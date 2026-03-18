@@ -1,0 +1,318 @@
+openapi: 3.1.0
+info:
+  title: API ANBG PAS/PAO/PTA
+  version: 1.0.0
+  description: API REST pour le pilotage PAS, PAO, PTA, actions, reporting et alertes.
+servers:
+  - url: /api
+tags:
+  - name: Auth
+  - name: PAS
+  - name: PAO
+  - name: PTA
+  - name: Actions
+  - name: Reporting
+  - name: Alertes
+paths:
+  /login:
+    post:
+      tags: [Auth]
+      summary: Authentifier un utilisateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, device_name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                device_name:
+                  type: string
+      responses:
+        '200':
+          description: Connexion reussie
+        '401':
+          description: Identifiants invalides
+        '403':
+          description: Mot de passe expire
+        '429':
+          description: Trop de tentatives
+  /me:
+    get:
+      tags: [Auth]
+      summary: Retourner le profil connecte
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profil utilisateur
+  /pas:
+    get:
+      tags: [PAS]
+      summary: Lister les PAS visibles par le profil
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Liste paginee
+    post:
+      tags: [PAS]
+      summary: Creer un PAS
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: PAS cree
+  /paos:
+    get:
+      tags: [PAO]
+      summary: Lister les PAO
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Liste paginee
+    post:
+      tags: [PAO]
+      summary: Creer un PAO
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: PAO cree
+  /ptas:
+    get:
+      tags: [PTA]
+      summary: Lister les PTA
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Liste paginee
+    post:
+      tags: [PTA]
+      summary: Creer un PTA
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: PTA cree
+  /actions:
+    get:
+      tags: [Actions]
+      summary: Lister les actions visibles selon le perimetre
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: pta_id
+          schema:
+            type: integer
+        - in: query
+          name: responsable_id
+          schema:
+            type: integer
+        - in: query
+          name: statut
+          schema:
+            type: string
+        - in: query
+          name: q
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Liste paginee
+    post:
+      tags: [Actions]
+      summary: Creer une action
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [pta_id, libelle, type_cible, date_debut, date_fin, frequence_execution, responsable_id, financement_requis]
+              properties:
+                pta_id:
+                  type: integer
+                libelle:
+                  type: string
+                description:
+                  type: string
+                type_cible:
+                  type: string
+                  enum: [quantitative, qualitative]
+                unite_cible:
+                  type: string
+                quantite_cible:
+                  type: number
+                resultat_attendu:
+                  type: string
+                criteres_validation:
+                  type: string
+                livrable_attendu:
+                  type: string
+                date_debut:
+                  type: string
+                  format: date
+                date_fin:
+                  type: string
+                  format: date
+                frequence_execution:
+                  type: string
+                  enum: [instantanee, journaliere, hebdomadaire, mensuelle, annuelle]
+                responsable_id:
+                  type: integer
+                financement_requis:
+                  type: boolean
+                justificatif_financement:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Action creee
+  /actions/{action}:
+    get:
+      tags: [Actions]
+      summary: Consulter une action
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ActionId'
+      responses:
+        '200':
+          description: Detail action
+        '403':
+          description: Hors perimetre
+  /actions/{action}/weeks/{actionWeek}/submit:
+    post:
+      tags: [Actions]
+      summary: Soumettre une periode de suivi
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ActionId'
+        - name: actionWeek
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Periode enregistree
+  /actions/{action}/close:
+    post:
+      tags: [Actions]
+      summary: Soumettre une action au chef de service
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ActionId'
+      responses:
+        '200':
+          description: Action soumise
+  /actions/{action}/review:
+    post:
+      tags: [Actions]
+      summary: Validation ou rejet par chef de service
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ActionId'
+      responses:
+        '200':
+          description: Decision chef enregistree
+  /actions/{action}/review-direction:
+    post:
+      tags: [Actions]
+      summary: Validation ou rejet par la direction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ActionId'
+      responses:
+        '200':
+          description: Decision direction enregistree
+  /reporting/overview:
+    get:
+      tags: [Reporting]
+      summary: Retourner les indicateurs consolides
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tableau de bord consolide
+  /alertes:
+    get:
+      tags: [Alertes]
+      summary: Retourner le centre d alertes unifie
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Flux d alertes avec statut lu/non lu
+  /alertes/read-all:
+    post:
+      tags: [Alertes]
+      summary: Marquer les alertes visibles comme lues
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Alertes marquees comme lues
+  /alertes/{type}/{id}/read:
+    post:
+      tags: [Alertes]
+      summary: Marquer une alerte comme lue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [action_overdue, kpi_breach, action_log, delegation_expiring]
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Alerte marquee comme lue
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+  parameters:
+    ActionId:
+      name: action
+      in: path
+      required: true
+      schema:
+        type: integer

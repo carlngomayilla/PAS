@@ -1,0 +1,157 @@
+@extends('layouts.workspace')
+
+@section('content')
+    @php
+        $isEdit = $mode === 'edit';
+    @endphp
+    <section class="ui-card mb-3.5">
+        <h1>{{ $isEdit ? 'Modifier utilisateur' : 'Nouvel utilisateur' }}</h1>
+        <p class="text-slate-600">Configuration du profil et du scope organisationnel.</p>
+    </section>
+
+    <section class="ui-card mb-3.5">
+        <form method="POST" enctype="multipart/form-data" class="form-shell" action="{{ $isEdit ? route('workspace.referentiel.utilisateurs.update', $row) : route('workspace.referentiel.utilisateurs.store') }}">
+            @csrf
+            @if ($isEdit)
+                @method('PUT')
+            @endif
+
+            <div class="form-section">
+                <h2 class="form-section-title">Profil et rattachement</h2>
+                <p class="form-section-subtitle">Les champs agents sont figes automatiquement quand le role n est pas <code>agent</code>.</p>
+                <div class="form-grid">
+                    <div>
+                        <label for="profile_photo">Photo de profil</label>
+                        <input id="profile_photo" name="profile_photo" type="file" accept=".jpg,.jpeg,.png,.webp">
+                        <p class="field-hint">Formats: JPG, PNG, WEBP (max 3 Mo).</p>
+                        @if ($isEdit && $row->profile_photo_url)
+                            <div class="mt-2 flex items-center gap-2">
+                                <img src="{{ $row->profile_photo_url }}" alt="Photo actuelle de {{ $row->name }}" class="h-12 w-12 rounded-full object-cover ring-2 ring-white shadow-sm">
+                                <label class="!mb-0 inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input type="checkbox" name="remove_profile_photo" value="1" @checked(old('remove_profile_photo'))>
+                                    Supprimer la photo actuelle
+                                </label>
+                            </div>
+                        @endif
+                    </div>
+                    <div>
+                        <label for="name">Nom</label>
+                        <input id="name" name="name" type="text" value="{{ old('name', $row->name) }}" required>
+                    </div>
+                    <div>
+                        <label for="email">Email</label>
+                        <input id="email" name="email" type="email" value="{{ old('email', $row->email) }}" required>
+                    </div>
+                    <div>
+                        <label for="role">Role</label>
+                        <select id="role" name="role" required>
+                            <option value="">Selectionner</option>
+                            @foreach ($roleOptions as $role)
+                                <option value="{{ $role }}" @selected(old('role', $row->role) === $role)>{{ $role }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="agent_hint">Profil execution</label>
+                        <input id="agent_hint" type="text" value="Selectionner le role agent pour l execution des actions" disabled>
+                    </div>
+                    <div>
+                        <label for="direction_id">Direction</label>
+                        <select id="direction_id" name="direction_id">
+                            <option value="">Aucune</option>
+                            @foreach ($directionOptions as $direction)
+                                <option value="{{ $direction->id }}" @selected((int) old('direction_id', $row->direction_id) === $direction->id)>
+                                    {{ $direction->code }} - {{ $direction->libelle }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="service_id">Service</label>
+                        <select id="service_id" name="service_id">
+                            <option value="">Aucun</option>
+                            @foreach ($serviceOptions as $service)
+                                <option value="{{ $service->id }}" @selected((int) old('service_id', $row->service_id) === $service->id)>
+                                    {{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div id="agent-fields" class="conditional-block mt-4">
+                    <p class="field-hint mt-0">Informations complementaires reservees aux comptes agents.</p>
+                    <div class="form-grid-compact mt-2">
+                        <div>
+                            <label for="agent_matricule">Matricule agent</label>
+                            <input id="agent_matricule" name="agent_matricule" type="text" value="{{ old('agent_matricule', $row->agent_matricule) }}">
+                        </div>
+                        <div>
+                            <label for="agent_fonction">Fonction</label>
+                            <input id="agent_fonction" name="agent_fonction" type="text" value="{{ old('agent_fonction', $row->agent_fonction) }}" placeholder="Ex: Charge du suivi hebdomadaire">
+                        </div>
+                        <div>
+                            <label for="agent_telephone">Telephone</label>
+                            <input id="agent_telephone" name="agent_telephone" type="text" value="{{ old('agent_telephone', $row->agent_telephone) }}" placeholder="+241 ...">
+                        </div>
+                    </div>
+                </div>
+
+                <p class="field-hint mt-3">
+                    Regles: <code>direction</code> requiert une direction. <code>service</code> requiert direction + service.
+                    Les roles globaux (<code>admin</code>, <code>dg</code>, <code>planification</code>, <code>cabinet</code>) ne doivent pas etre rattaches a une direction/service.
+                    Le role <code>agent</code> doit etre rattache a une direction + un service.
+                </p>
+            </div>
+
+            <div class="form-section">
+                <h2 class="form-section-title">Securite du compte</h2>
+                <div class="form-grid">
+                    <div>
+                        <label for="password">{{ $isEdit ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe' }}</label>
+                        <input id="password" name="password" type="password" {{ $isEdit ? '' : 'required' }}>
+                    </div>
+                    <div>
+                        <label for="password_confirmation">Confirmation mot de passe</label>
+                        <input id="password_confirmation" name="password_confirmation" type="password" {{ $isEdit ? '' : 'required' }}>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Retour</a>
+            </div>
+        </form>
+    </section>
+@endsection
+
+@push('scripts')
+    <script>
+        (function () {
+            var role = document.getElementById('role');
+            var fields = document.getElementById('agent-fields');
+
+            function syncAgentFields() {
+                if (!role || !fields) {
+                    return;
+                }
+
+                var isAgent = role.value === 'agent';
+                fields.classList.toggle('hidden', !isAgent);
+                fields.classList.toggle('is-frozen', !isAgent);
+
+                var inputs = fields.querySelectorAll('input, select, textarea');
+                inputs.forEach(function (input) {
+                    input.disabled = !isAgent;
+                });
+            }
+
+            if (role) {
+                role.addEventListener('change', syncAgentFields);
+            }
+
+            syncAgentFields();
+        })();
+    </script>
+@endpush

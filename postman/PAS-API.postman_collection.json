@@ -1,0 +1,613 @@
+{
+  "info": {
+    "_postman_id": "f6e3f0f2-8a74-4f46-bf7e-2db4cf4a2d10",
+    "name": "PAS API - Local",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "codex"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.access_token) {",
+                  "  pm.collectionVariables.set('access_token', data.access_token);",
+                  "}",
+                  "if (data.user && data.user.role) {",
+                  "  pm.collectionVariables.set('current_role', data.user.role);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"device_name\": \"{{device_name}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "me"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('access_token');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PAO Axes",
+      "item": [
+        {
+          "name": "List Axes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pao-axes?per_page=20&pao_id={{pao_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-axes"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "20"
+                },
+                {
+                  "key": "pao_id",
+                  "value": "{{pao_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Axe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.data && data.data.id) {",
+                  "  pm.collectionVariables.set('pao_axe_id', String(data.data.id));",
+                  "  pm.collectionVariables.set('pao_axe_record_id', String(data.data.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pao_id\": {{pao_id}},\n  \"code\": \"AX-POSTMAN-01\",\n  \"libelle\": \"Axe Postman\",\n  \"description\": \"Axe cree depuis Postman\",\n  \"ordre\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/pao-axes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-axes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Show Axe",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pao-axes/{{pao_axe_record_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-axes",
+                "{{pao_axe_record_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Axe",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pao_id\": {{pao_id}},\n  \"code\": \"AX-POSTMAN-01\",\n  \"libelle\": \"Axe Postman (maj)\",\n  \"description\": \"Axe mis a jour depuis Postman\",\n  \"ordre\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/pao-axes/{{pao_axe_record_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-axes",
+                "{{pao_axe_record_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Axe",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pao-axes/{{pao_axe_record_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-axes",
+                "{{pao_axe_record_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PAO Objectifs Strategiques",
+      "item": [
+        {
+          "name": "List Objectifs Strategiques",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-strategiques?per_page=20&pao_axe_id={{pao_axe_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-strategiques"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "20"
+                },
+                {
+                  "key": "pao_axe_id",
+                  "value": "{{pao_axe_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Objectif Strategique",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.data && data.data.id) {",
+                  "  pm.collectionVariables.set('pao_objectif_strategique_id', String(data.data.id));",
+                  "  pm.collectionVariables.set('pao_objectif_strategique_record_id', String(data.data.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pao_axe_id\": {{pao_axe_id}},\n  \"code\": \"OS-POSTMAN-01\",\n  \"libelle\": \"Objectif strategique Postman\",\n  \"description\": \"Objectif strategique cree depuis Postman\",\n  \"echeance\": \"2026-12-15\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-strategiques",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-strategiques"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Show Objectif Strategique",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-strategiques/{{pao_objectif_strategique_record_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-strategiques",
+                "{{pao_objectif_strategique_record_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Objectif Strategique",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pao_axe_id\": {{pao_axe_id}},\n  \"code\": \"OS-POSTMAN-01\",\n  \"libelle\": \"Objectif strategique Postman (maj)\",\n  \"description\": \"Objectif strategique mis a jour\",\n  \"echeance\": \"2026-12-20\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-strategiques/{{pao_objectif_strategique_record_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-strategiques",
+                "{{pao_objectif_strategique_record_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Objectif Strategique",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-strategiques/{{pao_objectif_strategique_record_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-strategiques",
+                "{{pao_objectif_strategique_record_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PAO Objectifs Operationnels",
+      "item": [
+        {
+          "name": "List Objectifs Operationnels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-operationnels?per_page=20&pao_objectif_strategique_id={{pao_objectif_strategique_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-operationnels"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "20"
+                },
+                {
+                  "key": "pao_objectif_strategique_id",
+                  "value": "{{pao_objectif_strategique_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Objectif Operationnel",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.data && data.data.id) {",
+                  "  pm.collectionVariables.set('pao_objectif_operationnel_record_id', String(data.data.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pao_objectif_strategique_id\": {{pao_objectif_strategique_id}},\n  \"code\": \"OP-POSTMAN-01\",\n  \"libelle\": \"Objectif operationnel Postman\",\n  \"description_action_detaillee\": \"Description detaillee testee depuis Postman\",\n  \"responsable_id\": {{responsable_id}},\n  \"cible_pourcentage\": 75,\n  \"date_debut\": \"2026-03-01\",\n  \"date_fin\": \"2026-09-30\",\n  \"statut_realisation\": \"en_cours\",\n  \"ressources_requises\": \"Equipe metier et support technique\",\n  \"indicateur_performance\": \"Taux d avancement du livrable\",\n  \"risques_potentiels\": \"Retard de validation\",\n  \"echeance\": \"2026-09-30\",\n  \"priorite\": \"haute\",\n  \"progression_pourcentage\": 35,\n  \"date_realisation\": null,\n  \"livrable_attendu\": \"Livrable valide\",\n  \"contraintes\": \"Delais courts\",\n  \"dependances\": \"Validation DG\",\n  \"observations\": \"Rien a signaler\",\n  \"ordre\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-operationnels",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-operationnels"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Show Objectif Operationnel",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-operationnels/{{pao_objectif_operationnel_record_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-operationnels",
+                "{{pao_objectif_operationnel_record_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Objectif Operationnel",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pao_objectif_strategique_id\": {{pao_objectif_strategique_id}},\n  \"code\": \"OP-POSTMAN-01\",\n  \"libelle\": \"Objectif operationnel Postman (maj)\",\n  \"description_action_detaillee\": \"Mise a jour depuis Postman\",\n  \"responsable_id\": {{responsable_id}},\n  \"cible_pourcentage\": 85,\n  \"date_debut\": \"2026-03-01\",\n  \"date_fin\": \"2026-10-31\",\n  \"statut_realisation\": \"en_cours\",\n  \"ressources_requises\": \"Equipe metier et support technique\",\n  \"indicateur_performance\": \"Taux d avancement du livrable\",\n  \"risques_potentiels\": \"Retard de validation\",\n  \"echeance\": \"2026-10-31\",\n  \"priorite\": \"critique\",\n  \"progression_pourcentage\": 60,\n  \"date_realisation\": null,\n  \"livrable_attendu\": \"Livrable valide\",\n  \"contraintes\": \"Delais courts\",\n  \"dependances\": \"Validation DG\",\n  \"observations\": \"Avancement en cours\",\n  \"ordre\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-operationnels/{{pao_objectif_operationnel_record_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-operationnels",
+                "{{pao_objectif_operationnel_record_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Objectif Operationnel",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pao-objectifs-operationnels/{{pao_objectif_operationnel_record_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pao-objectifs-operationnels",
+                "{{pao_objectif_operationnel_record_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api"
+    },
+    {
+      "key": "email",
+      "value": "admin@anbg.test"
+    },
+    {
+      "key": "password",
+      "value": "Pass@12345"
+    },
+    {
+      "key": "device_name",
+      "value": "postman-local"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "current_role",
+      "value": ""
+    },
+    {
+      "key": "pao_id",
+      "value": "1"
+    },
+    {
+      "key": "pao_axe_id",
+      "value": "1"
+    },
+    {
+      "key": "pao_objectif_strategique_id",
+      "value": "1"
+    },
+    {
+      "key": "responsable_id",
+      "value": "8"
+    },
+    {
+      "key": "pao_axe_record_id",
+      "value": "1"
+    },
+    {
+      "key": "pao_objectif_strategique_record_id",
+      "value": "1"
+    },
+    {
+      "key": "pao_objectif_operationnel_record_id",
+      "value": "1"
+    }
+  ]
+}
+

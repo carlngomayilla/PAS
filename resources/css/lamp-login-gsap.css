@@ -1,0 +1,131 @@
+/* Fond OFF */
+.lamp-page {
+  background:
+    radial-gradient(1200px 600px at 18% 10%, rgba(52, 184, 255, .22), transparent 60%),
+    radial-gradient(900px 500px at 80% 18%, rgba(199, 229, 75, .16), transparent 56%),
+    radial-gradient(1000px 540px at 72% 64%, rgba(246, 182, 58, .14), transparent 58%),
+    #070b18;
+}
+
+/* Lampe */
+.lamp {
+  position: relative;
+  width: 280px;
+  height: 320px;
+}
+
+.lamp-head {
+  position: absolute;
+  top: 35px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 190px;
+  height: 90px;
+  border-radius: 90px 90px 30px 30px;
+  background: rgba(255, 255, 255, .10);
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+
+.lamp-neck {
+  position: absolute;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 90px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .12);
+}
+
+.lamp-base {
+  position: absolute;
+  bottom: 35px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .10);
+  border: 1px solid rgba(255, 255, 255, .10);
+}
+
+/* Glow chaud (ON) */
+.lamp-glow {
+  position: absolute;
+  top: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px;
+  height: 220px;
+  border-radius: 999px;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 0%,
+    rgba(255, 220, 130, .75),
+    rgba(255, 220, 130, .22) 40%,
+    rgba(255, 220, 130, 0) 70%
+  );
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+/* Cone de lumiere */
+.lamp-cone {
+  position: absolute;
+  top: 115px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 330px;
+  height: 260px;
+  opacity: 0;
+  background: conic-gradient(
+    from 180deg at 50% 0%,
+    rgba(255, 214, 102, 0) 0deg,
+    rgba(255, 214, 102, .20) 35deg,
+    rgba(255, 214, 102, .35) 55deg,
+    rgba(255, 214, 102, .20) 75deg,
+    rgba(255, 214, 102, 0) 110deg
+  );
+  filter: blur(10px);
+  border-radius: 0 0 999px 999px;
+  pointer-events: none;
+}
+
+/* Corde */
+.lamp-pull {
+  position: absolute;
+  right: 44px;
+  top: 28px;
+  width: 46px;
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.lamp-cord {
+  width: 2px;
+  height: 130px;
+  background: rgba(255, 255, 255, .35);
+  border-radius: 999px;
+}
+
+.lamp-knob {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .25);
+  border: 1px solid rgba(255, 255, 255, .22);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+}
+
+/* Carte (OFF par defaut) */
+.lamp-card {
+  transform: translateY(0);
+  border-color: rgba(255, 255, 255, .10);
+}

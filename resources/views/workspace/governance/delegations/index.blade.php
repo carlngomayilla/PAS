@@ -1,0 +1,87 @@
+@extends('layouts.workspace')
+
+@section('title', 'Delegations')
+
+@section('content')
+    <section class="ui-card mb-3.5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h1>Delegations temporaires</h1>
+                <p class="text-slate-600">
+                    Gestion de la suppleance pour les validations chef de service et direction.
+                </p>
+            </div>
+            <a class="btn btn-blue" href="{{ route('workspace.delegations.create') }}">Nouvelle delegation</a>
+        </div>
+    </section>
+
+    <section class="ui-card">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Delegant</th>
+                        <th>Delegue</th>
+                        <th>Portee</th>
+                        <th>Permissions</th>
+                        <th>Periode</th>
+                        <th>Statut</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($rows as $row)
+                        <tr>
+                            <td>{{ $row->id }}</td>
+                            <td>
+                                <strong>{{ $row->delegant?->name ?? '-' }}</strong><br>
+                                <span class="text-xs text-slate-500">{{ $row->delegant?->roleLabel() ?? '-' }}</span>
+                            </td>
+                            <td>
+                                <strong>{{ $row->delegue?->name ?? '-' }}</strong><br>
+                                <span class="text-xs text-slate-500">{{ $row->delegue?->roleLabel() ?? '-' }}</span>
+                            </td>
+                            <td>
+                                {{ strtoupper($row->role_scope) }}<br>
+                                <span class="text-xs text-slate-500">
+                                    {{ $row->direction?->code ?? '-' }}
+                                    @if ($row->service)
+                                        / {{ $row->service->code }}
+                                    @endif
+                                </span>
+                            </td>
+                            <td>{{ implode(', ', $row->permissions ?? []) ?: '-' }}</td>
+                            <td>
+                                {{ optional($row->date_debut)->format('Y-m-d H:i') ?: '-' }}<br>
+                                {{ optional($row->date_fin)->format('Y-m-d H:i') ?: '-' }}
+                            </td>
+                            <td>
+                                <span class="badge">{{ $row->statut }}</span>
+                            </td>
+                            <td>
+                                @if ($row->statut === 'active')
+                                    <form method="POST" action="{{ route('workspace.delegations.cancel', $row) }}" onsubmit="return window.confirm('Annuler cette delegation ?');">
+                                        @csrf
+                                        <input type="hidden" name="motif_annulation" value="Annulation administrative">
+                                        <button class="btn btn-red" type="submit">Annuler</button>
+                                    </form>
+                                @else
+                                    <span class="text-slate-500">-</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="text-slate-600">Aucune delegation enregistree.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4">
+            {{ $rows->links() }}
+        </div>
+    </section>
+@endsection

@@ -1,0 +1,807 @@
+<?php
+
+namespace App\Services\Actions;
+
+use App\Models\Action;
+use App\Models\ActionKpi;
+use App\Models\ActionLog;
+use App\Models\ActionWeek;
+use App\Models\Justificatif;
+use App\Models\User;
+use Illuminate\Support\Carbon;
+
+class ActionTrackingService
+{
+    public const FREQUENCE_INSTANTANEE = 'instantanee';
+    public const FREQUENCE_JOURNALIERE = 'journaliere';
+    public const FREQUENCE_HEBDOMADAIRE = 'hebdomadaire';
+    public const FREQUENCE_MENSUELLE = 'mensuelle';
+    public const FREQUENCE_ANNUELLE = 'annuelle';
+
+    public const STATUS_NON_DEMARRE = 'non_demarre';
+    public const STATUS_EN_COURS = 'en_cours';
+    public const STATUS_EN_AVANCE = 'en_avance';
+    public const STATUS_EN_RETARD = 'en_retard';
+    public const STATUS_ACHEVE_DANS_DELAI = 'acheve_dans_delai';
+    public const STATUS_ACHEVE_HORS_DELAI = 'acheve_hors_delai';
+
+    public const VALIDATION_NON_SOUMISE = 'non_soumise';
+    public const VALIDATION_SOUMISE_CHEF = 'soumise_chef';
+    public const VALIDATION_REJETEE_CHEF = 'rejetee_chef';
+    public const VALIDATION_VALIDEE_CHEF = 'validee_chef';
+    public const VALIDATION_REJETEE_DIRECTION = 'rejetee_direction';
+    public const VALIDATION_VALIDEE_DIRECTION = 'validee_direction';
+
+    /**
+     * @return array<int, string>
+     */
+    public static function dynamicStatusOptions(): array
+    {
+        return [
+            self::STATUS_NON_DEMARRE,
+            self::STATUS_EN_COURS,
+            self::STATUS_EN_AVANCE,
+            self::STATUS_EN_RETARD,
+            self::STATUS_ACHEVE_DANS_DELAI,
+            self::STATUS_ACHEVE_HORS_DELAI,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function executionFrequencyOptions(): array
+    {
+        return [
+            self::FREQUENCE_INSTANTANEE,
+            self::FREQUENCE_JOURNALIERE,
+            self::FREQUENCE_HEBDOMADAIRE,
+            self::FREQUENCE_MENSUELLE,
+            self::FREQUENCE_ANNUELLE,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function validationStatusOptions(): array
+    {
+        return [
+            self::VALIDATION_NON_SOUMISE,
+            self::VALIDATION_SOUMISE_CHEF,
+            self::VALIDATION_REJETEE_CHEF,
+            self::VALIDATION_VALIDEE_CHEF,
+            self::VALIDATION_REJETEE_DIRECTION,
+            self::VALIDATION_VALIDEE_DIRECTION,
+        ];
+    }
+
+    public function initializeActionTracking(Action $action, ?User $actor = null): void
+    {
+        $this->regenerateWeeks($action);
+        $this->refreshActionMetrics($action);
+
+        $this->createLogIfMissingToday(
+            $action,
+            'action_initialisee',
+            'info',
+            'Action initialisee avec suivi periodique automatique.',
+            [
+                'type_cible' => $action->type_cible,
+                'date_debut' => optional($action->date_debut)->toDateString(),
+                'date_fin' => optional($action->date_fin)->toDateString(),
+                'frequence_execution' => (string) ($action->frequence_execution ?? self::FREQUENCE_HEBDOMADAIRE),
+            ],
+            'responsable',
+            $actor?->id
+        );
+    }
+
+    public function canRegenerateWeeks(Action $action): bool
+    {
+        return ! $action->weeks()
+            ->where('est_renseignee', true)
+            ->exists();
+    }
+
+    public function regenerateWeeks(Action $action): void
+    {
+        $action->refresh();
+        $start = $action->date_debut !== null ? Carbon::parse($action->date_debut)->startOfDay() : null;
+        $end = $action->date_fin !== null ? Carbon::parse($action->date_fin)->startOfDay() : null;
+        $frequence = (string) ($action->frequence_execution ?? self::FREQUENCE_HEBDOMADAIRE);
+        if (! in_array($frequence, self::executionFrequencyOptions(), true)) {
+            $frequence = self::FREQUENCE_HEBDOMADAIRE;
+        }
+
+        if ($start === null || $end === null || $start->gt($end)) {
+            return;
+        }
+
+        $action->weeks()->delete();
+
+        $rows = [];
+        $periodNumber = 1;
+        $currentStart = $start->copy();
+
+        if ($frequence === self::FREQUENCE_INSTANTANEE) {
+            $rows[] = [
+                'numero_semaine' => 1,
+                'date_debut' => $currentStart->toDateString(),
+                'date_fin' => $end->copy()->toDateString(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        } else {
+            while ($currentStart->lte($end)) {
+                $currentEnd = match ($frequence) {
+                    self::FREQUENCE_JOURNALIERE => $currentStart->copy(),
+                    self::FREQUENCE_MENSUELLE => $currentStart->copy()->endOfMonth(),
+                    self::FREQUENCE_ANNUELLE => $currentStart->copy()->endOfYear(),
+                    default => $currentStart->copy()->addDays(6),
+                };
+
+                if ($currentEnd->gt($end)) {
+                    $currentEnd = $end->copy();
+                }
+
+                $rows[] = [
+                    'numero_semaine' => $periodNumber,
+                    'date_debut' => $currentStart->toDateString(),
+                    'date_fin' => $currentEnd->toDateString(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                $periodNumber++;
+                $currentStart = $currentEnd->copy()->addDay();
+            }
+        }
+
+        if ($rows !== []) {
+            $action->weeks()->createMany($rows);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function submitWeek(ActionWeek $week, array $payload, ?User $actor = null): ActionWeek
+    {
+        $week->loadMissing('action');
+        $action = $week->action;
+
+        if (! $action instanceof Action) {
+            throw new \RuntimeException('Action introuvable pour la semaine.');
+        }
+
+        $updates = [
+            'commentaire' => $payload['commentaire'] ?? null,
+            'difficultes' => $payload['difficultes'] ?? null,
+            'mesures_correctives' => $payload['mesures_correctives'] ?? null,
+            'est_renseignee' => true,
+            'saisi_le' => now(),
+            'saisi_par' => $actor?->id,
+        ];
+
+        if ($action->type_cible === 'quantitative') {
+            $updates['quantite_realisee'] = $payload['quantite_realisee'] ?? 0;
+            $updates['taches_realisees'] = null;
+            $updates['avancement_estime'] = null;
+        } else {
+            $updates['quantite_realisee'] = null;
+            $updates['taches_realisees'] = $payload['taches_realisees'] ?? null;
+            $updates['avancement_estime'] = $payload['avancement_estime'] ?? 0;
+        }
+
+        $week->fill($updates);
+        $week->save();
+
+        $this->createLogIfMissingToday(
+            $action,
+            'semaine_renseignee',
+            'info',
+            sprintf('Periode %d renseignee.', (int) $week->numero_semaine),
+            ['numero_semaine' => (int) $week->numero_semaine],
+            'responsable',
+            $actor?->id,
+            $week
+        );
+
+        $this->refreshActionMetrics($action);
+
+        return $week->fresh();
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function submitClosureForReview(Action $action, array $payload, ?User $actor = null): Action
+    {
+        $action->fill([
+            'date_fin_reelle' => $payload['date_fin_reelle'] ?? $action->date_fin_reelle,
+            'rapport_final' => $payload['rapport_final'] ?? $action->rapport_final,
+            'validation_hierarchique' => false,
+            'validation_sans_correction' => null,
+            'statut_validation' => self::VALIDATION_SOUMISE_CHEF,
+            'soumise_par' => $actor?->id,
+            'soumise_le' => now(),
+            'evalue_par' => null,
+            'evalue_le' => null,
+            'evaluation_note' => null,
+            'evaluation_commentaire' => null,
+            'direction_valide_par' => null,
+            'direction_valide_le' => null,
+            'direction_evaluation_note' => null,
+            'direction_evaluation_commentaire' => null,
+        ]);
+        $action->save();
+
+        $this->createLogIfMissingToday(
+            $action,
+            'action_soumise_validation',
+            'info',
+            'Action soumise au chef de service pour evaluation.',
+            [
+                'date_fin_reelle' => optional($action->date_fin_reelle)->toDateString(),
+            ],
+            'chef_service',
+            $actor?->id
+        );
+
+        $this->addDiscussionEntry(
+            $action,
+            (string) ($payload['rapport_final'] ?? 'Soumission de l action pour validation hierarchique.'),
+            'action_soumise_validation',
+            'info',
+            [
+                'date_fin_reelle' => optional($action->date_fin_reelle)->toDateString(),
+                'rapport_final' => $payload['rapport_final'] ?? null,
+            ],
+            $actor
+        );
+
+        return $this->refreshActionMetrics($action);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function reviewClosureSubmission(Action $action, array $payload, ?User $actor = null): Action
+    {
+        return $this->reviewClosureByChef($action, $payload, $actor);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function reviewClosureByChef(Action $action, array $payload, ?User $actor = null): Action
+    {
+        $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
+        $isApproved = $decision === 'valider';
+
+        $action->fill([
+            'statut_validation' => $isApproved ? self::VALIDATION_VALIDEE_CHEF : self::VALIDATION_REJETEE_CHEF,
+            'validation_hierarchique' => false,
+            'validation_sans_correction' => $isApproved
+                ? ($payload['validation_sans_correction'] ?? $action->validation_sans_correction)
+                : null,
+            'evalue_par' => $actor?->id,
+            'evalue_le' => now(),
+            'evaluation_note' => $payload['evaluation_note'] ?? null,
+            'evaluation_commentaire' => $payload['evaluation_commentaire'] ?? null,
+        ]);
+        $action->save();
+
+        $this->createLogIfMissingToday(
+            $action,
+            $isApproved ? 'action_validee_chef' : 'action_rejetee_chef',
+            $isApproved ? 'info' : 'warning',
+            $isApproved
+                ? 'Action validee par le chef de service.'
+                : 'Action rejetee par le chef de service.',
+            [
+                'evaluation_note' => $action->evaluation_note,
+                'statut_validation' => $action->statut_validation,
+            ],
+            'responsable',
+            $actor?->id
+        );
+
+        $this->addDiscussionEntry(
+            $action,
+            (string) ($payload['evaluation_commentaire'] ?? ($isApproved
+                ? 'Validation chef de service.'
+                : 'Rejet chef de service.')),
+            $isApproved ? 'action_validee_chef' : 'action_rejetee_chef',
+            $isApproved ? 'info' : 'warning',
+            [
+                'evaluation_note' => $action->evaluation_note,
+                'statut_validation' => $action->statut_validation,
+                'validation_sans_correction' => $action->validation_sans_correction,
+            ],
+            $actor
+        );
+
+        return $this->refreshActionMetrics($action);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function reviewClosureByDirection(Action $action, array $payload, ?User $actor = null): Action
+    {
+        $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
+        $isApproved = $decision === 'valider';
+
+        $action->fill([
+            'statut_validation' => $isApproved ? self::VALIDATION_VALIDEE_DIRECTION : self::VALIDATION_REJETEE_DIRECTION,
+            'validation_hierarchique' => $isApproved,
+            'direction_valide_par' => $actor?->id,
+            'direction_valide_le' => now(),
+            'direction_evaluation_note' => $payload['evaluation_note'] ?? null,
+            'direction_evaluation_commentaire' => $payload['evaluation_commentaire'] ?? null,
+        ]);
+        $action->save();
+
+        $this->createLogIfMissingToday(
+            $action,
+            $isApproved ? 'action_validee_direction' : 'action_rejetee_direction',
+            $isApproved ? 'info' : 'warning',
+            $isApproved
+                ? 'Action validee par le directeur.'
+                : 'Action rejetee par le directeur.',
+            [
+                'evaluation_note' => $action->direction_evaluation_note,
+                'statut_validation' => $action->statut_validation,
+            ],
+            'responsable',
+            $actor?->id
+        );
+
+        $this->addDiscussionEntry(
+            $action,
+            (string) ($payload['evaluation_commentaire'] ?? ($isApproved
+                ? 'Validation direction.'
+                : 'Rejet direction.')),
+            $isApproved ? 'action_validee_direction' : 'action_rejetee_direction',
+            $isApproved ? 'info' : 'warning',
+            [
+                'evaluation_note' => $action->direction_evaluation_note,
+                'statut_validation' => $action->statut_validation,
+            ],
+            $actor
+        );
+
+        return $this->refreshActionMetrics($action);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function closeAction(Action $action, array $payload, ?User $actor = null): Action
+    {
+        return $this->submitClosureForReview($action, $payload, $actor);
+    }
+
+    public function refreshActionMetrics(Action $action, ?Carbon $referenceDate = null): Action
+    {
+        $referenceDate = $referenceDate?->copy() ?? Carbon::today();
+        $action->loadMissing('weeks');
+
+        $weeks = $action->weeks()
+            ->orderBy('numero_semaine')
+            ->get();
+
+        $targetQuantity = (float) ($action->quantite_cible ?? 0);
+        $cumulativeQuantity = 0.0;
+        $latestQualitativeProgress = 0.0;
+
+        foreach ($weeks as $week) {
+            if ($action->type_cible === 'quantitative') {
+                $weeklyDone = $week->est_renseignee ? max(0.0, (float) ($week->quantite_realisee ?? 0)) : 0.0;
+                $cumulativeQuantity += $weeklyDone;
+                $weeklyRealProgress = $targetQuantity > 0
+                    ? min(100.0, round(($cumulativeQuantity / $targetQuantity) * 100, 2))
+                    : 0.0;
+            } else {
+                $weeklyRealProgress = $week->est_renseignee
+                    ? min(100.0, max(0.0, (float) ($week->avancement_estime ?? 0)))
+                    : 0.0;
+
+                if ($week->est_renseignee) {
+                    $latestQualitativeProgress = $weeklyRealProgress;
+                }
+            }
+
+            $weeklyTheoreticalProgress = $this->calculateTheoreticalProgress(
+                $action,
+                Carbon::parse($week->date_fin)->endOfDay()
+            );
+            $weeklyGap = round($weeklyRealProgress - $weeklyTheoreticalProgress, 2);
+
+            $week->fill([
+                'quantite_cumulee' => round($cumulativeQuantity, 4),
+                'progression_reelle' => $weeklyRealProgress,
+                'progression_theorique' => $weeklyTheoreticalProgress,
+                'ecart_progression' => $weeklyGap,
+            ]);
+            $week->save();
+        }
+
+        $realProgress = $action->type_cible === 'quantitative'
+            ? ($targetQuantity > 0 ? min(100.0, round(($cumulativeQuantity / $targetQuantity) * 100, 2)) : 0.0)
+            : min(100.0, max(0.0, $latestQualitativeProgress));
+
+        $theoreticalProgress = $this->calculateTheoreticalProgress($action, $referenceDate->copy()->endOfDay());
+        $status = $this->determineDynamicStatus($action, $realProgress, $theoreticalProgress, $referenceDate);
+        $legacyStatus = $this->mapLegacyStatus($status);
+        $beforeStatus = (string) $action->statut_dynamique;
+
+        $action->fill([
+            'date_echeance' => $action->date_echeance ?? $action->date_fin,
+            'progression_reelle' => $realProgress,
+            'progression_theorique' => $theoreticalProgress,
+            'statut_dynamique' => $status,
+            'statut' => $legacyStatus,
+        ]);
+        $action->save();
+
+        $kpis = $this->calculateActionKpis(
+            $action,
+            $realProgress,
+            $theoreticalProgress,
+            $cumulativeQuantity,
+            $referenceDate
+        );
+
+        ActionKpi::query()->updateOrCreate(
+            ['action_id' => $action->id],
+            array_merge(
+                $kpis,
+                [
+                    'progression_reelle' => $realProgress,
+                    'progression_theorique' => $theoreticalProgress,
+                    'statut_calcule' => $status,
+                    'derniere_evaluation_at' => now(),
+                ]
+            )
+        );
+
+        if ($beforeStatus !== '' && $beforeStatus !== $status) {
+            $this->createLogIfMissingToday(
+                $action,
+                'changement_statut',
+                'info',
+                sprintf('Statut dynamique mis a jour: %s -> %s', $beforeStatus, $status),
+                ['from' => $beforeStatus, 'to' => $status],
+                'chef_service'
+            );
+        }
+
+        $this->generateAutomaticAlerts($action, $weeks, $realProgress, $theoreticalProgress, $kpis, $referenceDate);
+
+        return $action->fresh(['actionKpi', 'weeks']);
+    }
+
+    public function addActionJustificatif(
+        Action $action,
+        ?ActionWeek $week,
+        string $categorie,
+        string $path,
+        string $originalName,
+        ?string $mimeType,
+        ?int $size,
+        ?string $description,
+        ?User $actor = null,
+        bool $encrypted = false
+    ): Justificatif {
+        return Justificatif::query()->create([
+            'justifiable_type' => Action::class,
+            'justifiable_id' => $action->id,
+            'action_week_id' => $week?->id,
+            'categorie' => $categorie,
+            'nom_original' => $originalName,
+            'chemin_stockage' => $path,
+            'est_chiffre' => $encrypted,
+            'mime_type' => $mimeType,
+            'taille_octets' => $size,
+            'description' => $description,
+            'ajoute_par' => $actor?->id,
+        ]);
+    }
+
+    private function calculateTheoreticalProgress(Action $action, Carbon $at): float
+    {
+        if ($action->date_debut === null || $action->date_fin === null) {
+            return 0.0;
+        }
+
+        $start = Carbon::parse($action->date_debut)->startOfDay();
+        $end = Carbon::parse($action->date_fin)->endOfDay();
+
+        if ($at->lt($start)) {
+            return 0.0;
+        }
+
+        if ($at->gte($end)) {
+            return 100.0;
+        }
+
+        $totalDuration = max(1, $start->diffInSeconds($end));
+        $elapsed = max(0, $start->diffInSeconds($at));
+
+        return round(min(100.0, ($elapsed / $totalDuration) * 100), 2);
+    }
+
+    private function determineDynamicStatus(
+        Action $action,
+        float $realProgress,
+        float $theoreticalProgress,
+        Carbon $referenceDate
+    ): string {
+        $endDate = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
+        $completed = $realProgress >= 100.0;
+
+        if ($realProgress <= 0.0) {
+            return self::STATUS_NON_DEMARRE;
+        }
+
+        if ($completed) {
+            if ((string) ($action->statut_validation ?? self::VALIDATION_NON_SOUMISE) !== self::VALIDATION_VALIDEE_DIRECTION) {
+                if ($endDate !== null && $referenceDate->gt($endDate)) {
+                    return self::STATUS_EN_RETARD;
+                }
+
+                return self::STATUS_EN_COURS;
+            }
+
+            $realEnd = $action->date_fin_reelle !== null
+                ? Carbon::parse($action->date_fin_reelle)->endOfDay()
+                : $referenceDate->copy()->endOfDay();
+
+            if ($endDate !== null && $realEnd->lte($endDate)) {
+                return self::STATUS_ACHEVE_DANS_DELAI;
+            }
+
+            return self::STATUS_ACHEVE_HORS_DELAI;
+        }
+
+        if ($endDate !== null && $referenceDate->gt($endDate)) {
+            return self::STATUS_EN_RETARD;
+        }
+
+        if ($realProgress >= ($theoreticalProgress + 5)) {
+            return self::STATUS_EN_AVANCE;
+        }
+
+        return self::STATUS_EN_COURS;
+    }
+
+    /**
+     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float}
+     */
+    private function calculateActionKpis(
+        Action $action,
+        float $realProgress,
+        float $theoreticalProgress,
+        float $cumulativeQuantity,
+        Carbon $referenceDate
+    ): array {
+        $delayKpi = 0.0;
+        $plannedEnd = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
+        $plannedStart = $action->date_debut !== null ? Carbon::parse($action->date_debut)->startOfDay() : null;
+
+        if ($realProgress >= 100.0 && $plannedEnd !== null) {
+            $actualEnd = $action->date_fin_reelle !== null
+                ? Carbon::parse($action->date_fin_reelle)->endOfDay()
+                : $referenceDate->copy()->endOfDay();
+
+            if ($actualEnd->lte($plannedEnd)) {
+                $delayKpi = 100.0;
+            } else {
+                $plannedDuration = $plannedStart !== null ? max(1, $plannedStart->diffInDays($plannedEnd) + 1) : 1;
+                $actualDuration = $plannedStart !== null ? max(1, $plannedStart->diffInDays($actualEnd) + 1) : 1;
+                $delayKpi = round(min(100.0, ($plannedDuration / $actualDuration) * 100), 2);
+            }
+        } else {
+            $delayKpi = round(max(0.0, min(100.0, 100.0 - max(0.0, $theoreticalProgress - $realProgress))), 2);
+        }
+
+        if ($action->type_cible === 'quantitative') {
+            $target = (float) ($action->quantite_cible ?? 0);
+            $performanceKpi = $target > 0
+                ? round(min(100.0, max(0.0, ($cumulativeQuantity / $target) * 100)), 2)
+                : 0.0;
+        } else {
+            $performanceKpi = round(min(100.0, max(0.0, $realProgress)), 2);
+        }
+
+        $conformiteKpi = $action->direction_evaluation_note !== null
+            ? round(min(100.0, max(0.0, (float) $action->direction_evaluation_note)), 2)
+            : ($action->evaluation_note !== null
+                ? round(min(100.0, max(0.0, (float) $action->evaluation_note)), 2)
+                : match ($action->validation_sans_correction) {
+                true => 100.0,
+                false => 70.0,
+                default => 85.0,
+            });
+
+        $globalKpi = round(
+            (0.4 * $delayKpi) + (0.4 * $performanceKpi) + (0.2 * $conformiteKpi),
+            2
+        );
+
+        return [
+            'kpi_delai' => $delayKpi,
+            'kpi_performance' => $performanceKpi,
+            'kpi_conformite' => $conformiteKpi,
+            'kpi_global' => $globalKpi,
+        ];
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, ActionWeek> $weeks
+     * @param array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float} $kpis
+     */
+    private function generateAutomaticAlerts(
+        Action $action,
+        \Illuminate\Support\Collection $weeks,
+        float $realProgress,
+        float $theoreticalProgress,
+        array $kpis,
+        Carbon $referenceDate
+    ): void {
+        $reference = $referenceDate->copy()->endOfDay();
+
+        $overdueWeeks = $weeks->filter(function (ActionWeek $week) use ($reference): bool {
+            return ! $week->est_renseignee
+                && Carbon::parse($week->date_fin)->endOfDay()->lt($reference);
+        })->values();
+
+        foreach ($overdueWeeks as $index => $week) {
+            $cible = $this->escalationRoleForMissingWeek($index + 1);
+            $this->createLogIfMissingToday(
+                $action,
+                'semaine_non_renseignee',
+                'warning',
+                sprintf('Periode %d non renseignee apres echeance.', (int) $week->numero_semaine),
+                ['numero_semaine' => (int) $week->numero_semaine],
+                $cible,
+                null,
+                $week
+            );
+        }
+
+        $gap = round($theoreticalProgress - $realProgress, 2);
+        $gapThreshold = (float) ($action->seuil_alerte_progression ?? 10);
+        if ($gap > $gapThreshold && $realProgress < 100) {
+            $this->createLogIfMissingToday(
+                $action,
+                'progression_sous_seuil',
+                'warning',
+                'Progression reelle en dessous du seuil attendu.',
+                [
+                    'progression_reelle' => $realProgress,
+                    'progression_theorique' => $theoreticalProgress,
+                    'ecart' => $gap,
+                    'seuil' => $gapThreshold,
+                ],
+                'direction'
+            );
+        }
+
+        if ($action->date_fin !== null) {
+            $daysLeft = Carbon::today()->diffInDays(Carbon::parse($action->date_fin), false);
+            if ($daysLeft <= 7 && $realProgress < 90) {
+                $this->createLogIfMissingToday(
+                    $action,
+                    'echeance_proche',
+                    'critical',
+                    'Date de fin proche sans avancement suffisant.',
+                    [
+                        'jours_restants' => $daysLeft,
+                        'progression_reelle' => $realProgress,
+                    ],
+                    'chef_service'
+                );
+            }
+        }
+
+        if (($kpis['kpi_global'] ?? 0) < 60) {
+            $this->createLogIfMissingToday(
+                $action,
+                'kpi_global_sous_seuil',
+                'warning',
+                'KPI global de l action sous le seuil de pilotage.',
+                ['kpi_global' => $kpis['kpi_global'] ?? 0],
+                'direction'
+            );
+        }
+    }
+
+    private function escalationRoleForMissingWeek(int $overdueCount): string
+    {
+        return match (true) {
+            $overdueCount >= 4 => 'dg',
+            $overdueCount === 3 => 'direction',
+            $overdueCount === 2 => 'chef_service',
+            default => 'responsable',
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     */
+    private function createLogIfMissingToday(
+        Action $action,
+        string $type,
+        string $level,
+        string $message,
+        array $details = [],
+        ?string $targetRole = null,
+        ?int $userId = null,
+        ?ActionWeek $week = null
+    ): void {
+        $query = ActionLog::query()
+            ->where('action_id', $action->id)
+            ->where('type_evenement', $type)
+            ->whereDate('created_at', today()->toDateString());
+
+        if ($week !== null) {
+            $query->where('action_week_id', $week->id);
+        } else {
+            $query->whereNull('action_week_id');
+        }
+
+        if ($query->exists()) {
+            return;
+        }
+
+        ActionLog::query()->create([
+            'action_id' => $action->id,
+            'action_week_id' => $week?->id,
+            'niveau' => $level,
+            'type_evenement' => $type,
+            'message' => $message,
+            'details' => $details,
+            'cible_role' => $targetRole,
+            'utilisateur_id' => $userId,
+            'lu' => false,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     */
+    public function addDiscussionEntry(
+        Action $action,
+        string $message,
+        string $type = 'commentaire',
+        string $level = 'info',
+        array $details = [],
+        ?User $actor = null
+    ): ActionLog {
+        return ActionLog::query()->create([
+            'action_id' => $action->id,
+            'action_week_id' => null,
+            'niveau' => $level,
+            'type_evenement' => $type,
+            'message' => trim($message) !== '' ? trim($message) : 'Commentaire',
+            'details' => $details,
+            'cible_role' => null,
+            'utilisateur_id' => $actor?->id,
+            'lu' => false,
+        ]);
+    }
+
+    private function mapLegacyStatus(string $dynamicStatus): string
+    {
+        return match ($dynamicStatus) {
+            self::STATUS_NON_DEMARRE => 'non_demarre',
+            self::STATUS_ACHEVE_DANS_DELAI, self::STATUS_ACHEVE_HORS_DELAI => 'termine',
+            self::STATUS_EN_RETARD => 'suspendu',
+            default => 'en_cours',
+        };
+    }
+}
