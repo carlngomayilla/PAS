@@ -47,7 +47,8 @@ Note technique :
 - PHP 8.2+
 - Composer
 - Node.js 20+
-- SQLite pour la demo locale, ou MySQL / PostgreSQL pour un deploiement reel
+- extension PHP `pdo_pgsql` si la base cible est PostgreSQL
+- SQLite pour une demo locale rapide, ou PostgreSQL pour un deploiement reel
 
 ## Installation locale
 
@@ -208,17 +209,24 @@ Avant un deploiement reel, prevoir au minimum :
 
 ### Variables d'environnement minimales
 
+Un template pret pour la production PostgreSQL est fourni dans :
+
+```bash
+.env.production.example
+```
+
 ```env
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://votre-domaine
 
-DB_CONNECTION=mysql
+DB_CONNECTION=pgsql
 DB_HOST=127.0.0.1
-DB_PORT=3306
+DB_PORT=5432
 DB_DATABASE=pas_anbg
-DB_USERNAME=...
+DB_USERNAME=postgres
 DB_PASSWORD=...
+DB_SSLMODE=prefer
 
 QUEUE_CONNECTION=database
 MAIL_MAILER=smtp
@@ -240,6 +248,12 @@ npm run build
 php artisan migrate --force
 php artisan optimize
 php artisan view:cache
+```
+
+Verification rapide de la connexion PostgreSQL :
+
+```bash
+php artisan migrate:status
 ```
 
 ### Taches d'exploitation a brancher
