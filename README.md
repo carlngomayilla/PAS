@@ -162,6 +162,7 @@ php artisan route:list
 php artisan schedule:list
 php artisan test
 php artisan view:cache
+php artisan anbg:health-check
 ```
 
 Regeneration du jeu de demonstration planning sans repartir d'une base vide :
@@ -278,6 +279,7 @@ php artisan schedule:run
 4. test de televersement d'un justificatif
 5. verification des notifications et des alertes
 6. verification du worker et du scheduler dans les logs
+7. verification de sante applicative avec `php artisan anbg:health-check`
 
 ### Reseed local uniquement
 

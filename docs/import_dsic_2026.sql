@@ -1,3 +1,9 @@
+-- ARCHIVE LEGACY
+-- Ce script conserve un import historique de demonstration base sur l'ancien referentiel
+-- `@anbg.test` et un ancien schema de planification.
+-- Il n'est pas aligne sur le referentiel ANBG courant seedé par `AnbgOrganizationSeeder`.
+-- Ne pas utiliser en production ni sur une base locale recente sans adaptation.
+--
 -- Import PAS / PAO / PTA / Actions (SQLite compatible)
 -- Source metier: PAS DG 2026-2028 / PAO DSIC 2026 / PTA SGDS-SSIRS-SCRP
 -- Important: le schema impose UN PAO par (pas_id, direction_id, annee).
@@ -498,4 +504,3 @@ WHERE t.titre = 'PTA DSIC Transversal 2026' AND s.code = 'TRANSV'
   AND NOT EXISTS (SELECT 1 FROM actions a WHERE a.pta_id = t.id AND a.libelle = 'Rationaliser la depense de bourses');
 
 COMMIT;
-

@@ -39,10 +39,14 @@ class SessionController extends Controller
 
         if (! $authenticated) {
             $normalizedMatricule = strtoupper(str_replace(' ', '', $identifier));
+            $legacyEmailAliases = [
+                strtolower($normalizedMatricule).'@anbg.ga',
+                strtolower($normalizedMatricule).'@anbg.test',
+            ];
 
             $matchedUser = User::query()
                 ->whereRaw("UPPER(REPLACE(agent_matricule, ' ', '')) = ?", [$normalizedMatricule])
-                ->orWhere('email', strtolower($normalizedMatricule).'@anbg.test')
+                ->orWhereIn('email', $legacyEmailAliases)
                 ->first();
 
             if ($matchedUser instanceof User) {

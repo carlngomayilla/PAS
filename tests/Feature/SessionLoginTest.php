@@ -47,6 +47,24 @@ class SessionLoginTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
+    public function test_user_can_login_with_matricule_alias_in_anbg_ga_domain(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'c1-55@anbg.ga',
+            'password' => Hash::make('Pass@12345'),
+            'password_changed_at' => now(),
+            'role' => User::ROLE_AGENT,
+            'agent_matricule' => null,
+        ]);
+
+        $this->post(route('login'), [
+            'email' => 'C1-55',
+            'password' => 'Pass@12345',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticatedAs($user);
+    }
+
     public function test_login_is_rate_limited_after_five_attempts(): void
     {
         for ($attempt = 0; $attempt < 5; $attempt++) {
