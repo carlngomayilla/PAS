@@ -1,4 +1,4 @@
-﻿# ANBG - Pilotage PAS / PAO / PTA
+# ANBG - Pilotage PAS / PAO / PTA
 
 Application Laravel de pilotage strategique et operationnel de l'ANBG.
 
@@ -11,12 +11,36 @@ L'application couvre la chaine suivante :
 - `PTA` : plan de travail annuel du service, rattache a un PAO
 - `Actions` : execution, affectation, suivi, justificatifs, commentaires et cloture
 - `Alertes` : centre d'alertes avec navigation directe vers la cause
-- `Pilotage` et `Reporting` : consolidation transversale, exports et visualisations
-- `Referentiels` : directions, services, utilisateurs, delegations
+- `Pilotage` et `Reporting` : consolidation transversale, exports `.xlsx` / `.pdf` et visualisations
+- `Referentiels` : directions, services, utilisateurs et delegations
 - `Profil`, `Notifications`, `Audit`, `Retention`, `Documentation API`
 
 Le module `SchoolErp` n'est plus dans le runtime applicatif.
 Les anciens ecrans `pas-axes` et `pas-objectifs` ne sont plus des parcours metier actifs : les routes de compatibilite redirigent vers le wizard PAS.
+
+## Organisation et roles seedes
+
+Le seed ANBG injecte le referentiel organisationnel suivant :
+
+- directions : `DG`, `DGA`, `SCIQ`, `UCAS`, `DS`, `DSIC`, `DAF`
+- services : `19` services rattaches a ces directions
+- utilisateurs : comptes ANBG reels avec emails `@anbg.ga`
+
+Roles metier exposes dans l'application :
+
+- `Administrateur`
+- `DG`
+- `CABINET`
+- `PLANIFICATION`
+- `DIRECTION`
+- `SERVICES`
+- `AGENT`
+
+Note technique :
+
+- le role utilisateur affiche `SERVICES`
+- la valeur interne conservee pour l'autorisation reste `service`
+- le role `admin` reste disponible pour l'administration technique globale
 
 ## Prerequis
 
@@ -33,6 +57,12 @@ npm install
 php artisan key:generate
 php artisan migrate --seed
 npm run build
+```
+
+Pour repartir d'une base propre avec le jeu de demonstration ANBG complet :
+
+```bash
+php artisan migrate:fresh --seed --force
 ```
 
 ## Demarrage
@@ -53,16 +83,32 @@ npm run dev
 
 Mot de passe commun : `Pass@12345`
 
-- `admin@anbg.test`
-- `dg@anbg.test`
-- `planification@anbg.test`
-- `cabinet@anbg.test`
-- `daf.direction@anbg.test`
-- `dsi.direction@anbg.test`
-- `dpp.direction@anbg.test`
-- `finance.service@anbg.test`
-- `dev.service@anbg.test`
-- `planif.service@anbg.test`
+Comptes utiles pour la recette rapide :
+
+- `admin@anbg.ga` : administrateur technique global
+- `ingrid@anbg.ga` : DG
+- `loick.adan@anbg.ga` : CABINET
+- `hilaire.nguebet@anbg.ga` : PLANIFICATION
+- `suzy.mbazogo@anbg.ga` : DIRECTION
+- `marie.simba@anbg.ga` : SERVICES
+- `claude.azizet@anbg.ga` : AGENT
+
+Exemples de matricules disponibles apres seed :
+
+- `ADM-001`
+- `DG-002`
+- `CAB-003`
+- `PLA-016`
+- `DIR-019`
+- `SRV-026`
+- `AGT-030`
+
+Des placeholders restent volontairement presents dans le seed pour les postes non nommes :
+
+- `dga@anbg.ga`
+- `directeur.ds@anbg.ga`
+- `directeur.dsic@anbg.ga`
+- `directeur.daf@anbg.ga`
 
 ## Entrees web principales
 
@@ -117,22 +163,34 @@ php artisan test
 php artisan view:cache
 ```
 
-Regeneration du jeu de donnees de demonstration :
+Regeneration du jeu de demonstration planning sans repartir d'une base vide :
 
 ```bash
 php artisan db:seed --class=RefreshPlanningDemoSeeder --force
 ```
 
+Reseed du referentiel ANBG seul :
+
+```bash
+php artisan db:seed --class=AnbgOrganizationSeeder --force
+```
+
 ## Etat de la qualite
 
-La suite de tests metier locale a ete remise au vert sur le perimetre applicatif courant.
+Le dernier etat valide localement couvre :
+
+- `60` tests passants
+- build front `npm run build` OK
+- vues Blade compilees avec `php artisan view:cache`
+
 Les derniers lots ont notamment couvre :
 
 - dashboard et vues analytiques
 - roles et perimetres PAS / PAO / PTA / Actions
 - suivi et cloture des actions
 - alertes et reporting
-- profil et navigation workspace
+- exports `.xlsx` / `.pdf`
+- profil, navigation workspace et theming
 
 ## Deploiement
 
@@ -147,3 +205,72 @@ Avant un deploiement reel, prevoir au minimum :
 - scheduler systeme
 - stockage persistant pour `storage/`
 - sauvegardes et supervision
+
+### Variables d'environnement minimales
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://votre-domaine
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=pas_anbg
+DB_USERNAME=...
+DB_PASSWORD=...
+
+QUEUE_CONNECTION=database
+MAIL_MAILER=smtp
+MAIL_HOST=...
+MAIL_PORT=587
+MAIL_USERNAME=...
+MAIL_PASSWORD=...
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=no-reply@anbg.ga
+MAIL_FROM_NAME="ANBG Pilotage"
+```
+
+### Sequence de mise en production
+
+```bash
+composer install --no-dev --optimize-autoloader
+npm install
+npm run build
+php artisan migrate --force
+php artisan optimize
+php artisan view:cache
+```
+
+### Taches d'exploitation a brancher
+
+Worker de queue :
+
+```bash
+php artisan queue:work --queue=default,notifications
+```
+
+Scheduler systeme :
+
+```bash
+php artisan schedule:run
+```
+
+### Verifications post-deploiement
+
+1. connexion avec `admin@anbg.ga`
+2. acces a `/dashboard` et `/workspace`
+3. test d'export `Reporting` en `.xlsx` et `.pdf`
+4. test de televersement d'un justificatif
+5. verification des notifications et des alertes
+6. verification du worker et du scheduler dans les logs
+
+### Reseed local uniquement
+
+Les commandes de seed ci-dessous sont prevues pour la demo locale ou les environnements de recette, pas pour une production deja exploitee :
+
+```bash
+php artisan migrate:fresh --seed --force
+php artisan db:seed --class=RefreshPlanningDemoSeeder --force
+php artisan db:seed --class=AnbgOrganizationSeeder --force
+```

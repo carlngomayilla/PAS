@@ -49,7 +49,7 @@
             type="text" name="email" required autofocus value="{{ old('email') }}"
             class="mt-2 w-full rounded-xl border border-white/10 bg-[linear-gradient(135deg,rgba(10,20,46,0.96)_0%,rgba(18,35,72,0.92)_100%)] px-4 py-3 text-white
                    placeholder:text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_-24px_rgba(57,150,211,0.42)] focus:border-[#3996d3]/55 focus:outline-none focus:ring-2 focus:ring-[#3996d3]/30"
-            placeholder="ex: a1-01@anbg.test ou A1-01"
+            placeholder="ex: admin@anbg.ga ou ADM-001"
           >
           @error('email') <div class="field-error">{{ $message }}</div> @enderror
         </div>

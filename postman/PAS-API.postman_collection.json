@@ -562,7 +562,7 @@
     },
     {
       "key": "email",
-      "value": "admin@anbg.test"
+      "value": "admin@anbg.ga"
     },
     {
       "key": "password",
@@ -610,4 +610,3 @@
     }
   ]
 }
-
