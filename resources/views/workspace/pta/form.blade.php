@@ -21,11 +21,11 @@
                         PAO parent
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-indigo-500"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         Service du PAO
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-emerald-500"></span>
+                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
                         Perimetre fige
                     </span>
                 </div>

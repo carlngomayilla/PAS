@@ -79,8 +79,8 @@
                                 <div class="flex flex-wrap gap-1.5">
                                     <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.justificatifs.download', $item) }}">Telecharger</a>
                                     @if ($canWriteByJustificatif[$item->id] ?? false)
-                                        <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-amber-700 text-white hover:bg-amber-600" href="{{ route('workspace.justificatifs.edit', $item) }}">Modifier</a>
-                                        <form method="POST" action="{{ route('workspace.justificatifs.destroy', $item) }}" onsubmit="return confirm('Supprimer ce justificatif ?')">
+                                        <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-[#f9b13c] text-white hover:brightness-105" href="{{ route('workspace.justificatifs.edit', $item) }}">Modifier</a>
+                                        <form method="POST" action="{{ route('workspace.justificatifs.destroy', $item) }}" data-confirm-message="Supprimer ce justificatif ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
                                             <button class="btn btn-red btn-sm" type="submit">Supprimer</button>
@@ -97,8 +97,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="mt-3">
-            {{ $justificatifs->links() }}
-        </div>
+        <div class="pagination">{{ $justificatifs->links() }}</div>
     </section>
 @endsection

@@ -15,7 +15,7 @@ class DemoPlanningSeeder extends Seeder
         $targetYear = 2026;
 
         $anchorUsers = DB::table('users')
-            ->whereIn('email', ['finance.service@anbg.test', 'dev.service@anbg.test', 'planif.service@anbg.test'])
+            ->whereIn('email', ['robert.ekomi@anbg.ga', 'arnold.mindzeli@anbg.ga', 'marie.simba@anbg.ga'])
             ->get(['id', 'email', 'direction_id', 'service_id']);
 
         if ($anchorUsers->count() < 3) {
@@ -50,7 +50,7 @@ class DemoPlanningSeeder extends Seeder
             ->whereIn('role', [User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION])
             ->orderByRaw("CASE WHEN role = 'admin' THEN 0 WHEN role = 'dg' THEN 1 ELSE 2 END")
             ->value('id') ?? 0);
-        $financeAnchor = $anchorUsersByEmail->get('finance.service@anbg.test');
+        $financeAnchor = $anchorUsersByEmail->get('robert.ekomi@anbg.ga');
 
         $pasId = (int) DB::table('pas')->insertGetId([
             'titre' => 'PAS ANBG 2026-2028',

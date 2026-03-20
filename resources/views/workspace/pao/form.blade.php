@@ -22,11 +22,11 @@
                         Objectif strategique source
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-indigo-500"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         Axe et PAS deduits
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-emerald-500"></span>
+                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
                         Direction et service cibles
                     </span>
                 </div>

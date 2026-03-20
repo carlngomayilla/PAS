@@ -1,28 +1,31 @@
 @extends('layouts.workspace')
 
-@section('title', 'Centre d alertes')
+@section('title', "Centre d'alertes")
 
 @php
     $levelStyles = [
         'critical' => [
-            'panel' => 'border-rose-300/80 bg-rose-50/90 dark:border-rose-500/40 dark:bg-rose-950/20',
-            'dot' => 'bg-rose-500',
-            'badge' => 'bg-rose-600 text-white',
-            'soft' => 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200',
+            'panel' => 'border-[#f9b13c]/40 bg-[#fff0df]/90 dark:border-[#f9b13c]/35 dark:bg-[#f9b13c]/10',
+            'dot' => 'bg-[#f9b13c]',
+            'iconBadge' => 'bg-[#f9b13c] text-white',
+            'badge' => 'anbg-badge anbg-badge-danger',
+            'soft' => 'bg-[#fff0df] text-[#f9b13c] dark:bg-[#f9b13c]/15 dark:text-[#f8e932]',
             'icon' => '!',
         ],
         'warning' => [
-            'panel' => 'border-amber-300/80 bg-amber-50/90 dark:border-amber-500/40 dark:bg-amber-950/20',
-            'dot' => 'bg-amber-500',
-            'badge' => 'bg-amber-500 text-white',
-            'soft' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200',
+            'panel' => 'border-[#f9b13c]/40 bg-[#fff8d6]/90 dark:border-[#f9b13c]/35 dark:bg-[#f9b13c]/10',
+            'dot' => 'bg-[#f0e509]',
+            'iconBadge' => 'bg-[#f0e509] text-[#1c203d]',
+            'badge' => 'anbg-badge anbg-badge-warning',
+            'soft' => 'bg-[#fff8d6] text-[#f9b13c] dark:bg-[#f9b13c]/15 dark:text-[#f8e932]',
             'icon' => '!',
         ],
         'info' => [
-            'panel' => 'border-sky-300/80 bg-sky-50/90 dark:border-sky-500/40 dark:bg-sky-950/20',
-            'dot' => 'bg-sky-500',
-            'badge' => 'bg-sky-600 text-white',
-            'soft' => 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-200',
+            'panel' => 'border-[#3996d3]/40 bg-[#e8f3fb]/90 dark:border-[#3996d3]/35 dark:bg-[#3996d3]/10',
+            'dot' => 'bg-[#3996d3]',
+            'iconBadge' => 'bg-[#3996d3] text-white',
+            'badge' => 'anbg-badge anbg-badge-info',
+            'soft' => 'bg-[#e8f3fb] text-[#3996d3] dark:bg-[#3996d3]/15 dark:text-[#8fc043]',
             'icon' => 'i',
         ],
     ];
@@ -35,9 +38,9 @@
         <div class="showcase-hero-body">
             <div>
                 <span class="showcase-eyebrow">Alertes operationnelles</span>
-                <h1 class="showcase-title">Centre d alertes</h1>
+                <h1 class="showcase-title">Centre d'alertes</h1>
                 <p class="showcase-subtitle">
-                    Vue unifiee des retards, KPI sous seuil, incidents de suivi et delegations proches d expiration.
+                    Vue unifiee des retards, KPI sous seuil, incidents de suivi et delegations proches d'expiration.
                     Cliquer sur une alerte ouvre directement la cause dans le module concerne.
                 </p>
             </div>
@@ -47,6 +50,12 @@
                     <span class="showcase-chip-dot bg-blue-600"></span>
                     Limite d affichage: {{ $limit }} elements
                 </span>
+                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.pilotage') }}">
+                    Retour pilotage
+                </a>
+                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting') }}">
+                    Ouvrir le reporting
+                </a>
                 @if (($summary['unread'] ?? 0) > 0)
                     <form method="POST" action="{{ route('workspace.alertes.read_all', ['limit' => $limit]) }}">
                         @csrf
@@ -62,22 +71,22 @@
     <section class="showcase-summary-grid mb-4">
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Non lues</p>
-            <p class="showcase-kpi-number text-rose-600 dark:text-rose-300">{{ $summary['unread'] ?? 0 }}</p>
+            <p class="showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]">{{ $summary['unread'] ?? 0 }}</p>
             <p class="showcase-kpi-meta">Alertes a traiter</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Critiques</p>
-            <p class="showcase-kpi-number text-rose-600 dark:text-rose-300">{{ $summary['critical'] ?? 0 }}</p>
+            <p class="showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]">{{ $summary['critical'] ?? 0 }}</p>
             <p class="showcase-kpi-meta">Escalade immediate</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Attention</p>
-            <p class="showcase-kpi-number text-amber-600 dark:text-amber-300">{{ $summary['warning'] ?? 0 }}</p>
+            <p class="showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]">{{ $summary['warning'] ?? 0 }}</p>
             <p class="showcase-kpi-meta">Surveillance rapprochee</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Info</p>
-            <p class="showcase-kpi-number text-sky-600 dark:text-sky-300">{{ $summary['info'] ?? 0 }}</p>
+            <p class="showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]">{{ $summary['info'] ?? 0 }}</p>
             <p class="showcase-kpi-meta">Information de contexte</p>
         </article>
     </section>
@@ -87,14 +96,14 @@
             <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 dark:border-slate-800 dark:bg-slate-950/50">
                 <button class="{{ $filterButtonBase }} border-slate-300 bg-slate-900 text-white dark:border-slate-700 dark:bg-slate-100 dark:text-slate-900" data-level-filter="all" type="button">
                     Tous
-                    <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs dark:bg-slate-900/10">{{ $summary['total'] ?? 0 }}</span>
+                    <span class="anbg-badge anbg-badge-neutral px-2 py-0.5 text-[10px] leading-none">{{ $summary['total'] ?? 0 }}</span>
                 </button>
                 @foreach (['critical', 'warning', 'info'] as $level)
                     @php $style = $levelStyles[$level]; @endphp
                     <button class="{{ $filterButtonBase }} border-transparent {{ $style['soft'] }}" data-level-filter="{{ $level }}" type="button">
                         {{ $level === 'critical' ? 'Critique' : ($level === 'warning' ? 'Attention' : 'Info') }}
                         @if (($levelUnreadCounts[$level] ?? 0) > 0)
-                            <span class="rounded-full bg-white/40 px-2 py-0.5 text-xs dark:bg-slate-900/20">{{ $levelUnreadCounts[$level] }}</span>
+                            <span class="{{ $style['badge'] }} px-2 py-0.5 text-[10px] leading-none">{{ $levelUnreadCounts[$level] }}</span>
                         @endif
                     </button>
                 @endforeach
@@ -107,7 +116,7 @@
                 <button class="{{ $filterButtonBase }} border-transparent bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-200" data-state-filter="unread" type="button">
                     Non lues
                     @if (($summary['unread'] ?? 0) > 0)
-                        <span class="rounded-full bg-rose-500 px-2 py-0.5 text-xs text-white">{{ $summary['unread'] }}</span>
+                        <span class="anbg-badge anbg-badge-warning px-2 py-0.5 text-[10px] leading-none">{{ $summary['unread'] }}</span>
                     @endif
                 </button>
                 <button class="{{ $filterButtonBase }} border-transparent bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-200" data-state-filter="read" type="button">
@@ -135,21 +144,21 @@
                 @endif
 
                 <div class="flex items-start gap-4">
-                    <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-lg font-bold {{ $style['badge'] }}">
+                    <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-lg font-bold {{ $style['iconBadge'] }}">
                         {{ $style['icon'] }}
                     </span>
 
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
                             <h2 class="text-base font-semibold text-slate-950 dark:text-slate-50">{{ $alert['titre'] }}</h2>
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $style['badge'] }}">
+                            <span class="{{ $style['badge'] }} px-3">
                                 {{ $alert['niveau_label'] }}
                             </span>
-                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                            <span class="anbg-badge anbg-badge-neutral px-3">
                                 {{ $alert['type_label'] }}
                             </span>
                             @if ($isUnread)
-                                <span class="inline-flex items-center rounded-full bg-rose-500 px-2.5 py-0.5 text-xs font-semibold text-white">
+                                <span class="anbg-badge anbg-badge-warning px-3">
                                     Non lu
                                 </span>
                             @endif

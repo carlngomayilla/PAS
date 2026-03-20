@@ -73,18 +73,18 @@
         $statusStyles = [
             'non_demarre' => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
             'en_cours' => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-            'en_avance' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-            'en_retard' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-            'acheve_dans_delai' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-            'acheve_hors_delai' => 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+            'en_avance' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/15 dark:text-[#f8e932]',
+            'en_retard' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-[#f8e932]',
+            'acheve_dans_delai' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/15 dark:text-[#f8e932]',
+            'acheve_hors_delai' => 'bg-[#fff8d6] text-[#f9b13c] dark:bg-[#f0e509]/15 dark:text-[#f8e932]',
         ];
         $validationStyles = [
             'non_soumise' => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
-            'soumise_chef' => 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
-            'rejetee_chef' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
+            'soumise_chef' => 'bg-[#fff8d6] text-[#f9b13c] dark:bg-[#f0e509]/15 dark:text-[#f8e932]',
+            'rejetee_chef' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-[#f8e932]',
             'validee_chef' => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-            'rejetee_direction' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-            'validee_direction' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+            'rejetee_direction' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-[#f8e932]',
+            'validee_direction' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/15 dark:text-[#f8e932]',
         ];
         $detailSections = [
             'action-validation' => 'Validation',
@@ -118,7 +118,7 @@
                         Frequence {{ $frequenceLabel }}
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-indigo-500"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         Periode {{ optional($action->date_debut)->format('d/m/Y') ?: '-' }} -> {{ optional($action->date_fin)->format('d/m/Y') ?: '-' }}
                     </span>
                     <span class="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold {{ $statusClass }}">
@@ -148,7 +148,7 @@
             <p class="showcase-kpi-label">Progression reelle</p>
             <p class="showcase-kpi-number">{{ number_format($progressionReelle, 1) }}%</p>
             <div class="mt-3 showcase-progress-track">
-                <span class="showcase-progress-bar {{ $progressionReelle >= 80 ? 'bg-emerald-500' : ($progressionReelle >= 50 ? 'bg-blue-500' : 'bg-amber-500') }}" style="width: {{ $progressionReelle }}%"></span>
+                <span class="showcase-progress-bar {{ $progressionReelle >= 80 ? 'bg-[#8fc043]' : ($progressionReelle >= 50 ? 'bg-blue-500' : 'bg-[#f0e509]') }}" style="width: {{ $progressionReelle }}%"></span>
             </div>
         </article>
         <article class="showcase-kpi-card">
@@ -172,22 +172,22 @@
 
     <section id="action-validation" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Circuit de validation</h2>
-        <p class="showcase-panel-subtitle">Cha ine de validation agent -> chef de service -> direction avec gel automatique des saisies apres soumission.</p>
+        <p class="showcase-panel-subtitle">Chaine de validation agent -> chef de service -> direction avec gel automatique des saisies apres soumission.</p>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Etape 1 - Soumission agent</strong>
                 <p class="mt-2 text-slate-600">Statut: <strong>{{ in_array($validationStatus, ['non_soumise', 'rejetee_chef', 'rejetee_direction'], true) ? 'A faire / a corriger' : 'Effectuee' }}</strong></p>
                 <p class="text-slate-600">Soumis par: <strong>{{ $action->soumisPar?->name ?? '-' }}</strong></p>
                 <p class="text-slate-600">Date soumission: <strong>{{ optional($action->soumise_le)->format('Y-m-d H:i') ?: '-' }}</strong></p>
             </article>
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Etape 2 - Evaluation chef de service</strong>
                 <p class="mt-2 text-slate-600">Statut: <strong>{{ in_array($validationStatus, ['validee_chef', 'rejetee_direction', 'validee_direction'], true) ? 'Effectuee' : ($isAwaitingChef ? 'En attente' : '-') }}</strong></p>
                 <p class="text-slate-600">Evaluateur: <strong>{{ $action->evaluePar?->name ?? '-' }}</strong></p>
                 <p class="text-slate-600">Note: <strong>{{ $action->evaluation_note !== null ? number_format((float) $action->evaluation_note, 2) . '/100' : '-' }}</strong></p>
                 <p class="text-slate-600">Date: <strong>{{ optional($action->evalue_le)->format('Y-m-d H:i') ?: '-' }}</strong></p>
             </article>
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Etape 3 - Validation direction</strong>
                 <p class="mt-2 text-slate-600">Statut: <strong>{{ $isValidatedDirection ? 'Validee' : ($isAwaitingDirection ? 'En attente' : '-') }}</strong></p>
                 <p class="text-slate-600">Evaluateur: <strong>{{ $action->directionValidePar?->name ?? '-' }}</strong></p>
@@ -200,17 +200,17 @@
             <strong>{{ $isValidatedDirection ? 'Oui (action comptabilisee)' : 'Non (en attente validation direction)' }}</strong>
         </p>
         @if ($validationStatus === 'rejetee_chef')
-            <p class="mt-2 text-sm text-amber-600">Motif rejet chef: <strong>{{ $action->evaluation_commentaire ?: '-' }}</strong></p>
+            <p class="mt-2 text-sm text-[#f9b13c]">Motif rejet chef: <strong>{{ $action->evaluation_commentaire ?: '-' }}</strong></p>
         @elseif ($validationStatus === 'rejetee_direction')
-            <p class="mt-2 text-sm text-amber-600">Motif rejet direction: <strong>{{ $action->direction_evaluation_commentaire ?: '-' }}</strong></p>
+            <p class="mt-2 text-sm text-[#f9b13c]">Motif rejet direction: <strong>{{ $action->direction_evaluation_commentaire ?: '-' }}</strong></p>
         @endif
     </section>
 
     <section id="action-fiche" class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">Fiche complete de l action</h2>
+        <h2 class="showcase-panel-title">Fiche complete de l'action</h2>
         <p class="showcase-panel-subtitle">Lecture consolidee des informations strategiques, des ressources et des criteres de performance.</p>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Contexte planification</strong>
                 <p class="mt-2 text-slate-600">PAS: <strong>{{ $pas?->titre ?? '-' }}</strong></p>
                 <p class="text-slate-600">Periode PAS: <strong>{{ $pas?->periode_debut ?? '-' }} - {{ $pas?->periode_fin ?? '-' }}</strong></p>
@@ -220,7 +220,7 @@
                 <p class="text-slate-600">Service: <strong>{{ $pta?->service?->code ?? '-' }} - {{ $pta?->service?->libelle ?? '-' }}</strong></p>
             </article>
 
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Identification</strong>
                 <p class="mt-2 text-slate-600">ID action: <strong>#{{ $action->id }}</strong></p>
                 <p class="text-slate-600">Titre: <strong>{{ $action->libelle }}</strong></p>
@@ -230,7 +230,7 @@
                 <p class="text-slate-600">Statut dynamique: <strong>{{ $status }}</strong></p>
             </article>
 
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Responsable et echeances</strong>
                 <p class="mt-2 text-slate-600">Responsable: <strong>{{ $action->responsable?->name ?? '-' }}</strong></p>
                 <p class="text-slate-600">Email: <strong>{{ $action->responsable?->email ?? '-' }}</strong></p>
@@ -244,7 +244,7 @@
                 <p class="text-slate-600">Frequence execution: <strong>{{ $frequenceLabel }}</strong></p>
             </article>
 
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Cible et performance</strong>
                 @if ($action->type_cible === 'quantitative')
                     <p class="mt-2 text-slate-600">Unite cible: <strong>{{ $action->unite_cible ?: '-' }}</strong></p>
@@ -259,13 +259,13 @@
                 <p class="text-slate-600">Progression theorique: <strong>{{ number_format((float) ($action->progression_theorique ?? 0), 2) }}%</strong></p>
             </article>
 
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Ressources mobilisees</strong>
                 <p class="mt-2 text-slate-600">Ressources: <strong>{{ $ressources !== [] ? implode(', ', $ressources) : '-' }}</strong></p>
                 <p class="text-slate-600">Autres details: <strong>{{ $action->ressource_autres_details ?: '-' }}</strong></p>
             </article>
 
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Financement</strong>
                 <p class="mt-2 text-slate-600">Financement requis: <strong>{{ $action->financement_requis ? 'Oui' : 'Non' }}</strong></p>
                 <p class="text-slate-600">Description besoin: <strong>{{ $action->description_financement ?: '-' }}</strong></p>
@@ -273,13 +273,13 @@
                 <p class="text-slate-600">Montant estime: <strong>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 2) : '-' }}</strong></p>
             </article>
 
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Risques et mesures</strong>
                 <p class="mt-2 text-slate-600">Risques potentiels: <strong>{{ $action->risques ?: '-' }}</strong></p>
                 <p class="text-slate-600">Mesures preventives: <strong>{{ $action->mesures_preventives ?: '-' }}</strong></p>
             </article>
 
-            <article class="showcase-inline-stat">
+            <article class="showcase-inline-stat action-detail-card">
                 <strong>Cloture et evaluation</strong>
                 <p class="mt-2 text-slate-600">Rapport final: <strong>{{ $action->rapport_final ?: '-' }}</strong></p>
                 <p class="text-slate-600">Commentaire chef: <strong>{{ $action->evaluation_commentaire ?: '-' }}</strong></p>
@@ -290,7 +290,7 @@
     </section>
 
     <section id="action-status" class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">Etat d avancement</h2>
+        <h2 class="showcase-panel-title">Etat d'avancement</h2>
         <p class="showcase-panel-subtitle">Synthese du niveau de progression reel, theorique et des KPI utilises pour la decision.</p>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             <article class="showcase-inline-stat">
@@ -324,10 +324,10 @@
         <h2 class="showcase-panel-title">Suivi {{ $periodeLabelPluriel }}</h2>
         <p class="showcase-panel-subtitle">Execution periodique detaillee avec blocage automatique apres soumission pour validation.</p>
         @if ($agentLocked)
-            <p class="mb-3 text-sm text-amber-600">Saisie gelee: action soumise. Modifications possibles uniquement apres rejet motive.</p>
+            <p class="action-section-note mb-3">Saisie gelee: action soumise. Modifications possibles uniquement apres rejet motive.</p>
         @endif
         @forelse ($action->weeks as $week)
-            <article id="action-week-{{ $week->id }}" class="mb-3 rounded-[1.25rem] border border-slate-200/85 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+            <article id="action-week-{{ $week->id }}" class="action-week-card mb-3">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <strong>{{ $periodeLabelSingulier }} {{ $week->numero_semaine }}</strong>
@@ -398,7 +398,7 @@
     @if ($canSubmitClosure)
         <section id="action-cloture" class="showcase-panel mb-4">
             <h2 class="showcase-panel-title">Soumission de cloture (Agent)</h2>
-            <p class="mb-2 text-sm text-slate-600">L action sera envoyee au chef de service pour evaluation, puis a la direction apres validation chef. Aucun justificatif supplementaire n est requis a cette etape.</p>
+            <p class="mb-2 text-sm text-slate-600">L'action sera envoyee au chef de service pour evaluation, puis a la direction apres validation chef. Aucun justificatif supplementaire n'est requis a cette etape.</p>
             <form method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.close', $action) }}">
                 @csrf
                 <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
@@ -445,12 +445,12 @@
                             </select>
                         </div>
                         <div>
-                            <label for="justificatif_evaluation">Justificatif evaluation chef (optionnel)</label>
+                        <label for="justificatif_evaluation">Justificatif evaluation chef (optionnel)</label>
                             <input id="justificatif_evaluation" name="justificatif_evaluation" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
                         </div>
                     </div>
                     <div>
-                        <label for="evaluation_commentaire">Commentaire d evaluation</label>
+                        <label for="evaluation_commentaire">Commentaire d'evaluation</label>
                         <textarea id="evaluation_commentaire" name="evaluation_commentaire" required>{{ old('evaluation_commentaire') }}</textarea>
                     </div>
                     <button class="btn btn-blue mt-2.5" type="submit">
@@ -482,12 +482,12 @@
                             <input id="direction_evaluation_note" name="evaluation_note" type="number" step="0.01" min="0" max="100" value="{{ old('evaluation_note') }}" required>
                         </div>
                         <div>
-                            <label for="justificatif_evaluation_direction">Justificatif evaluation direction (optionnel)</label>
+                        <label for="justificatif_evaluation_direction">Justificatif evaluation direction (optionnel)</label>
                             <input id="justificatif_evaluation_direction" name="justificatif_evaluation_direction" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
                         </div>
                     </div>
                     <div>
-                        <label for="direction_evaluation_commentaire">Commentaire d evaluation direction</label>
+                        <label for="direction_evaluation_commentaire">Commentaire d'evaluation direction</label>
                         <textarea id="direction_evaluation_commentaire" name="evaluation_commentaire" required>{{ old('evaluation_commentaire') }}</textarea>
                     </div>
                     <button class="btn btn-blue mt-2.5" type="submit">
@@ -519,7 +519,7 @@
                             <p class="font-semibold">{{ $entry->utilisateur?->name ?? 'Systeme' }}</p>
                             <p class="text-xs text-slate-500">{{ optional($entry->created_at)->format('Y-m-d H:i') ?: '-' }}</p>
                         </div>
-                        <span class="badge">{{ str_replace('_', ' ', $entry->type_evenement) }}</span>
+                        <span class="anbg-badge anbg-badge-neutral px-3">{{ str_replace('_', ' ', $entry->type_evenement) }}</span>
                     </div>
                     <p class="mt-3 whitespace-pre-line text-slate-700 dark:text-slate-200">{{ $entry->message }}</p>
                 </article>
@@ -549,7 +549,7 @@
                             <td>{{ $doc->categorie }}</td>
                             <td>{{ $doc->action_week_id ?: '-' }}</td>
                             <td>
-                                <a class="text-blue-600 hover:underline" href="{{ route('workspace.actions.justificatifs.download', [$action, $doc]) }}">
+                                <a class="action-download-link" href="{{ route('workspace.actions.justificatifs.download', [$action, $doc]) }}">
                                     {{ $doc->nom_original }}
                                 </a>
                             </td>
@@ -564,7 +564,7 @@
     </section>
 
     <section id="action-logs" class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">Journal d alertes et evenements</h2>
+        <h2 class="showcase-panel-title">Journal d'alertes et evenements</h2>
         <div class="overflow-auto">
             <table>
                 <thead>

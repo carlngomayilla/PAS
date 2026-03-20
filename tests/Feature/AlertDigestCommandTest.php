@@ -6,11 +6,13 @@ use App\Mail\AlertDigestMail;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\Concerns\CreatesAdminUser;
 use Tests\TestCase;
 
 class AlertDigestCommandTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesAdminUser;
 
     protected function setUp(): void
     {
@@ -21,20 +23,21 @@ class AlertDigestCommandTest extends TestCase
     public function test_alert_digest_command_sends_emails_to_operational_profiles_with_alerts(): void
     {
         Mail::fake();
+        $admin = $this->createAdminUser();
 
         $this->artisan('alertes:notifier --limit=10')
             ->assertSuccessful();
 
-        Mail::assertSent(AlertDigestMail::class, function (AlertDigestMail $mail): bool {
-            return $mail->hasTo('admin@anbg.test');
+        Mail::assertSent(AlertDigestMail::class, function (AlertDigestMail $mail) use ($admin): bool {
+            return $mail->hasTo($admin->email);
         });
 
         Mail::assertSent(AlertDigestMail::class, function (AlertDigestMail $mail): bool {
-            return $mail->hasTo('dg@anbg.test');
+            return $mail->hasTo('ingrid@anbg.ga');
         });
 
         Mail::assertNotSent(AlertDigestMail::class, function (AlertDigestMail $mail): bool {
-            return $mail->hasTo('cabinet@anbg.test');
+            return $mail->hasTo('loick.adan@anbg.ga');
         });
     }
 
@@ -52,13 +55,13 @@ class AlertDigestCommandTest extends TestCase
     public function test_alert_digest_command_creates_database_notifications_for_profiles_with_alerts(): void
     {
         Mail::fake();
+        $admin = $this->createAdminUser();
 
         $this->artisan('alertes:notifier --limit=10')
             ->assertSuccessful();
 
-        $admin = User::query()->where('email', 'admin@anbg.test')->firstOrFail();
-        $dg = User::query()->where('email', 'dg@anbg.test')->firstOrFail();
-        $cabinet = User::query()->where('email', 'cabinet@anbg.test')->firstOrFail();
+        $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
+        $cabinet = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
 
         $adminNotification = $admin->notifications()->latest()->first();
         $dgNotification = $dg->notifications()->latest()->first();
@@ -75,14 +78,13 @@ class AlertDigestCommandTest extends TestCase
     public function test_alert_digest_command_does_not_duplicate_daily_database_notification(): void
     {
         Mail::fake();
+        $admin = $this->createAdminUser();
 
         $this->artisan('alertes:notifier --limit=10')
             ->assertSuccessful();
 
         $this->artisan('alertes:notifier --limit=10')
             ->assertSuccessful();
-
-        $admin = User::query()->where('email', 'admin@anbg.test')->firstOrFail();
 
         $todayDigestCount = $admin->notifications()
             ->whereDate('created_at', now()->toDateString())

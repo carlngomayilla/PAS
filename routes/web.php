@@ -123,6 +123,7 @@ Route::middleware('auth')->group(function (): void {
             Route::post('pas/{pas}/lock', [PasWebController::class, 'lock'])->name('pas.lock');
             Route::post('pas/{pas}/reopen', [PasWebController::class, 'reopen'])->name('pas.reopen');
 
+            // Routes legacy conservees uniquement pour rediriger vers le wizard PAS.
             Route::resource('pas-axes', PasAxeWebController::class)
                 ->except(['show'])
                 ->parameters(['pas-axes' => 'pasAxe']);

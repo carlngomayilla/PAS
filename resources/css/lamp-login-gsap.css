@@ -1,10 +1,10 @@
 /* Fond OFF */
 .lamp-page {
   background:
-    radial-gradient(1200px 600px at 18% 10%, rgba(52, 184, 255, .22), transparent 60%),
-    radial-gradient(900px 500px at 80% 18%, rgba(199, 229, 75, .16), transparent 56%),
-    radial-gradient(1000px 540px at 72% 64%, rgba(246, 182, 58, .14), transparent 58%),
-    #070b18;
+    radial-gradient(1200px 600px at 18% 10%, rgba(57, 150, 211, .22), transparent 60%),
+    radial-gradient(900px 500px at 80% 18%, rgba(143, 192, 67, .16), transparent 56%),
+    radial-gradient(1000px 540px at 72% 64%, rgba(249, 177, 60, .14), transparent 58%),
+    #1c203d;
 }
 
 /* Lampe */
@@ -128,4 +128,112 @@
 .lamp-card {
   transform: translateY(0);
   border-color: rgba(255, 255, 255, .10);
+}
+
+@media (max-width: 640px) {
+  .lamp {
+    width: 240px;
+    height: 276px;
+  }
+
+  .lamp-head {
+    top: 28px;
+    width: 164px;
+    height: 78px;
+  }
+
+  .lamp-neck {
+    top: 100px;
+    width: 14px;
+    height: 76px;
+  }
+
+  .lamp-base {
+    bottom: 28px;
+    width: 190px;
+    height: 22px;
+  }
+
+  .lamp-glow {
+    top: 78px;
+    width: 220px;
+    height: 190px;
+  }
+
+  .lamp-cone {
+    top: 98px;
+    width: 280px;
+    height: 220px;
+  }
+
+  .lamp-pull {
+    right: 34px;
+    top: 20px;
+    width: 40px;
+    height: 154px;
+    gap: 8px;
+  }
+
+  .lamp-cord {
+    height: 112px;
+  }
+
+  .lamp-knob {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .lamp {
+    width: 208px;
+    height: 238px;
+  }
+
+  .lamp-head {
+    top: 24px;
+    width: 142px;
+    height: 68px;
+  }
+
+  .lamp-neck {
+    top: 88px;
+    width: 12px;
+    height: 66px;
+  }
+
+  .lamp-base {
+    bottom: 24px;
+    width: 166px;
+    height: 20px;
+  }
+
+  .lamp-glow {
+    top: 66px;
+    width: 192px;
+    height: 166px;
+  }
+
+  .lamp-cone {
+    top: 88px;
+    width: 246px;
+    height: 188px;
+  }
+
+  .lamp-pull {
+    right: 28px;
+    top: 16px;
+    width: 34px;
+    height: 138px;
+    gap: 7px;
+  }
+
+  .lamp-cord {
+    height: 98px;
+  }
+
+  .lamp-knob {
+    width: 14px;
+    height: 14px;
+  }
 }

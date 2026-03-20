@@ -1,5 +1,7 @@
 @extends('layouts.workspace')
 
+@section('title', 'Pilotage global')
+
 @section('content')
     @php
         $pipelineGapLabels = [
@@ -8,6 +10,14 @@
             'pta_sans_action' => 'PTA sans action',
             'action_sans_kpi' => 'Actions sans KPI',
             'kpi_sans_mesure' => 'KPI sans mesure',
+        ];
+        $pilotageStatusBadges = [
+            'non_demarre' => 'anbg-badge anbg-badge-neutral',
+            'en_cours' => 'anbg-badge anbg-badge-info',
+            'en_avance' => 'anbg-badge anbg-badge-success',
+            'en_retard' => 'anbg-badge anbg-badge-danger',
+            'acheve_dans_delai' => 'anbg-badge anbg-badge-success',
+            'acheve_hors_delai' => 'anbg-badge anbg-badge-warning',
         ];
     @endphp
 
@@ -26,24 +36,27 @@
                         Genere le {{ $generatedAt }}
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-indigo-500"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         Role {{ $scope['role'] }}
                     </span>
                     @if ($scope['direction_id'])
                         <span class="showcase-chip">
-                            <span class="showcase-chip-dot bg-emerald-500"></span>
+                            <span class="showcase-chip-dot bg-[#8fc043]"></span>
                             Direction #{{ $scope['direction_id'] }}
                         </span>
                     @endif
                     @if ($scope['service_id'])
                         <span class="showcase-chip">
-                            <span class="showcase-chip-dot bg-amber-500"></span>
+                            <span class="showcase-chip-dot bg-[#f0e509]"></span>
                             Service #{{ $scope['service_id'] }}
                         </span>
                     @endif
                 </div>
             </div>
             <div class="showcase-action-row">
+                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('dashboard') }}">
+                    Retour dashboard
+                </a>
                 <a class="btn btn-blue rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting') }}">
                     Ouvrir le reporting
                 </a>
@@ -66,7 +79,7 @@
 
     <section class="mb-4 grid gap-4 xl:grid-cols-2">
         <article class="showcase-panel">
-            <h2 class="showcase-panel-title">Taux d avancement</h2>
+            <h2 class="showcase-panel-title">Taux d'avancement</h2>
             <p class="showcase-panel-subtitle">Lecture synthese des realisations par niveau de planification.</p>
             <div class="mt-4 showcase-summary-grid">
                 @foreach ($completion as $key => $value)
@@ -192,7 +205,7 @@
 
     <section class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Comparaison interannuelle</h2>
-        <p class="showcase-panel-subtitle">Analyse d evolution entre les annees disponibles pour le meme perimetre.</p>
+        <p class="showcase-panel-subtitle">Analyse d'evolution entre les annees disponibles pour le meme perimetre.</p>
         <div class="mt-4 table-wrap">
             <table>
                 <thead>
@@ -230,7 +243,7 @@
     </section>
 
     <section class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">Actions proches de l echeance</h2>
+        <h2 class="showcase-panel-title">Actions proches de l'echeance</h2>
         <p class="showcase-panel-subtitle">Liste courte des actions actives a surveiller dans l immediat.</p>
         <div class="mt-4 overflow-auto">
             <table>
@@ -253,7 +266,7 @@
                             <td>{{ $row->responsable?->name ?? '-' }}</td>
                             <td>{{ $row->date_echeance }}</td>
                             <td>
-                                <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                <span class="{{ $pilotageStatusBadges[$row->statut_dynamique] ?? 'anbg-badge anbg-badge-neutral' }} px-3">
                                     {{ $row->statut_dynamique }}
                                 </span>
                             </td>

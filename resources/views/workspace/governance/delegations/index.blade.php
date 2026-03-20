@@ -3,6 +3,13 @@
 @section('title', 'Delegations')
 
 @section('content')
+    @php
+        $delegationStatusBadges = [
+            'active' => 'anbg-badge anbg-badge-success',
+            'cancelled' => 'anbg-badge anbg-badge-neutral',
+            'expired' => 'anbg-badge anbg-badge-warning',
+        ];
+    @endphp
     <section class="ui-card mb-3.5">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -57,11 +64,13 @@
                                 {{ optional($row->date_fin)->format('Y-m-d H:i') ?: '-' }}
                             </td>
                             <td>
-                                <span class="badge">{{ $row->statut }}</span>
+                                <span class="{{ $delegationStatusBadges[$row->statut] ?? 'anbg-badge anbg-badge-neutral' }} px-3">
+                                    {{ $row->statut }}
+                                </span>
                             </td>
                             <td>
                                 @if ($row->statut === 'active')
-                                    <form method="POST" action="{{ route('workspace.delegations.cancel', $row) }}" onsubmit="return window.confirm('Annuler cette delegation ?');">
+                                    <form method="POST" action="{{ route('workspace.delegations.cancel', $row) }}" data-confirm-message="Annuler cette delegation ?" data-confirm-tone="danger" data-confirm-label="Annuler">
                                         @csrf
                                         <input type="hidden" name="motif_annulation" value="Annulation administrative">
                                         <button class="btn btn-red" type="submit">Annuler</button>
@@ -80,8 +89,6 @@
             </table>
         </div>
 
-        <div class="mt-4">
-            {{ $rows->links() }}
-        </div>
+        <div class="pagination">{{ $rows->links() }}</div>
     </section>
 @endsection

@@ -148,8 +148,8 @@
             </div>
 
             <div class="form-actions">
-                <button class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.pao-objectifs-operationnels.index') }}">Retour</a>
+                <button class="btn btn-green" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <a class="btn btn-blue" href="{{ route('workspace.pao-objectifs-operationnels.index') }}">Retour</a>
             </div>
         </form>
     </section>

@@ -14,6 +14,6 @@
 <img 
     src="{{ $logoPath }}" 
     alt="ANBG - Agence Nationale des Bourses du Gabon"
-    {{ $attributes->merge(['class' => $class]) }}
+    {{ $attributes->merge(['class' => trim('block '.$class)]) }}
     style="object-fit: contain;"
 />

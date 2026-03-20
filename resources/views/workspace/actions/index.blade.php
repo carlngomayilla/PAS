@@ -12,12 +12,12 @@
             'achevees' => $listing->filter(fn ($item) => in_array($item->statut_dynamique, ['acheve_dans_delai', 'acheve_hors_delai'], true))->count(),
         ];
         $statusStyles = [
-            'non_demarre' => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
-            'en_cours' => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-            'en_avance' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-            'en_retard' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-            'acheve_dans_delai' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-            'acheve_hors_delai' => 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+            'non_demarre' => 'anbg-badge anbg-badge-neutral',
+            'en_cours' => 'anbg-badge anbg-badge-info',
+            'en_avance' => 'anbg-badge anbg-badge-success',
+            'en_retard' => 'anbg-badge anbg-badge-danger',
+            'acheve_dans_delai' => 'anbg-badge anbg-badge-success',
+            'acheve_hors_delai' => 'anbg-badge anbg-badge-warning',
         ];
     @endphp
 
@@ -40,7 +40,7 @@
                         {{ $statusCounts['en_retard'] }} en retard sur cette page
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-emerald-500"></span>
+                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
                         {{ $statusCounts['achevees'] }} achevees sur cette page
                     </span>
                 </div>
@@ -173,9 +173,9 @@
                             $kpiGlobal = $row->actionKpi?->kpi_global;
                             $statusClass = $statusStyles[$row->statut_dynamique ?: 'non_demarre'] ?? $statusStyles['non_demarre'];
                             $progressValue = max(0, min(100, (float) ($row->progression_reelle ?? 0)));
-                            $progressColor = $progressValue >= 80 ? 'bg-emerald-500' : ($progressValue >= 50 ? 'bg-blue-500' : ($progressValue > 0 ? 'bg-amber-500' : 'bg-slate-400'));
+                            $progressColor = $progressValue >= 80 ? 'bg-[#8fc043]' : ($progressValue >= 50 ? 'bg-blue-500' : ($progressValue > 0 ? 'bg-[#f0e509]' : 'bg-slate-400'));
                             $kpiColor = $kpiGlobal !== null
-                                ? ((float) $kpiGlobal >= 80 ? 'text-emerald-600 dark:text-emerald-300' : ((float) $kpiGlobal >= 60 ? 'text-amber-600 dark:text-amber-300' : 'text-red-600 dark:text-red-300'))
+                                ? ((float) $kpiGlobal >= 80 ? 'text-[#8fc043] dark:text-[#f8e932]' : ((float) $kpiGlobal >= 60 ? 'text-[#f9b13c] dark:text-[#f8e932]' : 'text-[#f9b13c] dark:text-[#f8e932]'))
                                 : 'text-slate-400 dark:text-slate-500';
                         @endphp
                         <tr>
@@ -184,9 +184,9 @@
                                 <div class="font-semibold text-slate-900 dark:text-slate-100">{{ $row->libelle }}</div>
                                 <p class="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">{{ $row->description ?: 'Aucune description renseignee.' }}</p>
                                 <div class="mt-2 flex flex-wrap gap-2">
-                                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">Type {{ $row->type_cible }}</span>
+                                    <span class="anbg-badge anbg-badge-neutral">Type {{ $row->type_cible }}</span>
                                     @if ($row->date_echeance)
-                                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                        <span class="anbg-badge anbg-badge-neutral">
                                             Echeance {{ \Illuminate\Support\Carbon::parse($row->date_echeance)->format('d/m/Y') }}
                                         </span>
                                     @endif
@@ -194,7 +194,7 @@
                             </td>
                             <td class="min-w-[170px]">
                                 <div class="font-medium text-slate-900 dark:text-slate-100">{{ $row->pta?->titre ?? '-' }}</div>
-                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PTA rattache a l action</p>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PTA rattache a l'action</p>
                             </td>
                             <td class="min-w-[180px]">
                                 <div class="font-medium text-slate-900 dark:text-slate-100">{{ $row->responsable?->name ?? '-' }}</div>
@@ -212,10 +212,10 @@
                             <td class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $row->frequence_execution ?: 'hebdomadaire' }}</td>
                             <td>
                                 <div class="font-semibold text-slate-900 dark:text-slate-100">{{ $semainesRenseignees }}/{{ $semainesTotal }}</div>
-                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">periodes renseignees</p>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Periodes renseignees</p>
                             </td>
                             <td>
-                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $statusClass }}">
+                                <span class="{{ $statusClass }} px-3">
                                     {{ $row->statut_dynamique ?: 'non_demarre' }}
                                 </span>
                             </td>
@@ -225,7 +225,7 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $row->financement_requis ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200' }}">
+                                <span class="{{ $row->financement_requis ? 'anbg-badge anbg-badge-warning' : 'anbg-badge anbg-badge-neutral' }} px-3">
                                     {{ $row->financement_requis ? 'Oui' : 'Non' }}
                                 </span>
                             </td>
@@ -234,7 +234,7 @@
                                     <a class="btn btn-blue btn-sm rounded-xl" href="{{ route('workspace.actions.suivi', $row) }}">Suivi</a>
                                     @if ($canWrite)
                                         <a class="btn btn-amber btn-sm rounded-xl" href="{{ route('workspace.actions.edit', $row) }}">Modifier</a>
-                                        <form method="POST" action="{{ route('workspace.actions.destroy', $row) }}" onsubmit="return confirm('Supprimer cette action ?')">
+                                        <form method="POST" action="{{ route('workspace.actions.destroy', $row) }}" data-confirm-message="Supprimer cette action ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
                                             <button class="btn btn-red btn-sm" type="submit">Supprimer</button>
@@ -252,8 +252,6 @@
             </table>
         </div>
 
-        <div class="mt-4">
-            {{ $rows->links() }}
-        </div>
+        <div class="pagination">{{ $rows->links() }}</div>
     </section>
 @endsection

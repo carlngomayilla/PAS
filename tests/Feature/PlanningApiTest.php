@@ -13,11 +13,13 @@ use App\Models\Service;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\CreatesAdminUser;
 use Tests\TestCase;
 
 class PlanningApiTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesAdminUser;
 
     protected function setUp(): void
     {
@@ -27,8 +29,10 @@ class PlanningApiTest extends TestCase
 
     public function test_admin_can_login_and_access_profile_endpoint(): void
     {
+        $admin = $this->createAdminUser();
+
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'admin@anbg.test',
+            'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit',
         ]);
@@ -48,13 +52,13 @@ class PlanningApiTest extends TestCase
             ->getJson('/api/me');
 
         $meResponse->assertOk()
-            ->assertJsonPath('user.email', 'admin@anbg.test');
+            ->assertJsonPath('user.email', $admin->email);
     }
 
     public function test_direction_user_only_sees_his_direction_paos(): void
     {
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'daf.direction@anbg.test',
+            'email' => 'directeur.daf@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-direction',
         ]);
@@ -78,7 +82,7 @@ class PlanningApiTest extends TestCase
     public function test_service_user_cannot_create_pao_for_another_direction(): void
     {
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'dev.service@anbg.test',
+            'email' => 'arnold.mindzeli@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-service',
         ]);
@@ -105,13 +109,13 @@ class PlanningApiTest extends TestCase
     public function test_service_user_cannot_create_pao_even_for_his_own_service(): void
     {
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'finance.service@anbg.test',
+            'email' => 'robert.ekomi@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-service-own-pao',
         ]);
 
         $token = (string) $loginResponse->json('access_token');
-        $serviceUser = \App\Models\User::query()->where('email', 'finance.service@anbg.test')->firstOrFail();
+        $serviceUser = \App\Models\User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
         $objectifId = (int) PasObjectif::query()->value('id');
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
@@ -130,14 +134,14 @@ class PlanningApiTest extends TestCase
     public function test_direction_user_cannot_create_pao_when_pas_is_not_shared_with_his_direction(): void
     {
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'daf.direction@anbg.test',
+            'email' => 'directeur.daf@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-direction-pao-scope',
         ]);
 
         $token = (string) $loginResponse->json('access_token');
         $dafDirectionId = (int) Direction::query()->where('code', 'DAF')->value('id');
-        $dsiDirectionId = (int) Direction::query()->where('code', 'DSI')->value('id');
+        $dsicDirectionId = (int) Direction::query()->where('code', 'DSIC')->value('id');
 
         $pas = Pas::query()->create([
             'titre' => 'PAS non partage DAF',
@@ -145,7 +149,7 @@ class PlanningApiTest extends TestCase
             'periode_fin' => 2028,
             'statut' => 'brouillon',
         ]);
-        $pas->directions()->sync([$dsiDirectionId]);
+        $pas->directions()->sync([$dsicDirectionId]);
         $axe = PasAxe::query()->create([
             'pas_id' => $pas->id,
             'code' => 'AXE-HORS-SCOPE',
@@ -175,7 +179,7 @@ class PlanningApiTest extends TestCase
     public function test_direction_user_can_create_pao_for_his_own_direction_and_service(): void
     {
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'daf.direction@anbg.test',
+            'email' => 'directeur.daf@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-direction-own-pao',
         ]);
@@ -222,13 +226,13 @@ class PlanningApiTest extends TestCase
     public function test_service_user_can_create_pta_only_for_his_service_pao(): void
     {
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'finance.service@anbg.test',
+            'email' => 'robert.ekomi@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-service-pta',
         ]);
 
         $token = (string) $loginResponse->json('access_token');
-        $serviceUser = \App\Models\User::query()->where('email', 'finance.service@anbg.test')->firstOrFail();
+        $serviceUser = \App\Models\User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
 
         $pao = Pao::query()->create([
             'pas_id' => (int) Pas::query()->value('id'),
@@ -255,7 +259,7 @@ class PlanningApiTest extends TestCase
     public function test_direction_user_cannot_create_pta_directly(): void
     {
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'daf.direction@anbg.test',
+            'email' => 'directeur.daf@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-direction-pta-forbidden',
         ]);
@@ -286,15 +290,17 @@ class PlanningApiTest extends TestCase
 
     public function test_admin_can_create_pas_with_directions_axes_and_objectifs(): void
     {
+        $admin = $this->createAdminUser();
+
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'admin@anbg.test',
+            'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-create-pas-full',
         ]);
 
         $token = (string) $loginResponse->json('access_token');
         $directionIds = Direction::query()
-            ->whereIn('code', ['DAF', 'DSI'])
+            ->whereIn('code', ['DAF', 'DSIC'])
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->values()
@@ -369,19 +375,20 @@ class PlanningApiTest extends TestCase
         ]);
     }
 
-    public function test_service_user_can_submit_weekly_tracking_with_justificatif(): void
+    public function test_agent_user_can_submit_weekly_tracking_with_justificatif(): void
     {
         Storage::fake('local');
 
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'finance.service@anbg.test',
+            'email' => 'melissa.abogo@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-justificatif',
         ]);
 
         $token = (string) $loginResponse->json('access_token');
+        $agent = \App\Models\User::query()->where('email', 'melissa.abogo@anbg.ga')->firstOrFail();
         $action = Action::query()
-            ->where('libelle', 'Automatiser le suivi des engagements')
+            ->where('responsable_id', (int) $agent->id)
             ->firstOrFail();
         $weekId = (int) $action->weeks()->orderBy('numero_semaine')->value('id');
         $this->assertGreaterThan(0, $weekId);
@@ -417,7 +424,7 @@ class PlanningApiTest extends TestCase
     public function test_non_admin_cannot_list_users_from_referentiel_api(): void
     {
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'dg@anbg.test',
+            'email' => 'ingrid@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-non-admin-users-api',
         ]);
@@ -432,8 +439,10 @@ class PlanningApiTest extends TestCase
 
     public function test_alerts_api_returns_unified_items_with_read_state(): void
     {
+        $admin = $this->createAdminUser();
+
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'admin@anbg.test',
+            'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-alerts-api',
         ]);
@@ -463,8 +472,10 @@ class PlanningApiTest extends TestCase
 
     public function test_alerts_api_can_mark_one_alert_as_read(): void
     {
+        $admin = $this->createAdminUser();
+
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'admin@anbg.test',
+            'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-alerts-read-api',
         ]);
@@ -488,7 +499,6 @@ class PlanningApiTest extends TestCase
         $readResponse->assertOk()
             ->assertJsonPath('fingerprint', $first['fingerprint']);
 
-        $admin = \App\Models\User::query()->where('email', 'admin@anbg.test')->firstOrFail();
         $this->assertDatabaseHas('alert_reads', [
             'user_id' => $admin->id,
             'fingerprint' => $first['fingerprint'],
@@ -509,8 +519,10 @@ class PlanningApiTest extends TestCase
 
     public function test_admin_can_consult_reporting_and_audit_endpoints(): void
     {
+        $admin = $this->createAdminUser();
+
         $loginResponse = $this->postJson('/api/login', [
-            'email' => 'admin@anbg.test',
+            'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-reporting',
         ]);

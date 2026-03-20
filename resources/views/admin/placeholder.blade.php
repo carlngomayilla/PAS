@@ -9,7 +9,7 @@
             Cette page est prete pour brancher votre controller metier.
         </p>
         <div class="mt-4 flex flex-wrap gap-2">
-            <a href="{{ route('admin.dashboard') }}" class="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500">
+            <a href="{{ route('admin.dashboard') }}" class="rounded-xl bg-[#3996d3] px-3 py-2 text-sm font-medium text-white hover:bg-[#3996d3]">
                 Retour dashboard
             </a>
             <a href="{{ route('workspace.actions.index') }}" class="rounded-xl bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">

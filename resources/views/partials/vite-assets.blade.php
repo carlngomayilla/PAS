@@ -195,6 +195,15 @@
         color: rgb(226, 232, 240);
     }
 
+    .dark input[type='checkbox'],
+    .dark input[type='radio'] {
+        border-color: rgba(255, 255, 255, 0.16);
+        background: linear-gradient(135deg, rgba(10, 20, 46, 0.96) 0%, rgba(18, 35, 72, 0.92) 100%);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.04),
+            0 6px 16px -14px rgba(57, 150, 211, 0.35);
+    }
+
     .dark .conditional-block {
         border-color: rgba(71, 85, 105, 0.85);
         background: rgba(15, 23, 42, 0.82);
@@ -214,6 +223,28 @@
         background-color: rgba(255, 255, 255, 0.98) !important;
         color: rgb(15, 23, 42) !important;
         box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .admin-theme-scope select {
+        appearance: none;
+        padding-right: 2.8rem;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7 5 5 5-5' stroke='%231c203d' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.95rem center;
+        background-size: 0.95rem;
+    }
+
+    .admin-theme-scope select[multiple] {
+        min-height: 10.5rem;
+        padding: 0.75rem;
+        background-image: none !important;
+        background-position: initial !important;
+        background-size: auto !important;
+    }
+
+    .admin-theme-scope select[multiple] option {
+        padding: 0.45rem 0.6rem;
+        border-radius: 0.55rem;
     }
 
     .admin-theme-scope input:not([type='checkbox']):not([type='radio']) {
@@ -244,10 +275,28 @@
     .dark .admin-theme-scope input:not([type='checkbox']):not([type='radio']),
     .dark .admin-theme-scope select,
     .dark .admin-theme-scope textarea {
-        background-color: rgba(15, 23, 42, 0.92) !important;
-        border-color: rgba(71, 85, 105, 0.95) !important;
+        background: linear-gradient(135deg, rgba(10, 20, 46, 0.96) 0%, rgba(18, 35, 72, 0.92) 100%) !important;
+        border-color: rgba(255, 255, 255, 0.10) !important;
         color: rgb(241, 245, 249) !important;
         caret-color: rgb(248, 250, 252);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.03),
+            0 10px 24px -24px rgba(57, 150, 211, 0.42) !important;
+    }
+
+    .dark .admin-theme-scope select,
+    .dark select {
+        background-image:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7 5 5 5-5' stroke='%23cbd5e1' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
+            linear-gradient(135deg, rgba(10, 20, 46, 0.96) 0%, rgba(18, 35, 72, 0.92) 100%) !important;
+        background-repeat: no-repeat, repeat !important;
+        background-position: right 0.95rem center, center !important;
+        background-size: 0.95rem, 100% 100% !important;
+    }
+
+    .dark .admin-theme-scope select[multiple],
+    .dark select[multiple] {
+        background-image: none !important;
     }
 
     .admin-theme-scope input::placeholder,
@@ -278,8 +327,11 @@
     .dark input:not([type='checkbox']):not([type='radio']):focus,
     .dark select:focus,
     .dark textarea:focus {
-        border-color: rgba(99, 102, 241, 0.95) !important;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3) !important;
+        border-color: rgba(57, 150, 211, 0.55) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.04),
+            0 0 0 3px rgba(57, 150, 211, 0.30),
+            0 16px 28px -24px rgba(57, 150, 211, 0.58) !important;
         outline: none !important;
     }
 
@@ -297,9 +349,25 @@
     .dark input:disabled,
     .dark select:disabled,
     .dark textarea:disabled {
-        background-color: rgba(30, 41, 59, 0.75) !important;
+        background: linear-gradient(135deg, rgba(17, 24, 39, 0.88) 0%, rgba(30, 41, 59, 0.8) 100%) !important;
         color: rgb(148, 163, 184) !important;
-        border-color: rgba(71, 85, 105, 0.65) !important;
+        border-color: rgba(71, 85, 105, 0.55) !important;
+        box-shadow: none !important;
+    }
+
+    .dark .admin-theme-scope input[type='file'] {
+        background: linear-gradient(135deg, rgba(10, 20, 46, 0.96) 0%, rgba(18, 35, 72, 0.92) 100%) !important;
+        border-color: rgba(255, 255, 255, 0.10) !important;
+        color: rgb(241, 245, 249) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.03),
+            0 10px 24px -24px rgba(57, 150, 211, 0.42) !important;
+    }
+
+    .dark .admin-theme-scope input[type='file']::file-selector-button {
+        background: linear-gradient(135deg, rgba(57, 150, 211, 0.95) 0%, rgba(28, 32, 61, 0.98) 100%);
+        color: rgb(240, 249, 255);
+        box-shadow: 0 8px 20px -18px rgba(57, 150, 211, 0.72);
     }
 
     .admin-theme-scope select option,

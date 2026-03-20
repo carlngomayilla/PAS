@@ -50,16 +50,6 @@
         ],
     ];
 
-    // Account section
-    $accountItems = [
-        [
-            'label' => 'Mon profil',
-            'route' => 'workspace.profile.edit',
-            'icon' => 'user',
-            'active' => request()->routeIs('workspace.profile.*'),
-        ],
-    ];
-
     // Reference section (conditional)
     $referenceItems = [];
     if ($isGlobalReader) {
@@ -85,15 +75,18 @@
         'cog' => '<svg viewBox="0 0 24 24" class="h-5 w-5 fill-current"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.02 7.02 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.05.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/></svg>',
     ];
 
-    $name = (string) ($user?->name ?? 'Utilisateur');
-    $initial = strtoupper(substr(trim($name), 0, 1));
 @endphp
 
 <aside class="w-full md:sticky md:top-0 md:h-screen md:w-[280px] md:min-w-[280px]">
-  <div class="flex h-full flex-col bg-gradient-to-b from-slate-950 to-slate-900 text-slate-200">
+  <div class="sidebar-brand-surface flex h-full flex-col text-slate-100">
     <!-- Header -->
     <div class="border-b border-slate-800/50 px-4 py-4">
-      <x-brand.logo variant="wordmark" class="w-full max-w-[10rem] text-white" />
+      <div class="flex items-center">
+        <div class="min-w-0 flex-1">
+          <x-brand.logo variant="wordmark" class="block h-auto w-full max-w-[8.5rem]" />
+          <div class="mt-1 truncate text-[11px] text-slate-400">Pilotage et execution</div>
+        </div>
+      </div>
     </div>
 
     <!-- Navigation -->
@@ -103,7 +96,7 @@
         @foreach ($mainItems as $item)
           <a
             href="{{ route($item['route']) }}"
-            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/50' }}"
+            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-[linear-gradient(135deg,#8fc043_0%,#f0e509_24%,#f9b13c_52%,#3996d3_78%,#1c203d_100%)] text-white shadow-lg shadow-[#3996d3]/35' : 'text-slate-200 hover:text-white hover:bg-white/8' }}"
           >
             <span class="opacity-90">{!! $svgs[$item['icon']] ?? $svgs['grid'] !!}</span>
             <span>{{ $item['label'] }}</span>
@@ -117,7 +110,7 @@
         @foreach ($planningItems as $item)
           <a
             href="{{ route($item['route']) }}"
-            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/50' }}"
+            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-[linear-gradient(135deg,#8fc043_0%,#f0e509_24%,#f9b13c_52%,#3996d3_78%,#1c203d_100%)] text-white shadow-lg shadow-[#3996d3]/35' : 'text-slate-200 hover:text-white hover:bg-white/8' }}"
           >
             <span class="opacity-90">{!! $svgs[$item['icon']] ?? $svgs['grid'] !!}</span>
             <span>{{ $item['label'] }}</span>
@@ -131,7 +124,7 @@
         @foreach ($executionItems as $item)
           <a
             href="{{ route($item['route']) }}"
-            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/50' }}"
+            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-[linear-gradient(135deg,#8fc043_0%,#f0e509_24%,#f9b13c_52%,#3996d3_78%,#1c203d_100%)] text-white shadow-lg shadow-[#3996d3]/35' : 'text-slate-200 hover:text-white hover:bg-white/8' }}"
           >
             <span class="opacity-90">{!! $svgs[$item['icon']] ?? $svgs['grid'] !!}</span>
             <span>{{ $item['label'] }}</span>
@@ -146,7 +139,7 @@
           @foreach ($referenceItems as $item)
             <a
               href="{{ route($item['route']) }}"
-              class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/50' }}"
+              class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-[linear-gradient(135deg,#8fc043_0%,#f0e509_24%,#f9b13c_52%,#3996d3_78%,#1c203d_100%)] text-white shadow-lg shadow-[#3996d3]/35' : 'text-slate-200 hover:text-white hover:bg-white/8' }}"
             >
               <span class="opacity-90">{!! $svgs[$item['icon']] ?? $svgs['grid'] !!}</span>
               <span>{{ $item['label'] }}</span>
@@ -155,52 +148,16 @@
         </div>
       @endif
 
-      <!-- Account Section -->
-      <div class="mb-6">
-        <div class="mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Compte</div>
-        @foreach ($accountItems as $item)
-          <a
-            href="{{ route($item['route']) }}"
-            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/50' }}"
-          >
-            <span class="opacity-90">{!! $svgs[$item['icon']] ?? $svgs['grid'] !!}</span>
-            <span>{{ $item['label'] }}</span>
-          </a>
-        @endforeach
-      </div>
     </nav>
 
-    <!-- Footer - User Profile -->
+    <!-- Footer -->
     <div class="border-t border-slate-800/50 px-4 py-4">
-      <div class="rounded-lg bg-slate-800/30 p-3">
-        <!-- User Info -->
-        <div class="flex items-center gap-3 mb-3">
-          @if ($user?->profile_photo_url)
-            <img src="{{ $user->profile_photo_url }}" alt="Photo de {{ $name }}" class="h-10 w-10 rounded-lg object-cover ring-2 ring-slate-600">
-          @else
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 font-semibold text-white">
-              {{ $initial !== '' ? $initial : 'U' }}
-            </div>
-          @endif
-          <div class="min-w-0">
-            <div class="truncate text-sm font-semibold text-white">{{ $name }}</div>
-            <div class="truncate text-xs text-slate-400">{{ $user?->roleLabel() ?? 'Compte' }}</div>
-          </div>
-        </div>
-
-        <!-- User Actions -->
-        <div class="flex gap-2">
-          <a href="{{ route('workspace.profile.edit') }}" class="flex-1 inline-flex items-center justify-center rounded-md px-2 py-2 text-xs font-medium bg-slate-700/50 text-slate-200 hover:bg-slate-700 transition-colors">
-            Profil
-          </a>
-          <form method="POST" action="{{ route('logout') }}" class="flex-1">
-            @csrf
-            <button type="submit" class="w-full inline-flex items-center justify-center rounded-md px-2 py-2 text-xs font-medium bg-red-700/40 text-red-200 hover:bg-red-700/60 transition-colors">
-              Deconnexion
-            </button>
-          </form>
-        </div>
-      </div>
+      <form method="POST" action="{{ route('logout') }}">
+        @csrf
+        <button type="submit" class="w-full inline-flex items-center justify-center rounded-lg px-3 py-3 text-sm font-medium bg-[linear-gradient(135deg,rgba(249,177,60,0.34)_0%,rgba(240,229,9,0.26)_100%)] text-[#f8e932] hover:brightness-105 transition-colors">
+          Deconnexion
+        </button>
+      </form>
     </div>
   </div>
 </aside>

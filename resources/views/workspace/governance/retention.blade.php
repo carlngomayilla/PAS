@@ -18,10 +18,10 @@
                         <input type="hidden" name="mode" value="dry-run">
                         <button class="btn btn-blue" type="submit">Lancer dry-run</button>
                     </form>
-                    <form method="POST" action="{{ route('workspace.retention.run') }}" onsubmit="return window.confirm('Executer l archivage non destructif maintenant ?');">
+                    <form method="POST" action="{{ route('workspace.retention.run') }}" data-confirm-message="Executer l'archivage non destructif maintenant ?" data-confirm-tone="warning" data-confirm-label="Executer">
                         @csrf
                         <input type="hidden" name="mode" value="execute">
-                        <button class="btn btn-amber" type="submit">Executer archivage</button>
+                        <button class="btn btn-amber" type="submit">Executer l'archivage</button>
                     </form>
                 </div>
             @endif
@@ -70,9 +70,15 @@
                     @forelse ($summary['recent_archives'] as $archive)
                         <tr>
                             <td>{{ $archive->id }}</td>
-                            <td>{{ $archive->source_table }}</td>
+                            <td><span class="anbg-badge anbg-badge-neutral px-3">{{ $archive->source_table }}</span></td>
                             <td>{{ $archive->entity_type }}@if($archive->entity_id) #{{ $archive->entity_id }} @endif</td>
-                            <td>{{ $archive->scope_label ?: '-' }}</td>
+                            <td>
+                                @if ($archive->scope_label)
+                                    <span class="anbg-badge anbg-badge-info px-3">{{ $archive->scope_label }}</span>
+                                @else
+                                    -
+                                @endif
+                            </td>
                             <td>{{ $archive->batch_key ?: '-' }}</td>
                             <td>{{ optional($archive->archived_at)->format('Y-m-d H:i') ?: '-' }}</td>
                         </tr>

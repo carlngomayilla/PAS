@@ -1,3 +1,5 @@
+import { applyAnbgChartDefaults } from './chart-theme';
+
 async function bootReportingAssets() {
   const hasReportingCharts =
     document.getElementById('chart-funnel') ||
@@ -13,6 +15,7 @@ async function bootReportingAssets() {
   ]);
 
   window.Chart = Chart;
+  applyAnbgChartDefaults(Chart);
   window.html2canvas = html2canvasModule.default;
   document.dispatchEvent(new CustomEvent('anbg:reporting-assets-ready'));
 }

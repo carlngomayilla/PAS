@@ -179,12 +179,12 @@ class User extends Authenticatable
     {
         return match ($this->role) {
             self::ROLE_ADMIN => 'Administrateur',
-            self::ROLE_DG => 'Direction Generale',
-            self::ROLE_PLANIFICATION => 'Planification',
-            self::ROLE_DIRECTION => 'Direction',
-            self::ROLE_SERVICE => 'Service',
-            self::ROLE_AGENT => 'Agent executant',
-            self::ROLE_CABINET => 'Cabinet',
+            self::ROLE_DG => 'DG',
+            self::ROLE_PLANIFICATION => 'PLANIFICATION',
+            self::ROLE_DIRECTION => 'DIRECTION',
+            self::ROLE_SERVICE => 'SERVICES',
+            self::ROLE_AGENT => 'AGENT',
+            self::ROLE_CABINET => 'CABINET',
             default => 'Profil non defini',
         };
     }

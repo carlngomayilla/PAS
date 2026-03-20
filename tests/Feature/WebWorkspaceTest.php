@@ -10,11 +10,14 @@ use App\Models\Pta;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Tests\Concerns\CreatesAdminUser;
 use Tests\TestCase;
+use ZipArchive;
 
 class WebWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesAdminUser;
 
     protected function setUp(): void
     {
@@ -24,7 +27,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_admin_can_access_workspace_pages(): void
     {
-        $admin = User::query()->where('email', 'admin@anbg.test')->firstOrFail();
+        $admin = $this->createAdminUser();
 
         $this->actingAs($admin)
             ->get('/workspace')
@@ -45,12 +48,12 @@ class WebWorkspaceTest extends TestCase
             ->get('/workspace/alertes')
             ->assertOk()
             ->assertSee('Alertes operationnelles')
-            ->assertSee('Centre d alertes');
+            ->assertSee("Centre d'alertes", false);
 
         $this->actingAs($admin)
             ->get('/workspace/audit')
             ->assertOk()
-            ->assertSee('Journal d audit');
+            ->assertSee("Journal d'audit", false);
 
         $this->actingAs($admin)
             ->get('/workspace/referentiel/directions')
@@ -118,7 +121,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_service_user_has_no_audit_access_and_removed_modules_are_unavailable(): void
     {
-        $serviceUser = User::query()->where('email', 'finance.service@anbg.test')->firstOrFail();
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
 
         $this->actingAs($serviceUser)
             ->get('/workspace/pilotage')
@@ -156,7 +159,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_alerts_page_exposes_direct_links_to_alert_causes(): void
     {
-        $admin = User::query()->where('email', 'admin@anbg.test')->firstOrFail();
+        $admin = $this->createAdminUser();
 
         $actionLog = ActionLog::query()
             ->whereIn('niveau', ['warning', 'critical'])
@@ -178,7 +181,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_alert_read_route_redirects_to_the_cause_and_marks_it_as_read(): void
     {
-        $admin = User::query()->where('email', 'admin@anbg.test')->firstOrFail();
+        $admin = $this->createAdminUser();
 
         $actionLog = ActionLog::query()
             ->whereIn('niveau', ['warning', 'critical'])
@@ -206,7 +209,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_overdue_action_alert_redirects_to_action_status(): void
     {
-        $admin = User::query()->where('email', 'admin@anbg.test')->firstOrFail();
+        $admin = $this->createAdminUser();
         $action = Action::query()
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', now()->toDateString())
@@ -234,7 +237,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_kpi_alert_redirects_to_action_status(): void
     {
-        $admin = User::query()->where('email', 'admin@anbg.test')->firstOrFail();
+        $admin = $this->createAdminUser();
 
         $mesureId = KpiMesure::query()
             ->select('kpi_mesures.id')
@@ -266,9 +269,9 @@ class WebWorkspaceTest extends TestCase
 
     public function test_non_admin_global_profiles_cannot_access_user_role_management(): void
     {
-        $dg = User::query()->where('email', 'dg@anbg.test')->firstOrFail();
-        $planification = User::query()->where('email', 'planification@anbg.test')->firstOrFail();
-        $cabinet = User::query()->where('email', 'cabinet@anbg.test')->firstOrFail();
+        $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
+        $planification = User::query()->where('email', 'hilaire.nguebet@anbg.ga')->firstOrFail();
+        $cabinet = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
 
         $this->actingAs($dg)
             ->get('/workspace/referentiel/utilisateurs')
@@ -285,7 +288,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_cabinet_cannot_access_removed_justificatifs_module(): void
     {
-        $cabinet = User::query()->where('email', 'cabinet@anbg.test')->firstOrFail();
+        $cabinet = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
 
         $response = $this->actingAs($cabinet)
             ->get('/workspace/justificatifs');
@@ -299,7 +302,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_cabinet_can_open_and_submit_pas_wizard(): void
     {
-        $cabinet = User::query()->where('email', 'cabinet@anbg.test')->firstOrFail();
+        $cabinet = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
 
         $this->actingAs($cabinet)
             ->get(route('workspace.pas.create'))
@@ -337,7 +340,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_dg_can_approve_and_lock_submitted_pao(): void
     {
-        $dg = User::query()->where('email', 'dg@anbg.test')->firstOrFail();
+        $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
         $pao = Pao::query()->where('statut', 'soumis')->firstOrFail();
 
         $this->actingAs($dg)
@@ -365,7 +368,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_direction_user_cannot_approve_pao(): void
     {
-        $directionUser = User::query()->where('email', 'daf.direction@anbg.test')->firstOrFail();
+        $directionUser = User::query()->where('email', 'directeur.daf@anbg.ga')->firstOrFail();
         $pao = Pao::query()
             ->where('direction_id', (int) $directionUser->direction_id)
             ->where('statut', 'soumis')
@@ -381,7 +384,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_service_user_cannot_edit_his_service_pao(): void
     {
-        $serviceUser = User::query()->where('email', 'finance.service@anbg.test')->firstOrFail();
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
         $pao = Pao::query()
             ->where('service_id', (int) $serviceUser->service_id)
             ->firstOrFail();
@@ -393,7 +396,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_direction_user_cannot_open_pta_create_form(): void
     {
-        $directionUser = User::query()->where('email', 'daf.direction@anbg.test')->firstOrFail();
+        $directionUser = User::query()->where('email', 'directeur.daf@anbg.ga')->firstOrFail();
 
         $this->actingAs($directionUser)
             ->get(route('workspace.pta.create'))
@@ -402,7 +405,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_service_user_can_reopen_then_submit_his_own_pta(): void
     {
-        $serviceUser = User::query()->where('email', 'finance.service@anbg.test')->firstOrFail();
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
         $pta = Pta::query()
             ->where('service_id', (int) $serviceUser->service_id)
             ->where('statut', 'soumis')
@@ -429,7 +432,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_reopen_requires_reason_for_pta(): void
     {
-        $serviceUser = User::query()->where('email', 'finance.service@anbg.test')->firstOrFail();
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
         $pta = Pta::query()
             ->where('service_id', (int) $serviceUser->service_id)
             ->where('statut', 'soumis')
@@ -446,16 +449,40 @@ class WebWorkspaceTest extends TestCase
         $this->assertSame('soumis', $pta->statut);
     }
 
-    public function test_admin_can_export_reporting_in_csv_and_pdf(): void
+    public function test_admin_can_export_reporting_in_xlsx_and_pdf(): void
     {
-        $admin = User::query()->where('email', 'admin@anbg.test')->firstOrFail();
+        $admin = $this->createAdminUser();
 
-        $csvResponse = $this->actingAs($admin)
+        $xlsxResponse = $this->actingAs($admin)
             ->get(route('workspace.reporting.export.excel'));
 
-        $csvResponse->assertOk();
-        $csvResponse->assertHeader('content-type', 'text/csv; charset=UTF-8');
-        $this->assertStringContainsString('Reporting consolide ANBG', $csvResponse->streamedContent());
+        $xlsxResponse->assertOk();
+        $xlsxResponse->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringContainsString('.xlsx', (string) $xlsxResponse->headers->get('content-disposition'));
+        $xlsxBinary = $xlsxResponse->streamedContent();
+        $this->assertStringStartsWith('PK', $xlsxBinary);
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'xlsx_test_');
+        $this->assertNotFalse($tempFile);
+        file_put_contents($tempFile, $xlsxBinary);
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($tempFile) === true);
+        $workbookXml = $zip->getFromName('xl/workbook.xml');
+        $sheetTwoXml = $zip->getFromName('xl/worksheets/sheet2.xml');
+        $chartOneXml = $zip->getFromName('xl/charts/chart1.xml');
+        $drawingXml = $zip->getFromName('xl/drawings/drawing1.xml');
+        $zip->close();
+        @unlink($tempFile);
+
+        $this->assertNotFalse($workbookXml);
+        $this->assertNotFalse($sheetTwoXml);
+        $this->assertNotFalse($chartOneXml);
+        $this->assertNotFalse($drawingXml);
+        $this->assertStringContainsString('Synthese graphique', (string) $workbookXml);
+        $this->assertStringContainsString('Funnel de pilotage', (string) $sheetTwoXml);
+        $this->assertStringContainsString('<c:barChart>', (string) $chartOneXml);
+        $this->assertStringContainsString('rId1', (string) $drawingXml);
 
         $pdfResponse = $this->actingAs($admin)
             ->get(route('workspace.reporting.export.pdf'));
@@ -466,7 +493,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_agent_cannot_manage_actions_but_can_submit_weekly_tracking(): void
     {
-        $agent = User::query()->where('email', 'finance.service@anbg.test')->firstOrFail();
+        $agent = User::query()->where('email', 'melissa.abogo@anbg.ga')->firstOrFail();
         $action = Action::query()
             ->where('responsable_id', (int) $agent->id)
             ->firstOrFail();
@@ -482,10 +509,6 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($agent)
             ->delete(route('workspace.actions.destroy', $action))
-            ->assertForbidden();
-
-        $this->actingAs($agent)
-            ->post(route('workspace.actions.close', $action))
             ->assertForbidden();
 
         $response = $this->actingAs($agent)

@@ -1,12 +1,12 @@
 @extends('layouts.guest')
 
 @section('content')
-<div class="lamp-page min-h-screen flex items-center justify-center px-4">
-  <div class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+<div class="lamp-page min-h-screen flex items-center justify-center px-4 py-24 sm:py-28">
+  <div class="w-full max-w-5xl grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-10 items-center">
 
     <section class="relative select-none">
-      <div class="mx-auto max-w-[30rem] text-white">
-        <x-brand.logo variant="full" class="mx-auto w-full max-w-[28rem] opacity-95" />
+      <div class="mx-auto max-w-[27rem] text-white">
+        <x-brand.logo variant="full" class="mx-auto w-full max-w-[18rem] sm:max-w-[22rem] md:max-w-[24rem] h-auto opacity-95" />
       </div>
 
       <div class="lamp mx-auto" id="lampScene">
@@ -33,9 +33,9 @@
       </audio>
     </section>
 
-    <section class="lamp-card rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl p-8" id="loginCard">
-      <div class="mb-6">
-        <x-brand.logo variant="wordmark" class="w-full max-w-[16rem] text-white/95" />
+    <section class="lamp-card rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl sm:p-8" id="loginCard">
+      <div class="mb-5 sm:mb-6">
+        <x-brand.logo variant="wordmark" class="w-full max-w-[11.5rem] sm:max-w-[13.5rem] h-auto" />
       </div>
       <h1 class="text-xl font-extrabold text-white">Connexion</h1>
       <p class="mt-1 text-sm text-slate-300">Accede a ton espace.</p>
@@ -47,31 +47,31 @@
           <label class="text-xs font-semibold text-slate-300">Email ou matricule</label>
           <input
             type="text" name="email" required autofocus value="{{ old('email') }}"
-            class="mt-2 w-full rounded-xl bg-black/25 border border-white/10 px-4 py-3 text-white
-                   placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+            class="mt-2 w-full rounded-xl border border-white/10 bg-[linear-gradient(135deg,rgba(10,20,46,0.96)_0%,rgba(18,35,72,0.92)_100%)] px-4 py-3 text-white
+                   placeholder:text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_-24px_rgba(57,150,211,0.42)] focus:border-[#3996d3]/55 focus:outline-none focus:ring-2 focus:ring-[#3996d3]/30"
             placeholder="ex: a1-01@anbg.test ou A1-01"
           >
-          @error('email') <div class="mt-1 text-xs text-red-400">{{ $message }}</div> @enderror
+          @error('email') <div class="field-error">{{ $message }}</div> @enderror
         </div>
 
         <div>
           <label class="text-xs font-semibold text-slate-300">Mot de passe</label>
           <input
             type="password" name="password" required
-            class="mt-2 w-full rounded-xl bg-black/25 border border-white/10 px-4 py-3 text-white
-                   placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+            class="mt-2 w-full rounded-xl border border-white/10 bg-[linear-gradient(135deg,rgba(10,20,46,0.96)_0%,rgba(18,35,72,0.92)_100%)] px-4 py-3 text-white
+                   placeholder:text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_-24px_rgba(57,150,211,0.42)] focus:border-[#3996d3]/55 focus:outline-none focus:ring-2 focus:ring-[#3996d3]/30"
             placeholder="********"
           >
-          @error('password') <div class="mt-1 text-xs text-red-400">{{ $message }}</div> @enderror
+          @error('password') <div class="field-error">{{ $message }}</div> @enderror
         </div>
 
         <div class="flex items-center justify-between">
           <label class="flex items-center gap-2 text-sm text-slate-300">
-            <input type="checkbox" name="remember" class="rounded border-white/20 bg-black/30">
+            <input type="checkbox" name="remember" class="h-4 w-4">
             Se souvenir
           </label>
           @if (Route::has('password.request'))
-            <a class="text-sm text-sky-300 hover:text-lime-200" href="{{ route('password.request') }}">
+            <a class="text-sm text-[#3996d3] hover:text-[#f8e932]" href="{{ route('password.request') }}">
               Mot de passe oublie ?
             </a>
           @endif
@@ -79,8 +79,8 @@
 
         <button
           type="submit"
-          class="w-full rounded-xl py-3 font-bold text-slate-950
-                 bg-gradient-to-r from-[#C7E54B] via-[#75BC43] to-[#34B8FF]
+          class="w-full rounded-xl py-3 font-bold text-[#1c203d]
+                 bg-gradient-to-r from-[#8fc043] via-[#f8e932] to-[#f9b13c]
                  hover:brightness-105 transition"
         >
           Se connecter

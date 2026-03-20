@@ -28,7 +28,7 @@ class DashboardProfileInteractionsTest extends TestCase
     {
         $this->seed();
 
-        $user = User::query()->where('email', 'finance.service@anbg.test')->firstOrFail();
+        $user = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
 
         $response = $this->actingAs($user)->get('/dashboard');
 

@@ -23,11 +23,11 @@
                         {{ $ptaOptions->count() }} PTA disponibles
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-emerald-500"></span>
+                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
                         {{ $responsableOptions->count() }} agents executants eligibles
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot {{ $targetType === 'quantitative' ? 'bg-indigo-500' : 'bg-amber-500' }}"></span>
+                        <span class="showcase-chip-dot {{ $targetType === 'quantitative' ? 'bg-[#3996d3]' : 'bg-[#f0e509]' }}"></span>
                         Cible {{ $targetType }}
                     </span>
                 </div>
@@ -114,7 +114,7 @@
                             @endforeach
                         </select>
                         @if ($responsableOptions->isEmpty())
-                            <p class="field-hint text-amber-600">
+                            <p class="field-hint text-[#f9b13c]">
                                 Aucun agent executant disponible pour votre perimetre.
                             </p>
                         @endif

@@ -2,8 +2,8 @@
 
 @section('content')
     <section class="ui-card mb-3.5">
-        <h1>Journal d audit</h1>
-        <p class="text-slate-600">Trace des operations effectuees dans l application.</p>
+        <h1>Journal d'audit</h1>
+        <p class="text-slate-600">Trace des operations effectuees dans l'application.</p>
     </section>
 
     <section class="ui-card mb-3.5">
@@ -23,11 +23,11 @@
                     <input id="user_id" name="user_id" type="number" value="{{ $filters['user_id'] }}">
                 </div>
                 <div>
-                    <label for="entite_type">Entite type</label>
+                    <label for="entite_type">Type d'entite</label>
                     <input id="entite_type" name="entite_type" type="text" value="{{ $filters['entite_type'] }}">
                 </div>
                 <div>
-                    <label for="entite_id">Entite ID</label>
+                    <label for="entite_id">ID entite</label>
                     <input id="entite_id" name="entite_id" type="number" value="{{ $filters['entite_id'] }}">
                 </div>
                 <div>
@@ -64,19 +64,16 @@
                             <td>{{ $log->created_at }}</td>
                             <td>{{ $log->user?->email ?? '-' }}</td>
                             <td>{{ $log->module }}</td>
-                            <td><span class="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">{{ $log->action }}</span></td>
+                            <td><span class="anbg-badge anbg-badge-neutral px-3">{{ $log->action }}</span></td>
                             <td>{{ class_basename($log->entite_type) }} #{{ $log->entite_id }}</td>
                             <td>{{ $log->adresse_ip ?? '-' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="text-slate-600">Aucune entree d audit.</td></tr>
+                        <tr><td colspan="7" class="text-slate-600">Aucune entree d'audit.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-        <div class="mt-3">
-            {{ $logs->links() }}
-        </div>
+        <div class="pagination">{{ $logs->links() }}</div>
     </section>
 @endsection
-

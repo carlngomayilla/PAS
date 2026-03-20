@@ -16,16 +16,16 @@
                         {{ $profil['role_label'] }}
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-indigo-500"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         {{ $profil['scope'] }}
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-emerald-500"></span>
+                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
                         {{ $user->direction?->libelle ?? 'Sans direction' }} / {{ $user->service?->libelle ?? 'Sans service' }}
                     </span>
                 </div>
                 @if ($passwordExpired)
-                    <p class="mt-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/20 dark:text-amber-200">
+                    <p class="mt-4 rounded-2xl border border-[#f9b13c]/40 bg-[#fff8d6] px-4 py-3 text-sm text-[#1c203d] dark:border-[#f9b13c]/35 dark:bg-[#f9b13c]/10 dark:text-[#f8e932]">
                         Mot de passe expire. Le renouvellement est obligatoire pour acceder aux autres modules.
                     </p>
                 @endif
@@ -181,7 +181,7 @@
                         <tr class="border-t border-slate-200 dark:border-slate-800">
                             <td class="px-3 py-2">
                                 @if ($session['is_current'])
-                                    <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Session courante</span>
+                                    <span class="rounded-full bg-[#eef6e1] px-2 py-1 text-xs font-semibold text-[#1c203d] dark:bg-[#8fc043]/15 dark:text-[#f8e932]">Session courante</span>
                                 @else
                                     <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">Active</span>
                                 @endif

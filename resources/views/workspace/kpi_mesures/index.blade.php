@@ -85,8 +85,8 @@
                             @if ($canWrite)
                                 <td>
                                     <div class="flex flex-wrap gap-1.5">
-                                        <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-amber-700 text-white hover:bg-amber-600" href="{{ route('workspace.kpi-mesures.edit', $row) }}">Modifier</a>
-                                        <form method="POST" action="{{ route('workspace.kpi-mesures.destroy', $row) }}" onsubmit="return confirm('Supprimer cette mesure KPI ?')">
+                                        <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-[#f9b13c] text-white hover:brightness-105" href="{{ route('workspace.kpi-mesures.edit', $row) }}">Modifier</a>
+                                        <form method="POST" action="{{ route('workspace.kpi-mesures.destroy', $row) }}" data-confirm-message="Supprimer cette mesure KPI ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
                                             <button class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-red-700 text-white hover:bg-red-600" type="submit">Supprimer</button>
@@ -103,8 +103,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="mt-3">
-            {{ $rows->links() }}
-        </div>
+        <div class="pagination">{{ $rows->links() }}</div>
     </section>
 @endsection

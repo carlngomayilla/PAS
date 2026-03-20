@@ -6,18 +6,18 @@
         <p class="text-slate-600">Une direction peut contenir plusieurs services.</p>
         @if ($canWrite)
             <p class="mt-2.5">
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" href="{{ route('workspace.referentiel.services.create') }}">Nouveau service</a>
+                <a class="btn btn-green" href="{{ route('workspace.referentiel.services.create') }}">Nouveau service</a>
             </p>
         @endif
     </section>
 
     <section class="ui-card mb-3.5">
-        <h2>Navigation referentiel</h2>
+        <h2>Navigation du referentiel</h2>
         <div class="flex flex-wrap gap-1.5">
-            <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.referentiel.directions.index') }}">Directions</a>
-            <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-slate-900 text-white hover:bg-slate-800" href="{{ route('workspace.referentiel.services.index') }}">Services</a>
+            <a class="btn btn-blue" href="{{ route('workspace.referentiel.directions.index') }}">Directions</a>
+            <a class="btn btn-primary" href="{{ route('workspace.referentiel.services.index') }}">Services</a>
             @if ($canManageRoles)
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Utilisateurs</a>
+                <a class="btn btn-blue" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Utilisateurs</a>
             @endif
         </div>
     </section>
@@ -51,8 +51,8 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-1.5">
-                <button class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-slate-900 text-white hover:bg-slate-800" type="submit">Appliquer</button>
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.referentiel.services.index') }}">Reinitialiser</a>
+                <button class="btn btn-primary" type="submit">Appliquer</button>
+                <a class="btn btn-blue" href="{{ route('workspace.referentiel.services.index') }}">Reinitialiser</a>
             </div>
         </form>
     </section>
@@ -80,7 +80,7 @@
                         <tr>
                             <td>{{ $row->id }}</td>
                             <td>{{ $row->direction?->code }} - {{ $row->direction?->libelle }}</td>
-                            <td><span class="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">{{ $row->code }}</span></td>
+                            <td><span class="anbg-badge anbg-badge-neutral px-3">{{ $row->code }}</span></td>
                             <td>{{ $row->libelle }}</td>
                             <td>{{ $row->actif ? 'Oui' : 'Non' }}</td>
                             <td>{{ $row->users_count }}</td>
@@ -88,11 +88,11 @@
                             @if ($canWrite)
                                 <td>
                                     <div class="flex flex-wrap gap-1.5">
-                                        <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-amber-700 text-white hover:bg-amber-600" href="{{ route('workspace.referentiel.services.edit', $row) }}">Modifier</a>
-                                        <form method="POST" action="{{ route('workspace.referentiel.services.destroy', $row) }}" onsubmit="return confirm('Supprimer ce service ?')">
+                                        <a class="btn btn-amber" href="{{ route('workspace.referentiel.services.edit', $row) }}">Modifier</a>
+                                        <form method="POST" action="{{ route('workspace.referentiel.services.destroy', $row) }}" data-confirm-message="Supprimer ce service ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-red-700 text-white hover:bg-red-600" type="submit">Supprimer</button>
+                                            <button class="btn btn-red" type="submit">Supprimer</button>
                                         </form>
                                     </div>
                                 </td>
@@ -106,6 +106,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="mt-3">{{ $rows->links() }}</div>
+        <div class="pagination">{{ $rows->links() }}</div>
     </section>
 @endsection

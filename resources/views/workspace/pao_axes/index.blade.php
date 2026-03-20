@@ -1,6 +1,14 @@
 @extends('layouts.workspace')
 
 @section('content')
+    @php
+        $legacyWorkflowBadges = [
+            'brouillon' => 'anbg-badge anbg-badge-neutral',
+            'soumis' => 'anbg-badge anbg-badge-warning',
+            'valide' => 'anbg-badge anbg-badge-success',
+            'verrouille' => 'anbg-badge anbg-badge-info',
+        ];
+    @endphp
     <section class="ui-card mb-3.5">
         <h1>PAO - Axes strategiques</h1>
         <p class="text-slate-600">Declinaison annuelle des axes du PAO attribue a une direction precise.</p>
@@ -59,14 +67,19 @@
                     @forelse ($rows as $row)
                         <tr>
                             <td>{{ $row->id }}</td>
-                            <td><span class="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">{{ $row->code }}</span></td>
+                            <td><span class="anbg-badge anbg-badge-neutral px-3">{{ $row->code }}</span></td>
                             <td>
                                 <strong>{{ $row->libelle }}</strong><br>
                                 <span class="text-slate-600">{{ $row->description ?: '-' }}</span>
                             </td>
                             <td>
                                 {{ $row->pao?->titre ?? '-' }}<br>
-                                <span class="text-slate-600">{{ $row->pao?->annee ?? '-' }} | {{ $row->pao?->statut ?? '' }}</span>
+                                <span class="text-slate-600">{{ $row->pao?->annee ?? '-' }}</span>
+                                @if ($row->pao?->statut)
+                                    <span class="{{ $legacyWorkflowBadges[$row->pao->statut] ?? 'anbg-badge anbg-badge-neutral' }} px-3 ml-2">
+                                        {{ $row->pao->statut }}
+                                    </span>
+                                @endif
                             </td>
                             <td>{{ $row->ordre }}</td>
                             <td>{{ $row->objectifs_strategiques_count }}</td>
@@ -74,7 +87,7 @@
                                 <td>
                                     <div class="flex flex-wrap gap-1.5">
                                         <a class="btn btn-amber" href="{{ route('workspace.pao-axes.edit', $row) }}">Modifier</a>
-                                        <form method="POST" action="{{ route('workspace.pao-axes.destroy', $row) }}" onsubmit="return confirm('Supprimer cet axe ?')">
+                                        <form method="POST" action="{{ route('workspace.pao-axes.destroy', $row) }}" data-confirm-message="Supprimer cet axe ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
                                             <button class="btn btn-red btn-sm" type="submit">Supprimer</button>
@@ -91,8 +104,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="mt-3">
-            {{ $rows->links() }}
-        </div>
+        <div class="pagination">{{ $rows->links() }}</div>
     </section>
 @endsection

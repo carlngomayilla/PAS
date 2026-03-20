@@ -57,8 +57,8 @@
 
         <x-admin.sidebar :notification-counts="$headerUnreadByModule" :unread-total="$headerUnreadCount" />
 
-        <div class="lg:pl-72">
-            <header class="sticky top-0 z-30 border-b border-sky-100/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.95)_0%,rgba(242,250,255,0.92)_100%)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/60">
+        <div class="lg:pl-32">
+            <header class="sticky top-0 z-30 border-b border-[#3996d3]/18 bg-[linear-gradient(135deg,rgba(255,255,255,0.96)_0%,rgba(238,244,249,0.94)_100%)] backdrop-blur dark:border-white/10 dark:bg-none dark:bg-[linear-gradient(180deg,rgba(4,17,37,0.94)_0%,rgba(13,24,52,0.92)_100%)]">
                 <div class="flex h-16 items-center gap-3 px-4 sm:px-6">
                     <button
                         type="button"
@@ -71,9 +71,11 @@
                         </svg>
                     </button>
 
-                    <div class="flex-1">
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Administration</p>
-                        <h1 class="text-base font-semibold leading-tight sm:text-lg">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Administration</p>
+                        </div>
+                        <h1 class="truncate text-base font-semibold leading-tight sm:text-lg">
                             @yield('title', 'Dashboard')
                         </h1>
                     </div>
@@ -86,7 +88,7 @@
                                 </svg>
                             </span>
                             <input
-                                class="w-full rounded-xl border border-sky-100 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(243,250,255,0.95)_100%)] px-9 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-400/35 dark:border-slate-800 dark:bg-slate-900"
+                                class="w-full rounded-xl border border-[#3996d3]/18 bg-[linear-gradient(135deg,rgba(255,255,255,0.99)_0%,rgba(245,249,252,0.96)_100%)] px-9 py-2 text-sm outline-none focus:ring-2 focus:ring-[#3996d3]/30 dark:border-white/10 dark:bg-none dark:bg-[linear-gradient(135deg,rgba(10,20,46,0.96)_0%,rgba(18,35,72,0.92)_100%)] dark:text-slate-100 dark:placeholder:text-slate-400"
                                 placeholder="Rechercher..."
                             />
                         </div>
@@ -114,7 +116,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .53-.21 1.04-.59 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                             </svg>
                             @if ($headerUnreadCount > 0)
-                                <span class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white">
+                                <span class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#f9b13c] px-1 text-[10px] font-semibold leading-none text-[#1c203d]">
                                     {{ $headerUnreadCount > 99 ? '99+' : $headerUnreadCount }}
                                 </span>
                             @endif
@@ -122,7 +124,7 @@
 
                         <div
                             id="header-notifications-menu"
-                            class="absolute right-0 z-40 mt-2 hidden w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950"
+                            class="admin-dropdown-panel absolute right-0 z-40 mt-2 hidden w-[340px] overflow-hidden rounded-2xl"
                         >
                             <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800">
                                 <div>
@@ -133,9 +135,9 @@
                                     @csrf
                                     <button
                                         type="submit"
-                                        class="rounded-lg px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-slate-900"
+                                        class="rounded-lg px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#e8f3fb] dark:text-[#8fc043] dark:hover:bg-slate-900"
                                     >
-                                        Tout marquer lu
+                                        Tout marquer comme lu
                                     </button>
                                 </form>
                             </div>
@@ -158,13 +160,13 @@
                                     @endphp
                                     <a
                                         href="{{ route('workspace.notifications.read', $notification->id) }}"
-                                        class="block border-b border-slate-100 px-3 py-2 transition last:border-b-0 hover:bg-slate-50 dark:border-slate-900 dark:hover:bg-slate-900/60 {{ $isUnread ? 'bg-indigo-50/70 dark:bg-indigo-950/20' : '' }}"
+                                        class="block border-b border-slate-100 px-3 py-2 transition last:border-b-0 hover:bg-slate-50 dark:border-slate-900 dark:hover:bg-slate-900/60 {{ $isUnread ? 'bg-[#e8f3fb]/70 dark:bg-[#3996d3]/10' : '' }}"
                                     >
                                         <div class="mb-1 flex items-start justify-between gap-2">
                                             <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
                                                 {{ $notification->data['title'] ?? 'Notification' }}
                                             </p>
-                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                            <span class="anbg-badge anbg-badge-neutral px-2 py-0.5 text-[10px] uppercase tracking-wide leading-none">
                                                 {{ $moduleLabel }}
                                             </span>
                                         </div>
@@ -185,30 +187,61 @@
                     </div>
 
                     <div class="flex items-center gap-3">
-                        <div class="hidden text-right sm:block">
-                            <p class="text-sm font-medium">{{ auth()->user()?->name ?? 'Utilisateur' }}</p>
+                        <a href="{{ route('workspace.profile.edit') }}" class="hidden text-right transition-opacity hover:opacity-75 sm:block">
+                            <p class="text-sm font-medium dark:text-slate-100">{{ auth()->user()?->name ?? 'Utilisateur' }}</p>
                             <p class="text-xs text-slate-500 dark:text-slate-400">{{ auth()->user()?->roleLabel() ?? 'Compte' }}</p>
-                        </div>
-                        @if (auth()->user()?->profile_photo_url)
-                            <img src="{{ auth()->user()->profile_photo_url }}" alt="Avatar" class="h-9 w-9 rounded-2xl object-cover">
-                        @else
-                            <div class="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-bold text-white">
-                                {{ auth()->user()?->profile_initials ?? 'U' }}
-                            </div>
-                        @endif
+                        </a>
+                        <a href="{{ route('workspace.profile.edit') }}" class="inline-flex items-center justify-center rounded-2xl hover:opacity-75 transition-opacity">
+                            @if (auth()->user()?->profile_photo_url)
+                                <img src="{{ auth()->user()->profile_photo_url }}" alt="Avatar" class="h-9 w-9 rounded-2xl object-cover">
+                            @else
+                                <div class="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[#3996d3] to-[#1c203d] text-xs font-bold text-white">
+                                    {{ auth()->user()?->profile_initials ?? 'U' }}
+                                </div>
+                            @endif
+                        </a>
                     </div>
                 </div>
             </header>
 
             <main class="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
                 @if (session('success'))
-                    <div class="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-green-700 shadow-sm">{{ session('success') }}</div>
+                    <div class="flash-success">{{ session('success') }}</div>
                 @endif
                 @if ($errors->any())
-                    <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700 shadow-sm">{{ $errors->first() }}</div>
+                    <div class="flash-error">{{ $errors->first() }}</div>
                 @endif
                 @yield('content')
             </main>
+        </div>
+    </div>
+
+    <div id="anbg-dialog" class="anbg-dialog hidden" aria-hidden="true">
+        <div class="anbg-dialog-backdrop" data-dialog-dismiss></div>
+        <div class="anbg-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="anbg-dialog-title">
+            <div class="anbg-dialog-header">
+                <div>
+                    <p id="anbg-dialog-eyebrow" class="anbg-dialog-eyebrow">Confirmation</p>
+                    <h2 id="anbg-dialog-title" class="anbg-dialog-title">Confirmer l'action</h2>
+                </div>
+                <button type="button" id="anbg-dialog-close" class="anbg-dialog-close" aria-label="Fermer la boite de dialogue">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="anbg-dialog-body">
+                <p id="anbg-dialog-message" class="anbg-dialog-message"></p>
+                <div id="anbg-dialog-input-wrap" class="hidden">
+                    <label id="anbg-dialog-input-label" for="anbg-dialog-input" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Valeur</label>
+                    <input id="anbg-dialog-input" type="text" autocomplete="off">
+                    <p id="anbg-dialog-error" class="field-error hidden"></p>
+                </div>
+            </div>
+            <div class="anbg-dialog-actions">
+                <button type="button" id="anbg-dialog-cancel" class="btn btn-secondary">Annuler</button>
+                <button type="button" id="anbg-dialog-confirm" class="btn btn-primary">Confirmer</button>
+            </div>
         </div>
     </div>
 
@@ -222,6 +255,9 @@
                 var isDark = theme === 'dark';
                 root.classList.toggle('dark', isDark);
                 root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+                window.dispatchEvent(new CustomEvent('anbg:theme-changed', {
+                    detail: { theme: isDark ? 'dark' : 'light' }
+                }));
                 return isDark;
             }
 
@@ -242,9 +278,30 @@
             var openButton = document.getElementById('admin-sidebar-open');
             var closeButton = document.getElementById('admin-sidebar-close');
             var overlay = document.getElementById('admin-overlay');
+            var sidebarLabelScroll = sidebar ? sidebar.querySelector('[data-gooey-nav-scroll]') : null;
+            var sidebarLabelLayer = sidebar ? sidebar.querySelector('[data-gooey-label-layer]') : null;
+            var sidebarFloatingLabel = sidebar ? sidebar.querySelector('[data-gooey-floating-label]') : null;
+            var sidebarLabelItems = sidebar ? Array.prototype.slice.call(sidebar.querySelectorAll('.gooey-item[data-label]')) : [];
+            var sidebarActiveLabelItem = sidebar ? sidebar.querySelector('.gooey-item[data-active="1"]') : null;
+            var sidebarCurrentLabelItem = null;
             var notificationsWrapper = document.getElementById('header-notifications');
             var notificationsToggle = document.getElementById('header-notifications-toggle');
             var notificationsMenu = document.getElementById('header-notifications-menu');
+            var dialogRoot = document.getElementById('anbg-dialog');
+            var dialogBackdrop = dialogRoot ? dialogRoot.querySelector('[data-dialog-dismiss]') : null;
+            var dialogClose = document.getElementById('anbg-dialog-close');
+            var dialogTitle = document.getElementById('anbg-dialog-title');
+            var dialogEyebrow = document.getElementById('anbg-dialog-eyebrow');
+            var dialogMessage = document.getElementById('anbg-dialog-message');
+            var dialogInputWrap = document.getElementById('anbg-dialog-input-wrap');
+            var dialogInputLabel = document.getElementById('anbg-dialog-input-label');
+            var dialogInput = document.getElementById('anbg-dialog-input');
+            var dialogError = document.getElementById('anbg-dialog-error');
+            var dialogCancel = document.getElementById('anbg-dialog-cancel');
+            var dialogConfirm = document.getElementById('anbg-dialog-confirm');
+            var dialogResolver = null;
+            var dialogLastFocused = null;
+            var dialogState = null;
 
             function openSidebar() {
                 if (!sidebar || !overlay) {
@@ -272,6 +329,90 @@
                 overlay.addEventListener('click', closeSidebar);
             }
 
+            function sidebarLabelsEnabled() {
+                return !!(sidebar && sidebarLabelLayer && sidebarFloatingLabel) && window.matchMedia('(min-width: 1024px)').matches;
+            }
+
+            function hideSidebarFloatingLabel() {
+                if (!sidebarFloatingLabel) {
+                    return;
+                }
+
+                sidebarFloatingLabel.classList.remove('is-visible');
+                sidebarCurrentLabelItem = null;
+            }
+
+            function showSidebarFloatingLabel(item) {
+                if (!sidebarLabelsEnabled() || !item || !sidebarFloatingLabel || !sidebar) {
+                    hideSidebarFloatingLabel();
+                    return;
+                }
+
+                var trigger = item.querySelector('.gooey-link, .gooey-logout');
+                var label = item.dataset.label;
+
+                if (!trigger || !label) {
+                    hideSidebarFloatingLabel();
+                    return;
+                }
+
+                var sidebarRect = sidebar.getBoundingClientRect();
+                var triggerRect = trigger.getBoundingClientRect();
+                var top = triggerRect.top - sidebarRect.top + (triggerRect.height / 2);
+                var left = triggerRect.right - sidebarRect.left + 10;
+
+                sidebarFloatingLabel.textContent = label;
+                sidebarFloatingLabel.style.top = top + 'px';
+                sidebarFloatingLabel.style.left = left + 'px';
+                sidebarFloatingLabel.classList.add('is-visible');
+                sidebarCurrentLabelItem = item;
+            }
+
+            function restoreSidebarFloatingLabel() {
+                if (!sidebarLabelsEnabled()) {
+                    hideSidebarFloatingLabel();
+                    return;
+                }
+
+                if (sidebarActiveLabelItem) {
+                    showSidebarFloatingLabel(sidebarActiveLabelItem);
+                    return;
+                }
+
+                hideSidebarFloatingLabel();
+            }
+
+            sidebarLabelItems.forEach(function (item) {
+                var trigger = item.querySelector('.gooey-link, .gooey-logout');
+                if (!trigger) {
+                    return;
+                }
+
+                item.addEventListener('mouseenter', function () {
+                    showSidebarFloatingLabel(item);
+                });
+
+                item.addEventListener('mouseleave', function () {
+                    restoreSidebarFloatingLabel();
+                });
+
+                trigger.addEventListener('focus', function () {
+                    showSidebarFloatingLabel(item);
+                });
+
+                trigger.addEventListener('blur', function () {
+                    window.requestAnimationFrame(restoreSidebarFloatingLabel);
+                });
+            });
+
+            if (sidebarLabelScroll) {
+                sidebarLabelScroll.addEventListener('scroll', function () {
+                    if (sidebarCurrentLabelItem) {
+                        showSidebarFloatingLabel(sidebarCurrentLabelItem);
+                    }
+                });
+            }
+
             function openNotificationsMenu() {
                 if (!notificationsMenu) {
                     return;
@@ -284,6 +425,120 @@
                     return;
                 }
                 notificationsMenu.classList.add('hidden');
+            }
+
+            function resetDialog() {
+                if (!dialogRoot) {
+                    return;
+                }
+
+                dialogRoot.classList.add('hidden');
+                dialogRoot.setAttribute('aria-hidden', 'true');
+
+                if (dialogInputWrap) {
+                    dialogInputWrap.classList.add('hidden');
+                }
+
+                if (dialogInput) {
+                    dialogInput.value = '';
+                }
+
+                if (dialogError) {
+                    dialogError.textContent = '';
+                    dialogError.classList.add('hidden');
+                }
+
+                dialogState = null;
+
+                if (dialogLastFocused && typeof dialogLastFocused.focus === 'function') {
+                    dialogLastFocused.focus();
+                }
+                dialogLastFocused = null;
+            }
+
+            function resolveDialog(payload) {
+                var resolver = dialogResolver;
+                dialogResolver = null;
+                resetDialog();
+                if (typeof resolver === 'function') {
+                    resolver(payload);
+                }
+            }
+
+            function openDialog(options) {
+                if (!dialogRoot || !dialogTitle || !dialogMessage || !dialogCancel || !dialogConfirm) {
+                    return Promise.resolve({ confirmed: false, value: null });
+                }
+
+                dialogLastFocused = document.activeElement;
+                dialogState = options || {};
+
+                dialogRoot.classList.remove('hidden');
+                dialogRoot.setAttribute('aria-hidden', 'false');
+
+                if (dialogEyebrow) {
+                    dialogEyebrow.textContent = dialogState.eyebrow || 'Confirmation';
+                }
+
+                dialogTitle.textContent = dialogState.title || 'Confirmer l action';
+                dialogMessage.textContent = dialogState.message || '';
+                dialogCancel.textContent = dialogState.cancelLabel || 'Annuler';
+                dialogConfirm.textContent = dialogState.confirmLabel || 'Confirmer';
+                dialogConfirm.dataset.tone = dialogState.tone || 'primary';
+
+                if (dialogInputWrap && dialogInput && dialogInputLabel) {
+                    var hasPrompt = dialogState.mode === 'prompt';
+                    dialogInputWrap.classList.toggle('hidden', !hasPrompt);
+                    dialogInputLabel.textContent = dialogState.inputLabel || 'Valeur';
+                    dialogInput.placeholder = dialogState.inputPlaceholder || '';
+                    dialogInput.value = dialogState.initialValue || '';
+                }
+
+                if (dialogError) {
+                    dialogError.textContent = '';
+                    dialogError.classList.add('hidden');
+                }
+
+                window.requestAnimationFrame(function () {
+                    if (dialogState && dialogState.mode === 'prompt' && dialogInput) {
+                        dialogInput.focus();
+                        dialogInput.select();
+                    } else {
+                        dialogConfirm.focus();
+                    }
+                });
+
+                return new Promise(function (resolve) {
+                    dialogResolver = resolve;
+                });
+            }
+
+            function submitDialogConfirm() {
+                if (!dialogState) {
+                    resolveDialog({ confirmed: false, value: null });
+                    return;
+                }
+
+                if (dialogState.mode === 'prompt') {
+                    var value = dialogInput ? dialogInput.value.trim() : '';
+                    var minLength = Number(dialogState.minLength || 0);
+
+                    if (value.length < minLength) {
+                        if (dialogError) {
+                            dialogError.textContent = 'Veuillez saisir au moins ' + minLength + ' caracteres.';
+                            dialogError.classList.remove('hidden');
+                        }
+                        if (dialogInput) {
+                            dialogInput.focus();
+                        }
+                        return;
+                    }
+
+                    resolveDialog({ confirmed: true, value: value });
+                    return;
+                }
+
+                resolveDialog({ confirmed: true, value: null });
             }
 
             if (notificationsToggle) {
@@ -311,8 +566,104 @@
                 closeNotificationsMenu();
             });
 
+            if (dialogBackdrop) {
+                dialogBackdrop.addEventListener('click', function () {
+                    resolveDialog({ confirmed: false, value: null });
+                });
+            }
+
+            if (dialogClose) {
+                dialogClose.addEventListener('click', function () {
+                    resolveDialog({ confirmed: false, value: null });
+                });
+            }
+
+            if (dialogCancel) {
+                dialogCancel.addEventListener('click', function () {
+                    resolveDialog({ confirmed: false, value: null });
+                });
+            }
+
+            if (dialogConfirm) {
+                dialogConfirm.addEventListener('click', submitDialogConfirm);
+            }
+
+            if (dialogInput) {
+                dialogInput.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        submitDialogConfirm();
+                    }
+                });
+            }
+
+            document.addEventListener('submit', function (event) {
+                var form = event.target;
+
+                if (!(form instanceof HTMLFormElement)) {
+                    return;
+                }
+
+                var confirmMessage = form.dataset.confirmMessage;
+                var promptMessage = form.dataset.promptMessage;
+
+                if (!confirmMessage && !promptMessage) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                if (promptMessage) {
+                    openDialog({
+                        mode: 'prompt',
+                        eyebrow: form.dataset.promptTitle || 'Retour brouillon',
+                        title: form.dataset.promptTitle || 'Retour brouillon',
+                        message: promptMessage,
+                        tone: 'primary',
+                        confirmLabel: form.dataset.promptConfirm || 'Confirmer',
+                        cancelLabel: form.dataset.promptCancel || 'Annuler',
+                        inputLabel: form.dataset.promptLabel || 'Motif',
+                        inputPlaceholder: form.dataset.promptPlaceholder || '',
+                        minLength: Number(form.dataset.promptMinlength || 0),
+                    }).then(function (result) {
+                        if (!result.confirmed) {
+                            return;
+                        }
+
+                        var targetName = form.dataset.promptTarget || 'motif_retour';
+                        var targetInput = form.querySelector('[name=\"' + targetName + '\"]');
+                        if (targetInput) {
+                            targetInput.value = result.value || '';
+                        }
+
+                        HTMLFormElement.prototype.submit.call(form);
+                    });
+
+                    return;
+                }
+
+                openDialog({
+                    mode: 'confirm',
+                    eyebrow: form.dataset.confirmTone === 'danger' ? 'Action sensible' : 'Confirmation',
+                    title: form.dataset.confirmTitle || 'Confirmer l action',
+                    message: confirmMessage,
+                    tone: form.dataset.confirmTone || 'primary',
+                    confirmLabel: form.dataset.confirmLabel || 'Confirmer',
+                    cancelLabel: form.dataset.confirmCancel || 'Annuler',
+                }).then(function (result) {
+                    if (!result.confirmed) {
+                        return;
+                    }
+
+                    HTMLFormElement.prototype.submit.call(form);
+                });
+            }, true);
+
             window.addEventListener('keydown', function (event) {
                 if (event.key === 'Escape') {
+                    if (dialogResolver) {
+                        resolveDialog({ confirmed: false, value: null });
+                    }
                     closeSidebar();
                     closeNotificationsMenu();
                 }
@@ -332,6 +683,8 @@
                 if (!sidebar.classList.contains('-translate-x-full')) {
                     overlay.classList.remove('hidden');
                 }
+
+                restoreSidebarFloatingLabel();
             }
 
             syncSidebarForViewport();

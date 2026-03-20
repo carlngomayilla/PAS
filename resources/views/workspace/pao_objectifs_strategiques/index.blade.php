@@ -6,7 +6,7 @@
         <p class="text-slate-600">Objectifs strategiques annuels relies aux axes du PAO.</p>
         @if ($canWrite)
             <p class="mt-2.5">
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" href="{{ route('workspace.pao-objectifs-strategiques.create') }}">Nouvel objectif strategique</a>
+                <a class="btn btn-green" href="{{ route('workspace.pao-objectifs-strategiques.create') }}">Nouvel objectif strategique</a>
             </p>
         @endif
     </section>
@@ -33,7 +33,7 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.pao-objectifs-strategiques.index') }}">Reinitialiser</a>
+                <a class="btn btn-blue" href="{{ route('workspace.pao-objectifs-strategiques.index') }}">Reinitialiser</a>
             </div>
         </form>
     </section>
@@ -59,7 +59,7 @@
                     @forelse ($rows as $row)
                         <tr>
                             <td>{{ $row->id }}</td>
-                            <td><span class="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">{{ $row->code }}</span></td>
+                            <td><span class="anbg-badge anbg-badge-neutral px-3">{{ $row->code }}</span></td>
                             <td>
                                 <strong>{{ $row->libelle }}</strong><br>
                                 <span class="text-slate-600">{{ $row->description ?: '-' }}</span>
@@ -73,8 +73,8 @@
                             @if ($canWrite)
                                 <td>
                                     <div class="flex flex-wrap gap-1.5">
-                                        <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-amber-700 text-white hover:bg-amber-600" href="{{ route('workspace.pao-objectifs-strategiques.edit', $row) }}">Modifier</a>
-                                        <form method="POST" action="{{ route('workspace.pao-objectifs-strategiques.destroy', $row) }}" onsubmit="return confirm('Supprimer cet objectif ?')">
+                                        <a class="btn btn-amber" href="{{ route('workspace.pao-objectifs-strategiques.edit', $row) }}">Modifier</a>
+                                        <form method="POST" action="{{ route('workspace.pao-objectifs-strategiques.destroy', $row) }}" data-confirm-message="Supprimer cet objectif ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
                                             <button class="btn btn-red btn-sm" type="submit">Supprimer</button>
@@ -91,8 +91,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="mt-3">
-            {{ $rows->links() }}
-        </div>
+        <div class="pagination">{{ $rows->links() }}</div>
     </section>
 @endsection

@@ -1,5 +1,7 @@
 @extends('layouts.workspace')
 
+@section('title', 'Reporting consolide')
+
 @section('content')
     @php
         $chartsData = $charts ?? [];
@@ -266,6 +268,46 @@
             color: rgb(148 163 184);
         }
 
+        .dark .chart-panel h3,
+        .dark .gauge-card strong {
+            color: rgb(241 245 249);
+        }
+
+        .dark .chart-panel table th {
+            background: linear-gradient(180deg, rgba(28, 32, 61, 0.96) 0%, rgba(20, 24, 47, 0.98) 100%);
+            color: rgb(248 250 252);
+            border-color: rgba(71, 85, 105, 0.85);
+        }
+
+        .dark .chart-panel table td {
+            color: rgb(226 232 240);
+            border-color: rgba(71, 85, 105, 0.68);
+        }
+
+        .dark .chart-panel tbody tr:nth-child(even) td {
+            background: rgba(18, 24, 43, 0.86);
+        }
+
+        .dark .chart-panel tbody tr:hover td {
+            background: rgba(21, 39, 75, 0.86);
+        }
+
+        .dark .heatmap-table th {
+            color: rgb(148 163 184);
+        }
+
+        .dark .heatmap-table td {
+            color: rgb(241 245 249);
+        }
+
+        .dark .gantt-track {
+            background: rgba(51, 65, 85, 0.44);
+        }
+
+        .dark .gantt-progress {
+            background: rgba(248, 233, 50, 0.22);
+        }
+
         .dark .treemap-item {
             background: linear-gradient(145deg, rgba(14, 116, 144, 0.28) 0%, rgba(6, 182, 212, 0.34) 100%);
             border-color: rgba(56, 189, 248, 0.25);
@@ -297,24 +339,26 @@
                 <div class="showcase-chip-row">
                     @if ($scope['direction_id'])
                         <span class="showcase-chip">
-                            <span class="showcase-chip-dot bg-emerald-500"></span>
+                            <span class="showcase-chip-dot bg-[#8fc043]"></span>
                             Direction #{{ $scope['direction_id'] }}
                         </span>
                     @endif
                     @if ($scope['service_id'])
                         <span class="showcase-chip">
-                            <span class="showcase-chip-dot bg-amber-500"></span>
+                            <span class="showcase-chip-dot bg-[#f0e509]"></span>
                             Service #{{ $scope['service_id'] }}
                         </span>
                     @endif
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         11 graphiques consolides
                     </span>
                 </div>
             </div>
             <div class="showcase-action-row">
-                <a class="btn btn-green rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.excel') }}">Exporter Excel (CSV)</a>
+                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.pilotage') }}">Retour pilotage</a>
+                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.alertes') }}">Centre d'alertes</a>
+                <a class="btn btn-green rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.excel') }}">Exporter Excel (.xlsx)</a>
                 <a class="btn btn-blue rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.pdf') }}">Exporter PDF</a>
             </div>
         </div>
@@ -412,7 +456,7 @@
             </article>
 
             <article class="chart-panel">
-                <h3>3) Avancement Reel vs Theorique</h3>
+                <h3>3) Avancement reel vs theorique</h3>
                 <p>Tendance hebdomadaire de progression moyenne.</p>
                 <div class="chart-canvas"><canvas id="chart-progress-weekly"></canvas></div>
             </article>
@@ -430,7 +474,7 @@
             </article>
 
             <article class="chart-panel">
-                <h3>6) Heatmap Des Retards</h3>
+                <h3>6) Heatmap des retards</h3>
                 <p>Concentration des actions en retard par semaine et direction.</p>
                 <div class="heatmap-wrap">
                     <table class="heatmap-table">
@@ -451,7 +495,7 @@
                                             $value = (int) ($retardHeatmap['matrix'][$unitIndex][$weekIndex] ?? 0);
                                             $opacity = $value > 0 ? 0.14 + (0.78 * ($value / $heatMax)) : 0.06;
                                         @endphp
-                                        <td style="background: rgba(239, 68, 68, {{ number_format($opacity, 3, '.', '') }});" title="{{ $value }} action(s) en retard">
+                                        <td style="background: rgba(249, 177, 60, {{ number_format($opacity, 3, '.', '') }});" title="{{ $value }} action(s) en retard">
                                             {{ $value }}
                                         </td>
                                     @endforeach
@@ -467,7 +511,7 @@
             </article>
 
             <article class="chart-panel">
-                <h3>7) Gantt Des Actions Critiques</h3>
+                <h3>7) Gantt des actions critiques</h3>
                 <p>Top des actions les plus risquees selon retard, ecart de progression et risques declares.</p>
                 <div class="gantt-list">
                     @forelse ($criticalGantt['items'] as $item)
@@ -689,30 +733,44 @@
     <script>
         (function () {
             var charts = @json($chartsData);
-            var isDark = document.documentElement.classList.contains('dark');
-            var palette = ['#0f766e', '#0284c7', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#16a34a'];
-            var textColor = isDark ? '#cbd5e1' : '#334155';
-            var gridColor = isDark ? 'rgba(100,116,139,0.35)' : 'rgba(148,163,184,0.28)';
+            var palette = ['#3996d3', '#8fc043', '#f0e509', '#f9b13c', '#1c203d', '#3996d3', '#8fc043', '#f9b13c'];
+            var reportingRendered = false;
+
+            function reportingTheme() {
+                if (typeof window.getAnbgChartTheme === 'function') {
+                    return window.getAnbgChartTheme();
+                }
+
+                var isDark = document.documentElement.classList.contains('dark');
+                return {
+                    isDark: isDark,
+                    text: isDark ? '#cbd5e1' : '#334155',
+                    grid: isDark ? 'rgba(100,116,139,0.35)' : 'rgba(148,163,184,0.28)',
+                    emphasis: isDark ? '#f8e932' : '#1c203d',
+                    emphasisFill: isDark ? 'rgba(248,233,50,0.16)' : 'rgba(28,32,61,0.16)',
+                };
+            }
 
             function baseOptions() {
+                var theme = reportingTheme();
                 return {
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
                             labels: {
-                                color: textColor,
+                                color: theme.text,
                                 boxWidth: 12,
                             },
                         },
                     },
                     scales: {
                         x: {
-                            ticks: { color: textColor },
-                            grid: { color: gridColor },
+                            ticks: { color: theme.text },
+                            grid: { color: theme.grid },
                         },
                         y: {
-                            ticks: { color: textColor },
-                            grid: { color: gridColor },
+                            ticks: { color: theme.text },
+                            grid: { color: theme.grid },
                         },
                     },
                 };
@@ -739,6 +797,17 @@
                         chart.resize();
                     }
                 });
+            }
+
+            function destroyChart(target) {
+                if (!target || typeof Chart === 'undefined' || typeof Chart.getChart !== 'function') {
+                    return;
+                }
+
+                var chart = Chart.getChart(target);
+                if (chart) {
+                    chart.destroy();
+                }
             }
 
             function chartPanelTitle(panel) {
@@ -898,13 +967,25 @@
                 updateFullscreenButtons();
             }
 
-            function renderReporting() {
-                if (typeof window.Chart === 'undefined') {
+            function renderReporting(force) {
+                if ((reportingRendered && !force) || typeof window.Chart === 'undefined') {
                     return;
                 }
 
+                if (typeof window.applyAnbgChartDefaults === 'function') {
+                    window.applyAnbgChartDefaults(window.Chart);
+                }
+
+                reportingRendered = true;
+                var theme = reportingTheme();
+                var textColor = theme.text;
+                var gridColor = theme.grid;
+                var emphasis = theme.emphasis;
+                var emphasisFill = theme.emphasisFill;
+
                 var funnelCtx = document.getElementById('chart-funnel');
                 if (funnelCtx) {
+                    destroyChart(funnelCtx);
                     new Chart(funnelCtx, {
                         type: 'bar',
                         data: {
@@ -912,7 +993,7 @@
                             datasets: [{
                                 label: 'Volumes',
                                 data: charts.funnel.values,
-                                backgroundColor: ['#0ea5e9', '#0284c7', '#2563eb', '#312e81'],
+                                backgroundColor: ['#3996d3', '#8fc043', '#f0e509', '#1c203d'],
                                 borderRadius: 8,
                             }],
                         },
@@ -922,6 +1003,7 @@
 
                 var statusCtx = document.getElementById('chart-status-by-unit');
                 if (statusCtx) {
+                    destroyChart(statusCtx);
                     var statusDatasets = (charts.status_by_unit.datasets || []).map(function (set, idx) {
                         return {
                             label: set.label,
@@ -948,6 +1030,7 @@
 
                 var progressCtx = document.getElementById('chart-progress-weekly');
                 if (progressCtx) {
+                    destroyChart(progressCtx);
                     new Chart(progressCtx, {
                         type: 'line',
                         data: {
@@ -955,15 +1038,15 @@
                             datasets: [{
                                 label: 'Progression reelle',
                                 data: charts.progress_weekly.reel,
-                                borderColor: '#0ea5e9',
-                                backgroundColor: 'rgba(14,165,233,0.20)',
+                                borderColor: '#3996d3',
+                                backgroundColor: 'rgba(57,150,211,0.20)',
                                 tension: 0.3,
                                 fill: true,
                             }, {
                                 label: 'Progression theorique',
                                 data: charts.progress_weekly.theorique,
-                                borderColor: '#9333ea',
-                                backgroundColor: 'rgba(147,51,234,0.15)',
+                                borderColor: emphasis,
+                                backgroundColor: emphasisFill,
                                 tension: 0.3,
                                 fill: true,
                             }],
@@ -974,6 +1057,7 @@
 
                 var kpiCtx = document.getElementById('chart-kpi-trend');
                 if (kpiCtx) {
+                    destroyChart(kpiCtx);
                     new Chart(kpiCtx, {
                         type: 'line',
                         data: {
@@ -981,20 +1065,20 @@
                             datasets: [{
                                 label: 'Valeur mesuree',
                                 data: charts.kpi_trend.valeurs,
-                                borderColor: '#0f766e',
-                                backgroundColor: 'rgba(15,118,110,0.18)',
+                                borderColor: '#8fc043',
+                                backgroundColor: 'rgba(143,192,67,0.18)',
                                 fill: true,
                                 tension: 0.25,
                             }, {
                                 label: 'Cible',
                                 data: charts.kpi_trend.cibles,
-                                borderColor: '#2563eb',
+                                borderColor: '#3996d3',
                                 borderDash: [6, 4],
                                 tension: 0.2,
                             }, {
                                 label: 'Seuil alerte',
                                 data: charts.kpi_trend.seuils,
-                                borderColor: '#dc2626',
+                                borderColor: '#f9b13c',
                                 borderDash: [3, 4],
                                 tension: 0.2,
                             }],
@@ -1005,6 +1089,7 @@
 
                 var interannualCtx = document.getElementById('chart-interannual');
                 if (interannualCtx) {
+                    destroyChart(interannualCtx);
                     var interannualOptions = baseOptions();
                     interannualOptions.scales.y1 = {
                         position: 'right',
@@ -1021,22 +1106,22 @@
                                 type: 'bar',
                                 label: 'Actions total',
                                 data: charts.interannual_overview.actions_total,
-                                backgroundColor: '#0ea5e9',
+                                backgroundColor: '#3996d3',
                                 borderRadius: 6,
                                 yAxisID: 'y',
                             }, {
                                 type: 'bar',
                                 label: 'Actions validees',
                                 data: charts.interannual_overview.actions_validees,
-                                backgroundColor: '#22c55e',
+                                backgroundColor: '#8fc043',
                                 borderRadius: 6,
                                 yAxisID: 'y',
                             }, {
                                 type: 'line',
                                 label: 'Progression moyenne (%)',
                                 data: charts.interannual_overview.progression_moyenne,
-                                borderColor: '#f59e0b',
-                                backgroundColor: 'rgba(245,158,11,0.18)',
+                                borderColor: '#f9b13c',
+                                backgroundColor: 'rgba(249,177,60,0.18)',
                                 tension: 0.3,
                                 yAxisID: 'y1',
                             }],
@@ -1047,6 +1132,7 @@
 
                 var paretoCtx = document.getElementById('chart-risk-pareto');
                 if (paretoCtx) {
+                    destroyChart(paretoCtx);
                     var paretoOptions = baseOptions();
                     paretoOptions.scales.y1 = {
                         position: 'right',
@@ -1063,15 +1149,15 @@
                                 type: 'bar',
                                 label: 'Occurrences',
                                 data: charts.risk_pareto.counts,
-                                backgroundColor: '#0ea5e9',
+                                backgroundColor: '#3996d3',
                                 borderRadius: 6,
                                 yAxisID: 'y',
                             }, {
                                 type: 'line',
                                 label: 'Cumul (%)',
                                 data: charts.risk_pareto.cumulative_pct,
-                                borderColor: '#dc2626',
-                                backgroundColor: 'rgba(220,38,38,0.20)',
+                                borderColor: emphasis,
+                                backgroundColor: emphasisFill,
                                 tension: 0.3,
                                 yAxisID: 'y1',
                             }],
@@ -1082,6 +1168,7 @@
 
                 var topRiskCtx = document.getElementById('chart-top-risks');
                 if (topRiskCtx) {
+                    destroyChart(topRiskCtx);
                     var topRiskOptions = baseOptions();
                     topRiskOptions.indexAxis = 'y';
 
@@ -1092,7 +1179,7 @@
                             datasets: [{
                                 label: 'Score de risque',
                                 data: charts.top_risks.scores,
-                                backgroundColor: '#ef4444',
+                                backgroundColor: '#f9b13c',
                                 borderRadius: 8,
                             }],
                         },
@@ -1106,6 +1193,7 @@
                     if (!gaugeCanvas) {
                         return;
                     }
+                    destroyChart(gaugeCanvas);
                     var value = Number(charts.performance_gauge.values[index] || 0);
                     value = Math.max(0, Math.min(100, value));
                     new Chart(gaugeCanvas, {
@@ -1114,7 +1202,7 @@
                             labels: ['Performance', 'Reste'],
                             datasets: [{
                                 data: [value, 100 - value],
-                                backgroundColor: ['#0ea5e9', 'rgba(148,163,184,0.22)'],
+                                backgroundColor: ['#3996d3', 'rgba(148,163,184,0.22)'],
                                 borderWidth: 0,
                             }],
                         },
@@ -1146,6 +1234,11 @@
             if (typeof window.Chart !== 'undefined') {
                 renderReporting();
             }
+
+            window.addEventListener('anbg:theme-changed', function () {
+                renderReporting(true);
+                setTimeout(resizeAllCharts, 80);
+            });
         })();
     </script>
 @endpush

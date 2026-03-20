@@ -9,23 +9,24 @@ class CleanupLegacyDirectionServiceSeeder extends Seeder
 {
     public function run(): void
     {
-        $keepDirectionCodes = ['DG', 'CDG', 'DGA', 'DAF', 'DS', 'DSIC'];
+        $keepDirectionCodes = ['DG', 'DGA', 'SCIQ', 'UCAS', 'DS', 'DSIC', 'DAF'];
         $keepServiceCodes = [
-            'DG-SP',
-            'CDG-SCIQ',
-            'DGA-SDGA',
-            'DAF-SAJRH',
-            'DAF-SFC',
-            'DAF-SAMG',
-            'DS-SEB',
-            'DS-SENB',
-            'DS-PCZ',
-            'DS-PGCZ',
-            'DS-RP',
-            'DS-SP',
-            'DSIC-SCRP',
-            'DSIC-SSIRS',
-            'DSIC-SGDS',
+            'DIRGEN',
+            'CAB',
+            'DIRECTION',
+            'SECDGA',
+            'CTRLINT',
+            'UCAS',
+            'ACCUEIL',
+            'ENB',
+            'EB',
+            'PLANIF',
+            'SIRS',
+            'CRP',
+            'GDS',
+            'AJARH',
+            'SFC',
+            'AMG',
         ];
 
         $removeDirectionIds = DB::table('directions')
@@ -104,4 +105,3 @@ class CleanupLegacyDirectionServiceSeeder extends Seeder
         });
     }
 }
-

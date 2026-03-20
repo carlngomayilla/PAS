@@ -21,9 +21,12 @@
                         OpenAPI local
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-indigo-500"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         Swagger hors ligne
                     </span>
+                </div>
+                <div class="showcase-action-row mt-4">
+                    <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ $specUrl }}" target="_blank" rel="noreferrer">Ouvrir le YAML</a>
                 </div>
             </div>
         </div>

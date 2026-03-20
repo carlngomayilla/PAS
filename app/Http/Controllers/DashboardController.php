@@ -447,7 +447,7 @@ class DashboardController extends Controller
                     'x' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
                     'y' => round((float) ($action->actionKpi?->kpi_conformite ?? 0), 2),
                     'r' => max(5, min(12, (int) round($global / 10))),
-                    'color' => $global >= 80 ? '#75BC43' : ($global >= 60 ? '#1586D4' : '#F05323'),
+                    'color' => $global >= 80 ? '#8FC043' : ($global >= 60 ? '#3996D3' : '#F9B13C'),
                     'title' => (string) $action->libelle,
                 ];
             })
@@ -458,7 +458,7 @@ class DashboardController extends Controller
             ->take(3)
             ->values()
             ->map(function (array $row, int $index): array {
-                $palette = ['#1586D4', '#75BC43', '#F2C14E'];
+                $palette = ['#3996D3', '#8FC043', '#F0E509'];
 
                 return [
                     'label' => (string) $row['label'],
@@ -508,11 +508,11 @@ class DashboardController extends Controller
     private function buildStatusCards(Collection $actions): array
     {
         $rows = [
-            'en_avance' => ['label' => 'En avance', 'color' => '#75BC43', 'bg' => '#E8F6D8', 'count' => 0],
-            'en_cours' => ['label' => 'En cours', 'color' => '#1586D4', 'bg' => '#E3F3FF', 'count' => 0],
-            'en_retard' => ['label' => 'En retard', 'color' => '#F05323', 'bg' => '#FDE9E3', 'count' => 0],
+            'en_avance' => ['label' => 'En avance', 'color' => '#8FC043', 'bg' => '#EEF6E1', 'count' => 0],
+            'en_cours' => ['label' => 'En cours', 'color' => '#3996D3', 'bg' => '#E8F3FB', 'count' => 0],
+            'en_retard' => ['label' => 'En retard', 'color' => '#F9B13C', 'bg' => '#FFF0DF', 'count' => 0],
             'non_demarre' => ['label' => 'Non demarre', 'color' => '#64748B', 'bg' => '#F1F5F9', 'count' => 0],
-            'acheve' => ['label' => 'Acheve', 'color' => '#162566', 'bg' => '#E8EAFF', 'count' => 0],
+            'acheve' => ['label' => 'Acheve', 'color' => '#1C203D', 'bg' => '#EEF1F8', 'count' => 0],
         ];
 
         foreach ($actions as $action) {
@@ -747,26 +747,26 @@ class DashboardController extends Controller
     private function statusColor(string $status): string
     {
         return match ($status) {
-            'acheve' => '#162566',
-            'en_avance' => '#75BC43',
-            'en_retard' => '#F05323',
+            'acheve' => '#1C203D',
+            'en_avance' => '#8FC043',
+            'en_retard' => '#F9B13C',
             'non_demarre' => '#64748B',
-            default => '#1586D4',
+            default => '#3996D3',
         };
     }
 
     private function kpiColor(float $value): string
     {
         if ($value >= 80) {
-            return '#75BC43';
+            return '#8FC043';
         }
 
         if ($value >= 60) {
-            return '#F2C14E';
+            return '#F0E509';
         }
 
         if ($value > 0) {
-            return '#F05323';
+            return '#F9B13C';
         }
 
         return '#94A3B8';

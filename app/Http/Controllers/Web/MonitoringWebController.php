@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
+use App\Services\Exports\ReportingWorkbookExporter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -35,7 +36,8 @@ class MonitoringWebController extends Controller
 
     public function __construct(
         private readonly AlertCenterService $alertCenter,
-        private readonly AlertReadService $alertReadService
+        private readonly AlertReadService $alertReadService,
+        private readonly ReportingWorkbookExporter $reportingWorkbookExporter
     ) {
     }
 
@@ -192,147 +194,34 @@ class MonitoringWebController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        $payload = $this->buildReportingPayload($user, true, false);
+        $payload = $this->buildReportingPayload($user, true, true);
         $generatedAt = $payload['generatedAt'];
-        $filename = 'reporting_anbg_'.$generatedAt->format('Ymd_His').'.csv';
+        $filename = 'reporting_anbg_'.$generatedAt->format('Ymd_His').'.xlsx';
+        $tempPath = $this->reportingWorkbookExporter->create($payload);
 
-        return response()->streamDownload(function () use ($payload): void {
-            $output = fopen('php://output', 'wb');
-            if (! is_resource($output)) {
+        return response()->streamDownload(function () use ($tempPath): void {
+            $stream = fopen($tempPath, 'rb');
+            if (! is_resource($stream)) {
+                @unlink($tempPath);
+
                 return;
             }
 
-            fwrite($output, "\xEF\xBB\xBF");
+            try {
+                while (! feof($stream)) {
+                    $chunk = fread($stream, 8192);
+                    if ($chunk === false) {
+                        break;
+                    }
 
-            fputcsv($output, ['Reporting consolide ANBG'], ';');
-            fputcsv($output, ['Genere le', $payload['generatedAt']->format('Y-m-d H:i:s')], ';');
-            fputcsv($output, ['Role', $payload['scope']['role']], ';');
-            fputcsv($output, ['Direction ID', $payload['scope']['direction_id'] ?? '-'], ';');
-            fputcsv($output, ['Service ID', $payload['scope']['service_id'] ?? '-'], ';');
-            fputcsv($output, [], ';');
-
-            fputcsv($output, ['Indicateurs globaux'], ';');
-            fputcsv($output, ['Indicateur', 'Valeur'], ';');
-            foreach ($payload['global'] as $key => $value) {
-                fputcsv($output, [$key, $value], ';');
-            }
-            fputcsv($output, [], ';');
-
-            fputcsv($output, ['Statuts'], ';');
-            fputcsv($output, ['Module', 'Statut', 'Total'], ';');
-            foreach ($payload['statuts'] as $module => $rows) {
-                foreach ($rows as $status => $total) {
-                    fputcsv($output, [$module, $status, $total], ';');
+                    echo $chunk;
                 }
+            } finally {
+                fclose($stream);
+                @unlink($tempPath);
             }
-            fputcsv($output, [], ';');
-
-            fputcsv($output, ['Alertes de synthese'], ';');
-            fputcsv($output, ['Alerte', 'Total'], ';');
-            foreach ($payload['alertes'] as $label => $count) {
-                fputcsv($output, [$label, $count], ';');
-            }
-            fputcsv($output, [], ';');
-
-            fputcsv($output, ['Vue consolidee du PAS'], ';');
-            fputcsv($output, ['PAS', 'Periode', 'Axes', 'Objectifs', 'PAO', 'PTA', 'Actions', 'Validees', 'Progression moyenne', 'Taux realisation'], ';');
-            foreach ($payload['pasConsolidation'] as $row) {
-                fputcsv($output, [
-                    (string) ($row['titre'] ?? ''),
-                    (string) ($row['periode'] ?? ''),
-                    (int) ($row['axes_total'] ?? 0),
-                    (int) ($row['objectifs_total'] ?? 0),
-                    (int) ($row['paos_total'] ?? 0),
-                    (int) ($row['ptas_total'] ?? 0),
-                    (int) ($row['actions_total'] ?? 0),
-                    (int) ($row['actions_validees'] ?? 0),
-                    (float) ($row['progression_moyenne'] ?? 0),
-                    (float) ($row['taux_realisation'] ?? 0),
-                ], ';');
-            }
-            fputcsv($output, [], ';');
-
-            fputcsv($output, ['Comparaison interannuelle'], ';');
-            fputcsv($output, ['Annee', 'PAO', 'PTA', 'Actions', 'Actions validees', 'Actions en retard', 'Progression moyenne', 'Taux validation'], ';');
-            foreach ($payload['interannualComparison'] as $row) {
-                fputcsv($output, [
-                    (int) ($row['annee'] ?? 0),
-                    (int) ($row['paos_total'] ?? 0),
-                    (int) ($row['ptas_total'] ?? 0),
-                    (int) ($row['actions_total'] ?? 0),
-                    (int) ($row['actions_validees'] ?? 0),
-                    (int) ($row['actions_retard'] ?? 0),
-                    (float) ($row['progression_moyenne'] ?? 0),
-                    (float) ($row['taux_validation'] ?? 0),
-                ], ';');
-            }
-            fputcsv($output, [], ';');
-
-            fputcsv($output, ['Details - Actions en retard'], ';');
-            fputcsv($output, ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable'], ';');
-            foreach ($payload['details']['actions_retard'] as $action) {
-                fputcsv($output, [
-                    (int) $action->id,
-                    (string) $action->libelle,
-                    optional($action->date_echeance)->format('Y-m-d') ?? '',
-                    (string) $action->statut_dynamique,
-                    (string) ($action->pta?->titre ?? ''),
-                    (string) ($action->responsable?->name ?? ''),
-                ], ';');
-            }
-            fputcsv($output, [], ';');
-
-            fputcsv($output, ['Details - KPI sous seuil'], ';');
-            fputcsv($output, ['Mesure ID', 'KPI', 'Periode', 'Valeur', 'Seuil', 'Action'], ';');
-            foreach ($payload['details']['kpi_sous_seuil'] as $mesure) {
-                fputcsv($output, [
-                    (int) $mesure->id,
-                    (string) ($mesure->kpi?->libelle ?? ''),
-                    (string) $mesure->periode,
-                    (string) $mesure->valeur,
-                    (string) ($mesure->kpi?->seuil_alerte ?? ''),
-                    (string) ($mesure->kpi?->action?->libelle ?? ''),
-                ], ';');
-            }
-            fputcsv($output, [], ';');
-
-            fputcsv($output, ['Structure des rapports - Tableau strategique'], ';');
-            fputcsv($output, [
-                'Axe strategique',
-                'Objectif strategique',
-                'Objectif operationnel',
-                'Description actions detaillees',
-                'RMO',
-                'Cible',
-                'Debut',
-                'Fin',
-                'Etat de realisation',
-                'Progression',
-                'Ressources requises',
-                'Indicateurs de performance',
-                'Risques potentiels',
-            ], ';');
-            foreach ($payload['details']['structure_rapports'] as $row) {
-                fputcsv($output, [
-                    (string) ($row['axe_strategique'] ?? ''),
-                    (string) ($row['objectif_strategique'] ?? ''),
-                    (string) ($row['objectif_operationnel'] ?? ''),
-                    (string) ($row['description_actions_detaillees'] ?? ''),
-                    (string) ($row['rmo'] ?? ''),
-                    (string) ($row['cible'] ?? ''),
-                    (string) ($row['debut'] ?? ''),
-                    (string) ($row['fin'] ?? ''),
-                    (string) ($row['etat_realisation'] ?? ''),
-                    (string) ($row['progression'] ?? ''),
-                    (string) ($row['ressources_requises'] ?? ''),
-                    (string) ($row['indicateurs_performance'] ?? ''),
-                    (string) ($row['risques_potentiels'] ?? ''),
-                ], ';');
-            }
-
-            fclose($output);
         }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
 
@@ -345,7 +234,7 @@ class MonitoringWebController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        $payload = $this->buildReportingPayload($user, true, false);
+        $payload = $this->buildReportingPayload($user, true, true);
         $generatedAt = $payload['generatedAt'];
         $filename = 'reporting_anbg_'.$generatedAt->format('Ymd_His').'.pdf';
 

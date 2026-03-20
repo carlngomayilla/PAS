@@ -94,7 +94,7 @@
 
             <div class="form-actions">
                 <button class="btn btn-blue" type="submit">Enregistrer delegation</button>
-                <a class="btn" href="{{ route('workspace.delegations.index') }}">Retour</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.delegations.index') }}">Retour</a>
             </div>
         </form>
     </section>

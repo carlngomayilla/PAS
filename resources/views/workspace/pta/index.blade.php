@@ -24,11 +24,11 @@
                         Un PAO parent
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-indigo-500"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         Un service cible
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-emerald-500"></span>
+                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
                         Porte les actions operationnelles
                     </span>
                 </div>
@@ -151,8 +151,8 @@
                         @php
                             $statusClasses = match ((string) $row->statut) {
                                 'verrouille' => 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900',
-                                'valide' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
-                                'soumis' => 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
+                                'valide' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/20 dark:text-[#f8e932]',
+                                'soumis' => 'bg-[#fff8d6] text-[#1c203d] dark:bg-[#f0e509]/20 dark:text-[#f8e932]',
                                 default => 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
                             };
                             $canSubmit = $row->statut === 'brouillon'
@@ -203,19 +203,19 @@
                                             </form>
                                         @endif
                                         @if ($canLock)
-                                            <form method="POST" action="{{ route('workspace.pta.lock', $row) }}" onsubmit="return confirm('Verrouiller ce PTA ?')">
+                                            <form method="POST" action="{{ route('workspace.pta.lock', $row) }}" data-confirm-message="Verrouiller ce PTA ?" data-confirm-tone="warning" data-confirm-label="Verrouiller">
                                                 @csrf
                                                 <button class="btn btn-primary" type="submit">Verrouiller</button>
                                             </form>
                                         @endif
                                         @if ($canReopen)
-                                            <form method="POST" action="{{ route('workspace.pta.reopen', $row) }}" onsubmit="return requireWorkflowReason(this, 'PTA')">
+                                            <form method="POST" action="{{ route('workspace.pta.reopen', $row) }}" data-prompt-title="Retour brouillon" data-prompt-message="Saisir le motif de retour brouillon (PTA)." data-prompt-label="Motif de retour" data-prompt-placeholder="Minimum 5 caracteres" data-prompt-target="motif_retour" data-prompt-minlength="5" data-prompt-confirm="Confirmer">
                                                 @csrf
                                                 <input type="hidden" name="motif_retour" value="">
                                                 <button class="btn btn-blue" type="submit">Retour brouillon</button>
                                             </form>
                                         @endif
-                                        <form method="POST" action="{{ route('workspace.pta.destroy', $row) }}" onsubmit="return confirm('Supprimer ce PTA ?')">
+                                        <form method="POST" action="{{ route('workspace.pta.destroy', $row) }}" data-confirm-message="Supprimer ce PTA ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
                                             <button class="btn btn-red" type="submit">Supprimer</button>
@@ -232,9 +232,7 @@
                 </tbody>
             </table>
         </div>
-        <div class="mt-4">
-            {{ $rows->links() }}
-        </div>
+        <div class="pagination">{{ $rows->links() }}</div>
     </section>
 @endsection
 

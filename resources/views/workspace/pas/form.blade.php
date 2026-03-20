@@ -41,11 +41,11 @@
                         Etape 1: PAS
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-indigo-500"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         Etape 2: Axes
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-emerald-500"></span>
+                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
                         Etape 3: OS
                     </span>
                 </div>
@@ -165,7 +165,7 @@
                         type="button"
                         id="add-axe"
                         data-wizard-visible="axes"
-                        class="inline-flex items-center justify-center rounded-md bg-indigo-700 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-indigo-600"
+                        class="inline-flex items-center justify-center rounded-md bg-[#1c203d] px-2.5 py-1.5 text-sm font-medium text-white hover:bg-[#3996d3]"
                     >
                         Ajouter un axe
                     </button>
@@ -176,7 +176,7 @@
 
             <div class="form-actions">
                 <button id="wizard-prev" class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-slate-200 text-slate-900 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" type="button">Etape precedente</button>
-                <button id="wizard-next" class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-indigo-700 text-white hover:bg-indigo-600" type="button">Etape suivante</button>
+                <button id="wizard-next" class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-[#1c203d] text-white hover:bg-[#3996d3]" type="button">Etape suivante</button>
                 <button id="wizard-submit" class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
                 <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.pas.index') }}">Retour</a>
             </div>
@@ -481,7 +481,7 @@
                     '<div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700" data-objectif-index="' + objectifIndex + '">' +
                         '<div class="mb-2 flex items-center justify-between gap-2">' +
                             '<h4 class="text-sm font-semibold">Objectif strategique</h4>' +
-                            '<button type="button" class="remove-objectif inline-flex items-center justify-center rounded-md bg-rose-700 px-2 py-1 text-xs font-medium text-white hover:bg-rose-600">Supprimer</button>' +
+                            '<button type="button" class="remove-objectif inline-flex items-center justify-center rounded-md bg-[#f9b13c] px-2 py-1 text-xs font-medium text-white hover:bg-[#f9b13c]">Supprimer</button>' +
                         '</div>' +
                         '<div class="form-grid">' +
                             '<div>' +
@@ -549,7 +549,7 @@
                 card.innerHTML = '' +
                     '<div class="mb-3 flex items-center justify-between gap-2">' +
                         '<h3 class="text-base font-semibold">Axe strategique</h3>' +
-                        '<button type="button" class="remove-axe inline-flex items-center justify-center rounded-md bg-rose-700 px-2 py-1 text-xs font-medium text-white hover:bg-rose-600">Supprimer axe</button>' +
+                        '<button type="button" class="remove-axe inline-flex items-center justify-center rounded-md bg-[#f9b13c] px-2 py-1 text-xs font-medium text-white hover:bg-[#f9b13c]">Supprimer axe</button>' +
                     '</div>' +
                     '<div data-wizard-block="axes">' +
                         '<div class="form-grid">' +
@@ -582,7 +582,7 @@
                     '<div class="mt-4 rounded-lg bg-slate-100 p-3 dark:bg-slate-900/60" data-wizard-block="objectifs">' +
                         '<div class="mb-2 flex items-center justify-between gap-2">' +
                             '<h4 class="text-sm font-semibold">Objectifs strategiques</h4>' +
-                            '<button type="button" class="add-objectif inline-flex items-center justify-center rounded-md bg-emerald-700 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-600">Ajouter objectif</button>' +
+                            '<button type="button" class="add-objectif inline-flex items-center justify-center rounded-md bg-[#8fc043] px-2 py-1 text-xs font-medium text-white hover:brightness-105">Ajouter objectif</button>' +
                         '</div>' +
                         '<div class="objectifs-list space-y-3"></div>' +
                     '</div>';
