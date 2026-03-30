@@ -35,7 +35,7 @@ class ActionWorkflowSecurityTest extends TestCase
         $token = $otherAgent->createToken('phpunit-agent-scope')->plainTextToken;
 
         $this->withHeader('Authorization', 'Bearer '.$token)
-            ->getJson('/api/actions/'.$action->id)
+            ->getJson('/api/v1/actions/'.$action->id)
             ->assertForbidden();
     }
 
@@ -306,3 +306,4 @@ class ActionWorkflowSecurityTest extends TestCase
         ];
     }
 }
+

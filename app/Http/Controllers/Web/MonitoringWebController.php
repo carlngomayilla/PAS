@@ -19,10 +19,12 @@ use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
+use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Exports\ReportingWorkbookExporter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -37,7 +39,8 @@ class MonitoringWebController extends Controller
     public function __construct(
         private readonly AlertCenterService $alertCenter,
         private readonly AlertReadService $alertReadService,
-        private readonly ReportingWorkbookExporter $reportingWorkbookExporter
+        private readonly ReportingWorkbookExporter $reportingWorkbookExporter,
+        private readonly ReportingAnalyticsService $reportingAnalyticsService
     ) {
     }
 
@@ -94,7 +97,7 @@ class MonitoringWebController extends Controller
                     ->orWhere(function (Builder $subQuery) use ($today): void {
                         $subQuery->whereNotNull('date_echeance')
                             ->whereDate('date_echeance', '<', $today)
-                            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai']);
+                            ->whereNotIn('statut_dynamique', $this->completedActionStatuses());
                     });
             })
             ->count();
@@ -126,7 +129,7 @@ class MonitoringWebController extends Controller
             ->with(['pta:id,titre,direction_id,service_id', 'responsable:id,name,email'])
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '>=', $today)
-            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai'])
+            ->whereNotIn('statut_dynamique', $this->completedActionStatuses())
             ->orderBy('date_echeance')
             ->limit(10)
             ->get();
@@ -182,7 +185,7 @@ class MonitoringWebController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        return view('workspace.monitoring.reporting', $this->buildReportingPayload($user, true));
+        return view('workspace.monitoring.reporting', $this->reportingAnalyticsService->buildPayload($user));
     }
 
     public function exportExcel(Request $request): StreamedResponse
@@ -194,7 +197,7 @@ class MonitoringWebController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        $payload = $this->buildReportingPayload($user, true, true);
+        $payload = $this->reportingAnalyticsService->buildPayload($user, true, true);
         $generatedAt = $payload['generatedAt'];
         $filename = 'reporting_anbg_'.$generatedAt->format('Ymd_His').'.xlsx';
         $tempPath = $this->reportingWorkbookExporter->create($payload);
@@ -234,7 +237,7 @@ class MonitoringWebController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        $payload = $this->buildReportingPayload($user, true, true);
+        $payload = $this->reportingAnalyticsService->buildPayload($user, true, true);
         $generatedAt = $payload['generatedAt'];
         $filename = 'reporting_anbg_'.$generatedAt->format('Ymd_His').'.pdf';
 
@@ -268,21 +271,70 @@ class MonitoringWebController extends Controller
             })
             ->values();
 
+        $reportingPayload = $this->reportingAnalyticsService->buildPayload($user, false, false);
+
         return view('workspace.monitoring.alertes', [
             'limit' => $limit,
             'alertItems' => $items,
+            'kpiSummary' => $reportingPayload['kpiSummary'] ?? [],
             'summary' => [
                 'total' => $items->count(),
                 'unread' => $items->where('is_unread', true)->count(),
+                'urgence' => $items->where('niveau', 'urgence')->count(),
                 'critical' => $items->where('niveau', 'critical')->count(),
                 'warning' => $items->where('niveau', 'warning')->count(),
                 'info' => $items->where('niveau', 'info')->count(),
             ],
             'levelUnreadCounts' => [
+                'urgence' => $items->where('niveau', 'urgence')->where('is_unread', true)->count(),
                 'critical' => $items->where('niveau', 'critical')->where('is_unread', true)->count(),
                 'warning' => $items->where('niveau', 'warning')->where('is_unread', true)->count(),
                 'info' => $items->where('niveau', 'info')->where('is_unread', true)->count(),
             ],
+        ]);
+    }
+
+    public function alertesDropdown(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->denyUnlessPlanningReader($user);
+
+        $limit = max(1, min(12, (int) $request->integer('limit', 6)));
+        $readFingerprints = $this->alertReadService->readFingerprintsForUser($user);
+        $reportingPayload = $this->reportingAnalyticsService->buildPayload($user, false, false);
+        $summary = $this->alertCenter->summaryForUser($user, $readFingerprints);
+
+        $items = $this->alertCenter
+            ->buildForUser($user, $limit)
+            ->map(function (array $item) use ($readFingerprints, $limit): array {
+                $item['is_unread'] = ! in_array((string) $item['fingerprint'], $readFingerprints, true);
+                $item['read_url'] = route('workspace.alertes.read', [
+                    'type' => $item['source_type'],
+                    'id' => $item['source_id'],
+                    'limit' => $limit,
+                ]);
+
+                return $item;
+            })
+            ->values();
+
+        return response()->json([
+            'generated_at' => now()->toIso8601String(),
+            'summary' => [
+                'total' => (int) ($summary['total'] ?? 0),
+                'unread' => (int) ($summary['unread'] ?? 0),
+                'urgence' => (int) ($summary['urgence'] ?? 0),
+                'critical' => (int) ($summary['critical'] ?? 0),
+                'warning' => (int) ($summary['warning'] ?? 0),
+                'info' => (int) ($summary['info'] ?? 0),
+            ],
+            'kpi_summary' => $reportingPayload['kpiSummary'] ?? [],
+            'items' => $items,
+            'center_url' => route('workspace.alertes'),
         ]);
     }
 
@@ -1317,7 +1369,12 @@ class MonitoringWebController extends Controller
      */
     private function completedActionStatuses(): array
     {
-        return ['acheve_dans_delai', 'acheve_hors_delai'];
+        return [
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_SUSPENDU,
+            ActionTrackingService::STATUS_ANNULE,
+        ];
     }
 
     private function computeActionRiskScore(Action $action, Carbon $today): float
@@ -1406,7 +1463,7 @@ class MonitoringWebController extends Controller
         $retardsActions = (clone $actions)
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', $today)
-            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai'])
+            ->whereNotIn('statut_dynamique', $this->completedActionStatuses())
             ->count();
 
         $kpiSousSeuilQuery = KpiMesure::query()
@@ -1428,7 +1485,7 @@ class MonitoringWebController extends Controller
                 ->with(['pta:id,titre,direction_id,service_id', 'responsable:id,name,email'])
                 ->whereNotNull('date_echeance')
                 ->whereDate('date_echeance', '<', $today)
-                ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai'])
+                ->whereNotIn('statut_dynamique', $this->completedActionStatuses())
                 ->orderBy('date_echeance')
                 ->limit(200)
                 ->get();

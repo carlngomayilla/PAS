@@ -1,22 +1,46 @@
-import { applyAnbgChartDefaults } from './chart-theme';
-
 async function bootDashboardCharts() {
   const hasDashboardCharts =
-    document.getElementById('dashboard-status-mix-chart') ||
-    document.getElementById('dashboard-kpi-line-chart') ||
-    document.getElementById('dashboard-unit-summary-chart') ||
-    document.getElementById('dashboard-kpi-grouped-chart') ||
-    document.getElementById('dashboard-interannual-chart') ||
-    document.getElementById('dashboard-radar-chart') ||
-    document.getElementById('dashboard-scatter-chart');
+    document.querySelector('[data-dashboard-tabs]') ||
+    document.getElementById('dashboard-gantt-chart') ||
+    document.getElementById('dashboard-critical-gantt-chart');
 
   if (!hasDashboardCharts) {
     return;
   }
 
-  const { default: Chart } = await import('chart.js/auto');
+  const [
+    chartJs,
+    matrixModule,
+    treemapModule,
+    d3,
+    chartTheme,
+  ] = await Promise.all([
+    import('chart.js'),
+    import('chartjs-chart-matrix'),
+    import('chartjs-chart-treemap'),
+    import('d3'),
+    import('./chart-theme'),
+  ]);
+
+  const { Chart, registerables } = chartJs;
+  const { MatrixController, MatrixElement } = matrixModule;
+  const { TreemapController, TreemapElement } = treemapModule;
+
+  Chart.register(
+    ...registerables,
+    MatrixController,
+    MatrixElement,
+    TreemapController,
+    TreemapElement,
+  );
+
+  chartTheme.applyAnbgChartDefaults(Chart);
+
   window.Chart = Chart;
-  applyAnbgChartDefaults(Chart);
+  window.d3 = d3;
+  window.getAnbgChartTheme = chartTheme.getAnbgChartTheme;
+  window.applyAnbgChartDefaults = chartTheme.applyAnbgChartDefaults;
+
   document.dispatchEvent(new CustomEvent('anbg:dashboard-assets-ready'));
 }
 

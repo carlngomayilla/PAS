@@ -52,6 +52,13 @@
                         </select>
                     </div>
                     <div>
+                        <label class="!mb-2 block" for="is_active">Etat du compte</label>
+                        <label class="checkbox-pill !mb-0">
+                            <input id="is_active" name="is_active" type="checkbox" value="1" @checked(old('is_active', $isEdit ? (int) $row->is_active : 1))>
+                            Compte actif
+                        </label>
+                    </div>
+                    <div>
                         <label for="agent_hint">Profil execution</label>
                         <input id="agent_hint" type="text" value="Selectionner le role agent pour l execution des actions" disabled>
                     </div>

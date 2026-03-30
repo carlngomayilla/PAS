@@ -26,7 +26,7 @@ class PaoController extends Controller
             abort(401);
         }
 
-        $this->denyUnlessPlanningReader($user);
+        $this->authorize('viewAny', Pao::class);
 
         $perPage = max(1, min(100, (int) $request->integer('per_page', 15)));
 
@@ -107,7 +107,7 @@ class PaoController extends Controller
         }
 
         $validated = $request->validated();
-        $this->denyUnlessManagePao($user, (int) $validated['direction_id']);
+        $this->authorize('create', [Pao::class, (int) $validated['direction_id']]);
         $objectif = $this->resolveAccessibleObjectif($user, (int) $validated['pas_objectif_id']);
 
         $pao = Pao::query()->create([
@@ -137,9 +137,7 @@ class PaoController extends Controller
             abort(401);
         }
 
-        if (! $this->canReadPao($user, (int) $pao->id, (int) $pao->direction_id)) {
-            abort(403, 'Acces non autorise.');
-        }
+        $this->authorize('view', $pao);
 
         return response()->json([
             'data' => $pao->load([
@@ -169,8 +167,8 @@ class PaoController extends Controller
 
         $validated = $request->validated();
 
-        $this->denyUnlessManagePao($user, (int) $pao->direction_id);
-        $this->denyUnlessManagePao($user, (int) $validated['direction_id']);
+        $this->authorize('update', $pao);
+        $this->authorize('create', [Pao::class, (int) $validated['direction_id']]);
         $objectif = $this->resolveAccessibleObjectif($user, (int) $validated['pas_objectif_id']);
 
         if ($pao->ptas()->exists() && (int) $pao->service_id !== (int) $validated['service_id']) {
@@ -209,7 +207,7 @@ class PaoController extends Controller
             abort(401);
         }
 
-        $this->denyUnlessManagePao($user, (int) $pao->direction_id);
+        $this->authorize('delete', $pao);
 
         if ($pao->statut === 'verrouille') {
             return response()->json([

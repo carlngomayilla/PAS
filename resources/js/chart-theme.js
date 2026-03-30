@@ -13,6 +13,7 @@ export function getAnbgChartTheme() {
     surfaceStroke: isDark ? 'rgba(148,163,184,0.22)' : 'rgba(203,213,225,0.92)',
     emphasis: isDark ? '#f8e932' : '#1c203d',
     emphasisFill: isDark ? 'rgba(248,233,50,0.16)' : 'rgba(28,32,61,0.16)',
+    tooltipShadow: isDark ? 'rgba(15,23,42,0.42)' : 'rgba(15,23,42,0.12)',
   };
 }
 
@@ -26,12 +27,34 @@ export function applyAnbgChartDefaults(Chart) {
   Chart.defaults.color = theme.text;
   Chart.defaults.borderColor = theme.grid;
   Chart.defaults.font.family = 'Instrument Sans, ui-sans-serif, system-ui, sans-serif';
+  Chart.defaults.font.size = 12;
+  Chart.defaults.elements.line.borderJoinStyle = 'round';
+  Chart.defaults.elements.line.borderCapStyle = 'round';
+  Chart.defaults.elements.point.hoverBorderWidth = 2;
+  Chart.defaults.elements.point.hitRadius = 10;
+  Chart.defaults.elements.point.hoverRadius = 5;
+  Chart.defaults.elements.bar.borderSkipped = false;
+  Chart.defaults.elements.bar.inflateAmount = 0.6;
+  Chart.defaults.plugins.legend.align = 'start';
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.plugins.legend.labels.pointStyle = 'circle';
+  Chart.defaults.plugins.legend.labels.boxWidth = 8;
+  Chart.defaults.plugins.legend.labels.boxHeight = 8;
+  Chart.defaults.plugins.legend.labels.padding = 14;
   Chart.defaults.plugins.legend.labels.color = theme.text;
   Chart.defaults.plugins.tooltip.backgroundColor = theme.tooltipBackground;
   Chart.defaults.plugins.tooltip.titleColor = theme.tooltipTitle;
   Chart.defaults.plugins.tooltip.bodyColor = theme.tooltipBody;
   Chart.defaults.plugins.tooltip.borderColor = theme.tooltipBorder;
   Chart.defaults.plugins.tooltip.borderWidth = 1;
+  Chart.defaults.plugins.tooltip.cornerRadius = 14;
+  Chart.defaults.plugins.tooltip.padding = 12;
+  Chart.defaults.plugins.tooltip.boxPadding = 5;
+  Chart.defaults.plugins.tooltip.usePointStyle = true;
+  Chart.defaults.plugins.tooltip.displayColors = true;
+  Chart.defaults.plugins.tooltip.titleFont = { size: 13, weight: '800' };
+  Chart.defaults.plugins.tooltip.bodyFont = { size: 12, weight: '600' };
+  Chart.defaults.plugins.tooltip.footerFont = { size: 11, weight: '700' };
 
   return theme;
 }

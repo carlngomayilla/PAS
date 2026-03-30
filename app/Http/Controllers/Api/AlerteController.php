@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
+use App\Services\Analytics\ReportingAnalyticsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,7 +17,8 @@ class AlerteController extends Controller
 
     public function __construct(
         private readonly AlertCenterService $alertCenter,
-        private readonly AlertReadService $alertReadService
+        private readonly AlertReadService $alertReadService,
+        private readonly ReportingAnalyticsService $reportingAnalyticsService
     ) {
     }
 
@@ -31,12 +33,13 @@ class AlerteController extends Controller
 
         $limit = max(1, min(100, (int) $request->integer('limit', 20)));
         $readFingerprints = $this->alertReadService->readFingerprintsForUser($user);
+        $reportingPayload = $this->reportingAnalyticsService->buildPayload($user, false, false);
 
         $items = $this->alertCenter
             ->buildForUser($user, $limit)
             ->map(function (array $item) use ($readFingerprints, $limit): array {
                 $item['is_unread'] = ! in_array((string) $item['fingerprint'], $readFingerprints, true);
-                $item['read_endpoint'] = route('api.alertes.read', [
+                $item['read_endpoint'] = route('v1.api.alertes.read', [
                     'type' => $item['source_type'],
                     'id' => $item['source_id'],
                 ]);
@@ -51,15 +54,18 @@ class AlerteController extends Controller
             'summary' => [
                 'total' => $items->count(),
                 'unread' => $items->where('is_unread', true)->count(),
+                'urgence' => $items->where('niveau', 'urgence')->count(),
                 'critical' => $items->where('niveau', 'critical')->count(),
                 'warning' => $items->where('niveau', 'warning')->count(),
                 'info' => $items->where('niveau', 'info')->count(),
             ],
             'level_unread_counts' => [
+                'urgence' => $items->where('niveau', 'urgence')->where('is_unread', true)->count(),
                 'critical' => $items->where('niveau', 'critical')->where('is_unread', true)->count(),
                 'warning' => $items->where('niveau', 'warning')->where('is_unread', true)->count(),
                 'info' => $items->where('niveau', 'info')->where('is_unread', true)->count(),
             ],
+            'kpi_summary' => $reportingPayload['kpiSummary'] ?? [],
             'items' => $items,
             'alerts' => [
                 'actions_retard' => $items->where('source_type', 'action_overdue')->values(),

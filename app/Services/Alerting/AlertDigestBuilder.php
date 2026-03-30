@@ -2,6 +2,7 @@
 
 namespace App\Services\Alerting;
 
+use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\KpiMesure;
@@ -12,6 +13,13 @@ use Illuminate\Support\Collection;
 
 class AlertDigestBuilder
 {
+    use AuthorizesPlanningScope;
+
+    public function __construct(
+        private readonly AlertRoutingService $alertRoutingService
+    ) {
+    }
+
     /**
      * @return array{
      *     generated_at: \Illuminate\Support\Carbon,
@@ -36,7 +44,7 @@ class AlertDigestBuilder
             ->with(['pta:id,direction_id,service_id,titre', 'responsable:id,name,email'])
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', $today)
-            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai']);
+            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai', 'suspendu', 'annule']);
         $this->scopeAction($actionsQuery, $user);
 
         $kpiMesureIds = $this->kpiSousSeuilIds($user, $limit);
@@ -87,9 +95,16 @@ class AlertDigestBuilder
             return true;
         }
 
-        return $user->hasRole(User::ROLE_SERVICE)
+        if (
+            $user->hasRole(User::ROLE_SERVICE)
             && $user->direction_id !== null
-            && $user->service_id !== null;
+            && $user->service_id !== null
+        ) {
+            return true;
+        }
+
+        return $user->hasDelegatedPermission('planning_read')
+            || $user->hasDelegatedPermission('planning_write');
     }
 
     /**
@@ -148,21 +163,9 @@ class AlertDigestBuilder
 
     private function scopeAction(Builder $query, User $user): void
     {
-        if ($user->hasGlobalReadAccess()) {
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
-            return;
-        }
-
-        $query->whereRaw('1 = 0');
+        $query->whereHas('pta', function (Builder $ptaQuery) use ($user): void {
+            $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
+        });
     }
 
     private function scopeJoinedPta(
@@ -171,21 +174,7 @@ class AlertDigestBuilder
         string $directionColumn,
         string $serviceColumn
     ): void {
-        if ($user->hasGlobalReadAccess()) {
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->where($directionColumn, (int) $user->direction_id);
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->where($serviceColumn, (int) $user->service_id);
-            return;
-        }
-
-        $query->whereRaw('1 = 0');
+        $this->scopeByUserDirection($query, $user, $directionColumn, $serviceColumn);
     }
 
     /**
@@ -199,18 +188,20 @@ class AlertDigestBuilder
                 'action.pta:id,direction_id,service_id,titre',
                 'week:id,action_id,numero_semaine',
             ])
-            ->whereIn('niveau', ['warning', 'critical']);
+            ->whereIn('niveau', ['warning', 'critical', 'urgence']);
 
         if (! $user->hasGlobalReadAccess()) {
-            if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-                $query->whereHas('action.pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
-            } elseif ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-                $query->whereHas('action.pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
-            } else {
-                $query->whereRaw('1 = 0');
-            }
+            $query->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {
+                $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
+            });
         }
 
-        return $query->latest()->limit($limit)->get();
+        return $query
+            ->latest()
+            ->limit($limit * 5)
+            ->get()
+            ->filter(fn (ActionLog $log): bool => $this->alertRoutingService->userCanSeeActionLog($user, $log))
+            ->take($limit)
+            ->values();
     }
 }

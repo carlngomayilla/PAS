@@ -10,6 +10,7 @@ use App\Models\PasAxe;
 use App\Models\PasObjectif;
 use App\Models\Pao;
 use App\Models\Service;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -31,7 +32,7 @@ class PlanningApiTest extends TestCase
     {
         $admin = $this->createAdminUser();
 
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit',
@@ -49,7 +50,7 @@ class PlanningApiTest extends TestCase
         $token = (string) $loginResponse->json('access_token');
 
         $meResponse = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/me');
+            ->getJson('/api/v1/me');
 
         $meResponse->assertOk()
             ->assertJsonPath('user.email', $admin->email);
@@ -57,7 +58,7 @@ class PlanningApiTest extends TestCase
 
     public function test_direction_user_only_sees_his_direction_paos(): void
     {
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'directeur.daf@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-direction',
@@ -67,7 +68,7 @@ class PlanningApiTest extends TestCase
         $dafDirectionId = (int) Direction::query()->where('code', 'DAF')->value('id');
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/paos');
+            ->getJson('/api/v1/paos');
 
         $response->assertOk();
 
@@ -81,7 +82,7 @@ class PlanningApiTest extends TestCase
 
     public function test_service_user_cannot_create_pao_for_another_direction(): void
     {
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'arnold.mindzeli@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-service',
@@ -94,7 +95,7 @@ class PlanningApiTest extends TestCase
         $dafServiceId = (int) Service::query()->where('direction_id', $dafDirectionId)->value('id');
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/paos', [
+            ->postJson('/api/v1/paos', [
                 'pas_objectif_id' => $objectifId,
                 'direction_id' => $dafDirectionId,
                 'service_id' => $dafServiceId,
@@ -108,7 +109,7 @@ class PlanningApiTest extends TestCase
 
     public function test_service_user_cannot_create_pao_even_for_his_own_service(): void
     {
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'robert.ekomi@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-service-own-pao',
@@ -119,7 +120,7 @@ class PlanningApiTest extends TestCase
         $objectifId = (int) PasObjectif::query()->value('id');
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/paos', [
+            ->postJson('/api/v1/paos', [
                 'pas_objectif_id' => $objectifId,
                 'direction_id' => (int) $serviceUser->direction_id,
                 'service_id' => (int) $serviceUser->service_id,
@@ -133,7 +134,7 @@ class PlanningApiTest extends TestCase
 
     public function test_direction_user_cannot_create_pao_when_pas_is_not_shared_with_his_direction(): void
     {
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'directeur.daf@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-direction-pao-scope',
@@ -164,7 +165,7 @@ class PlanningApiTest extends TestCase
         ]);
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/paos', [
+            ->postJson('/api/v1/paos', [
                 'pas_objectif_id' => (int) $objectif->id,
                 'direction_id' => $dafDirectionId,
                 'service_id' => (int) Service::query()->where('direction_id', $dafDirectionId)->value('id'),
@@ -178,7 +179,7 @@ class PlanningApiTest extends TestCase
 
     public function test_direction_user_can_create_pao_for_his_own_direction_and_service(): void
     {
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'directeur.daf@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-direction-own-pao',
@@ -209,7 +210,7 @@ class PlanningApiTest extends TestCase
         ]);
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/paos', [
+            ->postJson('/api/v1/paos', [
                 'pas_objectif_id' => (int) $objectif->id,
                 'direction_id' => $directionId,
                 'service_id' => $serviceId,
@@ -225,7 +226,7 @@ class PlanningApiTest extends TestCase
 
     public function test_service_user_can_create_pta_only_for_his_service_pao(): void
     {
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'robert.ekomi@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-service-pta',
@@ -245,7 +246,7 @@ class PlanningApiTest extends TestCase
         ]);
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/ptas', [
+            ->postJson('/api/v1/ptas', [
                 'pao_id' => (int) $pao->id,
                 'titre' => 'PTA service autorise',
                 'statut' => 'brouillon',
@@ -258,7 +259,7 @@ class PlanningApiTest extends TestCase
 
     public function test_direction_user_cannot_create_pta_directly(): void
     {
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'directeur.daf@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-direction-pta-forbidden',
@@ -279,7 +280,7 @@ class PlanningApiTest extends TestCase
         ]);
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/ptas', [
+            ->postJson('/api/v1/ptas', [
                 'pao_id' => (int) $pao->id,
                 'titre' => 'PTA direction interdit',
                 'statut' => 'brouillon',
@@ -292,7 +293,7 @@ class PlanningApiTest extends TestCase
     {
         $admin = $this->createAdminUser();
 
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-create-pas-full',
@@ -307,7 +308,7 @@ class PlanningApiTest extends TestCase
             ->all();
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/pas', [
+            ->postJson('/api/v1/pas', [
                 'titre' => 'PAS test structure integree',
                 'periode_debut' => 2027,
                 'periode_fin' => 2029,
@@ -379,7 +380,7 @@ class PlanningApiTest extends TestCase
     {
         Storage::fake('local');
 
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'melissa.abogo@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-justificatif',
@@ -394,7 +395,7 @@ class PlanningApiTest extends TestCase
         $this->assertGreaterThan(0, $weekId);
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->post("/api/actions/{$action->id}/weeks/{$weekId}/submit", [
+            ->post("/api/v1/actions/{$action->id}/weeks/{$weekId}/submit", [
                 'quantite_realisee' => 5,
                 'commentaire' => 'Saisie API test',
                 'difficultes' => 'RAS',
@@ -421,9 +422,56 @@ class PlanningApiTest extends TestCase
         Storage::disk('local')->assertExists($storedPath);
     }
 
+    public function test_action_api_exposes_quality_and_risk_kpis(): void
+    {
+        $admin = $this->createAdminUser();
+        $action = Action::query()->firstOrFail();
+
+        $action->actionKpi()->updateOrCreate(
+            ['action_id' => $action->id],
+            [
+                'kpi_delai' => 75,
+                'kpi_performance' => 82,
+                'kpi_conformite' => 91,
+                'kpi_qualite' => 88,
+                'kpi_risque' => 63,
+                'kpi_global' => 80,
+                'progression_reelle' => 64,
+                'progression_theorique' => 70,
+                'statut_calcule' => 'a_risque',
+            ]
+        );
+
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => $admin->email,
+            'password' => 'Pass@12345',
+            'device_name' => 'phpunit-action-kpis',
+        ]);
+
+        $token = (string) $loginResponse->json('access_token');
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/actions/'.$action->id);
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    'action_kpi' => [
+                        'kpi_qualite',
+                        'kpi_risque',
+                    ],
+                ],
+            ]);
+
+        $payload = $response->json('data.action_kpi');
+        $this->assertIsArray($payload);
+        $this->assertArrayHasKey('kpi_qualite', $payload);
+        $this->assertArrayHasKey('kpi_risque', $payload);
+    }
+
     public function test_non_admin_cannot_list_users_from_referentiel_api(): void
     {
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'ingrid@anbg.ga',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-non-admin-users-api',
@@ -432,16 +480,55 @@ class PlanningApiTest extends TestCase
         $token = (string) $loginResponse->json('access_token');
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/referentiel/utilisateurs');
+            ->getJson('/api/v1/referentiel/utilisateurs');
 
         $response->assertForbidden();
+    }
+
+    public function test_admin_users_referentiel_api_is_paginated_and_can_filter_on_activity_status(): void
+    {
+        $admin = $this->createAdminUser();
+
+        User::factory()->create([
+            'name' => 'Utilisateur inactif API',
+            'email' => 'inactive.api@anbg.test',
+            'role' => User::ROLE_SERVICE,
+            'is_active' => false,
+            'password_changed_at' => now(),
+        ]);
+
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => $admin->email,
+            'password' => 'Pass@12345',
+            'device_name' => 'phpunit-admin-users-api',
+        ]);
+
+        $token = (string) $loginResponse->json('access_token');
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/referentiel/utilisateurs?per_page=5&is_active=0');
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'data',
+                'current_page',
+                'per_page',
+                'total',
+            ])
+            ->assertJsonPath('per_page', 5);
+
+        $rows = $response->json('data');
+        $this->assertIsArray($rows);
+        $this->assertCount(1, $rows);
+        $this->assertSame('inactive.api@anbg.test', $rows[0]['email']);
+        $this->assertFalse((bool) $rows[0]['is_active']);
     }
 
     public function test_alerts_api_returns_unified_items_with_read_state(): void
     {
         $admin = $this->createAdminUser();
 
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-alerts-api',
@@ -450,13 +537,22 @@ class PlanningApiTest extends TestCase
         $token = (string) $loginResponse->json('access_token');
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/alertes');
+            ->getJson('/api/v1/alertes');
 
         $response->assertOk()
             ->assertJsonStructure([
                 'generated_at',
-                'summary' => ['total', 'unread', 'critical', 'warning', 'info'],
-                'level_unread_counts' => ['critical', 'warning', 'info'],
+                'summary' => ['total', 'unread', 'urgence', 'critical', 'warning', 'info'],
+                'level_unread_counts' => ['urgence', 'critical', 'warning', 'info'],
+                'kpi_summary' => [
+                    'delai',
+                    'performance',
+                    'conformite',
+                    'qualite',
+                    'risque',
+                    'global',
+                    'progression',
+                ],
                 'items',
                 'alerts',
             ]);
@@ -464,17 +560,42 @@ class PlanningApiTest extends TestCase
         $items = $response->json('items');
         $this->assertIsArray($items);
         $this->assertNotEmpty($items);
+        $this->assertIsNumeric($response->json('kpi_summary.qualite'));
+        $this->assertIsNumeric($response->json('kpi_summary.risque'));
         $this->assertArrayHasKey('source_type', $items[0]);
         $this->assertArrayHasKey('is_unread', $items[0]);
         $this->assertArrayHasKey('target_url', $items[0]);
         $this->assertArrayHasKey('read_endpoint', $items[0]);
     }
 
+    public function test_alerts_api_applies_limit_globally(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => $admin->email,
+            'password' => 'Pass@12345',
+            'device_name' => 'phpunit-alerts-limit-api',
+        ]);
+
+        $token = (string) $loginResponse->json('access_token');
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/alertes?limit=1');
+
+        $response->assertOk()
+            ->assertJsonPath('summary.total', 1);
+
+        $items = $response->json('items');
+        $this->assertIsArray($items);
+        $this->assertCount(1, $items);
+    }
+
     public function test_alerts_api_can_mark_one_alert_as_read(): void
     {
         $admin = $this->createAdminUser();
 
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-alerts-read-api',
@@ -483,7 +604,7 @@ class PlanningApiTest extends TestCase
         $token = (string) $loginResponse->json('access_token');
 
         $indexResponse = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/alertes');
+            ->getJson('/api/v1/alertes?limit=100');
 
         $indexResponse->assertOk();
         $first = $indexResponse->json('items.0');
@@ -494,7 +615,7 @@ class PlanningApiTest extends TestCase
         $this->assertTrue((bool) ($first['is_unread'] ?? false));
 
         $readResponse = $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/alertes/'.$first['source_type'].'/'.$first['source_id'].'/read');
+            ->postJson('/api/v1/alertes/'.$first['source_type'].'/'.$first['source_id'].'/read');
 
         $readResponse->assertOk()
             ->assertJsonPath('fingerprint', $first['fingerprint']);
@@ -507,11 +628,14 @@ class PlanningApiTest extends TestCase
         ]);
 
         $afterResponse = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/alertes');
+            ->getJson('/api/v1/alertes?limit=100');
 
         $afterResponse->assertOk();
         $matching = collect($afterResponse->json('items'))
-            ->firstWhere('fingerprint', $first['fingerprint']);
+            ->first(function (array $item) use ($first): bool {
+                return (string) ($item['source_type'] ?? '') === (string) $first['source_type']
+                    && (int) ($item['source_id'] ?? 0) === (int) $first['source_id'];
+            });
 
         $this->assertIsArray($matching);
         $this->assertFalse((bool) ($matching['is_unread'] ?? true));
@@ -521,7 +645,7 @@ class PlanningApiTest extends TestCase
     {
         $admin = $this->createAdminUser();
 
-        $loginResponse = $this->postJson('/api/login', [
+        $loginResponse = $this->postJson('/api/v1/login', [
             'email' => $admin->email,
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-reporting',
@@ -530,20 +654,33 @@ class PlanningApiTest extends TestCase
         $token = (string) $loginResponse->json('access_token');
 
         $reportingResponse = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/reporting/overview');
+            ->getJson('/api/v1/reporting/overview');
 
         $reportingResponse->assertOk()
             ->assertJsonStructure([
                 'generated_at',
                 'scope',
                 'global',
+                'kpi_summary' => [
+                    'delai',
+                    'performance',
+                    'conformite',
+                    'qualite',
+                    'risque',
+                    'global',
+                    'progression',
+                ],
                 'statuts',
                 'alertes',
             ]);
 
+        $reportingResponse->assertJsonPath('kpi_summary.qualite', fn ($value) => is_numeric($value));
+        $reportingResponse->assertJsonPath('kpi_summary.risque', fn ($value) => is_numeric($value));
+
         $auditResponse = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/journal-audit');
+            ->getJson('/api/v1/journal-audit');
 
         $auditResponse->assertOk();
     }
 }
+

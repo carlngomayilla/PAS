@@ -318,6 +318,10 @@ class ReferentielWebController extends Controller
             $request->filled('role'),
             fn (Builder $q) => $q->where('role', (string) $request->string('role'))
         );
+        $query->when(
+            $request->filled('is_active'),
+            fn (Builder $q) => $q->where('is_active', $request->string('is_active') === '1')
+        );
         $query->when($request->filled('q'), function (Builder $q) use ($request): void {
             $search = trim((string) $request->string('q'));
             $q->where(function (Builder $subQuery) use ($search): void {
@@ -338,6 +342,7 @@ class ReferentielWebController extends Controller
                 'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
                 'service_id' => $request->filled('service_id') ? (int) $request->integer('service_id') : null,
                 'role' => (string) $request->string('role'),
+                'is_active' => $request->filled('is_active') ? (string) $request->string('is_active') : '',
             ],
         ]);
     }
@@ -366,12 +371,13 @@ class ReferentielWebController extends Controller
         $this->applyRoleScopeRules($validated);
         $profilePhotoPath = $this->storeProfilePhoto($request);
 
-        $created = DB::transaction(function () use ($validated, $profilePhotoPath): User {
+        $created = DB::transaction(function () use ($validated, $profilePhotoPath, $request): User {
             $created = User::query()->create([
                 'name' => (string) $validated['name'],
                 'profile_photo_path' => $profilePhotoPath,
                 'email' => (string) $validated['email'],
                 'role' => (string) $validated['role'],
+                'is_active' => $request->boolean('is_active', true),
                 'is_agent' => (string) $validated['role'] === User::ROLE_AGENT,
                 'agent_matricule' => $validated['agent_matricule'] ?? null,
                 'agent_fonction' => $validated['agent_fonction'] ?? null,
@@ -421,6 +427,7 @@ class ReferentielWebController extends Controller
             'name' => (string) $validated['name'],
             'email' => (string) $validated['email'],
             'role' => (string) $validated['role'],
+            'is_active' => $request->boolean('is_active', true),
             'is_agent' => (string) $validated['role'] === User::ROLE_AGENT,
             'agent_matricule' => $validated['agent_matricule'] ?? null,
             'agent_fonction' => $validated['agent_fonction'] ?? null,
@@ -503,6 +510,7 @@ class ReferentielWebController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', $emailRule],
             'role' => ['required', Rule::in($this->roleOptions())],
+            'is_active' => ['nullable', 'boolean'],
             'agent_matricule' => ['nullable', 'string', 'max:80'],
             'agent_fonction' => ['nullable', 'string', 'max:120'],
             'agent_telephone' => ['nullable', 'string', 'max:40'],

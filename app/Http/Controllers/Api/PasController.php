@@ -31,7 +31,7 @@ class PasController extends Controller
             abort(401);
         }
 
-        $this->denyUnlessPlanningReader($user);
+        $this->authorize('viewAny', Pas::class);
 
         $perPage = max(1, min(100, (int) $request->integer('per_page', 15)));
 
@@ -80,7 +80,7 @@ class PasController extends Controller
             abort(401);
         }
 
-        $this->denyUnlessStrategicWriter($user);
+        $this->authorize('create', Pas::class);
 
         $validated = $request->validated();
         $statut = (string) ($validated['statut'] ?? 'brouillon');
@@ -129,9 +129,7 @@ class PasController extends Controller
             abort(401);
         }
 
-        if (! $this->canReadPas($user, (int) $pas->id)) {
-            abort(403, 'Acces non autorise.');
-        }
+        $this->authorize('view', $pas);
 
         return response()->json([
             'data' => $pas->load([
@@ -153,7 +151,7 @@ class PasController extends Controller
             abort(401);
         }
 
-        $this->denyUnlessStrategicWriter($user);
+        $this->authorize('update', $pas);
 
         if ($pas->statut === 'verrouille') {
             return response()->json([
@@ -217,7 +215,7 @@ class PasController extends Controller
             abort(401);
         }
 
-        $this->denyUnlessStrategicWriter($user);
+        $this->authorize('delete', $pas);
 
         if ($pas->statut === 'verrouille') {
             return response()->json([

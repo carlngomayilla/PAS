@@ -14,6 +14,7 @@
 
     $pilotageItems = [
         [
+            'code' => 'dashboard',
             'label' => 'Dashboard',
             'route' => 'dashboard',
             'icon' => 'dashboard',
@@ -23,6 +24,7 @@
 
     if ($canSeeModule('alertes')) {
         $pilotageItems[] = [
+            'code' => 'alertes',
             'label' => 'Alertes',
             'route' => 'workspace.alertes',
             'icon' => 'alert',
@@ -33,6 +35,7 @@
 
     if ($canSeeModule('reporting')) {
         $pilotageItems[] = [
+            'code' => 'reporting',
             'label' => 'Rapports',
             'route' => 'workspace.reporting',
             'icon' => 'reporting',
@@ -43,6 +46,7 @@
 
     if ($canSeeModule('pas') || $canSeeModule('pao') || $canSeeModule('pta') || $canSeeModule('execution')) {
         $pilotageItems[] = [
+            'code' => 'pilotage',
             'label' => 'Pilotage',
             'route' => 'workspace.pilotage',
             'icon' => 'pilotage',
@@ -56,6 +60,7 @@
 
     if ($canSeeModule('pas')) {
         $planificationItems[] = [
+            'code' => 'pas',
             'label' => 'PAS',
             'route' => 'workspace.pas.index',
             'icon' => 'pas',
@@ -65,6 +70,7 @@
 
     if ($canSeeModule('pao')) {
         $planificationItems[] = [
+            'code' => 'pao',
             'label' => 'PAO',
             'route' => 'workspace.pao.index',
             'icon' => 'pao',
@@ -75,6 +81,7 @@
 
     if ($canSeeModule('pta')) {
         $planificationItems[] = [
+            'code' => 'pta',
             'label' => 'PTA',
             'route' => 'workspace.pta.index',
             'icon' => 'pta',
@@ -91,6 +98,7 @@
 
     if ($canSeeModule('execution')) {
         $executionItems[] = [
+            'code' => 'actions',
             'label' => 'Actions',
             'route' => 'workspace.actions.index',
             'icon' => 'actions',
@@ -107,6 +115,7 @@
 
     if ($canSeeModule('referentiel')) {
         $gouvernanceItems[] = [
+            'code' => 'referentiel',
             'label' => 'Refer.',
             'route' => 'workspace.referentiel.directions.index',
             'icon' => 'referentiel',
@@ -116,6 +125,7 @@
 
     if ($canSeeModule('delegations')) {
         $gouvernanceItems[] = [
+            'code' => 'delegations',
             'label' => 'Deleg.',
             'route' => 'workspace.delegations.index',
             'icon' => 'delegations',
@@ -125,6 +135,7 @@
 
     if ($canSeeModule('retention')) {
         $gouvernanceItems[] = [
+            'code' => 'retention',
             'label' => 'Retention',
             'route' => 'workspace.retention.index',
             'icon' => 'retention',
@@ -134,6 +145,7 @@
 
     if ($canSeeModule('api_docs')) {
         $gouvernanceItems[] = [
+            'code' => 'api_docs',
             'label' => 'API Docs',
             'route' => 'workspace.api-docs.index',
             'icon' => 'docs',
@@ -143,6 +155,7 @@
 
     if ($canSeeModule('audit')) {
         $gouvernanceItems[] = [
+            'code' => 'audit',
             'label' => 'Audit',
             'route' => 'workspace.audit.index',
             'icon' => 'audit',
@@ -209,10 +222,11 @@
                         @php
                             $active = $isActive($item['patterns']);
                             $badgeCount = (int) ($item['badge'] ?? 0);
+                            $itemCode = (string) ($item['code'] ?? $item['route']);
                             $iconPath = $icons[$item['icon']] ?? $icons['dashboard'];
                         @endphp
 
-                        <div class="gooey-item" data-active="{{ $active ? '1' : '0' }}" data-label="{{ $item['label'] }}">
+                        <div class="gooey-item" data-active="{{ $active ? '1' : '0' }}" data-label="{{ $item['label'] }}" data-sidebar-module="{{ $itemCode }}">
                             <a
                                 href="{{ route($item['route']) }}"
                                 class="gooey-link{{ $active ? ' gooey-link-active' : '' }}"
@@ -224,7 +238,7 @@
                                 </svg>
 
                                 @if ($badgeCount > 0)
-                                    <span class="gooey-badge">{{ $badgeCount > 99 ? '99+' : $badgeCount }}</span>
+                                    <span class="gooey-badge" data-sidebar-badge-for="{{ $itemCode }}">{{ $badgeCount > 99 ? '99+' : $badgeCount }}</span>
                                 @endif
                             </a>
 

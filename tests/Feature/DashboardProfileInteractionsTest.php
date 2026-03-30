@@ -35,5 +35,9 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertOk();
         $response->assertSee('Tableau de bord strategique et operationnel');
         $response->assertSee('Diagramme de Gantt compact');
+        $response->assertSee('"dgPayload"', false);
+        $response->assertSee('"kpi_summary"', false);
+        $response->assertSee('"kpi_qualite"', false);
+        $response->assertSee('"kpi_risque"', false);
     }
 }

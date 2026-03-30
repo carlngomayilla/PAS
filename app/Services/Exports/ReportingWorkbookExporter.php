@@ -3,55 +3,49 @@
 namespace App\Services\Exports;
 
 use Carbon\CarbonInterface;
+use App\Support\Zip\SimpleZipWriter;
 use Illuminate\Support\Str;
 use RuntimeException;
-use ZipArchive;
 
 class ReportingWorkbookExporter
 {
+    public function __construct(
+        private readonly SimpleZipWriter $zipWriter = new SimpleZipWriter()
+    ) {
+    }
+
     public function create(array $payload): string
     {
-        if (! class_exists(ZipArchive::class)) {
-            throw new RuntimeException('ZipArchive extension is required to build XLSX exports.');
-        }
-
         $sheets = $this->buildSheets($payload);
         $tempPath = tempnam(sys_get_temp_dir(), 'anbg_xlsx_');
         if ($tempPath === false) {
             throw new RuntimeException('Unable to allocate temporary file for XLSX export.');
         }
 
-        $zip = new ZipArchive();
-        if ($zip->open($tempPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            @unlink($tempPath);
-            throw new RuntimeException('Unable to open XLSX archive for writing.');
-        }
-
         $sheetNames = array_map(static fn (array $sheet): string => (string) $sheet['name'], $sheets);
         $drawingCount = count(array_filter($sheets, static fn (array $sheet): bool => ! empty($sheet['charts'] ?? [])));
         $chartCount = array_sum(array_map(static fn (array $sheet): int => count($sheet['charts'] ?? []), $sheets));
 
-        $zip->addFromString('[Content_Types].xml', $this->contentTypesXml(count($sheets), $drawingCount, $chartCount));
-        $zip->addFromString('_rels/.rels', $this->rootRelationshipsXml());
-        $zip->addFromString('docProps/app.xml', $this->appPropertiesXml($sheetNames));
-        $zip->addFromString('docProps/core.xml', $this->corePropertiesXml($payload['generatedAt'] ?? null));
-        $zip->addFromString('xl/workbook.xml', $this->workbookXml($sheetNames));
-        $zip->addFromString('xl/_rels/workbook.xml.rels', $this->workbookRelationshipsXml(count($sheets)));
-        $zip->addFromString('xl/styles.xml', $this->stylesXml());
+        $entries = [
+            '[Content_Types].xml' => $this->contentTypesXml(count($sheets), $drawingCount, $chartCount),
+            '_rels/.rels' => $this->rootRelationshipsXml(),
+            'docProps/app.xml' => $this->appPropertiesXml($sheetNames),
+            'docProps/core.xml' => $this->corePropertiesXml($payload['generatedAt'] ?? null),
+            'xl/workbook.xml' => $this->workbookXml($sheetNames),
+            'xl/_rels/workbook.xml.rels' => $this->workbookRelationshipsXml(count($sheets)),
+            'xl/styles.xml' => $this->stylesXml(),
+        ];
 
         $drawingIndex = 1;
         $chartIndex = 1;
         foreach ($sheets as $index => $sheet) {
             $hasCharts = ! empty($sheet['charts'] ?? []);
-            $zip->addFromString(
-                'xl/worksheets/sheet'.($index + 1).'.xml',
-                $this->sheetXml(
-                    $sheet['rows'],
-                    $sheet['merges'],
-                    (int) $sheet['maxColumns'],
-                    $sheet['widths'] ?? [],
-                    $hasCharts ? 'rId1' : null
-                )
+            $entries['xl/worksheets/sheet'.($index + 1).'.xml'] = $this->sheetXml(
+                $sheet['rows'],
+                $sheet['merges'],
+                (int) $sheet['maxColumns'],
+                $sheet['widths'] ?? [],
+                $hasCharts ? 'rId1' : null
             );
 
             if (! $hasCharts) {
@@ -59,31 +53,25 @@ class ReportingWorkbookExporter
             }
 
             $charts = (array) ($sheet['charts'] ?? []);
-            $zip->addFromString(
-                'xl/worksheets/_rels/sheet'.($index + 1).'.xml.rels',
-                $this->sheetRelationshipsXml($drawingIndex)
-            );
-            $zip->addFromString(
-                'xl/drawings/drawing'.$drawingIndex.'.xml',
-                $this->drawingXml($charts)
-            );
-            $zip->addFromString(
-                'xl/drawings/_rels/drawing'.$drawingIndex.'.xml.rels',
-                $this->drawingRelationshipsXml($chartIndex, count($charts))
-            );
+            $entries['xl/worksheets/_rels/sheet'.($index + 1).'.xml.rels'] = $this->sheetRelationshipsXml($drawingIndex);
+            $entries['xl/drawings/drawing'.$drawingIndex.'.xml'] = $this->drawingXml($charts);
+            $entries['xl/drawings/_rels/drawing'.$drawingIndex.'.xml.rels'] = $this->drawingRelationshipsXml($chartIndex, count($charts));
 
             foreach ($charts as $chart) {
-                $zip->addFromString(
-                    'xl/charts/chart'.$chartIndex.'.xml',
-                    $this->chartXml($chart, $chartIndex)
-                );
+                $entries['xl/charts/chart'.$chartIndex.'.xml'] = $this->chartXml($chart, $chartIndex);
                 $chartIndex++;
             }
 
             $drawingIndex++;
         }
 
-        $zip->close();
+        try {
+            $this->zipWriter->write($tempPath, $entries);
+        } catch (\Throwable $exception) {
+            @unlink($tempPath);
+
+            throw $exception;
+        }
 
         return $tempPath;
     }
@@ -184,6 +172,7 @@ class ReportingWorkbookExporter
         $rowIndex += 2;
 
         $cardRanges = [[1, 2], [3, 4], [5, 6], [7, 8]];
+        $kpiSummary = (array) ($payload['kpiSummary'] ?? []);
         $cardsGroups = [
             [
                 ['Actions', (int) ($payload['global']['actions_total'] ?? 0), 13, 14],
@@ -196,6 +185,12 @@ class ReportingWorkbookExporter
                 ['PAO', (int) ($payload['global']['paos_total'] ?? 0), 13, 14],
                 ['PTA', (int) ($payload['global']['ptas_total'] ?? 0), 15, 16],
                 ['Retards', (int) ($payload['alertes']['actions_en_retard'] ?? 0), 17, 18],
+            ],
+            [
+                ['KPI global', (int) round((float) ($kpiSummary['global'] ?? 0)), 13, 14],
+                ['Qualite', (int) round((float) ($kpiSummary['qualite'] ?? 0)), 15, 16],
+                ['Risque', (int) round((float) ($kpiSummary['risque'] ?? 0)), 17, 18],
+                ['Progression', (int) round((float) ($kpiSummary['progression'] ?? 0)), 19, 20],
             ],
         ];
         foreach ($cardsGroups as $cards) {
@@ -453,6 +448,21 @@ class ReportingWorkbookExporter
         ];
 
         $sections[] = [
+            'title' => 'Synthese KPI validee direction',
+            'headers' => ['KPI delai', 'KPI performance', 'KPI conformite', 'KPI qualite', 'KPI risque', 'KPI global', 'Progression moyenne'],
+            'types' => ['decimal', 'decimal', 'decimal', 'decimal', 'decimal', 'decimal', 'percent'],
+            'rows' => [[
+                (float) ($payload['kpiSummary']['delai'] ?? 0),
+                (float) ($payload['kpiSummary']['performance'] ?? 0),
+                (float) ($payload['kpiSummary']['conformite'] ?? 0),
+                (float) ($payload['kpiSummary']['qualite'] ?? 0),
+                (float) ($payload['kpiSummary']['risque'] ?? 0),
+                (float) ($payload['kpiSummary']['global'] ?? 0),
+                (float) ($payload['kpiSummary']['progression'] ?? 0),
+            ]],
+        ];
+
+        $sections[] = [
             'title' => 'Vue consolidee du PAS',
             'headers' => ['PAS', 'Periode', 'Axes', 'Objectifs', 'PAO', 'PTA', 'Actions', 'Validees', 'Progression moyenne', 'Taux realisation'],
             'types' => ['string', 'string', 'integer', 'integer', 'integer', 'integer', 'integer', 'integer', 'percent', 'percent'],
@@ -467,9 +477,9 @@ class ReportingWorkbookExporter
         ];
         $sections[] = [
             'title' => 'Details - Actions en retard',
-            'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable'],
-            'types' => ['integer', 'string', 'string', 'string', 'string', 'string'],
-            'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? '')])->all(),
+            'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable', 'KPI global', 'KPI qualite', 'KPI risque'],
+            'types' => ['integer', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal', 'decimal'],
+            'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_global ?? 0), (float) ($action->actionKpi?->kpi_qualite ?? 0), (float) ($action->actionKpi?->kpi_risque ?? 0)])->all(),
         ];
 
         $sections[] = [
@@ -481,9 +491,9 @@ class ReportingWorkbookExporter
 
         $sections[] = [
             'title' => 'Structure des rapports - Tableau strategique',
-            'headers' => ['Axe strategique', 'Objectif strategique', 'Objectif operationnel', 'Description actions detaillees', 'RMO', 'Cible', 'Debut', 'Fin', 'Etat de realisation', 'Progression', 'Ressources requises', 'Indicateurs de performance', 'Risques potentiels'],
-            'types' => array_fill(0, 13, 'string'),
-            'rows' => collect($payload['details']['structure_rapports'] ?? [])->map(fn (array $row): array => [(string) ($row['axe_strategique'] ?? ''), (string) ($row['objectif_strategique'] ?? ''), (string) ($row['objectif_operationnel'] ?? ''), (string) ($row['description_actions_detaillees'] ?? ''), (string) ($row['rmo'] ?? ''), (string) ($row['cible'] ?? ''), (string) ($row['debut'] ?? ''), (string) ($row['fin'] ?? ''), (string) ($row['etat_realisation'] ?? ''), (string) ($row['progression'] ?? ''), (string) ($row['ressources_requises'] ?? ''), (string) ($row['indicateurs_performance'] ?? ''), (string) ($row['risques_potentiels'] ?? '')])->all(),
+            'headers' => ['Axe strategique', 'Objectif strategique', 'Objectif operationnel', 'Description actions detaillees', 'RMO', 'Cible', 'Debut', 'Fin', 'Etat de realisation', 'Progression', 'KPI global', 'KPI qualite', 'KPI risque', 'Ressources requises', 'Indicateurs de performance', 'Risques potentiels'],
+            'types' => ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal', 'decimal', 'string', 'string', 'string'],
+            'rows' => collect($payload['details']['structure_rapports'] ?? [])->map(fn (array $row): array => [(string) ($row['axe_strategique'] ?? ''), (string) ($row['objectif_strategique'] ?? ''), (string) ($row['objectif_operationnel'] ?? ''), (string) ($row['description_actions_detaillees'] ?? ''), (string) ($row['rmo'] ?? ''), (string) ($row['cible'] ?? ''), (string) ($row['debut'] ?? ''), (string) ($row['fin'] ?? ''), (string) ($row['etat_realisation'] ?? ''), (string) ($row['progression'] ?? ''), (float) ($row['kpi_global'] ?? 0), (float) ($row['kpi_qualite'] ?? 0), (float) ($row['kpi_risque'] ?? 0), (string) ($row['ressources_requises'] ?? ''), (string) ($row['indicateurs_performance'] ?? ''), (string) ($row['risques_potentiels'] ?? '')])->all(),
         ];
 
         return $sections;

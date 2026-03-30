@@ -59,6 +59,14 @@
                         @endforeach
                     </select>
                 </div>
+                <div>
+                    <label for="is_active">Statut</label>
+                    <select id="is_active" name="is_active">
+                        <option value="">Tous</option>
+                        <option value="1" @selected($filters['is_active'] === '1')>Actifs</option>
+                        <option value="0" @selected($filters['is_active'] === '0')>Inactifs</option>
+                    </select>
+                </div>
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
@@ -76,6 +84,7 @@
                         <th>ID</th>
                         <th>Profil</th>
                         <th>Role</th>
+                        <th>Statut</th>
                         <th>Portee</th>
                         <th>Agent</th>
                         <th>Direction</th>
@@ -107,6 +116,11 @@
                             <td>
                                 <span class="anbg-badge anbg-badge-neutral px-3">
                                     {{ $row->roleLabel() }} ({{ $row->role }})
+                                </span>
+                            </td>
+                            <td>
+                                <span class="anbg-badge {{ $row->is_active ? 'anbg-badge-success' : 'anbg-badge-danger' }} px-3">
+                                    {{ $row->is_active ? 'Actif' : 'Inactif' }}
                                 </span>
                             </td>
                             <td class="text-sm text-slate-600">{{ $row->profileScopeLabel() }}</td>
@@ -141,7 +155,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 8 : 7 }}" class="text-slate-600">Aucun utilisateur trouve.</td>
+                            <td colspan="{{ $canWrite ? 9 : 8 }}" class="text-slate-600">Aucun utilisateur trouve.</td>
                         </tr>
                     @endforelse
                 </tbody>

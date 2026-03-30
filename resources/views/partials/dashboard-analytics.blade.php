@@ -3,10 +3,11 @@
 @php
     $dashboardNotifications = auth()->user()?->notifications()->latest()->limit(6)->get() ?? collect();
     $analytics = $dashboardData ?? [];
-    $globalScores = $analytics['global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'global' => 0, 'progression' => 0];
+    $globalScores = $analytics['global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'risque' => 0, 'global' => 0, 'progression' => 0];
     $statusCards = $analytics['status_cards'] ?? [];
     $unitRows = $analytics['unit_rows'] ?? [];
     $actionRows = $analytics['action_rows'] ?? [];
+    $priorityActionRows = collect($actionRows)->take(8)->all();
     $ganttRows = $analytics['gantt_rows'] ?? [];
     $bulletRows = $analytics['bullet_rows'] ?? [];
     $alertRows = $analytics['alert_rows'] ?? [];
@@ -66,8 +67,11 @@
     $dashboardStatusTone = static function (string $status): string {
         return match ($status) {
             'acheve', 'en_avance' => 'success',
+            'a_risque' => 'warning',
             'en_retard' => 'danger',
+            'suspendu' => 'danger',
             'non_demarre' => 'neutral',
+            'annule' => 'neutral',
             default => 'info',
         };
     };
@@ -82,7 +86,10 @@
             .dashboard-tab-panel{display:none;animation:dashboardFadeUp .24s ease}
             .dashboard-tab-panel.active{display:block}
             .dashboard-canvas{position:relative;min-height:300px}
-            .dashboard-canvas canvas{position:absolute;inset:0;width:100%!important;height:100%!important}
+            .dashboard-canvas-lg{min-height:320px}
+            .dashboard-chart-host{width:100%;height:100%}
+            .dashboard-canvas .dashboard-chart-host,.dashboard-canvas .dashboard-chart-host canvas,.dashboard-canvas svg{position:absolute;inset:0;width:100%!important;height:100%!important}
+            .dashboard-chart-host canvas{display:block}
             .dashboard-table{width:100%;border-collapse:collapse;font-size:.84rem}
             .dashboard-table th{padding:.78rem .9rem;text-align:left;font-size:.67rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#1C203D;background:linear-gradient(180deg,rgba(241,246,250,.98)_0%,rgba(232,243,251,.96)_100%);border-bottom:1px solid rgba(208,218,229,.92);white-space:nowrap}
             .dashboard-table td{padding:.85rem .9rem;border-bottom:1px solid rgba(218,226,236,.95);color:rgb(30 41 59);vertical-align:middle}
@@ -101,6 +108,61 @@
             .dashboard-gantt-bar,.dashboard-gantt-progress{position:absolute;top:.45rem;bottom:.45rem;border-radius:9999px}
             .dashboard-gantt-bar{opacity:.28}
             .dashboard-gantt-today{position:absolute;top:0;bottom:0;width:2px;background:rgb(249 177 60 / .72)}
+            .dashboard-gantt-svg{overflow:visible}
+            .dashboard-gantt-axis text{font-size:.66rem;fill:#64748B;font-weight:800}
+            .dashboard-gantt-axis line,.dashboard-gantt-axis path{stroke:rgba(148,163,184,.22)}
+            .dashboard-gantt-label{font-size:.78rem;fill:#1C203D;font-weight:700}
+            .dashboard-gantt-meta{font-size:.68rem;fill:#64748B}
+            .dashboard-gantt-bg{fill:rgba(226,232,240,.78)}
+            .dashboard-gantt-plan{opacity:.28}
+            .dashboard-gantt-real{filter:drop-shadow(0 0 10px rgba(57,150,211,.22))}
+            .dashboard-gantt-today-line{stroke:#F9B13C;stroke-width:2;stroke-dasharray:4 4}
+            .dashboard-gantt-right{font-size:.72rem;fill:#1C203D;font-weight:900}
+            .dashboard-advanced-shell{display:flex;flex-direction:column;gap:1rem}
+            .dashboard-advanced-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+            .dashboard-advanced-card{position:relative;overflow:hidden;border:1px solid rgba(57,150,211,.18);border-radius:1.45rem;padding:1rem 1rem 1.1rem;background:linear-gradient(180deg,rgba(255,255,255,.98) 0%,rgba(248,250,252,.96) 100%);box-shadow:0 24px 46px -38px rgba(15,23,42,.45)}
+            .dashboard-advanced-card::before{content:'';position:absolute;inset:0 0 auto 0;height:4px;background:linear-gradient(90deg,#3996D3 0%,#8FC043 28%,#F0E509 58%,#F9B13C 100%);opacity:.95}
+            .dashboard-advanced-card:hover{transform:translateY(-2px);box-shadow:0 28px 48px -36px rgba(15,23,42,.62)}
+            .dashboard-advanced-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.85rem;margin-bottom:.9rem}
+            .dashboard-advanced-kpi{border-radius:1.2rem;border:1px solid rgba(57,150,211,.14);padding:1rem;background:linear-gradient(180deg,rgba(255,255,255,.98) 0%,rgba(248,250,252,.94) 100%);box-shadow:0 18px 34px -30px rgba(15,23,42,.45)}
+            .dashboard-advanced-kpi .dashboard-summary-value{color:#1C203D}
+            .dashboard-advanced-kpi-blue .dashboard-summary-value{color:#3996D3}
+            .dashboard-advanced-kpi-green .dashboard-summary-value{color:#8FC043}
+            .dashboard-advanced-kpi-amber .dashboard-summary-value{color:#F9B13C}
+            .dashboard-advanced-kpi-navy .dashboard-summary-value{color:#1C203D}
+            .dashboard-table-compact th,.dashboard-table-compact td{padding:.68rem .72rem}
+            .dashboard-table-wide{min-width:1180px}
+            .dashboard-heatmap-wrap{overflow:auto}
+            .dashboard-heatmap-table{width:100%;border-collapse:separate;border-spacing:.38rem;font-size:.78rem}
+            .dashboard-heatmap-table th{padding:.2rem .16rem;border:none;background:transparent;font-size:.66rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#64748B}
+            .dashboard-heatmap-table td{padding:0;border:none;text-align:center}
+            .dashboard-heatmap-cell{display:flex;align-items:center;justify-content:center;min-width:2.8rem;min-height:2.55rem;border-radius:.95rem;color:#1C203D;font-size:.76rem;font-weight:900;box-shadow:inset 0 -1px 0 rgba(255,255,255,.28)}
+            .dashboard-critical-gantt-list{display:flex;flex-direction:column;gap:.7rem}
+            .dashboard-critical-gantt-row{display:grid;grid-template-columns:minmax(190px,220px) 1fr;gap:.75rem;align-items:center}
+            .dashboard-critical-gantt-track{position:relative;height:1rem;border-radius:9999px;background:linear-gradient(180deg,rgba(226,232,240,.95) 0%,rgba(226,232,240,.82) 100%);overflow:hidden}
+            .dashboard-critical-gantt-bar{position:absolute;top:0;bottom:0;border-radius:9999px;background:linear-gradient(90deg,rgba(249,177,60,.32) 0%,rgba(57,150,211,.38) 100%)}
+            .dashboard-critical-gantt-progress{display:block;height:100%;border-radius:9999px;background:linear-gradient(90deg,#F9B13C 0%,#3996D3 100%);box-shadow:0 0 22px -8px rgba(57,150,211,.58)}
+            .dashboard-treemap-wrap{display:flex;flex-wrap:wrap;gap:.7rem}
+            .dashboard-treemap-item{min-width:170px;border-radius:1rem;padding:.82rem;background:linear-gradient(145deg,rgba(57,150,211,.12) 0%,rgba(143,192,67,.18) 100%);border:1px solid rgba(57,150,211,.16);transition:transform .18s ease,box-shadow .18s ease}
+            .dashboard-treemap-item:hover{transform:translateY(-2px);box-shadow:0 18px 28px -24px rgba(15,23,42,.6)}
+            .dashboard-treemap-item strong{display:block;font-size:.78rem;color:#1C203D}
+            .dashboard-treemap-item span{display:block;margin-top:.25rem;font-size:.74rem;color:#475569}
+            .dashboard-risk-inline{display:flex;align-items:center;gap:.55rem}
+            .dashboard-risk-inline-bar{display:inline-flex;align-items:center;flex:1;min-width:86px;height:.5rem;border-radius:9999px;background:rgba(226,232,240,.95);overflow:hidden}
+            .dashboard-risk-inline-bar span{display:block;height:100%;border-radius:9999px;background:linear-gradient(90deg,#F9B13C 0%,#1C203D 100%)}
+            .dashboard-gauge-grid{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+            .dashboard-gauge-card{border-radius:1rem;border:1px solid rgba(203,213,225,.85);padding:.75rem;background:rgba(255,255,255,.94);text-align:center}
+            .dashboard-gauge-card strong{display:block;min-height:2rem;font-size:.76rem;color:#1C203D}
+            .dashboard-gauge-card p{margin:.1rem 0 0;font-size:.78rem;color:#64748B}
+            .dashboard-gauge-canvas{position:relative;height:105px}
+            .dashboard-gauge-canvas .dashboard-chart-host,.dashboard-gauge-canvas .dashboard-chart-host canvas,.dashboard-gauge-canvas svg{position:absolute;inset:0;width:100%!important;height:100%!important}
+            .dashboard-status-block{border:1px solid rgba(226,232,240,.9);border-radius:1rem;background:rgba(248,250,252,.9);padding:.8rem}
+            .dashboard-status-block-title{margin-bottom:.55rem;font-size:.72rem;font-weight:900;letter-spacing:.08em;color:#1C203D}
+            .dashboard-chart-legend{display:flex;flex-wrap:wrap;gap:.5rem .65rem;margin-top:.75rem}
+            .dashboard-chart-legend span{display:inline-flex;align-items:center;gap:.4rem;border-radius:9999px;padding:.32rem .64rem;font-size:.69rem;font-weight:800;background:rgba(241,245,249,.96);color:#1C203D}
+            .dashboard-chart-legend i{display:inline-block;width:.65rem;height:.65rem;border-radius:9999px}
+            .dashboard-reporting-jump{display:inline-flex;align-items:center;justify-content:center;border-radius:1rem;padding:.78rem 1rem;font-size:.78rem;font-weight:800;color:#1C203D;background:linear-gradient(135deg,rgba(248,233,50,.32) 0%,rgba(57,150,211,.18) 100%);border:1px solid rgba(57,150,211,.2);transition:all .16s ease}
+            .dashboard-reporting-jump:hover{background:linear-gradient(135deg,rgba(248,233,50,.46) 0%,rgba(57,150,211,.24) 100%);transform:translateY(-1px)}
             @keyframes dashboardFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
             .dark .dashboard-tab-inactive{color:rgb(148 163 184)}
             .dark .dashboard-table th{background:linear-gradient(180deg,rgba(28,32,61,.96)_0%,rgba(20,24,47,.98)_100%);border-bottom-color:rgb(51 65 85 / .88);color:rgb(248 250 252)}
@@ -112,7 +174,24 @@
             .dark .dashboard-bullet-target{background:rgb(248 250 252)}
             .dark .dashboard-gantt-track::before{background-image:linear-gradient(to right,rgb(51 65 85 / .72) 1px,transparent 1px)}
             .dark .dashboard-gantt-month{border-left-color:rgb(30 41 59 / .9);color:rgb(148 163 184)}
-            @media (max-width:1024px){.dashboard-bullet,.dashboard-gantt-grid,.dashboard-gantt-head{grid-template-columns:1fr}}
+            .dark .dashboard-gantt-axis text,.dark .dashboard-gantt-meta{fill:#94A3B8}
+            .dark .dashboard-gantt-axis line,.dark .dashboard-gantt-axis path{stroke:rgba(100,116,139,.24)}
+            .dark .dashboard-gantt-label,.dark .dashboard-gantt-right{fill:#F8FAFC}
+            .dark .dashboard-gantt-bg{fill:rgba(51,65,85,.78)}
+            .dark .dashboard-advanced-card,.dark .dashboard-advanced-kpi{border-color:rgba(57,150,211,.18);background:linear-gradient(180deg,rgba(15,23,42,.96) 0%,rgba(15,23,42,.88) 100%)}
+            .dark .dashboard-advanced-kpi .dashboard-summary-meta,.dark .dashboard-advanced-kpi .dashboard-summary-label{color:#94A3B8}
+            .dark .dashboard-heatmap-table th{color:#94A3B8}
+            .dark .dashboard-heatmap-cell{color:#F8FAFC;box-shadow:inset 0 -1px 0 rgba(255,255,255,.06)}
+            .dark .dashboard-critical-gantt-track{background:linear-gradient(180deg,rgba(51,65,85,.72) 0%,rgba(30,41,59,.86) 100%)}
+            .dark .dashboard-treemap-item{border-color:rgba(57,150,211,.2);background:linear-gradient(145deg,rgba(57,150,211,.18) 0%,rgba(143,192,67,.14) 100%)}
+            .dark .dashboard-treemap-item strong{color:#F8FAFC}
+            .dark .dashboard-treemap-item span,.dark .dashboard-gauge-card p{color:#CBD5E1}
+            .dark .dashboard-risk-inline-bar{background:rgba(30,41,59,.95)}
+            .dark .dashboard-gauge-card,.dark .dashboard-status-block{border-color:rgba(51,65,85,.88);background:rgba(15,23,42,.82)}
+            .dark .dashboard-gauge-card strong,.dark .dashboard-status-block-title{color:#F8FAFC}
+            .dark .dashboard-chart-legend span{background:rgba(15,23,42,.9);color:#F8FAFC}
+            .dark .dashboard-reporting-jump{color:#F8FAFC;background:linear-gradient(135deg,rgba(248,233,50,.16) 0%,rgba(57,150,211,.16) 100%);border-color:rgba(57,150,211,.26)}
+            @media (max-width:1024px){.dashboard-bullet,.dashboard-gantt-grid,.dashboard-gantt-head,.dashboard-critical-gantt-row{grid-template-columns:1fr}}
         </style>
     @endpush
 @endonce
@@ -148,6 +227,7 @@
     <button type="button" class="dashboard-tab dashboard-tab-inactive" data-dashboard-tab="actions">Actions</button>
     <button type="button" class="dashboard-tab dashboard-tab-inactive" data-dashboard-tab="gantt">Gantt</button>
     <button type="button" class="dashboard-tab dashboard-tab-inactive" data-dashboard-tab="tables">Tableaux</button>
+    <button type="button" class="dashboard-tab dashboard-tab-inactive" data-dashboard-tab="analytics">Analytique avancee</button>
 </div>
 
 <section class="dashboard-tab-panel active" data-dashboard-panel="overview">
@@ -161,25 +241,14 @@
         @endforeach
     </div>
 
-    <div class="mb-4 grid gap-4 xl:grid-cols-[repeat(3,minmax(0,1fr))_1.2fr]">
-        @foreach ([['key' => 'delai', 'label' => 'KPI Delai'],['key' => 'performance', 'label' => 'KPI Performance'],['key' => 'conformite', 'label' => 'KPI Conformite']] as $gauge)
+    <div class="mb-4 grid gap-4 xl:grid-cols-[repeat(5,minmax(0,1fr))_1.2fr]">
+        @foreach ([['key' => 'delai', 'label' => 'KPI Delai'],['key' => 'performance', 'label' => 'KPI Performance'],['key' => 'conformite', 'label' => 'KPI Conformite'],['key' => 'qualite', 'label' => 'KPI Qualite'],['key' => 'risque', 'label' => 'KPI Risque']] as $gauge)
             @php
                 $value = (float) ($globalScores[$gauge['key']] ?? 0);
-                $radius = 38;
-                $circumference = pi() * $radius;
-                $offset = $circumference * (1 - ($value / 100));
-                $color = $value >= 80 ? '#8FC043' : ($value >= 60 ? '#F0E509' : ($value > 0 ? '#F9B13C' : '#94A3B8'));
             @endphp
             <article class="showcase-panel">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{{ $gauge['label'] }}</p>
-                <div class="flex min-h-[120px] items-center justify-center">
-                    <svg width="132" height="86" viewBox="0 0 132 86" aria-hidden="true">
-                        <path d="M 28 70 A 38 38 0 0 1 104 70" fill="none" stroke="rgba(226,232,240,.95)" stroke-width="10" stroke-linecap="round"></path>
-                        <path d="M 28 70 A 38 38 0 0 1 104 70" fill="none" stroke="{{ $color }}" stroke-width="10" stroke-linecap="round" stroke-dasharray="{{ $circumference }}" stroke-dashoffset="{{ $offset }}"></path>
-                        <text x="66" y="54" text-anchor="middle" font-size="24" font-weight="900" fill="{{ $color }}">{{ number_format($value, 0) }}</text>
-                        <text x="66" y="67" text-anchor="middle" font-size="9" fill="#94A3B8">/100</text>
-                    </svg>
-                </div>
+                <div class="dashboard-canvas !min-h-[140px]"><div id="dashboard-kpi-gauge-{{ $gauge['key'] }}" class="dashboard-chart-host"></div></div>
                 <p class="text-center text-xs text-slate-500">Moyenne scopee sur les actions calculees.</p>
             </article>
         @endforeach
@@ -192,7 +261,7 @@
                 </div>
                 <span class="showcase-chip">{{ $metrics['totals']['actions_total'] ?? 0 }} actions</span>
             </div>
-            <div class="dashboard-canvas"><canvas id="dashboard-status-mix-chart"></canvas></div>
+            <div class="dashboard-canvas"><div id="dashboard-status-mix-chart" class="dashboard-chart-host"></div></div>
         </article>
     </div>
 
@@ -205,7 +274,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($analytics['monthly'] ?? []) }} mois</span>
             </div>
-            <div class="dashboard-canvas"><canvas id="dashboard-kpi-line-chart"></canvas></div>
+            <div class="dashboard-canvas"><div id="dashboard-kpi-line-chart" class="dashboard-chart-host"></div></div>
         </article>
 
         <article class="showcase-panel">
@@ -216,7 +285,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($unitRows) }} {{ strtolower($unitModeLabel) }}</span>
             </div>
-            <div class="dashboard-canvas"><canvas id="dashboard-unit-summary-chart"></canvas></div>
+            <div class="dashboard-canvas"><div id="dashboard-unit-summary-chart" class="dashboard-chart-host"></div></div>
         </article>
     </div>
 
@@ -315,7 +384,7 @@
 
 <section class="dashboard-tab-panel" data-dashboard-panel="kpi">
     <div class="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">KPI par mois</h2><p class="showcase-panel-subtitle">Comparaison delai, performance, conformite et global.</p></div><span class="showcase-chip">12 mois</span></div><div class="dashboard-canvas"><canvas id="dashboard-kpi-grouped-chart"></canvas></div></article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">KPI par mois</h2><p class="showcase-panel-subtitle">Comparaison delai, performance, conformite, qualite, risque et global.</p></div><span class="showcase-chip">12 mois</span></div><div class="dashboard-canvas"><div id="dashboard-kpi-grouped-chart" class="dashboard-chart-host"></div></div></article>
         <article class="showcase-panel">
             <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">KPI global moyen</h2><p class="showcase-panel-subtitle">Vue macro du perimetre actuellement scope.</p></div><span class="showcase-chip">Seuil 60</span></div>
             <div class="rounded-[1.4rem] p-5 text-white" style="background: linear-gradient(135deg, #8FC043 0%, #3996D3 52%, #1C203D 100%);"><p class="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/75">Score actuel</p><p class="mt-3 text-5xl font-black leading-none">{{ number_format((float) ($globalScores['global'] ?? 0), 0) }}</p><p class="mt-3 text-sm text-white/80">Progression moyenne: {{ number_format((float) ($globalScores['progression'] ?? 0), 0) }}%</p><div class="mt-4 h-2 rounded-full bg-white/20"><div class="h-2 rounded-full bg-white" style="width: {{ min(100, max(0, (float) ($globalScores['global'] ?? 0))) }}%;"></div></div></div>
@@ -324,7 +393,7 @@
     </div>
 
     <div class="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Comparaison interannuelle</h2><p class="showcase-panel-subtitle">Actions total, actions validees et progression moyenne.</p></div><span class="showcase-chip">{{ count($interannualRows) }} annee(s)</span></div><div class="dashboard-canvas"><canvas id="dashboard-interannual-chart"></canvas></div></article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Comparaison interannuelle</h2><p class="showcase-panel-subtitle">Actions total, actions validees et progression moyenne.</p></div><span class="showcase-chip">{{ count($interannualRows) }} annee(s)</span></div><div class="dashboard-canvas"><div id="dashboard-interannual-chart" class="dashboard-chart-host"></div></div></article>
         <article class="showcase-panel">
             <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Cible vs realise</h2><p class="showcase-panel-subtitle">Lecture type bullet chart sur les actions prioritaires.</p></div><span class="showcase-chip">Cible 80</span></div>
             @if ($bulletRows !== [])
@@ -345,21 +414,21 @@
                 <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune action classee pour le moment.</div>
             @endif
         </article>
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Radar de comparaison</h2><p class="showcase-panel-subtitle">Delai, performance, conformite et progression.</p></div><span class="showcase-chip">{{ min(3, count($unitRows)) }} jeux</span></div><div class="dashboard-canvas"><canvas id="dashboard-radar-chart"></canvas></div></article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Radar de comparaison</h2><p class="showcase-panel-subtitle">Delai, performance, conformite et progression.</p></div><span class="showcase-chip">{{ min(3, count($unitRows)) }} jeux</span></div><div class="dashboard-canvas"><div id="dashboard-radar-chart" class="dashboard-chart-host"></div></div></article>
     </div>
 
-    <div class="showcase-panel mt-4"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Scatter performance / conformite</h2><p class="showcase-panel-subtitle">Repere visuel pour isoler les actions solides ou fragiles.</p></div><span class="showcase-chip">{{ count($analytics['scatter_points'] ?? []) }} points</span></div><div class="dashboard-canvas"><canvas id="dashboard-scatter-chart"></canvas></div></div>
+    <div class="showcase-panel mt-4"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Scatter performance / conformite</h2><p class="showcase-panel-subtitle">Repere visuel pour isoler les actions solides ou fragiles.</p></div><span class="showcase-chip">{{ count($analytics['scatter_points'] ?? []) }} points</span></div><div class="dashboard-canvas"><div id="dashboard-scatter-chart" class="dashboard-chart-host"></div></div></div>
 
     <div class="showcase-panel mt-4">
-        <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Tableau detaille des actions</h2><p class="showcase-panel-subtitle">Statut, progression, KPI et responsable.</p></div><span class="showcase-chip">{{ count($actionRows) }} lignes</span></div>
+        <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Actions prioritaires</h2><p class="showcase-panel-subtitle">Vue decisionnelle compacte sur les actions les plus visibles du portefeuille.</p></div><span class="showcase-chip">{{ count($priorityActionRows) }} lignes</span></div>
         <div class="overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Progression</th><th>KPI</th><th>Delai</th><th>Perf.</th><th>Conf.</th></tr></thead>
+                <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Progression</th><th>KPI</th><th>Delai</th><th>Perf.</th><th>Conf.</th><th>Qual.</th><th>Risque</th></tr></thead>
                 <tbody>
-                    @forelse ($actionRows as $row)
+                    @forelse ($priorityActionRows as $row)
                         @php
-                            $statusColor = match ($row['statut']) {'acheve' => '#1C203D','en_avance' => '#8FC043','en_retard' => '#F9B13C','non_demarre' => '#64748B',default => '#3996D3'};
-                            $statusBg = match ($row['statut']) {'acheve' => '#EEF1F8','en_avance' => '#EEF6E1','en_retard' => '#FFF0DF','non_demarre' => '#F1F5F9',default => '#E8F3FB'};
+                            $statusColor = match ($row['statut']) {'acheve' => '#1C203D','en_avance' => '#8FC043','a_risque' => '#F0E509','en_retard' => '#F9B13C','suspendu' => '#7C3AED','annule' => '#475569','non_demarre' => '#64748B',default => '#3996D3'};
+                            $statusBg = match ($row['statut']) {'acheve' => '#EEF1F8','en_avance' => '#EEF6E1','a_risque' => '#FFF8D6','en_retard' => '#FFF0DF','suspendu' => '#F3E8FF','annule' => '#E2E8F0','non_demarre' => '#F1F5F9',default => '#E8F3FB'};
                             $progress = (float) ($row['progression'] ?? 0);
                             $progressColor = $progress >= 80 ? '#8FC043' : ($progress >= 60 ? '#3996D3' : ($progress > 0 ? '#F0E509' : '#94A3B8'));
                         @endphp
@@ -368,13 +437,13 @@
                             <td>{{ $row['direction'] }}</td>
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}"><span class="h-2 w-2 rounded-full" style="background: {{ $statusColor }};"></span>{{ $row['statut_label'] }}</span></td>
                             <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 0) }}%</span></div></td>
-                            @foreach (['kpi_global', 'kpi_delai', 'kpi_performance', 'kpi_conformite'] as $metricKey)
+                            @foreach (['kpi_global', 'kpi_delai', 'kpi_performance', 'kpi_conformite', 'kpi_qualite', 'kpi_risque'] as $metricKey)
                                 @php $metricValue = (float) ($row[$metricKey] ?? 0); $metricColor = $metricValue >= 80 ? '#8FC043' : ($metricValue >= 60 ? '#F9B13C' : ($metricValue > 0 ? '#F9B13C' : '#64748B')); $metricBg = $metricValue >= 80 ? '#EEF6E1' : ($metricValue >= 60 ? '#FFF8D6' : ($metricValue > 0 ? '#FFF0DF' : '#F1F5F9')); @endphp
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($metricValue)) }}">{{ number_format($metricValue, 0) }}</span></td>
                             @endforeach
                         </tr>
                     @empty
-                        <tr><td colspan="8">Aucune action disponible sur ce perimetre.</td></tr>
+                        <tr><td colspan="10">Aucune action disponible sur ce perimetre.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -386,28 +455,7 @@
     <article class="showcase-panel">
         <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Diagramme de Gantt compact</h2><p class="showcase-panel-subtitle">Barre grise = duree planifiee, barre couleur = progression reelle, ligne orange = aujourd'hui.</p></div><span class="showcase-chip">{{ count($ganttRows) }} actions</span></div>
         @if ($ganttRows !== [])
-            <div class="overflow-x-auto">
-                <div class="dashboard-gantt-head mb-3"><div></div><div class="relative min-w-[620px] h-5">@foreach ($ganttMonths as $month)<div class="dashboard-gantt-month" style="left: {{ $month['offset'] }}%; width: {{ $month['width'] }}%;">{{ $month['label'] }}</div>@endforeach</div><div class="text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">KPI</div></div>
-                <div class="grid gap-2">
-                    @foreach ($ganttRows as $row)
-                        @php
-                            $start = $row['date_debut'] ? \Illuminate\Support\Carbon::parse($row['date_debut']) : null;
-                            $end = $row['date_fin'] ? \Illuminate\Support\Carbon::parse($row['date_fin']) : null;
-                            $rangeDays = max(1, $ganttStart->diffInDays($ganttEnd));
-                            $offset = $start ? round(($ganttStart->diffInDays($start) / $rangeDays) * 100, 2) : 0;
-                            $width = ($start && $end) ? round((max(1, $start->diffInDays($end)) / $rangeDays) * 100, 2) : 0;
-                            $progressWidth = round($width * ((float) ($row['progression'] ?? 0) / 100), 2);
-                            $kpiRow = collect($actionRows)->firstWhere('id', $row['id']);
-                            $kpiValue = (float) ($kpiRow['kpi_global'] ?? 0);
-                        @endphp
-                        <div class="dashboard-gantt-grid">
-                            <div><a href="{{ $row['url'] }}" class="text-sm font-semibold text-slate-900 hover:text-[#3996D3] dark:text-slate-100">{{ $row['libelle'] }}</a><p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{{ $row['responsable'] }} | {{ $row['date_debut_label'] }} - {{ $row['date_fin_label'] }}</p></div>
-                            <div class="dashboard-gantt-track"><span class="dashboard-gantt-today" style="left: {{ min(100, max(0, $todayPercent)) }}%;"></span><span class="dashboard-gantt-bar" style="left: {{ min(100, max(0, $offset)) }}%; width: {{ min(100, max(0, $width)) }}%; background: {{ $row['color'] }};"></span><span class="dashboard-gantt-progress" style="left: {{ min(100, max(0, $offset)) }}%; width: {{ min(100, max(0, $progressWidth)) }}%; background: {{ $row['color'] }};"></span></div>
-                            <div class="text-right text-sm font-black" style="color: {{ $kpiValue >= 80 ? '#8FC043' : ($kpiValue >= 60 ? '#F9B13C' : ($kpiValue > 0 ? '#F9B13C' : '#64748B')) }};">{{ number_format($kpiValue, 0) }}</div>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
+            <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-gantt-chart" class="dashboard-chart-host"></div></div>
         @else
             <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune action datee disponible pour produire un Gantt.</div>
         @endif
@@ -416,33 +464,31 @@
 
 <section class="dashboard-tab-panel" data-dashboard-panel="tables">
     <div class="grid gap-4">
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Comparaison interannuelle</h2><p class="showcase-panel-subtitle">Lecture tabulaire des volumes, validations, retards et progression moyenne.</p></div><span class="showcase-chip">{{ count($interannualRows) }} lignes</span></div><div class="overflow-x-auto"><table class="dashboard-table"><thead><tr><th>Annee</th><th>PAO</th><th>PTA</th><th>Actions</th><th>Validees</th><th>Retard</th><th>Progression</th><th>Taux validation</th></tr></thead><tbody>@forelse ($interannualRows as $row)<tr><td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['annee'] }}</td><td>{{ $row['paos_total'] }}</td><td>{{ $row['ptas_total'] }}</td><td>{{ $row['actions_total'] }}</td><td>{{ $row['actions_validees'] }}</td><td>{{ $row['actions_retard'] }}</td><td>{{ number_format((float) $row['progression_moyenne'], 0) }}%</td><td>{{ number_format((float) $row['taux_validation'], 0) }}%</td></tr>@empty<tr><td colspan="8">Aucune comparaison interannuelle exploitable.</td></tr>@endforelse</tbody></table></div></article>
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Alertes actives</h2><p class="showcase-panel-subtitle">Actions en retard, KPI critiques, ecarts de progression et validations bloquees.</p></div><span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span></div><div class="overflow-x-auto"><table class="dashboard-table"><thead><tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Detail</th><th>KPI</th><th>Acces</th></tr></thead><tbody>@forelse ($alertRows as $row)<tr><td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['titre'] }}</td><td>{{ $row['direction'] }}</td><td>{{ $row['action'] }}</td><td><span class="dashboard-pill" style="{{ $dashboardPillVars($row['niveau'] === 'Critique' ? 'danger' : 'warning') }}">{{ $row['niveau'] }}</span></td><td>{{ $row['details'] }}</td>@php $kpiValue = (float) ($row['kpi'] ?? 0); @endphp<td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpiValue)) }}">{{ number_format($kpiValue, 0) }}</span></td><td><a href="{{ $row['url'] }}" class="inline-flex items-center justify-center rounded-xl bg-[#3996D3] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#1C203D]">Voir</a></td></tr>@empty<tr><td colspan="7">Aucune alerte active sur ce perimetre.</td></tr>@endforelse</tbody></table></div></article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Alertes actives</h2><p class="showcase-panel-subtitle">Tableau principal de decision: retards, KPI critiques, ecarts de progression et validations bloquees.</p></div><span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span></div><div class="overflow-x-auto"><table class="dashboard-table"><thead><tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Detail</th><th>KPI</th><th>Qual.</th><th>Risque</th><th>Acces</th></tr></thead><tbody>@forelse ($alertRows as $row)<tr><td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['titre'] }}</td><td>{{ $row['direction'] }}</td><td>{{ $row['action'] }}</td><td><span class="dashboard-pill" style="{{ $dashboardPillVars(in_array($row['niveau'], ['Critique', 'Urgence'], true) ? 'danger' : 'warning') }}">{{ $row['niveau'] }}</span></td><td>{{ $row['details'] }}</td>@php $kpiValue = (float) ($row['kpi'] ?? 0); $qualityValue = (float) ($row['kpi_qualite'] ?? 0); $riskValue = (float) ($row['kpi_risque'] ?? 0); @endphp<td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpiValue)) }}">{{ number_format($kpiValue, 0) }}</span></td><td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($qualityValue)) }}">{{ number_format($qualityValue, 0) }}</span></td><td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($riskValue)) }}">{{ number_format($riskValue, 0) }}</span></td><td><a href="{{ $row['url'] }}" class="inline-flex items-center justify-center rounded-xl bg-[#3996D3] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#1C203D]">Voir</a></td></tr>@empty<tr><td colspan="9">Aucune alerte active sur ce perimetre.</td></tr>@endforelse</tbody></table></div></article>
     </div>
+</section>
+
+<section class="dashboard-tab-panel" data-dashboard-panel="analytics">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="showcase-panel-title">Analytique avancee consolidee</h2>
+            <p class="showcase-panel-subtitle">Tous les graphes et les tableaux de reporting sont embarques ici pour concentrer la lecture decisionnelle sur le dashboard.</p>
+        </div>
+        <a href="{{ route('workspace.reporting') }}" class="dashboard-reporting-jump">Exports et centre de diffusion</a>
+    </div>
+
+    @include('partials.dashboard-reporting-analytics', ['reportingAnalytics' => $reportingAnalytics ?? []])
 </section>
 
 @once
     @push('scripts')
-        <script>
-            (function(){
-                var tabsRoot=document.querySelector('[data-dashboard-tabs]');
-                if(tabsRoot){tabsRoot.querySelectorAll('[data-dashboard-tab]').forEach(function(button){button.addEventListener('click',function(){var key=button.getAttribute('data-dashboard-tab');tabsRoot.querySelectorAll('[data-dashboard-tab]').forEach(function(tabButton){tabButton.classList.toggle('dashboard-tab-active',tabButton===button);tabButton.classList.toggle('dashboard-tab-inactive',tabButton!==button);});document.querySelectorAll('[data-dashboard-panel]').forEach(function(panel){panel.classList.toggle('active',panel.getAttribute('data-dashboard-panel')===key);});window.setTimeout(function(){Object.keys(chartInstances).forEach(function(chartKey){if(chartInstances[chartKey]){chartInstances[chartKey].resize();}});},120);});});}
-                var payload=@json($dashboardData ?? []), statusCards=payload.status_cards||[], monthly=payload.monthly||[], unitRows=payload.unit_rows||[], interannual=payload.interannual||[], scatterPoints=payload.scatter_points||[], radarDatasets=payload.radar_datasets||[], chartInstances={}, rendered=false;
-                function dashboardTheme(){return typeof window.getAnbgChartTheme==='function'?window.getAnbgChartTheme():{isDark:document.documentElement.classList.contains('dark'),emphasis:'#1C203D',emphasisFill:'rgba(28,32,61,0.16)'};}
-                function scatterSets(points){return points.map(function(point){return{label:point.title,data:[{x:point.x,y:point.y,r:point.r}],backgroundColor:point.color,borderColor:point.color,pointRadius:point.r,pointHoverRadius:point.r+2};});}
-                function mountChart(id,config){var canvas=document.getElementById(id); if(!canvas||typeof window.Chart==='undefined'){return;} if(chartInstances[id]){chartInstances[id].destroy();} chartInstances[id]=new window.Chart(canvas,config);}
-                function render(force){if((rendered&&!force)||typeof window.Chart==='undefined'){return;} if(typeof window.applyAnbgChartDefaults==='function'){window.applyAnbgChartDefaults(window.Chart);} rendered=true; var theme=dashboardTheme();
-                    mountChart('dashboard-status-mix-chart',{type:'doughnut',data:{labels:statusCards.map(function(item){return item.label;}),datasets:[{data:statusCards.map(function(item){return item.count;}),backgroundColor:statusCards.map(function(item){return item.color;}),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
-                    mountChart('dashboard-kpi-line-chart',{type:'line',data:{labels:monthly.map(function(item){return item.label;}),datasets:[{label:'Delai',data:monthly.map(function(item){return item.delai;}),borderColor:'#3996D3',backgroundColor:'#3996D31A',tension:.35,fill:true},{label:'Performance',data:monthly.map(function(item){return item.performance;}),borderColor:'#8FC043',backgroundColor:'#8FC0431A',tension:.35,fill:true},{label:'Conformite',data:monthly.map(function(item){return item.conformite;}),borderColor:'#F0E509',backgroundColor:'#F0E5091A',tension:.35,fill:true},{label:'Global',data:monthly.map(function(item){return item.global;}),borderColor:theme.emphasis,backgroundColor:theme.emphasisFill,tension:.35,fill:true}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,suggestedMax:100}},plugins:{legend:{position:'bottom'}}}});
-                    mountChart('dashboard-unit-summary-chart',{type:'bar',data:{labels:unitRows.map(function(item){return item.label;}),datasets:[{label:'KPI moyen',data:unitRows.map(function(item){return item.kpi_global;}),backgroundColor:'#3996D3',borderRadius:8},{label:'Progression',data:unitRows.map(function(item){return item.progression_moyenne;}),backgroundColor:'#8FC043',borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,suggestedMax:100}},plugins:{legend:{position:'bottom'}}}});
-                    mountChart('dashboard-kpi-grouped-chart',{type:'bar',data:{labels:monthly.map(function(item){return item.label;}),datasets:[{label:'Delai',data:monthly.map(function(item){return item.delai;}),backgroundColor:'#3996D3',borderRadius:6},{label:'Perf.',data:monthly.map(function(item){return item.performance;}),backgroundColor:'#8FC043',borderRadius:6},{label:'Conf.',data:monthly.map(function(item){return item.conformite;}),backgroundColor:'#F0E509',borderRadius:6},{label:'Global',data:monthly.map(function(item){return item.global;}),backgroundColor:theme.emphasis,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,suggestedMax:100}},plugins:{legend:{position:'bottom'}}}});
-                    mountChart('dashboard-interannual-chart',{data:{labels:interannual.map(function(item){return item.annee;}),datasets:[{type:'bar',label:'Actions',data:interannual.map(function(item){return item.actions_total;}),backgroundColor:'#3996D3',borderRadius:8},{type:'bar',label:'Validees',data:interannual.map(function(item){return item.actions_validees;}),backgroundColor:'#8FC043',borderRadius:8},{type:'line',label:'Progression moyenne',data:interannual.map(function(item){return item.progression_moyenne;}),borderColor:theme.emphasis,backgroundColor:theme.emphasisFill,yAxisID:'y1',tension:.35}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,position:'left'},y1:{beginAtZero:true,suggestedMax:100,position:'right',grid:{drawOnChartArea:false}}},plugins:{legend:{position:'bottom'}}}});
-                    mountChart('dashboard-radar-chart',{type:'radar',data:{labels:['Delai','Performance','Conformite','Progression'],datasets:radarDatasets},options:{responsive:true,maintainAspectRatio:false,scales:{r:{beginAtZero:true,suggestedMax:100}},plugins:{legend:{position:'bottom'}}}});
-                    mountChart('dashboard-scatter-chart',{type:'bubble',data:{datasets:scatterSets(scatterPoints)},options:{responsive:true,maintainAspectRatio:false,parsing:false,scales:{x:{beginAtZero:true,suggestedMax:100,title:{display:true,text:'Performance'}},y:{beginAtZero:true,suggestedMax:100,title:{display:true,text:'Conformite'}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(context){var value=context.raw||{};return context.dataset.label+' - Perf '+value.x+' / Conf '+value.y;}}}}}});
-                }
-                document.addEventListener('anbg:dashboard-assets-ready',render,{once:true}); if(typeof window.Chart!=='undefined'){render();}
-                window.addEventListener('anbg:theme-changed',function(){render(true);window.setTimeout(function(){Object.keys(chartInstances).forEach(function(chartKey){if(chartInstances[chartKey]){chartInstances[chartKey].resize();}});},80);});
-            })();
+        <script id="anbg-dashboard-payload" type="application/json">
+            {!! json_encode([
+                'dashboardData' => $dashboardData ?? [],
+                'reportingAnalytics' => $reportingAnalytics ?? [],
+                'dgPayload' => $dgPayload ?? [],
+                'ganttRows' => $ganttRows ?? [],
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
         </script>
     @endpush
 @endonce

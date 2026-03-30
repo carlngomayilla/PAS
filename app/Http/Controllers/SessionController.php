@@ -65,6 +65,17 @@ class SessionController extends Controller
                 ->onlyInput('email');
         }
 
+        $user = $request->user();
+        if ($user instanceof User && ! (bool) $user->is_active) {
+            Auth::guard('web')->logout();
+
+            return back()
+                ->withErrors([
+                    'email' => 'Compte desactive.',
+                ])
+                ->onlyInput('email');
+        }
+
         $request->session()->regenerate();
 
         $defaultRoute = route('dashboard');

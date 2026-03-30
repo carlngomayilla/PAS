@@ -242,11 +242,18 @@
 </head>
 <body>
     @php
+        $kpiSummary = $kpiSummary ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'risque' => 0, 'global' => 0, 'progression' => 0];
         $summaryCards = [
             ['label' => 'PAS', 'value' => $global['pas_total'] ?? 0, 'class' => 'blue'],
             ['label' => 'PAO', 'value' => $global['paos_total'] ?? 0, 'class' => 'green'],
             ['label' => 'PTA', 'value' => $global['ptas_total'] ?? 0, 'class' => 'orange'],
             ['label' => 'Actions', 'value' => $global['actions_total'] ?? 0, 'class' => 'navy'],
+        ];
+        $kpiCards = [
+            ['label' => 'KPI global', 'value' => number_format((float) ($kpiSummary['global'] ?? 0), 1), 'class' => 'green'],
+            ['label' => 'KPI qualite', 'value' => number_format((float) ($kpiSummary['qualite'] ?? 0), 1), 'class' => 'blue'],
+            ['label' => 'KPI risque', 'value' => number_format((float) ($kpiSummary['risque'] ?? 0), 1), 'class' => 'orange'],
+            ['label' => 'Progression', 'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 1).'%', 'class' => 'navy'],
         ];
 
         $funnelLabels = $charts['funnel']['labels'] ?? [];
@@ -323,6 +330,19 @@
         <table class="cards-grid">
             <tr>
                 @foreach ($summaryCards as $card)
+                    <td>
+                        <div class="metric-card card-{{ $card['class'] }}">
+                            <div class="metric-label">{{ $card['label'] }}</div>
+                            <div class="metric-value">{{ $card['value'] }}</div>
+                        </div>
+                    </td>
+                @endforeach
+            </tr>
+        </table>
+
+        <table class="cards-grid">
+            <tr>
+                @foreach ($kpiCards as $card)
                     <td>
                         <div class="metric-card card-{{ $card['class'] }}">
                             <div class="metric-label">{{ $card['label'] }}</div>
@@ -464,6 +484,31 @@
                 @endforeach
             </tbody>
         </table>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>KPI delai</th>
+                    <th>KPI performance</th>
+                    <th>KPI conformite</th>
+                    <th>KPI qualite</th>
+                    <th>KPI risque</th>
+                    <th>KPI global</th>
+                    <th>Progression moyenne</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{ number_format((float) ($kpiSummary['delai'] ?? 0), 2) }}</td>
+                    <td>{{ number_format((float) ($kpiSummary['performance'] ?? 0), 2) }}</td>
+                    <td>{{ number_format((float) ($kpiSummary['conformite'] ?? 0), 2) }}</td>
+                    <td>{{ number_format((float) ($kpiSummary['qualite'] ?? 0), 2) }}</td>
+                    <td>{{ number_format((float) ($kpiSummary['risque'] ?? 0), 2) }}</td>
+                    <td>{{ number_format((float) ($kpiSummary['global'] ?? 0), 2) }}</td>
+                    <td>{{ number_format((float) ($kpiSummary['progression'] ?? 0), 2) }}%</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="section page-break-section">
@@ -600,6 +645,9 @@
                     <th>Statut</th>
                     <th>PTA</th>
                     <th>Responsable</th>
+                    <th>KPI global</th>
+                    <th>Qualite</th>
+                    <th>Risque</th>
                 </tr>
             </thead>
             <tbody>
@@ -611,10 +659,13 @@
                         <td>{{ $action->statut_dynamique }}</td>
                         <td>{{ $action->pta?->titre ?? '-' }}</td>
                         <td>{{ $action->responsable?->name ?? '-' }}</td>
+                        <td>{{ number_format((float) ($action->actionKpi?->kpi_global ?? 0), 2) }}</td>
+                        <td>{{ number_format((float) ($action->actionKpi?->kpi_qualite ?? 0), 2) }}</td>
+                        <td>{{ number_format((float) ($action->actionKpi?->kpi_risque ?? 0), 2) }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6">Aucune action en retard.</td>
+                        <td colspan="9">Aucune action en retard.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -670,6 +721,9 @@
                     <th>Fin</th>
                     <th>Etat</th>
                     <th>Prog.</th>
+                    <th>KPI global</th>
+                    <th>Qualite</th>
+                    <th>Risque</th>
                     <th>Ressources</th>
                     <th>Indicateurs</th>
                     <th>Risques</th>
@@ -688,13 +742,16 @@
                         <td>{{ $row['fin'] ?: '-' }}</td>
                         <td>{{ $row['etat_realisation'] ?: '-' }}</td>
                         <td>{{ $row['progression'] ?: '-' }}</td>
+                        <td>{{ number_format((float) ($row['kpi_global'] ?? 0), 2) }}</td>
+                        <td>{{ number_format((float) ($row['kpi_qualite'] ?? 0), 2) }}</td>
+                        <td>{{ number_format((float) ($row['kpi_risque'] ?? 0), 2) }}</td>
                         <td>{{ $row['ressources_requises'] ?: '-' }}</td>
                         <td>{{ $row['indicateurs_performance'] ?: '-' }}</td>
                         <td>{{ $row['risques_potentiels'] ?: '-' }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="13">Aucune ligne de structure disponible.</td>
+                        <td colspan="16">Aucune ligne de structure disponible.</td>
                     </tr>
                 @endforelse
             </tbody>

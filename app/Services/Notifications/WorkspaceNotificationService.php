@@ -3,10 +3,13 @@
 namespace App\Services\Notifications;
 
 use App\Models\Action;
+use App\Models\ActionLog;
+use App\Models\Delegation;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\User;
+use App\Services\Alerting\AlertRoutingService;
 use App\Services\Governance\DelegationService;
 use App\Notifications\WorkspaceModuleNotification;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -16,7 +19,8 @@ use Illuminate\Support\Facades\Notification;
 class WorkspaceNotificationService
 {
     public function __construct(
-        private readonly DelegationService $delegationService
+        private readonly DelegationService $delegationService,
+        private readonly AlertRoutingService $alertRoutingService
     ) {
     }
 
@@ -204,6 +208,59 @@ class WorkspaceNotificationService
         );
     }
 
+    public function notifyActionAlertEscalation(ActionLog $log, ?int $excludeUserId = null): void
+    {
+        if (! in_array((string) $log->niveau, ['warning', 'critical', 'urgence'], true)) {
+            return;
+        }
+
+        $log->loadMissing(
+            'action:id,pta_id,libelle',
+            'action.pta:id,direction_id,service_id',
+            'week:id,action_id,numero_semaine'
+        );
+
+        $action = $log->action;
+        if (! $action instanceof Action) {
+            return;
+        }
+
+        $targets = $this->alertRoutingService->recipientsForActionLog($log);
+        $rawLevel = strtolower((string) $log->niveau);
+        $level = match ($rawLevel) {
+            'urgence' => 'urgence',
+            'critical' => 'critical',
+            default => 'warning',
+        };
+
+        $this->dispatch(
+            $targets,
+            [
+                'title' => match ($level) {
+                    'urgence' => 'Urgence action',
+                    'critical' => 'Alerte critique action',
+                    default => 'Alerte action',
+                },
+                'message' => (string) $log->message,
+                'module' => 'alertes',
+                'entity_type' => 'action_log',
+                'entity_id' => $log->id,
+                'url' => $this->resolveActionAlertUrl($log),
+                'icon' => $level === 'warning' ? 'alert-triangle' : 'alert-octagon',
+                'status' => $level === 'warning' ? 'warning' : 'critical',
+                'priority' => $level === 'urgence' ? 'urgent' : ($level === 'critical' ? 'high' : 'normal'),
+                'meta' => [
+                    'event' => 'action_alert',
+                    'type_evenement' => (string) $log->type_evenement,
+                    'cible_role' => (string) ($log->cible_role ?? ''),
+                    'action_id' => (int) $action->id,
+                    'niveau' => $level,
+                ],
+            ],
+            $excludeUserId
+        );
+    }
+
     public function notifyPasStatus(Pas $pas, string $event, ?User $actor = null): void
     {
         $pas->loadMissing('directions:id');
@@ -298,6 +355,45 @@ class WorkspaceNotificationService
         );
     }
 
+    public function notifyDelegationCreated(Delegation $delegation, ?User $actor = null): void
+    {
+        $delegation->loadMissing([
+            'delegant:id,name',
+            'delegue:id,name',
+            'direction:id,code,libelle',
+            'service:id,code,libelle',
+        ]);
+
+        $delegate = $delegation->delegue;
+        if (! $delegate instanceof User) {
+            return;
+        }
+
+        $scopeLabel = $delegation->service !== null
+            ? trim((string) ($delegation->direction?->code.' / '.$delegation->service?->code.' - '.$delegation->service?->libelle))
+            : trim((string) ($delegation->direction?->code.' - '.$delegation->direction?->libelle));
+
+        $this->dispatch(
+            new EloquentCollection([$delegate]),
+            [
+                'title' => 'Nouvelle delegation recue',
+                'message' => sprintf(
+                    'Une delegation de %s vous a ete attribuee sur le perimetre %s.',
+                    (string) ($delegation->delegant?->name ?? 'un responsable'),
+                    $scopeLabel !== '' ? $scopeLabel : 'non renseigne'
+                ),
+                'module' => 'delegations',
+                'entity_type' => 'delegation',
+                'entity_id' => $delegation->id,
+                'url' => route('workspace.delegations.index'),
+                'icon' => 'users',
+                'status' => 'info',
+                'priority' => 'high',
+            ],
+            $actor?->id
+        );
+    }
+
     /**
      * @return array{0:string,1:string,2:string}
      */
@@ -329,6 +425,27 @@ class WorkspaceNotificationService
                 sprintf('%s "%s" a ete mis a jour.', $moduleLabel, $titleValue),
                 'info',
             ],
+        };
+    }
+
+    private function resolveActionAlertUrl(ActionLog $log): string
+    {
+        $action = $log->action;
+        if (! $action instanceof Action) {
+            return route('workspace.alertes');
+        }
+
+        if ($log->week !== null) {
+            return route('workspace.actions.suivi', $action).'#action-week-'.$log->week->id;
+        }
+
+        return match ((string) $log->type_evenement) {
+            'progression_sous_seuil',
+            'kpi_global_sous_seuil',
+            'action_a_risque',
+            'echeance_proche',
+            'alerte_combinee_critique' => route('workspace.actions.suivi', $action).'#action-status',
+            default => route('workspace.actions.suivi', $action).'#action-logs',
         };
     }
 

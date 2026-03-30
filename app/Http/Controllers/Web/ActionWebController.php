@@ -39,7 +39,7 @@ class ActionWebController extends Controller
             ->with([
                 'pta:id,pao_id,direction_id,service_id,titre,statut',
                 'responsable:id,name,email',
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite',
+                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque',
             ])
             ->withCount([
                 'kpis',
@@ -107,6 +107,7 @@ class ActionWebController extends Controller
             'row' => new Action([
                 'type_cible' => 'quantitative',
                 'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
+                'statut' => 'non_demarre',
                 'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
                 'financement_requis' => false,
                 'seuil_alerte_progression' => 10,
@@ -150,8 +151,18 @@ class ActionWebController extends Controller
 
         $action = DB::transaction(function () use ($validated, $request, $trackingService, $user, $secureStorage): Action {
             $payload = $validated;
-            $payload['statut'] = 'non_demarre';
-            $payload['statut_dynamique'] = ActionTrackingService::STATUS_NON_DEMARRE;
+            $manualStatus = in_array((string) ($payload['statut'] ?? ''), [
+                ActionTrackingService::STATUS_SUSPENDU,
+                ActionTrackingService::STATUS_ANNULE,
+            ], true)
+                ? (string) $payload['statut']
+                : 'non_demarre';
+            $payload['statut'] = $manualStatus;
+            $payload['statut_dynamique'] = match ($manualStatus) {
+                ActionTrackingService::STATUS_SUSPENDU => ActionTrackingService::STATUS_SUSPENDU,
+                ActionTrackingService::STATUS_ANNULE => ActionTrackingService::STATUS_ANNULE,
+                default => ActionTrackingService::STATUS_NON_DEMARRE,
+            };
             $payload['progression_reelle'] = 0;
             $payload['progression_theorique'] = 0;
             $payload['frequence_execution'] = $payload['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;

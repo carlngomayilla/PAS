@@ -14,8 +14,11 @@
         $pilotageStatusBadges = [
             'non_demarre' => 'anbg-badge anbg-badge-neutral',
             'en_cours' => 'anbg-badge anbg-badge-info',
+            'a_risque' => 'anbg-badge anbg-badge-warning',
             'en_avance' => 'anbg-badge anbg-badge-success',
             'en_retard' => 'anbg-badge anbg-badge-danger',
+            'suspendu' => 'anbg-badge anbg-badge-danger',
+            'annule' => 'anbg-badge anbg-badge-neutral',
             'acheve_dans_delai' => 'anbg-badge anbg-badge-success',
             'acheve_hors_delai' => 'anbg-badge anbg-badge-warning',
         ];

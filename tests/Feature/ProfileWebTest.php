@@ -13,6 +13,8 @@ class ProfileWebTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0n8AAAAASUVORK5CYII=';
+
     public function test_authenticated_user_can_open_profile_page(): void
     {
         $user = User::factory()->create([
@@ -45,7 +47,10 @@ class ProfileWebTest extends TestCase
             ->put(route('workspace.profile.update'), [
                 'name' => 'Nom Modifie',
                 'email' => 'profil.modifie@anbg.test',
-                'profile_photo' => UploadedFile::fake()->image('avatar-new.png'),
+                'profile_photo' => UploadedFile::fake()->createWithContent(
+                    'avatar-new.png',
+                    (string) base64_decode(self::TINY_PNG, true)
+                ),
                 'current_password' => 'Password-Old@123',
                 'password' => 'Password-New@123',
                 'password_confirmation' => 'Password-New@123',

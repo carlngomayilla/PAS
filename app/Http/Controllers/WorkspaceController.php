@@ -22,6 +22,7 @@ class WorkspaceController extends Controller
 
         $modules = collect($user->workspaceModules())->map(function (array $module): array {
             $webRoute = match ($module['code']) {
+                'messagerie' => route('workspace.messaging.index'),
                 'pas' => route('workspace.pas.index'),
                 'pao' => route('workspace.pao.index'),
                 'pta' => route('workspace.pta.index'),

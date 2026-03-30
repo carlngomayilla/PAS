@@ -141,6 +141,18 @@
                         </select>
                         <p class="field-hint">Le systeme genere automatiquement les periodes de suivi selon cette frequence.</p>
                     </div>
+                    <div>
+                        <label for="statut">Statut manuel</label>
+                        @php
+                            $manualStatus = old('statut', $row->statut ?: 'non_demarre');
+                        @endphp
+                        <select id="statut" name="statut">
+                            <option value="non_demarre" @selected($manualStatus === 'non_demarre')>Pilotage automatique</option>
+                            <option value="suspendu" @selected($manualStatus === 'suspendu')>Suspendu</option>
+                            <option value="annule" @selected($manualStatus === 'annule')>Annule</option>
+                        </select>
+                        <p class="field-hint">Suspendu gele les KPI. Annule sort l action du pilotage automatique.</p>
+                    </div>
                 </div>
                 <div class="mt-3">
                     <label for="libelle">Titre de l action</label>

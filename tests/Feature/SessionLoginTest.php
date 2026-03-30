@@ -97,4 +97,26 @@ class SessionLoginTest extends TestCase
 
         $this->assertAuthenticatedAs($user);
     }
+
+    public function test_inactive_user_cannot_login_via_web_form(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'inactive@anbg.test',
+            'password' => Hash::make('Pass@12345'),
+            'password_changed_at' => now(),
+            'role' => User::ROLE_AGENT,
+            'agent_matricule' => 'Z1-10',
+            'is_active' => false,
+        ]);
+
+        $this->from(route('login.form'))
+            ->post(route('login'), [
+                'email' => $user->email,
+                'password' => 'Pass@12345',
+            ])
+            ->assertRedirect(route('login.form'))
+            ->assertSessionHasErrors('email');
+
+        $this->assertGuest();
+    }
 }

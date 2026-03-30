@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -37,6 +38,7 @@ class User extends Authenticatable
         'password',
         'password_changed_at',
         'role',
+        'is_active',
         'is_agent',
         'agent_matricule',
         'agent_fonction',
@@ -74,6 +76,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password_changed_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
             'is_agent' => 'boolean',
         ];
     }
@@ -136,6 +139,23 @@ class User extends Authenticatable
         return $this->belongsTo(Service::class, 'service_id');
     }
 
+    public function conversations(): BelongsToMany
+    {
+        return $this->belongsToMany(Conversation::class, 'conversation_participants')
+            ->withPivot(['last_read_at', 'is_favorite', 'joined_at'])
+            ->withTimestamps();
+    }
+
+    public function conversationParticipants(): HasMany
+    {
+        return $this->hasMany(ConversationParticipant::class);
+    }
+
+    public function messagesSent(): HasMany
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
+
     public function passwordHistories(): HasMany
     {
         return $this->hasMany(PasswordHistory::class);
@@ -191,7 +211,7 @@ class User extends Authenticatable
 
     public function isAgent(): bool
     {
-        return $this->role === self::ROLE_AGENT || (bool) $this->is_agent;
+        return $this->role === self::ROLE_AGENT;
     }
 
     public function profileScopeLabel(): string
@@ -221,18 +241,19 @@ class User extends Authenticatable
 
     public function activeDelegations(?string $permission = null)
     {
-        $delegations = $this->delegationsReceived()
+        $now = now();
+
+        $query = $this->delegationsReceived()
             ->with(['delegant:id,name,role,direction_id,service_id', 'direction:id,code,libelle', 'service:id,code,libelle'])
-            ->get()
-            ->filter(static fn (Delegation $delegation): bool => $delegation->isActiveAt());
+            ->where('statut', 'active')
+            ->where('date_debut', '<=', $now)
+            ->where('date_fin', '>=', $now);
 
         if ($permission !== null && $permission !== '') {
-            $delegations = $delegations->filter(
-                static fn (Delegation $delegation): bool => $delegation->hasPermission($permission)
-            );
+            $query->whereJsonContains('permissions', $permission);
         }
 
-        return $delegations->values();
+        return $query->get()->values();
     }
 
     /**
@@ -241,7 +262,7 @@ class User extends Authenticatable
     public function delegatedDirectionIds(?string $permission = null): array
     {
         return $this->activeDelegations($permission)
-            ->filter(static fn (Delegation $delegation): bool => $delegation->direction_id !== null)
+            ->filter(static fn (Delegation $delegation): bool => $delegation->role_scope === Delegation::SCOPE_DIRECTION && $delegation->direction_id !== null)
             ->pluck('direction_id')
             ->map(static fn ($id): int => (int) $id)
             ->unique()
@@ -255,7 +276,7 @@ class User extends Authenticatable
     public function delegatedServiceScopes(?string $permission = null): array
     {
         return $this->activeDelegations($permission)
-            ->filter(static fn (Delegation $delegation): bool => $delegation->direction_id !== null && $delegation->service_id !== null)
+            ->filter(static fn (Delegation $delegation): bool => $delegation->role_scope === Delegation::SCOPE_SERVICE && $delegation->direction_id !== null && $delegation->service_id !== null)
             ->map(static fn (Delegation $delegation): array => [
                 'direction_id' => (int) $delegation->direction_id,
                 'service_id' => (int) $delegation->service_id,
@@ -299,110 +320,7 @@ class User extends Authenticatable
      */
     public function profileInteractions(): array
     {
-        $items = match ($this->role) {
-            self::ROLE_ADMIN => [
-                [
-                    'module' => 'Gouvernance PAS/PAO/PTA',
-                    'operations' => ['Creer', 'Modifier', 'Supprimer', 'Valider', 'Verrouiller', 'Consulter'],
-                    'portee' => 'Toutes les directions et services',
-                ],
-                [
-                    'module' => 'Execution et performance',
-                    'operations' => ['Piloter actions', 'Suivre progression globale', 'Consulter alertes'],
-                    'portee' => 'Globale',
-                ],
-                [
-                    'module' => 'Administration',
-                    'operations' => ['Gerer utilisateurs', 'Consulter journal audit'],
-                    'portee' => 'Globale',
-                ],
-            ],
-            self::ROLE_DG => [
-                [
-                    'module' => 'PAS',
-                    'operations' => ['Valider', 'Verrouiller', 'Consulter'],
-                    'portee' => 'Globale',
-                ],
-                [
-                    'module' => 'PAO / PTA',
-                    'operations' => ['Superviser', 'Valider', 'Consulter'],
-                    'portee' => 'Globale',
-                ],
-                [
-                    'module' => 'Reporting',
-                    'operations' => ['Consulter tableaux de bord consolides'],
-                    'portee' => 'Globale',
-                ],
-            ],
-            self::ROLE_PLANIFICATION => [
-                [
-                    'module' => 'Structuration PAS/PAO/PTA',
-                    'operations' => ['Creer', 'Modifier', 'Soumettre', 'Consulter'],
-                    'portee' => 'Globale',
-                ],
-                [
-                    'module' => 'Objectifs strategiques',
-                    'operations' => ['Definir axes/objectifs', 'Configurer indicateurs de suivi'],
-                    'portee' => 'Globale',
-                ],
-                [
-                    'module' => 'Suivi et reporting',
-                    'operations' => ['Consolider avancement', 'Produire rapports'],
-                    'portee' => 'Globale',
-                ],
-            ],
-            self::ROLE_DIRECTION => [
-                [
-                    'module' => 'PAO de la direction',
-                    'operations' => ['Creer', 'Modifier', 'Suivre', 'Soumettre'],
-                    'portee' => 'Direction rattachee',
-                ],
-                [
-                    'module' => 'PTA et execution',
-                    'operations' => ['Superviser services', 'Suivre actions'],
-                    'portee' => 'Direction rattachee',
-                ],
-            ],
-            self::ROLE_SERVICE => [
-                [
-                    'module' => 'PTA du service',
-                    'operations' => ['Executer taches', 'Mettre a jour statuts'],
-                    'portee' => 'Direction et service rattaches',
-                ],
-                [
-                    'module' => 'Actions',
-                    'operations' => ['Renseigner execution', 'Saisir suivi hebdomadaire', 'Televerser justificatifs', 'Signaler risques'],
-                    'portee' => 'Direction et service rattaches',
-                ],
-            ],
-            self::ROLE_AGENT => [
-                [
-                    'module' => 'Suivi hebdomadaire des actions',
-                    'operations' => ['Renseigner suivi hebdomadaire', 'Mettre a jour progression', 'Signaler difficultes', 'Televerser justificatifs hebdomadaires'],
-                    'portee' => 'Direction et service rattaches',
-                ],
-            ],
-            self::ROLE_CABINET => [
-                [
-                    'module' => 'Pilotage',
-                    'operations' => ['Consulter PAS/PAO/PTA', 'Consulter reporting'],
-                    'portee' => 'Globale',
-                ],
-                [
-                    'module' => 'Audit',
-                    'operations' => ['Lecture seule des informations'],
-                    'portee' => 'Globale',
-                ],
-            ],
-            default => [],
-        };
-
-        return [
-            'role' => $this->role,
-            'role_label' => $this->roleLabel(),
-            'scope' => $this->profileScopeLabel(),
-            'items' => $items,
-        ];
+        return app(\App\Services\UserProfileService::class)->interactionsFor($this);
     }
 
     /**
@@ -410,148 +328,6 @@ class User extends Authenticatable
      */
     public function workspaceModules(): array
     {
-        $hasDelegatedPlanningRead = $this->hasDelegatedPermission('planning_read')
-            || $this->hasDelegatedPermission('planning_write');
-        $hasDelegatedPlanningWrite = $this->hasDelegatedPermission('planning_write');
-        $hasDelegatedActionReview = $this->hasDelegatedPermission('action_review');
-
-        $canReadPlanning = $this->hasGlobalReadAccess()
-            || $this->hasRole(self::ROLE_DIRECTION, self::ROLE_SERVICE)
-            || $hasDelegatedPlanningRead;
-        $canWriteGlobal = $this->hasGlobalWriteAccess();
-        $canWriteDirection = $this->hasRole(self::ROLE_DIRECTION) || $hasDelegatedPlanningWrite;
-        $canWriteService = $this->hasRole(self::ROLE_SERVICE) || $hasDelegatedPlanningWrite;
-        $isAgent = $this->isAgent();
-        $canWriteOperational = $canWriteGlobal || $canWriteDirection || $canWriteService;
-        $canManageActions = $canWriteOperational && ! $isAgent;
-
-        $modules = [];
-
-        if ($canReadPlanning) {
-            $modules[] = [
-                'code' => 'pas',
-                'label' => 'PAS',
-                'description' => 'Vision strategique pluriannuelle',
-                'endpoint' => '/api/pas',
-                'can_write' => $canWriteGlobal,
-                'actions' => $canWriteGlobal
-                    ? ['Consulter', 'Creer', 'Modifier', 'Valider', 'Verrouiller']
-                    : ['Consulter'],
-            ];
-
-            $modules[] = [
-                'code' => 'pao',
-                'label' => 'PAO',
-                'description' => 'Declinaison annuelle par direction',
-                'endpoint' => '/api/paos',
-                'can_write' => $canWriteGlobal || $canWriteDirection,
-                'actions' => ($canWriteGlobal || $canWriteDirection)
-                    ? ['Consulter', 'Creer', 'Modifier', 'Suivre']
-                    : ['Consulter'],
-            ];
-
-            $modules[] = [
-                'code' => 'pta',
-                'label' => 'PTA',
-                'description' => 'Planification operationnelle par service',
-                'endpoint' => '/api/ptas',
-                'can_write' => $canWriteGlobal || $canWriteDirection || $canWriteService,
-                'actions' => ($canWriteGlobal || $canWriteDirection || $canWriteService)
-                    ? ['Consulter', 'Creer', 'Modifier', 'Executer']
-                    : ['Consulter'],
-            ];
-        }
-
-        if ($canReadPlanning || $isAgent || $hasDelegatedActionReview) {
-            $modules[] = [
-                'code' => 'execution',
-                'label' => 'Actions',
-                'description' => 'Execution des taches et suivi de progression',
-                'endpoint' => '/api/actions',
-                'can_write' => $canWriteOperational || $isAgent || $hasDelegatedActionReview,
-                'actions' => $isAgent
-                    ? ['Consulter', 'Renseigner suivi hebdomadaire', 'Televerser justificatifs hebdomadaires']
-                    : ($canManageActions
-                        ? ['Consulter', 'Creer', 'Modifier', 'Supprimer', 'Cloturer', 'Suivi hebdomadaire']
-                        : ($hasDelegatedActionReview
-                            ? ['Consulter', 'Evaluer', 'Valider ou rejeter']
-                            : ['Consulter'])),
-            ];
-        }
-
-        if ($canReadPlanning) {
-            $modules[] = [
-                'code' => 'alertes',
-                'label' => 'Alertes',
-                'description' => 'Retards et indicateurs sous seuil',
-                'endpoint' => '/api/alertes',
-                'can_write' => false,
-                'actions' => ['Consulter'],
-            ];
-
-            $modules[] = [
-                'code' => 'reporting',
-                'label' => 'Reporting',
-                'description' => 'Tableau de bord consolide des indicateurs',
-                'endpoint' => '/api/reporting/overview',
-                'can_write' => false,
-                'actions' => ['Consulter'],
-            ];
-        }
-
-        if ($this->hasGlobalReadAccess()) {
-            $modules[] = [
-                'code' => 'referentiel',
-                'label' => 'Referentiels',
-                'description' => 'Directions, services, utilisateurs',
-                'endpoint' => '/api/referentiel/utilisateurs',
-                'can_write' => $canWriteGlobal,
-                'actions' => $canWriteGlobal
-                    ? ['Consulter', 'Administrer']
-                    : ['Consulter'],
-            ];
-
-            $modules[] = [
-                'code' => 'audit',
-                'label' => 'Journal Audit',
-                'description' => 'Tracabilite des actions utilisateurs',
-                'endpoint' => '/api/journal-audit',
-                'can_write' => false,
-                'actions' => ['Consulter'],
-            ];
-
-            $modules[] = [
-                'code' => 'api_docs',
-                'label' => 'Documentation API',
-                'description' => 'Contrats OpenAPI et Swagger UI',
-                'endpoint' => '/workspace/documentation-api',
-                'can_write' => false,
-                'actions' => ['Consulter'],
-            ];
-
-            $modules[] = [
-                'code' => 'retention',
-                'label' => 'Retention',
-                'description' => 'Archivage et gouvernance des donnees',
-                'endpoint' => '/workspace/retention',
-                'can_write' => $canWriteGlobal,
-                'actions' => $canWriteGlobal ? ['Consulter', 'Piloter'] : ['Consulter'],
-            ];
-        }
-
-        if ($canWriteGlobal) {
-            $modules[] = [
-                'code' => 'delegations',
-                'label' => 'Delegations',
-                'description' => 'Suppleance temporaire de validation',
-                'endpoint' => '/workspace/referentiel/delegations',
-                'can_write' => true,
-                'actions' => ['Consulter', 'Creer', 'Annuler'],
-            ];
-        }
-
-        return $modules;
+        return app(\App\Services\UserWorkspaceService::class)->modulesFor($this);
     }
 }
-
-

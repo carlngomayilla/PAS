@@ -4,6 +4,14 @@
 
 @php
     $levelStyles = [
+        'urgence' => [
+            'panel' => 'border-red-500/45 bg-red-50/95 dark:border-red-400/40 dark:bg-red-500/10',
+            'dot' => 'bg-red-500',
+            'iconBadge' => 'bg-red-500 text-white',
+            'badge' => 'anbg-badge anbg-badge-danger',
+            'soft' => 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-200',
+            'icon' => '!',
+        ],
         'critical' => [
             'panel' => 'border-[#f9b13c]/40 bg-[#fff0df]/90 dark:border-[#f9b13c]/35 dark:bg-[#f9b13c]/10',
             'dot' => 'bg-[#f9b13c]',
@@ -70,6 +78,11 @@
 
     <section class="showcase-summary-grid mb-4">
         <article class="showcase-kpi-card">
+            <p class="showcase-kpi-label">Urgences</p>
+            <p class="showcase-kpi-number text-red-600 dark:text-red-300">{{ $summary['urgence'] ?? 0 }}</p>
+            <p class="showcase-kpi-meta">Escalade DG immediate</p>
+        </article>
+        <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Non lues</p>
             <p class="showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]">{{ $summary['unread'] ?? 0 }}</p>
             <p class="showcase-kpi-meta">Alertes a traiter</p>
@@ -91,6 +104,29 @@
         </article>
     </section>
 
+    <section class="showcase-summary-grid mb-4">
+        <article class="showcase-kpi-card">
+            <p class="showcase-kpi-label">KPI global</p>
+            <p class="showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]">{{ number_format((float) ($kpiSummary['global'] ?? 0), 0) }}</p>
+            <p class="showcase-kpi-meta">Synthese DG des actions validees direction</p>
+        </article>
+        <article class="showcase-kpi-card">
+            <p class="showcase-kpi-label">Qualite</p>
+            <p class="showcase-kpi-number text-[#8fc043] dark:text-[#f8e932]">{{ number_format((float) ($kpiSummary['qualite'] ?? 0), 0) }}</p>
+            <p class="showcase-kpi-meta">Conformite des preuves et du suivi</p>
+        </article>
+        <article class="showcase-kpi-card">
+            <p class="showcase-kpi-label">Risque</p>
+            <p class="showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]">{{ number_format((float) ($kpiSummary['risque'] ?? 0), 0) }}</p>
+            <p class="showcase-kpi-meta">Exposition globale et actions fragiles</p>
+        </article>
+        <article class="showcase-kpi-card">
+            <p class="showcase-kpi-label">Progression</p>
+            <p class="showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]">{{ number_format((float) ($kpiSummary['progression'] ?? 0), 0) }}</p>
+            <p class="showcase-kpi-meta">Execution moyenne consolidee</p>
+        </article>
+    </section>
+
     <section class="showcase-toolbar mb-4">
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 dark:border-slate-800 dark:bg-slate-950/50">
@@ -98,10 +134,10 @@
                     Tous
                     <span class="anbg-badge anbg-badge-neutral px-2 py-0.5 text-[10px] leading-none">{{ $summary['total'] ?? 0 }}</span>
                 </button>
-                @foreach (['critical', 'warning', 'info'] as $level)
+                @foreach (['urgence', 'critical', 'warning', 'info'] as $level)
                     @php $style = $levelStyles[$level]; @endphp
                     <button class="{{ $filterButtonBase }} border-transparent {{ $style['soft'] }}" data-level-filter="{{ $level }}" type="button">
-                        {{ $level === 'critical' ? 'Critique' : ($level === 'warning' ? 'Attention' : 'Info') }}
+                        {{ $level === 'urgence' ? 'Urgence' : ($level === 'critical' ? 'Critique' : ($level === 'warning' ? 'Attention' : 'Info')) }}
                         @if (($levelUnreadCounts[$level] ?? 0) > 0)
                             <span class="{{ $style['badge'] }} px-2 py-0.5 text-[10px] leading-none">{{ $levelUnreadCounts[$level] }}</span>
                         @endif
@@ -178,6 +214,32 @@
                                 <strong>Action:</strong> {{ $alert['action']['libelle'] }}
                                 <span class="mx-2 text-slate-400">|</span>
                                 <strong>PTA:</strong> {{ $alert['action']['pta'] }}
+                            </div>
+                        @endif
+
+                        @if (!empty($alert['metrics']) || !empty($alert['escalation_label']))
+                            <div class="mt-3 flex flex-wrap items-center gap-2">
+                                @foreach ([
+                                    'kpi_global' => 'KPI global',
+                                    'kpi_qualite' => 'Qualite',
+                                    'kpi_risque' => 'Risque',
+                                ] as $metricKey => $metricLabel)
+                                    @php
+                                        $metricValue = (float) ($alert['metrics'][$metricKey] ?? 0);
+                                        $metricTone = $metricValue >= 80 ? 'success' : ($metricValue >= 60 ? 'warning' : 'danger');
+                                    @endphp
+                                    @if (array_key_exists($metricKey, (array) ($alert['metrics'] ?? [])))
+                                        <span class="anbg-badge anbg-badge-{{ $metricTone }} px-3 py-1 text-[11px]">
+                                            {{ $metricLabel }} {{ number_format($metricValue, 0) }}
+                                        </span>
+                                    @endif
+                                @endforeach
+
+                                @if (!empty($alert['escalation_label']))
+                                    <span class="anbg-badge anbg-badge-info px-3 py-1 text-[11px]">
+                                        Escalade {{ $alert['escalation_label'] }}
+                                    </span>
+                                @endif
                             </div>
                         @endif
                     </div>

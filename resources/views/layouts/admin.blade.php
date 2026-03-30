@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <script>
         (function () {
             var themeKey = 'anbg-theme';
@@ -32,6 +33,18 @@
     $headerNotifications = collect();
     $headerUnreadCount = 0;
     $headerUnreadByModule = [];
+    $headerSidebarBadges = [];
+    $headerMessages = collect();
+    $headerMessageUnreadCount = 0;
+    $headerAlertSummary = [
+        'total' => 0,
+        'unread' => 0,
+        'urgence' => 0,
+        'critical' => 0,
+        'warning' => 0,
+        'info' => 0,
+    ];
+    $headerAlertUnreadCount = 0;
 
     if ($layoutUser) {
         $headerNotifications = $layoutUser->notifications()
@@ -48,6 +61,28 @@
             ->groupBy(static fn ($notification): string => strtolower((string) ($notification->data['module'] ?? 'autres')))
             ->map(static fn ($rows): int => $rows->count())
             ->toArray();
+        $headerSidebarBadges = $headerUnreadByModule;
+
+        if (collect($layoutUser->workspaceModules())->pluck('code')->contains('alertes')) {
+            $alertReadService = app(\App\Services\Alerting\AlertReadService::class);
+            $alertCenterService = app(\App\Services\Alerting\AlertCenterService::class);
+            $headerAlertSummary = $alertCenterService->summaryForUser(
+                $layoutUser,
+                $alertReadService->readFingerprintsForUser($layoutUser)
+            );
+            $headerAlertUnreadCount = (int) ($headerAlertSummary['unread'] ?? 0);
+            $headerSidebarBadges['alertes'] = $headerAlertUnreadCount;
+        }
+
+        if (
+            \Illuminate\Support\Facades\Schema::hasTable('conversations')
+            && \Illuminate\Support\Facades\Schema::hasTable('conversation_participants')
+            && \Illuminate\Support\Facades\Schema::hasTable('messages')
+        ) {
+            $messagingService = app(\App\Services\Messaging\MessagingService::class);
+            $headerMessages = $messagingService->recentConversations($layoutUser, 6);
+            $headerMessageUnreadCount = $messagingService->unreadCount($layoutUser);
+        }
     }
 @endphp
 
@@ -55,7 +90,7 @@
     <div class="min-h-screen">
         <div id="admin-overlay" class="fixed inset-0 z-40 hidden bg-black/40 lg:hidden"></div>
 
-        <x-admin.sidebar :notification-counts="$headerUnreadByModule" :unread-total="$headerUnreadCount" />
+        <x-admin.sidebar :notification-counts="$headerSidebarBadges" :unread-total="$headerUnreadCount" />
 
         <div class="lg:pl-32">
             <header class="sticky top-0 z-30 border-b border-[#3996d3]/18 bg-[linear-gradient(135deg,rgba(255,255,255,0.96)_0%,rgba(238,244,249,0.94)_100%)] backdrop-blur dark:border-white/10 dark:bg-none dark:bg-[linear-gradient(180deg,rgba(4,17,37,0.94)_0%,rgba(13,24,52,0.92)_100%)]">
@@ -105,6 +140,91 @@
                         </svg>
                     </button>
 
+                    <div class="relative" id="header-messaging">
+                        <button
+                            type="button"
+                            id="header-messaging-toggle"
+                            class="relative inline-flex items-center justify-center rounded-xl p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+                            aria-label="Messagerie"
+                        >
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8m-8 4h5m-9 5l1.2-3.6A8 8 0 014 12V7a3 3 0 013-3h10a3 3 0 013 3v5a3 3 0 01-3 3H9l-4 4z" />
+                            </svg>
+                            @if ($headerMessageUnreadCount > 0)
+                                <span class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#f8e932] px-1 text-[10px] font-semibold leading-none text-[#1c203d]">
+                                    {{ $headerMessageUnreadCount > 99 ? '99+' : $headerMessageUnreadCount }}
+                                </span>
+                            @endif
+                        </button>
+
+                        <div
+                            id="header-messaging-menu"
+                            class="admin-dropdown-panel absolute right-0 z-40 mt-2 hidden w-[360px] overflow-hidden rounded-2xl"
+                        >
+                            <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+                                <div>
+                                    <p class="text-sm font-semibold">Messagerie</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $headerMessageUnreadCount }} message(s) non lus</p>
+                                </div>
+                                <a
+                                    href="{{ route('workspace.messaging.index') }}"
+                                    class="rounded-lg px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#e8f3fb] dark:text-[#8fc043] dark:hover:bg-slate-900"
+                                >
+                                    Ouvrir
+                                </a>
+                            </div>
+
+                            <div class="border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                    <a href="{{ route('workspace.messaging.index') }}" class="rounded-xl border border-slate-200 px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900">
+                                        Messages recents
+                                    </a>
+                                    <a href="{{ route('workspace.messaging.index') }}#messaging-orgchart" class="rounded-xl border border-slate-200 px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900">
+                                        Organigramme
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="max-h-96 overflow-y-auto">
+                                @forelse ($headerMessages as $thread)
+                                    @php
+                                        $threadUser = $thread->getAttribute('other_user');
+                                    @endphp
+                                    <a
+                                        href="{{ route('workspace.messaging.index', ['conversation' => $thread->id]) }}"
+                                        class="block border-b border-slate-100 px-3 py-2 transition last:border-b-0 hover:bg-slate-50 dark:border-slate-900 dark:hover:bg-slate-900/60 {{ (int) $thread->getAttribute('unread_messages_count') > 0 ? 'bg-[#fff8d6]/70 dark:bg-[#f8e932]/10' : '' }}"
+                                    >
+                                        <div class="mb-1 flex items-start justify-between gap-2">
+                                            <div class="min-w-0">
+                                                <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                    {{ $thread->getAttribute('display_name') }}
+                                                </p>
+                                                <p class="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                                                    {{ $threadUser?->agent_fonction ?: $thread->getAttribute('display_scope') }}
+                                                </p>
+                                            </div>
+                                            @if ((int) $thread->getAttribute('unread_messages_count') > 0)
+                                                <span class="anbg-badge anbg-badge-warning px-2 py-0.5 text-[10px]">
+                                                    {{ $thread->getAttribute('unread_messages_count') }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <p class="truncate text-xs text-slate-600 dark:text-slate-300">
+                                            {{ $thread->latestMessage?->body ?: ($thread->latestMessage?->attachment_original_name ?: 'Conversation ouverte.') }}
+                                        </p>
+                                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                            {{ $thread->latestMessage?->sent_at?->diffForHumans() ?? 'Nouveau' }}
+                                        </p>
+                                    </a>
+                                @empty
+                                    <div class="px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                                        Aucune conversation recente.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="relative" id="header-notifications">
                         <button
                             type="button"
@@ -115,17 +235,43 @@
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .53-.21 1.04-.59 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                             </svg>
-                            @if ($headerUnreadCount > 0)
-                                <span class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#f9b13c] px-1 text-[10px] font-semibold leading-none text-[#1c203d]">
-                                    {{ $headerUnreadCount > 99 ? '99+' : $headerUnreadCount }}
-                                </span>
-                            @endif
+                            <span
+                                id="header-notifications-badge"
+                                class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#f9b13c] px-1 text-[10px] font-semibold leading-none text-[#1c203d] {{ $headerAlertUnreadCount > 0 ? '' : 'hidden' }}"
+                            >
+                                {{ $headerAlertUnreadCount > 99 ? '99+' : $headerAlertUnreadCount }}
+                            </span>
                         </button>
 
                         <div
                             id="header-notifications-menu"
+                            data-alerts-endpoint="{{ route('workspace.alertes.dropdown') }}"
                             class="admin-dropdown-panel absolute right-0 z-40 mt-2 hidden w-[340px] overflow-hidden rounded-2xl"
                         >
+                            <div class="border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div>
+                                        <p class="text-sm font-semibold">Alertes</p>
+                                        <p id="header-alerts-summary" class="text-xs text-slate-500 dark:text-slate-400">
+                                            {{ $headerAlertSummary['unread'] ?? 0 }} non lue(s) sur {{ $headerAlertSummary['total'] ?? 0 }} alerte(s).
+                                        </p>
+                                    </div>
+                                    <a
+                                        href="{{ route('workspace.alertes') }}"
+                                        class="rounded-lg px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#e8f3fb] dark:text-[#8fc043] dark:hover:bg-slate-900"
+                                    >
+                                        Centre
+                                    </a>
+                                </div>
+                                <div id="header-alerts-kpi-summary" class="mt-2 hidden flex flex-wrap gap-2"></div>
+                            </div>
+
+                            <div id="header-alerts-items" class="border-b border-slate-200 dark:border-slate-800">
+                                <div class="px-3 py-4 text-xs text-slate-500 dark:text-slate-400">
+                                    Les alertes recentes s affichent ici.
+                                </div>
+                            </div>
+
                             <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800">
                                 <div>
                                     <p class="text-sm font-semibold">Notifications</p>
@@ -245,6 +391,32 @@
         </div>
     </div>
 
+    <div id="analytics-explorer" class="analytics-explorer hidden" aria-hidden="true">
+        <div class="analytics-explorer-backdrop" data-analytics-explorer-dismiss></div>
+        <div class="analytics-explorer-panel" role="dialog" aria-modal="true" aria-labelledby="analytics-explorer-title">
+            <div class="analytics-explorer-header">
+                <div>
+                    <p class="anbg-dialog-eyebrow">Analyse detaillee</p>
+                    <h2 id="analytics-explorer-title" class="anbg-dialog-title">Visualisation</h2>
+                    <p id="analytics-explorer-subtitle" class="anbg-dialog-message mt-1"></p>
+                </div>
+                <button type="button" id="analytics-explorer-close" class="anbg-dialog-close" aria-label="Fermer la visualisation">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="analytics-explorer-body" class="analytics-explorer-body"></div>
+            <div class="analytics-explorer-actions">
+                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Cliquez sur un graphique ou un tableau pour l ouvrir ici.</span>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="analytics-explorer-download" class="btn btn-primary hidden">Telecharger</button>
+                    <button type="button" class="btn btn-secondary" data-analytics-explorer-dismiss>Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         (function () {
             var root = document.documentElement;
@@ -284,9 +456,19 @@
             var sidebarLabelItems = sidebar ? Array.prototype.slice.call(sidebar.querySelectorAll('.gooey-item[data-label]')) : [];
             var sidebarActiveLabelItem = sidebar ? sidebar.querySelector('.gooey-item[data-active="1"]') : null;
             var sidebarCurrentLabelItem = null;
+            var messagingWrapper = document.getElementById('header-messaging');
+            var messagingToggle = document.getElementById('header-messaging-toggle');
+            var messagingMenu = document.getElementById('header-messaging-menu');
             var notificationsWrapper = document.getElementById('header-notifications');
             var notificationsToggle = document.getElementById('header-notifications-toggle');
             var notificationsMenu = document.getElementById('header-notifications-menu');
+            var notificationsBadge = document.getElementById('header-notifications-badge');
+            var notificationsAlertsEndpoint = notificationsMenu ? notificationsMenu.getAttribute('data-alerts-endpoint') : null;
+            var notificationsAlertsSummary = document.getElementById('header-alerts-summary');
+            var notificationsAlertsKpis = document.getElementById('header-alerts-kpi-summary');
+            var notificationsAlertsItems = document.getElementById('header-alerts-items');
+            var notificationsAlertsLoadedAt = 0;
+            var notificationsAlertsPending = null;
             var dialogRoot = document.getElementById('anbg-dialog');
             var dialogBackdrop = dialogRoot ? dialogRoot.querySelector('[data-dialog-dismiss]') : null;
             var dialogClose = document.getElementById('anbg-dialog-close');
@@ -413,11 +595,174 @@
                 });
             }
 
+            function escapeHtml(value) {
+                return String(value == null ? '' : value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function notificationAlertTone(level) {
+                if (level === 'urgence') {
+                    return 'anbg-badge anbg-badge-danger';
+                }
+                if (level === 'critical') {
+                    return 'anbg-badge anbg-badge-danger';
+                }
+
+                if (level === 'warning') {
+                    return 'anbg-badge anbg-badge-warning';
+                }
+
+                return 'anbg-badge anbg-badge-info';
+            }
+
+            function renderNavbarAlertSummary(payload) {
+                if (!notificationsAlertsSummary) {
+                    return;
+                }
+
+                var summary = payload && payload.summary ? payload.summary : {};
+                notificationsAlertsSummary.textContent = (summary.unread || 0) + ' non lue(s) sur ' + (summary.total || 0) + ' alerte(s).';
+
+                if (notificationsBadge) {
+                    var unread = Number(summary.unread || 0);
+                    notificationsBadge.textContent = unread > 99 ? '99+' : String(unread);
+                    notificationsBadge.classList.toggle('hidden', unread <= 0);
+                }
+            }
+
+            function renderNavbarAlertKpis(payload) {
+                if (!notificationsAlertsKpis) {
+                    return;
+                }
+
+                var summary = payload && payload.kpi_summary ? payload.kpi_summary : {};
+                var cards = [
+                    ['Global', summary.global],
+                    ['Qualite', summary.qualite],
+                    ['Risque', summary.risque],
+                    ['Progression', summary.progression],
+                ].filter(function (row) {
+                    return typeof row[1] !== 'undefined';
+                });
+
+                if (!cards.length) {
+                    notificationsAlertsKpis.classList.add('hidden');
+                    notificationsAlertsKpis.innerHTML = '';
+                    return;
+                }
+
+                notificationsAlertsKpis.classList.remove('hidden');
+                notificationsAlertsKpis.innerHTML = cards.map(function (row) {
+                    var value = Number(row[1] || 0);
+                    var tone = value >= 80 ? 'success' : (value >= 60 ? 'warning' : 'danger');
+
+                    return '<span class="anbg-badge anbg-badge-' + tone + ' px-3 py-1 text-[11px]">' + escapeHtml(row[0]) + ' ' + escapeHtml(value.toFixed(0)) + '</span>';
+                }).join('');
+            }
+
+            function renderNavbarAlertItems(payload) {
+                if (!notificationsAlertsItems) {
+                    return;
+                }
+
+                var items = payload && Array.isArray(payload.items) ? payload.items : [];
+                if (!items.length) {
+                    notificationsAlertsItems.innerHTML = '<div class="px-3 py-4 text-xs text-slate-500 dark:text-slate-400">Aucune alerte recente.</div>';
+                    return;
+                }
+
+                notificationsAlertsItems.innerHTML = items.map(function (item) {
+                    var metrics = item.metrics || {};
+                    var metricChips = [
+                        ['Global', metrics.kpi_global],
+                        ['Qualite', metrics.kpi_qualite],
+                        ['Risque', metrics.kpi_risque],
+                    ].filter(function (row) {
+                        return typeof row[1] !== 'undefined';
+                    }).map(function (row) {
+                        return '<span class="anbg-badge anbg-badge-neutral px-2 py-0.5 text-[10px]">' + escapeHtml(row[0]) + ' ' + escapeHtml(Number(row[1] || 0).toFixed(0)) + '</span>';
+                    }).join('');
+
+                    var escalation = item.escalation_label
+                        ? '<span class="anbg-badge anbg-badge-info px-2 py-0.5 text-[10px]">Escalade ' + escapeHtml(item.escalation_label) + '</span>'
+                        : '';
+
+                    return '<a href="' + escapeHtml(item.read_url || item.target_url || '#') + '" class="block border-b border-slate-100 px-3 py-2 transition last:border-b-0 hover:bg-slate-50 dark:border-slate-900 dark:hover:bg-slate-900/60 ' + (item.is_unread ? 'bg-[#fff8d6]/70 dark:bg-[#f8e932]/10' : '') + '">' +
+                        '<div class="mb-1 flex items-start justify-between gap-2">' +
+                            '<p class="text-sm font-semibold text-slate-900 dark:text-slate-100">' + escapeHtml(item.titre || 'Alerte') + '</p>' +
+                            '<span class="' + notificationAlertTone(String(item.niveau || 'info')) + ' px-2 py-0.5 text-[10px]">' + escapeHtml(item.niveau_label || item.niveau || 'Info') + '</span>' +
+                        '</div>' +
+                        '<p class="text-xs text-slate-600 dark:text-slate-300">' + escapeHtml(item.message || '') + '</p>' +
+                        '<div class="mt-2 flex flex-wrap items-center gap-2">' + metricChips + escalation + '</div>' +
+                        '<p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">' + escapeHtml(item.date_label || '') + '</p>' +
+                    '</a>';
+                }).join('');
+            }
+
+            function loadNavbarAlerts(forceRefresh) {
+                if (!notificationsAlertsEndpoint || !notificationsAlertsItems) {
+                    return Promise.resolve();
+                }
+
+                var isFresh = notificationsAlertsLoadedAt > 0 && (Date.now() - notificationsAlertsLoadedAt) < 60000;
+                if (!forceRefresh && isFresh) {
+                    return Promise.resolve();
+                }
+
+                if (notificationsAlertsPending) {
+                    return notificationsAlertsPending;
+                }
+
+                notificationsAlertsPending = window.fetch(notificationsAlertsEndpoint, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('alerts_dropdown_failed');
+                        }
+
+                        return response.json();
+                    })
+                    .then(function (payload) {
+                        notificationsAlertsLoadedAt = Date.now();
+                        renderNavbarAlertSummary(payload);
+                        renderNavbarAlertKpis(payload);
+                        renderNavbarAlertItems(payload);
+                    })
+                    .catch(function () {
+                        if (notificationsAlertsSummary) {
+                            notificationsAlertsSummary.textContent = 'Impossible de charger les alertes pour le moment.';
+                        }
+                        if (notificationsAlertsKpis) {
+                            notificationsAlertsKpis.classList.add('hidden');
+                            notificationsAlertsKpis.innerHTML = '';
+                        }
+                        if (notificationsAlertsItems) {
+                            notificationsAlertsItems.innerHTML = '<div class="px-3 py-4 text-xs text-slate-500 dark:text-slate-400">Ouvrir le centre d alertes pour consulter le detail.</div>';
+                        }
+                    })
+                    .finally(function () {
+                        notificationsAlertsPending = null;
+                    });
+
+                return notificationsAlertsPending;
+            }
+
             function openNotificationsMenu() {
                 if (!notificationsMenu) {
                     return;
                 }
+                closeMessagingMenu();
                 notificationsMenu.classList.remove('hidden');
+                loadNavbarAlerts(false);
             }
 
             function closeNotificationsMenu() {
@@ -425,6 +770,21 @@
                     return;
                 }
                 notificationsMenu.classList.add('hidden');
+            }
+
+            function openMessagingMenu() {
+                if (!messagingMenu) {
+                    return;
+                }
+                closeNotificationsMenu();
+                messagingMenu.classList.remove('hidden');
+            }
+
+            function closeMessagingMenu() {
+                if (!messagingMenu) {
+                    return;
+                }
+                messagingMenu.classList.add('hidden');
             }
 
             function resetDialog() {
@@ -556,7 +916,32 @@
                 });
             }
 
+            if (messagingToggle) {
+                messagingToggle.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (!messagingMenu) {
+                        return;
+                    }
+                    if (messagingMenu.classList.contains('hidden')) {
+                        openMessagingMenu();
+                    } else {
+                        closeMessagingMenu();
+                    }
+                });
+            }
+
             document.addEventListener('click', function (event) {
+                if (!notificationsWrapper || !notificationsMenu) {
+                    if (!messagingWrapper || !messagingMenu) {
+                        return;
+                    }
+                }
+
+                if (messagingWrapper && messagingMenu && !messagingWrapper.contains(event.target)) {
+                    closeMessagingMenu();
+                }
+
                 if (!notificationsWrapper || !notificationsMenu) {
                     return;
                 }
@@ -665,6 +1050,7 @@
                         resolveDialog({ confirmed: false, value: null });
                     }
                     closeSidebar();
+                    closeMessagingMenu();
                     closeNotificationsMenu();
                 }
             });

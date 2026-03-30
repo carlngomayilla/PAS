@@ -8,6 +8,7 @@ use App\Models\Direction;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Governance\RetentionService;
+use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -150,7 +151,7 @@ class GovernanceWebController extends Controller
         ]);
     }
 
-    public function delegationsStore(Request $request): RedirectResponse
+    public function delegationsStore(Request $request, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -208,7 +209,7 @@ class GovernanceWebController extends Controller
             ]);
         }
 
-        Delegation::query()->create([
+        $delegation = Delegation::query()->create([
             'delegant_id' => $delegant->id,
             'delegue_id' => $delegate->id,
             'role_scope' => $validated['role_scope'],
@@ -221,6 +222,8 @@ class GovernanceWebController extends Controller
             'statut' => 'active',
             'cree_par' => $user->id,
         ]);
+
+        $notificationService->notifyDelegationCreated($delegation, $user);
 
         return redirect()
             ->route('workspace.delegations.index')

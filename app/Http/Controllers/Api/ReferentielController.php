@@ -87,6 +87,8 @@ class ReferentielController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
+        $perPage = max(1, min(100, (int) $request->integer('per_page', 20)));
+
         $query = User::query()
             ->with([
                 'direction:id,code,libelle',
@@ -120,6 +122,10 @@ class ReferentielController extends Controller
             $request->filled('role'),
             fn ($q) => $q->where('role', (string) $request->string('role'))
         );
+        $query->when(
+            $request->filled('is_active'),
+            fn ($q) => $q->where('is_active', $request->string('is_active') === '1')
+        );
         $query->when($request->filled('q'), function ($q) use ($request): void {
             $search = trim((string) $request->string('q'));
             $q->where(function ($subQuery) use ($search): void {
@@ -128,18 +134,19 @@ class ReferentielController extends Controller
             });
         });
 
-        return response()->json([
-            'data' => $query->get([
+        return response()->json(
+            $query->paginate($perPage, [
                 'id',
                 'name',
                 'email',
                 'role',
+                'is_active',
                 'agent_matricule',
                 'agent_fonction',
                 'agent_telephone',
                 'direction_id',
                 'service_id',
-            ]),
-        ]);
+            ])->withQueryString()
+        );
     }
 }

@@ -35,6 +35,12 @@ class AuthController extends Controller
             ], 401);
         }
 
+        if (! (bool) $user->is_active) {
+            return response()->json([
+                'message' => 'Compte desactive.',
+            ], 403);
+        }
+
         if ($this->passwordPolicy->isExpired($user)) {
             return response()->json([
                 'message' => $this->passwordPolicy->expirationMessage(),
@@ -42,7 +48,11 @@ class AuthController extends Controller
             ], 403);
         }
 
-        $token = $user->createToken($validated['device_name'])->plainTextToken;
+        $expiresAt = config('sanctum.expiration') !== null
+            ? now()->addMinutes((int) config('sanctum.expiration'))
+            : null;
+
+        $token = $user->createToken($validated['device_name'], ['*'], $expiresAt)->plainTextToken;
         $profil = $user->profileInteractions();
 
         return response()->json([

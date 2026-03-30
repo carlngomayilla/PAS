@@ -12,6 +12,8 @@ class ReferentielUtilisateurProfilePhotoTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0n8AAAAASUVORK5CYII=';
+
     public function test_admin_can_create_user_with_profile_photo(): void
     {
         Storage::fake('public');
@@ -28,7 +30,10 @@ class ReferentielUtilisateurProfilePhotoTest extends TestCase
             'role' => User::ROLE_CABINET,
             'password' => 'Password-Test@123',
             'password_confirmation' => 'Password-Test@123',
-            'profile_photo' => UploadedFile::fake()->image('avatar.png'),
+            'profile_photo' => UploadedFile::fake()->createWithContent(
+                'avatar.png',
+                (string) base64_decode(self::TINY_PNG, true)
+            ),
         ]);
 
         $response->assertRedirect(route('workspace.referentiel.utilisateurs.index'));
@@ -64,7 +69,10 @@ class ReferentielUtilisateurProfilePhotoTest extends TestCase
             'name' => 'User Photo',
             'email' => 'user.photo@anbg.test',
             'role' => User::ROLE_CABINET,
-            'profile_photo' => UploadedFile::fake()->image('avatar-new.png'),
+            'profile_photo' => UploadedFile::fake()->createWithContent(
+                'avatar-new.png',
+                (string) base64_decode(self::TINY_PNG, true)
+            ),
         ])->assertRedirect(route('workspace.referentiel.utilisateurs.index'));
 
         $target->refresh();

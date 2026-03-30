@@ -73,8 +73,11 @@
         $statusStyles = [
             'non_demarre' => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
             'en_cours' => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+            'a_risque' => 'bg-[#fff8d6] text-[#b98a00] dark:bg-[#f0e509]/15 dark:text-[#f8e932]',
             'en_avance' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/15 dark:text-[#f8e932]',
             'en_retard' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-[#f8e932]',
+            'suspendu' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200',
+            'annule' => 'bg-slate-200 text-slate-700 dark:bg-slate-700/50 dark:text-slate-200',
             'acheve_dans_delai' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/15 dark:text-[#f8e932]',
             'acheve_hors_delai' => 'bg-[#fff8d6] text-[#f9b13c] dark:bg-[#f0e509]/15 dark:text-[#f8e932]',
         ];
@@ -161,7 +164,7 @@
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">KPI global</p>
             <p class="showcase-kpi-number">{{ number_format((float) ($kpi?->kpi_global ?? 0), 1) }}%</p>
-            <p class="showcase-kpi-meta">Delai {{ number_format((float) ($kpi?->kpi_delai ?? 0), 1) }} | Performance {{ number_format((float) ($kpi?->kpi_performance ?? 0), 1) }}</p>
+            <p class="showcase-kpi-meta">Delai {{ number_format((float) ($kpi?->kpi_delai ?? 0), 1) }} | Performance {{ number_format((float) ($kpi?->kpi_performance ?? 0), 1) }} | Qualite {{ number_format((float) ($kpi?->kpi_qualite ?? 0), 1) }} | Risque {{ number_format((float) ($kpi?->kpi_risque ?? 0), 1) }}</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Periodes suivies</p>
@@ -312,6 +315,14 @@
             <article class="showcase-inline-stat">
                 <strong>KPI conformite</strong>
                 <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_conformite ?? 0), 2) }}%</p>
+            </article>
+            <article class="showcase-inline-stat">
+                <strong>KPI qualite</strong>
+                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_qualite ?? 0), 2) }}%</p>
+            </article>
+            <article class="showcase-inline-stat">
+                <strong>KPI risque</strong>
+                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_risque ?? 0), 2) }}%</p>
             </article>
             <article class="showcase-inline-stat">
                 <strong>KPI global</strong>

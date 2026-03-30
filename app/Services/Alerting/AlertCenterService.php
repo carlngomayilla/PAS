@@ -10,6 +10,8 @@ use App\Models\Direction;
 use App\Models\KpiMesure;
 use App\Models\PasObjectif;
 use App\Models\User;
+use App\Services\Actions\ActionTrackingService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -18,6 +20,13 @@ class AlertCenterService
 {
     use AuthorizesPlanningScope;
 
+    private const CACHE_TTL_SECONDS = 60;
+
+    public function __construct(
+        private readonly AlertRoutingService $alertRoutingService
+    ) {
+    }
+
     /**
      * @return Collection<int, array<string, mixed>>
      */
@@ -25,16 +34,55 @@ class AlertCenterService
     {
         $limit = max(1, min(100, $limit));
 
-        $items = collect()
-            ->merge($this->buildOverdueActionItems($user, $limit))
-            ->merge($this->buildKpiItems($user, $limit))
-            ->merge($this->buildActionLogItems($user, $limit))
-            ->merge($this->buildMissingPaoCoverageItems($user, $limit))
-            ->merge($this->buildDelegationItems($user, $limit));
+        return Cache::remember(
+            $this->cacheKey('items', $user, ['limit' => $limit]),
+            now()->addSeconds(self::CACHE_TTL_SECONDS),
+            fn (): Collection => $this->collectForUser($user, $limit)
+        );
+    }
 
-        return $items
-            ->sortByDesc(static fn (array $item): int => (int) ($item['sort_timestamp'] ?? 0))
-            ->values();
+    /**
+     * @param array<int, string> $readFingerprints
+     * @return array{
+     *     total: int,
+     *     unread: int,
+     *     urgence: int,
+     *     critical: int,
+     *     warning: int,
+     *     info: int,
+     *     level_unread_counts: array{urgence:int,critical:int,warning:int,info:int}
+     * }
+     */
+    public function summaryForUser(User $user, array $readFingerprints = []): array
+    {
+        sort($readFingerprints);
+
+        return Cache::remember(
+            $this->cacheKey('summary', $user, [
+                'reads' => sha1(json_encode($readFingerprints, JSON_THROW_ON_ERROR)),
+            ]),
+            now()->addSeconds(self::CACHE_TTL_SECONDS),
+            function () use ($user, $readFingerprints): array {
+                $items = $this->collectForUser($user, null);
+
+                return [
+                    'total' => $items->count(),
+                    'unread' => $items
+                        ->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))
+                        ->count(),
+                    'urgence' => $items->where('niveau', 'urgence')->count(),
+                    'critical' => $items->where('niveau', 'critical')->count(),
+                    'warning' => $items->where('niveau', 'warning')->count(),
+                    'info' => $items->where('niveau', 'info')->count(),
+                    'level_unread_counts' => [
+                        'urgence' => $items->where('niveau', 'urgence')->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))->count(),
+                        'critical' => $items->where('niveau', 'critical')->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))->count(),
+                        'warning' => $items->where('niveau', 'warning')->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))->count(),
+                        'info' => $items->where('niveau', 'info')->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))->count(),
+                    ],
+                ];
+            }
+        );
     }
 
     /**
@@ -42,20 +90,40 @@ class AlertCenterService
      */
     public function findForUser(User $user, string $type, int $id): ?array
     {
-        return match ($type) {
-            'action_overdue' => $this->findOverdueActionItem($user, $id),
-            'kpi_breach' => $this->findKpiItem($user, $id),
-            'action_log' => $this->findActionLogItem($user, $id),
-            'missing_pao_coverage' => $this->findMissingPaoCoverageItem($user, $id),
-            'delegation_expiring' => $this->findDelegationItem($user, $id),
-            default => null,
-        };
+        return Cache::remember(
+            $this->cacheKey('find', $user, ['type' => $type, 'id' => $id]),
+            now()->addSeconds(self::CACHE_TTL_SECONDS),
+            fn (): ?array => match ($type) {
+                'action_overdue' => $this->findOverdueActionItem($user, $id),
+                'kpi_breach' => $this->findKpiItem($user, $id),
+                'action_log' => $this->findActionLogItem($user, $id),
+                'missing_pao_coverage' => $this->findMissingPaoCoverageItem($user, $id),
+                'delegation_expiring' => $this->findDelegationItem($user, $id),
+                default => null,
+            }
+        );
+    }
+
+    /**
+     * @param array<string, scalar|null> $context
+     */
+    private function cacheKey(string $segment, User $user, array $context = []): string
+    {
+        ksort($context);
+
+        return 'alert-center:'.$segment.':'.sha1(json_encode([
+            'user_id' => (int) $user->id,
+            'role' => (string) $user->role,
+            'direction_id' => $user->direction_id !== null ? (int) $user->direction_id : null,
+            'service_id' => $user->service_id !== null ? (int) $user->service_id : null,
+            'context' => $context,
+        ], JSON_THROW_ON_ERROR));
     }
 
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    private function buildOverdueActionItems(User $user, int $limit): Collection
+    private function buildOverdueActionItems(User $user, ?int $limit): Collection
     {
         $today = Carbon::today()->toDateString();
 
@@ -65,16 +133,20 @@ class AlertCenterService
                 'pta.direction:id,code,libelle',
                 'pta.service:id,code,libelle',
                 'responsable:id,name',
+                'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
             ])
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', $today)
-            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai']);
+            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai', 'suspendu', 'annule']);
 
         $this->scopeAction($query, $user);
 
+        $query->orderBy('date_echeance');
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
         return $query
-            ->orderBy('date_echeance')
-            ->limit($limit)
             ->get()
             ->map(fn (Action $action): array => $this->mapOverdueAction($action));
     }
@@ -82,7 +154,7 @@ class AlertCenterService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    private function buildKpiItems(User $user, int $limit): Collection
+    private function buildKpiItems(User $user, ?int $limit): Collection
     {
         $query = KpiMesure::query()
             ->select('kpi_mesures.id')
@@ -94,9 +166,12 @@ class AlertCenterService
 
         $this->scopeJoinedPta($query, $user, 'ptas.direction_id', 'ptas.service_id');
 
+        $query->orderByDesc('kpi_mesures.id');
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
         $ids = $query
-            ->orderByDesc('kpi_mesures.id')
-            ->limit($limit)
             ->pluck('kpi_mesures.id')
             ->map(static fn ($id): int => (int) $id)
             ->all();
@@ -109,6 +184,7 @@ class AlertCenterService
             ->with([
                 'kpi:id,action_id,libelle,seuil_alerte,periodicite',
                 'kpi.action:id,pta_id,libelle,responsable_id',
+                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'kpi.action.pta.direction:id,code,libelle',
                 'kpi.action.pta.service:id,code,libelle',
@@ -122,18 +198,19 @@ class AlertCenterService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    private function buildActionLogItems(User $user, int $limit): Collection
+    private function buildActionLogItems(User $user, ?int $limit): Collection
     {
         $query = ActionLog::query()
             ->with([
                 'action:id,pta_id,libelle,statut_dynamique',
+                'action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
                 'action.pta:id,direction_id,service_id,titre',
                 'action.pta.direction:id,code,libelle',
                 'action.pta.service:id,code,libelle',
                 'week:id,action_id,numero_semaine',
                 'utilisateur:id,name',
             ])
-            ->whereIn('niveau', ['warning', 'critical']);
+            ->whereIn('niveau', ['warning', 'critical', 'urgence']);
 
         if (! $user->hasGlobalReadAccess()) {
             $query->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {
@@ -141,17 +218,27 @@ class AlertCenterService
             });
         }
 
-        return $query
-            ->latest()
-            ->limit($limit)
+        $query->latest();
+        if ($limit !== null) {
+            $query->limit($limit * 5);
+        }
+
+        $items = $query
             ->get()
+            ->filter(fn (ActionLog $log): bool => $this->alertRoutingService->userCanSeeActionLog($user, $log));
+
+        if ($limit !== null) {
+            $items = $items->take($limit);
+        }
+
+        return $items
             ->map(fn (ActionLog $log): array => $this->mapActionLog($log));
     }
 
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    private function buildDelegationItems(User $user, int $limit): Collection
+    private function buildDelegationItems(User $user, ?int $limit): Collection
     {
         $moduleCodes = collect($user->workspaceModules())->pluck('code');
         if (! $moduleCodes->contains('delegations')) {
@@ -169,8 +256,11 @@ class AlertCenterService
             ->active()
             ->whereNotNull('date_fin')
             ->where('date_fin', '<=', $deadline)
-            ->orderBy('date_fin')
-            ->limit($limit);
+            ->orderBy('date_fin');
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
 
         return $query
             ->get()
@@ -180,7 +270,7 @@ class AlertCenterService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    private function buildMissingPaoCoverageItems(User $user, int $limit): Collection
+    private function buildMissingPaoCoverageItems(User $user, ?int $limit): Collection
     {
         if (! $user->hasGlobalReadAccess() && ! $user->hasRole(User::ROLE_DIRECTION)) {
             return collect();
@@ -222,8 +312,41 @@ class AlertCenterService
                     ->map(fn (Direction $direction): array => $this->mapMissingPaoCoverage($objectif, $direction))
                     ->all();
             })
-            ->take($limit)
+            ->when($limit !== null, fn (Collection $items): Collection => $items->take($limit))
             ->values();
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function collectForUser(User $user, ?int $limit): Collection
+    {
+        $items = collect()
+            ->merge($this->buildOverdueActionItems($user, $limit))
+            ->merge($this->buildKpiItems($user, $limit))
+            ->merge($this->buildActionLogItems($user, $limit))
+            ->merge($this->buildMissingPaoCoverageItems($user, $limit))
+            ->merge($this->buildDelegationItems($user, $limit))
+            ->sort(static function (array $left, array $right): int {
+                $leftTimestamp = (int) ($left['sort_timestamp'] ?? 0);
+                $rightTimestamp = (int) ($right['sort_timestamp'] ?? 0);
+
+                if ($leftTimestamp !== $rightTimestamp) {
+                    return $rightTimestamp <=> $leftTimestamp;
+                }
+
+                $leftFingerprint = (string) ($left['fingerprint'] ?? '');
+                $rightFingerprint = (string) ($right['fingerprint'] ?? '');
+
+                return $leftFingerprint <=> $rightFingerprint;
+            })
+            ->values();
+
+        if ($limit !== null) {
+            return $items->take($limit)->values();
+        }
+
+        return $items;
     }
 
     /**
@@ -239,11 +362,17 @@ class AlertCenterService
                 'pta.direction:id,code,libelle',
                 'pta.service:id,code,libelle',
                 'responsable:id,name',
+                'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
             ])
             ->whereKey($id)
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', $today)
-            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai']);
+            ->whereNotIn('statut_dynamique', [
+                ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_SUSPENDU,
+                ActionTrackingService::STATUS_ANNULE,
+            ]);
 
         $this->scopeAction($query, $user);
 
@@ -276,6 +405,7 @@ class AlertCenterService
             ->with([
                 'kpi:id,action_id,libelle,seuil_alerte,periodicite',
                 'kpi.action:id,pta_id,libelle,responsable_id',
+                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'kpi.action.pta.direction:id,code,libelle',
                 'kpi.action.pta.service:id,code,libelle',
@@ -293,6 +423,7 @@ class AlertCenterService
         $query = ActionLog::query()
             ->with([
                 'action:id,pta_id,libelle,statut_dynamique',
+                'action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
                 'action.pta:id,direction_id,service_id,titre',
                 'action.pta.direction:id,code,libelle',
                 'action.pta.service:id,code,libelle',
@@ -300,7 +431,7 @@ class AlertCenterService
                 'utilisateur:id,name',
             ])
             ->whereKey($id)
-            ->whereIn('niveau', ['warning', 'critical']);
+            ->whereIn('niveau', ['warning', 'critical', 'urgence']);
 
         if (! $user->hasGlobalReadAccess()) {
             $query->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {
@@ -309,8 +440,15 @@ class AlertCenterService
         }
 
         $log = $query->first();
+        if (! $log instanceof ActionLog) {
+            return null;
+        }
 
-        return $log instanceof ActionLog ? $this->mapActionLog($log) : null;
+        if (! $this->alertRoutingService->userCanSeeActionLog($user, $log)) {
+            return null;
+        }
+
+        return $this->mapActionLog($log);
     }
 
     /**
@@ -423,6 +561,7 @@ class AlertCenterService
                 'libelle' => (string) $action->libelle,
                 'pta' => (string) ($action->pta?->titre ?? '-'),
             ],
+            'metrics' => $this->actionMetrics($action),
             'section_label' => 'Statut et avancement',
             'target_url' => route('workspace.actions.suivi', $action).'#action-status',
             'fingerprint' => 'action_overdue:'.$action->id.':'.$deadline->format('Ymd').':'.$type,
@@ -469,6 +608,7 @@ class AlertCenterService
                 'libelle' => (string) $action->libelle,
                 'pta' => (string) ($action->pta?->titre ?? '-'),
             ] : null,
+            'metrics' => $this->actionMetrics($action),
             'section_label' => 'KPI et performance',
             'target_url' => $action instanceof Action ? route('workspace.actions.suivi', $action).'#action-status' : route('workspace.alertes'),
             'fingerprint' => 'kpi_breach:'.$mesure->id.':'.number_format($value, 4, '.', ''),
@@ -508,6 +648,8 @@ class AlertCenterService
                 'libelle' => (string) $action->libelle,
                 'pta' => (string) ($action->pta?->titre ?? '-'),
             ] : null,
+            'metrics' => $this->actionMetrics($action),
+            'escalation_label' => $this->escalationLabel($log->cible_role),
             'section_label' => $sectionLabel,
             'target_url' => $targetUrl,
             'fingerprint' => 'action_log:'.$log->id.':'.(optional($log->created_at)?->timestamp ?? 0),
@@ -678,6 +820,7 @@ class AlertCenterService
     private function levelLabel(string $level): string
     {
         return match ($level) {
+            'urgence' => 'Urgence',
             'critical' => 'Critique',
             'warning' => 'Attention',
             'info' => 'Info',
@@ -689,7 +832,12 @@ class AlertCenterService
     {
         return match ($type) {
             'retard' => 'Retard',
+            'action_a_risque' => 'A risque',
             'action_non_demarre' => 'Non demarree',
+            'alerte_combinee_critique' => 'Escalade DG',
+            'retard_kpi_critique' => 'Escalade DG',
+            'conformite_incomplete' => 'Conformite',
+            'justificatif_absent' => 'Justificatif',
             'pao_manquant' => 'PAO manquant',
             'kpi_global' => 'KPI global',
             'kpi_sous_seuil' => 'KPI sous seuil',
@@ -706,9 +854,41 @@ class AlertCenterService
         };
     }
 
+    /**
+     * @return array<string, float>|null
+     */
+    private function actionMetrics(?Action $action): ?array
+    {
+        if (! $action instanceof Action) {
+            return null;
+        }
+
+        return [
+            'kpi_global' => round((float) ($action->actionKpi?->kpi_global ?? 0), 2),
+            'kpi_qualite' => round((float) ($action->actionKpi?->kpi_qualite ?? 0), 2),
+            'kpi_risque' => round((float) ($action->actionKpi?->kpi_risque ?? 0), 2),
+        ];
+    }
+
+    private function escalationLabel(?string $role): ?string
+    {
+        $normalized = strtolower(trim((string) $role));
+
+        return match ($normalized) {
+            'chef_service', 'service' => 'Service',
+            'direction' => 'Direction + Planification',
+            'planification' => 'Planification + DG',
+            'dg' => 'DG',
+            default => null,
+        };
+    }
+
     private function logTitle(ActionLog $log): string
     {
         return match ((string) $log->type_evenement) {
+            'action_a_risque' => 'Action a risque',
+            'alerte_combinee_critique' => 'Retard et KPI critique',
+            'retard_kpi_critique' => 'Retard et KPI critique',
             'periode_manquante' => 'Periode non renseignee',
             'ecart_progression' => 'Ecart de progression',
             'validation_bloquee' => 'Validation bloquee',

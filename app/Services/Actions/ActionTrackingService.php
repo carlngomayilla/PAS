@@ -8,6 +8,7 @@ use App\Models\ActionLog;
 use App\Models\ActionWeek;
 use App\Models\Justificatif;
 use App\Models\User;
+use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Support\Carbon;
 
 class ActionTrackingService
@@ -20,10 +21,15 @@ class ActionTrackingService
 
     public const STATUS_NON_DEMARRE = 'non_demarre';
     public const STATUS_EN_COURS = 'en_cours';
+    public const STATUS_A_RISQUE = 'a_risque';
     public const STATUS_EN_AVANCE = 'en_avance';
     public const STATUS_EN_RETARD = 'en_retard';
+    public const STATUS_SUSPENDU = 'suspendu';
+    public const STATUS_ANNULE = 'annule';
     public const STATUS_ACHEVE_DANS_DELAI = 'acheve_dans_delai';
     public const STATUS_ACHEVE_HORS_DELAI = 'acheve_hors_delai';
+
+    public const RISK_ALERT_THRESHOLD_DAYS = 3;
 
     public const VALIDATION_NON_SOUMISE = 'non_soumise';
     public const VALIDATION_SOUMISE_CHEF = 'soumise_chef';
@@ -40,8 +46,11 @@ class ActionTrackingService
         return [
             self::STATUS_NON_DEMARRE,
             self::STATUS_EN_COURS,
+            self::STATUS_A_RISQUE,
             self::STATUS_EN_AVANCE,
             self::STATUS_EN_RETARD,
+            self::STATUS_SUSPENDU,
+            self::STATUS_ANNULE,
             self::STATUS_ACHEVE_DANS_DELAI,
             self::STATUS_ACHEVE_HORS_DELAI,
         ];
@@ -387,7 +396,7 @@ class ActionTrackingService
     public function refreshActionMetrics(Action $action, ?Carbon $referenceDate = null): Action
     {
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
-        $action->loadMissing('weeks');
+        $action->loadMissing('weeks', 'actionKpi');
 
         $weeks = $action->weeks()
             ->orderBy('numero_semaine')
@@ -447,13 +456,42 @@ class ActionTrackingService
         ]);
         $action->save();
 
-        $kpis = $this->calculateActionKpis(
-            $action,
-            $realProgress,
-            $theoreticalProgress,
-            $cumulativeQuantity,
-            $referenceDate
-        );
+        $existingKpi = $action->actionKpi;
+        if ($status === self::STATUS_SUSPENDU) {
+            $kpis = $existingKpi instanceof ActionKpi
+                ? [
+                    'kpi_delai' => (float) $existingKpi->kpi_delai,
+                    'kpi_performance' => (float) $existingKpi->kpi_performance,
+                    'kpi_conformite' => (float) $existingKpi->kpi_conformite,
+                    'kpi_qualite' => (float) $existingKpi->kpi_qualite,
+                    'kpi_risque' => (float) $existingKpi->kpi_risque,
+                    'kpi_global' => (float) $existingKpi->kpi_global,
+                ]
+                : $this->calculateActionKpis(
+                    $action,
+                    $realProgress,
+                    $theoreticalProgress,
+                    $cumulativeQuantity,
+                    $referenceDate
+                );
+        } elseif ($status === self::STATUS_ANNULE) {
+            $kpis = [
+                'kpi_delai' => 0.0,
+                'kpi_performance' => 0.0,
+                'kpi_conformite' => 0.0,
+                'kpi_qualite' => 0.0,
+                'kpi_risque' => 0.0,
+                'kpi_global' => 0.0,
+            ];
+        } else {
+            $kpis = $this->calculateActionKpis(
+                $action,
+                $realProgress,
+                $theoreticalProgress,
+                $cumulativeQuantity,
+                $referenceDate
+            );
+        }
 
         ActionKpi::query()->updateOrCreate(
             ['action_id' => $action->id],
@@ -477,9 +515,38 @@ class ActionTrackingService
                 ['from' => $beforeStatus, 'to' => $status],
                 'chef_service'
             );
+
+            if ($status === self::STATUS_SUSPENDU) {
+                $this->createLogIfMissingToday(
+                    $action,
+                    'action_suspendue',
+                    'warning',
+                    'Action suspendue. Les KPI sont geles jusqu a reactivation.',
+                    [
+                        'statut_dynamique' => $status,
+                        'progression_reelle' => $realProgress,
+                    ],
+                    'direction'
+                );
+            }
+
+            if ($status === self::STATUS_ANNULE) {
+                $this->createLogIfMissingToday(
+                    $action,
+                    'action_annulee',
+                    'info',
+                    'Action annulee. Les alertes automatiques sont desactivees.',
+                    [
+                        'statut_dynamique' => $status,
+                    ],
+                    'direction'
+                );
+            }
         }
 
-        $this->generateAutomaticAlerts($action, $weeks, $realProgress, $theoreticalProgress, $kpis, $referenceDate);
+        if (! in_array($status, [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)) {
+            $this->generateAutomaticAlerts($action, $weeks, $realProgress, $theoreticalProgress, $kpis, $referenceDate);
+        }
 
         return $action->fresh(['actionKpi', 'weeks']);
     }
@@ -540,22 +607,20 @@ class ActionTrackingService
         float $theoreticalProgress,
         Carbon $referenceDate
     ): string {
-        $endDate = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
-        $completed = $realProgress >= 100.0;
-
-        if ($realProgress <= 0.0) {
-            return self::STATUS_NON_DEMARRE;
+        $manualStatus = strtolower(trim((string) ($action->statut ?? '')));
+        if ($manualStatus === self::STATUS_ANNULE) {
+            return self::STATUS_ANNULE;
         }
 
-        if ($completed) {
-            if ((string) ($action->statut_validation ?? self::VALIDATION_NON_SOUMISE) !== self::VALIDATION_VALIDEE_DIRECTION) {
-                if ($endDate !== null && $referenceDate->gt($endDate)) {
-                    return self::STATUS_EN_RETARD;
-                }
+        if ($manualStatus === self::STATUS_SUSPENDU) {
+            return self::STATUS_SUSPENDU;
+        }
 
-                return self::STATUS_EN_COURS;
-            }
+        $startDate = $action->date_debut !== null ? Carbon::parse($action->date_debut)->startOfDay() : null;
+        $endDate = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
+        $actualEnd = $action->date_fin_reelle !== null ? Carbon::parse($action->date_fin_reelle)->endOfDay() : null;
 
+        if ($actualEnd !== null) {
             $realEnd = $action->date_fin_reelle !== null
                 ? Carbon::parse($action->date_fin_reelle)->endOfDay()
                 : $referenceDate->copy()->endOfDay();
@@ -567,19 +632,26 @@ class ActionTrackingService
             return self::STATUS_ACHEVE_HORS_DELAI;
         }
 
+        if ($startDate !== null && $referenceDate->lt($startDate)) {
+            return self::STATUS_NON_DEMARRE;
+        }
+
         if ($endDate !== null && $referenceDate->gt($endDate)) {
             return self::STATUS_EN_RETARD;
         }
 
-        if ($realProgress >= ($theoreticalProgress + 5)) {
-            return self::STATUS_EN_AVANCE;
+        if ($endDate !== null) {
+            $daysLeft = $referenceDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay(), false);
+            if ($daysLeft >= 0 && $daysLeft <= self::RISK_ALERT_THRESHOLD_DAYS) {
+                return self::STATUS_A_RISQUE;
+            }
         }
 
         return self::STATUS_EN_COURS;
     }
 
     /**
-     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float}
+     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_risque: float, kpi_global: float}
      */
     private function calculateActionKpis(
         Action $action,
@@ -627,8 +699,23 @@ class ActionTrackingService
                 default => 85.0,
             });
 
+        $dueWeeks = $action->weeks()
+            ->whereDate('date_fin', '<=', $referenceDate->toDateString())
+            ->get();
+        $missingDueWeeks = $dueWeeks->filter(fn (ActionWeek $week): bool => ! $week->est_renseignee)->count();
+        if ($missingDueWeeks > 0) {
+            $conformiteKpi = round(max(0.0, $conformiteKpi - min(45.0, 20.0 + (($missingDueWeeks - 1) * 10.0))), 2);
+        }
+
+        $qualityKpi = $this->calculateQualityKpi($action, $referenceDate);
+        $riskKpi = $this->calculateRiskKpi($action, $realProgress, $theoreticalProgress, $referenceDate);
+
         $globalKpi = round(
-            (0.4 * $delayKpi) + (0.4 * $performanceKpi) + (0.2 * $conformiteKpi),
+            (0.25 * $delayKpi)
+            + (0.30 * $performanceKpi)
+            + (0.15 * $conformiteKpi)
+            + (0.15 * $qualityKpi)
+            + (0.15 * $riskKpi),
             2
         );
 
@@ -636,13 +723,15 @@ class ActionTrackingService
             'kpi_delai' => $delayKpi,
             'kpi_performance' => $performanceKpi,
             'kpi_conformite' => $conformiteKpi,
+            'kpi_qualite' => $qualityKpi,
+            'kpi_risque' => $riskKpi,
             'kpi_global' => $globalKpi,
         ];
     }
 
     /**
      * @param \Illuminate\Support\Collection<int, ActionWeek> $weeks
-     * @param array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float} $kpis
+     * @param array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_risque: float, kpi_global: float} $kpis
      */
     private function generateAutomaticAlerts(
         Action $action,
@@ -673,6 +762,21 @@ class ActionTrackingService
             );
         }
 
+        if ($overdueWeeks->isNotEmpty()) {
+            $this->createLogIfMissingToday(
+                $action,
+                'conformite_incomplete',
+                'warning',
+                'Conformite insuffisante: des periodes attendues ne sont pas renseignees.',
+                [
+                    'periodes_manquantes' => $overdueWeeks->count(),
+                    'progression_reelle' => $realProgress,
+                    'progression_theorique' => $theoreticalProgress,
+                ],
+                'chef_service'
+            );
+        }
+
         $gap = round($theoreticalProgress - $realProgress, 2);
         $gapThreshold = (float) ($action->seuil_alerte_progression ?? 10);
         if ($gap > $gapThreshold && $realProgress < 100) {
@@ -692,8 +796,34 @@ class ActionTrackingService
         }
 
         if ($action->date_fin !== null) {
-            $daysLeft = Carbon::today()->diffInDays(Carbon::parse($action->date_fin), false);
-            if ($daysLeft <= 7 && $realProgress < 90) {
+            $daysLeft = $referenceDate
+                ->copy()
+                ->startOfDay()
+                ->diffInDays(Carbon::parse($action->date_fin)->startOfDay(), false);
+
+            if ($daysLeft >= 0 && $daysLeft <= self::RISK_ALERT_THRESHOLD_DAYS && $action->date_fin_reelle === null) {
+                $this->createLogIfMissingToday(
+                    $action,
+                    'action_a_risque',
+                    'warning',
+                    'Action proche de l echeance et necessitant une vigilance immediate.',
+                    [
+                        'jours_restants' => $daysLeft,
+                        'progression_reelle' => $realProgress,
+                        'progression_theorique' => $theoreticalProgress,
+                    ],
+                    'chef_service'
+                );
+            }
+        }
+
+        if ($action->date_fin !== null) {
+            $daysLeft = $referenceDate
+                ->copy()
+                ->startOfDay()
+                ->diffInDays(Carbon::parse($action->date_fin)->startOfDay(), false);
+
+            if ($daysLeft >= 0 && $daysLeft <= 7 && $realProgress < 90) {
                 $this->createLogIfMissingToday(
                     $action,
                     'echeance_proche',
@@ -708,16 +838,142 @@ class ActionTrackingService
             }
         }
 
-        if (($kpis['kpi_global'] ?? 0) < 60) {
+        $hasExecutionJustificatif = $action->justificatifs()
+            ->whereIn('categorie', ['hebdomadaire', 'final'])
+            ->exists();
+
+        if (($overdueWeeks->isNotEmpty() || $action->date_fin_reelle !== null) && ! $hasExecutionJustificatif) {
+            $this->createLogIfMissingToday(
+                $action,
+                'justificatif_absent',
+                'warning',
+                'Aucun justificatif d execution n a ete depose pour l action.',
+                [
+                    'statut_dynamique' => $action->statut_dynamique,
+                    'date_fin_reelle' => optional($action->date_fin_reelle)->toDateString(),
+                ],
+                'chef_service'
+            );
+        }
+
+        $globalKpi = (float) ($kpis['kpi_global'] ?? 0);
+
+        if ($globalKpi < 40) {
+            $this->createLogIfMissingToday(
+                $action,
+                'kpi_global_sous_seuil',
+                'critical',
+                'KPI global de l action sous le seuil critique de pilotage.',
+                ['kpi_global' => $globalKpi],
+                'direction'
+            );
+        } elseif ($globalKpi < 60) {
             $this->createLogIfMissingToday(
                 $action,
                 'kpi_global_sous_seuil',
                 'warning',
                 'KPI global de l action sous le seuil de pilotage.',
-                ['kpi_global' => $kpis['kpi_global'] ?? 0],
+                ['kpi_global' => $globalKpi],
                 'direction'
             );
         }
+
+        if (
+            $action->date_fin !== null
+            && $action->date_fin_reelle === null
+            && $referenceDate->copy()->endOfDay()->gt(Carbon::parse($action->date_fin)->endOfDay())
+            && $globalKpi < 40
+        ) {
+            $this->createLogIfMissingToday(
+                $action,
+                'alerte_combinee_critique',
+                'urgence',
+                'Action en retard avec KPI critique. Urgence et escalade DG requises.',
+                [
+                    'kpi_global' => $globalKpi,
+                    'progression_reelle' => $realProgress,
+                    'progression_theorique' => $theoreticalProgress,
+                    'statut_dynamique' => $action->statut_dynamique,
+                ],
+                'dg'
+            );
+        }
+    }
+
+    private function calculateQualityKpi(Action $action, Carbon $referenceDate): float
+    {
+        $score = 100.0;
+
+        if (trim((string) ($action->description ?? '')) === '') {
+            $score -= 15.0;
+        }
+
+        if (trim((string) ($action->criteres_validation ?? '')) === '') {
+            $score -= 15.0;
+        }
+
+        if (trim((string) ($action->livrable_attendu ?? '')) === '') {
+            $score -= 10.0;
+        }
+
+        $dueWeeks = $action->weeks()
+            ->whereDate('date_fin', '<=', $referenceDate->toDateString())
+            ->get();
+
+        if ($dueWeeks->isNotEmpty() && $dueWeeks->contains(fn (ActionWeek $week): bool => ! $week->est_renseignee)) {
+            $score -= 30.0;
+        }
+
+        $hasExecutionJustificatif = $action->justificatifs()
+            ->whereIn('categorie', ['hebdomadaire', 'final'])
+            ->exists();
+
+        if (! $hasExecutionJustificatif) {
+            $score -= 20.0;
+        }
+
+        if ($action->date_fin_reelle !== null && trim((string) ($action->rapport_final ?? '')) === '') {
+            $score -= 10.0;
+        }
+
+        return round(max(0.0, min(100.0, $score)), 2);
+    }
+
+    private function calculateRiskKpi(
+        Action $action,
+        float $realProgress,
+        float $theoreticalProgress,
+        Carbon $referenceDate
+    ): float {
+        $score = 100.0;
+        $gap = max(0.0, $theoreticalProgress - $realProgress);
+
+        if ($gap > 0) {
+            $score -= min(30.0, round($gap, 2));
+        }
+
+        $deadline = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
+        if ($deadline !== null && $action->date_fin_reelle === null) {
+            if ($referenceDate->copy()->endOfDay()->gt($deadline)) {
+                $daysLate = $deadline->diffInDays($referenceDate->copy()->endOfDay());
+                $score -= min(45.0, 20.0 + ($daysLate * 5.0));
+            } else {
+                $daysLeft = $referenceDate->copy()->startOfDay()->diffInDays($deadline->copy()->startOfDay(), false);
+                if ($daysLeft >= 0 && $daysLeft <= self::RISK_ALERT_THRESHOLD_DAYS) {
+                    $score -= 20.0;
+                }
+            }
+        }
+
+        $risks = trim((string) ($action->risques ?? ''));
+        $preventiveMeasures = trim((string) ($action->mesures_preventives ?? ''));
+        if ($risks !== '' && $preventiveMeasures === '') {
+            $score -= 15.0;
+        } elseif ($risks !== '') {
+            $score -= 5.0;
+        }
+
+        return round(max(0.0, min(100.0, $score)), 2);
     }
 
     private function escalationRoleForMissingWeek(int $overdueCount): string
@@ -742,7 +998,7 @@ class ActionTrackingService
         ?string $targetRole = null,
         ?int $userId = null,
         ?ActionWeek $week = null
-    ): void {
+    ): ?ActionLog {
         $query = ActionLog::query()
             ->where('action_id', $action->id)
             ->where('type_evenement', $type)
@@ -755,10 +1011,10 @@ class ActionTrackingService
         }
 
         if ($query->exists()) {
-            return;
+            return null;
         }
 
-        ActionLog::query()->create([
+        $log = ActionLog::query()->create([
             'action_id' => $action->id,
             'action_week_id' => $week?->id,
             'niveau' => $level,
@@ -769,6 +1025,12 @@ class ActionTrackingService
             'utilisateur_id' => $userId,
             'lu' => false,
         ]);
+
+        if (in_array($level, ['warning', 'critical', 'urgence'], true)) {
+            app(WorkspaceNotificationService::class)->notifyActionAlertEscalation($log, $userId);
+        }
+
+        return $log;
     }
 
     /**
@@ -799,8 +1061,10 @@ class ActionTrackingService
     {
         return match ($dynamicStatus) {
             self::STATUS_NON_DEMARRE => 'non_demarre',
+            self::STATUS_SUSPENDU => 'suspendu',
+            self::STATUS_ANNULE => 'annule',
             self::STATUS_ACHEVE_DANS_DELAI, self::STATUS_ACHEVE_HORS_DELAI => 'termine',
-            self::STATUS_EN_RETARD => 'suspendu',
+            self::STATUS_EN_RETARD => 'en_cours',
             default => 'en_cours',
         };
     }

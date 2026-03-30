@@ -12,6 +12,7 @@ use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\Analytics\ReportingAnalyticsService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
@@ -22,6 +23,11 @@ use Illuminate\View\View;
 class DashboardController extends Controller
 {
     use AuthorizesPlanningScope;
+
+    public function __construct(
+        private readonly ReportingAnalyticsService $reportingAnalyticsService
+    ) {
+    }
 
     public function index(Request $request): View
     {
@@ -64,7 +70,7 @@ class DashboardController extends Controller
                 'pta.direction:id,code,libelle',
                 'pta.service:id,code,libelle',
                 'responsable:id,name',
-                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_global,progression_reelle,progression_theorique',
+                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque,kpi_global,progression_reelle,progression_theorique',
             ])
             ->orderByDesc('date_echeance')
             ->get();
@@ -89,7 +95,12 @@ class DashboardController extends Controller
         $actionsRetard = (clone $actions)
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', $today)
-            ->whereNotIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai'])
+            ->whereNotIn('statut_dynamique', [
+                ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_SUSPENDU,
+                ActionTrackingService::STATUS_ANNULE,
+            ])
             ->count();
 
         $kpiSousSeuilQuery = KpiMesure::query()
@@ -107,6 +118,12 @@ class DashboardController extends Controller
 
         $view = $request->routeIs('admin.*') ? 'admin.dashboard' : 'dashboard';
         $dashboardData = $this->buildDashboardData($user, $scopedActions);
+        $reportingAnalytics = $this->reportingAnalyticsService->buildPayload($user, true, true);
+        $dgPayload = [
+            'global_scores' => $dashboardData['global_scores'] ?? [],
+            'alert_rows' => $dashboardData['alert_rows'] ?? [],
+            'kpi_summary' => $reportingAnalytics['kpiSummary'] ?? [],
+        ];
 
         return view($view, [
             'user' => $user,
@@ -118,6 +135,8 @@ class DashboardController extends Controller
                 'status_breakdown' => $statusBreakdown,
             ],
             'dashboardData' => $dashboardData,
+            'reportingAnalytics' => $reportingAnalytics,
+            'dgPayload' => $dgPayload,
             'chartPayload' => $this->buildChartPayload($totals, $alerts, $statusBreakdown),
         ]);
     }
@@ -331,9 +350,12 @@ class DashboardController extends Controller
     private function buildDashboardData(User $user, Collection $actions): array
     {
         $actions = $actions->values();
+        $validatedActions = $actions
+            ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
+            ->values();
         $currentYear = (int) now()->year;
         $unitMeta = $this->resolveUnitMeta($user);
-        $unitRows = $this->buildUnitRows($actions, (string) $unitMeta['mode']);
+        $unitRows = $this->buildUnitRows($validatedActions, (string) $unitMeta['mode']);
         $interannual = $this->buildInterannualComparison($user);
         $statusCards = $this->buildStatusCards($actions);
         $alerts = $this->buildDashboardAlertRows($actions);
@@ -347,15 +369,17 @@ class DashboardController extends Controller
         };
 
         $globalScores = [
-            'delai' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
-            'performance' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
-            'conformite' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
-            'global' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
-            'progression' => $avg($actions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
+            'delai' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
+            'performance' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
+            'conformite' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
+            'qualite' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
+            'risque' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)),
+            'global' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
+            'progression' => $avg($validatedActions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
         ];
 
-        $monthly = collect(range(1, 12))->map(function (int $month) use ($actions, $currentYear, $avg): array {
-            $monthActions = $actions->filter(function (Action $action) use ($currentYear, $month): bool {
+        $monthly = collect(range(1, 12))->map(function (int $month) use ($validatedActions, $currentYear, $avg): array {
+            $monthActions = $validatedActions->filter(function (Action $action) use ($currentYear, $month): bool {
                 $date = $action->date_debut;
 
                 return $date instanceof Carbon
@@ -370,11 +394,13 @@ class DashboardController extends Controller
                 'delai' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
                 'performance' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
                 'conformite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
+                'qualite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
+                'risque' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)),
                 'global' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
             ];
         })->all();
 
-        $actionRows = $actions
+        $actionRows = $validatedActions
             ->sortByDesc(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0))
             ->take(12)
             ->map(function (Action $action): array {
@@ -393,6 +419,8 @@ class DashboardController extends Controller
                     'kpi_delai' => round((float) ($action->actionKpi?->kpi_delai ?? 0), 2),
                     'kpi_performance' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
                     'kpi_conformite' => round((float) ($action->actionKpi?->kpi_conformite ?? 0), 2),
+                    'kpi_qualite' => round((float) ($action->actionKpi?->kpi_qualite ?? 0), 2),
+                    'kpi_risque' => round((float) ($action->actionKpi?->kpi_risque ?? 0), 2),
                     'date_debut' => $action->date_debut instanceof Carbon ? $action->date_debut->format('d/m/Y') : '-',
                     'date_fin' => $action->date_fin instanceof Carbon ? $action->date_fin->format('d/m/Y') : '-',
                     'url' => route('workspace.actions.suivi', $action),
@@ -435,7 +463,7 @@ class DashboardController extends Controller
             ])
             ->all();
 
-        $scatterPoints = $actions
+        $scatterPoints = $validatedActions
             ->filter(fn (Action $action): bool => $action->actionKpi instanceof ActionKpi)
             ->sortByDesc(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0))
             ->take(18)
@@ -510,7 +538,10 @@ class DashboardController extends Controller
         $rows = [
             'en_avance' => ['label' => 'En avance', 'color' => '#8FC043', 'bg' => '#EEF6E1', 'count' => 0],
             'en_cours' => ['label' => 'En cours', 'color' => '#3996D3', 'bg' => '#E8F3FB', 'count' => 0],
+            'a_risque' => ['label' => 'A risque', 'color' => '#F0E509', 'bg' => '#FFF8D6', 'count' => 0],
             'en_retard' => ['label' => 'En retard', 'color' => '#F9B13C', 'bg' => '#FFF0DF', 'count' => 0],
+            'suspendu' => ['label' => 'Suspendu', 'color' => '#7C3AED', 'bg' => '#F3E8FF', 'count' => 0],
+            'annule' => ['label' => 'Annule', 'color' => '#475569', 'bg' => '#E2E8F0', 'count' => 0],
             'non_demarre' => ['label' => 'Non demarre', 'color' => '#64748B', 'bg' => '#F1F5F9', 'count' => 0],
             'acheve' => ['label' => 'Acheve', 'color' => '#1C203D', 'bg' => '#EEF1F8', 'count' => 0],
         ];
@@ -575,6 +606,8 @@ class DashboardController extends Controller
                     'kpi_delai' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)), 2),
                     'kpi_performance' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)), 2),
                     'kpi_conformite' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)), 2),
+                    'kpi_qualite' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)), 2),
+                    'kpi_risque' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)), 2),
                     'alertes' => $alerts,
                     'validation_pct' => round(($validated / $total) * 100, 2),
                 ];
@@ -597,9 +630,14 @@ class DashboardController extends Controller
             $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
             $status = (string) ($action->statut_dynamique ?? '');
             $globalKpi = (float) ($action->actionKpi?->kpi_global ?? 0);
+            $qualityKpi = (float) ($action->actionKpi?->kpi_qualite ?? 0);
+            $riskKpi = (float) ($action->actionKpi?->kpi_risque ?? 0);
             $gap = max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
 
             if ($deadline instanceof Carbon && $deadline->lt($today) && ! in_array($status, [ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, ActionTrackingService::STATUS_ACHEVE_HORS_DELAI], true)) {
+                if (in_array($status, [ActionTrackingService::STATUS_SUSPENDU, ActionTrackingService::STATUS_ANNULE], true)) {
+                    continue;
+                }
                 $daysLate = $deadline->diffInDays($today);
                 $rows[] = [
                     'titre' => (float) ($action->progression_reelle ?? 0) <= 0 ? 'Action non demarree' : 'Action en retard',
@@ -608,6 +646,8 @@ class DashboardController extends Controller
                     'action' => (string) $action->libelle,
                     'details' => $daysLate.'j',
                     'kpi' => round($globalKpi, 2),
+                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_risque' => round($riskKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -615,11 +655,34 @@ class DashboardController extends Controller
             if ($globalKpi > 0 && $globalKpi < 60) {
                 $rows[] = [
                     'titre' => 'KPI global critique',
-                    'niveau' => 'Critique',
+                    'niveau' => $globalKpi < 40 ? 'Critique' : 'Attention',
                     'direction' => (string) ($action->pta?->direction?->code ?? '-'),
                     'action' => (string) $action->libelle,
                     'details' => number_format($globalKpi, 0).' / 100',
                     'kpi' => round($globalKpi, 2),
+                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_risque' => round($riskKpi, 2),
+                    'url' => route('workspace.actions.suivi', $action).'#action-status',
+                ];
+            }
+
+            if (
+                $deadline instanceof Carbon
+                && $deadline->lt($today)
+                && ! in_array($status, [ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, ActionTrackingService::STATUS_ACHEVE_HORS_DELAI], true)
+                && ! in_array($status, [ActionTrackingService::STATUS_SUSPENDU, ActionTrackingService::STATUS_ANNULE], true)
+                && $globalKpi > 0
+                && $globalKpi < 40
+            ) {
+                $rows[] = [
+                    'titre' => 'Retard + KPI critique',
+                    'niveau' => 'Urgence',
+                    'direction' => (string) ($action->pta?->direction?->code ?? '-'),
+                    'action' => (string) $action->libelle,
+                    'details' => 'Escalade DG',
+                    'kpi' => round($globalKpi, 2),
+                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_risque' => round($riskKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -632,6 +695,8 @@ class DashboardController extends Controller
                     'action' => (string) $action->libelle,
                     'details' => number_format($gap, 0).' pts',
                     'kpi' => round($globalKpi, 2),
+                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_risque' => round($riskKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -648,6 +713,8 @@ class DashboardController extends Controller
                     'action' => (string) $action->libelle,
                     'details' => $action->soumise_le->diffInDays($today).'j',
                     'kpi' => round($globalKpi, 2),
+                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_risque' => round($riskKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-validation',
                 ];
             }
@@ -686,6 +753,9 @@ class DashboardController extends Controller
                 $actions = $ptas->flatMap->actions;
                 $actionsTotal = $actions->count();
                 $actionsValidees = $actions->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)->count();
+                $validatedActions = $actions
+                    ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
+                    ->values();
                 $actionsRetard = $actions->filter(function (Action $action): bool {
                     return $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard';
                 })->count();
@@ -697,8 +767,8 @@ class DashboardController extends Controller
                     'actions_total' => $actionsTotal,
                     'actions_validees' => $actionsValidees,
                     'actions_retard' => $actionsRetard,
-                    'progression_moyenne' => $actionsTotal > 0
-                        ? round((float) $actions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2)
+                    'progression_moyenne' => $validatedActions->isNotEmpty()
+                        ? round((float) $validatedActions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2)
                         : 0.0,
                     'taux_validation' => $this->completionRate($actionsValidees, $actionsTotal),
                 ];
@@ -726,8 +796,11 @@ class DashboardController extends Controller
         return match ($status) {
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI => 'acheve',
+            ActionTrackingService::STATUS_A_RISQUE => 'a_risque',
             ActionTrackingService::STATUS_EN_AVANCE => 'en_avance',
             ActionTrackingService::STATUS_EN_RETARD => 'en_retard',
+            ActionTrackingService::STATUS_SUSPENDU => 'suspendu',
+            ActionTrackingService::STATUS_ANNULE => 'annule',
             ActionTrackingService::STATUS_NON_DEMARRE => 'non_demarre',
             default => 'en_cours',
         };
@@ -737,8 +810,11 @@ class DashboardController extends Controller
     {
         return match ($status) {
             'acheve' => 'Acheve',
+            'a_risque' => 'A risque',
             'en_avance' => 'En avance',
             'en_retard' => 'En retard',
+            'suspendu' => 'Suspendu',
+            'annule' => 'Annule',
             'non_demarre' => 'Non demarre',
             default => 'En cours',
         };
@@ -748,8 +824,11 @@ class DashboardController extends Controller
     {
         return match ($status) {
             'acheve' => '#1C203D',
+            'a_risque' => '#F0E509',
             'en_avance' => '#8FC043',
             'en_retard' => '#F9B13C',
+            'suspendu' => '#7C3AED',
+            'annule' => '#475569',
             'non_demarre' => '#64748B',
             default => '#3996D3',
         };
@@ -775,6 +854,9 @@ class DashboardController extends Controller
     private function isAlertAction(Action $action): bool
     {
         $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
+        if (in_array((string) ($action->statut_dynamique ?? ''), [ActionTrackingService::STATUS_SUSPENDU, ActionTrackingService::STATUS_ANNULE], true)) {
+            return false;
+        }
         $isOverdue = $deadline instanceof Carbon
             && $deadline->lt(Carbon::today())
             && ! in_array((string) ($action->statut_dynamique ?? ''), [ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, ActionTrackingService::STATUS_ACHEVE_HORS_DELAI], true);

@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\ActionTrackingWebController;
 use App\Http\Controllers\Web\AuditWebController;
 use App\Http\Controllers\Web\GovernanceWebController;
 use App\Http\Controllers\Web\MonitoringWebController;
+use App\Http\Controllers\Web\MessagingWebController;
 use App\Http\Controllers\Web\NotificationWebController;
 use App\Http\Controllers\Web\PaoWebController;
 use App\Http\Controllers\Web\PasAxeWebController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Web\PasWebController;
 use App\Http\Controllers\Web\ProfileWebController;
 use App\Http\Controllers\Web\PtaWebController;
 use App\Http\Controllers\Web\ReferentielWebController;
+use App\Http\Middleware\EnsureActiveAccount;
 use App\Http\Middleware\EnsurePasswordIsFresh;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
@@ -28,7 +30,7 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', [SessionController::class, 'store'])->middleware('throttle:login')->name('login');
 });
 
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void {
     Route::post('/logout', [SessionController::class, 'destroy'])->name('logout');
 
     Route::get('/workspace/profil', [ProfileWebController::class, 'edit'])->name('workspace.profile.edit');
@@ -45,14 +47,25 @@ Route::middleware('auth')->group(function (): void {
 
         Route::prefix('/admin')->name('admin.')->group(function (): void {
             Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-            Route::view('/candidats', 'admin.placeholder', ['title' => 'Candidats'])->name('candidats.index');
-            Route::view('/bourses', 'admin.placeholder', ['title' => 'Bourses'])->name('bourses.index');
-            Route::view('/quotas', 'admin.placeholder', ['title' => 'Quotas'])->name('quotas.index');
             Route::get('/settings', fn () => redirect()->route('workspace.profile.edit'))->name('settings');
             Route::get('/referentiel', fn () => redirect()->route('workspace.referentiel.directions.index'))->name('referentiel');
         });
 
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace.index');
+        Route::get('/workspace/messagerie', [MessagingWebController::class, 'index'])
+            ->name('workspace.messaging.index');
+        Route::get('/workspace/messagerie/profil/{target}/card', [MessagingWebController::class, 'profileCard'])
+            ->name('workspace.messaging.profile.card');
+        Route::post('/workspace/messagerie/direct/{target}', [MessagingWebController::class, 'startDirect'])
+            ->name('workspace.messaging.direct');
+        Route::post('/workspace/messagerie/conversations/{conversation}/messages', [MessagingWebController::class, 'send'])
+            ->name('workspace.messaging.send');
+        Route::get('/workspace/messagerie/conversations/{conversation}/updates', [MessagingWebController::class, 'updates'])
+            ->name('workspace.messaging.updates');
+        Route::get('/workspace/messagerie/conversations/{conversation}/messages/{message}/attachment', [MessagingWebController::class, 'downloadAttachment'])
+            ->name('workspace.messaging.attachment.download');
+        Route::post('/workspace/messagerie/conversations/{conversation}/favorite', [MessagingWebController::class, 'toggleFavorite'])
+            ->name('workspace.messaging.favorite');
         Route::get('/workspace/notifications/{notification}/read', [NotificationWebController::class, 'read'])
             ->name('workspace.notifications.read');
         Route::post('/workspace/notifications/read-all', [NotificationWebController::class, 'readAll'])
@@ -178,6 +191,8 @@ Route::middleware('auth')->group(function (): void {
             ->name('workspace.pilotage');
         Route::get('/workspace/alertes', [MonitoringWebController::class, 'alertes'])
             ->name('workspace.alertes');
+        Route::get('/workspace/alertes/dropdown', [MonitoringWebController::class, 'alertesDropdown'])
+            ->name('workspace.alertes.dropdown');
         Route::post('/workspace/alertes/read-all', [MonitoringWebController::class, 'readAllAlertes'])
             ->name('workspace.alertes.read_all');
         Route::get('/workspace/alertes/{type}/{id}/read', [MonitoringWebController::class, 'readAlerte'])

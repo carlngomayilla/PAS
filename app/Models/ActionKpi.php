@@ -18,6 +18,8 @@ class ActionKpi extends Model
         'kpi_delai',
         'kpi_performance',
         'kpi_conformite',
+        'kpi_qualite',
+        'kpi_risque',
         'kpi_global',
         'progression_reelle',
         'progression_theorique',
@@ -34,6 +36,8 @@ class ActionKpi extends Model
             'kpi_delai' => 'decimal:2',
             'kpi_performance' => 'decimal:2',
             'kpi_conformite' => 'decimal:2',
+            'kpi_qualite' => 'decimal:2',
+            'kpi_risque' => 'decimal:2',
             'kpi_global' => 'decimal:2',
             'progression_reelle' => 'decimal:2',
             'progression_theorique' => 'decimal:2',
@@ -46,4 +50,3 @@ class ActionKpi extends Model
         return $this->belongsTo(Action::class, 'action_id');
     }
 }
-
