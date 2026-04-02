@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePaoAxeRequest;
 use App\Http\Requests\UpdatePaoAxeRequest;
 use App\Models\Pao;
 use App\Models\PaoAxe;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +20,7 @@ use Illuminate\View\View;
 class PaoAxeWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): View
@@ -107,7 +110,7 @@ class PaoAxeWebController extends Controller
 
         if ($pao->statut === 'verrouille') {
             return back()->withInput()->withErrors([
-                'pao_id' => 'Le PAO parent est verrouille. Creation impossible.',
+                'pao_id' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'parent', 'Creation'),
             ]);
         }
 
@@ -116,7 +119,7 @@ class PaoAxeWebController extends Controller
 
         return redirect()
             ->route('workspace.pao-axes.index')
-            ->with('success', 'Axe strategique PAO cree avec succes.');
+            ->with('success', $this->entityCreatedMessage(UiLabel::object('pao_axe')));
     }
 
     public function edit(Request $request, PaoAxe $paoAxe): View
@@ -149,7 +152,9 @@ class PaoAxeWebController extends Controller
         }
 
         if ($currentPao->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO parent est verrouille. Mise a jour impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'parent', 'Mise a jour'),
+            ]);
         }
 
         $this->denyUnlessWriteDirection($user, (int) $currentPao->direction_id);
@@ -160,7 +165,7 @@ class PaoAxeWebController extends Controller
             $this->denyUnlessWriteDirection($user, (int) $targetPao->direction_id);
             if ($targetPao->statut === 'verrouille') {
                 return back()->withInput()->withErrors([
-                    'pao_id' => 'Le PAO cible est verrouille. Mise a jour impossible.',
+                    'pao_id' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'cible', 'Mise a jour'),
                 ]);
             }
         }
@@ -171,7 +176,7 @@ class PaoAxeWebController extends Controller
 
         return redirect()
             ->route('workspace.pao-axes.index')
-            ->with('success', 'Axe strategique PAO mis a jour avec succes.');
+            ->with('success', $this->entityUpdatedMessage(UiLabel::object('pao_axe')));
     }
 
     public function destroy(Request $request, PaoAxe $paoAxe): RedirectResponse
@@ -189,7 +194,9 @@ class PaoAxeWebController extends Controller
         $this->denyUnlessWriteDirection($user, (int) $pao->direction_id);
 
         if ($pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO parent est verrouille. Suppression impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'parent', 'Suppression'),
+            ]);
         }
 
         $before = $paoAxe->toArray();
@@ -198,7 +205,7 @@ class PaoAxeWebController extends Controller
 
         return redirect()
             ->route('workspace.pao-axes.index')
-            ->with('success', 'Axe strategique PAO supprime avec succes.');
+            ->with('success', $this->entityDeletedMessage(UiLabel::object('pao_axe')));
     }
 
     private function canWrite(User $user): bool

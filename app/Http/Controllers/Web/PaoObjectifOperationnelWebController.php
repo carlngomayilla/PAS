@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePaoObjectifOperationnelRequest;
 use App\Http\Requests\UpdatePaoObjectifOperationnelRequest;
 use App\Models\PaoObjectifOperationnel;
 use App\Models\PaoObjectifStrategique;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,6 +21,7 @@ use Illuminate\View\View;
 class PaoObjectifOperationnelWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): View
@@ -149,7 +152,7 @@ class PaoObjectifOperationnelWebController extends Controller
 
         if ($objectifStrategique->paoAxe?->pao?->statut === 'verrouille') {
             return back()->withInput()->withErrors([
-                'pao_objectif_strategique_id' => 'Le PAO parent est verrouille. Creation impossible.',
+                'pao_objectif_strategique_id' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'parent', 'Creation'),
             ]);
         }
 
@@ -167,7 +170,7 @@ class PaoObjectifOperationnelWebController extends Controller
 
         return redirect()
             ->route('workspace.pao-objectifs-operationnels.index')
-            ->with('success', 'Objectif operationnel cree avec succes.');
+            ->with('success', $this->entityCreatedMessage(UiLabel::object('pao_objectif_operationnel')));
     }
 
     public function edit(Request $request, PaoObjectifOperationnel $paoObjectifOperationnel): View
@@ -205,7 +208,9 @@ class PaoObjectifOperationnelWebController extends Controller
         $paoObjectifOperationnel->loadMissing('objectifStrategique.paoAxe.pao:id,direction_id,statut');
 
         if ($paoObjectifOperationnel->objectifStrategique?->paoAxe?->pao?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO parent est verrouille. Mise a jour impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'parent', 'Mise a jour'),
+            ]);
         }
 
         $this->denyUnlessWriteDirection(
@@ -223,7 +228,7 @@ class PaoObjectifOperationnelWebController extends Controller
 
         if ($targetObjectifStrategique->paoAxe?->pao?->statut === 'verrouille') {
             return back()->withInput()->withErrors([
-                'pao_objectif_strategique_id' => 'Le PAO cible est verrouille. Mise a jour impossible.',
+                'pao_objectif_strategique_id' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'cible', 'Mise a jour'),
             ]);
         }
 
@@ -243,7 +248,7 @@ class PaoObjectifOperationnelWebController extends Controller
 
         return redirect()
             ->route('workspace.pao-objectifs-operationnels.index')
-            ->with('success', 'Objectif operationnel mis a jour avec succes.');
+            ->with('success', $this->entityUpdatedMessage(UiLabel::object('pao_objectif_operationnel')));
     }
 
     public function destroy(Request $request, PaoObjectifOperationnel $paoObjectifOperationnel): RedirectResponse
@@ -256,7 +261,9 @@ class PaoObjectifOperationnelWebController extends Controller
         $paoObjectifOperationnel->loadMissing('objectifStrategique.paoAxe.pao:id,direction_id,statut');
 
         if ($paoObjectifOperationnel->objectifStrategique?->paoAxe?->pao?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO parent est verrouille. Suppression impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'parent', 'Suppression'),
+            ]);
         }
 
         $this->denyUnlessWriteDirection(
@@ -278,7 +285,7 @@ class PaoObjectifOperationnelWebController extends Controller
 
         return redirect()
             ->route('workspace.pao-objectifs-operationnels.index')
-            ->with('success', 'Objectif operationnel supprime avec succes.');
+            ->with('success', $this->entityDeletedMessage(UiLabel::object('pao_objectif_operationnel')));
     }
 
     /**

@@ -194,7 +194,7 @@
                             <td class="px-3 py-2 text-right">
                                 <form method="POST" action="{{ $session['is_current'] ? route('workspace.profile.sessions.revoke_current') : route('workspace.profile.sessions.revoke', $session['id']) }}">
                                     @csrf
-                                    <button class="btn btn-red btn-sm" type="submit">
+                                    <button class="btn btn-primary btn-sm" type="submit">
                                         {{ $session['is_current'] ? 'Fermer cette session' : 'Revoquer' }}
                                     </button>
                                 </form>

@@ -16,6 +16,9 @@ export default {
                 'anbg-gold': '#f0e509',
                 'anbg-orange': '#f9b13c',
             },
+            fontFamily: {
+                sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            },
         },
     },
     plugins: [],

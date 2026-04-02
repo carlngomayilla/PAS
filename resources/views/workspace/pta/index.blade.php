@@ -3,11 +3,22 @@
 @section('content')
     @php
         $currentUser = auth()->user();
+        $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
         $visibleRows = collect($rows->items());
         $draftCount = $visibleRows->where('statut', 'brouillon')->count();
         $validatedCount = $visibleRows->filter(fn ($item) => in_array((string) $item->statut, ['valide', 'verrouille'], true))->count();
         $actionsTotal = (int) $visibleRows->sum('actions_count');
         $servicesCovered = $visibleRows->pluck('service_id')->filter()->unique()->count();
+        $tableLevel = in_array($filters['statut'] ?? null, ['valide', 'verrouille', 'valide_ou_verrouille'], true)
+            ? ['label' => 'Valide', 'tone' => 'warning']
+            : ['label' => 'Provisoire', 'tone' => 'info'];
+        $tableLevelClass = $tableLevel['tone'] === 'warning' ? 'anbg-badge anbg-badge-warning' : 'anbg-badge anbg-badge-info';
+        $summaryCards = [
+            ['label' => 'Total', 'value' => $rows->total(), 'meta' => 'PTA dans le perimetre courant', 'href' => route('workspace.pta.index'), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
+            ['label' => 'Brouillons visibles', 'value' => $draftCount, 'meta' => 'Plans en construction', 'href' => route('workspace.pta.index', ['statut' => 'brouillon']), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
+            ['label' => 'Valides / verrouilles', 'value' => $validatedCount, 'meta' => 'PTA prets pour l execution', 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille']), 'badge' => 'Valide', 'badge_tone' => 'warning'],
+            ['label' => 'Actions / services', 'value' => $actionsTotal.' / '.$servicesCovered, 'meta' => 'Actions visibles et services couverts', 'href' => route('workspace.actions.index'), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
+        ];
     @endphp
 
     <section class="showcase-hero mb-4">
@@ -20,15 +31,15 @@
                 </p>
                 <div class="showcase-chip-row">
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
+                        <span class="showcase-chip-dot bg-[#1E3A8A]"></span>
                         Un PAO parent
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
+                        <span class="showcase-chip-dot bg-[#3B82F6]"></span>
                         Un service cible
                     </span>
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
+                        <span class="showcase-chip-dot bg-[#10B981]"></span>
                         Porte les actions operationnelles
                     </span>
                 </div>
@@ -41,27 +52,23 @@
         </div>
     </section>
 
+    <div class="mb-4 flex flex-wrap gap-2">
+        <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
+        <span class="anbg-badge anbg-badge-warning px-3 py-1">Valide</span>
+        <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
+    </div>
+
     <section class="showcase-summary-grid mb-4">
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Total</p>
-            <p class="showcase-kpi-number">{{ $rows->total() }}</p>
-            <p class="showcase-kpi-meta">PTA dans le perimetre courant</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Brouillons visibles</p>
-            <p class="showcase-kpi-number">{{ $draftCount }}</p>
-            <p class="showcase-kpi-meta">Plans en construction</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Valides / verrouilles</p>
-            <p class="showcase-kpi-number">{{ $validatedCount }}</p>
-            <p class="showcase-kpi-meta">PTA prets pour l execution</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Actions / services</p>
-            <p class="showcase-kpi-number">{{ $actionsTotal }} / {{ $servicesCovered }}</p>
-            <p class="showcase-kpi-meta">Actions visibles et services couverts</p>
-        </article>
+        @foreach ($summaryCards as $card)
+            <x-stat-card-link
+                :href="$card['href']"
+                :label="$card['label']"
+                :value="$card['value']"
+                :meta="$card['meta']"
+                :badge="$card['badge']"
+                :badge-tone="$card['badge_tone']"
+            />
+        @endforeach
     </section>
 
     <section class="showcase-toolbar mb-4">
@@ -106,15 +113,26 @@
                     <select id="statut" name="statut">
                         <option value="">Tous</option>
                         @foreach ($statusOptions as $status)
-                            <option value="{{ $status }}" @selected($filters['statut'] === $status)>{{ $status }}</option>
+                            <option value="{{ $status }}" @selected($filters['statut'] === $status)>{{ $workflowStatusLabel($status) }}</option>
                         @endforeach
                     </select>
                 </div>
             </div>
+            @if ($filters['without_action'])
+                <input type="hidden" name="without_action" value="1">
+            @endif
             <div class="mt-4 flex flex-wrap gap-2">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
                 <a class="btn btn-blue" href="{{ route('workspace.pta.index') }}">Reinitialiser</a>
             </div>
+            @if ($filters['without_action'])
+                <div class="mt-4 showcase-chip-row">
+                    <span class="showcase-chip">
+                        <span class="showcase-chip-dot bg-[#F59E0B]"></span>
+                        Drill-down actif : PTA sans action
+                    </span>
+                </div>
+            @endif
         </form>
     </section>
 
@@ -123,6 +141,9 @@
             <div>
                 <h2 class="showcase-panel-title">Liste des PTA</h2>
                 <p class="showcase-panel-subtitle">Lecture du service porteur, du PAO parent et du volume d actions par plan.</p>
+                <div class="mt-2">
+                    <span class="{{ $tableLevelClass }} px-3 py-1">{{ $tableLevel['label'] }}</span>
+                </div>
             </div>
             <span class="showcase-chip">
                 <span class="showcase-chip-dot bg-slate-500"></span>
@@ -150,10 +171,11 @@
                     @forelse ($rows as $row)
                         @php
                             $statusClasses = match ((string) $row->statut) {
-                                'verrouille' => 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900',
-                                'valide' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/20 dark:text-[#f8e932]',
-                                'soumis' => 'bg-[#fff8d6] text-[#1c203d] dark:bg-[#f0e509]/20 dark:text-[#f8e932]',
-                                default => 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
+                                'brouillon' => 'anbg-badge anbg-badge-neutral',
+                                'soumis' => 'anbg-badge anbg-badge-warning',
+                                'valide' => 'anbg-badge anbg-badge-success',
+                                'verrouille' => 'anbg-badge anbg-badge-info',
+                                default => 'anbg-badge anbg-badge-neutral',
                             };
                             $canSubmit = $row->statut === 'brouillon'
                                 && ($currentUser->hasGlobalWriteAccess()
@@ -180,8 +202,8 @@
                             <td>{{ $row->direction?->code }} {{ $row->direction?->libelle ? '- '.$row->direction->libelle : '' }}</td>
                             <td>{{ $row->service?->code }} {{ $row->service?->libelle ? '- '.$row->service->libelle : '' }}</td>
                             <td>
-                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClasses }}">
-                                    {{ $row->statut }}
+                                <span class="{{ $statusClasses }}">
+                                    {{ $workflowStatusLabel($row->statut) }}
                                 </span>
                             </td>
                             <td>{{ $row->actions_count }}</td>

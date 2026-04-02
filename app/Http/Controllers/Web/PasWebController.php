@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePasRequest;
 use App\Http\Requests\UpdatePasRequest;
@@ -13,6 +14,7 @@ use App\Models\Pas;
 use App\Models\User;
 use App\Services\PasStructureService;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +24,7 @@ use Illuminate\View\View;
 class PasWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function __construct(
@@ -52,16 +55,24 @@ class PasWebController extends Controller
 
         $this->scopePasByUser($query, $user);
 
-        $query->when(
-            $request->filled('statut'),
-            fn ($q) => $q->where('statut', (string) $request->string('statut'))
-        );
+        $statusFilter = trim((string) $request->string('statut'));
+        if ($statusFilter !== '') {
+            if ($statusFilter === 'valide_ou_verrouille') {
+                $query->whereIn('statut', ['valide', 'verrouille']);
+            } else {
+                $query->where('statut', $statusFilter);
+            }
+        }
         $query->when(
             $request->filled('direction_id'),
             fn ($q) => $q->whereHas(
                 'directions',
                 fn ($subQuery) => $subQuery->whereKey((int) $request->integer('direction_id'))
             )
+        );
+        $query->when(
+            $request->boolean('without_pao'),
+            fn ($q) => $q->doesntHave('paos')
         );
 
         $query->when($request->filled('q'), function ($q) use ($request): void {
@@ -72,12 +83,13 @@ class PasWebController extends Controller
         return view('workspace.pas.index', [
             'rows' => $query->orderByDesc('periode_debut')->orderByDesc('id')->paginate(15)->withQueryString(),
             'canWrite' => $this->canWrite($user),
-            'statusOptions' => $this->statusOptions($user),
+            'statusOptions' => array_merge($this->statusOptions($user), ['valide_ou_verrouille']),
             'directionOptions' => $this->directionOptions($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
-                'statut' => (string) $request->string('statut'),
+                'statut' => $statusFilter,
                 'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
+                'without_pao' => $request->boolean('without_pao'),
             ],
         ]);
     }
@@ -153,7 +165,7 @@ class PasWebController extends Controller
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', 'PAS cree avec succes.');
+            ->with('success', $this->entityCreatedMessage(UiLabel::object('pas')));
     }
 
     public function edit(Request $request, Pas $pas): View
@@ -185,7 +197,7 @@ class PasWebController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         if ($pas->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAS est verrouille et ne peut plus etre modifie.']);
+            return back()->withErrors(['general' => $this->lockedStateMessage('PAS', 'plus etre modifie')]);
         }
 
         $validated = $request->validated();
@@ -235,7 +247,7 @@ class PasWebController extends Controller
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', 'PAS mis a jour avec succes.');
+            ->with('success', $this->entityUpdatedMessage(UiLabel::object('pas')));
     }
 
     public function destroy(Request $request, Pas $pas): RedirectResponse
@@ -248,7 +260,7 @@ class PasWebController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         if ($pas->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAS est verrouille et ne peut pas etre supprime.']);
+            return back()->withErrors(['general' => $this->lockedStateMessage('PAS', 'etre supprime')]);
         }
 
         $before = $pas->toArray();
@@ -258,7 +270,7 @@ class PasWebController extends Controller
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', 'PAS supprime avec succes.');
+            ->with('success', $this->entityDeletedMessage(UiLabel::object('pas')));
     }
 
     public function submit(Request $request, Pas $pas, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -271,11 +283,11 @@ class PasWebController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         if ($pas->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAS est verrouille et ne peut pas etre soumis.']);
+            return back()->withErrors(['general' => $this->lockedStateMessage('PAS', 'etre soumis')]);
         }
 
         if ($pas->statut !== 'brouillon') {
-            return back()->withErrors(['general' => 'Seul un PAS en brouillon peut etre soumis.']);
+            return back()->withErrors(['general' => $this->requiredStateMessage('PAS', 'brouillon', 'soumis')]);
         }
 
         $before = $pas->toArray();
@@ -305,7 +317,7 @@ class PasWebController extends Controller
         }
 
         if ($pas->statut !== 'soumis') {
-            return back()->withErrors(['general' => 'Seul un PAS soumis peut etre valide.']);
+            return back()->withErrors(['general' => $this->requiredStateMessage('PAS', 'soumis', 'valide')]);
         }
 
         $before = $pas->toArray();
@@ -320,7 +332,7 @@ class PasWebController extends Controller
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', 'PAS valide avec succes.');
+            ->with('success', $this->transitionedStateMessage('PAS', 'valide'));
     }
 
     public function lock(Request $request, Pas $pas, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -335,7 +347,7 @@ class PasWebController extends Controller
         }
 
         if ($pas->statut !== 'valide') {
-            return back()->withErrors(['general' => 'Seul un PAS valide peut etre verrouille.']);
+            return back()->withErrors(['general' => $this->requiredStateMessage('PAS', 'valide', 'verrouille')]);
         }
 
         $before = $pas->toArray();
@@ -350,7 +362,7 @@ class PasWebController extends Controller
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', 'PAS verrouille avec succes.');
+            ->with('success', $this->transitionedStateMessage('PAS', 'verrouille'));
     }
 
     public function reopen(Request $request, Pas $pas, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -365,7 +377,7 @@ class PasWebController extends Controller
         }
 
         if (! in_array($pas->statut, ['soumis', 'valide'], true)) {
-            return back()->withErrors(['general' => 'Retour brouillon possible uniquement depuis soumis ou valide.']);
+            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage(['soumis', 'valide'])]);
         }
 
         $validated = $request->validate([
@@ -387,7 +399,7 @@ class PasWebController extends Controller
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', 'PAS remis en brouillon.');
+            ->with('success', $this->reopenedStateMessage('PAS'));
     }
 
     private function canWrite(User $user): bool

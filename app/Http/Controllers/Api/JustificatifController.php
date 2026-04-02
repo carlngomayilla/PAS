@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreJustificatifRequest;
 use App\Http\Requests\UpdateJustificatifRequest;
@@ -13,6 +14,7 @@ use App\Models\Kpi;
 use App\Models\KpiMesure;
 use App\Models\User;
 use App\Services\Security\SecureJustificatifStorage;
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class JustificatifController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): JsonResponse
@@ -87,7 +90,7 @@ class JustificatifController extends Controller
 
         if ($scope['is_locked']) {
             return response()->json([
-                'message' => 'Le PTA parent est verrouille. Ajout impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Ajout'),
             ], 409);
         }
 
@@ -116,7 +119,7 @@ class JustificatifController extends Controller
         );
 
         return response()->json([
-            'message' => 'Justificatif ajoute avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('justificatif')),
             'data' => $this->transformJustificatif($justificatif->load('ajoutePar:id,name,email')),
         ], 201);
     }
@@ -152,7 +155,7 @@ class JustificatifController extends Controller
 
         if ($scope['is_locked']) {
             return response()->json([
-                'message' => 'Le PTA parent est verrouille. Mise a jour impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour'),
             ], 409);
         }
 
@@ -183,7 +186,7 @@ class JustificatifController extends Controller
         );
 
         return response()->json([
-            'message' => 'Justificatif mis a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('justificatif')),
             'data' => $this->transformJustificatif($justificatif->load('ajoutePar:id,name,email')),
         ]);
     }
@@ -205,7 +208,7 @@ class JustificatifController extends Controller
 
         if ($scope['is_locked']) {
             return response()->json([
-                'message' => 'Le PTA parent est verrouille. Suppression impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Suppression'),
             ], 409);
         }
 
@@ -314,7 +317,7 @@ class JustificatifController extends Controller
     private function assertUserCanReadEntity(User $user, ?Model $entity): void
     {
         if ($entity === null) {
-            abort(404, 'Entite associee introuvable.');
+            abort(404, $this->entityNotFoundMessage(UiLabel::object('associated_entity')));
         }
 
         $scope = $this->resolveEntityScope($entity);
@@ -368,7 +371,7 @@ class JustificatifController extends Controller
             ];
         }
 
-        abort(422, 'Type d entite non pris en charge.');
+        abort(422, $this->unsupportedTypeMessage(UiLabel::object('justifiable_entity')));
     }
 
     private function resolveJustifiableEntity(string $type, int $id): Model
@@ -379,7 +382,7 @@ class JustificatifController extends Controller
         $entity = $class::query()->find($id);
 
         if ($entity === null) {
-            abort(404, 'Entite justifiable introuvable.');
+            abort(404, $this->entityNotFoundMessage(UiLabel::object('justifiable_entity')));
         }
 
         return $entity;
@@ -396,7 +399,7 @@ class JustificatifController extends Controller
             'action', strtolower(Action::class) => Action::class,
             'kpi', strtolower(Kpi::class) => Kpi::class,
             'kpi_mesure', 'kpimesure', strtolower(KpiMesure::class) => KpiMesure::class,
-            default => abort(422, 'Type de justificatif invalide.'),
+            default => abort(422, $this->invalidTypeMessage(UiLabel::object('justificatif'))),
         };
     }
 

@@ -4,17 +4,20 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePtaRequest;
 use App\Http\Requests\UpdatePtaRequest;
 use App\Models\Pta;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PtaController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): JsonResponse
@@ -111,7 +114,7 @@ class PtaController extends Controller
         $this->recordAudit($request, 'pta', 'create', $pta, null, $pta->toArray());
 
         return response()->json([
-            'message' => 'PTA cree avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('pta')),
             'data' => $pta->load([
                 'pao:id,pas_id,direction_id,service_id,annee,titre,statut',
                 'pao.service:id,direction_id,code,libelle',
@@ -158,7 +161,7 @@ class PtaController extends Controller
 
         if ($pta->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA est verrouille et ne peut plus etre modifie.',
+                'message' => $this->lockedStateMessage('PTA', 'plus etre modifie'),
             ], 409);
         }
 
@@ -199,7 +202,7 @@ class PtaController extends Controller
         $this->recordAudit($request, 'pta', 'update', $pta, $before, $pta->toArray());
 
         return response()->json([
-            'message' => 'PTA mis a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('pta')),
             'data' => $pta->load([
                 'pao:id,pas_id,direction_id,service_id,annee,titre,statut',
                 'pao.service:id,direction_id,code,libelle',
@@ -225,7 +228,7 @@ class PtaController extends Controller
 
         if ($pta->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA est verrouille et ne peut pas etre supprime.',
+                'message' => $this->lockedStateMessage('PTA', 'etre supprime'),
             ], 409);
         }
 

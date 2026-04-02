@@ -18,6 +18,8 @@ use App\Http\Controllers\Web\PtaWebController;
 use App\Http\Controllers\Web\ReferentielWebController;
 use App\Http\Middleware\EnsureActiveAccount;
 use App\Http\Middleware\EnsurePasswordIsFresh;
+use App\Models\Kpi;
+use App\Models\KpiMesure;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -164,6 +166,41 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::resource('actions', ActionWebController::class)
                 ->except(['show'])
                 ->parameters(['actions' => 'action']);
+            Route::get('kpi', fn () => redirect()
+                ->route('workspace.actions.index')
+                ->with('info', 'Le parametrage des indicateurs se fait maintenant directement dans les actions.'))
+                ->name('kpi.index');
+            Route::get('kpi/create', fn () => redirect()
+                ->to(route('workspace.actions.create').'#action-indicator-settings')
+                ->with('info', 'Le parametrage des indicateurs se fait maintenant directement dans les actions.'))
+                ->name('kpi.create');
+            Route::get('kpi/{kpi}/edit', function (Kpi $kpi) {
+                $target = $kpi->action_id !== null
+                    ? route('workspace.actions.edit', $kpi->action_id).'#action-indicator-settings'
+                    : route('workspace.actions.index');
+
+                return redirect()
+                    ->to($target)
+                    ->with('info', 'Le parametrage des indicateurs se fait maintenant directement dans les actions.');
+            })->name('kpi.edit');
+            Route::get('kpi-mesures', fn () => redirect()
+                ->route('workspace.actions.index')
+                ->with('info', 'Le suivi des indicateurs passe desormais par les actions et le reporting.'))
+                ->name('kpi-mesures.index');
+            Route::get('kpi-mesures/create', fn () => redirect()
+                ->route('workspace.actions.index')
+                ->with('info', 'Le suivi des indicateurs passe desormais par les actions et le reporting.'))
+                ->name('kpi-mesures.create');
+            Route::get('kpi-mesures/{kpiMesure}/edit', function (KpiMesure $kpiMesure) {
+                $actionId = $kpiMesure->kpi?->action_id;
+                $target = $actionId !== null
+                    ? route('workspace.actions.suivi', $actionId)
+                    : route('workspace.actions.index');
+
+                return redirect()
+                    ->to($target)
+                    ->with('info', 'Le suivi des indicateurs passe desormais par les actions et le reporting.');
+            })->name('kpi-mesures.edit');
             Route::get('actions/{action}/suivi', [ActionTrackingWebController::class, 'show'])
                 ->name('actions.suivi');
             Route::post('actions/{action}/semaines/{actionWeek}/soumettre', [ActionTrackingWebController::class, 'submitWeek'])

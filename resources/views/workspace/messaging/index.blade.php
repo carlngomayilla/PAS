@@ -228,7 +228,7 @@
                     <div class="flex items-center gap-2">
                         <form method="POST" action="{{ route('workspace.messaging.favorite', $activeConversation) }}">
                             @csrf
-                            <button class="btn {{ $activeConversation->getAttribute('is_favorite') ? 'btn-amber' : 'btn-secondary' }} !px-3 !py-2" type="submit">
+                            <button class="btn btn-primary !px-3 !py-2" type="submit">
                                 {{ $activeConversation->getAttribute('is_favorite') ? 'Retirer favori' : 'Ajouter favori' }}
                             </button>
                         </form>

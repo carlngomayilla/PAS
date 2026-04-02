@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePaoObjectifStrategiqueRequest;
 use App\Http\Requests\UpdatePaoObjectifStrategiqueRequest;
 use App\Models\PaoAxe;
 use App\Models\PaoObjectifStrategique;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PaoObjectifStrategiqueController extends Controller
 {
+    use FormatsWorkflowMessages;
+
     public function __construct()
     {
         $this->authorizeResource(PaoObjectifStrategique::class, 'paoObjectifStrategique');
@@ -79,7 +83,7 @@ class PaoObjectifStrategiqueController extends Controller
         $objectifStrategique = PaoObjectifStrategique::create($validated);
 
         return response()->json([
-            'message' => 'Objectif strategique PAO cree avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('pao_objectif_strategique')),
             'data' => $objectifStrategique->load(['paoAxe:id,pao_id,code,libelle']),
         ], 201);
     }
@@ -106,7 +110,7 @@ class PaoObjectifStrategiqueController extends Controller
         $paoObjectifStrategique->save();
 
         return response()->json([
-            'message' => 'Objectif strategique PAO mis a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('pao_objectif_strategique')),
             'data' => $paoObjectifStrategique->load(['paoAxe:id,pao_id,code,libelle']),
         ]);
     }

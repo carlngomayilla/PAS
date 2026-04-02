@@ -4,6 +4,7 @@
 
 @section('content')
     @php
+        $delegationStatusLabel = static fn (string $status): string => \App\Support\UiLabel::delegationStatus($status);
         $delegationStatusBadges = [
             'active' => 'anbg-badge anbg-badge-success',
             'cancelled' => 'anbg-badge anbg-badge-neutral',
@@ -65,7 +66,7 @@
                             </td>
                             <td>
                                 <span class="{{ $delegationStatusBadges[$row->statut] ?? 'anbg-badge anbg-badge-neutral' }} px-3">
-                                    {{ $row->statut }}
+                                    {{ $delegationStatusLabel($row->statut) }}
                                 </span>
                             </td>
                             <td>
@@ -73,7 +74,7 @@
                                     <form method="POST" action="{{ route('workspace.delegations.cancel', $row) }}" data-confirm-message="Annuler cette delegation ?" data-confirm-tone="danger" data-confirm-label="Annuler">
                                         @csrf
                                         <input type="hidden" name="motif_annulation" value="Annulation administrative">
-                                        <button class="btn btn-red" type="submit">Annuler</button>
+                                        <button class="btn btn-primary" type="submit">Annuler</button>
                                     </form>
                                 @else
                                     <span class="text-slate-500">-</span>

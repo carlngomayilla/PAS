@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePaoObjectifStrategiqueRequest;
 use App\Http\Requests\UpdatePaoObjectifStrategiqueRequest;
 use App\Models\PaoAxe;
 use App\Models\PaoObjectifStrategique;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +20,7 @@ use Illuminate\View\View;
 class PaoObjectifStrategiqueWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): View
@@ -110,7 +113,7 @@ class PaoObjectifStrategiqueWebController extends Controller
 
         if ($axe->pao?->statut === 'verrouille') {
             return back()->withInput()->withErrors([
-                'pao_axe_id' => 'Le PAO parent est verrouille. Creation impossible.',
+                'pao_axe_id' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'parent', 'Creation'),
             ]);
         }
 
@@ -126,7 +129,7 @@ class PaoObjectifStrategiqueWebController extends Controller
 
         return redirect()
             ->route('workspace.pao-objectifs-strategiques.index')
-            ->with('success', 'Objectif strategique PAO cree avec succes.');
+            ->with('success', $this->entityCreatedMessage(UiLabel::object('pao_objectif_strategique')));
     }
 
     public function edit(Request $request, PaoObjectifStrategique $paoObjectifStrategique): View
@@ -165,7 +168,9 @@ class PaoObjectifStrategiqueWebController extends Controller
         }
 
         if ($currentAxe->pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO parent est verrouille. Mise a jour impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'parent', 'Mise a jour'),
+            ]);
         }
 
         $this->denyUnlessWriteDirection($user, (int) $currentAxe->pao->direction_id);
@@ -177,7 +182,7 @@ class PaoObjectifStrategiqueWebController extends Controller
 
         if ($targetAxe->pao?->statut === 'verrouille') {
             return back()->withInput()->withErrors([
-                'pao_axe_id' => 'Le PAO cible est verrouille. Mise a jour impossible.',
+                'pao_axe_id' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'cible', 'Mise a jour'),
             ]);
         }
 
@@ -195,7 +200,7 @@ class PaoObjectifStrategiqueWebController extends Controller
 
         return redirect()
             ->route('workspace.pao-objectifs-strategiques.index')
-            ->with('success', 'Objectif strategique PAO mis a jour avec succes.');
+            ->with('success', $this->entityUpdatedMessage(UiLabel::object('pao_objectif_strategique')));
     }
 
     public function destroy(Request $request, PaoObjectifStrategique $paoObjectifStrategique): RedirectResponse
@@ -211,7 +216,9 @@ class PaoObjectifStrategiqueWebController extends Controller
         }
 
         if ($currentAxe->pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO parent est verrouille. Suppression impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pao'), 'parent', 'Suppression'),
+            ]);
         }
 
         $this->denyUnlessWriteDirection($user, (int) $currentAxe->pao->direction_id);
@@ -230,7 +237,7 @@ class PaoObjectifStrategiqueWebController extends Controller
 
         return redirect()
             ->route('workspace.pao-objectifs-strategiques.index')
-            ->with('success', 'Objectif strategique PAO supprime avec succes.');
+            ->with('success', $this->entityDeletedMessage(UiLabel::object('pao_objectif_strategique')));
     }
 
     private function canWrite(User $user): bool

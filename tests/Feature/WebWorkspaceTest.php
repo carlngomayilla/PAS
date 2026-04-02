@@ -6,6 +6,7 @@ use App\Models\ActionLog;
 use App\Models\Pao;
 use App\Models\Action;
 use App\Models\KpiMesure;
+use App\Models\Kpi;
 use App\Models\Pta;
 use App\Models\User;
 use App\Services\Alerting\AlertCenterService;
@@ -124,12 +125,18 @@ class WebWorkspaceTest extends TestCase
             ->assertSee('analytics-explorer-title', false);
 
         $this->actingAs($admin)
+            ->get('/workspace/actions/create')
+            ->assertOk()
+            ->assertSee('Indicateur principal')
+            ->assertSee('name="kpi_libelle"', false);
+
+        $this->actingAs($admin)
             ->get('/workspace/kpi')
-            ->assertNotFound();
+            ->assertRedirect(route('workspace.actions.index'));
 
         $this->actingAs($admin)
             ->get('/workspace/kpi-mesures')
-            ->assertNotFound();
+            ->assertRedirect(route('workspace.actions.index'));
 
         $this->actingAs($admin)
             ->get('/admin/candidats')
@@ -163,6 +170,139 @@ class WebWorkspaceTest extends TestCase
             ->assertDontSee('Entonnoir PAS - PAO - PTA - Actions');
     }
 
+    public function test_dashboard_stat_cards_expose_drilldown_links(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee(route('workspace.actions.index'), false)
+            ->assertSee(route('workspace.actions.index', ['statut' => 'en_retard']), false)
+            ->assertSee(route('workspace.actions.index', ['statut_validation' => 'validee_direction']), false);
+    }
+
+    public function test_dashboard_graphs_and_summary_tables_expose_drilldown_metadata(): void
+    {
+        $admin = $this->createAdminUser();
+        $reportingPayload = app(ReportingAnalyticsService::class)->buildPayload($admin, true, true);
+
+        $response = $this->actingAs($admin)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('data-row-link="', false)
+            ->assertSee('"actions_index_url"', false)
+            ->assertSee(route('workspace.pas.index'), false)
+            ->assertSee(route('workspace.actions.index'), false);
+
+        $topRiskUrl = $reportingPayload['charts']['top_risks']['rows'][0]['url'] ?? null;
+        if (is_string($topRiskUrl) && $topRiskUrl !== '') {
+            $response->assertSee($topRiskUrl, false);
+        }
+
+        $pasRowUrl = $reportingPayload['pasConsolidation'][0]['url'] ?? null;
+        if (is_string($pasRowUrl) && $pasRowUrl !== '') {
+            $response->assertSee($pasRowUrl, false);
+        }
+    }
+
+    public function test_pilotage_stat_cards_expose_drilldown_links(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get('/workspace/pilotage')
+            ->assertOk()
+            ->assertSee(route('workspace.pas.index', ['without_pao' => 1]), false)
+            ->assertSee(route('workspace.actions.index', ['without_kpi' => 1]), false);
+    }
+
+    public function test_workspace_indexes_accept_drilldown_filter_aliases(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get('/workspace/actions?statut=achevees&sort=kpi_global_desc&without_kpi=1')
+            ->assertOk()
+            ->assertSee('Drill-down actif : actions sans indicateur')
+            ->assertSee('value="achevees" selected', false)
+            ->assertSee('value="kpi_global_desc" selected', false);
+
+        $this->actingAs($admin)
+            ->get('/workspace/pas?statut=valide_ou_verrouille&without_pao=1')
+            ->assertOk()
+            ->assertSee('Drill-down actif : PAS sans PAO')
+            ->assertSee('value="valide_ou_verrouille" selected', false);
+
+        $this->actingAs($admin)
+            ->get('/workspace/pao?statut=valide_ou_verrouille&without_pta=1')
+            ->assertOk()
+            ->assertSee('Drill-down actif : PAO sans PTA')
+            ->assertSee('value="valide_ou_verrouille" selected', false);
+
+        $this->actingAs($admin)
+            ->get('/workspace/pta?statut=valide_ou_verrouille&without_action=1')
+            ->assertOk()
+            ->assertSee('Drill-down actif : PTA sans action')
+            ->assertSee('value="valide_ou_verrouille" selected', false);
+
+        $this->actingAs($admin)
+            ->get('/workspace/alertes?niveau=warning&etat=unread&limit=100')
+            ->assertOk()
+            ->assertSee('var activeLevel = "warning";', false)
+            ->assertSee('var activeState = "unread";', false);
+
+        $action = Action::query()
+            ->with('pta.pao')
+            ->whereNotNull('date_debut')
+            ->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get('/workspace/actions?direction_id='.$action->pta->direction_id.'&service_id='.$action->pta->service_id.'&pas_objectif_id='.$action->pta->pao->pas_objectif_id.'&annee='.$action->pta->pao->annee.'&mois_demarrage='.$action->date_debut->format('Y-m'))
+            ->assertOk()
+            ->assertSee('name="direction_id" value="'.$action->pta->direction_id.'"', false)
+            ->assertSee('name="service_id" value="'.$action->pta->service_id.'"', false)
+            ->assertSee('name="pas_objectif_id" value="'.$action->pta->pao->pas_objectif_id.'"', false)
+            ->assertSee('name="annee" value="'.$action->pta->pao->annee.'"', false)
+            ->assertSee('name="mois_demarrage" value="'.$action->date_debut->format('Y-m').'"', false);
+    }
+
+    public function test_workspace_list_pages_show_reading_level_badges(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get('/workspace/actions')
+            ->assertOk()
+            ->assertSee('Provisoire');
+
+        $this->actingAs($admin)
+            ->get('/workspace/actions?statut_validation=validee_direction')
+            ->assertOk()
+            ->assertSee('Officiel');
+
+        $this->actingAs($admin)
+            ->get('/workspace/pas?statut=valide_ou_verrouille')
+            ->assertOk()
+            ->assertSee('Valide');
+
+        $this->actingAs($admin)
+            ->get('/workspace/pao?statut=valide_ou_verrouille')
+            ->assertOk()
+            ->assertSee('Valide');
+
+        $this->actingAs($admin)
+            ->get('/workspace/pta?statut=valide_ou_verrouille')
+            ->assertOk()
+            ->assertSee('Valide');
+
+        $this->actingAs($admin)
+            ->get('/workspace/alertes')
+            ->assertOk()
+            ->assertSee('Provisoire')
+            ->assertSee('Officiel');
+    }
+
     public function test_service_user_has_no_audit_access_and_removed_modules_are_unavailable(): void
     {
         $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
@@ -186,7 +326,7 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($serviceUser)
             ->get('/workspace/kpi-mesures')
-            ->assertNotFound();
+            ->assertRedirect(route('workspace.actions.index'));
 
         $this->actingAs($serviceUser)
             ->get('/workspace/audit')
@@ -199,6 +339,95 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($serviceUser)
             ->get('/workspace/pao-objectifs-operationnels/create')
             ->assertNotFound();
+    }
+
+    public function test_legacy_kpi_workspace_pages_redirect_to_action_context(): void
+    {
+        $admin = $this->createAdminUser();
+        $kpi = Kpi::query()->with('action')->firstOrFail();
+        $mesure = KpiMesure::query()->with('kpi.action')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get('/workspace/kpi')
+            ->assertRedirect(route('workspace.actions.index'));
+
+        $this->actingAs($admin)
+            ->get('/workspace/kpi/create')
+            ->assertRedirect(route('workspace.actions.create').'#action-indicator-settings');
+
+        $this->actingAs($admin)
+            ->get('/workspace/kpi/'.$kpi->id.'/edit')
+            ->assertRedirect(route('workspace.actions.edit', $kpi->action).'#action-indicator-settings');
+
+        $this->actingAs($admin)
+            ->get('/workspace/kpi-mesures')
+            ->assertRedirect(route('workspace.actions.index'));
+
+        $this->actingAs($admin)
+            ->get('/workspace/kpi-mesures/create')
+            ->assertRedirect(route('workspace.actions.index'));
+
+        $this->actingAs($admin)
+            ->get('/workspace/kpi-mesures/'.$mesure->id.'/edit')
+            ->assertRedirect(route('workspace.actions.suivi', $mesure->kpi->action));
+    }
+
+    public function test_action_form_persists_primary_indicator_configuration(): void
+    {
+        $admin = $this->createAdminUser();
+        [$pta, $responsable] = $this->firstUnlockedPtaAndAgent();
+
+        $this->actingAs($admin)
+            ->get('/workspace/actions/create')
+            ->assertOk()
+            ->assertSee('Indicateur principal')
+            ->assertSee('name="kpi_periodicite"', false)
+            ->assertSee('name="kpi_est_a_renseigner"', false)
+            ->assertDontSee('name="kpi_unite"', false)
+            ->assertDontSee('name="kpi_cible"', false);
+
+        $response = $this->actingAs($admin)
+            ->post(route('workspace.actions.store'), [
+                'pta_id' => (int) $pta->id,
+                'responsable_id' => (int) $responsable->id,
+                'libelle' => 'Action test indicateur embarque',
+                'description' => 'Creation via formulaire action',
+                'type_cible' => 'quantitative',
+                'unite_cible' => 'dossiers',
+                'quantite_cible' => 120,
+                'date_debut' => '2026-04-06',
+                'date_fin' => '2026-04-30',
+                'frequence_execution' => 'hebdomadaire',
+                'statut' => 'non_demarre',
+                'seuil_alerte_progression' => 12,
+                'risques' => 'Charge de travail',
+                'mesures_preventives' => 'Pilotage hebdomadaire',
+                'kpi_seuil_alerte' => 75,
+                'kpi_periodicite' => 'mensuel',
+                'kpi_est_a_renseigner' => 0,
+                'financement_requis' => 0,
+                'ressource_main_oeuvre' => 1,
+                'ressource_equipement' => 0,
+                'ressource_partenariat' => 0,
+                'ressource_autres' => 0,
+            ])
+            ->assertRedirect();
+
+        $action = Action::query()
+            ->where('libelle', 'Action test indicateur embarque')
+            ->latest('id')
+            ->firstOrFail();
+
+        $response->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->assertDatabaseHas('kpis', [
+            'action_id' => (int) $action->id,
+            'libelle' => 'Action test indicateur embarque',
+            'unite' => 'dossiers',
+            'cible' => 120,
+            'periodicite' => 'mensuel',
+            'est_a_renseigner' => 0,
+        ]);
     }
 
     public function test_alerts_page_exposes_direct_links_to_alert_causes(): void
@@ -345,7 +574,7 @@ class WebWorkspaceTest extends TestCase
             ->get('/workspace/alertes')
             ->assertOk()
             ->assertSee('Escalade DG')
-            ->assertSee('KPI global')
+            ->assertSee('Indicateur global')
             ->assertSee('Qualite')
             ->assertSee('Risque');
     }
@@ -667,10 +896,15 @@ class WebWorkspaceTest extends TestCase
         $this->assertNotFalse($chartOneXml);
         $this->assertNotFalse($drawingXml);
         $this->assertStringContainsString('Synthese graphique', (string) $workbookXml);
-        $this->assertStringContainsString('Synthese KPI validee direction', (string) $sheetOneXml);
-        $this->assertStringContainsString('KPI qualite', (string) $sheetOneXml);
-        $this->assertStringContainsString('KPI risque', (string) $sheetOneXml);
-        $this->assertStringContainsString('Funnel de pilotage', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Niveaux de lecture', (string) $sheetOneXml);
+        $this->assertStringContainsString('Synthese indicateurs validee direction', (string) $sheetOneXml);
+        $this->assertStringContainsString('[Officiel] Vue consolidee du PAS', (string) $sheetOneXml);
+        $this->assertStringContainsString('[Valide] Details - indicateurs sous seuil', (string) $sheetOneXml);
+        $this->assertStringContainsString('Indicateur qualite', (string) $sheetOneXml);
+        $this->assertStringContainsString('Indicateur risque', (string) $sheetOneXml);
+        $this->assertStringContainsString('Niveaux de lecture : Provisoire | Valide | Officiel', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Funnel de pilotage [Provisoire]', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Vue interannuelle [Officiel]', (string) $sheetTwoXml);
         $this->assertStringContainsString('<c:barChart>', (string) $chartOneXml);
         $this->assertStringContainsString('rId1', (string) $drawingXml);
 
@@ -688,9 +922,13 @@ class WebWorkspaceTest extends TestCase
 
         $html = view('workspace.monitoring.reporting-pdf', $payload)->render();
 
-        $this->assertStringContainsString('KPI qualite', $html);
-        $this->assertStringContainsString('KPI risque', $html);
-        $this->assertStringContainsString('KPI global', $html);
+        $this->assertStringContainsString('Indicateur qualite', $html);
+        $this->assertStringContainsString('Indicateur risque', $html);
+        $this->assertStringContainsString('Indicateur global', $html);
+        $this->assertStringContainsString('Provisoire', $html);
+        $this->assertStringContainsString('Valide', $html);
+        $this->assertStringContainsString('Officiel', $html);
+        $this->assertStringContainsString('level-badge level-officiel', $html);
     }
 
     public function test_agent_cannot_manage_actions_but_can_submit_weekly_tracking(): void
@@ -729,5 +967,25 @@ class WebWorkspaceTest extends TestCase
         $week->refresh();
         $this->assertTrue((bool) $week->est_renseignee);
         $this->assertSame((int) $agent->id, (int) $week->saisi_par);
+    }
+
+    /**
+     * @return array{0: \App\Models\Pta, 1: \App\Models\User}
+     */
+    private function firstUnlockedPtaAndAgent(): array
+    {
+        $pta = Pta::query()
+            ->where('statut', '!=', 'verrouille')
+            ->orderBy('id')
+            ->firstOrFail();
+
+        $agent = User::query()
+            ->where('role', User::ROLE_AGENT)
+            ->where('direction_id', (int) $pta->direction_id)
+            ->where('service_id', (int) $pta->service_id)
+            ->orderBy('id')
+            ->firstOrFail();
+
+        return [$pta, $agent];
     }
 }

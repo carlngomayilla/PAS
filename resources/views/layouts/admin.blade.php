@@ -456,6 +456,8 @@
             var sidebarLabelItems = sidebar ? Array.prototype.slice.call(sidebar.querySelectorAll('.gooey-item[data-label]')) : [];
             var sidebarActiveLabelItem = sidebar ? sidebar.querySelector('.gooey-item[data-active="1"]') : null;
             var sidebarCurrentLabelItem = null;
+            var sidebarScrollStorageKey = 'anbg:sidebar:scroll:{{ auth()->id() ?? 'guest' }}';
+            var sidebarScrollSaveFrame = null;
             var messagingWrapper = document.getElementById('header-messaging');
             var messagingToggle = document.getElementById('header-messaging-toggle');
             var messagingMenu = document.getElementById('header-messaging-menu');
@@ -564,6 +566,66 @@
                 hideSidebarFloatingLabel();
             }
 
+            function persistSidebarScrollPosition() {
+                if (!sidebarLabelScroll) {
+                    return;
+                }
+
+                try {
+                    window.localStorage.setItem(sidebarScrollStorageKey, String(sidebarLabelScroll.scrollTop));
+                } catch (error) {
+                    // no-op: sidebar scroll persistence is a progressive enhancement
+                }
+            }
+
+            function queueSidebarScrollPositionSave() {
+                if (!sidebarLabelScroll) {
+                    return;
+                }
+
+                if (sidebarScrollSaveFrame) {
+                    window.cancelAnimationFrame(sidebarScrollSaveFrame);
+                }
+
+                sidebarScrollSaveFrame = window.requestAnimationFrame(function () {
+                    sidebarScrollSaveFrame = null;
+                    persistSidebarScrollPosition();
+                });
+            }
+
+            function restoreSidebarScrollPosition() {
+                if (!sidebarLabelScroll) {
+                    return;
+                }
+
+                var savedScrollTop = null;
+
+                try {
+                    savedScrollTop = window.localStorage.getItem(sidebarScrollStorageKey);
+                } catch (error) {
+                    savedScrollTop = null;
+                }
+
+                window.requestAnimationFrame(function () {
+                    var parsedScrollTop = savedScrollTop === null ? Number.NaN : Number(savedScrollTop);
+
+                    if (Number.isFinite(parsedScrollTop) && parsedScrollTop >= 0) {
+                        sidebarLabelScroll.scrollTop = parsedScrollTop;
+                    } else if (sidebarActiveLabelItem) {
+                        var activeTrigger = sidebarActiveLabelItem.querySelector('.gooey-link, .gooey-logout');
+                        if (activeTrigger && typeof activeTrigger.scrollIntoView === 'function') {
+                            activeTrigger.scrollIntoView({
+                                block: 'center',
+                                inline: 'nearest',
+                            });
+                        }
+                    }
+
+                    persistSidebarScrollPosition();
+                    restoreSidebarFloatingLabel();
+                });
+            }
+
             sidebarLabelItems.forEach(function (item) {
                 var trigger = item.querySelector('.gooey-link, .gooey-logout');
                 if (!trigger) {
@@ -585,6 +647,8 @@
                 trigger.addEventListener('blur', function () {
                     window.requestAnimationFrame(restoreSidebarFloatingLabel);
                 });
+
+                trigger.addEventListener('click', persistSidebarScrollPosition);
             });
 
             if (sidebarLabelScroll) {
@@ -592,8 +656,12 @@
                     if (sidebarCurrentLabelItem) {
                         showSidebarFloatingLabel(sidebarCurrentLabelItem);
                     }
+
+                    queueSidebarScrollPositionSave();
                 });
             }
+
+            restoreSidebarScrollPosition();
 
             function escapeHtml(value) {
                 return String(value == null ? '' : value)

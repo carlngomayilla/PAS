@@ -42,13 +42,101 @@
 @endphp
 
 @section('content')
+    @php
+        $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
+        $alertSummaryCards = [
+            [
+                'label' => 'Urgences',
+                'value' => $summary['urgence'] ?? 0,
+                'meta' => 'Escalade DG immediate',
+                'href' => route('workspace.alertes', ['niveau' => 'urgence', 'limit' => 100]),
+                'valueClass' => 'showcase-kpi-number text-red-600 dark:text-red-300',
+                'badge' => 'Provisoire',
+                'badge_tone' => 'info',
+            ],
+            [
+                'label' => 'Non lues',
+                'value' => $summary['unread'] ?? 0,
+                'meta' => 'Alertes a traiter',
+                'href' => route('workspace.alertes', ['etat' => 'unread', 'limit' => 100]),
+                'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
+                'badge' => 'Provisoire',
+                'badge_tone' => 'info',
+            ],
+            [
+                'label' => 'Critiques',
+                'value' => $summary['critical'] ?? 0,
+                'meta' => 'Escalade immediate',
+                'href' => route('workspace.alertes', ['niveau' => 'critical', 'limit' => 100]),
+                'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
+                'badge' => 'Provisoire',
+                'badge_tone' => 'info',
+            ],
+            [
+                'label' => 'Attention',
+                'value' => $summary['warning'] ?? 0,
+                'meta' => 'Surveillance rapprochee',
+                'href' => route('workspace.alertes', ['niveau' => 'warning', 'limit' => 100]),
+                'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
+                'badge' => 'Provisoire',
+                'badge_tone' => 'info',
+            ],
+            [
+                'label' => 'Info',
+                'value' => $summary['info'] ?? 0,
+                'meta' => 'Information de contexte',
+                'href' => route('workspace.alertes', ['niveau' => 'info', 'limit' => 100]),
+                'valueClass' => 'showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]',
+                'badge' => 'Provisoire',
+                'badge_tone' => 'info',
+            ],
+        ];
+        $kpiCards = [
+            [
+                'label' => $metricLabel('global'),
+                'value' => number_format((float) ($kpiSummary['global'] ?? 0), 0),
+                'meta' => 'Synthese DG des actions validees direction',
+                'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc']),
+                'valueClass' => 'showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]',
+                'badge' => 'Officiel',
+                'badge_tone' => 'success',
+            ],
+            [
+                'label' => 'Qualite',
+                'value' => number_format((float) ($kpiSummary['qualite'] ?? 0), 0),
+                'meta' => 'Conformite des preuves et du suivi',
+                'href' => route('workspace.actions.index', ['sort' => 'kpi_qualite_desc']),
+                'valueClass' => 'showcase-kpi-number text-[#8fc043] dark:text-[#f8e932]',
+                'badge' => 'Officiel',
+                'badge_tone' => 'success',
+            ],
+            [
+                'label' => 'Risque',
+                'value' => number_format((float) ($kpiSummary['risque'] ?? 0), 0),
+                'meta' => 'Exposition globale et actions fragiles',
+                'href' => route('workspace.actions.index', ['sort' => 'kpi_risque_desc']),
+                'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
+                'badge' => 'Officiel',
+                'badge_tone' => 'success',
+            ],
+            [
+                'label' => 'Progression',
+                'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 0),
+                'meta' => 'Execution moyenne consolidee',
+                'href' => route('workspace.actions.index', ['sort' => 'progression_desc']),
+                'valueClass' => 'showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]',
+                'badge' => 'Officiel',
+                'badge_tone' => 'success',
+            ],
+        ];
+    @endphp
     <section class="showcase-hero mb-4">
         <div class="showcase-hero-body">
             <div>
                 <span class="showcase-eyebrow">Alertes operationnelles</span>
                 <h1 class="showcase-title">Centre d'alertes</h1>
                 <p class="showcase-subtitle">
-                    Vue unifiee des retards, KPI sous seuil, incidents de suivi et delegations proches d'expiration.
+                    Vue unifiee des retards, indicateurs sous seuil, incidents de suivi et delegations proches d'expiration.
                     Cliquer sur une alerte ouvre directement la cause dans le module concerne.
                 </p>
             </div>
@@ -76,55 +164,38 @@
         </div>
     </section>
 
+    <div class="mb-4 flex flex-wrap gap-2">
+        <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
+        <span class="anbg-badge anbg-badge-warning px-3 py-1">Valide</span>
+        <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
+    </div>
+
     <section class="showcase-summary-grid mb-4">
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Urgences</p>
-            <p class="showcase-kpi-number text-red-600 dark:text-red-300">{{ $summary['urgence'] ?? 0 }}</p>
-            <p class="showcase-kpi-meta">Escalade DG immediate</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Non lues</p>
-            <p class="showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]">{{ $summary['unread'] ?? 0 }}</p>
-            <p class="showcase-kpi-meta">Alertes a traiter</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Critiques</p>
-            <p class="showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]">{{ $summary['critical'] ?? 0 }}</p>
-            <p class="showcase-kpi-meta">Escalade immediate</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Attention</p>
-            <p class="showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]">{{ $summary['warning'] ?? 0 }}</p>
-            <p class="showcase-kpi-meta">Surveillance rapprochee</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Info</p>
-            <p class="showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]">{{ $summary['info'] ?? 0 }}</p>
-            <p class="showcase-kpi-meta">Information de contexte</p>
-        </article>
+        @foreach ($alertSummaryCards as $card)
+            <x-stat-card-link
+                :href="$card['href']"
+                :label="$card['label']"
+                :value="$card['value']"
+                :meta="$card['meta']"
+                :value-class="$card['valueClass']"
+                :badge="$card['badge']"
+                :badge-tone="$card['badge_tone']"
+            />
+        @endforeach
     </section>
 
     <section class="showcase-summary-grid mb-4">
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">KPI global</p>
-            <p class="showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]">{{ number_format((float) ($kpiSummary['global'] ?? 0), 0) }}</p>
-            <p class="showcase-kpi-meta">Synthese DG des actions validees direction</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Qualite</p>
-            <p class="showcase-kpi-number text-[#8fc043] dark:text-[#f8e932]">{{ number_format((float) ($kpiSummary['qualite'] ?? 0), 0) }}</p>
-            <p class="showcase-kpi-meta">Conformite des preuves et du suivi</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Risque</p>
-            <p class="showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]">{{ number_format((float) ($kpiSummary['risque'] ?? 0), 0) }}</p>
-            <p class="showcase-kpi-meta">Exposition globale et actions fragiles</p>
-        </article>
-        <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Progression</p>
-            <p class="showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]">{{ number_format((float) ($kpiSummary['progression'] ?? 0), 0) }}</p>
-            <p class="showcase-kpi-meta">Execution moyenne consolidee</p>
-        </article>
+        @foreach ($kpiCards as $card)
+            <x-stat-card-link
+                :href="$card['href']"
+                :label="$card['label']"
+                :value="$card['value']"
+                :meta="$card['meta']"
+                :value-class="$card['valueClass']"
+                :badge="$card['badge']"
+                :badge-tone="$card['badge_tone']"
+            />
+        @endforeach
     </section>
 
     <section class="showcase-toolbar mb-4">
@@ -161,6 +232,14 @@
             </div>
         </div>
     </section>
+
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h2 class="showcase-panel-title">Fil d alertes</h2>
+            <p class="showcase-panel-subtitle">Evenements operationnels en cours, filtres selon votre perimetre et vos niveaux de lecture.</p>
+        </div>
+        <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
+    </div>
 
     <section class="space-y-3" id="alert-feed">
         @forelse ($alertItems as $alert)
@@ -220,7 +299,7 @@
                         @if (!empty($alert['metrics']) || !empty($alert['escalation_label']))
                             <div class="mt-3 flex flex-wrap items-center gap-2">
                                 @foreach ([
-                                    'kpi_global' => 'KPI global',
+                                    'kpi_global' => 'Indicateur global',
                                     'kpi_qualite' => 'Qualite',
                                     'kpi_risque' => 'Risque',
                                 ] as $metricKey => $metricLabel)
@@ -272,8 +351,8 @@
             var levelButtons = Array.prototype.slice.call(document.querySelectorAll('[data-level-filter]'));
             var stateButtons = Array.prototype.slice.call(document.querySelectorAll('[data-state-filter]'));
             var emptyState = document.getElementById('alert-empty-state');
-            var activeLevel = 'all';
-            var activeState = 'all';
+            var activeLevel = @json($activeLevel);
+            var activeState = @json($activeState);
 
             function syncButtons(buttons, activeValue, attribute) {
                 buttons.forEach(function (button) {
@@ -306,11 +385,30 @@
                 }
             }
 
+            function syncQueryString() {
+                var url = new URL(window.location.href);
+
+                if (activeLevel === 'all') {
+                    url.searchParams.delete('niveau');
+                } else {
+                    url.searchParams.set('niveau', activeLevel);
+                }
+
+                if (activeState === 'all') {
+                    url.searchParams.delete('etat');
+                } else {
+                    url.searchParams.set('etat', activeState);
+                }
+
+                window.history.replaceState({}, '', url.toString());
+            }
+
             levelButtons.forEach(function (button) {
                 button.addEventListener('click', function () {
                     activeLevel = button.getAttribute('data-level-filter') || 'all';
                     syncButtons(levelButtons, activeLevel, 'data-level-filter');
                     applyFilters();
+                    syncQueryString();
                 });
             });
 
@@ -319,6 +417,7 @@
                     activeState = button.getAttribute('data-state-filter') || 'all';
                     syncButtons(stateButtons, activeState, 'data-state-filter');
                     applyFilters();
+                    syncQueryString();
                 });
             });
 

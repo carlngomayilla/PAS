@@ -187,6 +187,8 @@
         'pao' => 'M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
         'pta' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
         'actions' => 'M13 10V3L4 14h7v7l9-11h-7z',
+        'kpi' => 'M5 12h4m3-6h7m-7 6h7m-7 6h7M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z',
+        'kpi_mesures' => 'M7 17l3-3 2 2 5-6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z',
         'referentiel' => 'M10.325 4.317a1.724 1.724 0 013.35 0 1.724 1.724 0 002.573 1.066 1.724 1.724 0 012.37 2.37 1.724 1.724 0 001.065 2.572 1.724 1.724 0 010 3.35 1.724 1.724 0 00-1.066 2.573 1.724 1.724 0 01-2.37 2.37 1.724 1.724 0 00-2.572 1.065 1.724 1.724 0 01-3.35 0 1.724 1.724 0 00-2.573-1.066 1.724 1.724 0 01-2.37-2.37 1.724 1.724 0 00-1.065-2.572 1.724 1.724 0 010-3.35 1.724 1.724 0 001.066-2.573 1.724 1.724 0 012.37-2.37 1.724 1.724 0 002.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
         'delegations' => 'M12 4l7 4-7 4-7-4 7-4zm0 8l7 4-7 4-7-4 7-4z',
         'retention' => 'M7 3h8l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm8 1v5h5',
@@ -196,16 +198,16 @@
 @endphp
 
 <aside id="admin-sidebar" class="sidebar-anbg gooey-sidebar fixed inset-y-0 left-0 z-50 flex h-screen w-32 -translate-x-full flex-col overflow-visible border-r border-white/6 shadow-2xl transition-transform duration-200 ease-out lg:translate-x-0">
-    <div class="shrink-0 flex min-h-[5.25rem] items-start justify-between gap-3 px-4 py-4">
-        <div class="min-w-0 flex-1">
+    <div class="relative shrink-0 flex min-h-[5.75rem] flex-col items-center justify-center px-3 py-4 text-center">
+        <div class="flex w-full flex-col items-center justify-center">
             <x-brand.logo variant="wordmark" class="gooey-sidebar-wordmark block h-auto" />
-            <p class="mt-2 truncate text-[11px] font-medium tracking-[0.16em] text-white/55">PILOTAGE</p>
+            <p class="mt-2 w-full text-center text-[11px] font-medium tracking-[0.16em] text-white/55">PILOTAGE</p>
         </div>
 
         <button
             type="button"
             id="admin-sidebar-close"
-            class="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-white/80 transition hover:bg-white/10 hover:text-white lg:hidden"
+            class="absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-2xl text-white/80 transition hover:bg-white/10 hover:text-white lg:hidden"
             aria-label="Fermer le menu"
         >
             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -258,8 +260,8 @@
     </div>
 
     <div class="shrink-0 px-3 py-4">
-        <div class="gooey-item" data-label="Deconnexion">
-            <form method="POST" action="{{ route('logout') }}">
+        <div class="gooey-item gooey-item-logout" data-label="Deconnexion">
+            <form method="POST" action="{{ route('logout') }}" class="gooey-logout-form">
                 @csrf
                 <button type="submit" class="gooey-logout" aria-label="Deconnexion">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

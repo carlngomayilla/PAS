@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePtaRequest;
 use App\Http\Requests\UpdatePtaRequest;
@@ -13,6 +14,7 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Support\UiLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,6 +22,7 @@ use Illuminate\View\View;
 class PtaWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): View
@@ -55,9 +58,17 @@ class PtaWebController extends Controller
             $request->filled('service_id'),
             fn ($q) => $q->where('service_id', (int) $request->integer('service_id'))
         );
+        $statusFilter = trim((string) $request->string('statut'));
+        if ($statusFilter !== '') {
+            if ($statusFilter === 'valide_ou_verrouille') {
+                $query->whereIn('statut', ['valide', 'verrouille']);
+            } else {
+                $query->where('statut', $statusFilter);
+            }
+        }
         $query->when(
-            $request->filled('statut'),
-            fn ($q) => $q->where('statut', (string) $request->string('statut'))
+            $request->boolean('without_action'),
+            fn ($q) => $q->doesntHave('actions')
         );
         $query->when($request->filled('q'), function ($q) use ($request): void {
             $search = trim((string) $request->string('q'));
@@ -71,14 +82,15 @@ class PtaWebController extends Controller
             'rows' => $query->orderByDesc('id')->paginate(15)->withQueryString(),
             'paoOptions' => $this->paoOptions($user),
             'serviceOptions' => $this->serviceOptions($user),
-            'statusOptions' => $this->statusOptions($user),
+            'statusOptions' => array_merge($this->statusOptions($user), ['valide_ou_verrouille']),
             'canWrite' => $this->canWrite($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
                 'pao_id' => $request->filled('pao_id') ? (int) $request->integer('pao_id') : null,
                 'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
                 'service_id' => $request->filled('service_id') ? (int) $request->integer('service_id') : null,
-                'statut' => (string) $request->string('statut'),
+                'statut' => $statusFilter,
+                'without_action' => $request->boolean('without_action'),
             ],
         ]);
     }
@@ -163,7 +175,7 @@ class PtaWebController extends Controller
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA cree avec succes.');
+            ->with('success', $this->entityCreatedMessage(UiLabel::object('pta')));
     }
 
     public function edit(Request $request, Pta $pta): View
@@ -196,7 +208,7 @@ class PtaWebController extends Controller
         }
 
         if ($pta->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA est verrouille et ne peut plus etre modifie.']);
+            return back()->withErrors(['general' => $this->lockedStateMessage('PTA', 'plus etre modifie')]);
         }
 
         $validated = $request->validated();
@@ -250,7 +262,7 @@ class PtaWebController extends Controller
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA mis a jour avec succes.');
+            ->with('success', $this->entityUpdatedMessage(UiLabel::object('pta')));
     }
 
     public function destroy(Request $request, Pta $pta): RedirectResponse
@@ -261,7 +273,7 @@ class PtaWebController extends Controller
         }
 
         if ($pta->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA est verrouille et ne peut pas etre supprime.']);
+            return back()->withErrors(['general' => $this->lockedStateMessage('PTA', 'etre supprime')]);
         }
 
         $this->denyUnlessManagePta(
@@ -277,7 +289,7 @@ class PtaWebController extends Controller
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA supprime avec succes.');
+            ->with('success', $this->entityDeletedMessage(UiLabel::object('pta')));
     }
 
     public function submit(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -288,11 +300,11 @@ class PtaWebController extends Controller
         }
 
         if ($pta->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA est verrouille et ne peut pas etre soumis.']);
+            return back()->withErrors(['general' => $this->lockedStateMessage('PTA', 'etre soumis')]);
         }
 
         if ($pta->statut !== 'brouillon') {
-            return back()->withErrors(['general' => 'Seul un PTA en brouillon peut etre soumis.']);
+            return back()->withErrors(['general' => $this->requiredStateMessage('PTA', 'brouillon', 'soumis')]);
         }
 
         $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
@@ -324,7 +336,7 @@ class PtaWebController extends Controller
         }
 
         if ($pta->statut !== 'soumis') {
-            return back()->withErrors(['general' => 'Seul un PTA soumis peut etre valide.']);
+            return back()->withErrors(['general' => $this->requiredStateMessage('PTA', 'soumis', 'valide')]);
         }
 
         $before = $pta->toArray();
@@ -339,7 +351,7 @@ class PtaWebController extends Controller
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA valide avec succes.');
+            ->with('success', $this->transitionedStateMessage('PTA', 'valide'));
     }
 
     public function lock(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -354,7 +366,7 @@ class PtaWebController extends Controller
         }
 
         if ($pta->statut !== 'valide') {
-            return back()->withErrors(['general' => 'Seul un PTA valide peut etre verrouille.']);
+            return back()->withErrors(['general' => $this->requiredStateMessage('PTA', 'valide', 'verrouille')]);
         }
 
         $before = $pta->toArray();
@@ -369,7 +381,7 @@ class PtaWebController extends Controller
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA verrouille avec succes.');
+            ->with('success', $this->transitionedStateMessage('PTA', 'verrouille'));
     }
 
     public function reopen(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -380,11 +392,11 @@ class PtaWebController extends Controller
         }
 
         if ($pta->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA verrouille ne peut pas etre remis en brouillon.']);
+            return back()->withErrors(['general' => $this->lockedCannotBeReopenedMessage('PTA')]);
         }
 
         if (! in_array($pta->statut, ['soumis', 'valide'], true)) {
-            return back()->withErrors(['general' => 'Retour brouillon possible uniquement depuis soumis ou valide.']);
+            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage(['soumis', 'valide'])]);
         }
 
         if ($pta->statut === 'soumis'
@@ -416,7 +428,7 @@ class PtaWebController extends Controller
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA remis en brouillon.');
+            ->with('success', $this->reopenedStateMessage('PTA'));
     }
 
     private function canWrite(User $user): bool

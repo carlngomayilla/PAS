@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,6 +24,14 @@ class Kpi extends Model
         'cible',
         'seuil_alerte',
         'periodicite',
+        'est_a_renseigner',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    protected $appends = [
+        'mode_saisie_label',
     ];
 
     /**
@@ -32,7 +42,13 @@ class Kpi extends Model
         return [
             'cible' => 'decimal:4',
             'seuil_alerte' => 'decimal:4',
+            'est_a_renseigner' => 'boolean',
         ];
+    }
+
+    public function getModeSaisieLabelAttribute(): string
+    {
+        return UiLabel::indicatorInputMode($this->est_a_renseigner);
     }
 
     public function action(): BelongsTo
@@ -48,5 +64,10 @@ class Kpi extends Model
     public function justificatifs(): MorphMany
     {
         return $this->morphMany(Justificatif::class, 'justifiable');
+    }
+
+    public function scopeARenseigner(Builder $query): Builder
+    {
+        return $query->where('est_a_renseigner', true);
     }
 }

@@ -73,6 +73,7 @@ class UserWorkspaceService
                     ? ['Consulter', 'Creer', 'Modifier', 'Executer']
                     : ['Consulter'],
             ];
+
         }
 
         if ($canReadPlanning || $isAgent || $hasDelegatedActionReview) {
@@ -85,7 +86,7 @@ class UserWorkspaceService
                 'actions'     => $isAgent
                     ? ['Consulter', 'Renseigner suivi hebdomadaire', 'Televerser justificatifs hebdomadaires']
                     : ($canManageActions
-                        ? ['Consulter', 'Creer', 'Modifier', 'Supprimer', 'Cloturer', 'Suivi hebdomadaire']
+                        ? ['Consulter', 'Creer', 'Modifier', 'Parametrer indicateur', 'Supprimer', 'Cloturer', 'Suivi hebdomadaire']
                         : ($hasDelegatedActionReview
                             ? ['Consulter', 'Evaluer', 'Valider ou rejeter']
                             : ['Consulter'])),

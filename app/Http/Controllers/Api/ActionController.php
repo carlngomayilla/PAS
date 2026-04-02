@@ -11,6 +11,7 @@ use App\Http\Requests\UpdateActionRequest;
 use App\Models\Action;
 use App\Models\Pta;
 use App\Models\User;
+use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Http\JsonResponse;
@@ -89,6 +90,7 @@ class ActionController extends Controller
 
     public function store(
         StoreActionRequest $request,
+        ActionIndicatorService $indicatorService,
         ActionTrackingService $trackingService,
         SecureJustificatifStorage $secureStorage
     ): JsonResponse {
@@ -98,6 +100,7 @@ class ActionController extends Controller
         }
 
         $validated = $request->validated();
+        $indicatorPayload = $indicatorService->pullPrimaryIndicatorPayload($validated);
         $pta = Pta::query()->findOrFail((int) $validated['pta_id']);
 
         if ($locked = $this->assertPtaNotLocked($pta)) {
@@ -108,7 +111,7 @@ class ActionController extends Controller
         $dummyAction->setRelation('pta', $pta);
         $this->authorize('create', $dummyAction);
 
-        $action = DB::transaction(function () use ($validated, $request, $trackingService, $user, $secureStorage): Action {
+        $action = DB::transaction(function () use ($validated, $indicatorPayload, $request, $trackingService, $indicatorService, $user, $secureStorage): Action {
             $payload = $validated;
             $manualStatus = in_array((string) ($payload['statut'] ?? ''), [
                 ActionTrackingService::STATUS_SUSPENDU,
@@ -130,6 +133,7 @@ class ActionController extends Controller
 
             $action = Action::query()->create($payload);
             $trackingService->initializeActionTracking($action, $user);
+            $indicatorService->syncPrimaryIndicator($action, $indicatorPayload);
 
             if ($request->hasFile('justificatif_financement')) {
                 $file = $request->file('justificatif_financement');
@@ -160,6 +164,7 @@ class ActionController extends Controller
                 'pta:id,pao_id,direction_id,service_id,titre,statut',
                 'responsable:id,name,email',
                 'weeks:id,action_id,numero_semaine,date_debut,date_fin,est_renseignee',
+                'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque',
             ]),
         ], 201);
@@ -188,7 +193,8 @@ class ActionController extends Controller
                 'soumisPar:id,name,email',
                 'evaluePar:id,name,email',
                 'directionValidePar:id,name,email',
-                'kpis:id,action_id,libelle,periodicite',
+                'kpis:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
+                'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'weeks' => fn ($q) => $q->orderBy('numero_semaine'),
                 'actionKpi',
                 'actionLogs' => fn ($q) => $q->latest()->limit(50),
@@ -200,6 +206,7 @@ class ActionController extends Controller
     public function update(
         UpdateActionRequest $request,
         Action $action,
+        ActionIndicatorService $indicatorService,
         ActionTrackingService $trackingService,
         SecureJustificatifStorage $secureStorage
     ): JsonResponse {
@@ -217,6 +224,7 @@ class ActionController extends Controller
         $this->authorize('update', $action);
 
         $validated = $request->validated();
+        $indicatorPayload = $indicatorService->pullPrimaryIndicatorPayload($validated);
         $targetPta = Pta::query()->findOrFail((int) $validated['pta_id']);
 
         if ($locked = $this->assertPtaNotLocked($targetPta)) {
@@ -237,7 +245,7 @@ class ActionController extends Controller
 
         $before = $action->toArray();
 
-        DB::transaction(function () use ($action, $validated, $trackingService, $dateChanged, $frequencyChanged, $targetTypeChanged, $request, $user, $secureStorage): void {
+        DB::transaction(function () use ($action, $validated, $indicatorPayload, $trackingService, $indicatorService, $dateChanged, $frequencyChanged, $targetTypeChanged, $request, $user, $secureStorage): void {
             $payload = $validated;
             $payload['date_echeance'] = $payload['date_fin'];
             $payload['seuil_alerte_progression'] = $payload['seuil_alerte_progression'] ?? 10;
@@ -245,6 +253,7 @@ class ActionController extends Controller
 
             $action->fill($payload);
             $action->save();
+            $indicatorService->syncPrimaryIndicator($action, $indicatorPayload);
 
             if ($dateChanged || $frequencyChanged || $targetTypeChanged) {
                 $trackingService->regenerateWeeks($action);
@@ -280,6 +289,7 @@ class ActionController extends Controller
                 'pta:id,pao_id,direction_id,service_id,titre,statut',
                 'responsable:id,name,email',
                 'weeks:id,action_id,numero_semaine,date_debut,date_fin,est_renseignee',
+                'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque',
             ]),
         ]);

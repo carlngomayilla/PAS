@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePaoObjectifOperationnelRequest;
 use App\Http\Requests\UpdatePaoObjectifOperationnelRequest;
 use App\Models\PaoObjectifOperationnel;
 use App\Models\PaoObjectifStrategique;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PaoObjectifOperationnelController extends Controller
 {
+    use FormatsWorkflowMessages;
+
     public function __construct()
     {
         $this->authorizeResource(PaoObjectifOperationnel::class, 'paoObjectifOperationnel');
@@ -105,7 +109,7 @@ class PaoObjectifOperationnelController extends Controller
         $objectif = PaoObjectifOperationnel::create($validated);
 
         return response()->json([
-            'message' => 'Objectif operationnel cree avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('pao_objectif_operationnel')),
             'data' => $objectif->load([
                 'objectifStrategique:id,pao_axe_id,code,libelle',
                 'responsable:id,name,email',
@@ -143,7 +147,7 @@ class PaoObjectifOperationnelController extends Controller
         $paoObjectifOperationnel->save();
 
         return response()->json([
-            'message' => 'Objectif operationnel mis a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('pao_objectif_operationnel')),
             'data' => $paoObjectifOperationnel->load([
                 'objectifStrategique:id,pao_axe_id,code,libelle',
                 'responsable:id,name,email',

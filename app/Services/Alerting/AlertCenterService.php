@@ -579,10 +579,10 @@ class AlertCenterService
         $isCritical = $threshold > 0 && $value <= ($threshold * 0.8);
         $level = $isCritical ? 'critical' : 'warning';
         $isGlobal = str_contains(mb_strtolower((string) ($mesure->kpi?->libelle ?? '')), 'global');
-        $title = $isGlobal ? 'KPI global critique' : 'KPI sous seuil';
+        $title = $isGlobal ? 'Indicateur global critique' : 'Indicateur sous seuil';
         $message = sprintf(
             '%s est a %.2f pour la periode %s, sous le seuil de %.2f.',
-            (string) ($mesure->kpi?->libelle ?? 'Le KPI'),
+            (string) ($mesure->kpi?->libelle ?? 'L indicateur'),
             $value,
             (string) ($mesure->periode ?: '-'),
             $threshold
@@ -609,7 +609,7 @@ class AlertCenterService
                 'pta' => (string) ($action->pta?->titre ?? '-'),
             ] : null,
             'metrics' => $this->actionMetrics($action),
-            'section_label' => 'KPI et performance',
+            'section_label' => 'Indicateurs et performance',
             'target_url' => $action instanceof Action ? route('workspace.actions.suivi', $action).'#action-status' : route('workspace.alertes'),
             'fingerprint' => 'kpi_breach:'.$mesure->id.':'.number_format($value, 4, '.', ''),
         ];
@@ -839,8 +839,8 @@ class AlertCenterService
             'conformite_incomplete' => 'Conformite',
             'justificatif_absent' => 'Justificatif',
             'pao_manquant' => 'PAO manquant',
-            'kpi_global' => 'KPI global',
-            'kpi_sous_seuil' => 'KPI sous seuil',
+            'kpi_global' => 'Indicateur global',
+            'kpi_sous_seuil' => 'Indicateur sous seuil',
             'periode_manquante' => 'Periode manquante',
             'ecart_progression' => 'Ecart progression',
             'validation_bloquee' => 'Validation bloquee',
@@ -887,8 +887,8 @@ class AlertCenterService
     {
         return match ((string) $log->type_evenement) {
             'action_a_risque' => 'Action a risque',
-            'alerte_combinee_critique' => 'Retard et KPI critique',
-            'retard_kpi_critique' => 'Retard et KPI critique',
+            'alerte_combinee_critique' => 'Retard et indicateur critique',
+            'retard_kpi_critique' => 'Retard et indicateur critique',
             'periode_manquante' => 'Periode non renseignee',
             'ecart_progression' => 'Ecart de progression',
             'validation_bloquee' => 'Validation bloquee',

@@ -319,7 +319,7 @@ class DashboardController extends Controller
 
         return [
             'volumes' => [
-                'labels' => ['PAS', 'PAO', 'PTA', 'Actions', 'KPI', 'Mesures KPI'],
+                'labels' => ['PAS', 'PAO', 'PTA', 'Actions', 'Indicateurs', 'Mesures d indicateur'],
                 'values' => [
                     (int) ($totals['pas_total'] ?? 0),
                     (int) ($totals['paos_total'] ?? 0),
@@ -330,7 +330,7 @@ class DashboardController extends Controller
                 ],
             ],
             'alerts' => [
-                'labels' => ['Actions en retard', 'KPI sous seuil'],
+                'labels' => ['Actions en retard', 'Indicateurs sous seuil'],
                 'values' => [
                     (int) ($alerts['actions_en_retard'] ?? 0),
                     (int) ($alerts['mesures_kpi_sous_seuil'] ?? 0),
@@ -353,12 +353,15 @@ class DashboardController extends Controller
         $validatedActions = $actions
             ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
             ->values();
+        $dashboardRole = $this->resolveDashboardRole($user);
         $currentYear = (int) now()->year;
         $unitMeta = $this->resolveUnitMeta($user);
         $unitRows = $this->buildUnitRows($validatedActions, (string) $unitMeta['mode']);
         $interannual = $this->buildInterannualComparison($user);
         $statusCards = $this->buildStatusCards($actions);
+        $officialStatusCards = $this->buildStatusCards($validatedActions);
         $alerts = $this->buildDashboardAlertRows($actions);
+        $roleDashboard = $this->buildRoleDashboard($user, $actions, $validatedActions);
 
         $avg = static function (Collection $items, callable $callback): float {
             if ($items->isEmpty()) {
@@ -368,37 +371,10 @@ class DashboardController extends Controller
             return round((float) $items->avg($callback), 2);
         };
 
-        $globalScores = [
-            'delai' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
-            'performance' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
-            'conformite' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
-            'qualite' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
-            'risque' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)),
-            'global' => $avg($validatedActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
-            'progression' => $avg($validatedActions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
-        ];
-
-        $monthly = collect(range(1, 12))->map(function (int $month) use ($validatedActions, $currentYear, $avg): array {
-            $monthActions = $validatedActions->filter(function (Action $action) use ($currentYear, $month): bool {
-                $date = $action->date_debut;
-
-                return $date instanceof Carbon
-                    && (int) $date->year === $currentYear
-                    && (int) $date->month === $month;
-            })->values();
-
-            $label = Carbon::create($currentYear, $month, 1)->locale('fr')->translatedFormat('M');
-
-            return [
-                'label' => ucfirst($label),
-                'delai' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
-                'performance' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
-                'conformite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
-                'qualite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
-                'risque' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)),
-                'global' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
-            ];
-        })->all();
+        $operationalGlobalScores = $this->buildGlobalScoreSummary($actions, $avg);
+        $globalScores = $this->buildGlobalScoreSummary($validatedActions, $avg);
+        $operationalMonthly = $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false);
+        $monthly = $this->buildMonthlyScoreRows($validatedActions, $currentYear, $avg, true);
 
         $actionRows = $validatedActions
             ->sortByDesc(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0))
@@ -477,6 +453,7 @@ class DashboardController extends Controller
                     'r' => max(5, min(12, (int) round($global / 10))),
                     'color' => $global >= 80 ? '#8FC043' : ($global >= 60 ? '#3996D3' : '#F9B13C'),
                     'title' => (string) $action->libelle,
+                    'url' => route('workspace.actions.suivi', $action),
                 ];
             })
             ->values()
@@ -492,6 +469,7 @@ class DashboardController extends Controller
                     'label' => (string) $row['label'],
                     'borderColor' => $palette[$index % count($palette)],
                     'backgroundColor' => $palette[$index % count($palette)].'26',
+                    'url' => (string) ($row['url'] ?? ''),
                     'data' => [
                         round((float) ($row['kpi_delai'] ?? 0), 2),
                         round((float) ($row['kpi_performance'] ?? 0), 2),
@@ -513,8 +491,14 @@ class DashboardController extends Controller
             ->all();
 
         return [
+            'dashboard_role' => $dashboardRole,
+            'actions_index_url' => $this->actionIndexRoute(),
             'unit_mode_label' => (string) $unitMeta['label'],
+            'operational_global_scores' => $operationalGlobalScores,
             'global_scores' => $globalScores,
+            'operational_status_cards' => $statusCards,
+            'official_status_cards' => $officialStatusCards,
+            'operational_monthly' => $operationalMonthly,
             'status_cards' => $statusCards,
             'monthly' => $monthly,
             'unit_rows' => $unitRows,
@@ -526,7 +510,1106 @@ class DashboardController extends Controller
             'radar_datasets' => $radarDatasets,
             'top_action_bars' => $topActionBars,
             'alert_rows' => $alerts,
+            'role_dashboard' => $roleDashboard,
         ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @param Collection<int, Action> $validatedActions
+     * @return array<string, mixed>
+     */
+    private function buildRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
+    {
+        $role = $this->resolveDashboardRole($user);
+
+        return match ($role) {
+            'agent' => $this->buildAgentRoleDashboard($actions),
+            'service' => $this->buildServiceRoleDashboard($actions),
+            'direction' => $this->buildDirectionRoleDashboard($actions, $validatedActions),
+            'planification' => $this->buildPlanificationRoleDashboard($user, $actions, $validatedActions),
+            'dg' => $this->buildDgRoleDashboard($user, $actions, $validatedActions),
+            'cabinet' => $this->buildCabinetRoleDashboard($user, $actions, $validatedActions),
+            default => [
+                'enabled' => false,
+                'role' => $role,
+            ],
+        };
+    }
+
+    private function resolveDashboardRole(User $user): string
+    {
+        if ($user->hasRole(User::ROLE_DG)) {
+            return 'dg';
+        }
+
+        if ($user->hasRole(User::ROLE_CABINET)) {
+            return 'cabinet';
+        }
+
+        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_PLANIFICATION)) {
+            return 'planification';
+        }
+
+        if ($user->isAgent()) {
+            return 'agent';
+        }
+
+        if ($user->hasRole(User::ROLE_SERVICE)) {
+            return 'service';
+        }
+
+        if ($user->hasRole(User::ROLE_DIRECTION)) {
+            return 'direction';
+        }
+
+        return 'global';
+    }
+
+    private function makeRoleCard(
+        string $label,
+        string|int $value,
+        string $meta,
+        string $href,
+        string $accent,
+        string $bg,
+        ?string $badge = null,
+        string $badgeTone = 'neutral'
+    ): array {
+        return [
+            'label' => $label,
+            'value' => $value,
+            'meta' => $meta,
+            'href' => $href,
+            'accent' => $accent,
+            'bg' => $bg,
+            'badge' => $badge,
+            'badge_tone' => $badgeTone,
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, int>
+     */
+    private function statusCounts(Collection $actions): array
+    {
+        $counts = [
+            'non_demarre' => 0,
+            'en_cours' => 0,
+            'a_risque' => 0,
+            'en_retard' => 0,
+            'acheve' => 0,
+            'suspendu' => 0,
+            'annule' => 0,
+            'en_avance' => 0,
+        ];
+
+        foreach ($actions as $action) {
+            $status = $this->normalizeStatus((string) ($action->statut_dynamique ?? ''));
+            $counts[$status] = ($counts[$status] ?? 0) + 1;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, mixed>
+     */
+    private function buildRoleStatusChart(Collection $actions): array
+    {
+        $rows = collect($this->buildStatusCards($actions))
+            ->filter(fn (array $row): bool => (int) ($row['count'] ?? 0) > 0)
+            ->values();
+
+        if ($rows->isEmpty()) {
+            $rows = collect($this->buildStatusCards($actions))->take(4)->values();
+        }
+
+        return [
+            'labels' => $rows->pluck('label')->all(),
+            'values' => $rows->map(fn (array $row): int => (int) ($row['count'] ?? 0))->all(),
+            'urls' => $rows->pluck('href')->all(),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, mixed>
+     */
+    private function buildRoleTrendChart(Collection $actions): array
+    {
+        $currentYear = (int) now()->year;
+        $rows = collect(range(1, 12))->map(function (int $month) use ($actions, $currentYear): array {
+            $monthActions = $actions->filter(function (Action $action) use ($currentYear, $month): bool {
+                $date = $action->date_debut;
+
+                return $date instanceof Carbon
+                    && (int) $date->year === $currentYear
+                    && (int) $date->month === $month;
+            })->values();
+
+            $monthKey = sprintf('%04d-%02d', $currentYear, $month);
+
+            return [
+                'label' => ucfirst(Carbon::create($currentYear, $month, 1)->locale('fr')->translatedFormat('M')),
+                'url' => $this->actionIndexRoute(['mois_demarrage' => $monthKey]),
+                'total' => $monthActions->count(),
+                'achevees' => $monthActions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count(),
+                'retard' => $monthActions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count(),
+            ];
+        })->all();
+
+        return [
+            'labels' => array_column($rows, 'label'),
+            'urls' => array_column($rows, 'url'),
+            'datasets' => [
+                ['label' => 'Actions', 'color' => '#3B82F6', 'data' => array_column($rows, 'total')],
+                ['label' => 'Achevees', 'color' => '#10B981', 'data' => array_column($rows, 'achevees')],
+                ['label' => 'En retard', 'color' => '#EF4444', 'data' => array_column($rows, 'retard')],
+            ],
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, mixed>
+     */
+    private function buildWeeklyLoadChart(Collection $actions): array
+    {
+        $start = now()->copy()->startOfMonth()->startOfWeek(Carbon::MONDAY);
+        $rows = collect(range(0, 7))->map(function (int $offset) use ($actions, $start): array {
+            $weekStart = $start->copy()->addWeeks($offset)->startOfDay();
+            $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
+            $weekRows = $actions->filter(function (Action $action) use ($weekStart, $weekEnd): bool {
+                $date = $action->date_debut;
+
+                return $date instanceof Carbon
+                    && $date->betweenIncluded($weekStart, $weekEnd);
+            })->values();
+
+            return [
+                'label' => 'S'.str_pad((string) $weekStart->isoWeek(), 2, '0', STR_PAD_LEFT),
+                'url' => $this->actionIndexRoute(['week_start' => $weekStart->toDateString()]),
+                'total' => $weekRows->count(),
+            ];
+        })->all();
+
+        return [
+            'type' => 'bar',
+            'index_axis' => 'x',
+            'stacked' => false,
+            'labels' => array_column($rows, 'label'),
+            'urls' => array_column($rows, 'url'),
+            'datasets' => [
+                ['label' => 'Actions', 'color' => '#1E3A8A', 'data' => array_column($rows, 'total')],
+            ],
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, mixed>
+     */
+    private function buildValidationPipelineChart(Collection $actions): array
+    {
+        $rows = [
+            [
+                'label' => 'Brouillon',
+                'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_NON_SOUMISE)->count(),
+                'url' => $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE]),
+            ],
+            [
+                'label' => 'Soumises service',
+                'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)->count(),
+                'url' => $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]),
+            ],
+            [
+                'label' => 'Validees service',
+                'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_CHEF)->count(),
+                'url' => $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]),
+            ],
+            [
+                'label' => 'Validees direction',
+                'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)->count(),
+                'url' => $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION]),
+            ],
+        ];
+
+        return [
+            'type' => 'bar',
+            'index_axis' => 'x',
+            'stacked' => false,
+            'labels' => array_column($rows, 'label'),
+            'urls' => array_column($rows, 'url'),
+            'datasets' => [
+                ['label' => 'Actions', 'color' => '#1E3A8A', 'data' => array_column($rows, 'value')],
+            ],
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, mixed>
+     */
+    private function buildDirectionServiceChart(Collection $actions): array
+    {
+        $rows = collect($this->buildDirectionServiceRows($actions, 6));
+
+        return [
+            'type' => 'bar',
+            'index_axis' => 'y',
+            'stacked' => false,
+            'labels' => $rows->pluck('service')->all(),
+            'urls' => $rows->pluck('url')->all(),
+            'datasets' => [
+                ['label' => 'Execution', 'color' => '#10B981', 'data' => $rows->pluck('taux_execution')->all()],
+                ['label' => 'Validation', 'color' => '#3B82F6', 'data' => $rows->pluck('taux_validation')->all()],
+                ['label' => 'Retards', 'color' => '#EF4444', 'data' => $rows->pluck('retards')->all()],
+            ],
+        ];
+    }
+
+    private function progressionGap(Action $action): float
+    {
+        return max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
+    }
+
+    private function requiresActionUpdate(Action $action): bool
+    {
+        if (in_array((string) ($action->statut_dynamique ?? ''), [
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_ANNULE,
+        ], true)) {
+            return false;
+        }
+
+        return $this->progressionGap($action) >= 15
+            || $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'non_demarre';
+    }
+
+    private function delayDays(Action $action): int
+    {
+        $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
+
+        if (! $deadline instanceof Carbon || $deadline->gte(Carbon::today())) {
+            return 0;
+        }
+
+        return $deadline->diffInDays(Carbon::today());
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @param Collection<int, Action> $validatedActions
+     * @return array<string, mixed>
+     */
+    private function buildScopePortfolioMetrics(User $user, Collection $actions, Collection $validatedActions): array
+    {
+        $statusCounts = $this->statusCounts($actions);
+        $pasQuery = $this->buildPasScopedQuery($user);
+        $paoQuery = Pao::query();
+        $ptaQuery = Pta::query();
+        $this->scopePao($paoQuery, $user);
+        $this->scopePta($ptaQuery, $user);
+
+        $directionRows = $this->buildGlobalDirectionRows($actions, 100);
+
+        return [
+            'pas_total' => (clone $pasQuery)->count(),
+            'paos_total' => (clone $paoQuery)->count(),
+            'ptas_total' => (clone $ptaQuery)->count(),
+            'actions_total' => $actions->count(),
+            'actions_valides_service' => $actions
+                ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
+                    ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                    ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                ], true))
+                ->count(),
+            'actions_valides_direction' => $validatedActions->count(),
+            'actions_en_retard' => $statusCounts['en_retard'],
+            'alerts' => $actions->filter(fn (Action $action): bool => $this->isAlertAction($action))->count(),
+            'completion_rate' => $this->completionRate($statusCounts['acheve'], $actions->count()),
+            'delay_rate' => $this->completionRate(max(0, $actions->count() - $statusCounts['en_retard']), $actions->count()),
+            'global_score' => round((float) $validatedActions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
+            'directions_total' => collect($directionRows)->count(),
+            'services_total' => $actions->pluck('pta.service_id')->filter()->unique()->count(),
+            'directions_difficulte' => collect($directionRows)->filter(function (array $row): bool {
+                return (float) ($row['score'] ?? 0) < 60 || (int) ($row['retards'] ?? 0) > 0;
+            })->count(),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, float|int>
+     */
+    private function buildDashboardSnapshot(Collection $actions): array
+    {
+        $statusCounts = $this->statusCounts($actions);
+        $total = $actions->count();
+        $completed = $statusCounts['acheve'];
+        $late = $statusCounts['en_retard'];
+
+        return [
+            'actions_total' => $total,
+            'achevees' => $completed,
+            'retards' => $late,
+            'completion_rate' => $this->completionRate($completed, $total),
+            'delay_rate' => $this->completionRate(max(0, $total - $late), $total),
+            'score' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, float>
+     */
+    private function buildGlobalScoreSummary(Collection $actions, callable $avg): array
+    {
+        return [
+            'delai' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
+            'performance' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
+            'conformite' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
+            'qualite' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
+            'risque' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)),
+            'global' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
+            'progression' => $avg($actions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildMonthlyScoreRows(Collection $actions, int $currentYear, callable $avg, bool $official): array
+    {
+        return collect(range(1, 12))->map(function (int $month) use ($actions, $currentYear, $avg, $official): array {
+            $monthActions = $actions->filter(function (Action $action) use ($currentYear, $month): bool {
+                $date = $action->date_debut;
+
+                return $date instanceof Carbon
+                    && (int) $date->year === $currentYear
+                    && (int) $date->month === $month;
+            })->values();
+
+            $label = Carbon::create($currentYear, $month, 1)->locale('fr')->translatedFormat('M');
+            $monthKey = sprintf('%04d-%02d', $currentYear, $month);
+            $url = [
+                'mois_demarrage' => $monthKey,
+            ];
+
+            if ($official) {
+                $url['statut_validation'] = ActionTrackingService::VALIDATION_VALIDEE_DIRECTION;
+            }
+
+            return [
+                'label' => ucfirst($label),
+                'month_key' => $monthKey,
+                'url' => $this->actionIndexRoute($url),
+                'delai' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
+                'performance' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
+                'conformite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
+                'qualite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
+                'risque' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)),
+                'global' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
+            ];
+        })->all();
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildGlobalDirectionRows(Collection $actions, int $limit = 8): array
+    {
+        return $actions
+            ->groupBy(fn (Action $action): string => (string) ($action->pta?->direction?->id ?? 0))
+            ->map(function (Collection $rows): array {
+                $first = $rows->first();
+                $total = $rows->count();
+                $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
+                $late = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+                $validatedDirection = $rows->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)->count();
+                $score = round((float) $rows->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2);
+                $directionId = (int) ($first?->pta?->direction?->id ?? 0);
+                $criticalService = $rows
+                    ->groupBy(fn (Action $action): string => (string) ($action->pta?->service?->libelle ?? 'Non renseigne'))
+                    ->map(fn (Collection $serviceRows): int => $serviceRows->filter(fn (Action $action): bool => $this->isAlertAction($action))->count())
+                    ->sortDesc()
+                    ->keys()
+                    ->first();
+
+                return [
+                    'direction' => (string) ($first?->pta?->direction?->libelle ?? 'Non renseignee'),
+                    'actions_total' => $total,
+                    'achevees' => $completed,
+                    'retards' => $late,
+                    'validees_direction' => $validatedDirection,
+                    'taux_execution' => $this->completionRate($completed, $total),
+                    'taux_validation' => $this->completionRate($validatedDirection, $total),
+                    'score' => $score,
+                    'service_critique' => (string) ($criticalService ?? '-'),
+                    'url' => $directionId > 0
+                        ? $this->actionIndexRoute(['direction_id' => $directionId])
+                        : route('workspace.actions.index'),
+                ];
+            })
+            ->sortByDesc('score')
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildGlobalDirectionComparisonRows(Collection $actions, int $limit = 8): array
+    {
+        return $actions
+            ->groupBy(fn (Action $action): string => (string) ($action->pta?->direction?->id ?? 0))
+            ->map(function (Collection $rows): array {
+                $first = $rows->first();
+                $directionId = (int) ($first?->pta?->direction?->id ?? 0);
+                $officialRows = $rows
+                    ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
+                    ->values();
+                $snapshot = $this->buildDashboardSnapshot($rows);
+                $officialSnapshot = $this->buildDashboardSnapshot($officialRows);
+                $criticalService = $rows
+                    ->groupBy(fn (Action $action): string => (string) ($action->pta?->service?->libelle ?? 'Non renseigne'))
+                    ->map(fn (Collection $serviceRows): int => $serviceRows->filter(fn (Action $action): bool => $this->isAlertAction($action))->count())
+                    ->sortDesc()
+                    ->keys()
+                    ->first();
+
+                return [
+                    'direction' => (string) ($first?->pta?->direction?->libelle ?? 'Non renseignee'),
+                    'actions_total' => (int) $snapshot['actions_total'],
+                    'actions_officielles' => (int) $officialSnapshot['actions_total'],
+                    'achevees' => (int) $snapshot['achevees'],
+                    'retards' => (int) $snapshot['retards'],
+                    'validees_direction' => (int) $officialSnapshot['actions_total'],
+                    'taux_execution_operationnel' => (float) $snapshot['completion_rate'],
+                    'taux_execution_officiel' => (float) $officialSnapshot['completion_rate'],
+                    'taux_validation' => $this->completionRate((int) $officialSnapshot['actions_total'], (int) $snapshot['actions_total']),
+                    'score_operationnel' => (float) $snapshot['score'],
+                    'score_officiel' => (float) $officialSnapshot['score'],
+                    'service_critique' => (string) ($criticalService ?? '-'),
+                    'url' => $directionId > 0
+                        ? $this->actionIndexRoute(['direction_id' => $directionId])
+                        : route('workspace.actions.index'),
+                ];
+            })
+            ->sortByDesc(function (array $row): float {
+                return ((float) ($row['score_officiel'] ?? 0) * 1000) + (float) ($row['score_operationnel'] ?? 0);
+            })
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildGlobalPendingValidationRows(Collection $actions, int $limit = 8): array
+    {
+        return $actions
+            ->filter(fn (Action $action): bool => in_array((string) ($action->statut_validation ?? ''), [
+                ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ], true))
+            ->sortBy(fn (Action $action): string => $action->soumise_le instanceof Carbon ? $action->soumise_le->toIso8601String() : '')
+            ->take($limit)
+            ->map(function (Action $action): array {
+                return [
+                    'direction' => (string) ($action->pta?->direction?->libelle ?? '-'),
+                    'service' => (string) ($action->pta?->service?->libelle ?? '-'),
+                    'libelle' => (string) $action->libelle,
+                    'responsable' => (string) ($action->responsable?->name ?? '-'),
+                    'validation_status' => (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE),
+                    'soumise_le' => $action->soumise_le instanceof Carbon ? $action->soumise_le->format('d/m/Y H:i') : '-',
+                    'url' => route('workspace.actions.suivi', $action),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @param Collection<int, Action> $validatedActions
+     * @return array<string, mixed>
+     */
+    private function buildPlanificationRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
+    {
+        $portfolio = $this->buildScopePortfolioMetrics($user, $actions, $validatedActions);
+        $directionRows = $this->buildGlobalDirectionRows($actions, 8);
+
+        return [
+            'enabled' => true,
+            'role' => 'planification',
+            'hero' => [
+                'eyebrow' => 'Vue planification',
+                'title' => 'Consolidation transverse du pilotage',
+                'subtitle' => 'Lecture globale des plans, validations officielles et directions en difficulte pour superviser le dispositif.',
+            ],
+            'summary_cards' => [
+                $this->makeRoleCard('PAS actifs', $portfolio['pas_total'], 'Perimetre strategique', route('workspace.pas.index'), '#1E3A8A', '#EFF6FF', 'Provisoire', 'info'),
+                $this->makeRoleCard('PAO actifs', $portfolio['paos_total'], 'Declinaison operationnelle', route('workspace.pao.index'), '#3B82F6', '#EFF6FF', 'Provisoire', 'info'),
+                $this->makeRoleCard('PTA actifs', $portfolio['ptas_total'], 'Execution en cours', route('workspace.pta.index'), '#3B82F6', '#EFF6FF', 'Provisoire', 'info'),
+                $this->makeRoleCard('Actions validees direction', $portfolio['actions_valides_direction'], 'Socle de consolidation', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION]), '#10B981', '#ECFDF5', 'Officiel', 'success'),
+                $this->makeRoleCard('Actions en retard', $portfolio['actions_en_retard'], 'Retards consolides', $this->actionIndexRoute(['statut' => 'en_retard']), '#EF4444', '#FEF2F2', 'Provisoire', 'warning'),
+                $this->makeRoleCard('Indicateur consolide', number_format((float) $portfolio['global_score'], 0), 'Moyenne validee direction', route('workspace.reporting'), '#1E3A8A', '#EFF6FF', 'Officiel', 'info'),
+                $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Points de vigilance', route('workspace.alertes', ['niveau' => 'critical']), '#EF4444', '#FEF2F2', 'Provisoire', 'danger'),
+                $this->makeRoleCard('Directions en difficulte', $portfolio['directions_difficulte'], 'Score faible ou retards', route('workspace.reporting'), '#F59E0B', '#FFFBEB', 'Valide', 'warning'),
+            ],
+            'status_chart' => [
+                'title' => 'Repartition globale des actions',
+                'subtitle' => 'Lecture transverse par statut operationnel.',
+                ...$this->buildRoleStatusChart($actions),
+            ],
+            'trend_chart' => [
+                'title' => 'Evolution globale du dispositif',
+                'subtitle' => 'Actions, achevements et retards sur l annee en cours.',
+                ...$this->buildRoleTrendChart($actions),
+            ],
+            'support_chart' => [
+                'title' => 'Performance par direction',
+                'subtitle' => 'Comparaison des directions sur execution, validation et retards.',
+                ...[
+                    'type' => 'bar',
+                    'index_axis' => 'y',
+                    'stacked' => false,
+                    'labels' => array_column($directionRows, 'direction'),
+                    'urls' => array_column($directionRows, 'url'),
+                    'datasets' => [
+                        ['label' => 'Execution', 'color' => '#10B981', 'data' => array_column($directionRows, 'taux_execution')],
+                        ['label' => 'Validation', 'color' => '#3B82F6', 'data' => array_column($directionRows, 'taux_validation')],
+                        ['label' => 'Retards', 'color' => '#EF4444', 'data' => array_column($directionRows, 'retards')],
+                    ],
+                ],
+            ],
+            'primary_rows' => $directionRows,
+            'secondary_rows' => $this->buildDirectionCriticalRows($actions, 8),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @param Collection<int, Action> $validatedActions
+     * @return array<string, mixed>
+     */
+    private function buildDgRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
+    {
+        $portfolio = $this->buildScopePortfolioMetrics($user, $actions, $validatedActions);
+        $operational = $this->buildDashboardSnapshot($actions);
+        $official = $this->buildDashboardSnapshot($validatedActions);
+        $allDirectionRows = $this->buildGlobalDirectionComparisonRows($actions, 100);
+        $directionRows = collect($allDirectionRows)->take(8)->values()->all();
+        $difficultyRows = collect($allDirectionRows)
+            ->filter(function (array $row): bool {
+                return (float) ($row['score_operationnel'] ?? 0) < 60
+                    || (
+                        (int) ($row['actions_officielles'] ?? 0) > 0
+                        && (float) ($row['score_officiel'] ?? 0) < 60
+                    )
+                    || (int) ($row['retards'] ?? 0) > 0;
+            })
+            ->sortByDesc('retards')
+            ->values()
+            ->all();
+        $operationalCards = [
+            $this->makeRoleCard('Directions actives', $portfolio['directions_total'], 'Directions visibles', route('workspace.reporting'), '#1E3A8A', '#EFF6FF', 'Provisoire', 'info'),
+            $this->makeRoleCard('Services actifs', $portfolio['services_total'], 'Services engages', route('workspace.reporting'), '#3B82F6', '#EFF6FF', 'Provisoire', 'info'),
+            $this->makeRoleCard('Actions totales', $portfolio['actions_total'], 'Portefeuille institutionnel', route('workspace.actions.index'), '#1F2937', '#F8FBFF', 'Provisoire', 'neutral'),
+            $this->makeRoleCard('Execution operationnelle', number_format((float) $operational['completion_rate'], 0).'%', 'Achevees / portefeuille total', $this->actionIndexRoute(['statut' => 'achevees']), '#3B82F6', '#EFF6FF', 'Provisoire', 'info'),
+            $this->makeRoleCard('Delais operationnels', number_format((float) $operational['delay_rate'], 0).'%', 'Actions hors retard', $this->actionIndexRoute(['statut' => 'en_retard']), '#1E3A8A', '#EFF6FF', 'Provisoire', 'info'),
+            $this->makeRoleCard('Score operationnel', number_format((float) $operational['score'], 0), 'Moyenne sur toutes les actions visibles', route('workspace.reporting'), '#3B82F6', '#EFF6FF', 'Provisoire', 'info'),
+            $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Points de decision', route('workspace.alertes', ['niveau' => 'critical']), '#EF4444', '#FEF2F2', 'Provisoire', 'danger'),
+            $this->makeRoleCard('Directions en difficulte', count($difficultyRows), 'Retards ou ecart entre operationnel et officiel', route('workspace.reporting'), '#F59E0B', '#FFFBEB', 'Valide', 'warning'),
+        ];
+        $officialCards = [
+            $this->makeRoleCard('Actions officielles', $portfolio['actions_valides_direction'], 'Validees direction', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION]), '#10B981', '#ECFDF5', 'Officiel', 'success'),
+            $this->makeRoleCard('Execution officielle', number_format((float) $official['completion_rate'], 0).'%', 'Achevees / actions validees direction', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, 'statut' => 'achevees']), '#10B981', '#ECFDF5', 'Officiel', 'success'),
+            $this->makeRoleCard('Delais officiels', number_format((float) $official['delay_rate'], 0).'%', 'Socle valide direction hors retard', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION]), '#10B981', '#ECFDF5', 'Officiel', 'success'),
+            $this->makeRoleCard('Score officiel', number_format((float) $official['score'], 0), 'Moyenne validee direction', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, 'sort' => 'kpi_global_desc']), '#10B981', '#ECFDF5', 'Officiel', 'success'),
+        ];
+
+        return [
+            'enabled' => true,
+            'role' => 'dg',
+            'hero' => [
+                'eyebrow' => 'Vue DG',
+                'title' => 'Lecture strategique institutionnelle',
+                'subtitle' => 'Lecture strategique avec separation explicite entre portefeuille operationnel et socle officiel valide direction.',
+            ],
+            'summary_cards' => array_merge($operationalCards, $officialCards),
+            'summary_groups' => [
+                [
+                    'title' => 'Statistiques operationnelles',
+                    'subtitle' => 'Portefeuille total, retards, alertes et scores calcules sur toutes les actions visibles.',
+                    'cards' => $operationalCards,
+                ],
+                [
+                    'title' => 'Statistiques officielles',
+                    'subtitle' => 'Socle valide direction retenu pour la lecture institutionnelle officielle.',
+                    'cards' => $officialCards,
+                ],
+            ],
+            'comparison_chart' => [
+                'title' => 'Operationnel vs officiel',
+                'subtitle' => 'Comparer rapidement le terrain et le socle officiel remonte a la DG.',
+                'type' => 'bar',
+                'index_axis' => 'x',
+                'stacked' => false,
+                'labels' => ['Execution', 'Delai', 'Score KPI'],
+                'urls' => [
+                    $this->actionIndexRoute(['statut' => 'achevees']),
+                    $this->actionIndexRoute(['statut' => 'en_retard']),
+                    route('workspace.reporting'),
+                ],
+                'datasets' => [
+                    ['label' => 'Operationnel', 'color' => '#3B82F6', 'data' => [(float) $operational['completion_rate'], (float) $operational['delay_rate'], (float) $operational['score']]],
+                    ['label' => 'Officiel', 'color' => '#10B981', 'data' => [(float) $official['completion_rate'], (float) $official['delay_rate'], (float) $official['score']]],
+                ],
+            ],
+            'status_chart' => [
+                'title' => 'Repartition institutionnelle des statuts',
+                'subtitle' => 'Vision rapide du portefeuille total, sans filtrer sur la validation finale.',
+                ...$this->buildRoleStatusChart($actions),
+            ],
+            'trend_chart' => [
+                'title' => 'Evolution institutionnelle',
+                'subtitle' => 'Lecture temporelle operationnelle du portefeuille DG.',
+                ...$this->buildRoleTrendChart($actions),
+            ],
+            'support_chart' => [
+                'title' => 'Directions : operationnel vs officiel',
+                'subtitle' => 'Comparer par direction le portefeuille total et le socle officiel valide direction.',
+                ...[
+                    'type' => 'bar',
+                    'index_axis' => 'y',
+                    'stacked' => false,
+                    'labels' => array_column($directionRows, 'direction'),
+                    'urls' => array_column($directionRows, 'url'),
+                    'datasets' => [
+                        ['label' => 'Exec. op.', 'color' => '#3B82F6', 'data' => array_column($directionRows, 'taux_execution_operationnel')],
+                        ['label' => 'Exec. off.', 'color' => '#10B981', 'data' => array_column($directionRows, 'taux_execution_officiel')],
+                        ['label' => 'Score op.', 'color' => '#1E3A8A', 'data' => array_column($directionRows, 'score_operationnel')],
+                        ['label' => 'Score off.', 'color' => '#0F766E', 'data' => array_column($directionRows, 'score_officiel')],
+                    ],
+                ],
+            ],
+            'primary_rows' => $directionRows,
+            'secondary_rows' => $difficultyRows,
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @param Collection<int, Action> $validatedActions
+     * @return array<string, mixed>
+     */
+    private function buildCabinetRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
+    {
+        $portfolio = $this->buildScopePortfolioMetrics($user, $actions, $validatedActions);
+        $pendingRows = $this->buildGlobalPendingValidationRows($actions, 8);
+
+        return [
+            'enabled' => true,
+            'role' => 'cabinet',
+            'hero' => [
+                'eyebrow' => 'Vue cabinet',
+                'title' => 'Suivi transverse et appui decisionnel',
+                'subtitle' => 'Lecture rapprochee des points bloquants, des validations en attente et des alertes critiques.',
+            ],
+            'summary_cards' => [
+                $this->makeRoleCard('Actions sensibles', $portfolio['alerts'], 'Actions a forte vigilance', route('workspace.alertes', ['niveau' => 'critical']), '#EF4444', '#FEF2F2', 'Provisoire', 'danger'),
+                $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Niveau de risque courant', route('workspace.alertes', ['niveau' => 'critical']), '#EF4444', '#FEF2F2', 'Provisoire', 'danger'),
+                $this->makeRoleCard('Actions en retard', $portfolio['actions_en_retard'], 'Retards institutionnels', $this->actionIndexRoute(['statut' => 'en_retard']), '#F59E0B', '#FFFBEB', 'Provisoire', 'warning'),
+                $this->makeRoleCard('Actions validees direction', $portfolio['actions_valides_direction'], 'Base officielle', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION]), '#10B981', '#ECFDF5', 'Officiel', 'success'),
+                $this->makeRoleCard('Validations en attente', count($pendingRows), 'Actions a arbitrer', route('workspace.actions.index', ['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]), '#3B82F6', '#EFF6FF', 'Valide', 'info'),
+                $this->makeRoleCard('Directions en difficulte', $portfolio['directions_difficulte'], 'Suivi prioritaire', route('workspace.reporting'), '#F59E0B', '#FFFBEB', 'Valide', 'warning'),
+            ],
+            'status_chart' => [
+                'title' => 'Repartition des statuts',
+                'subtitle' => 'Vision transverse des statuts operationnels.',
+                ...$this->buildRoleStatusChart($actions),
+            ],
+            'trend_chart' => [
+                'title' => 'Evolution des alertes et retards',
+                'subtitle' => 'Lecture temporelle des tensions du portefeuille.',
+                ...$this->buildRoleTrendChart($actions),
+            ],
+            'support_chart' => [
+                'title' => 'Pipeline de validation transverse',
+                'subtitle' => 'Repartition des actions entre soumission, validation service et validation direction.',
+                ...$this->buildValidationPipelineChart($actions),
+            ],
+            'primary_rows' => $pendingRows,
+            'secondary_rows' => $this->buildDirectionCriticalRows($actions, 8),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, mixed>
+     */
+    private function buildAgentRoleDashboard(Collection $actions): array
+    {
+        $total = $actions->count();
+        $statusCounts = $this->statusCounts($actions);
+        $alertCount = $actions->filter(fn (Action $action): bool => $this->isAlertAction($action))->count();
+        $updateCount = $actions->filter(fn (Action $action): bool => $this->requiresActionUpdate($action))->count();
+
+        return [
+            'enabled' => true,
+            'role' => 'agent',
+            'hero' => [
+                'eyebrow' => 'Vue agent',
+                'title' => 'Suivi personnel de l execution',
+                'subtitle' => 'Pilotage de mes actions, de mes retards et de mes alertes sans quitter mon perimetre individuel.',
+            ],
+            'summary_cards' => [
+                $this->makeRoleCard('Mes actions', $total, 'Portefeuille individuel', route('workspace.actions.index'), '#1F2937', '#F8FBFF', 'Provisoire', 'neutral'),
+                $this->makeRoleCard('Mes actions en cours', $statusCounts['en_cours'], 'Execution active', $this->actionIndexRoute(['statut' => 'en_cours']), '#3B82F6', '#EFF6FF', 'Provisoire', 'info'),
+                $this->makeRoleCard('Mes actions achevees', $statusCounts['acheve'], 'Actions terminees', $this->actionIndexRoute(['statut' => 'achevees']), '#10B981', '#ECFDF5', 'Provisoire', 'success'),
+                $this->makeRoleCard('Mes actions en retard', $statusCounts['en_retard'], 'Retards a traiter', $this->actionIndexRoute(['statut' => 'en_retard']), '#EF4444', '#FEF2F2', 'Provisoire', 'danger'),
+                $this->makeRoleCard('Mes alertes actives', $alertCount, 'Actions a surveiller', route('workspace.alertes', ['niveau' => 'warning']), '#F59E0B', '#FFFBEB', 'Provisoire', 'warning'),
+                $this->makeRoleCard('Actions a mettre a jour', $updateCount, 'Ecarts de progression', route('workspace.actions.index', ['sort' => 'progression_desc']), '#1E3A8A', '#EFF6FF', 'Valide', 'info'),
+            ],
+            'status_chart' => [
+                'title' => 'Repartition de mes actions',
+                'subtitle' => 'Lecture immediate du portefeuille personnel par statut.',
+                ...$this->buildRoleStatusChart($actions),
+            ],
+            'trend_chart' => [
+                'title' => 'Evolution mensuelle de mes actions',
+                'subtitle' => 'Volume, achevement et retards par mois de demarrage.',
+                ...$this->buildRoleTrendChart($actions),
+            ],
+            'support_chart' => [
+                'title' => 'Charge personnelle par semaine',
+                'subtitle' => 'Actions planifiees par semaine de demarrage.',
+                ...$this->buildWeeklyLoadChart($actions),
+            ],
+            'primary_rows' => $this->buildPriorityActionRows($actions, 8),
+            'secondary_rows' => $this->buildLateActionRows($actions, 8),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, mixed>
+     */
+    private function buildServiceRoleDashboard(Collection $actions): array
+    {
+        $total = $actions->count();
+        $statusCounts = $this->statusCounts($actions);
+        $pendingServiceValidation = $actions->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)->count();
+        $validatedService = $actions
+            ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ], true))
+            ->count();
+        $alertCount = $actions->filter(fn (Action $action): bool => $this->isAlertAction($action))->count();
+        $completionRate = $this->completionRate($statusCounts['acheve'], $total);
+
+        return [
+            'enabled' => true,
+            'role' => 'service',
+            'hero' => [
+                'eyebrow' => 'Vue service',
+                'title' => 'Pilotage du service',
+                'subtitle' => 'Suivi des validations, des retards et de la charge du service avec une lecture directement exploitable.',
+            ],
+            'summary_cards' => [
+                $this->makeRoleCard('Actions du service', $total, 'Portefeuille du service', route('workspace.actions.index'), '#1F2937', '#F8FBFF', 'Provisoire', 'neutral'),
+                $this->makeRoleCard('Actions en cours', $statusCounts['en_cours'], 'Execution active', $this->actionIndexRoute(['statut' => 'en_cours']), '#3B82F6', '#EFF6FF', 'Provisoire', 'info'),
+                $this->makeRoleCard('Actions achevees', $statusCounts['acheve'], 'Actions terminees', $this->actionIndexRoute(['statut' => 'achevees']), '#10B981', '#ECFDF5', 'Provisoire', 'success'),
+                $this->makeRoleCard('Actions en retard', $statusCounts['en_retard'], 'Retards du service', $this->actionIndexRoute(['statut' => 'en_retard']), '#EF4444', '#FEF2F2', 'Provisoire', 'danger'),
+                $this->makeRoleCard('Actions a valider', $pendingServiceValidation, 'Soumissions en attente', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]), '#F59E0B', '#FFFBEB', 'Valide', 'warning'),
+                $this->makeRoleCard('Actions validees service', $validatedService, 'Validation chef effectuee', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]), '#1E3A8A', '#EFF6FF', 'Valide', 'info'),
+                $this->makeRoleCard('Alertes actives', $alertCount, 'Actions critiques', route('workspace.alertes', ['niveau' => 'warning']), '#F59E0B', '#FFFBEB', 'Provisoire', 'warning'),
+                $this->makeRoleCard('Taux execution service', number_format($completionRate, 0).'%', 'Actions achevees / total', route('workspace.actions.index', ['statut' => 'achevees']), '#10B981', '#ECFDF5', 'Provisoire', 'success'),
+            ],
+            'status_chart' => [
+                'title' => 'Repartition des actions du service',
+                'subtitle' => 'Lecture operationnelle du service par statut.',
+                ...$this->buildRoleStatusChart($actions),
+            ],
+            'trend_chart' => [
+                'title' => 'Evolution mensuelle du service',
+                'subtitle' => 'Volume, achevement et retards sur les actions du service.',
+                ...$this->buildRoleTrendChart($actions),
+            ],
+            'support_chart' => [
+                'title' => 'Pipeline de validation du service',
+                'subtitle' => 'Ou se situent les actions entre soumission, validation service et validation direction.',
+                ...$this->buildValidationPipelineChart($actions),
+            ],
+            'primary_rows' => $this->buildServiceValidationRows($actions, 8),
+            'secondary_rows' => $this->buildServiceAgentPerformanceRows($actions, 8),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @param Collection<int, Action> $validatedActions
+     * @return array<string, mixed>
+     */
+    private function buildDirectionRoleDashboard(Collection $actions, Collection $validatedActions): array
+    {
+        $total = $actions->count();
+        $statusCounts = $this->statusCounts($actions);
+        $validatedDirection = $actions
+            ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
+            ->count();
+        $validatedService = $actions
+            ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ], true))
+            ->count();
+        $pendingValidation = $actions
+            ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
+                ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ], true))
+            ->count();
+        $alertCount = $actions->filter(fn (Action $action): bool => $this->isAlertAction($action))->count();
+        $completionRate = $this->completionRate($statusCounts['acheve'], $total);
+        $delayRate = $this->completionRate(max(0, $total - $statusCounts['en_retard']), $total);
+        $globalScore = round((float) $validatedActions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2);
+
+        return [
+            'enabled' => true,
+            'role' => 'direction',
+            'hero' => [
+                'eyebrow' => 'Vue direction',
+                'title' => 'Pilotage directionnel et comparaison des services',
+                'subtitle' => 'Lecture globale de la direction avec detail par service, validations en attente et actions critiques.',
+            ],
+            'summary_cards' => [
+                $this->makeRoleCard('Actions direction', $total, 'Portefeuille directionnel', route('workspace.actions.index'), '#1F2937', '#F8FBFF', 'Provisoire', 'neutral'),
+                $this->makeRoleCard('Actions en cours', $statusCounts['en_cours'], 'Execution active', $this->actionIndexRoute(['statut' => 'en_cours']), '#3B82F6', '#EFF6FF', 'Provisoire', 'info'),
+                $this->makeRoleCard('Actions achevees', $statusCounts['acheve'], 'Actions terminees', $this->actionIndexRoute(['statut' => 'achevees']), '#10B981', '#ECFDF5', 'Provisoire', 'success'),
+                $this->makeRoleCard('Actions en retard', $statusCounts['en_retard'], 'Retards directionnels', $this->actionIndexRoute(['statut' => 'en_retard']), '#EF4444', '#FEF2F2', 'Provisoire', 'danger'),
+                $this->makeRoleCard('Actions validees service', $validatedService, 'Niveau chef atteint', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]), '#3B82F6', '#EFF6FF', 'Valide', 'info'),
+                $this->makeRoleCard('Actions validees direction', $validatedDirection, 'Consolidation officielle', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION]), '#10B981', '#ECFDF5', 'Officiel', 'success'),
+                $this->makeRoleCard('En attente validation', $pendingValidation, 'Soumises ou attente direction', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]), '#F59E0B', '#FFFBEB', 'Valide', 'warning'),
+                $this->makeRoleCard('Alertes critiques', $alertCount, 'Actions a traiter', route('workspace.alertes', ['niveau' => 'critical']), '#EF4444', '#FEF2F2', 'Provisoire', 'danger'),
+                $this->makeRoleCard('Taux execution direction', number_format($completionRate, 0).'%', 'Actions achevees / total', route('workspace.actions.index', ['statut' => 'achevees']), '#10B981', '#ECFDF5', 'Provisoire', 'success'),
+                $this->makeRoleCard('Respect des delais', number_format($delayRate, 0).'%', 'Actions hors retard', route('workspace.actions.index', ['statut' => 'en_retard']), '#1E3A8A', '#EFF6FF', 'Provisoire', 'info'),
+                $this->makeRoleCard('Score global direction', number_format($globalScore, 0), 'Indicateur moyen valide direction', route('workspace.actions.index', ['sort' => 'kpi_global_desc']), '#1E3A8A', '#EFF6FF', 'Officiel', 'info'),
+            ],
+            'status_chart' => [
+                'title' => 'Repartition des actions de la direction',
+                'subtitle' => 'Lecture macro par statut operationnel.',
+                ...$this->buildRoleStatusChart($actions),
+            ],
+            'trend_chart' => [
+                'title' => 'Evolution mensuelle de la direction',
+                'subtitle' => 'Volume, achevement et retards par mois de demarrage.',
+                ...$this->buildRoleTrendChart($actions),
+            ],
+            'support_chart' => [
+                'title' => 'Performance par service',
+                'subtitle' => 'Comparaison des services sur execution, validation et retards.',
+                ...$this->buildDirectionServiceChart($actions),
+            ],
+            'primary_rows' => $this->buildDirectionServiceRows($actions, 8),
+            'secondary_rows' => $this->buildDirectionCriticalRows($actions, 8),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildPriorityActionRows(Collection $actions, int $limit = 8): array
+    {
+        return $actions
+            ->sortBy([
+                fn (Action $action): int => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard' ? 0 : 1,
+                fn (Action $action): int => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'a_risque' ? 0 : 1,
+                fn (Action $action): float => -1 * $this->progressionGap($action),
+                fn (Action $action): string => $action->date_echeance instanceof Carbon ? $action->date_echeance->toDateString() : '9999-12-31',
+            ])
+            ->take($limit)
+            ->map(function (Action $action): array {
+                return [
+                    'libelle' => (string) $action->libelle,
+                    'pta' => (string) ($action->pta?->titre ?? '-'),
+                    'echeance' => $action->date_echeance instanceof Carbon ? $action->date_echeance->format('d/m/Y') : '-',
+                    'statut' => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')),
+                    'progression' => round((float) ($action->progression_reelle ?? 0), 2),
+                    'validation_status' => (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE),
+                    'url' => route('workspace.actions.suivi', $action),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildLateActionRows(Collection $actions, int $limit = 8): array
+    {
+        $today = Carbon::today();
+
+        return $actions
+            ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')
+            ->sortByDesc(function (Action $action) use ($today): int {
+                $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
+
+                return $deadline instanceof Carbon ? $deadline->diffInDays($today) : 0;
+            })
+            ->take($limit)
+            ->map(function (Action $action) use ($today): array {
+                $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
+                $daysLate = $deadline instanceof Carbon ? $deadline->diffInDays($today) : 0;
+
+                return [
+                    'libelle' => (string) $action->libelle,
+                    'echeance' => $deadline instanceof Carbon ? $deadline->format('d/m/Y') : '-',
+                    'retard_jours' => $daysLate,
+                    'validation_status' => (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE),
+                    'progression' => round((float) ($action->progression_reelle ?? 0), 2),
+                    'url' => route('workspace.actions.suivi', $action),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildServiceValidationRows(Collection $actions, int $limit = 8): array
+    {
+        return $actions
+            ->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)
+            ->sortBy(fn (Action $action): string => $action->soumise_le instanceof Carbon ? $action->soumise_le->toIso8601String() : '')
+            ->take($limit)
+            ->map(function (Action $action): array {
+                return [
+                    'libelle' => (string) $action->libelle,
+                    'agent' => (string) ($action->responsable?->name ?? '-'),
+                    'soumise_le' => $action->soumise_le instanceof Carbon ? $action->soumise_le->format('d/m/Y H:i') : '-',
+                    'statut' => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')),
+                    'progression' => round((float) ($action->progression_reelle ?? 0), 2),
+                    'retard_jours' => $this->delayDays($action),
+                    'url' => route('workspace.actions.suivi', $action),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildServiceAgentPerformanceRows(Collection $actions, int $limit = 8): array
+    {
+        return $actions
+            ->groupBy(fn (Action $action): string => (string) ($action->responsable?->id ?? 0))
+            ->map(function (Collection $rows): array {
+                $first = $rows->first();
+                $total = $rows->count();
+                $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
+                $late = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+
+                return [
+                    'agent' => (string) ($first?->responsable?->name ?? 'Non assigne'),
+                    'actions_total' => $total,
+                    'achevees' => $completed,
+                    'retards' => $late,
+                    'taux_execution' => $this->completionRate($completed, $total),
+                    'url' => route('workspace.actions.index'),
+                ];
+            })
+            ->sortByDesc('actions_total')
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildDirectionServiceRows(Collection $actions, int $limit = 8): array
+    {
+        return $actions
+            ->groupBy(fn (Action $action): string => (string) ($action->pta?->service?->id ?? 0))
+            ->map(function (Collection $rows): array {
+                $first = $rows->first();
+                $total = $rows->count();
+                $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
+                $late = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+                $validatedDirection = $rows->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)->count();
+                $score = round((float) $rows->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2);
+                $serviceId = (int) ($first?->pta?->service?->id ?? 0);
+
+                return [
+                    'service' => (string) ($first?->pta?->service?->libelle ?? 'Non renseigne'),
+                    'actions_total' => $total,
+                    'achevees' => $completed,
+                    'retards' => $late,
+                    'validees_direction' => $validatedDirection,
+                    'taux_execution' => $this->completionRate($completed, $total),
+                    'taux_validation' => $this->completionRate($validatedDirection, $total),
+                    'score' => $score,
+                    'url' => $serviceId > 0
+                        ? $this->actionIndexRoute(['service_id' => $serviceId])
+                        : route('workspace.actions.index'),
+                ];
+            })
+            ->sortByDesc('score')
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildDirectionCriticalRows(Collection $actions, int $limit = 8): array
+    {
+        return $actions
+            ->filter(fn (Action $action): bool => $this->isAlertAction($action))
+            ->sortByDesc(function (Action $action): float {
+                return ($this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard' ? 100 : 0)
+                    + $this->delayDays($action)
+                    + max(0.0, 60 - (float) ($action->actionKpi?->kpi_global ?? 0));
+            })
+            ->take($limit)
+            ->map(function (Action $action): array {
+                return [
+                    'libelle' => (string) $action->libelle,
+                    'direction' => (string) ($action->pta?->direction?->libelle ?? '-'),
+                    'service' => (string) ($action->pta?->service?->libelle ?? '-'),
+                    'responsable' => (string) ($action->responsable?->name ?? '-'),
+                    'retard_jours' => $this->delayDays($action),
+                    'validation_status' => (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE),
+                    'niveau_risque' => (float) ($action->actionKpi?->kpi_risque ?? 0),
+                    'url' => route('workspace.actions.suivi', $action),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
@@ -536,14 +1619,14 @@ class DashboardController extends Controller
     private function buildStatusCards(Collection $actions): array
     {
         $rows = [
-            'en_avance' => ['label' => 'En avance', 'color' => '#8FC043', 'bg' => '#EEF6E1', 'count' => 0],
-            'en_cours' => ['label' => 'En cours', 'color' => '#3996D3', 'bg' => '#E8F3FB', 'count' => 0],
-            'a_risque' => ['label' => 'A risque', 'color' => '#F0E509', 'bg' => '#FFF8D6', 'count' => 0],
-            'en_retard' => ['label' => 'En retard', 'color' => '#F9B13C', 'bg' => '#FFF0DF', 'count' => 0],
-            'suspendu' => ['label' => 'Suspendu', 'color' => '#7C3AED', 'bg' => '#F3E8FF', 'count' => 0],
-            'annule' => ['label' => 'Annule', 'color' => '#475569', 'bg' => '#E2E8F0', 'count' => 0],
-            'non_demarre' => ['label' => 'Non demarre', 'color' => '#64748B', 'bg' => '#F1F5F9', 'count' => 0],
-            'acheve' => ['label' => 'Acheve', 'color' => '#1C203D', 'bg' => '#EEF1F8', 'count' => 0],
+            'en_avance' => ['label' => 'En avance', 'color' => '#8FC043', 'bg' => '#EEF6E1', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_avance'])],
+            'en_cours' => ['label' => 'En cours', 'color' => '#3996D3', 'bg' => '#E8F3FB', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_cours'])],
+            'a_risque' => ['label' => 'A risque', 'color' => '#F0E509', 'bg' => '#FFF8D6', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'a_risque'])],
+            'en_retard' => ['label' => 'En retard', 'color' => '#F9B13C', 'bg' => '#FFF0DF', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_retard'])],
+            'suspendu' => ['label' => 'Suspendu', 'color' => '#7C3AED', 'bg' => '#F3E8FF', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'suspendu'])],
+            'annule' => ['label' => 'Annule', 'color' => '#475569', 'bg' => '#E2E8F0', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'annule'])],
+            'non_demarre' => ['label' => 'Non demarre', 'color' => '#64748B', 'bg' => '#F1F5F9', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'non_demarre'])],
+            'acheve' => ['label' => 'Acheve', 'color' => '#1C203D', 'bg' => '#EEF1F8', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'achevees'])],
         ];
 
         foreach ($actions as $action) {
@@ -575,18 +1658,32 @@ class DashboardController extends Controller
                 $objectifCode = (string) ($action->pta?->pao?->pasObjectif?->code ?? '');
                 $objectifLibelle = (string) ($action->pta?->pao?->pasObjectif?->libelle ?? 'Non renseigne');
                 $label = trim($axeCode.' / '.$objectifCode.' - '.$objectifLibelle, ' /-') ?: $objectifLibelle;
+                $url = $this->actionIndexRoute([
+                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                    'pas_objectif_id' => (int) ($action->pta?->pao?->pasObjectif?->id ?? 0),
+                ]);
             } elseif ($mode === 'direction') {
                 $groupKey = (string) ($action->pta?->direction?->id ?? 0);
                 $label = (string) ($action->pta?->direction?->code ?? $action->pta?->direction?->libelle ?? 'Non renseigne');
+                $url = $this->actionIndexRoute([
+                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                    'direction_id' => (int) ($action->pta?->direction?->id ?? 0),
+                ]);
             } elseif ($mode === 'service') {
                 $groupKey = (string) ($action->pta?->service?->id ?? 0);
                 $label = (string) ($action->pta?->service?->code ?? $action->pta?->service?->libelle ?? 'Non renseigne');
+                $url = $this->actionIndexRoute([
+                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                    'service_id' => (int) ($action->pta?->service?->id ?? 0),
+                ]);
             } else {
                 $groupKey = (string) $action->id;
                 $label = (string) $action->libelle;
+                $url = route('workspace.actions.suivi', $action);
             }
 
             $groups[$groupKey]['label'] = $label;
+            $groups[$groupKey]['url'] = $url;
             $groups[$groupKey]['items'][] = $action;
         }
 
@@ -600,6 +1697,9 @@ class DashboardController extends Controller
 
                 return [
                     'label' => (string) ($group['label'] ?? 'Non renseigne'),
+                    'url' => (string) ($group['url'] ?? $this->actionIndexRoute([
+                        'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                    ])),
                     'actions_total' => $items->count(),
                     'progression_moyenne' => round((float) $items->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2),
                     'kpi_global' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
@@ -654,7 +1754,7 @@ class DashboardController extends Controller
 
             if ($globalKpi > 0 && $globalKpi < 60) {
                 $rows[] = [
-                    'titre' => 'KPI global critique',
+                    'titre' => 'Indicateur global critique',
                     'niveau' => $globalKpi < 40 ? 'Critique' : 'Attention',
                     'direction' => (string) ($action->pta?->direction?->code ?? '-'),
                     'action' => (string) $action->libelle,
@@ -675,7 +1775,7 @@ class DashboardController extends Controller
                 && $globalKpi < 40
             ) {
                 $rows[] = [
-                    'titre' => 'Retard + KPI critique',
+                    'titre' => 'Retard + indicateur critique',
                     'niveau' => 'Urgence',
                     'direction' => (string) ($action->pta?->direction?->code ?? '-'),
                     'action' => (string) $action->libelle,
@@ -762,6 +1862,7 @@ class DashboardController extends Controller
 
                 return [
                     'annee' => (int) $annee,
+                    'url' => route('workspace.pao.index', ['annee' => (int) $annee]),
                     'paos_total' => $rows->count(),
                     'ptas_total' => $ptas->count(),
                     'actions_total' => $actionsTotal,
@@ -789,6 +1890,14 @@ class DashboardController extends Controller
         }
 
         return ['mode' => 'action', 'label' => 'Actions'];
+    }
+
+    private function actionIndexRoute(array $filters = []): string
+    {
+        return route('workspace.actions.index', array_filter(
+            $filters,
+            static fn ($value): bool => $value !== null && $value !== ''
+        ));
     }
 
     private function normalizeStatus(string $status): string

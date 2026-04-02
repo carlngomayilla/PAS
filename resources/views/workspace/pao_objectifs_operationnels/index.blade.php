@@ -2,6 +2,7 @@
 
 @section('content')
     @php
+        $operationalStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
         $legacyOperationalStatusBadges = [
             'non_demarre' => 'anbg-badge anbg-badge-neutral',
             'en_cours' => 'anbg-badge anbg-badge-info',
@@ -56,7 +57,7 @@
                     <select id="statut_realisation" name="statut_realisation">
                         <option value="">Tous</option>
                         @foreach ($statusOptions as $status)
-                            <option value="{{ $status }}" @selected($filters['statut_realisation'] === $status)>{{ $status }}</option>
+                            <option value="{{ $status }}" @selected($filters['statut_realisation'] === $status)>{{ $operationalStatusLabel($status) }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -119,7 +120,7 @@
                                 <span class="text-slate-600">Prog: {{ $row->progression_pourcentage }}%</span>
                             </td>
                             <td>
-                                <span class="{{ $legacyOperationalStatusBadges[$row->statut_realisation] ?? 'anbg-badge anbg-badge-neutral' }} px-3">{{ $row->statut_realisation }}</span><br>
+                                <span class="{{ $legacyOperationalStatusBadges[$row->statut_realisation] ?? 'anbg-badge anbg-badge-neutral' }} px-3">{{ $operationalStatusLabel($row->statut_realisation) }}</span><br>
                                 <span class="text-slate-600">{{ $row->priorite }}</span>
                             </td>
                             <td>{{ $row->echeance ?? '-' }}</td>

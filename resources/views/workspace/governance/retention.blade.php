@@ -21,7 +21,7 @@
                     <form method="POST" action="{{ route('workspace.retention.run') }}" data-confirm-message="Executer l'archivage non destructif maintenant ?" data-confirm-tone="warning" data-confirm-label="Executer">
                         @csrf
                         <input type="hidden" name="mode" value="execute">
-                        <button class="btn btn-amber" type="submit">Executer l'archivage</button>
+                        <button class="btn btn-primary" type="submit">Executer l'archivage</button>
                     </form>
                 </div>
             @endif

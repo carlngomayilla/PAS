@@ -4,18 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePasObjectifRequest;
 use App\Http\Requests\UpdatePasObjectifRequest;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PasObjectifController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): JsonResponse
@@ -72,7 +75,7 @@ class PasObjectifController extends Controller
 
         if ($pasAxe->pas?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PAS parent est verrouille. Creation impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'parent', 'Creation'),
             ], 409);
         }
 
@@ -80,7 +83,7 @@ class PasObjectifController extends Controller
         $this->recordAudit($request, 'pas_objectif', 'create', $objectif, null, $objectif->toArray());
 
         return response()->json([
-            'message' => 'Objectif strategique PAS cree avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('pas_objectif')),
             'data' => $objectif->load(['pasAxe:id,pas_id,code,libelle', 'pasAxe.pas:id,titre,statut']),
         ], 201);
     }
@@ -117,7 +120,7 @@ class PasObjectifController extends Controller
         $pasObjectif->loadMissing('pasAxe.pas:id,statut');
         if ($pasObjectif->pasAxe?->pas?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PAS parent est verrouille. Mise a jour impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'parent', 'Mise a jour'),
             ], 409);
         }
 
@@ -125,7 +128,7 @@ class PasObjectifController extends Controller
         $targetAxe = PasAxe::query()->with('pas:id,statut')->findOrFail((int) $validated['pas_axe_id']);
         if ($targetAxe->pas?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PAS cible est verrouille. Mise a jour impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'cible', 'Mise a jour'),
             ], 409);
         }
 
@@ -136,7 +139,7 @@ class PasObjectifController extends Controller
         $this->recordAudit($request, 'pas_objectif', 'update', $pasObjectif, $before, $pasObjectif->toArray());
 
         return response()->json([
-            'message' => 'Objectif strategique PAS mis a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('pas_objectif')),
             'data' => $pasObjectif->load(['pasAxe:id,pas_id,code,libelle', 'pasAxe.pas:id,titre,statut']),
         ]);
     }
@@ -153,7 +156,7 @@ class PasObjectifController extends Controller
         $pasObjectif->loadMissing('pasAxe.pas:id,statut');
         if ($pasObjectif->pasAxe?->pas?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PAS parent est verrouille. Suppression impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'parent', 'Suppression'),
             ], 409);
         }
 

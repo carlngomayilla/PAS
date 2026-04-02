@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePaoAxeRequest;
 use App\Http\Requests\UpdatePaoAxeRequest;
 use App\Models\Pao;
 use App\Models\PaoAxe;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PaoAxeController extends Controller
 {
+    use FormatsWorkflowMessages;
+
     public function __construct()
     {
         $this->authorizeResource(PaoAxe::class, 'paoAxe');
@@ -80,7 +84,7 @@ class PaoAxeController extends Controller
         $paoAxe = PaoAxe::create($validated);
 
         return response()->json([
-            'message' => 'Axe strategique PAO cree avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('pao_axe')),
             'data' => $paoAxe->load(['pao:id,pas_id,direction_id,annee,titre,echeance']),
         ], 201);
     }
@@ -105,7 +109,7 @@ class PaoAxeController extends Controller
         $paoAxe->save();
 
         return response()->json([
-            'message' => 'Axe strategique PAO mis a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('pao_axe')),
             'data' => $paoAxe->load(['pao:id,pas_id,direction_id,annee,titre,echeance']),
         ]);
     }

@@ -3,6 +3,7 @@
 @section('content')
     @php
         $isEdit = $mode === 'edit';
+        $operationalStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
     @endphp
     <section class="ui-card mb-3.5">
         <h1>{{ $isEdit ? 'Modifier objectif operationnel' : 'Nouvel objectif operationnel' }}</h1>
@@ -55,7 +56,7 @@
                         <select id="statut_realisation" name="statut_realisation" required>
                             @foreach ($statusOptions as $status)
                                 <option value="{{ $status }}" @selected(old('statut_realisation', $row->statut_realisation ?: 'non_demarre') === $status)>
-                                    {{ $status }}
+                                    {{ $operationalStatusLabel($status) }}
                                 </option>
                             @endforeach
                         </select>

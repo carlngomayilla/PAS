@@ -5,8 +5,8 @@
         $isEdit = $mode === 'edit';
     @endphp
     <section class="ui-card mb-3.5">
-        <h1>{{ $isEdit ? 'Modifier mesure KPI' : 'Nouvelle mesure KPI' }}</h1>
-        <p class="text-slate-600">Saisie de la valeur mesuree pour une periode donnee.</p>
+        <h1>{{ $isEdit ? 'Modifier mesure indicateur' : 'Nouvelle mesure indicateur' }}</h1>
+        <p class="text-slate-600">Saisie de la valeur mesuree pour une periode donnee sur les seuls indicateurs a renseigner.</p>
     </section>
 
     <section class="ui-card mb-3.5">
@@ -18,27 +18,33 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Saisie de mesure</h2>
-                <p class="form-section-subtitle">Le format de periode se fige selon la periodicite du KPI choisi.</p>
+                <p class="form-section-subtitle">Le format de periode se fige selon la periodicite de l indicateur choisi. Les indicateurs sans saisie sont exclus.</p>
                 <div class="form-grid">
                     <div>
-                        <label for="kpi_id">KPI</label>
+                        <label for="kpi_id">Indicateur</label>
                         <select id="kpi_id" name="kpi_id" required>
                             <option value="">Selectionner</option>
                             @foreach ($kpiOptions as $kpi)
                                 <option
                                     value="{{ $kpi->id }}"
                                     data-periodicite="{{ $kpi->periodicite }}"
+                                    data-est-a-renseigner="{{ $kpi->est_a_renseigner ? '1' : '0' }}"
                                     @selected((int) old('kpi_id', $row->kpi_id) === $kpi->id)
                                 >
-                                    #{{ $kpi->id }} - {{ $kpi->libelle }} ({{ $kpi->periodicite }})
+                                    #{{ $kpi->id }} - {{ $kpi->libelle }} ({{ $kpi->periodicite }}) - {{ $kpi->mode_saisie_label }}
                                 </option>
                             @endforeach
                         </select>
+                        @if ($kpiOptions->isEmpty())
+                            <p class="field-hint text-amber-700">Aucun indicateur a renseigner n est disponible sur votre perimetre.</p>
+                        @else
+                            <p class="field-hint">Seuls les indicateurs <strong>a renseigner</strong> sont proposes.</p>
+                        @endif
                     </div>
                     <div id="periode_block" class="conditional-block">
                         <label for="periode">Periode</label>
                         <input id="periode" name="periode" type="text" maxlength="20" value="{{ old('periode', $row->periode) }}" required>
-                        <p id="periode_hint" class="field-hint">Selectionner un KPI pour obtenir le format attendu.</p>
+                        <p id="periode_hint" class="field-hint">Selectionner un indicateur pour obtenir le format attendu.</p>
                     </div>
                     <div>
                         <label for="valeur">Valeur</label>
@@ -64,8 +70,8 @@
             </div>
 
             <div class="form-actions">
-                <button class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.kpi-mesures.index') }}">Retour</a>
+                <button class="btn btn-primary" id="submit_mesure_button" type="submit" @disabled(! $isEdit && $kpiOptions->isEmpty())>{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <a class="btn btn-secondary" href="{{ route('workspace.kpi-mesures.index') }}">Retour</a>
             </div>
         </form>
     </section>
@@ -78,6 +84,8 @@
             var periodeInput = document.getElementById('periode');
             var periodeHint = document.getElementById('periode_hint');
             var periodeBlock = document.getElementById('periode_block');
+            var valeurInput = document.getElementById('valeur');
+            var submitButton = document.getElementById('submit_mesure_button');
 
             function periodiciteHint(periodicite) {
                 switch (periodicite) {
@@ -92,7 +100,7 @@
                     case 'ponctuel':
                         return 'Format libre: date ou libelle ponctuel.';
                     default:
-                        return 'Selectionner un KPI pour obtenir le format attendu.';
+                        return 'Selectionner un indicateur pour obtenir le format attendu.';
                 }
             }
 
@@ -103,11 +111,23 @@
 
                 var option = kpiSelect.options[kpiSelect.selectedIndex];
                 var periodicite = option ? (option.getAttribute('data-periodicite') || '') : '';
-                var enabled = !!periodicite;
+                var requiresInput = option ? option.getAttribute('data-est-a-renseigner') !== '0' : false;
+                var enabled = !!periodicite && requiresInput;
 
                 periodeInput.disabled = !enabled;
                 periodeBlock.classList.toggle('is-frozen', !enabled);
-                periodeHint.textContent = periodiciteHint(periodicite);
+                if (valeurInput) {
+                    valeurInput.disabled = !enabled;
+                }
+                if (submitButton) {
+                    submitButton.disabled = !enabled;
+                }
+
+                if (!requiresInput && option && option.value) {
+                    periodeHint.textContent = 'Cet indicateur n attend pas de saisie manuelle.';
+                } else {
+                    periodeHint.textContent = periodiciteHint(periodicite);
+                }
 
                 if (!enabled) {
                     periodeInput.value = '';

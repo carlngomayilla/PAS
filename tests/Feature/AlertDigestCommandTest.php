@@ -400,7 +400,7 @@ class AlertDigestCommandTest extends TestCase
             'action_week_id' => null,
             'niveau' => 'urgence',
             'type_evenement' => 'alerte_combinee_critique',
-            'message' => 'Action en retard avec KPI critique. Urgence et escalade DG requises.',
+            'message' => 'Action en retard avec indicateur critique. Urgence et escalade DG requises.',
             'details' => ['kpi_global' => 35],
             'cible_role' => 'dg',
             'utilisateur_id' => null,

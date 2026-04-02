@@ -25,6 +25,7 @@ class UpdateKpiRequest extends FormRequest
             'cible' => ['nullable', 'numeric', 'min:0'],
             'seuil_alerte' => ['nullable', 'numeric', 'min:0'],
             'periodicite' => ['nullable', Rule::in(['mensuel', 'trimestriel', 'semestriel', 'annuel', 'ponctuel'])],
+            'est_a_renseigner' => ['nullable', 'boolean'],
         ];
     }
 

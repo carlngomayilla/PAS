@@ -3,6 +3,7 @@
 @section('content')
     @php
         $isEdit = $mode === 'edit';
+        $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
         $objectifMeta = is_array($objectifMap ?? null) ? $objectifMap : [];
         $selectedObjectifId = (int) old('pas_objectif_id', $row->pas_objectif_id);
         $selectedDirectionId = (int) old('direction_id', $row->direction_id);
@@ -32,7 +33,7 @@
                 </div>
             </div>
             <div class="showcase-action-row">
-                <a class="btn btn-blue" href="{{ route('workspace.pao.index') }}">Retour liste</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.pao.index') }}">Retour liste</a>
             </div>
         </div>
     </section>
@@ -55,7 +56,7 @@
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Workflow</p>
-            <p class="showcase-kpi-number text-[1.35rem]">{{ strtoupper((string) old('statut', $row->statut ?: 'brouillon')) }}</p>
+            <p class="showcase-kpi-number text-[1.35rem]">{{ $workflowStatusLabel((string) old('statut', $row->statut ?: 'brouillon')) }}</p>
             <p class="showcase-kpi-meta">{{ old('annee', $row->annee) ?: 'Annee non renseignee' }}</p>
         </article>
     </section>
@@ -131,7 +132,7 @@
                         <label for="statut">Statut</label>
                         <select id="statut" name="statut" required>
                             @foreach ($statusOptions as $status)
-                                <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'brouillon') === $status)>{{ $status }}</option>
+                                <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'brouillon') === $status)>{{ $workflowStatusLabel($status) }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -162,8 +163,8 @@
             </div>
 
             <div class="form-actions">
-                <button class="btn btn-green" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
-                <a class="btn btn-blue" href="{{ route('workspace.pao.index') }}">Retour</a>
+                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <a class="btn btn-secondary" href="{{ route('workspace.pao.index') }}">Retour</a>
             </div>
         </form>
     </section>
@@ -190,7 +191,7 @@
                                 <td><span class="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">{{ $item['action'] }}</span></td>
                                 <td>
                                     @if (!empty($item['from']) || !empty($item['to']))
-                                        {{ $item['from'] ?? '-' }} -> {{ $item['to'] ?? '-' }}
+                                        {{ !empty($item['from']) ? $workflowStatusLabel((string) $item['from']) : '-' }} -> {{ !empty($item['to']) ? $workflowStatusLabel((string) $item['to']) : '-' }}
                                     @else
                                         -
                                     @endif

@@ -24,7 +24,7 @@
                 <td align="right">{{ $digest['totals']['actions_retard'] }}</td>
             </tr>
             <tr>
-                <td>KPI sous seuil</td>
+                <td>Indicateurs sous seuil</td>
                 <td align="right">{{ $digest['totals']['kpi_sous_seuil'] }}</td>
             </tr>
             <tr>
@@ -66,11 +66,11 @@
     @endif
 
     @if ($digest['kpi_sous_seuil']->isNotEmpty())
-        <h3 style="margin-bottom: 6px;">KPI sous seuil</h3>
+        <h3 style="margin-bottom: 6px;">Indicateurs sous seuil</h3>
         <ul>
             @foreach ($digest['kpi_sous_seuil'] as $mesure)
                 <li>
-                    {{ $mesure->kpi?->libelle ?? 'KPI' }} |
+                    {{ $mesure->kpi?->libelle ?? 'Indicateur' }} |
                     valeur: {{ $mesure->valeur }} |
                     seuil: {{ $mesure->kpi?->seuil_alerte ?? '-' }} |
                     periode: {{ $mesure->periode }}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePaoRequest;
 use App\Http\Requests\UpdatePaoRequest;
@@ -11,12 +12,14 @@ use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasObjectif;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PaoController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): JsonResponse
@@ -118,7 +121,7 @@ class PaoController extends Controller
         $this->recordAudit($request, 'pao', 'create', $pao, null, $pao->toArray());
 
         return response()->json([
-            'message' => 'PAO cree avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('pao')),
             'data' => $pao->load([
                 'pas:id,titre,periode_debut,periode_fin,statut',
                 'pasObjectif:id,pas_axe_id,code,libelle,ordre',
@@ -161,7 +164,7 @@ class PaoController extends Controller
 
         if ($pao->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PAO est verrouille et ne peut plus etre modifie.',
+                'message' => $this->lockedStateMessage('PAO', 'plus etre modifie'),
             ], 409);
         }
 
@@ -188,7 +191,7 @@ class PaoController extends Controller
         $this->recordAudit($request, 'pao', 'update', $pao, $before, $pao->toArray());
 
         return response()->json([
-            'message' => 'PAO mis a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('pao')),
             'data' => $pao->load([
                 'pas:id,titre,periode_debut,periode_fin,statut',
                 'pasObjectif:id,pas_axe_id,code,libelle,ordre',
@@ -211,7 +214,7 @@ class PaoController extends Controller
 
         if ($pao->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PAO est verrouille et ne peut pas etre supprime.',
+                'message' => $this->lockedStateMessage('PAO', 'etre supprime'),
             ], 409);
         }
 
@@ -233,7 +236,7 @@ class PaoController extends Controller
                 ?->contains(static fn ($direction): bool => (int) $direction->id === (int) $user->direction_id);
 
             if (! $allowed) {
-                abort(403, 'Objectif strategique hors perimetre.');
+                abort(403, $this->outOfScopeMessage(UiLabel::object('pas_objectif')));
             }
         }
 

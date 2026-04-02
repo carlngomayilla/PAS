@@ -28,6 +28,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -52,6 +53,7 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        $roleProfile = $this->buildMonitoringRoleProfile($user, 'pilotage');
 
         $today = Carbon::today()->toDateString();
 
@@ -133,9 +135,13 @@ class MonitoringWebController extends Controller
             ->orderBy('date_echeance')
             ->limit(10)
             ->get();
+        $dgComparison = $roleProfile['role'] === 'dg'
+            ? $this->buildDgMonitoringComparison($user)
+            : null;
 
         return view('workspace.monitoring.pilotage', [
             'generatedAt' => now(),
+            'roleProfile' => $roleProfile,
             'scope' => [
                 'role' => $user->role,
                 'direction_id' => $user->direction_id,
@@ -173,6 +179,7 @@ class MonitoringWebController extends Controller
             'pasConsolidation' => $this->buildPasConsolidation($user),
             'interannualComparison' => $this->buildInterannualComparison($user),
             'actionsProches' => $actionsProches,
+            'dgComparison' => $dgComparison,
         ]);
     }
 
@@ -185,7 +192,13 @@ class MonitoringWebController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        return view('workspace.monitoring.reporting', $this->reportingAnalyticsService->buildPayload($user));
+        $payload = $this->reportingAnalyticsService->buildPayload($user);
+        $payload['roleProfile'] = $this->buildMonitoringRoleProfile($user, 'reporting');
+        $payload['dgComparison'] = ($payload['roleProfile']['role'] ?? null) === 'dg'
+            ? $this->buildDgMonitoringComparison($user)
+            : null;
+
+        return view('workspace.monitoring.reporting', $payload);
     }
 
     public function exportExcel(Request $request): StreamedResponse
@@ -256,15 +269,26 @@ class MonitoringWebController extends Controller
         $this->denyUnlessPlanningReader($user);
 
         $limit = max(1, min(100, (int) $request->integer('limit', 20)));
+        $activeLevel = in_array((string) $request->string('niveau'), ['all', 'urgence', 'critical', 'warning', 'info'], true)
+            ? (string) $request->string('niveau')
+            : 'all';
+        $activeState = in_array((string) $request->string('etat'), ['all', 'unread', 'read'], true)
+            ? (string) $request->string('etat')
+            : 'all';
+        $fetchLimit = ($activeLevel !== 'all' || $activeState !== 'all')
+            ? max($limit, 100)
+            : $limit;
         $readFingerprints = $this->alertReadService->readFingerprintsForUser($user);
         $items = $this->alertCenter
-            ->buildForUser($user, $limit)
-            ->map(function (array $item) use ($readFingerprints, $limit): array {
+            ->buildForUser($user, $fetchLimit)
+            ->map(function (array $item) use ($readFingerprints, $limit, $activeLevel, $activeState): array {
                 $item['is_unread'] = ! in_array((string) $item['fingerprint'], $readFingerprints, true);
                 $item['read_url'] = route('workspace.alertes.read', [
                     'type' => $item['source_type'],
                     'id' => $item['source_id'],
                     'limit' => $limit,
+                    'niveau' => $activeLevel !== 'all' ? $activeLevel : null,
+                    'etat' => $activeState !== 'all' ? $activeState : null,
                 ]);
 
                 return $item;
@@ -291,6 +315,8 @@ class MonitoringWebController extends Controller
                 'warning' => $items->where('niveau', 'warning')->where('is_unread', true)->count(),
                 'info' => $items->where('niveau', 'info')->where('is_unread', true)->count(),
             ],
+            'activeLevel' => $activeLevel,
+            'activeState' => $activeState,
         ]);
     }
 
@@ -807,6 +833,201 @@ class MonitoringWebController extends Controller
             ->toArray();
 
         return $result;
+    }
+
+    /**
+     * @return array{
+     *     operational: array<string, float|int>,
+     *     official: array<string, float|int>,
+     *     direction_rows: array<int, array<string, mixed>>
+     * }
+     */
+    private function buildDgMonitoringComparison(User $user): array
+    {
+        $actions = Action::query()
+            ->with([
+                'actionKpi:id,action_id,kpi_global',
+                'pta:id,direction_id,service_id,titre',
+                'pta.direction:id,libelle',
+                'pta.service:id,libelle',
+            ]);
+        $this->scopeAction($actions, $user);
+
+        $rows = $actions->get();
+        $officialRows = $rows
+            ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
+            ->values();
+
+        return [
+            'operational' => $this->buildMonitoringSnapshot($rows),
+            'official' => $this->buildMonitoringSnapshot($officialRows),
+            'direction_rows' => $this->buildMonitoringDirectionComparisonRows($rows, 8),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, float|int>
+     */
+    private function buildMonitoringSnapshot(Collection $actions): array
+    {
+        $total = $actions->count();
+        $completed = $actions->filter(function (Action $action): bool {
+            return in_array((string) $action->statut_dynamique, [
+                ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ], true);
+        })->count();
+        $late = $actions->filter(fn (Action $action): bool => (string) $action->statut_dynamique === ActionTrackingService::STATUS_EN_RETARD)->count();
+
+        return [
+            'actions_total' => $total,
+            'actions_achevees' => $completed,
+            'actions_retard' => $late,
+            'completion_rate' => $this->completionRate($completed, $total),
+            'delay_rate' => $this->completionRate(max(0, $total - $late), $total),
+            'score' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
+        ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildMonitoringDirectionComparisonRows(Collection $actions, int $limit = 8): array
+    {
+        return $actions
+            ->groupBy(fn (Action $action): string => (string) ($action->pta?->direction?->id ?? 0))
+            ->map(function (Collection $rows): array {
+                $first = $rows->first();
+                $directionId = (int) ($first?->pta?->direction?->id ?? 0);
+                $officialRows = $rows
+                    ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
+                    ->values();
+                $operational = $this->buildMonitoringSnapshot($rows);
+                $official = $this->buildMonitoringSnapshot($officialRows);
+
+                return [
+                    'direction' => (string) ($first?->pta?->direction?->libelle ?? 'Non renseignee'),
+                    'actions_total' => (int) $operational['actions_total'],
+                    'actions_officielles' => (int) $official['actions_total'],
+                    'taux_execution_operationnel' => (float) $operational['completion_rate'],
+                    'taux_execution_officiel' => (float) $official['completion_rate'],
+                    'score_operationnel' => (float) $operational['score'],
+                    'score_officiel' => (float) $official['score'],
+                    'retards' => (int) $operational['actions_retard'],
+                    'url' => $directionId > 0
+                        ? route('workspace.actions.index', ['direction_id' => $directionId])
+                        : route('workspace.actions.index'),
+                ];
+            })
+            ->sortByDesc(function (array $row): float {
+                return ((float) ($row['score_officiel'] ?? 0) * 1000) + (float) ($row['score_operationnel'] ?? 0);
+            })
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function buildMonitoringRoleProfile(User $user, string $page): array
+    {
+        $role = $this->resolveMonitoringRole($user);
+        $profiles = [
+            'pilotage' => [
+                'default' => [
+                    'eyebrow' => 'Pilotage global',
+                    'title' => 'Pilotage global et consolidation transverse',
+                    'subtitle' => 'Vue consolidee des volumes, ruptures de chaine, retards et realisation par annee.',
+                ],
+                'service' => [
+                    'eyebrow' => 'Pilotage service',
+                    'title' => 'Suivi du service et ruptures de chaine',
+                    'subtitle' => 'Lecture metier du service sur les plans, les ruptures, les retards et la couverture d execution.',
+                ],
+                'direction' => [
+                    'eyebrow' => 'Pilotage direction',
+                    'title' => 'Pilotage directionnel et consolidation des services',
+                    'subtitle' => 'Lecture consolidee des volumes, validations et ruptures de la direction et de ses services.',
+                ],
+                'dg' => [
+                    'eyebrow' => 'Pilotage DG',
+                    'title' => 'Pilotage institutionnel',
+                    'subtitle' => 'Vue strategique haute des plans, des ruptures et des tensions majeures du portefeuille.',
+                ],
+                'cabinet' => [
+                    'eyebrow' => 'Pilotage cabinet',
+                    'title' => 'Suivi transversal pour arbitrage',
+                    'subtitle' => 'Lecture rapprochee des retards, ruptures et actions sensibles utiles a l appui decisionnel.',
+                ],
+            ],
+            'reporting' => [
+                'default' => [
+                    'eyebrow' => 'Reporting consolide',
+                    'title' => 'Centre d export et de diffusion',
+                    'subtitle' => 'Les graphes et les tableaux de reporting ont ete centralises dans le dashboard analytique et servent ici a l export et a la diffusion.',
+                ],
+                'service' => [
+                    'eyebrow' => 'Reporting service',
+                    'title' => 'Diffusion consolidee du service',
+                    'subtitle' => 'Exports et vues consolidees du service avec lecture rapide des niveaux provisoire, valide et officiel.',
+                ],
+                'direction' => [
+                    'eyebrow' => 'Reporting direction',
+                    'title' => 'Centre de diffusion directionnel',
+                    'subtitle' => 'Exports et lectures consolidees de la direction avec un socle officiel base sur la validation finale.',
+                ],
+                'dg' => [
+                    'eyebrow' => 'Reporting DG',
+                    'title' => 'Centre d export institutionnel',
+                    'subtitle' => 'Point unique de diffusion des vues consolidees et officielles pour l arbitrage strategique.',
+                ],
+                'cabinet' => [
+                    'eyebrow' => 'Reporting cabinet',
+                    'title' => 'Centre de diffusion transverse',
+                    'subtitle' => 'Exports consolides et vue rapide des familles analytiques utiles a l accompagnement DG.',
+                ],
+            ],
+        ];
+
+        $pageProfiles = $profiles[$page] ?? [];
+        $profile = $pageProfiles[$role] ?? ($pageProfiles['default'] ?? [
+            'eyebrow' => $user->roleLabel(),
+            'title' => 'Lecture consolidee',
+            'subtitle' => 'Vue filtree selon le perimetre courant.',
+        ]);
+
+        return $profile + [
+            'role' => $role,
+            'role_label' => $user->roleLabel(),
+        ];
+    }
+
+    private function resolveMonitoringRole(User $user): string
+    {
+        if ($user->hasRole(User::ROLE_DG)) {
+            return 'dg';
+        }
+
+        if ($user->hasRole(User::ROLE_CABINET)) {
+            return 'cabinet';
+        }
+
+        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_PLANIFICATION)) {
+            return 'planification';
+        }
+
+        if ($user->hasRole(User::ROLE_DIRECTION)) {
+            return 'direction';
+        }
+
+        if ($user->hasRole(User::ROLE_SERVICE)) {
+            return 'service';
+        }
+
+        return 'reader';
     }
 
     /**

@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreKpiMesureRequest;
 use App\Http\Requests\UpdateKpiMesureRequest;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +20,7 @@ use Illuminate\View\View;
 class KpiMesureWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): View
@@ -31,13 +34,13 @@ class KpiMesureWebController extends Controller
 
         $query = KpiMesure::query()
             ->with([
-                'kpi:id,action_id,libelle,periodicite',
+                'kpi:id,action_id,libelle,periodicite,est_a_renseigner',
                 'kpi.action:id,pta_id,libelle',
                 'kpi.action.pta:id,direction_id,service_id,titre,statut',
                 'saisiPar:id,name,email',
             ]);
 
-        $this->scopeKpiMesure($query, $user);
+        $this->scopePlanningKpiMesures($query, $user);
 
         $query->when(
             $request->filled('kpi_id'),
@@ -51,6 +54,12 @@ class KpiMesureWebController extends Controller
             $request->filled('saisi_par'),
             fn ($q) => $q->where('saisi_par', (int) $request->integer('saisi_par'))
         );
+        $query->when(
+            $request->boolean('below_threshold'),
+            fn ($q) => $q->whereHas('kpi', fn (Builder $kpiQuery) => $kpiQuery
+                ->whereNotNull('seuil_alerte')
+                ->whereColumn('kpi_mesures.valeur', '<', 'kpis.seuil_alerte'))
+        );
         $query->when($request->filled('q'), function ($q) use ($request): void {
             $search = trim((string) $request->string('q'));
             $q->where(function ($subQuery) use ($search): void {
@@ -61,7 +70,7 @@ class KpiMesureWebController extends Controller
 
         return view('workspace.kpi_mesures.index', [
             'rows' => $query->orderByDesc('id')->paginate(15)->withQueryString(),
-            'kpiOptions' => $this->kpiOptions($user),
+            'kpiOptions' => $this->kpiFilterOptions($user),
             'saisiParOptions' => $this->saisiParOptions($user),
             'canWrite' => $this->canWrite($user),
             'filters' => [
@@ -69,6 +78,7 @@ class KpiMesureWebController extends Controller
                 'kpi_id' => $request->filled('kpi_id') ? (int) $request->integer('kpi_id') : null,
                 'periode' => (string) $request->string('periode'),
                 'saisi_par' => $request->filled('saisi_par') ? (int) $request->integer('saisi_par') : null,
+                'below_threshold' => $request->boolean('below_threshold'),
             ],
         ]);
     }
@@ -87,7 +97,7 @@ class KpiMesureWebController extends Controller
         return view('workspace.kpi_mesures.form', [
             'mode' => 'create',
             'row' => new KpiMesure(),
-            'kpiOptions' => $this->kpiOptions($user),
+            'kpiOptions' => $this->kpiFormOptions($user),
             'saisiParOptions' => $this->saisiParOptions($user),
         ]);
     }
@@ -110,7 +120,7 @@ class KpiMesureWebController extends Controller
 
         if ($kpi->action?->pta?->statut === 'verrouille') {
             return back()->withInput()->withErrors([
-                'kpi_id' => 'Le PTA parent est verrouille. Creation impossible.',
+                'kpi_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Creation'),
             ]);
         }
 
@@ -129,7 +139,7 @@ class KpiMesureWebController extends Controller
 
         return redirect()
             ->route('workspace.kpi-mesures.index')
-            ->with('success', 'Mesure KPI creee avec succes.');
+            ->with('success', $this->entityCreatedMessage(UiLabel::object('kpi_mesure'), true));
     }
 
     public function edit(Request $request, KpiMesure $kpiMesure): View
@@ -149,7 +159,7 @@ class KpiMesureWebController extends Controller
         return view('workspace.kpi_mesures.form', [
             'mode' => 'edit',
             'row' => $kpiMesure,
-            'kpiOptions' => $this->kpiOptions($user),
+            'kpiOptions' => $this->kpiFormOptions($user, $kpiMesure->kpi),
             'saisiParOptions' => $this->saisiParOptions($user),
         ]);
     }
@@ -164,7 +174,9 @@ class KpiMesureWebController extends Controller
         $kpiMesure->loadMissing('kpi.action.pta:id,direction_id,service_id,statut');
 
         if ($kpiMesure->kpi?->action?->pta?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA parent est verrouille. Mise a jour impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour'),
+            ]);
         }
 
         $validated = $request->validated();
@@ -174,7 +186,7 @@ class KpiMesureWebController extends Controller
 
         if ($targetKpi->action?->pta?->statut === 'verrouille') {
             return back()->withInput()->withErrors([
-                'kpi_id' => 'Le PTA cible est verrouille. Mise a jour impossible.',
+                'kpi_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
             ]);
         }
 
@@ -196,7 +208,7 @@ class KpiMesureWebController extends Controller
 
         return redirect()
             ->route('workspace.kpi-mesures.index')
-            ->with('success', 'Mesure KPI mise a jour avec succes.');
+            ->with('success', $this->entityUpdatedMessage(UiLabel::object('kpi_mesure')));
     }
 
     public function destroy(Request $request, KpiMesure $kpiMesure): RedirectResponse
@@ -209,7 +221,9 @@ class KpiMesureWebController extends Controller
         $kpiMesure->loadMissing('kpi.action.pta:id,direction_id,service_id,statut');
 
         if ($kpiMesure->kpi?->action?->pta?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA parent est verrouille. Suppression impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Suppression'),
+            ]);
         }
 
         $this->denyUnlessWriteService(
@@ -225,28 +239,51 @@ class KpiMesureWebController extends Controller
 
         return redirect()
             ->route('workspace.kpi-mesures.index')
-            ->with('success', 'Mesure KPI supprimee avec succes.');
+            ->with('success', $this->entityDeletedMessage(UiLabel::object('kpi_mesure'), true));
     }
 
     private function canWrite(User $user): bool
     {
         return $user->hasGlobalWriteAccess()
             || $user->hasRole(User::ROLE_DIRECTION)
-            || $user->hasRole(User::ROLE_SERVICE);
+            || $user->hasRole(User::ROLE_SERVICE)
+            || $user->hasDelegatedPermission('planning_write');
     }
 
     /**
      * @return \Illuminate\Database\Eloquent\Collection<int, Kpi>
      */
-    private function kpiOptions(User $user)
+    private function kpiFilterOptions(User $user)
     {
         $query = Kpi::query()
             ->with('action.pta:id,direction_id,service_id,titre,statut')
             ->orderByDesc('id');
 
-        $this->scopeKpi($query, $user);
+        $this->scopePlanningKpis($query, $user);
 
-        return $query->get(['id', 'action_id', 'libelle', 'periodicite']);
+        return $query->get(['id', 'action_id', 'libelle', 'periodicite', 'est_a_renseigner']);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, Kpi>
+     */
+    private function kpiFormOptions(User $user, ?Kpi $currentKpi = null)
+    {
+        $query = Kpi::query()
+            ->with('action.pta:id,direction_id,service_id,titre,statut')
+            ->orderByDesc('id');
+
+        $this->scopePlanningKpis($query, $user);
+
+        $query->where(function (Builder $builder) use ($currentKpi): void {
+            $builder->where('est_a_renseigner', true);
+
+            if ($currentKpi instanceof Kpi) {
+                $builder->orWhereKey($currentKpi->getKey());
+            }
+        });
+
+        return $query->get(['id', 'action_id', 'libelle', 'periodicite', 'est_a_renseigner']);
     }
 
     /**
@@ -256,52 +293,8 @@ class KpiMesureWebController extends Controller
     {
         $query = User::query()->orderBy('name');
 
-        if (! $user->hasGlobalReadAccess() && $user->direction_id !== null) {
-            $query->where('direction_id', (int) $user->direction_id);
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->where('service_id', (int) $user->service_id);
-        }
+        $this->scopePlanningUsers($query, $user);
 
         return $query->get(['id', 'name', 'email', 'direction_id', 'service_id']);
-    }
-
-    private function scopeKpiMesure(Builder $query, User $user): void
-    {
-        if ($user->hasGlobalReadAccess()) {
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('kpi.action.pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('kpi.action.pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
-            return;
-        }
-
-        $query->whereRaw('1 = 0');
-    }
-
-    private function scopeKpi(Builder $query, User $user): void
-    {
-        if ($user->hasGlobalReadAccess()) {
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('action.pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('action.pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
-            return;
-        }
-
-        $query->whereRaw('1 = 0');
     }
 }

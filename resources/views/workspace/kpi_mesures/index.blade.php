@@ -2,11 +2,11 @@
 
 @section('content')
     <section class="ui-card mb-3.5">
-        <h1>KPI - Mesures</h1>
-        <p class="text-slate-600">Saisie periodique des valeurs mesurees pour les indicateurs.</p>
+        <h1>Mesures d indicateur</h1>
+        <p class="text-slate-600">Saisie periodique des valeurs mesurees pour les indicateurs a renseigner.</p>
         @if ($canWrite)
             <p class="mt-2.5">
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" href="{{ route('workspace.kpi-mesures.create') }}">Nouvelle mesure KPI</a>
+                <a class="btn btn-primary" href="{{ route('workspace.kpi-mesures.create') }}">Nouvelle mesure</a>
             </p>
         @endif
     </section>
@@ -20,7 +20,7 @@
                     <input id="q" name="q" type="text" value="{{ $filters['q'] }}" placeholder="Periode ou commentaire">
                 </div>
                 <div>
-                    <label for="kpi_id">KPI</label>
+                    <label for="kpi_id">Indicateur</label>
                     <select id="kpi_id" name="kpi_id">
                         <option value="">Tous</option>
                         @foreach ($kpiOptions as $kpi)
@@ -48,19 +48,19 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.kpi-mesures.index') }}">Reinitialiser</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.kpi-mesures.index') }}">Reinitialiser</a>
             </div>
         </form>
     </section>
 
     <section class="ui-card mb-3.5">
-        <h2>Liste des mesures KPI</h2>
+        <h2>Liste des mesures</h2>
         <div class="overflow-auto">
             <table>
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>KPI</th>
+                        <th>Indicateur</th>
                         <th>Periode</th>
                         <th>Valeur</th>
                         <th>Saisi par</th>
@@ -86,7 +86,7 @@
                                 <td>
                                     <div class="flex flex-wrap gap-1.5">
                                         <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-[#f9b13c] text-white hover:brightness-105" href="{{ route('workspace.kpi-mesures.edit', $row) }}">Modifier</a>
-                                        <form method="POST" action="{{ route('workspace.kpi-mesures.destroy', $row) }}" data-confirm-message="Supprimer cette mesure KPI ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
+                                        <form method="POST" action="{{ route('workspace.kpi-mesures.destroy', $row) }}" data-confirm-message="Supprimer cette mesure ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
                                             <button class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-red-700 text-white hover:bg-red-600" type="submit">Supprimer</button>
@@ -97,7 +97,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 7 : 6 }}" class="text-slate-600">Aucune mesure KPI trouvee.</td>
+                            <td colspan="{{ $canWrite ? 7 : 6 }}" class="text-slate-600">Aucune mesure trouvee.</td>
                         </tr>
                     @endforelse
                 </tbody>

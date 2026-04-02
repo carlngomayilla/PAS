@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +13,14 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class Action extends Model
 {
     use HasFactory;
+
+    /**
+     * @var list<string>
+     */
+    protected $appends = [
+        'status_label',
+        'validation_status_label',
+    ];
 
     /**
      * @var list<string>
@@ -109,6 +118,11 @@ class Action extends Model
         return $this->hasMany(Kpi::class, 'action_id');
     }
 
+    public function primaryKpi(): HasOne
+    {
+        return $this->hasOne(Kpi::class, 'action_id')->orderBy('id');
+    }
+
     public function justificatifs(): MorphMany
     {
         return $this->morphMany(Justificatif::class, 'justifiable');
@@ -155,5 +169,15 @@ class Action extends Model
     public function directionValidePar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'direction_valide_par');
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return UiLabel::actionStatus($this->statut_dynamique ?: $this->statut);
+    }
+
+    public function getValidationStatusLabelAttribute(): string
+    {
+        return UiLabel::validationStatus($this->statut_validation);
     }
 }

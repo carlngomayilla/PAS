@@ -3,6 +3,7 @@
 @section('content')
     @php
         $isEdit = $mode === 'edit';
+        $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
 
         $initialAxes = old('axes', $axesPayload ?? []);
         if (! is_array($initialAxes) || count($initialAxes) === 0) {
@@ -74,7 +75,7 @@
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Workflow</p>
-            <p class="showcase-kpi-number text-[1.35rem]">{{ strtoupper((string) old('statut', $row->statut ?: 'brouillon')) }}</p>
+            <p class="showcase-kpi-number text-[1.35rem]">{{ $workflowStatusLabel((string) old('statut', $row->statut ?: 'brouillon')) }}</p>
             <p class="showcase-kpi-meta">Etat administratif courant</p>
         </article>
     </section>
@@ -148,7 +149,7 @@
                         <label for="statut">Statut</label>
                         <select id="statut" name="statut" required>
                             @foreach ($statusOptions as $status)
-                                <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'brouillon') === $status)>{{ $status }}</option>
+                                <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'brouillon') === $status)>{{ $workflowStatusLabel($status) }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -165,7 +166,7 @@
                         type="button"
                         id="add-axe"
                         data-wizard-visible="axes"
-                        class="inline-flex items-center justify-center rounded-md bg-[#1c203d] px-2.5 py-1.5 text-sm font-medium text-white hover:bg-[#3996d3]"
+                        class="btn btn-primary"
                     >
                         Ajouter un axe
                     </button>
@@ -175,10 +176,10 @@
             </div>
 
             <div class="form-actions">
-                <button id="wizard-prev" class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-slate-200 text-slate-900 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" type="button">Etape precedente</button>
-                <button id="wizard-next" class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-[#1c203d] text-white hover:bg-[#3996d3]" type="button">Etape suivante</button>
-                <button id="wizard-submit" class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.pas.index') }}">Retour</a>
+                <button id="wizard-prev" class="btn btn-secondary" type="button">Etape precedente</button>
+                <button id="wizard-next" class="btn btn-primary" type="button">Etape suivante</button>
+                <button id="wizard-submit" class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <a class="btn btn-secondary" href="{{ route('workspace.pas.index') }}">Retour</a>
             </div>
         </form>
     </section>
@@ -205,7 +206,7 @@
                                 <td><span class="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">{{ $item['action'] }}</span></td>
                                 <td>
                                     @if (!empty($item['from']) || !empty($item['to']))
-                                        {{ $item['from'] ?? '-' }} -> {{ $item['to'] ?? '-' }}
+                                        {{ !empty($item['from']) ? $workflowStatusLabel((string) $item['from']) : '-' }} -> {{ !empty($item['to']) ? $workflowStatusLabel((string) $item['to']) : '-' }}
                                     @else
                                         -
                                     @endif
@@ -582,7 +583,7 @@
                     '<div class="mt-4 rounded-lg bg-slate-100 p-3 dark:bg-slate-900/60" data-wizard-block="objectifs">' +
                         '<div class="mb-2 flex items-center justify-between gap-2">' +
                             '<h4 class="text-sm font-semibold">Objectifs strategiques</h4>' +
-                            '<button type="button" class="add-objectif inline-flex items-center justify-center rounded-md bg-[#8fc043] px-2 py-1 text-xs font-medium text-white hover:brightness-105">Ajouter objectif</button>' +
+                            '<button type="button" class="add-objectif inline-flex items-center justify-center rounded-md bg-[#3B82F6] px-2 py-1 text-xs font-medium text-white hover:bg-[#1E3A8A]">Ajouter objectif</button>' +
                         '</div>' +
                         '<div class="objectifs-list space-y-3"></div>' +
                     '</div>';

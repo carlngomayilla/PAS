@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePaoRequest;
 use App\Http\Requests\UpdatePaoRequest;
@@ -15,6 +16,7 @@ use App\Models\PasObjectif;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +25,7 @@ use Illuminate\View\View;
 class PaoWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): View
@@ -70,9 +73,17 @@ class PaoWebController extends Controller
             $request->filled('annee'),
             fn ($q) => $q->where('annee', (int) $request->integer('annee'))
         );
+        $statusFilter = trim((string) $request->string('statut'));
+        if ($statusFilter !== '') {
+            if ($statusFilter === 'valide_ou_verrouille') {
+                $query->whereIn('statut', ['valide', 'verrouille']);
+            } else {
+                $query->where('statut', $statusFilter);
+            }
+        }
         $query->when(
-            $request->filled('statut'),
-            fn ($q) => $q->where('statut', (string) $request->string('statut'))
+            $request->boolean('without_pta'),
+            fn ($q) => $q->doesntHave('ptas')
         );
         $query->when($request->filled('q'), function ($q) use ($request): void {
             $search = trim((string) $request->string('q'));
@@ -96,7 +107,7 @@ class PaoWebController extends Controller
             'objectifOptions' => $this->objectifOptions($user),
             'directionOptions' => $this->directionOptions($user),
             'serviceOptions' => $this->serviceOptions($user),
-            'statusOptions' => $this->statusOptions($user),
+            'statusOptions' => array_merge($this->statusOptions($user), ['valide_ou_verrouille']),
             'canWrite' => $this->canWrite($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
@@ -105,7 +116,8 @@ class PaoWebController extends Controller
                 'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
                 'service_id' => $request->filled('service_id') ? (int) $request->integer('service_id') : null,
                 'annee' => $request->filled('annee') ? (int) $request->integer('annee') : null,
-                'statut' => (string) $request->string('statut'),
+                'statut' => $statusFilter,
+                'without_pta' => $request->boolean('without_pta'),
             ],
         ]);
     }
@@ -196,7 +208,7 @@ class PaoWebController extends Controller
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', 'PAO cree avec succes.');
+            ->with('success', $this->entityCreatedMessage(UiLabel::object('pao')));
     }
 
     public function edit(Request $request, Pao $pao): View
@@ -233,7 +245,7 @@ class PaoWebController extends Controller
         }
 
         if ($pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO est verrouille et ne peut plus etre modifie.']);
+            return back()->withErrors(['general' => $this->lockedStateMessage('PAO', 'plus etre modifie')]);
         }
 
         $validated = $request->validated();
@@ -283,7 +295,7 @@ class PaoWebController extends Controller
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', 'PAO mis a jour avec succes.');
+            ->with('success', $this->entityUpdatedMessage(UiLabel::object('pao')));
     }
 
     public function destroy(Request $request, Pao $pao): RedirectResponse
@@ -294,7 +306,7 @@ class PaoWebController extends Controller
         }
 
         if ($pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO est verrouille et ne peut pas etre supprime.']);
+            return back()->withErrors(['general' => $this->lockedStateMessage('PAO', 'etre supprime')]);
         }
 
         $this->denyUnlessManagePao($user, (int) $pao->direction_id);
@@ -306,7 +318,7 @@ class PaoWebController extends Controller
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', 'PAO supprime avec succes.');
+            ->with('success', $this->entityDeletedMessage(UiLabel::object('pao')));
     }
 
     public function submit(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -317,11 +329,11 @@ class PaoWebController extends Controller
         }
 
         if ($pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO est verrouille et ne peut pas etre soumis.']);
+            return back()->withErrors(['general' => $this->lockedStateMessage('PAO', 'etre soumis')]);
         }
 
         if ($pao->statut !== 'brouillon') {
-            return back()->withErrors(['general' => 'Seul un PAO en brouillon peut etre soumis.']);
+            return back()->withErrors(['general' => $this->requiredStateMessage('PAO', 'brouillon', 'soumis')]);
         }
 
         $this->denyUnlessWriteDirection($user, (int) $pao->direction_id);
@@ -353,7 +365,7 @@ class PaoWebController extends Controller
         }
 
         if ($pao->statut !== 'soumis') {
-            return back()->withErrors(['general' => 'Seul un PAO soumis peut etre valide.']);
+            return back()->withErrors(['general' => $this->requiredStateMessage('PAO', 'soumis', 'valide')]);
         }
 
         $before = $pao->toArray();
@@ -368,7 +380,7 @@ class PaoWebController extends Controller
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', 'PAO valide avec succes.');
+            ->with('success', $this->transitionedStateMessage('PAO', 'valide'));
     }
 
     public function lock(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -383,7 +395,7 @@ class PaoWebController extends Controller
         }
 
         if ($pao->statut !== 'valide') {
-            return back()->withErrors(['general' => 'Seul un PAO valide peut etre verrouille.']);
+            return back()->withErrors(['general' => $this->requiredStateMessage('PAO', 'valide', 'verrouille')]);
         }
 
         $before = $pao->toArray();
@@ -398,7 +410,7 @@ class PaoWebController extends Controller
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', 'PAO verrouille avec succes.');
+            ->with('success', $this->transitionedStateMessage('PAO', 'verrouille'));
     }
 
     public function reopen(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -409,11 +421,11 @@ class PaoWebController extends Controller
         }
 
         if ($pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PAO verrouille ne peut pas etre remis en brouillon.']);
+            return back()->withErrors(['general' => $this->lockedCannotBeReopenedMessage('PAO')]);
         }
 
         if (! in_array($pao->statut, ['soumis', 'valide'], true)) {
-            return back()->withErrors(['general' => 'Retour brouillon possible uniquement depuis soumis ou valide.']);
+            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage(['soumis', 'valide'])]);
         }
 
         if ($pao->statut === 'valide' && ! $this->canApprove($user)) {
@@ -445,7 +457,7 @@ class PaoWebController extends Controller
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', 'PAO remis en brouillon.');
+            ->with('success', $this->reopenedStateMessage('PAO'));
     }
 
     private function canWrite(User $user): bool

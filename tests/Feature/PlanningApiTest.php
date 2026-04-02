@@ -3,12 +3,16 @@
 namespace Tests\Feature;
 
 use App\Models\Action;
+use App\Models\Delegation;
 use App\Models\Direction;
 use App\Models\Justificatif;
+use App\Models\Kpi;
+use App\Models\KpiMesure;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
 use App\Models\Pao;
+use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -469,6 +473,65 @@ class PlanningApiTest extends TestCase
         $this->assertArrayHasKey('kpi_risque', $payload);
     }
 
+    public function test_action_api_can_store_primary_indicator_configuration_directly(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => $admin->email,
+            'password' => 'Pass@12345',
+            'device_name' => 'phpunit-action-primary-indicator',
+        ]);
+
+        $token = (string) $loginResponse->json('access_token');
+        [$pta, $agent] = $this->firstUnlockedPtaAndAgent();
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/actions', [
+                'pta_id' => (int) $pta->id,
+                'responsable_id' => (int) $agent->id,
+                'libelle' => 'Action API indicateur embarque',
+                'description' => 'Creation action API avec indicateur principal',
+                'type_cible' => 'quantitative',
+                'unite_cible' => 'dossiers',
+                'quantite_cible' => 80,
+                'date_debut' => '2026-04-06',
+                'date_fin' => '2026-04-24',
+                'frequence_execution' => 'hebdomadaire',
+                'statut' => 'non_demarre',
+                'seuil_alerte_progression' => 10,
+                'risques' => 'Charge operationnelle',
+                'mesures_preventives' => 'Suivi resserre',
+                'kpi_seuil_alerte' => 70,
+                'kpi_periodicite' => 'mensuel',
+                'kpi_est_a_renseigner' => false,
+                'financement_requis' => false,
+                'ressource_main_oeuvre' => true,
+                'ressource_equipement' => false,
+                'ressource_partenariat' => false,
+                'ressource_autres' => false,
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.primary_kpi.libelle', 'Action API indicateur embarque')
+            ->assertJsonPath('data.primary_kpi.unite', 'dossiers')
+            ->assertJsonPath('data.primary_kpi.cible', '80.0000')
+            ->assertJsonPath('data.primary_kpi.est_a_renseigner', false)
+            ->assertJsonPath('data.primary_kpi.periodicite', 'mensuel');
+
+        $actionId = (int) $response->json('data.id');
+        $this->assertGreaterThan(0, $actionId);
+
+        $this->assertDatabaseHas('kpis', [
+            'action_id' => $actionId,
+            'libelle' => 'Action API indicateur embarque',
+            'unite' => 'dossiers',
+            'cible' => 80,
+            'periodicite' => 'mensuel',
+            'est_a_renseigner' => 0,
+        ]);
+    }
+
     public function test_non_admin_cannot_list_users_from_referentiel_api(): void
     {
         $loginResponse = $this->postJson('/api/v1/login', [
@@ -681,6 +744,140 @@ class PlanningApiTest extends TestCase
             ->getJson('/api/v1/journal-audit');
 
         $auditResponse->assertOk();
+    }
+
+    public function test_admin_can_consult_kpi_and_measure_api_endpoints(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => $admin->email,
+            'password' => 'Pass@12345',
+            'device_name' => 'phpunit-kpi-endpoints',
+        ]);
+
+        $token = (string) $loginResponse->json('access_token');
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/kpis')
+            ->assertOk();
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/kpi-mesures')
+            ->assertOk();
+    }
+
+    public function test_service_user_can_read_delegated_kpis_and_measures_via_api(): void
+    {
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $admin = $this->createAdminUser();
+
+        $delegatedKpi = Kpi::query()
+            ->with('action.pta')
+            ->whereHas('action.pta', fn ($query) => $query->where('service_id', '!=', (int) $serviceUser->service_id))
+            ->firstOrFail();
+
+        $this->assertNotNull($delegatedKpi->action);
+        $this->assertNotNull($delegatedKpi->action->pta);
+
+        Delegation::query()->create([
+            'delegant_id' => $admin->id,
+            'delegue_id' => $serviceUser->id,
+            'role_scope' => Delegation::SCOPE_SERVICE,
+            'direction_id' => (int) $delegatedKpi->action->pta->direction_id,
+            'service_id' => (int) $delegatedKpi->action->pta->service_id,
+            'permissions' => ['planning_read'],
+            'motif' => 'Lecture delegation API KPI',
+            'date_debut' => now()->subDay(),
+            'date_fin' => now()->addDay(),
+            'statut' => 'active',
+            'cree_par' => $admin->id,
+        ]);
+
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => $serviceUser->email,
+            'password' => 'Pass@12345',
+            'device_name' => 'phpunit-service-kpi-delegation',
+        ]);
+
+        $token = (string) $loginResponse->json('access_token');
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/kpis?q=' . urlencode((string) $delegatedKpi->libelle))
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => (int) $delegatedKpi->id,
+                'libelle' => (string) $delegatedKpi->libelle,
+            ]);
+
+        $mesure = KpiMesure::query()
+            ->where('kpi_id', (int) $delegatedKpi->id)
+            ->firstOrFail();
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/kpi-mesures?kpi_id=' . $delegatedKpi->id)
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => (int) $mesure->id,
+                'kpi_id' => (int) $delegatedKpi->id,
+            ]);
+    }
+
+    public function test_api_rejects_measure_creation_for_non_renseignable_kpi(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => $admin->email,
+            'password' => 'Pass@12345',
+            'device_name' => 'phpunit-kpi-no-input',
+        ]);
+
+        $token = (string) $loginResponse->json('access_token');
+        $action = Action::query()
+            ->whereHas('pta', fn ($query) => $query->where('statut', '!=', 'verrouille'))
+            ->firstOrFail();
+
+        $kpi = Kpi::query()->create([
+            'action_id' => (int) $action->id,
+            'libelle' => 'Indicateur API sans saisie',
+            'unite' => '%',
+            'cible' => 100,
+            'seuil_alerte' => 75,
+            'periodicite' => 'mensuel',
+            'est_a_renseigner' => false,
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/kpi-mesures', [
+                'kpi_id' => (int) $kpi->id,
+                'periode' => '2026-03',
+                'valeur' => 50,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'kpi_id' => 'Cet indicateur n attend pas de saisie manuelle.',
+            ]);
+    }
+
+    /**
+     * @return array{0: \App\Models\Pta, 1: \App\Models\User}
+     */
+    private function firstUnlockedPtaAndAgent(): array
+    {
+        $pta = Pta::query()
+            ->where('statut', '!=', 'verrouille')
+            ->orderBy('id')
+            ->firstOrFail();
+
+        $agent = User::query()
+            ->where('role', User::ROLE_AGENT)
+            ->where('direction_id', (int) $pta->direction_id)
+            ->where('service_id', (int) $pta->service_id)
+            ->orderBy('id')
+            ->firstOrFail();
+
+        return [$pta, $agent];
     }
 }
 

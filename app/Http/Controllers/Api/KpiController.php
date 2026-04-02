@@ -4,18 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreKpiRequest;
 use App\Http\Requests\UpdateKpiRequest;
 use App\Models\Action;
 use App\Models\Kpi;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class KpiController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): JsonResponse
@@ -36,27 +39,7 @@ class KpiController extends Controller
             ])
             ->withCount('mesures');
 
-        if (! $user->hasGlobalReadAccess()) {
-            if ($user->hasRole(User::ROLE_DIRECTION)) {
-                if ($user->direction_id === null) {
-                    $query->whereRaw('1 = 0');
-                } else {
-                    $query->whereHas('action.pta', function ($subQuery) use ($user): void {
-                        $subQuery->where('direction_id', (int) $user->direction_id);
-                    });
-                }
-            } elseif ($user->hasRole(User::ROLE_SERVICE)) {
-                if ($user->service_id === null) {
-                    $query->whereRaw('1 = 0');
-                } else {
-                    $query->whereHas('action.pta', function ($subQuery) use ($user): void {
-                        $subQuery->where('service_id', (int) $user->service_id);
-                    });
-                }
-            } else {
-                $query->whereRaw('1 = 0');
-            }
-        }
+        $this->scopePlanningKpis($query, $user);
 
         $query->when(
             $request->filled('action_id'),
@@ -66,6 +49,10 @@ class KpiController extends Controller
         $query->when(
             $request->filled('periodicite'),
             fn ($q) => $q->where('periodicite', (string) $request->string('periodicite'))
+        );
+        $query->when(
+            $request->filled('est_a_renseigner'),
+            fn ($q) => $q->where('est_a_renseigner', $request->boolean('est_a_renseigner'))
         );
 
         $query->when($request->filled('q'), function ($q) use ($request): void {
@@ -92,11 +79,12 @@ class KpiController extends Controller
         }
 
         $validated = $request->validated();
+        $validated['est_a_renseigner'] = $request->boolean('est_a_renseigner', true);
         $action = Action::query()->with('pta:id,direction_id,service_id,statut')->findOrFail((int) $validated['action_id']);
 
         if ($action->pta?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA parent est verrouille. Creation impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Creation'),
             ], 409);
         }
 
@@ -110,7 +98,7 @@ class KpiController extends Controller
         $this->recordAudit($request, 'kpi', 'create', $kpi, null, $kpi->toArray());
 
         return response()->json([
-            'message' => 'KPI cree avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('kpi')),
             'data' => $kpi->load([
                 'action:id,pta_id,libelle,statut',
                 'action.pta:id,direction_id,service_id,titre',
@@ -127,13 +115,7 @@ class KpiController extends Controller
 
         $kpi->loadMissing('action.pta:id,direction_id,service_id');
 
-        if (! $this->canReadDirection($user, (int) $kpi->action?->pta?->direction_id)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE)
-            && (int) $user->service_id !== (int) $kpi->action?->pta?->service_id
-        ) {
+        if (! $this->canReadService($user, (int) $kpi->action?->pta?->direction_id, (int) $kpi->action?->pta?->service_id)) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -157,16 +139,17 @@ class KpiController extends Controller
 
         if ($kpi->action?->pta?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA parent est verrouille. Mise a jour impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour'),
             ], 409);
         }
 
         $validated = $request->validated();
+        $validated['est_a_renseigner'] = $request->boolean('est_a_renseigner', true);
         $targetAction = Action::query()->with('pta:id,direction_id,service_id,statut')->findOrFail((int) $validated['action_id']);
 
         if ($targetAction->pta?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA cible est verrouille. Mise a jour impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
             ], 409);
         }
 
@@ -189,7 +172,7 @@ class KpiController extends Controller
         $this->recordAudit($request, 'kpi', 'update', $kpi, $before, $kpi->toArray());
 
         return response()->json([
-            'message' => 'KPI mis a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('kpi')),
             'data' => $kpi->load([
                 'action:id,pta_id,libelle,statut',
                 'action.pta:id,direction_id,service_id,titre',
@@ -208,7 +191,7 @@ class KpiController extends Controller
 
         if ($kpi->action?->pta?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA parent est verrouille. Suppression impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Suppression'),
             ], 409);
         }
 

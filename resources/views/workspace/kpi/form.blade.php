@@ -5,8 +5,8 @@
         $isEdit = $mode === 'edit';
     @endphp
     <section class="ui-card mb-3.5">
-        <h1>{{ $isEdit ? 'Modifier KPI' : 'Nouveau KPI' }}</h1>
-        <p class="text-slate-600">Configurer cible, seuil et periodicite de suivi.</p>
+        <h1>{{ $isEdit ? 'Modifier indicateur' : 'Nouvel indicateur' }}</h1>
+        <p class="text-slate-600">Configurer cible, seuil, periodicite et mode de saisie de l indicateur.</p>
     </section>
 
     <section class="ui-card mb-3.5">
@@ -17,8 +17,8 @@
             @endif
 
             <div class="form-section">
-                <h2 class="form-section-title">Parametrage du KPI</h2>
-                <p class="form-section-subtitle">Le seuil d alerte est fige tant que la cible n est pas renseignee.</p>
+                <h2 class="form-section-title">Parametrage de l indicateur</h2>
+                <p class="form-section-subtitle">Le seuil d alerte est fige tant que la cible n est pas renseignee. Les indicateurs sans saisie ne remontent pas dans le formulaire des mesures.</p>
                 <div class="form-grid">
                     <div>
                         <label for="action_id">Action</label>
@@ -40,6 +40,15 @@
                         </select>
                     </div>
                     <div>
+                        <label for="est_a_renseigner">Mode de saisie</label>
+                        <select id="est_a_renseigner" name="est_a_renseigner" required>
+                            @foreach ($modeSaisieOptions as $value => $label)
+                                <option value="{{ $value }}" @selected((string) (int) old('est_a_renseigner', $row->est_a_renseigner ?? true) === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <p class="field-hint">Choisir <strong>Sans saisie</strong> pour les indicateurs informatifs ou calcules.</p>
+                    </div>
+                    <div>
                         <label for="unite">Unite</label>
                         <input id="unite" name="unite" type="text" value="{{ old('unite', $row->unite) }}">
                     </div>
@@ -53,14 +62,14 @@
                     </div>
                 </div>
                 <div class="mt-3">
-                    <label for="libelle">Libelle KPI</label>
+                    <label for="libelle">Libelle indicateur</label>
                     <input id="libelle" name="libelle" type="text" value="{{ old('libelle', $row->libelle) }}" required>
                 </div>
             </div>
 
             <div class="form-actions">
-                <button class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.kpi.index') }}">Retour</a>
+                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <a class="btn btn-secondary" href="{{ route('workspace.kpi.index') }}">Retour</a>
             </div>
         </form>
     </section>

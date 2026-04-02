@@ -2,6 +2,7 @@
 
 @section('content')
     @php
+        $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
         $legacyWorkflowBadges = [
             'brouillon' => 'anbg-badge anbg-badge-neutral',
             'soumis' => 'anbg-badge anbg-badge-warning',
@@ -76,8 +77,8 @@
                                 {{ $row->pao?->titre ?? '-' }}<br>
                                 <span class="text-slate-600">{{ $row->pao?->annee ?? '-' }}</span>
                                 @if ($row->pao?->statut)
-                                    <span class="{{ $legacyWorkflowBadges[$row->pao->statut] ?? 'anbg-badge anbg-badge-neutral' }} px-3 ml-2">
-                                        {{ $row->pao->statut }}
+                                <span class="{{ $legacyWorkflowBadges[$row->pao->statut] ?? 'anbg-badge anbg-badge-neutral' }} px-3 ml-2">
+                                        {{ $workflowStatusLabel($row->pao->statut) }}
                                     </span>
                                 @endif
                             </td>

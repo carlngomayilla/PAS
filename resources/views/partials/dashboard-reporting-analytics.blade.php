@@ -1,4 +1,5 @@
 @php
+    $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
     $reporting = $reportingAnalytics ?? [];
     $reportingCharts = $reporting['charts'] ?? [];
     $reportingGlobal = $reporting['global'] ?? [];
@@ -23,10 +24,10 @@
     $ganttRange = max(1, $ganttMin->diffInDays($ganttMax));
     $treemapTotal = max(0.01, (float) ($resourceTreemap['total'] ?? 0));
     $reportingSummaryCards = [
-        ['label' => 'PAS scopes', 'value' => $reportingGlobal['pas_total'] ?? 0, 'tone' => 'navy', 'meta' => 'Strategie couverte'],
-        ['label' => 'Mesures KPI', 'value' => $reportingGlobal['kpi_mesures_total'] ?? 0, 'tone' => 'blue', 'meta' => 'Mesures consolidees'],
-        ['label' => 'Alertes retard', 'value' => $reportingAlerts['actions_en_retard'] ?? 0, 'tone' => 'amber', 'meta' => 'Suivi a traiter'],
-        ['label' => 'KPI sous seuil', 'value' => $reportingAlerts['mesures_kpi_sous_seuil'] ?? 0, 'tone' => 'green', 'meta' => 'Mesures critiques'],
+        ['label' => 'PAS scopes', 'value' => $reportingGlobal['pas_total'] ?? 0, 'tone' => 'navy', 'meta' => 'Strategie couverte', 'href' => route('workspace.pas.index'), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
+        ['label' => 'Mesures d indicateur', 'value' => $reportingGlobal['kpi_mesures_total'] ?? 0, 'tone' => 'blue', 'meta' => 'Mesures consolidees', 'href' => route('workspace.reporting'), 'badge' => 'Valide', 'badge_tone' => 'warning'],
+        ['label' => 'Alertes retard', 'value' => $reportingAlerts['actions_en_retard'] ?? 0, 'tone' => 'amber', 'meta' => 'Suivi a traiter', 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => 'Provisoire', 'badge_tone' => 'danger'],
+        ['label' => 'Indicateurs sous seuil', 'value' => $reportingAlerts['mesures_kpi_sous_seuil'] ?? 0, 'tone' => 'green', 'meta' => 'Mesures critiques', 'href' => route('workspace.alertes', ['niveau' => 'warning', 'limit' => 100]), 'badge' => 'Officiel', 'badge_tone' => 'success'],
     ];
     $statusCards = collect($reportingStatuses)
         ->map(function (array $rows, string $module): array {
@@ -44,13 +45,26 @@
 @endphp
 
 <div class="dashboard-advanced-shell">
+    <div class="flex flex-wrap gap-2">
+        <span class="anbg-badge anbg-badge-info px-3 py-1">Operationnel</span>
+        <span class="anbg-badge anbg-badge-warning px-3 py-1">Valide</span>
+        <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
+    </div>
+
     <div class="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
         @foreach ($reportingSummaryCards as $card)
-            <article class="dashboard-advanced-kpi dashboard-advanced-kpi-{{ $card['tone'] }}">
-                <p class="dashboard-summary-label">{{ $card['label'] }}</p>
-                <p class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none">{{ $card['value'] }}</p>
-                <p class="dashboard-summary-meta mt-2 text-xs">{{ $card['meta'] }}</p>
-            </article>
+            <x-stat-card-link
+                :href="$card['href']"
+                :label="$card['label']"
+                :value="$card['value']"
+                :meta="$card['meta']"
+                :badge="$card['badge']"
+                :badge-tone="$card['badge_tone']"
+                card-class="dashboard-advanced-kpi dashboard-advanced-kpi-{{ $card['tone'] }}"
+                label-class="dashboard-summary-label"
+                value-class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none"
+                meta-class="dashboard-summary-meta mt-2 text-xs"
+            />
         @endforeach
     </div>
 
@@ -61,7 +75,7 @@
                     <h2 class="showcase-panel-title">Entonnoir PAS - PAO - PTA - Actions</h2>
                     <p class="showcase-panel-subtitle">Mesure la densite de conversion entre planification et execution.</p>
                 </div>
-                <span class="showcase-chip">{{ count($reportingCharts['funnel']['labels'] ?? []) }} niveaux</span>
+                <span class="showcase-chip">Operationnel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-funnel-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -72,6 +86,7 @@
                     <h2 class="showcase-panel-title">Statuts empiles par {{ strtolower($reportingCharts['status_by_unit']['unit_label'] ?? 'unite') }}</h2>
                     <p class="showcase-panel-subtitle">Comparaison directe des poches de retard, avance et cloture.</p>
                 </div>
+                <span class="showcase-chip">Operationnel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-status-unit-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -82,6 +97,7 @@
                     <h2 class="showcase-panel-title">Avancement reel vs theorique</h2>
                     <p class="showcase-panel-subtitle">Tendance glissante sur les periodes renseignees.</p>
                 </div>
+                <span class="showcase-chip">Operationnel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-progress-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -89,9 +105,10 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">KPI consolides: valeur, cible, seuil</h2>
+                    <h2 class="showcase-panel-title">Indicateurs consolides: valeur, cible, seuil</h2>
                     <p class="showcase-panel-subtitle">Lecture dynamique du respect des cibles et des zones d alerte.</p>
                 </div>
+                <span class="showcase-chip">Officiel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-kpi-trend-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -102,6 +119,7 @@
                     <h2 class="showcase-panel-title">Evolution interannuelle</h2>
                     <p class="showcase-panel-subtitle">Volume d actions, validations et progression moyenne sur plusieurs annees.</p>
                 </div>
+                <span class="showcase-chip">Officiel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-interannual-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -112,6 +130,7 @@
                     <h2 class="showcase-panel-title">Pareto des risques</h2>
                     <p class="showcase-panel-subtitle">Priorise les causes qui concentrent le plus de blocages.</p>
                 </div>
+                <span class="showcase-chip">Valide</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-risk-pareto-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -149,7 +168,7 @@
                     </thead>
                     <tbody>
                         @forelse ($topRisks['rows'] as $row)
-                            <tr>
+                            <tr class="dashboard-row-link" data-row-link="{{ $row['url'] ?? '' }}">
                                 <td class="font-semibold">{{ $row['action'] }}</td>
                                 <td>
                                     <div class="dashboard-risk-inline">
@@ -247,7 +266,7 @@
                     </thead>
                     <tbody>
                         @forelse ($pasConsolidation as $row)
-                            <tr>
+                            <tr class="dashboard-row-link" data-row-link="{{ $row['url'] ?? '' }}">
                                 <td class="font-semibold">{{ $row['titre'] }}</td>
                                 <td>{{ $row['periode'] }}</td>
                                 <td>{{ $row['axes_total'] }}</td>
@@ -315,7 +334,7 @@
                     </thead>
                     <tbody>
                         @forelse ($interannualComparison as $row)
-                            <tr>
+                            <tr class="dashboard-row-link" data-row-link="{{ $row['url'] ?? '' }}">
                                 <td class="font-semibold">{{ $row['annee'] }}</td>
                                 <td>{{ $row['paos_total'] }}</td>
                                 <td>{{ $row['ptas_total'] }}</td>

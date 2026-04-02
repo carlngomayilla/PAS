@@ -6,7 +6,7 @@
         <p class="text-slate-600">Recherche, suivi et gestion documentaire des preuves d execution.</p>
         @if ($canWrite)
             <p class="mt-2.5">
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-green-700 text-white hover:bg-green-600" href="{{ route('workspace.justificatifs.create') }}">Ajouter un justificatif</a>
+                <a class="btn btn-primary" href="{{ route('workspace.justificatifs.create') }}">Ajouter un justificatif</a>
             </p>
         @endif
     </section>
@@ -35,7 +35,7 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.justificatifs.index') }}">Reinitialiser</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.justificatifs.index') }}">Reinitialiser</a>
             </div>
         </form>
     </section>
@@ -77,7 +77,7 @@
                             <td>{{ $item->ajoutePar?->name ?? '-' }}</td>
                             <td>
                                 <div class="flex flex-wrap gap-1.5">
-                                    <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.justificatifs.download', $item) }}">Telecharger</a>
+                                    <a class="btn btn-primary" href="{{ route('workspace.justificatifs.download', $item) }}">Telecharger</a>
                                     @if ($canWriteByJustificatif[$item->id] ?? false)
                                         <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-[#f9b13c] text-white hover:brightness-105" href="{{ route('workspace.justificatifs.edit', $item) }}">Modifier</a>
                                         <form method="POST" action="{{ route('workspace.justificatifs.destroy', $item) }}" data-confirm-message="Supprimer ce justificatif ?" data-confirm-tone="danger" data-confirm-label="Supprimer">

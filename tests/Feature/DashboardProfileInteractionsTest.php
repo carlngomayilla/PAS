@@ -33,11 +33,166 @@ class DashboardProfileInteractionsTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Tableau de bord strategique et operationnel');
+        $response->assertSee('Pilotage du service');
+        $response->assertSee('Actions a valider');
+        $response->assertSee('Performance des agents');
         $response->assertSee('Diagramme de Gantt compact');
+        $response->assertSee('dashboard-role-status-chart', false);
+        $response->assertSee('dashboard-role-support-chart', false);
         $response->assertSee('"dgPayload"', false);
         $response->assertSee('"kpi_summary"', false);
         $response->assertSee('"kpi_qualite"', false);
         $response->assertSee('"kpi_risque"', false);
+    }
+
+    public function test_seeded_agent_user_sees_agent_dashboard_sections(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'melissa.abogo@anbg.ga')->firstOrFail();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('Suivi personnel de l execution');
+        $response->assertSee('Mes actions prioritaires');
+        $response->assertSee('Mes actions en retard');
+        $response->assertSee('dashboard-role-trend-chart', false);
+    }
+
+    public function test_seeded_direction_user_sees_direction_dashboard_sections(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'directeur.daf@anbg.ga')->firstOrFail();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('Pilotage directionnel et comparaison des services');
+        $response->assertSee('Performance par service');
+        $response->assertSee('Actions critiques de la direction');
+        $response->assertSee('dashboard-role-support-chart', false);
+    }
+
+    public function test_seeded_planification_user_sees_planification_dashboard_sections(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'hilaire.nguebet@anbg.ga')->firstOrFail();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('Consolidation transverse du pilotage');
+        $response->assertSee('Classement des directions');
+        $response->assertSee('Actions critiques consolidees');
+        $response->assertSee('Officiel');
+    }
+
+    public function test_seeded_dg_user_sees_dg_dashboard_sections(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('Lecture strategique institutionnelle');
+        $response->assertSee('Statistiques operationnelles');
+        $response->assertSee('Statistiques officielles');
+        $response->assertSee('Jauges operationnelles');
+        $response->assertSee('Jauges officielles');
+        $response->assertSee('Graphiques operationnels');
+        $response->assertSee('Graphiques officiels');
+        $response->assertSee('Operationnel vs officiel');
+        $response->assertSee('Directions : operationnel vs officiel');
+        $response->assertSee('Execution operationnelle');
+        $response->assertSee('Execution officielle');
+        $response->assertSee('Directions en difficulte');
+        $response->assertSee('Officiel');
+        $response->assertSee('dashboard-role-comparison-chart', false);
+    }
+
+    public function test_seeded_cabinet_user_sees_cabinet_dashboard_sections(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('Suivi transverse et appui decisionnel');
+        $response->assertSee('Validations en attente');
+        $response->assertSee('Alertes critiques transverses');
+        $response->assertSee('Valide');
+    }
+
+    public function test_seeded_service_user_sees_role_aware_pilotage_page(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+
+        $response = $this->actingAs($user)->get('/workspace/pilotage');
+
+        $response->assertOk();
+        $response->assertSee('Suivi du service et ruptures de chaine');
+        $response->assertSee('Provisoire');
+        $response->assertSee('Officiel');
+    }
+
+    public function test_seeded_dg_user_sees_role_aware_reporting_page(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
+
+        $response = $this->actingAs($user)->get('/workspace/reporting');
+
+        $response->assertOk();
+        $response->assertSee('Centre d export institutionnel');
+        $response->assertSee('Lecture DG : operationnel vs officiel');
+        $response->assertSee('Statistiques operationnelles');
+        $response->assertSee('Statistiques officielles');
+        $response->assertSee('Directions : operationnel vs officiel');
+        $response->assertSee('Execution operationnelle');
+        $response->assertSee('Execution officielle');
+        $response->assertSee('Officiel');
+        $response->assertSee('Dashboard analytique');
+    }
+
+    public function test_seeded_dg_user_sees_role_aware_pilotage_comparison_sections(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
+
+        $response = $this->actingAs($user)->get('/workspace/pilotage');
+
+        $response->assertOk();
+        $response->assertSee('Pilotage institutionnel');
+        $response->assertSee('Lecture DG : operationnel vs officiel');
+        $response->assertSee('Statistiques operationnelles');
+        $response->assertSee('Statistiques officielles');
+        $response->assertSee('Directions : operationnel vs officiel');
+        $response->assertSee('Execution operationnelle');
+        $response->assertSee('Execution officielle');
+    }
+
+    public function test_seeded_cabinet_user_sees_role_aware_reporting_page(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
+
+        $response = $this->actingAs($user)->get('/workspace/reporting');
+
+        $response->assertOk();
+        $response->assertSee('Centre de diffusion transverse');
+        $response->assertSee('Valide');
+        $response->assertSee('Provisoire');
     }
 }

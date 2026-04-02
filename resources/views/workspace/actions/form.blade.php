@@ -6,6 +6,9 @@
         $targetType = old('type_cible', $row->type_cible ?: 'quantitative');
         $selectedPta = $ptaOptions->firstWhere('id', (int) old('pta_id', $row->pta_id));
         $selectedResponsable = $responsableOptions->firstWhere('id', (int) old('responsable_id', $row->responsable_id));
+        $primaryKpi = $row->relationLoaded('primaryKpi') ? $row->primaryKpi : null;
+        $derivedIndicatorUnit = trim((string) old('unite_cible', $row->unite_cible ?: $primaryKpi?->unite));
+        $derivedIndicatorTarget = old('quantite_cible', $row->quantite_cible ?? $primaryKpi?->cible);
     @endphp
 
     <section class="showcase-hero mb-4">
@@ -14,8 +17,9 @@
                 <span class="showcase-eyebrow">{{ $isEdit ? 'Edition action' : 'Nouvelle action' }}</span>
                 <h1 class="showcase-title">{{ $isEdit ? 'Modifier une action existante' : 'Enregistrer une nouvelle action' }}</h1>
                 <p class="showcase-subtitle">
-                    Creation d action avec generation automatique des periodes de suivi, calcul des KPI,
-                    gestion des ressources mobilisees et circuit de validation agent -> chef de service -> direction.
+                    Creation d action avec generation automatique des periodes de suivi, calcul des indicateurs,
+                    gestion des ressources mobilisees, parametrage direct de l indicateur principal
+                    et circuit de validation agent -> chef de service -> direction.
                 </p>
                 <div class="showcase-chip-row">
                     <span class="showcase-chip">
@@ -34,7 +38,7 @@
             </div>
             <div class="showcase-action-row">
                 @if ($isEdit)
-                    <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.actions.suivi', $row) }}">
+                    <a class="btn btn-follow rounded-2xl px-4 py-2.5" href="{{ route('workspace.actions.suivi', $row) }}">
                         Ouvrir le suivi
                     </a>
                 @endif
@@ -151,7 +155,7 @@
                             <option value="suspendu" @selected($manualStatus === 'suspendu')>Suspendu</option>
                             <option value="annule" @selected($manualStatus === 'annule')>Annule</option>
                         </select>
-                        <p class="field-hint">Suspendu gele les KPI. Annule sort l action du pilotage automatique.</p>
+                        <p class="field-hint">Suspendu gele les indicateurs. Annule sort l action du pilotage automatique.</p>
                     </div>
                 </div>
                 <div class="mt-3">
@@ -212,8 +216,69 @@
                 </div>
             </div>
 
+            <div id="action-indicator-settings" class="form-section">
+                <h2 class="form-section-title">3) Indicateur principal</h2>
+                <p class="form-section-subtitle">Seuls les reglages non redondants restent ici. L unite et la cible de l indicateur sont heritees automatiquement de l action quantitative.</p>
+                <div class="rounded-[1.15rem] border border-slate-200/85 bg-slate-50/90 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
+                    <p id="indicator-derived-hint" class="font-medium text-slate-800 dark:text-slate-100">
+                        {{ $targetType === 'quantitative' ? 'Les valeurs de mesure de l indicateur reprennent automatiquement la cible de l action.' : 'Pour une action qualitative, l indicateur conserve un reglage simple de suivi sans dupliquer la cible metier.' }}
+                    </p>
+                    <div class="mt-3 showcase-chip-row">
+                        <span id="indicator-derived-unit-chip" class="showcase-chip {{ $targetType === 'quantitative' ? '' : 'hidden' }}">
+                            <span class="showcase-chip-dot bg-[#3B82F6]"></span>
+                            Unite heritee: <strong class="ml-1">{{ $derivedIndicatorUnit !== '' ? $derivedIndicatorUnit : 'A definir dans la cible' }}</strong>
+                        </span>
+                        <span id="indicator-derived-target-chip" class="showcase-chip {{ $targetType === 'quantitative' ? '' : 'hidden' }}">
+                            <span class="showcase-chip-dot bg-[#10B981]"></span>
+                            Cible heritee: <strong class="ml-1">{{ ($derivedIndicatorTarget !== null && $derivedIndicatorTarget !== '') ? $derivedIndicatorTarget : 'A definir dans la cible' }}</strong>
+                        </span>
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label for="kpi_libelle">Libelle indicateur principal</label>
+                        <input
+                            id="kpi_libelle"
+                            name="kpi_libelle"
+                            type="text"
+                            value="{{ old('kpi_libelle', $primaryKpi?->libelle) }}"
+                            placeholder="Laisser vide pour reprendre le titre de l action"
+                        >
+                        <p class="field-hint">Si vous laissez ce champ vide, l indicateur reprendra le titre de l action.</p>
+                    </div>
+                    <div>
+                        <label for="kpi_periodicite">Periodicite</label>
+                        <select id="kpi_periodicite" name="kpi_periodicite" required>
+                            @foreach ($indicatorPeriodicityOptions as $value)
+                                <option value="{{ $value }}" @selected(old('kpi_periodicite', $primaryKpi?->periodicite ?? 'mensuel') === $value)>{{ ucfirst($value) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="kpi_est_a_renseigner">Mode de saisie</label>
+                        <select id="kpi_est_a_renseigner" name="kpi_est_a_renseigner" required>
+                            @foreach ($indicatorModeOptions as $value => $label)
+                                <option value="{{ $value }}" @selected((string) old('kpi_est_a_renseigner', (int) ($primaryKpi?->est_a_renseigner ?? true)) === (string) $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="kpi_seuil_alerte">Seuil d alerte</label>
+                        <input
+                            id="kpi_seuil_alerte"
+                            name="kpi_seuil_alerte"
+                            type="number"
+                            step="0.0001"
+                            min="0"
+                            value="{{ old('kpi_seuil_alerte', $primaryKpi?->seuil_alerte) }}"
+                        >
+                        <p class="field-hint">Le seuil est compare a la cible effective de l indicateur quand elle existe.</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-section">
-                <h2 class="form-section-title">3) Ressources et financement</h2>
+                <h2 class="form-section-title">4) Ressources et financement</h2>
                 <p class="form-section-subtitle">Les sous-champs se debloquent uniquement si necessaire.</p>
 
                 <div class="form-grid-compact">
@@ -289,7 +354,7 @@
             </div>
 
             <div class="form-section">
-                <h2 class="form-section-title">4) Risques et pilotage</h2>
+                <h2 class="form-section-title">5) Risques et pilotage</h2>
                 <p class="form-section-subtitle">Anticiper les blocages et definir les mesures preventives.</p>
                 <div class="form-grid">
                     <div>
@@ -313,7 +378,7 @@
             <div class="form-actions">
                 <button class="btn btn-green" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
                 @if ($isEdit)
-                    <a class="btn btn-blue" href="{{ route('workspace.actions.suivi', $row) }}">Voir suivi</a>
+                    <a class="btn btn-follow" href="{{ route('workspace.actions.suivi', $row) }}">Voir suivi</a>
                 @endif
                 <a class="btn btn-blue" href="{{ route('workspace.actions.index') }}">Retour</a>
             </div>
@@ -327,12 +392,17 @@
             var form = document.querySelector('form[data-is-edit]');
             var isEdit = form && form.getAttribute('data-is-edit') === '1';
             var typeSelect = document.getElementById('type_cible');
+            var unitInput = document.getElementById('unite_cible');
+            var quantityInput = document.getElementById('quantite_cible');
             var quantZone = document.getElementById('zone_quantitative');
             var qualZone = document.getElementById('zone_qualitative');
             var financementSelect = document.getElementById('financement_requis');
             var financeFields = document.getElementById('finance_fields');
             var autresRessourceCheckbox = document.getElementById('ressource_autres');
             var autresRessourceBlock = document.getElementById('autres_ressources_block');
+            var indicatorDerivedHint = document.getElementById('indicator-derived-hint');
+            var indicatorDerivedUnitChip = document.getElementById('indicator-derived-unit-chip');
+            var indicatorDerivedTargetChip = document.getElementById('indicator-derived-target-chip');
 
             function setSectionState(section, enabled) {
                 if (!section) {
@@ -390,6 +460,34 @@
                 qualZone.classList.toggle('hidden', isQuant);
                 setSectionState(quantZone, isQuant);
                 setSectionState(qualZone, !isQuant);
+                syncIndicatorDerivations();
+            }
+
+            function syncIndicatorDerivations() {
+                if (!typeSelect || !indicatorDerivedHint || !indicatorDerivedUnitChip || !indicatorDerivedTargetChip) {
+                    return;
+                }
+
+                var isQuant = typeSelect.value === 'quantitative';
+                var unitValue = unitInput && unitInput.value.trim() !== '' ? unitInput.value.trim() : 'A definir dans la cible';
+                var targetValue = quantityInput && quantityInput.value !== '' ? quantityInput.value : 'A definir dans la cible';
+
+                indicatorDerivedHint.textContent = isQuant
+                    ? 'Les valeurs de mesure de l indicateur reprennent automatiquement la cible de l action.'
+                    : 'Pour une action qualitative, l indicateur conserve un reglage simple de suivi sans dupliquer la cible metier.';
+
+                indicatorDerivedUnitChip.classList.toggle('hidden', !isQuant);
+                indicatorDerivedTargetChip.classList.toggle('hidden', !isQuant);
+
+                var unitStrong = indicatorDerivedUnitChip.querySelector('strong');
+                if (unitStrong) {
+                    unitStrong.textContent = unitValue;
+                }
+
+                var targetStrong = indicatorDerivedTargetChip.querySelector('strong');
+                if (targetStrong) {
+                    targetStrong.textContent = targetValue;
+                }
             }
 
             function syncFinanceFields() {
@@ -414,6 +512,14 @@
                 typeSelect.addEventListener('change', syncTargetZones);
             }
 
+            if (unitInput) {
+                unitInput.addEventListener('input', syncIndicatorDerivations);
+            }
+
+            if (quantityInput) {
+                quantityInput.addEventListener('input', syncIndicatorDerivations);
+            }
+
             if (financementSelect) {
                 financementSelect.addEventListener('change', syncFinanceFields);
             }
@@ -425,6 +531,7 @@
             syncTargetZones();
             syncFinanceFields();
             syncAutresRessources();
+            syncIndicatorDerivations();
         })();
     </script>
 @endpush

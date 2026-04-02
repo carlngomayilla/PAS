@@ -356,6 +356,7 @@ class ReportingAnalyticsService
 
                 return [
                     'annee' => (int) $annee,
+                    'url' => route('workspace.pao.index', ['annee' => (int) $annee]),
                     'paos_total' => $rows->count(),
                     'ptas_total' => $ptas->count(),
                     'actions_total' => $actionsTotal,
@@ -473,6 +474,7 @@ class ReportingAnalyticsService
             return [
                 'id' => (int) $pas->id,
                 'titre' => (string) $pas->titre,
+                'url' => route('workspace.pao.index', ['pas_id' => (int) $pas->id]),
                 'periode' => (string) $pas->periode_debut.'-'.$pas->periode_fin,
                 'statut' => (string) $pas->statut,
                 'axes_total' => $pas->axes->count(),
@@ -516,6 +518,12 @@ class ReportingAnalyticsService
                 (int) (clone $ptaQuery)->count(),
                 (int) (clone $actionQuery)->count(),
             ],
+            'urls' => [
+                route('workspace.pas.index'),
+                route('workspace.pao.index'),
+                route('workspace.pta.index'),
+                route('workspace.actions.index'),
+            ],
         ];
 
         $unitLabel = 'Direction';
@@ -540,6 +548,7 @@ class ReportingAnalyticsService
                 ->mapWithKeys(fn ($label, $id): array => [(int) $id => (string) $label])
                 ->toArray();
         }
+        $unitFilterKey = $unitColumn === 'ptas.service_id' ? 'service_id' : 'direction_id';
 
         $statusRows = Action::query()
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
@@ -581,11 +590,19 @@ class ReportingAnalyticsService
         $statusLabels = array_map(fn (int $id): string => $unitNames[$id] ?? ('#'.$id), $unitIds);
         $statusNames = array_slice(array_keys($statusTotals), 0, 6);
         $statusDatasets = [];
+        $statusUrls = [];
         foreach ($statusNames as $statusName) {
             $statusDatasets[] = [
                 'label' => $statusName,
                 'data' => array_map(fn (int $unitId): int => (int) ($statusMatrix[$statusName][$unitId] ?? 0), $unitIds),
             ];
+            $statusUrls[] = array_map(
+                fn (int $unitId): string => $this->actionIndexRoute([
+                    $unitFilterKey => $unitId,
+                    'statut' => $statusName,
+                ]),
+                $unitIds
+            );
         }
 
         $progressRows = ActionWeek::query()
@@ -612,12 +629,17 @@ class ReportingAnalyticsService
         $progressLabels = [];
         $progressReel = [];
         $progressTheorique = [];
+        $progressUrls = [];
         foreach ($progressBuckets as $weekStart => $bucket) {
             $date = Carbon::parse($weekStart);
             $count = max(1, (int) $bucket['count']);
             $progressLabels[] = 'S'.$date->isoWeek.' '.$date->year;
             $progressReel[] = round((float) $bucket['sum_reel'] / $count, 2);
             $progressTheorique[] = round((float) $bucket['sum_theorique'] / $count, 2);
+            $progressUrls[] = $this->actionIndexRoute([
+                'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                'week_start' => $weekStart,
+            ]);
         }
 
         $trendRows = KpiMesure::query()
@@ -690,11 +712,20 @@ class ReportingAnalyticsService
         $trendValues = [];
         $trendTargets = [];
         $trendThresholds = [];
+        $trendUrls = [];
         foreach ($periodBuckets as $period => $bucket) {
             $trendLabels[] = $period;
             $trendValues[] = round($bucket['count_valeur'] > 0 ? ((float) $bucket['sum_valeur'] / (int) $bucket['count_valeur']) : 0, 2);
             $trendTargets[] = round($bucket['count_cible'] > 0 ? ((float) $bucket['sum_cible'] / (int) $bucket['count_cible']) : 0, 2);
             $trendThresholds[] = round($bucket['count_seuil'] > 0 ? ((float) $bucket['sum_seuil'] / (int) $bucket['count_seuil']) : 0, 2);
+            $trendUrls[] = preg_match('/^(\d{4})/', $period, $matches) === 1
+                ? $this->actionIndexRoute([
+                    'annee' => (int) $matches[1],
+                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                ])
+                : $this->actionIndexRoute([
+                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                ]);
         }
 
         $weekStarts = [];
@@ -738,15 +769,25 @@ class ReportingAnalyticsService
             ->toArray();
         $heatUnits = array_map(fn (int $directionId): string => $heatDirectionNames[$directionId] ?? ('#'.$directionId), $heatDirectionIds);
         $heatMatrix = [];
+        $heatUrls = [];
         $heatMax = 0;
         foreach ($heatDirectionIds as $directionId) {
             $rowValues = [];
+            $rowUrls = [];
             foreach ($weekKeys as $weekKey) {
                 $value = (int) ($heatMatrixByDirection[$directionId][$weekKey] ?? 0);
                 $rowValues[] = $value;
+                $rowUrls[] = $value > 0
+                    ? $this->actionIndexRoute([
+                        'direction_id' => $directionId,
+                        'statut' => ActionTrackingService::STATUS_EN_RETARD,
+                        'week_start' => $weekKey,
+                    ])
+                    : '';
                 $heatMax = max($heatMax, $value);
             }
             $heatMatrix[] = $rowValues;
+            $heatUrls[] = $rowUrls;
         }
 
         $actionCandidates = (clone $actionQuery)
@@ -798,16 +839,20 @@ class ReportingAnalyticsService
                     'progress' => (float) $item['progress'],
                     'status' => (string) $item['status'],
                     'score' => (float) $item['score'],
+                    'url' => route('workspace.actions.suivi', $item['action']),
                 ])
                 ->all(),
         ];
 
-        $resourceTotals = [];
+        $resourceGroups = [];
         foreach ($actionCandidates as $action) {
             $groupLabel = trim((string) ($action->pta?->pao?->titre ?? $action->pta?->titre ?? 'Sans axe'));
             if ($groupLabel === '') {
                 $groupLabel = 'Sans axe';
             }
+            $resourceGroupKey = $action->pta?->pao?->id !== null
+                ? 'pao:'.(int) $action->pta->pao->id
+                : 'pta:'.(int) $action->pta_id;
             $weight = 0.0;
             $weight += (bool) $action->ressource_main_oeuvre ? 1.0 : 0.0;
             $weight += (bool) $action->ressource_equipement ? 1.0 : 0.0;
@@ -821,12 +866,22 @@ class ReportingAnalyticsService
             if ($weight <= 0) {
                 $weight = 0.5;
             }
-            $resourceTotals[$groupLabel] = ($resourceTotals[$groupLabel] ?? 0.0) + $weight;
+            if (! isset($resourceGroups[$resourceGroupKey])) {
+                $resourceGroups[$resourceGroupKey] = [
+                    'label' => $groupLabel,
+                    'weight' => 0.0,
+                    'url' => $action->pta?->pao?->id !== null
+                        ? route('workspace.pta.index', ['pao_id' => (int) $action->pta->pao->id])
+                        : $this->actionIndexRoute(['pta_id' => (int) $action->pta_id]),
+                ];
+            }
+            $resourceGroups[$resourceGroupKey]['weight'] += $weight;
         }
-        arsort($resourceTotals);
-        $resourceTotals = array_slice($resourceTotals, 0, 12, true);
-        $resourceLabels = array_keys($resourceTotals);
-        $resourceValues = array_map(fn ($value): float => round((float) $value, 2), array_values($resourceTotals));
+        uasort($resourceGroups, static fn (array $left, array $right): int => $right['weight'] <=> $left['weight']);
+        $resourceGroups = array_slice($resourceGroups, 0, 12, true);
+        $resourceLabels = array_map(fn (array $row): string => (string) $row['label'], array_values($resourceGroups));
+        $resourceValues = array_map(fn (array $row): float => round((float) $row['weight'], 2), array_values($resourceGroups));
+        $resourceUrls = array_map(fn (array $row): string => (string) $row['url'], array_values($resourceGroups));
 
         $riskCounts = [];
         foreach ($actionCandidates as $action) {
@@ -848,6 +903,10 @@ class ReportingAnalyticsService
 
         $paretoLabels = array_keys($riskCounts);
         $paretoValues = array_values($riskCounts);
+        $paretoUrls = array_map(
+            fn (string $label): string => $this->actionIndexRoute(['risque_label' => $label]),
+            $paretoLabels
+        );
         $paretoCumulative = [];
         $runningTotal = 0;
         $allTotal = array_sum($paretoValues);
@@ -867,6 +926,7 @@ class ReportingAnalyticsService
                     'statut' => (string) $item['status'],
                     'echeance' => $action->date_echeance instanceof Carbon ? $action->date_echeance->toDateString() : '-',
                     'responsable' => (string) ($action->responsable?->name ?? '-'),
+                    'url' => route('workspace.actions.suivi', $action),
                 ];
             })
             ->all();
@@ -896,6 +956,7 @@ class ReportingAnalyticsService
 
         $performanceLabels = [];
         $performanceValues = [];
+        $performanceUrls = [];
         foreach ($perfRows->take(6) as $row) {
             $directionId = (int) $row['direction_id'];
             if ($directionId <= 0) {
@@ -903,11 +964,19 @@ class ReportingAnalyticsService
             }
             $performanceLabels[] = $performanceDirectionNames[$directionId] ?? ('#'.$directionId);
             $performanceValues[] = (float) $row['avg'];
+            $performanceUrls[] = $this->actionIndexRoute([
+                'direction_id' => $directionId,
+                'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ]);
         }
 
         if ($performanceLabels === [] && $user->direction_id !== null) {
             $performanceLabels[] = $performanceDirectionNames[(int) $user->direction_id] ?? ('#'.$user->direction_id);
             $performanceValues[] = 0.0;
+            $performanceUrls[] = $this->actionIndexRoute([
+                'direction_id' => (int) $user->direction_id,
+                'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ]);
         }
 
         $interannualRows = $this->buildInterannualComparison($user);
@@ -918,33 +987,39 @@ class ReportingAnalyticsService
                 'unit_label' => $unitLabel,
                 'labels' => $statusLabels,
                 'datasets' => $statusDatasets,
+                'urls' => $statusUrls,
             ],
             'progress_weekly' => [
                 'labels' => $progressLabels,
                 'reel' => $progressReel,
                 'theorique' => $progressTheorique,
+                'urls' => $progressUrls,
             ],
             'kpi_trend' => [
                 'labels' => $trendLabels,
                 'valeurs' => $trendValues,
                 'cibles' => $trendTargets,
                 'seuils' => $trendThresholds,
+                'urls' => $trendUrls,
             ],
             'retard_heatmap' => [
                 'weeks' => $weekLabels,
                 'units' => $heatUnits,
                 'matrix' => $heatMatrix,
+                'urls' => $heatUrls,
                 'max' => $heatMax,
             ],
             'critical_gantt' => $criticalGantt,
             'resource_treemap' => [
                 'labels' => array_map(fn ($label): string => Str::limit((string) $label, 44), $resourceLabels),
                 'values' => $resourceValues,
+                'urls' => $resourceUrls,
                 'total' => round((float) array_sum($resourceValues), 2),
             ],
             'risk_pareto' => [
                 'labels' => array_map(fn ($label): string => Str::limit(Str::title((string) $label), 42), $paretoLabels),
                 'counts' => $paretoValues,
+                'urls' => $paretoUrls,
                 'cumulative_pct' => $paretoCumulative,
             ],
             'top_risks' => [
@@ -955,12 +1030,14 @@ class ReportingAnalyticsService
             'performance_gauge' => [
                 'labels' => $performanceLabels,
                 'values' => $performanceValues,
+                'urls' => $performanceUrls,
             ],
             'interannual_overview' => [
                 'labels' => array_map(fn (array $row): string => (string) $row['annee'], $interannualRows),
                 'actions_total' => array_map(fn (array $row): int => (int) $row['actions_total'], $interannualRows),
                 'actions_validees' => array_map(fn (array $row): int => (int) $row['actions_validees'], $interannualRows),
                 'progression_moyenne' => array_map(fn (array $row): float => (float) $row['progression_moyenne'], $interannualRows),
+                'urls' => array_map(fn (array $row): string => (string) ($row['url'] ?? route('workspace.pao.index', ['annee' => (int) $row['annee']])), $interannualRows),
             ],
         ];
     }
@@ -1086,6 +1163,14 @@ class ReportingAnalyticsService
         }
 
         return round(($done / $total) * 100, 2);
+    }
+
+    private function actionIndexRoute(array $filters = []): string
+    {
+        return route('workspace.actions.index', array_filter(
+            $filters,
+            static fn ($value): bool => $value !== null && $value !== ''
+        ));
     }
 
     /**

@@ -521,7 +521,7 @@ class ActionTrackingService
                     $action,
                     'action_suspendue',
                     'warning',
-                    'Action suspendue. Les KPI sont geles jusqu a reactivation.',
+                    'Action suspendue. Les indicateurs sont geles jusqu a reactivation.',
                     [
                         'statut_dynamique' => $status,
                         'progression_reelle' => $realProgress,
@@ -863,7 +863,7 @@ class ActionTrackingService
                 $action,
                 'kpi_global_sous_seuil',
                 'critical',
-                'KPI global de l action sous le seuil critique de pilotage.',
+                'Indicateur global de l action sous le seuil critique de pilotage.',
                 ['kpi_global' => $globalKpi],
                 'direction'
             );
@@ -872,7 +872,7 @@ class ActionTrackingService
                 $action,
                 'kpi_global_sous_seuil',
                 'warning',
-                'KPI global de l action sous le seuil de pilotage.',
+                'Indicateur global de l action sous le seuil de pilotage.',
                 ['kpi_global' => $globalKpi],
                 'direction'
             );
@@ -888,7 +888,7 @@ class ActionTrackingService
                 $action,
                 'alerte_combinee_critique',
                 'urgence',
-                'Action en retard avec KPI critique. Urgence et escalade DG requises.',
+                'Action en retard avec indicateur critique. Urgence et escalade DG requises.',
                 [
                     'kpi_global' => $globalKpi,
                     'progression_reelle' => $realProgress,

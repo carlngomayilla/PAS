@@ -2,6 +2,9 @@
 
 @section('content')
     @php
+        $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
+        $actionStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
+        $validationStatusLabel = static fn (string $status): string => \App\Support\UiLabel::validationStatus($status);
         $kpi = $action->actionKpi;
         $status = $action->statut_dynamique ?: 'non_demarre';
         $pta = $action->pta;
@@ -31,15 +34,7 @@
             default => 'semaines',
         };
         $validationStatus = (string) ($action->statut_validation ?: 'non_soumise');
-        $validationLabels = [
-            'non_soumise' => 'Non soumise',
-            'soumise_chef' => 'Soumise au chef de service',
-            'rejetee_chef' => 'Rejetee par le chef de service',
-            'validee_chef' => 'Validee par le chef de service (en attente direction)',
-            'rejetee_direction' => 'Rejetee par la direction',
-            'validee_direction' => 'Validee par la direction',
-        ];
-        $validationLabel = $validationLabels[$validationStatus] ?? $validationStatus;
+        $validationLabel = $validationStatusLabel($validationStatus);
         $agentLocked = auth()->check()
             && (int) auth()->id() === (int) $action->responsable_id
             && !in_array($validationStatus, ['non_soumise', 'rejetee_chef', 'rejetee_direction'], true);
@@ -71,28 +66,28 @@
             ->sortBy('created_at')
             ->values();
         $statusStyles = [
-            'non_demarre' => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
-            'en_cours' => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-            'a_risque' => 'bg-[#fff8d6] text-[#b98a00] dark:bg-[#f0e509]/15 dark:text-[#f8e932]',
-            'en_avance' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/15 dark:text-[#f8e932]',
-            'en_retard' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-[#f8e932]',
-            'suspendu' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200',
-            'annule' => 'bg-slate-200 text-slate-700 dark:bg-slate-700/50 dark:text-slate-200',
-            'acheve_dans_delai' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/15 dark:text-[#f8e932]',
-            'acheve_hors_delai' => 'bg-[#fff8d6] text-[#f9b13c] dark:bg-[#f0e509]/15 dark:text-[#f8e932]',
+            'non_demarre' => 'anbg-badge anbg-badge-neutral',
+            'en_cours' => 'anbg-badge anbg-badge-info',
+            'a_risque' => 'anbg-badge anbg-badge-warning',
+            'en_avance' => 'anbg-badge anbg-badge-success',
+            'en_retard' => 'anbg-badge anbg-badge-danger',
+            'suspendu' => 'anbg-badge anbg-badge-danger',
+            'annule' => 'anbg-badge anbg-badge-neutral',
+            'acheve_dans_delai' => 'anbg-badge anbg-badge-success',
+            'acheve_hors_delai' => 'anbg-badge anbg-badge-warning',
         ];
         $validationStyles = [
-            'non_soumise' => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
-            'soumise_chef' => 'bg-[#fff8d6] text-[#f9b13c] dark:bg-[#f0e509]/15 dark:text-[#f8e932]',
-            'rejetee_chef' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-[#f8e932]',
-            'validee_chef' => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-            'rejetee_direction' => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-[#f8e932]',
-            'validee_direction' => 'bg-[#eef6e1] text-[#1c203d] dark:bg-[#8fc043]/15 dark:text-[#f8e932]',
+            'non_soumise' => 'anbg-badge anbg-badge-neutral',
+            'soumise_chef' => 'anbg-badge anbg-badge-warning',
+            'rejetee_chef' => 'anbg-badge anbg-badge-danger',
+            'validee_chef' => 'anbg-badge anbg-badge-info',
+            'rejetee_direction' => 'anbg-badge anbg-badge-danger',
+            'validee_direction' => 'anbg-badge anbg-badge-success',
         ];
         $detailSections = [
             'action-validation' => 'Validation',
             'action-fiche' => 'Fiche',
-            'action-status' => 'KPI',
+            'action-status' => 'Indicateur',
             'action-weeks' => 'Suivi',
             'action-discussion' => 'Discussion',
             'action-justificatifs' => 'Justificatifs',
@@ -125,7 +120,7 @@
                         Periode {{ optional($action->date_debut)->format('d/m/Y') ?: '-' }} -> {{ optional($action->date_fin)->format('d/m/Y') ?: '-' }}
                     </span>
                     <span class="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold {{ $statusClass }}">
-                        {{ $status }}
+                        {{ $actionStatusLabel($status) }}
                     </span>
                     <span class="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold {{ $validationClass }}">
                         {{ $validationLabel }}
@@ -162,7 +157,7 @@
             </div>
         </article>
         <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">KPI global</p>
+            <p class="showcase-kpi-label">{{ $metricLabel('global') }}</p>
             <p class="showcase-kpi-number">{{ number_format((float) ($kpi?->kpi_global ?? 0), 1) }}%</p>
             <p class="showcase-kpi-meta">Delai {{ number_format((float) ($kpi?->kpi_delai ?? 0), 1) }} | Performance {{ number_format((float) ($kpi?->kpi_performance ?? 0), 1) }} | Qualite {{ number_format((float) ($kpi?->kpi_qualite ?? 0), 1) }} | Risque {{ number_format((float) ($kpi?->kpi_risque ?? 0), 1) }}</p>
         </article>
@@ -229,8 +224,8 @@
                 <p class="text-slate-600">Titre: <strong>{{ $action->libelle }}</strong></p>
                 <p class="text-slate-600">Description: <strong>{{ $action->description ?: '-' }}</strong></p>
                 <p class="text-slate-600">Type cible: <strong>{{ $action->type_cible }}</strong></p>
-                <p class="text-slate-600">Statut metier: <strong>{{ $action->statut ?: '-' }}</strong></p>
-                <p class="text-slate-600">Statut dynamique: <strong>{{ $status }}</strong></p>
+                <p class="text-slate-600">Statut metier: <strong>{{ $actionStatusLabel($action->statut ?: '-') }}</strong></p>
+                <p class="text-slate-600">Statut dynamique: <strong>{{ $actionStatusLabel($status) }}</strong></p>
             </article>
 
             <article class="showcase-inline-stat action-detail-card">
@@ -294,7 +289,7 @@
 
     <section id="action-status" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Etat d'avancement</h2>
-        <p class="showcase-panel-subtitle">Synthese du niveau de progression reel, theorique et des KPI utilises pour la decision.</p>
+        <p class="showcase-panel-subtitle">Synthese du niveau de progression reel, theorique et des indicateurs utilises pour la decision.</p>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             <article class="showcase-inline-stat">
                 <strong>Progression reelle</strong>
@@ -305,27 +300,27 @@
                 <p class="mt-1 text-lg">{{ number_format((float) ($action->progression_theorique ?? 0), 2) }}%</p>
             </article>
             <article class="showcase-inline-stat">
-                <strong>KPI delai</strong>
+                <strong>{{ $metricLabel('delai') }}</strong>
                 <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_delai ?? 0), 2) }}%</p>
             </article>
             <article class="showcase-inline-stat">
-                <strong>KPI performance</strong>
+                <strong>{{ $metricLabel('performance') }}</strong>
                 <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_performance ?? 0), 2) }}%</p>
             </article>
             <article class="showcase-inline-stat">
-                <strong>KPI conformite</strong>
+                <strong>{{ $metricLabel('conformite') }}</strong>
                 <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_conformite ?? 0), 2) }}%</p>
             </article>
             <article class="showcase-inline-stat">
-                <strong>KPI qualite</strong>
+                <strong>{{ $metricLabel('qualite') }}</strong>
                 <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_qualite ?? 0), 2) }}%</p>
             </article>
             <article class="showcase-inline-stat">
-                <strong>KPI risque</strong>
+                <strong>{{ $metricLabel('risque') }}</strong>
                 <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_risque ?? 0), 2) }}%</p>
             </article>
             <article class="showcase-inline-stat">
-                <strong>KPI global</strong>
+                <strong>{{ $metricLabel('global') }}</strong>
                 <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_global ?? 0), 2) }}%</p>
             </article>
         </div>

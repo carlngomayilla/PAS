@@ -4,38 +4,51 @@
     <meta charset="UTF-8">
     <title>Reporting consolide ANBG</title>
     <style>
+        :root {
+            --anbg-primary: #1E3A8A;
+            --anbg-secondary: #3B82F6;
+            --anbg-light: #EFF6FF;
+            --anbg-white: #FFFFFF;
+            --anbg-dark: #1F2937;
+            --anbg-muted: #6B7280;
+            --anbg-success: #10B981;
+            --anbg-warning: #F59E0B;
+            --anbg-danger: #EF4444;
+            --anbg-border: #BFDBFE;
+            --anbg-surface: #F8FBFF;
+        }
         @page {
             margin: 36px 32px 56px;
         }
         body {
             font-family: DejaVu Sans, sans-serif;
-            color: #1c203d;
+            color: var(--anbg-dark);
             font-size: 12px;
             margin: 0;
         }
         h1, h2 {
             margin: 0 0 8px;
-            color: #1c203d;
+            color: var(--anbg-dark);
         }
         .meta {
             margin-bottom: 14px;
-            color: #475569;
+            color: var(--anbg-muted);
         }
         table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 14px;
-            border: 1px solid #d9e4ee;
+            border: 1px solid var(--anbg-border);
         }
         th, td {
-            border: 1px solid #d9e4ee;
+            border: 1px solid var(--anbg-border);
             padding: 6px 7px;
             vertical-align: top;
         }
         th {
-            background: #e8f3fb;
+            background: var(--anbg-light);
             text-align: left;
-            color: #1c203d;
+            color: var(--anbg-primary);
             font-weight: 700;
         }
         .section {
@@ -43,11 +56,11 @@
         }
         .section h2 {
             padding: 6px 10px;
-            background: linear-gradient(90deg, #1c203d 0%, #3996d3 100%);
-            color: #ffffff;
+            background: linear-gradient(90deg, var(--anbg-primary) 0%, var(--anbg-secondary) 100%);
+            color: var(--anbg-white);
         }
         tbody tr:nth-child(even) td {
-            background: #f8fafc;
+            background: var(--anbg-surface);
         }
         .compact th,
         .compact td {
@@ -75,10 +88,10 @@
             margin-bottom: 12px;
         }
         .metric-card {
-            border: 1px solid #d9e4ee;
+            border: 1px solid var(--anbg-border);
             border-radius: 14px;
             overflow: hidden;
-            background: #ffffff;
+            background: var(--anbg-white);
         }
         .metric-label {
             padding: 7px 10px;
@@ -91,47 +104,29 @@
             font-weight: 900;
             text-align: center;
         }
-        .card-blue .metric-label {
-            background: #3996d3;
-            color: #ffffff;
-        }
-        .card-blue .metric-value {
-            background: #e8f3fb;
-            color: #1c203d;
-        }
-        .card-green .metric-label {
-            background: #8fc043;
-            color: #1c203d;
-        }
-        .card-green .metric-value {
-            background: #eef6e1;
-            color: #1c203d;
-        }
-        .card-orange .metric-label {
-            background: #f9b13c;
-            color: #1c203d;
-        }
-        .card-orange .metric-value {
-            background: #fff0df;
-            color: #1c203d;
-        }
-        .card-navy .metric-label {
-            background: #1c203d;
-            color: #ffffff;
-        }
-        .card-navy .metric-value {
-            background: #eef1f8;
-            color: #1c203d;
-        }
+        .card-primary .metric-label { background: var(--anbg-primary); color: var(--anbg-white); }
+        .card-primary .metric-value { background: var(--anbg-light); color: var(--anbg-primary); }
+        .card-secondary .metric-label { background: var(--anbg-secondary); color: var(--anbg-white); }
+        .card-secondary .metric-value { background: var(--anbg-light); color: var(--anbg-secondary); }
+        .card-light .metric-label { background: var(--anbg-light); color: var(--anbg-primary); }
+        .card-light .metric-value { background: var(--anbg-white); color: var(--anbg-secondary); }
+        .card-dark .metric-label { background: var(--anbg-dark); color: var(--anbg-white); }
+        .card-dark .metric-value { background: var(--anbg-light); color: var(--anbg-dark); }
+        .card-success .metric-label { background: var(--anbg-success); color: var(--anbg-white); }
+        .card-success .metric-value { background: var(--anbg-white); color: var(--anbg-success); }
+        .card-warning .metric-label { background: var(--anbg-warning); color: var(--anbg-dark); }
+        .card-warning .metric-value { background: var(--anbg-white); color: var(--anbg-warning); }
+        .card-danger .metric-label { background: var(--anbg-danger); color: var(--anbg-white); }
+        .card-danger .metric-value { background: var(--anbg-white); color: var(--anbg-danger); }
         .mini-panel {
-            border: 1px solid #d9e4ee;
+            border: 1px solid var(--anbg-border);
             border-radius: 14px;
             padding: 10px 12px;
-            background: #ffffff;
+            background: var(--anbg-white);
         }
         .mini-panel h3 {
             margin: 0 0 10px;
-            color: #1c203d;
+            color: var(--anbg-dark);
             font-size: 12px;
         }
         .bar-list {
@@ -145,12 +140,12 @@
         .bar-label {
             width: 42%;
             font-size: 10px;
-            color: #334155;
+            color: var(--anbg-muted);
         }
         .bar-value {
             width: 14%;
             font-size: 10px;
-            color: #1c203d;
+            color: var(--anbg-dark);
             font-weight: 700;
             text-align: right;
             padding-right: 8px;
@@ -158,7 +153,7 @@
         .bar-track {
             width: 100%;
             height: 8px;
-            background: #eef2f6;
+            background: var(--anbg-light);
             border-radius: 999px;
             overflow: hidden;
         }
@@ -166,33 +161,25 @@
             height: 8px;
             border-radius: 999px;
         }
-        .bar-fill-blue {
-            background: linear-gradient(90deg, #3996d3 0%, #1c203d 100%);
-        }
-        .bar-fill-green {
-            background: linear-gradient(90deg, #8fc043 0%, #f0e509 100%);
-        }
-        .bar-fill-orange {
-            background: linear-gradient(90deg, #f9b13c 0%, #f0e509 100%);
-        }
-        .bar-fill-navy {
-            background: linear-gradient(90deg, #1c203d 0%, #3996d3 100%);
-        }
+        .bar-fill-blue { background: linear-gradient(90deg, var(--anbg-primary) 0%, var(--anbg-secondary) 100%); }
+        .bar-fill-green { background: linear-gradient(90deg, var(--anbg-success) 0%, var(--anbg-secondary) 100%); }
+        .bar-fill-orange { background: linear-gradient(90deg, var(--anbg-warning) 0%, var(--anbg-danger) 100%); }
+        .bar-fill-navy { background: linear-gradient(90deg, var(--anbg-dark) 0%, var(--anbg-primary) 100%); }
         .cover {
             margin-bottom: 16px;
         }
         .toc {
-            border: 1px solid #d9e4ee;
+            border: 1px solid var(--anbg-border);
             border-radius: 14px;
             padding: 14px 16px;
-            background: #ffffff;
+            background: var(--anbg-white);
             page-break-after: always;
         }
         .toc h2 {
             padding: 0;
             margin-bottom: 10px;
             background: none;
-            color: #1c203d;
+            color: var(--anbg-dark);
         }
         .toc-table {
             width: 100%;
@@ -206,7 +193,7 @@
         }
         .toc-index {
             width: 36px;
-            color: #3996d3;
+            color: var(--anbg-secondary);
             font-weight: 900;
         }
         .page-break-section {
@@ -217,8 +204,8 @@
             margin-bottom: 6px;
             padding: 4px 10px;
             border-radius: 999px;
-            background: #eef1f8;
-            color: #1c203d;
+            background: var(--anbg-light);
+            color: var(--anbg-primary);
             font-size: 10px;
             font-weight: 800;
             letter-spacing: 0.04em;
@@ -229,7 +216,7 @@
             left: 0;
             right: 0;
             font-size: 10px;
-            color: #64748b;
+            color: var(--anbg-muted);
             text-align: right;
         }
         .pdf-footer .page-num:after {
@@ -238,22 +225,48 @@
         .pdf-footer .page-total:after {
             content: counter(pages);
         }
+        .level-row {
+            margin: 8px 0 10px;
+        }
+        .level-badge {
+            display: inline-block;
+            margin-right: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+        .level-provisoire {
+            background: var(--anbg-light);
+            color: var(--anbg-primary);
+        }
+        .level-valide {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+        .level-officiel {
+            background: #D1FAE5;
+            color: #065F46;
+        }
     </style>
 </head>
 <body>
     @php
+        $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
         $kpiSummary = $kpiSummary ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'risque' => 0, 'global' => 0, 'progression' => 0];
+        $scoreTone = static fn (float $score): string => $score >= 75 ? 'success' : ($score >= 50 ? 'warning' : 'danger');
         $summaryCards = [
-            ['label' => 'PAS', 'value' => $global['pas_total'] ?? 0, 'class' => 'blue'],
-            ['label' => 'PAO', 'value' => $global['paos_total'] ?? 0, 'class' => 'green'],
-            ['label' => 'PTA', 'value' => $global['ptas_total'] ?? 0, 'class' => 'orange'],
-            ['label' => 'Actions', 'value' => $global['actions_total'] ?? 0, 'class' => 'navy'],
+            ['label' => 'PAS', 'value' => $global['pas_total'] ?? 0, 'class' => 'primary'],
+            ['label' => 'PAO', 'value' => $global['paos_total'] ?? 0, 'class' => 'secondary'],
+            ['label' => 'PTA', 'value' => $global['ptas_total'] ?? 0, 'class' => 'light'],
+            ['label' => 'Actions', 'value' => $global['actions_total'] ?? 0, 'class' => 'dark'],
         ];
         $kpiCards = [
-            ['label' => 'KPI global', 'value' => number_format((float) ($kpiSummary['global'] ?? 0), 1), 'class' => 'green'],
-            ['label' => 'KPI qualite', 'value' => number_format((float) ($kpiSummary['qualite'] ?? 0), 1), 'class' => 'blue'],
-            ['label' => 'KPI risque', 'value' => number_format((float) ($kpiSummary['risque'] ?? 0), 1), 'class' => 'orange'],
-            ['label' => 'Progression', 'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 1).'%', 'class' => 'navy'],
+            ['label' => $metricLabel('global'), 'value' => number_format((float) ($kpiSummary['global'] ?? 0), 1), 'class' => $scoreTone((float) ($kpiSummary['global'] ?? 0))],
+            ['label' => $metricLabel('qualite'), 'value' => number_format((float) ($kpiSummary['qualite'] ?? 0), 1), 'class' => $scoreTone((float) ($kpiSummary['qualite'] ?? 0))],
+            ['label' => $metricLabel('risque'), 'value' => number_format((float) ($kpiSummary['risque'] ?? 0), 1), 'class' => $scoreTone((float) ($kpiSummary['risque'] ?? 0))],
+            ['label' => 'Progression', 'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 1).'%', 'class' => $scoreTone((float) ($kpiSummary['progression'] ?? 0))],
         ];
 
         $funnelLabels = $charts['funnel']['labels'] ?? [];
@@ -292,9 +305,25 @@
             '05' => 'Vue consolidee du PAS',
             '06' => 'Comparaison interannuelle',
             '07' => 'Details actions en retard',
-            '08' => 'Details KPI sous seuil',
+            '08' => 'Details indicateurs sous seuil',
             '09' => 'Structure des rapports strategiques',
         ];
+        $pdfSectionLevels = [
+            '01' => ['Provisoire', 'Valide', 'Officiel'],
+            '02' => ['Provisoire', 'Officiel'],
+            '03' => ['Provisoire'],
+            '04' => ['Provisoire'],
+            '05' => ['Officiel'],
+            '06' => ['Officiel'],
+            '07' => ['Provisoire'],
+            '08' => ['Valide'],
+            '09' => ['Officiel'],
+        ];
+        $levelClass = static fn (string $label): string => match ($label) {
+            'Officiel' => 'level-officiel',
+            'Valide' => 'level-valide',
+            default => 'level-provisoire',
+        };
     @endphp
 
     <div class="pdf-footer">
@@ -309,6 +338,11 @@
             Direction: {{ $scope['direction_id'] ?? '-' }} |
             Service: {{ $scope['service_id'] ?? '-' }}
         </p>
+        <div class="level-row">
+            <span class="level-badge level-provisoire">Provisoire</span>
+            <span class="level-badge level-valide">Valide</span>
+            <span class="level-badge level-officiel">Officiel</span>
+        </div>
     </div>
 
     <div class="toc">
@@ -326,6 +360,11 @@
     <div class="section page-break-section">
         <span class="section-kicker">Section 01</span>
         <h2>Synthese graphique</h2>
+        <div class="level-row">
+            @foreach ($pdfSectionLevels['01'] as $label)
+                <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
+            @endforeach
+        </div>
 
         <table class="cards-grid">
             <tr>
@@ -468,6 +507,11 @@
     <div class="section page-break-section">
         <span class="section-kicker">Section 02</span>
         <h2>Indicateurs globaux</h2>
+        <div class="level-row">
+            @foreach ($pdfSectionLevels['02'] as $label)
+                <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
+            @endforeach
+        </div>
         <table>
             <thead>
                 <tr>
@@ -488,12 +532,12 @@
         <table>
             <thead>
                 <tr>
-                    <th>KPI delai</th>
-                    <th>KPI performance</th>
-                    <th>KPI conformite</th>
-                    <th>KPI qualite</th>
-                    <th>KPI risque</th>
-                    <th>KPI global</th>
+                    <th>{{ $metricLabel('delai') }}</th>
+                    <th>{{ $metricLabel('performance') }}</th>
+                    <th>{{ $metricLabel('conformite') }}</th>
+                    <th>{{ $metricLabel('qualite') }}</th>
+                    <th>{{ $metricLabel('risque') }}</th>
+                    <th>{{ $metricLabel('global') }}</th>
                     <th>Progression moyenne</th>
                 </tr>
             </thead>
@@ -514,6 +558,11 @@
     <div class="section page-break-section">
         <span class="section-kicker">Section 03</span>
         <h2>Statuts</h2>
+        <div class="level-row">
+            @foreach ($pdfSectionLevels['03'] as $label)
+                <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
+            @endforeach
+        </div>
         <table>
             <thead>
                 <tr>
@@ -539,6 +588,11 @@
     <div class="section page-break-section">
         <span class="section-kicker">Section 04</span>
         <h2>Alertes de synthese</h2>
+        <div class="level-row">
+            @foreach ($pdfSectionLevels['04'] as $label)
+                <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
+            @endforeach
+        </div>
         <table>
             <thead>
                 <tr>
@@ -560,6 +614,11 @@
     <div class="section page-break-section">
         <span class="section-kicker">Section 05</span>
         <h2>Vue consolidee du PAS</h2>
+        <div class="level-row">
+            @foreach ($pdfSectionLevels['05'] as $label)
+                <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
+            @endforeach
+        </div>
         <table>
             <thead>
                 <tr>
@@ -599,6 +658,11 @@
     <div class="section page-break-section">
         <span class="section-kicker">Section 06</span>
         <h2>Comparaison interannuelle</h2>
+        <div class="level-row">
+            @foreach ($pdfSectionLevels['06'] as $label)
+                <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
+            @endforeach
+        </div>
         <table>
             <thead>
                 <tr>
@@ -636,6 +700,11 @@
     <div class="section page-break-section">
         <span class="section-kicker">Section 07</span>
         <h2>Details actions en retard</h2>
+        <div class="level-row">
+            @foreach ($pdfSectionLevels['07'] as $label)
+                <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
+            @endforeach
+        </div>
         <table>
             <thead>
                 <tr>
@@ -645,7 +714,7 @@
                     <th>Statut</th>
                     <th>PTA</th>
                     <th>Responsable</th>
-                    <th>KPI global</th>
+                    <th>{{ $metricLabel('global') }}</th>
                     <th>Qualite</th>
                     <th>Risque</th>
                 </tr>
@@ -674,12 +743,17 @@
 
     <div class="section page-break-section">
         <span class="section-kicker">Section 08</span>
-        <h2>Details KPI sous seuil</h2>
+        <h2>Details indicateurs sous seuil</h2>
+        <div class="level-row">
+            @foreach ($pdfSectionLevels['08'] as $label)
+                <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
+            @endforeach
+        </div>
         <table>
             <thead>
                 <tr>
                     <th>ID mesure</th>
-                    <th>KPI</th>
+                    <th>Indicateur</th>
                     <th>Periode</th>
                     <th>Valeur</th>
                     <th>Seuil</th>
@@ -708,6 +782,11 @@
     <div class="section page-break-section">
         <span class="section-kicker">Section 09</span>
         <h2>Structure des rapports strategiques</h2>
+        <div class="level-row">
+            @foreach ($pdfSectionLevels['09'] as $label)
+                <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
+            @endforeach
+        </div>
         <table class="compact">
             <thead>
                 <tr>
@@ -721,7 +800,7 @@
                     <th>Fin</th>
                     <th>Etat</th>
                     <th>Prog.</th>
-                    <th>KPI global</th>
+                    <th>{{ $metricLabel('global') }}</th>
                     <th>Qualite</th>
                     <th>Risque</th>
                     <th>Ressources</th>

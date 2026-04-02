@@ -4,18 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreKpiMesureRequest;
 use App\Http\Requests\UpdateKpiMesureRequest;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
 use App\Models\User;
+use App\Support\UiLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class KpiMesureController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): JsonResponse
@@ -31,33 +34,13 @@ class KpiMesureController extends Controller
 
         $query = KpiMesure::query()
             ->with([
-                'kpi:id,action_id,libelle,periodicite',
+                'kpi:id,action_id,libelle,periodicite,est_a_renseigner',
                 'kpi.action:id,pta_id,libelle',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'saisiPar:id,name,email',
             ]);
 
-        if (! $user->hasGlobalReadAccess()) {
-            if ($user->hasRole(User::ROLE_DIRECTION)) {
-                if ($user->direction_id === null) {
-                    $query->whereRaw('1 = 0');
-                } else {
-                    $query->whereHas('kpi.action.pta', function ($subQuery) use ($user): void {
-                        $subQuery->where('direction_id', (int) $user->direction_id);
-                    });
-                }
-            } elseif ($user->hasRole(User::ROLE_SERVICE)) {
-                if ($user->service_id === null) {
-                    $query->whereRaw('1 = 0');
-                } else {
-                    $query->whereHas('kpi.action.pta', function ($subQuery) use ($user): void {
-                        $subQuery->where('service_id', (int) $user->service_id);
-                    });
-                }
-            } else {
-                $query->whereRaw('1 = 0');
-            }
-        }
+        $this->scopePlanningKpiMesures($query, $user);
 
         $query->when(
             $request->filled('kpi_id'),
@@ -97,7 +80,7 @@ class KpiMesureController extends Controller
 
         if ($kpi->action?->pta?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA parent est verrouille. Creation impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Creation'),
             ], 409);
         }
 
@@ -115,9 +98,9 @@ class KpiMesureController extends Controller
         $this->recordAudit($request, 'kpi_mesure', 'create', $mesure, null, $mesure->toArray());
 
         return response()->json([
-            'message' => 'Mesure KPI creee avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('kpi_mesure'), true),
             'data' => $mesure->load([
-                'kpi:id,action_id,libelle,periodicite',
+                'kpi:id,action_id,libelle,periodicite,est_a_renseigner',
                 'kpi.action:id,pta_id,libelle',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'saisiPar:id,name,email',
@@ -134,19 +117,13 @@ class KpiMesureController extends Controller
 
         $kpiMesure->loadMissing('kpi.action.pta:id,direction_id,service_id');
 
-        if (! $this->canReadDirection($user, (int) $kpiMesure->kpi?->action?->pta?->direction_id)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE)
-            && (int) $user->service_id !== (int) $kpiMesure->kpi?->action?->pta?->service_id
-        ) {
+        if (! $this->canReadService($user, (int) $kpiMesure->kpi?->action?->pta?->direction_id, (int) $kpiMesure->kpi?->action?->pta?->service_id)) {
             abort(403, 'Acces non autorise.');
         }
 
         return response()->json([
             'data' => $kpiMesure->load([
-                'kpi:id,action_id,libelle,periodicite',
+                'kpi:id,action_id,libelle,periodicite,est_a_renseigner',
                 'kpi.action:id,pta_id,libelle',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'saisiPar:id,name,email',
@@ -165,7 +142,7 @@ class KpiMesureController extends Controller
 
         if ($kpiMesure->kpi?->action?->pta?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA parent est verrouille. Mise a jour impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour'),
             ], 409);
         }
 
@@ -174,7 +151,7 @@ class KpiMesureController extends Controller
 
         if ($targetKpi->action?->pta?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA cible est verrouille. Mise a jour impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
             ], 409);
         }
 
@@ -197,9 +174,9 @@ class KpiMesureController extends Controller
         $this->recordAudit($request, 'kpi_mesure', 'update', $kpiMesure, $before, $kpiMesure->toArray());
 
         return response()->json([
-            'message' => 'Mesure KPI mise a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('kpi_mesure')),
             'data' => $kpiMesure->load([
-                'kpi:id,action_id,libelle,periodicite',
+                'kpi:id,action_id,libelle,periodicite,est_a_renseigner',
                 'kpi.action:id,pta_id,libelle',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'saisiPar:id,name,email',
@@ -218,7 +195,7 @@ class KpiMesureController extends Controller
 
         if ($kpiMesure->kpi?->action?->pta?->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PTA parent est verrouille. Suppression impossible.',
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Suppression'),
             ], 409);
         }
 

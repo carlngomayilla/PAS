@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Models\Action;
 use App\Models\ActionWeek;
@@ -13,6 +14,7 @@ use App\Services\Actions\ActionTrackingService;
 use App\Services\Governance\DelegationService;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\Security\SecureJustificatifStorage;
+use App\Support\UiLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +25,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ActionTrackingWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function show(Request $request, Action $action, ActionTrackingService $trackingService): View
@@ -82,7 +85,9 @@ class ActionTrackingWebController extends Controller
         }
 
         if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA parent est verrouille. Saisie impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Saisie'),
+            ]);
         }
 
         if (! $this->isExecutionEditableByAgent($action)) {
@@ -163,7 +168,9 @@ class ActionTrackingWebController extends Controller
         }
 
         if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA parent est verrouille. Soumission impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Soumission'),
+            ]);
         }
 
         $currentValidationStatus = (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE);
@@ -284,7 +291,9 @@ class ActionTrackingWebController extends Controller
         }
 
         if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA parent est verrouille. Validation impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Validation'),
+            ]);
         }
 
         if ((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE) !== ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
@@ -358,7 +367,9 @@ class ActionTrackingWebController extends Controller
         }
 
         if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA parent est verrouille. Validation impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Validation'),
+            ]);
         }
 
         if ((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE) !== ActionTrackingService::VALIDATION_VALIDEE_CHEF) {

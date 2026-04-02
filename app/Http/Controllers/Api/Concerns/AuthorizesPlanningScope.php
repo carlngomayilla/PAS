@@ -160,6 +160,36 @@ trait AuthorizesPlanningScope
         return false;
     }
 
+    protected function canReadService(User $user, ?int $directionId, ?int $serviceId): bool
+    {
+        if ($user->hasGlobalReadAccess()) {
+            return true;
+        }
+
+        if ($directionId === null || $serviceId === null) {
+            return false;
+        }
+
+        if ($user->hasRole(User::ROLE_DIRECTION)) {
+            return (int) $user->direction_id === $directionId;
+        }
+
+        if ($user->hasRole(User::ROLE_SERVICE)) {
+            return (int) $user->direction_id === $directionId
+                && (int) $user->service_id === $serviceId;
+        }
+
+        if ($user->hasDelegatedDirectionScope($directionId, 'planning_read') || $user->hasDelegatedDirectionScope($directionId, 'planning_write')) {
+            return true;
+        }
+
+        if ($user->hasDelegatedServiceScope($directionId, $serviceId, 'planning_read') || $user->hasDelegatedServiceScope($directionId, $serviceId, 'planning_write')) {
+            return true;
+        }
+
+        return false;
+    }
+
     protected function canWriteDirection(User $user, ?int $directionId): bool
     {
         if ($user->hasGlobalWriteAccess()) {
@@ -415,5 +445,43 @@ trait AuthorizesPlanningScope
         }
 
         return false;
+    }
+
+    protected function scopePlanningActions(Builder|Relation $query, User $user): void
+    {
+        if ($user->hasGlobalReadAccess()) {
+            return;
+        }
+
+        $query->whereHas('pta', function (Builder $ptaQuery) use ($user): void {
+            $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
+        });
+    }
+
+    protected function scopePlanningKpis(Builder|Relation $query, User $user): void
+    {
+        if ($user->hasGlobalReadAccess()) {
+            return;
+        }
+
+        $query->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {
+            $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
+        });
+    }
+
+    protected function scopePlanningKpiMesures(Builder|Relation $query, User $user): void
+    {
+        if ($user->hasGlobalReadAccess()) {
+            return;
+        }
+
+        $query->whereHas('kpi.action.pta', function (Builder $ptaQuery) use ($user): void {
+            $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
+        });
+    }
+
+    protected function scopePlanningUsers(Builder|Relation $query, User $user): void
+    {
+        $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
     }
 }

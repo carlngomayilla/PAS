@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Action;
 use App\Models\Pta;
 use App\Models\User;
+use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -46,6 +47,13 @@ class UpdateActionRequest extends FormRequest
             'risques' => ['nullable', 'string'],
             'mesures_preventives' => ['nullable', 'string'],
 
+            'kpi_libelle' => ['nullable', 'string', 'max:255'],
+            'kpi_unite' => ['nullable', 'string', 'max:30'],
+            'kpi_cible' => ['nullable', 'numeric', 'min:0'],
+            'kpi_seuil_alerte' => ['nullable', 'numeric', 'min:0'],
+            'kpi_periodicite' => ['required', Rule::in(ActionIndicatorService::PERIODICITY_OPTIONS)],
+            'kpi_est_a_renseigner' => ['required', 'boolean'],
+
             'financement_requis' => ['required', 'boolean'],
             'ressource_main_oeuvre' => ['nullable', 'boolean'],
             'ressource_equipement' => ['nullable', 'boolean'],
@@ -84,6 +92,7 @@ class UpdateActionRequest extends FormRequest
             'ressource_equipement' => $this->boolean('ressource_equipement'),
             'ressource_partenariat' => $this->boolean('ressource_partenariat'),
             'ressource_autres' => $this->boolean('ressource_autres'),
+            'kpi_est_a_renseigner' => $this->boolean('kpi_est_a_renseigner', true),
         ]);
     }
 
@@ -187,6 +196,20 @@ class UpdateActionRequest extends FormRequest
                 $validator->errors()->add(
                     'montant_estime',
                     'Le montant estime ne doit pas etre renseigne si aucun financement n est requis.'
+                );
+            }
+
+            $indicatorTarget = $this->input('kpi_cible');
+            if (($indicatorTarget === null || $indicatorTarget === '') && $type === 'quantitative') {
+                $indicatorTarget = $this->input('quantite_cible');
+            }
+            $indicatorThreshold = $this->input('kpi_seuil_alerte');
+            if ($indicatorTarget !== null
+                && $indicatorThreshold !== null
+                && (float) $indicatorThreshold > (float) $indicatorTarget) {
+                $validator->errors()->add(
+                    'kpi_seuil_alerte',
+                    'Le seuil d alerte de l indicateur ne doit pas depasser sa cible.'
                 );
             }
 

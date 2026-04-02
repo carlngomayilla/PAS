@@ -57,18 +57,31 @@ class UpdateKpiMesureRequest extends FormRequest
                 return;
             }
 
+            $kpi = Kpi::query()
+                ->with('action.pta:id,direction_id')
+                ->find((int) $this->input('kpi_id'));
+
+            if ($kpi === null) {
+                return;
+            }
+
+            if (! $kpi->est_a_renseigner) {
+                $validator->errors()->add(
+                    'kpi_id',
+                    'Cet indicateur n attend pas de saisie manuelle.'
+                );
+
+                return;
+            }
+
             $saisiPar = $this->input('saisi_par');
             if ($saisiPar === null) {
                 return;
             }
 
-            $kpi = Kpi::query()
-                ->with('action.pta:id,direction_id')
-                ->find((int) $this->input('kpi_id'));
-
             $user = User::query()->find((int) $saisiPar);
 
-            if ($kpi === null || $user === null || $user->direction_id === null) {
+            if ($user === null || $user->direction_id === null) {
                 return;
             }
 

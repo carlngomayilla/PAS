@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\ActionWeekController;
 use App\Http\Controllers\Api\AlerteController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\JournalAuditController;
+use App\Http\Controllers\Api\KpiController;
+use App\Http\Controllers\Api\KpiMesureController;
 use App\Http\Controllers\Api\PaoController;
 use App\Http\Controllers\Api\PasAxeController;
 use App\Http\Controllers\Api\PasController;
@@ -44,6 +46,10 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
 
         Route::apiResource('ptas', PtaController::class)
             ->parameters(['ptas' => 'pta']);
+        Route::apiResource('kpis', KpiController::class)
+            ->parameters(['kpis' => 'kpi']);
+        Route::apiResource('kpi-mesures', KpiMesureController::class)
+            ->parameters(['kpi-mesures' => 'kpiMesure']);
 
         Route::apiResource('actions', ActionController::class)
             ->parameters(['actions' => 'action']);

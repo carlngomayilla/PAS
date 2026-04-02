@@ -16,7 +16,7 @@
                 <p><strong>{{ $justificatif->nom_original }}</strong></p>
                 <p class="text-slate-600">{{ $justificatif->mime_type }} | {{ number_format(($justificatif->taille_octets ?? 0) / 1024, 1) }} Ko</p>
                 <p class="mt-2">
-                    <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.justificatifs.download', $justificatif) }}">Telecharger</a>
+                    <a class="btn btn-primary" href="{{ route('workspace.justificatifs.download', $justificatif) }}">Telecharger</a>
                 </p>
             </article>
 
@@ -37,8 +37,8 @@
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button class="btn btn-green" type="submit">Enregistrer</button>
-                        <a class="inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-sm font-medium no-underline bg-blue-700 text-white hover:bg-blue-600" href="{{ route('workspace.justificatifs.index') }}">Retour</a>
+                        <button class="btn btn-primary" type="submit">Enregistrer</button>
+                        <a class="btn btn-secondary" href="{{ route('workspace.justificatifs.index') }}">Retour</a>
                     </div>
                 </form>
             </article>

@@ -113,7 +113,10 @@ class ReportingWorkbookExporter
         $rowIndex += 2;
 
         foreach ($sections as $section) {
-            $rows[] = $this->makeMergedRow($rowIndex, (string) $section['title'], $maxColumns, 3);
+            $sectionTitle = isset($section['level'])
+                ? sprintf('[%s] %s', (string) $section['level'], (string) $section['title'])
+                : (string) $section['title'];
+            $rows[] = $this->makeMergedRow($rowIndex, $sectionTitle, $maxColumns, 3);
             $merges[] = 'A'.$rowIndex.':'.$this->columnName($maxColumns).$rowIndex;
             $rowIndex++;
 
@@ -169,6 +172,10 @@ class ReportingWorkbookExporter
             2
         );
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
+        $rowIndex++;
+
+        $rows[] = $this->makeMergedRow($rowIndex, 'Niveaux de lecture : Provisoire | Valide | Officiel', $maxColumns, 2);
+        $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex += 2;
 
         $cardRanges = [[1, 2], [3, 4], [5, 6], [7, 8]];
@@ -177,7 +184,7 @@ class ReportingWorkbookExporter
             [
                 ['Actions', (int) ($payload['global']['actions_total'] ?? 0), 13, 14],
                 ['Validees', (int) ($payload['global']['actions_validees'] ?? 0), 15, 16],
-                ['KPI mesures', (int) ($payload['global']['kpi_mesures_total'] ?? 0), 17, 18],
+                ['Mesures d indicateur', (int) ($payload['global']['kpi_mesures_total'] ?? 0), 17, 18],
                 ['Obj. op.', (int) ($payload['global']['objectifs_operationnels_total'] ?? 0), 19, 20],
             ],
             [
@@ -187,7 +194,7 @@ class ReportingWorkbookExporter
                 ['Retards', (int) ($payload['alertes']['actions_en_retard'] ?? 0), 17, 18],
             ],
             [
-                ['KPI global', (int) round((float) ($kpiSummary['global'] ?? 0)), 13, 14],
+                ['Indicateur global', (int) round((float) ($kpiSummary['global'] ?? 0)), 13, 14],
                 ['Qualite', (int) round((float) ($kpiSummary['qualite'] ?? 0)), 15, 16],
                 ['Risque', (int) round((float) ($kpiSummary['risque'] ?? 0)), 17, 18],
                 ['Progression', (int) round((float) ($kpiSummary['progression'] ?? 0)), 19, 20],
@@ -232,7 +239,7 @@ class ReportingWorkbookExporter
         $funnelBase = max(1, (int) ($funnelValues[0] ?? max($funnelValues ?: [1])));
         $funnelMax = max(1, max($funnelValues ?: [1]));
 
-        $rows[] = $this->makeMergedRow($rowIndex, 'Funnel de pilotage', $maxColumns, 3);
+        $rows[] = $this->makeMergedRow($rowIndex, 'Funnel de pilotage [Provisoire]', $maxColumns, 3);
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex++;
         $rows[] = $this->makeStandardRow($rowIndex, ['Etape', 'Volume', 'Intensite', 'Couverture'], ['string', 'string', 'string', 'string'], 4);
@@ -255,7 +262,7 @@ class ReportingWorkbookExporter
         $alertRows = collect($payload['alertes'] ?? [])->map(fn ($value, $key): array => [$this->humanize((string) $key), (int) $value])->values()->all();
         $alertMax = max(1, max(array_map(static fn (array $row): int => (int) $row[1], $alertRows ?: [[0, 1]])));
 
-        $rows[] = $this->makeMergedRow($rowIndex, 'Alertes de synthese', $maxColumns, 3);
+        $rows[] = $this->makeMergedRow($rowIndex, 'Alertes de synthese [Provisoire]', $maxColumns, 3);
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex++;
         $rows[] = $this->makeStandardRow($rowIndex, ['Alerte', 'Total', 'Intensite'], ['string', 'string', 'string'], 4);
@@ -277,7 +284,7 @@ class ReportingWorkbookExporter
         $performanceLabels = array_values((array) ($performance['labels'] ?? []));
         $performanceValues = array_map('floatval', array_values((array) ($performance['values'] ?? [])));
 
-        $rows[] = $this->makeMergedRow($rowIndex, 'Performance moyenne', $maxColumns, 3);
+        $rows[] = $this->makeMergedRow($rowIndex, 'Performance moyenne [Valide]', $maxColumns, 3);
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex++;
         $rows[] = $this->makeStandardRow($rowIndex, ['Unite', 'Performance', 'Barre'], ['string', 'string', 'string'], 4);
@@ -299,7 +306,7 @@ class ReportingWorkbookExporter
         }
         $performanceEndRow = max($performanceStartRow, $rowIndex - 1);
         $rowIndex++;
-        $rows[] = $this->makeMergedRow($rowIndex, 'Vue interannuelle', $maxColumns, 3);
+        $rows[] = $this->makeMergedRow($rowIndex, 'Vue interannuelle [Officiel]', $maxColumns, 3);
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex++;
         $rows[] = $this->makeStandardRow($rowIndex, ['Annee', 'Actions', 'Validees', 'Progression', 'Validation'], ['string', 'string', 'string', 'string', 'string'], 4);
@@ -353,7 +360,7 @@ class ReportingWorkbookExporter
         $chartsMeta[] = [
             'title' => 'Funnel de pilotage',
             'type' => 'column',
-            'color' => '3996D3',
+            'color' => '1E3A8A',
             'anchor' => ['from_col' => 9, 'from_row' => 1, 'to_col' => 16, 'to_row' => 16],
             'categories' => [
                 'formula' => $this->rangeFormula($sheetName, 1, $funnelStartRow, $funnelEndRow),
@@ -367,7 +374,7 @@ class ReportingWorkbookExporter
         $chartsMeta[] = [
             'title' => 'Alertes de synthese',
             'type' => 'bar',
-            'color' => 'F9B13C',
+            'color' => 'EF4444',
             'anchor' => ['from_col' => 9, 'from_row' => 18, 'to_col' => 16, 'to_row' => 33],
             'categories' => [
                 'formula' => $this->rangeFormula($sheetName, 1, $alertsStartRow, $alertsEndRow),
@@ -381,7 +388,7 @@ class ReportingWorkbookExporter
         $chartsMeta[] = [
             'title' => 'Performance moyenne',
             'type' => 'bar',
-            'color' => '8FC043',
+            'color' => '10B981',
             'anchor' => ['from_col' => 17, 'from_row' => 1, 'to_col' => 24, 'to_row' => 16],
             'categories' => [
                 'formula' => $this->rangeFormula($sheetName, 1, $performanceStartRow, $performanceEndRow),
@@ -395,7 +402,7 @@ class ReportingWorkbookExporter
         $chartsMeta[] = [
             'title' => 'Validation interannuelle',
             'type' => 'line',
-            'color' => '1C203D',
+            'color' => '3B82F6',
             'anchor' => ['from_col' => 17, 'from_row' => 18, 'to_col' => 24, 'to_row' => 33],
             'categories' => [
                 'formula' => $this->rangeFormula($sheetName, 1, $interannualStartRow, $interannualEndRow),
@@ -421,7 +428,25 @@ class ReportingWorkbookExporter
     {
         $sections = [];
         $sections[] = [
+            'title' => 'Niveaux de lecture',
+            'headers' => ['Bloc', 'Niveau', 'Usage'],
+            'types' => ['string', 'string', 'string'],
+            'rows' => [
+                ['Indicateurs globaux', 'Provisoire', 'Volumes et perimetre courant'],
+                ['Statuts', 'Provisoire', 'Lecture operationnelle des modules'],
+                ['Alertes de synthese', 'Provisoire', 'Ecarts et urgences en cours'],
+                ['Synthese indicateurs validee direction', 'Officiel', 'Base consolidee pour diffusion'],
+                ['Vue consolidee du PAS', 'Officiel', 'Transformation strategique consolidee'],
+                ['Comparaison interannuelle', 'Officiel', 'Comparaison consolidee des exercices'],
+                ['Details - Actions en retard', 'Provisoire', 'Actions a traiter immediatement'],
+                ['Details - indicateurs sous seuil', 'Valide', 'Mesures en ecart avec suivi metier'],
+                ['Structure des rapports - Tableau strategique', 'Officiel', 'Socle detaille de diffusion'],
+            ],
+        ];
+
+        $sections[] = [
             'title' => 'Indicateurs globaux',
+            'level' => 'Provisoire',
             'headers' => ['Indicateur', 'Valeur'],
             'types' => ['string', 'string'],
             'rows' => collect($payload['global'] ?? [])->map(fn ($value, $key): array => [(string) $key, (string) $value])->values()->all(),
@@ -435,6 +460,7 @@ class ReportingWorkbookExporter
         }
         $sections[] = [
             'title' => 'Statuts',
+            'level' => 'Provisoire',
             'headers' => ['Module', 'Statut', 'Total'],
             'types' => ['string', 'string', 'integer'],
             'rows' => $statusRows,
@@ -442,14 +468,16 @@ class ReportingWorkbookExporter
 
         $sections[] = [
             'title' => 'Alertes de synthese',
+            'level' => 'Provisoire',
             'headers' => ['Alerte', 'Total'],
             'types' => ['string', 'integer'],
             'rows' => collect($payload['alertes'] ?? [])->map(fn ($count, $label): array => [(string) $label, (int) $count])->values()->all(),
         ];
 
         $sections[] = [
-            'title' => 'Synthese KPI validee direction',
-            'headers' => ['KPI delai', 'KPI performance', 'KPI conformite', 'KPI qualite', 'KPI risque', 'KPI global', 'Progression moyenne'],
+            'title' => 'Synthese indicateurs validee direction',
+            'level' => 'Officiel',
+            'headers' => ['Indicateur delai', 'Indicateur performance', 'Indicateur conformite', 'Indicateur qualite', 'Indicateur risque', 'Indicateur global', 'Progression moyenne'],
             'types' => ['decimal', 'decimal', 'decimal', 'decimal', 'decimal', 'decimal', 'percent'],
             'rows' => [[
                 (float) ($payload['kpiSummary']['delai'] ?? 0),
@@ -464,6 +492,7 @@ class ReportingWorkbookExporter
 
         $sections[] = [
             'title' => 'Vue consolidee du PAS',
+            'level' => 'Officiel',
             'headers' => ['PAS', 'Periode', 'Axes', 'Objectifs', 'PAO', 'PTA', 'Actions', 'Validees', 'Progression moyenne', 'Taux realisation'],
             'types' => ['string', 'string', 'integer', 'integer', 'integer', 'integer', 'integer', 'integer', 'percent', 'percent'],
             'rows' => collect($payload['pasConsolidation'] ?? [])->map(fn (array $row): array => [(string) ($row['titre'] ?? ''), (string) ($row['periode'] ?? ''), (int) ($row['axes_total'] ?? 0), (int) ($row['objectifs_total'] ?? 0), (int) ($row['paos_total'] ?? 0), (int) ($row['ptas_total'] ?? 0), (int) ($row['actions_total'] ?? 0), (int) ($row['actions_validees'] ?? 0), (float) ($row['progression_moyenne'] ?? 0), (float) ($row['taux_realisation'] ?? 0)])->all(),
@@ -471,27 +500,31 @@ class ReportingWorkbookExporter
 
         $sections[] = [
             'title' => 'Comparaison interannuelle',
+            'level' => 'Officiel',
             'headers' => ['Annee', 'PAO', 'PTA', 'Actions', 'Actions validees', 'Actions en retard', 'Progression moyenne', 'Taux validation'],
             'types' => ['integer', 'integer', 'integer', 'integer', 'integer', 'integer', 'percent', 'percent'],
             'rows' => collect($payload['interannualComparison'] ?? [])->map(fn (array $row): array => [(int) ($row['annee'] ?? 0), (int) ($row['paos_total'] ?? 0), (int) ($row['ptas_total'] ?? 0), (int) ($row['actions_total'] ?? 0), (int) ($row['actions_validees'] ?? 0), (int) ($row['actions_retard'] ?? 0), (float) ($row['progression_moyenne'] ?? 0), (float) ($row['taux_validation'] ?? 0)])->all(),
         ];
         $sections[] = [
             'title' => 'Details - Actions en retard',
-            'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable', 'KPI global', 'KPI qualite', 'KPI risque'],
+            'level' => 'Provisoire',
+            'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable', 'Indicateur global', 'Indicateur qualite', 'Indicateur risque'],
             'types' => ['integer', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal', 'decimal'],
             'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_global ?? 0), (float) ($action->actionKpi?->kpi_qualite ?? 0), (float) ($action->actionKpi?->kpi_risque ?? 0)])->all(),
         ];
 
         $sections[] = [
-            'title' => 'Details - KPI sous seuil',
-            'headers' => ['Mesure ID', 'KPI', 'Periode', 'Valeur', 'Seuil', 'Action'],
+            'title' => 'Details - indicateurs sous seuil',
+            'level' => 'Valide',
+            'headers' => ['Mesure ID', 'Indicateur', 'Periode', 'Valeur', 'Seuil', 'Action'],
             'types' => ['integer', 'string', 'string', 'decimal', 'decimal', 'string'],
             'rows' => collect($payload['details']['kpi_sous_seuil'] ?? [])->map(fn ($mesure): array => [(int) $mesure->id, (string) ($mesure->kpi?->libelle ?? ''), (string) $mesure->periode, (float) ($mesure->valeur ?? 0), (float) ($mesure->kpi?->seuil_alerte ?? 0), (string) ($mesure->kpi?->action?->libelle ?? '')])->all(),
         ];
 
         $sections[] = [
             'title' => 'Structure des rapports - Tableau strategique',
-            'headers' => ['Axe strategique', 'Objectif strategique', 'Objectif operationnel', 'Description actions detaillees', 'RMO', 'Cible', 'Debut', 'Fin', 'Etat de realisation', 'Progression', 'KPI global', 'KPI qualite', 'KPI risque', 'Ressources requises', 'Indicateurs de performance', 'Risques potentiels'],
+            'level' => 'Officiel',
+            'headers' => ['Axe strategique', 'Objectif strategique', 'Objectif operationnel', 'Description actions detaillees', 'RMO', 'Cible', 'Debut', 'Fin', 'Etat de realisation', 'Progression', 'Indicateur global', 'Indicateur qualite', 'Indicateur risque', 'Ressources requises', 'Indicateurs de performance', 'Risques potentiels'],
             'types' => ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal', 'decimal', 'string', 'string', 'string'],
             'rows' => collect($payload['details']['structure_rapports'] ?? [])->map(fn (array $row): array => [(string) ($row['axe_strategique'] ?? ''), (string) ($row['objectif_strategique'] ?? ''), (string) ($row['objectif_operationnel'] ?? ''), (string) ($row['description_actions_detaillees'] ?? ''), (string) ($row['rmo'] ?? ''), (string) ($row['cible'] ?? ''), (string) ($row['debut'] ?? ''), (string) ($row['fin'] ?? ''), (string) ($row['etat_realisation'] ?? ''), (string) ($row['progression'] ?? ''), (float) ($row['kpi_global'] ?? 0), (float) ($row['kpi_qualite'] ?? 0), (float) ($row['kpi_risque'] ?? 0), (string) ($row['ressources_requises'] ?? ''), (string) ($row['indicateurs_performance'] ?? ''), (string) ($row['risques_potentiels'] ?? '')])->all(),
         ];
@@ -743,7 +776,7 @@ class ReportingWorkbookExporter
     {
         $type = (string) ($chart['type'] ?? 'column');
         $title = (string) ($chart['title'] ?? 'Graphique');
-        $color = strtoupper((string) ($chart['color'] ?? '3996D3'));
+        $color = strtoupper((string) ($chart['color'] ?? '1E3A8A'));
         $categoryFormula = (string) ($chart['categories']['formula'] ?? '');
         $valueFormula = (string) ($chart['values']['formula'] ?? '');
         $categoryCache = array_values((array) ($chart['categories']['cache'] ?? []));
@@ -847,26 +880,26 @@ class ReportingWorkbookExporter
             .'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             .'<numFmts count="2"><numFmt numFmtId="164" formatCode="0.00"/><numFmt numFmtId="165" formatCode="0.00%"/></numFmts>'
             .'<fonts count="6">'
-            .'<font><sz val="11"/><color rgb="FF1C203D"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/><family val="2"/></font>'
             .'<font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>'
             .'<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>'
-            .'<font><b/><sz val="11"/><color rgb="FF1C203D"/><name val="Calibri"/><family val="2"/></font>'
-            .'<font><b/><sz val="18"/><color rgb="FF1C203D"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><b/><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><b/><sz val="18"/><color rgb="FF1F2937"/><name val="Calibri"/><family val="2"/></font>'
             .'<font><b/><sz val="18"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>'
             .'</fonts>'
             .'<fills count="11">'
             .'<fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FF1C203D"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FFE8F3FB"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FF3996D3"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF1E3A8A"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF3B82F6"/><bgColor indexed="64"/></patternFill></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FFF8FAFC"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FF8FC043"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FFEEF6E1"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FFF9B13C"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFF0DF"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFF8FBFF"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF10B981"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFECFDF5"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFF59E0B"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFFBEB"/><bgColor indexed="64"/></patternFill></fill>'
             .'</fills>'
-            .'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFD9E4EE"/></left><right style="thin"><color rgb="FFD9E4EE"/></right><top style="thin"><color rgb="FFD9E4EE"/></top><bottom style="thin"><color rgb="FFD9E4EE"/></bottom><diagonal/></border></borders>'
+            .'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFDBFE"/></left><right style="thin"><color rgb="FFBFDBFE"/></right><top style="thin"><color rgb="FFBFDBFE"/></top><bottom style="thin"><color rgb="FFBFDBFE"/></bottom><diagonal/></border></borders>'
             .'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
             .'<cellXfs count="21">'
             .'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'

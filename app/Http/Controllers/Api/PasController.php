@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePasRequest;
 use App\Http\Requests\UpdatePasRequest;
 use App\Models\Pas;
 use App\Models\User;
 use App\Services\PasStructureService;
+use App\Support\UiLabel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +19,7 @@ use Illuminate\Http\Request;
 class PasController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function __construct(
@@ -117,7 +120,7 @@ class PasController extends Controller
         $this->recordAudit($request, 'pas', 'create', $pas, null, $after);
 
         return response()->json([
-            'message' => 'PAS cree avec succes.',
+            'message' => $this->entityCreatedMessage(UiLabel::object('pas')),
             'data' => $after,
         ], 201);
     }
@@ -155,7 +158,7 @@ class PasController extends Controller
 
         if ($pas->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PAS est verrouille et ne peut plus etre modifie.',
+                'message' => $this->lockedStateMessage('PAS', 'plus etre modifie'),
             ], 409);
         }
 
@@ -203,7 +206,7 @@ class PasController extends Controller
         $this->recordAudit($request, 'pas', 'update', $pas, $before, $after);
 
         return response()->json([
-            'message' => 'PAS mis a jour avec succes.',
+            'message' => $this->entityUpdatedMessage(UiLabel::object('pas')),
             'data' => $after,
         ]);
     }
@@ -219,7 +222,7 @@ class PasController extends Controller
 
         if ($pas->statut === 'verrouille') {
             return response()->json([
-                'message' => 'Le PAS est verrouille et ne peut pas etre supprime.',
+                'message' => $this->lockedStateMessage('PAS', 'etre supprime'),
             ], 409);
         }
 

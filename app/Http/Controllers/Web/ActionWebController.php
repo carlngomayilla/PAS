@@ -4,24 +4,30 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
+use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreActionRequest;
 use App\Http\Requests\UpdateActionRequest;
 use App\Models\Action;
+use App\Models\ActionKpi;
 use App\Models\Pta;
 use App\Models\User;
+use App\Support\UiLabel;
+use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class ActionWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
     public function index(Request $request): View
@@ -53,15 +59,87 @@ class ActionWebController extends Controller
             $request->filled('pta_id'),
             fn (Builder $q) => $q->where('pta_id', (int) $request->integer('pta_id'))
         );
+        $query->when(
+            $request->filled('direction_id'),
+            fn (Builder $q) => $q->whereHas(
+                'pta',
+                fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', (int) $request->integer('direction_id'))
+            )
+        );
+        $query->when(
+            $request->filled('service_id'),
+            fn (Builder $q) => $q->whereHas(
+                'pta',
+                fn (Builder $ptaQuery) => $ptaQuery->where('service_id', (int) $request->integer('service_id'))
+            )
+        );
+        $query->when(
+            $request->filled('pas_objectif_id'),
+            fn (Builder $q) => $q->whereHas(
+                'pta.pao',
+                fn (Builder $paoQuery) => $paoQuery->where('pas_objectif_id', (int) $request->integer('pas_objectif_id'))
+            )
+        );
+        $query->when(
+            $request->filled('annee'),
+            fn (Builder $q) => $q->whereHas(
+                'pta.pao',
+                fn (Builder $paoQuery) => $paoQuery->where('annee', (int) $request->integer('annee'))
+            )
+        );
+        $query->when($request->filled('mois_demarrage'), function (Builder $q) use ($request): void {
+            $month = trim((string) $request->string('mois_demarrage'));
+            if (preg_match('/^\d{4}-\d{2}$/', $month) !== 1) {
+                return;
+            }
+
+            [$year, $monthValue] = explode('-', $month, 2);
+            $q->whereYear('date_debut', (int) $year)
+                ->whereMonth('date_debut', (int) $monthValue);
+        });
+        $query->when($request->filled('week_start'), function (Builder $q) use ($request): void {
+            $weekStart = trim((string) $request->string('week_start'));
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $weekStart) !== 1) {
+                return;
+            }
+
+            $start = Carbon::parse($weekStart)->startOfDay();
+            $end = $start->copy()->endOfWeek(Carbon::SUNDAY);
+
+            $q->whereHas('weeks', fn (Builder $weeksQuery) => $weeksQuery
+                ->whereBetween('date_debut', [$start->toDateString(), $end->toDateString()]));
+        });
+        $query->when($request->filled('risque_label'), function (Builder $q) use ($request): void {
+            $risk = trim((string) $request->string('risque_label'));
+            if ($risk === '') {
+                return;
+            }
+
+            $q->whereRaw('LOWER(risques) like ?', ['%'.mb_strtolower($risk).'%']);
+        });
+
+        $statusFilter = trim((string) $request->string('statut'));
+        if ($statusFilter !== '') {
+            if ($statusFilter === 'achevees') {
+                $query->whereIn('statut_dynamique', $this->completedActionStatuses());
+            } else {
+                $query->where('statut_dynamique', $statusFilter);
+            }
+        }
 
         $query->when(
-            $request->filled('statut'),
-            fn (Builder $q) => $q->where('statut_dynamique', (string) $request->string('statut'))
+            $request->filled('statut_validation'),
+            fn (Builder $q) => $q->where('statut_validation', (string) $request->string('statut_validation'))
         );
 
         $query->when(
             $request->filled('financement_requis'),
             fn (Builder $q) => $q->where('financement_requis', (bool) $request->boolean('financement_requis'))
+        );
+
+        $query->when(
+            $request->boolean('without_kpi'),
+            fn (Builder $q) => $q->doesntHave('kpis')
         );
 
         $query->when($request->filled('q'), function (Builder $q) use ($request): void {
@@ -75,18 +153,54 @@ class ActionWebController extends Controller
             });
         });
 
+        $sort = (string) $request->string('sort');
+        match ($sort) {
+            'progression_desc' => $query->orderByDesc('progression_reelle')->orderByDesc('id'),
+            'kpi_delai_desc' => $query->orderByDesc(
+                ActionKpi::query()->select('kpi_delai')->whereColumn('action_id', 'actions.id')->limit(1)
+            )->orderByDesc('id'),
+            'kpi_performance_desc' => $query->orderByDesc(
+                ActionKpi::query()->select('kpi_performance')->whereColumn('action_id', 'actions.id')->limit(1)
+            )->orderByDesc('id'),
+            'kpi_conformite_desc' => $query->orderByDesc(
+                ActionKpi::query()->select('kpi_conformite')->whereColumn('action_id', 'actions.id')->limit(1)
+            )->orderByDesc('id'),
+            'kpi_global_desc' => $query->orderByDesc(
+                ActionKpi::query()->select('kpi_global')->whereColumn('action_id', 'actions.id')->limit(1)
+            )->orderByDesc('id'),
+            'kpi_qualite_desc' => $query->orderByDesc(
+                ActionKpi::query()->select('kpi_qualite')->whereColumn('action_id', 'actions.id')->limit(1)
+            )->orderByDesc('id'),
+            'kpi_risque_desc' => $query->orderByDesc(
+                ActionKpi::query()->select('kpi_risque')->whereColumn('action_id', 'actions.id')->limit(1)
+            )->orderByDesc('id'),
+            default => $query->orderByDesc('id'),
+        };
+
         return view('workspace.actions.index', [
-            'rows' => $query->orderByDesc('id')->paginate(15)->withQueryString(),
+            'rows' => $query->paginate(15)->withQueryString(),
             'ptaOptions' => $this->ptaOptions($user),
-            'statusOptions' => ActionTrackingService::dynamicStatusOptions(),
+            'statusOptions' => array_merge(['achevees'], ActionTrackingService::dynamicStatusOptions()),
+            'validationOptions' => $this->validationStatusOptions(),
+            'sortOptions' => $this->sortOptions(),
             'canWrite' => $this->canWrite($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
                 'pta_id' => $request->filled('pta_id') ? (int) $request->integer('pta_id') : null,
-                'statut' => (string) $request->string('statut'),
+                'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
+                'service_id' => $request->filled('service_id') ? (int) $request->integer('service_id') : null,
+                'pas_objectif_id' => $request->filled('pas_objectif_id') ? (int) $request->integer('pas_objectif_id') : null,
+                'annee' => $request->filled('annee') ? (int) $request->integer('annee') : null,
+                'mois_demarrage' => $request->filled('mois_demarrage') ? trim((string) $request->string('mois_demarrage')) : '',
+                'week_start' => $request->filled('week_start') ? trim((string) $request->string('week_start')) : '',
+                'risque_label' => $request->filled('risque_label') ? trim((string) $request->string('risque_label')) : '',
+                'statut' => $statusFilter,
+                'statut_validation' => (string) $request->string('statut_validation'),
                 'financement_requis' => $request->filled('financement_requis')
                     ? (int) $request->integer('financement_requis')
                     : null,
+                'without_kpi' => $request->boolean('without_kpi'),
+                'sort' => $sort,
             ],
         ]);
     }
@@ -115,11 +229,14 @@ class ActionWebController extends Controller
             'ptaOptions' => $this->ptaOptions($user),
             'responsableOptions' => $this->responsableOptions($user),
             'statusOptions' => ActionTrackingService::dynamicStatusOptions(),
+            'indicatorPeriodicityOptions' => $this->indicatorPeriodicityOptions(),
+            'indicatorModeOptions' => $this->indicatorInputModeOptions(),
         ]);
     }
 
     public function store(
         StoreActionRequest $request,
+        ActionIndicatorService $indicatorService,
         ActionTrackingService $trackingService,
         WorkspaceNotificationService $notificationService,
         SecureJustificatifStorage $secureStorage
@@ -134,12 +251,14 @@ class ActionWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        $validated = $this->normalizeActionPayload($request->validated());
+        $validated = $request->validated();
+        $indicatorPayload = $indicatorService->pullPrimaryIndicatorPayload($validated);
+        $validated = $this->normalizeActionPayload($validated);
         $pta = Pta::query()->findOrFail((int) $validated['pta_id']);
 
         if ($pta->statut === 'verrouille') {
             return back()->withInput()->withErrors([
-                'pta_id' => 'Le PTA parent est verrouille. Creation impossible.',
+                'pta_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Creation'),
             ]);
         }
 
@@ -149,7 +268,7 @@ class ActionWebController extends Controller
             (int) $pta->service_id
         );
 
-        $action = DB::transaction(function () use ($validated, $request, $trackingService, $user, $secureStorage): Action {
+        $action = DB::transaction(function () use ($validated, $indicatorPayload, $request, $trackingService, $indicatorService, $user, $secureStorage): Action {
             $payload = $validated;
             $manualStatus = in_array((string) ($payload['statut'] ?? ''), [
                 ActionTrackingService::STATUS_SUSPENDU,
@@ -170,6 +289,7 @@ class ActionWebController extends Controller
 
             $action = Action::query()->create($payload);
             $trackingService->initializeActionTracking($action, $user);
+            $indicatorService->syncPrimaryIndicator($action, $indicatorPayload);
 
             if ($request->hasFile('justificatif_financement')) {
                 $file = $request->file('justificatif_financement');
@@ -207,7 +327,10 @@ class ActionWebController extends Controller
             abort(401);
         }
 
-        $action->loadMissing('pta:id,direction_id,service_id');
+        $action->loadMissing(
+            'pta:id,direction_id,service_id',
+            'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner'
+        );
         $this->denyUnlessActionManager(
             $user,
             (int) $action->pta?->direction_id,
@@ -220,12 +343,15 @@ class ActionWebController extends Controller
             'ptaOptions' => $this->ptaOptions($user),
             'responsableOptions' => $this->responsableOptions($user),
             'statusOptions' => ActionTrackingService::dynamicStatusOptions(),
+            'indicatorPeriodicityOptions' => $this->indicatorPeriodicityOptions(),
+            'indicatorModeOptions' => $this->indicatorInputModeOptions(),
         ]);
     }
 
     public function update(
         UpdateActionRequest $request,
         Action $action,
+        ActionIndicatorService $indicatorService,
         ActionTrackingService $trackingService,
         WorkspaceNotificationService $notificationService,
         SecureJustificatifStorage $secureStorage
@@ -238,15 +364,19 @@ class ActionWebController extends Controller
         $action->loadMissing('pta:id,direction_id,service_id,statut');
 
         if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA parent est verrouille. Mise a jour impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour'),
+            ]);
         }
 
-        $validated = $this->normalizeActionPayload($request->validated());
+        $validated = $request->validated();
+        $indicatorPayload = $indicatorService->pullPrimaryIndicatorPayload($validated);
+        $validated = $this->normalizeActionPayload($validated);
         $targetPta = Pta::query()->findOrFail((int) $validated['pta_id']);
 
         if ($targetPta->statut === 'verrouille') {
             return back()->withInput()->withErrors([
-                'pta_id' => 'Le PTA cible est verrouille. Mise a jour impossible.',
+                'pta_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
             ]);
         }
 
@@ -278,11 +408,12 @@ class ActionWebController extends Controller
         $before = $action->toArray();
         $previousResponsableId = (int) ($action->responsable_id ?? 0);
 
-        DB::transaction(function () use ($action, $validated, $request, $trackingService, $user, $dateChanged, $frequencyChanged, $targetTypeChanged, $secureStorage): void {
+        DB::transaction(function () use ($action, $validated, $indicatorPayload, $request, $trackingService, $indicatorService, $user, $dateChanged, $frequencyChanged, $targetTypeChanged, $secureStorage): void {
             $payload = $validated;
             $payload['date_echeance'] = $payload['date_fin'];
             $action->fill($payload);
             $action->save();
+            $indicatorService->syncPrimaryIndicator($action, $indicatorPayload);
 
             if ($dateChanged || $frequencyChanged || $targetTypeChanged) {
                 $trackingService->regenerateWeeks($action);
@@ -336,7 +467,9 @@ class ActionWebController extends Controller
         $action->loadMissing('pta:id,direction_id,service_id,statut');
 
         if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors(['general' => 'Le PTA parent est verrouille. Suppression impossible.']);
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Suppression'),
+            ]);
         }
 
         $this->denyUnlessActionManager(
@@ -363,7 +496,7 @@ class ActionWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.index')
-            ->with('success', 'Action supprimee avec succes.');
+            ->with('success', $this->entityDeletedMessage(UiLabel::object('action'), true));
     }
 
     /**
@@ -397,6 +530,25 @@ class ActionWebController extends Controller
         }
 
         return $validated;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function indicatorPeriodicityOptions(): array
+    {
+        return ActionIndicatorService::PERIODICITY_OPTIONS;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function indicatorInputModeOptions(): array
+    {
+        return [
+            '1' => UiLabel::indicatorInputMode(true),
+            '0' => UiLabel::indicatorInputMode(false),
+        ];
     }
 
     private function denyUnlessActionManager(User $user, ?int $directionId, ?int $serviceId): void
@@ -524,5 +676,48 @@ class ActionWebController extends Controller
                     ->where('service_id', (int) $scope['service_id']));
             }
         });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function validationStatusOptions(): array
+    {
+        return [
+            ActionTrackingService::VALIDATION_NON_SOUMISE,
+            ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function sortOptions(): array
+    {
+        return [
+            '' => 'Plus recentes',
+            'progression_desc' => 'Progression la plus forte',
+            'kpi_delai_desc' => UiLabel::metric('delai').' le plus eleve',
+            'kpi_performance_desc' => UiLabel::metric('performance').' le plus eleve',
+            'kpi_conformite_desc' => UiLabel::metric('conformite').' le plus eleve',
+            'kpi_global_desc' => UiLabel::metric('global').' le plus eleve',
+            'kpi_qualite_desc' => 'Qualite la plus forte',
+            'kpi_risque_desc' => 'Risque le plus eleve',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function completedActionStatuses(): array
+    {
+        return [
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+        ];
     }
 }

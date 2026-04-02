@@ -3,7 +3,7 @@
 @section('content')
     <section class="ui-card mb-3.5">
         <h1>Ajouter un justificatif</h1>
-        <p class="text-slate-600">Associez une preuve documentaire a une action, KPI ou mesure KPI.</p>
+        <p class="text-slate-600">Associez une preuve documentaire a une action, un indicateur ou une mesure d indicateur.</p>
     </section>
 
     <section class="ui-card mb-3.5">
@@ -14,7 +14,7 @@
                 <p class="form-section-subtitle">Format uniforme avec champs alignes sur toute la largeur disponible.</p>
                 <div class="form-grid">
                     <div>
-                        <label for="justifiable_type">Type d entite</label>
+                        <label for="justifiable_type">Type d'entite</label>
                         <select id="justifiable_type" name="justifiable_type" required>
                             <option value="">Selectionner</option>
                             @foreach ($typeOptions as $key => $label)
@@ -37,8 +37,8 @@
                 </div>
             </div>
             <div class="form-actions">
-                <button class="btn btn-green" type="submit">Enregistrer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.justificatifs.index') }}">Retour</a>
+                <button class="btn btn-primary" type="submit">Enregistrer</button>
+                <a class="btn btn-secondary" href="{{ route('workspace.justificatifs.index') }}">Retour</a>
             </div>
         </form>
     </section>
@@ -63,7 +63,7 @@
             </article>
 
             <article class="ui-card mb-3.5 !mb-0">
-                <strong>KPI</strong>
+                <strong>Indicateurs</strong>
                 <div class="overflow-auto mt-2">
                     <table>
                         <thead><tr><th>ID</th><th>Libelle</th></tr></thead>
@@ -71,7 +71,7 @@
                             @forelse ($references['kpis'] as $row)
                                 <tr><td>{{ $row->id }}</td><td>{{ $row->libelle }}</td></tr>
                             @empty
-                                <tr><td colspan="2" class="text-slate-600">Aucun KPI</td></tr>
+                                <tr><td colspan="2" class="text-slate-600">Aucun indicateur</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -79,7 +79,7 @@
             </article>
 
             <article class="ui-card mb-3.5 !mb-0">
-                <strong>Mesures KPI</strong>
+                <strong>Mesures indicateur</strong>
                 <div class="overflow-auto mt-2">
                     <table>
                         <thead><tr><th>ID</th><th>Periode</th></tr></thead>
@@ -87,7 +87,7 @@
                             @forelse ($references['kpi_mesures'] as $row)
                                 <tr><td>{{ $row->id }}</td><td>{{ $row->periode }}</td></tr>
                             @empty
-                                <tr><td colspan="2" class="text-slate-600">Aucune mesure KPI</td></tr>
+                                <tr><td colspan="2" class="text-slate-600">Aucune mesure indicateur</td></tr>
                             @endforelse
                         </tbody>
                     </table>
