@@ -12,17 +12,17 @@
             'annule' => 'anbg-badge anbg-badge-neutral',
         ];
     @endphp
-    <section class="ui-card mb-3.5">
-        <h1>PAO - Objectifs operationnels</h1>
-        <p class="text-slate-600">Pilotage detaille: action, responsable, cible, ressources, risques, statut et echeances.</p>
-        @if ($canWrite)
-            <p class="mt-2.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <h1>PAO - Objectifs operationnels</h1>
+            @if ($canWrite)
                 <a class="btn btn-green" href="{{ route('workspace.pao-objectifs-operationnels.create') }}">Nouvel objectif operationnel</a>
-            </p>
-        @endif
+            @endif
+        </div>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h2>Filtres</h2>
         <form method="GET" action="{{ route('workspace.pao-objectifs-operationnels.index') }}">
             <div class="form-grid-compact mb-2">
@@ -78,7 +78,7 @@
         </form>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h2>Liste des objectifs operationnels</h2>
         <div class="overflow-auto">
             <table>
@@ -147,4 +147,5 @@
         </div>
         <div class="pagination">{{ $rows->links() }}</div>
     </section>
+    </div>
 @endsection

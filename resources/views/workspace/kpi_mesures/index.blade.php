@@ -1,17 +1,17 @@
 @extends('layouts.workspace')
 
 @section('content')
-    <section class="ui-card mb-3.5">
-        <h1>Mesures d indicateur</h1>
-        <p class="text-slate-600">Saisie periodique des valeurs mesurees pour les indicateurs a renseigner.</p>
-        @if ($canWrite)
-            <p class="mt-2.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <h1>Mesures d indicateur</h1>
+            @if ($canWrite)
                 <a class="btn btn-primary" href="{{ route('workspace.kpi-mesures.create') }}">Nouvelle mesure</a>
-            </p>
-        @endif
+            @endif
+        </div>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h2>Filtres</h2>
         <form method="GET" action="{{ route('workspace.kpi-mesures.index') }}">
             <div class="form-grid-compact mb-2">
@@ -53,7 +53,7 @@
         </form>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h2>Liste des mesures</h2>
         <div class="overflow-auto">
             <table>
@@ -105,4 +105,5 @@
         </div>
         <div class="pagination">{{ $rows->links() }}</div>
     </section>
+    </div>
 @endsection

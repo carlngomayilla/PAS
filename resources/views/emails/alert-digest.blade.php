@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="{{ $platformSettings->htmlLang() }}">
 <head>
     <meta charset="UTF-8">
     <title>Alerte ANBG</title>

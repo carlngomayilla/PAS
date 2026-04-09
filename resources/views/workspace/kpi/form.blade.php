@@ -6,7 +6,7 @@
     @endphp
     <section class="ui-card mb-3.5">
         <h1>{{ $isEdit ? 'Modifier indicateur' : 'Nouvel indicateur' }}</h1>
-        <p class="text-slate-600">Configurer cible, seuil, periodicite et mode de saisie de l indicateur.</p>
+        <p class="text-slate-600">Configurer l indicateur principal de suivi.</p>
     </section>
 
     <section class="ui-card mb-3.5">
@@ -18,7 +18,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Parametrage de l indicateur</h2>
-                <p class="form-section-subtitle">Le seuil d alerte est fige tant que la cible n est pas renseignee. Les indicateurs sans saisie ne remontent pas dans le formulaire des mesures.</p>
+                <p class="form-section-subtitle">Parametres de suivi de l indicateur.</p>
                 <div class="form-grid">
                     <div>
                         <label for="action_id">Action</label>
@@ -46,11 +46,15 @@
                                 <option value="{{ $value }}" @selected((string) (int) old('est_a_renseigner', $row->est_a_renseigner ?? true) === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
-                        <p class="field-hint">Choisir <strong>Sans saisie</strong> pour les indicateurs informatifs ou calcules.</p>
                     </div>
                     <div>
                         <label for="unite">Unite</label>
-                        <input id="unite" name="unite" type="text" value="{{ old('unite', $row->unite) }}">
+                        <input id="unite" name="unite" type="text" list="kpi-unit-suggestions" value="{{ old('unite', $row->unite) }}">
+                        <datalist id="kpi-unit-suggestions">
+                            @foreach (($unitSuggestions ?? []) as $suggestion)
+                                <option value="{{ $suggestion }}"></option>
+                            @endforeach
+                        </datalist>
                     </div>
                     <div>
                         <label for="cible">Cible</label>

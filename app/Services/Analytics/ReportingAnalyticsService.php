@@ -13,7 +13,10 @@ use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\ActionCalculationSettings;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\ManagedKpiSettings;
+use App\Support\SafeSql;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Carbon;
@@ -27,12 +30,20 @@ class ReportingAnalyticsService
 
     private const CACHE_TTL_SECONDS = 60;
 
+    public function __construct(
+        private readonly ActionCalculationSettings $actionCalculationSettings,
+        private readonly ManagedKpiSettings $managedKpiSettings
+    ) {
+    }
+
     /**
      * @return array{
      *     generatedAt: \Illuminate\Support\Carbon,
      *     scope: array{role: string, direction_id: int|null, service_id: int|null},
+     *     officialPolicy: array{threshold_status: string, threshold_label: string, scope_summary: string},
      *     global: array<string, int>,
      *     kpiSummary: array<string, float>,
+     *     managedKpis: list<array<string, mixed>>,
      *     statuts: array<string, array<string, int>>,
      *     alertes: array<string, int>,
      *     pasConsolidation: array<int, array<string, mixed>>,
@@ -199,12 +210,20 @@ class ReportingAnalyticsService
                 });
         }
 
+        $kpiSummary = $this->buildKpiSummary($validatedActions);
+
         return [
             'generatedAt' => now(),
             'scope' => [
                 'role' => $user->role,
                 'direction_id' => $user->direction_id,
                 'service_id' => $user->service_id,
+            ],
+            'officialPolicy' => [
+                'threshold_status' => $this->actionCalculationSettings->officialValidationStatus(),
+                'threshold_label' => $this->actionCalculationSettings->officialThresholdLabel(),
+                'scope_summary' => $this->actionCalculationSettings->officialScopeSummary(),
+                'route_filters' => $this->actionCalculationSettings->officialRouteFilters(),
             ],
             'global' => [
                 'pas_total' => (clone $pas)->count(),
@@ -215,7 +234,12 @@ class ReportingAnalyticsService
                 'kpi_mesures_total' => (clone $mesures)->count(),
                 'objectifs_operationnels_total' => (clone $objectifsOperationnels)->count(),
             ],
-            'kpiSummary' => $this->buildKpiSummary($validatedActions),
+            'kpiSummary' => $kpiSummary,
+            'managedKpis' => $this->managedKpiSettings->buildRuntimeMetrics($kpiSummary, [
+                'role' => $user->effectiveRoleCode(),
+                'direction_id' => $user->direction_id,
+                'service_id' => $user->service_id,
+            ]),
             'statuts' => [
                 'pas' => $this->countByStatus($pas, 'statut'),
                 'paos' => $this->countByStatus($paos, 'statut'),
@@ -244,6 +268,7 @@ class ReportingAnalyticsService
             'service_id' => $user->service_id !== null ? (int) $user->service_id : null,
             'with_details' => $withDetails,
             'with_charts' => $withCharts,
+            'official_validation_status' => $this->actionCalculationSettings->officialValidationStatus(),
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -270,7 +295,7 @@ class ReportingAnalyticsService
 
     private function scopeActionStatistics(Builder $query, string $column = 'statut_validation'): void
     {
-        $query->where($column, ActionTrackingService::VALIDATION_VALIDEE_DIRECTION);
+        $this->actionCalculationSettings->applyOfficialScope($query, $column);
     }
 
     private function scopeMesure(Builder|Relation $query, User $user): void
@@ -550,6 +575,11 @@ class ReportingAnalyticsService
         }
         $unitFilterKey = $unitColumn === 'ptas.service_id' ? 'service_id' : 'direction_id';
 
+        $unitColumn = SafeSql::identifier($unitColumn, [
+            'ptas.direction_id',
+            'ptas.service_id',
+        ]);
+
         $statusRows = Action::query()
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
             ->selectRaw("{$unitColumn} as unit_id, actions.statut_dynamique as status_label, COUNT(*) as total")
@@ -609,9 +639,9 @@ class ReportingAnalyticsService
             ->select(['action_weeks.date_debut', 'action_weeks.progression_reelle', 'action_weeks.progression_theorique'])
             ->join('actions', 'actions.id', '=', 'action_weeks.action_id')
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
-            ->where('actions.statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
             ->whereNotNull('action_weeks.date_debut')
             ->orderBy('action_weeks.date_debut');
+        $this->scopeActionStatistics($progressRows, 'actions.statut_validation');
         $this->scopeJoinedPta($progressRows, $user, 'ptas.direction_id', 'ptas.service_id');
 
         $progressBuckets = [];
@@ -636,8 +666,7 @@ class ReportingAnalyticsService
             $progressLabels[] = 'S'.$date->isoWeek.' '.$date->year;
             $progressReel[] = round((float) $bucket['sum_reel'] / $count, 2);
             $progressTheorique[] = round((float) $bucket['sum_theorique'] / $count, 2);
-            $progressUrls[] = $this->actionIndexRoute([
-                'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            $progressUrls[] = $this->officialActionIndexRoute([
                 'week_start' => $weekStart,
             ]);
         }
@@ -647,9 +676,9 @@ class ReportingAnalyticsService
             ->join('kpis', 'kpis.id', '=', 'kpi_mesures.kpi_id')
             ->join('actions', 'actions.id', '=', 'kpis.action_id')
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
-            ->where('actions.statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
             ->whereNotNull('kpi_mesures.periode')
             ->orderBy('kpi_mesures.id');
+        $this->scopeActionStatistics($trendRows, 'actions.statut_validation');
         $this->scopeJoinedPta($trendRows, $user, 'ptas.direction_id', 'ptas.service_id');
 
         $periodBuckets = [];
@@ -719,13 +748,10 @@ class ReportingAnalyticsService
             $trendTargets[] = round($bucket['count_cible'] > 0 ? ((float) $bucket['sum_cible'] / (int) $bucket['count_cible']) : 0, 2);
             $trendThresholds[] = round($bucket['count_seuil'] > 0 ? ((float) $bucket['sum_seuil'] / (int) $bucket['count_seuil']) : 0, 2);
             $trendUrls[] = preg_match('/^(\d{4})/', $period, $matches) === 1
-                ? $this->actionIndexRoute([
+                ? $this->officialActionIndexRoute([
                     'annee' => (int) $matches[1],
-                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
                 ])
-                : $this->actionIndexRoute([
-                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
-                ]);
+                : $this->officialActionIndexRoute();
         }
 
         $weekStarts = [];
@@ -936,9 +962,9 @@ class ReportingAnalyticsService
 
         $performanceRows = Action::query()
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
-            ->where('actions.statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
             ->selectRaw('ptas.direction_id as direction_id, AVG(COALESCE(actions.progression_reelle, 0)) as avg_progression, COUNT(*) as total')
             ->groupBy('ptas.direction_id');
+        $this->scopeActionStatistics($performanceRows, 'actions.statut_validation');
         $this->scopeJoinedPta($performanceRows, $user, 'ptas.direction_id', 'ptas.service_id');
 
         $performanceDirectionNames = Direction::query()
@@ -964,18 +990,16 @@ class ReportingAnalyticsService
             }
             $performanceLabels[] = $performanceDirectionNames[$directionId] ?? ('#'.$directionId);
             $performanceValues[] = (float) $row['avg'];
-            $performanceUrls[] = $this->actionIndexRoute([
+            $performanceUrls[] = $this->officialActionIndexRoute([
                 'direction_id' => $directionId,
-                'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ]);
         }
 
         if ($performanceLabels === [] && $user->direction_id !== null) {
             $performanceLabels[] = $performanceDirectionNames[(int) $user->direction_id] ?? ('#'.$user->direction_id);
             $performanceValues[] = 0.0;
-            $performanceUrls[] = $this->actionIndexRoute([
+            $performanceUrls[] = $this->officialActionIndexRoute([
                 'direction_id' => (int) $user->direction_id,
-                'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ]);
         }
 
@@ -1061,9 +1085,7 @@ class ReportingAnalyticsService
      */
     private function validatedActions(Collection $actions): Collection
     {
-        return $actions
-            ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
-            ->values();
+        return $this->actionCalculationSettings->filterOfficial($actions, 'statut_validation');
     }
 
     /**
@@ -1173,11 +1195,26 @@ class ReportingAnalyticsService
         ));
     }
 
+    private function officialActionIndexRoute(array $filters = []): string
+    {
+        return $this->actionIndexRoute(array_merge(
+            $this->actionCalculationSettings->officialRouteFilters(),
+            $filters
+        ));
+    }
+
     /**
      * @return array<string, int>
      */
     private function countByStatus(Builder $query, string $statusColumn): array
     {
+        $statusColumn = SafeSql::identifier($statusColumn, [
+            'statut',
+            'statut_dynamique',
+            'statut_validation',
+            'statut_realisation',
+        ]);
+
         /** @var array<string, int> $result */
         $result = (clone $query)
             ->selectRaw("{$statusColumn} as status_label, COUNT(*) as total")

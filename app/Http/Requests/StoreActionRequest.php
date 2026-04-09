@@ -5,8 +5,11 @@ namespace App\Http\Requests;
 use App\Models\Action;
 use App\Models\Pta;
 use App\Models\User;
+use App\Services\ActionManagementSettings;
 use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\DocumentPolicySettings;
+use App\Services\DynamicReferentialSettings;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -23,12 +26,14 @@ class StoreActionRequest extends FormRequest
      */
     public function rules(): array
     {
+        $documentPolicy = app(DocumentPolicySettings::class);
+
         return [
             'pta_id' => ['required', 'integer', 'exists:ptas,id'],
             'libelle' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
 
-            'type_cible' => ['required', Rule::in(['quantitative', 'qualitative'])],
+            'type_cible' => ['required', Rule::in(app(DynamicReferentialSettings::class)->actionTargetTypeCodes())],
             'unite_cible' => ['nullable', 'string', 'max:100'],
             'quantite_cible' => ['nullable', 'numeric', 'min:0.0001'],
             'resultat_attendu' => ['nullable', 'string'],
@@ -67,8 +72,8 @@ class StoreActionRequest extends FormRequest
             'justificatif_financement' => [
                 'nullable',
                 'file',
-                'max:10240',
-                'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg',
+                'max:'.$documentPolicy->maxUploadKilobytes(),
+                $documentPolicy->mimesRule(),
             ],
         ];
     }
@@ -104,6 +109,16 @@ class StoreActionRequest extends FormRequest
             }
 
             $type = (string) $this->input('type_cible');
+            $actionManagementSettings = app(ActionManagementSettings::class);
+
+            if (! $actionManagementSettings->manualSuspendEnabled()
+                && (string) $this->input('statut') === ActionTrackingService::STATUS_SUSPENDU) {
+                $validator->errors()->add(
+                    'statut',
+                    'Le statut suspendu est desactive par la politique metier actuelle.'
+                );
+            }
+
             if ($type === 'quantitative') {
                 if (trim((string) $this->input('unite_cible')) === '') {
                     $validator->errors()->add(
@@ -135,6 +150,22 @@ class StoreActionRequest extends FormRequest
                     $validator->errors()->add(
                         'livrable_attendu',
                         'Le livrable attendu est obligatoire pour une action qualitative.'
+                    );
+                }
+            }
+
+            if ($actionManagementSettings->riskPlanRequired()) {
+                if (trim((string) $this->input('risques')) === '') {
+                    $validator->errors()->add(
+                        'risques',
+                        'Les risques sont obligatoires selon la politique metier des actions.'
+                    );
+                }
+
+                if (trim((string) $this->input('mesures_preventives')) === '') {
+                    $validator->errors()->add(
+                        'mesures_preventives',
+                        'Les mesures preventives sont obligatoires selon la politique metier des actions.'
                     );
                 }
             }

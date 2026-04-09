@@ -1,4 +1,8 @@
 @php
+    $displayMode = $displayMode ?? 'full';
+    $showSummary = in_array($displayMode, ['full', 'overview'], true);
+    $showChartBlocks = in_array($displayMode, ['full', 'charts'], true);
+    $showTableBlocks = in_array($displayMode, ['full', 'tables'], true);
     $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
     $reporting = $reportingAnalytics ?? [];
     $reportingCharts = $reporting['charts'] ?? [];
@@ -8,6 +12,10 @@
     $pasConsolidation = $reporting['pasConsolidation'] ?? [];
     $interannualComparison = $reporting['interannualComparison'] ?? [];
     $reportingDetails = $reporting['details'] ?? ['structure_rapports' => collect()];
+    $officialPolicy = is_array(($reporting['officialPolicy'] ?? null)) ? $reporting['officialPolicy'] : [];
+    $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
+    $officialBaseLower = mb_strtolower($officialBaseLabel);
+    $officialBaseText = 'Base statistique : '.$officialBaseLabel;
 
     $heatmap = $reportingCharts['retard_heatmap'] ?? ['weeks' => [], 'units' => [], 'matrix' => [], 'max' => 0];
     $criticalGantt = $reportingCharts['critical_gantt'] ?? ['min' => now()->subDays(14)->toDateString(), 'max' => now()->addDays(14)->toDateString(), 'items' => []];
@@ -17,6 +25,7 @@
     $structureHighlights = collect($reportingDetails['structure_rapports'] ?? collect())
         ->take(6)
         ->values();
+    $managedKpis = collect($reporting['managedKpis'] ?? [])->take(6)->values();
 
     $heatMax = max(1, (int) ($heatmap['max'] ?? 0));
     $ganttMin = \Illuminate\Support\Carbon::parse($criticalGantt['min'] ?? now()->subDays(14)->toDateString());
@@ -24,10 +33,10 @@
     $ganttRange = max(1, $ganttMin->diffInDays($ganttMax));
     $treemapTotal = max(0.01, (float) ($resourceTreemap['total'] ?? 0));
     $reportingSummaryCards = [
-        ['label' => 'PAS scopes', 'value' => $reportingGlobal['pas_total'] ?? 0, 'tone' => 'navy', 'meta' => 'Strategie couverte', 'href' => route('workspace.pas.index'), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
-        ['label' => 'Mesures d indicateur', 'value' => $reportingGlobal['kpi_mesures_total'] ?? 0, 'tone' => 'blue', 'meta' => 'Mesures consolidees', 'href' => route('workspace.reporting'), 'badge' => 'Valide', 'badge_tone' => 'warning'],
-        ['label' => 'Alertes retard', 'value' => $reportingAlerts['actions_en_retard'] ?? 0, 'tone' => 'amber', 'meta' => 'Suivi a traiter', 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => 'Provisoire', 'badge_tone' => 'danger'],
-        ['label' => 'Indicateurs sous seuil', 'value' => $reportingAlerts['mesures_kpi_sous_seuil'] ?? 0, 'tone' => 'green', 'meta' => 'Mesures critiques', 'href' => route('workspace.alertes', ['niveau' => 'warning', 'limit' => 100]), 'badge' => 'Officiel', 'badge_tone' => 'success'],
+        ['label' => 'PAS scopes', 'value' => $reportingGlobal['pas_total'] ?? 0, 'tone' => 'navy', 'meta' => 'Strategie couverte', 'href' => route('workspace.pas.index'), 'badge' => null, 'badge_tone' => 'info'],
+        ['label' => 'Mesures d indicateur', 'value' => $reportingGlobal['kpi_mesures_total'] ?? 0, 'tone' => 'blue', 'meta' => 'Mesures suivies', 'href' => route('workspace.reporting'), 'badge' => null, 'badge_tone' => 'warning'],
+        ['label' => 'Alertes retard', 'value' => $reportingAlerts['actions_en_retard'] ?? 0, 'tone' => 'amber', 'meta' => 'Suivi a traiter', 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => null, 'badge_tone' => 'danger'],
+        ['label' => 'Indicateurs sous seuil', 'value' => $reportingAlerts['mesures_kpi_sous_seuil'] ?? 0, 'tone' => 'green', 'meta' => 'Mesures critiques', 'href' => route('workspace.alertes', ['niveau' => 'warning', 'limit' => 100]), 'badge' => null, 'badge_tone' => 'success'],
     ];
     $statusCards = collect($reportingStatuses)
         ->map(function (array $rows, string $module): array {
@@ -45,37 +54,60 @@
 @endphp
 
 <div class="dashboard-advanced-shell">
-    <div class="flex flex-wrap gap-2">
-        <span class="anbg-badge anbg-badge-info px-3 py-1">Operationnel</span>
-        <span class="anbg-badge anbg-badge-warning px-3 py-1">Valide</span>
-        <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
-    </div>
+    @if ($showSummary)
+        <div class="flex flex-wrap gap-2">
+            <span class="anbg-badge anbg-badge-success px-3 py-1">Actions validees</span>
+            <span class="anbg-badge anbg-badge-info px-3 py-1">{{ $officialBaseText }}</span>
+        </div>
 
-    <div class="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
-        @foreach ($reportingSummaryCards as $card)
-            <x-stat-card-link
-                :href="$card['href']"
-                :label="$card['label']"
-                :value="$card['value']"
-                :meta="$card['meta']"
-                :badge="$card['badge']"
-                :badge-tone="$card['badge_tone']"
-                card-class="dashboard-advanced-kpi dashboard-advanced-kpi-{{ $card['tone'] }}"
-                label-class="dashboard-summary-label"
-                value-class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none"
-                meta-class="dashboard-summary-meta mt-2 text-xs"
-            />
-        @endforeach
-    </div>
+        <div class="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+            @foreach ($reportingSummaryCards as $card)
+                <x-stat-card-link
+                    :href="$card['href']"
+                    :label="$card['label']"
+                    :value="$card['value']"
+                    :meta="$card['meta']"
+                    :badge="$card['badge']"
+                    :badge-tone="$card['badge_tone']"
+                    card-class="dashboard-advanced-kpi dashboard-advanced-kpi-{{ $card['tone'] }}"
+                    label-class="dashboard-summary-label"
+                    value-class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none"
+                    meta-class="dashboard-summary-meta mt-2 text-xs"
+                />
+            @endforeach
+        </div>
 
-    <div class="dashboard-advanced-grid">
+        @if ($managedKpis->isNotEmpty())
+            <div class="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+                @foreach ($managedKpis as $metric)
+                    <x-stat-card-link
+                        :href="route('workspace.super-admin.kpis.edit')"
+                        :label="$metric['label']"
+                        :value="number_format((float) ($metric['value'] ?? 0), 1)"
+                        :meta="collect([
+                            ($metric['description'] ?? '') !== '' ? $metric['description'] : null,
+                            $metric['formula_summary'] ?? null,
+                            'Poids '.($metric['weight'] ?? 0),
+                        ])->filter()->implode(' | ')"
+                        badge="Actif"
+                        :badge-tone="$metric['tone'] === 'success' ? 'success' : ($metric['tone'] === 'warning' ? 'warning' : 'danger')"
+                        card-class="dashboard-advanced-kpi dashboard-advanced-kpi-navy"
+                        label-class="dashboard-summary-label"
+                        value-class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none"
+                        meta-class="dashboard-summary-meta mt-2 text-xs"
+                    />
+                @endforeach
+            </div>
+        @endif
+    @endif
+
+    @if ($showChartBlocks)
+    <div class="space-y-4">
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Entonnoir PAS - PAO - PTA - Actions</h2>
-                    <p class="showcase-panel-subtitle">Mesure la densite de conversion entre planification et execution.</p>
                 </div>
-                <span class="showcase-chip">Operationnel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-funnel-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -84,9 +116,7 @@
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Statuts empiles par {{ strtolower($reportingCharts['status_by_unit']['unit_label'] ?? 'unite') }}</h2>
-                    <p class="showcase-panel-subtitle">Comparaison directe des poches de retard, avance et cloture.</p>
                 </div>
-                <span class="showcase-chip">Operationnel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-status-unit-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -95,9 +125,7 @@
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Avancement reel vs theorique</h2>
-                    <p class="showcase-panel-subtitle">Tendance glissante sur les periodes renseignees.</p>
                 </div>
-                <span class="showcase-chip">Operationnel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-progress-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -105,10 +133,8 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Indicateurs consolides: valeur, cible, seuil</h2>
-                    <p class="showcase-panel-subtitle">Lecture dynamique du respect des cibles et des zones d alerte.</p>
+                    <h2 class="showcase-panel-title">Indicateurs suivis: valeur, cible, seuil</h2>
                 </div>
-                <span class="showcase-chip">Officiel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-kpi-trend-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -117,9 +143,7 @@
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Evolution interannuelle</h2>
-                    <p class="showcase-panel-subtitle">Volume d actions, validations et progression moyenne sur plusieurs annees.</p>
                 </div>
-                <span class="showcase-chip">Officiel</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-interannual-chart" class="dashboard-chart-host"></div></div>
         </article>
@@ -128,20 +152,17 @@
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Pareto des risques</h2>
-                    <p class="showcase-panel-subtitle">Priorise les causes qui concentrent le plus de blocages.</p>
                 </div>
-                <span class="showcase-chip">Valide</span>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-risk-pareto-chart" class="dashboard-chart-host"></div></div>
         </article>
     </div>
 
-    <div class="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
+    <div class="mt-4 space-y-4">
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Heatmap des retards</h2>
-                    <p class="showcase-panel-subtitle">Repere les semaines et unites ou le retard se concentre.</p>
                 </div>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-heatmap-chart" class="dashboard-chart-host"></div></div>
@@ -151,54 +172,17 @@
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Top actions a risque</h2>
-                    <p class="showcase-panel-subtitle">Score combine retard, ecart, financement requis et risques declares.</p>
                 </div>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-top-risks-chart" class="dashboard-chart-host"></div></div>
-            <div class="mt-4 overflow-x-auto">
-                <table class="dashboard-table dashboard-table-compact">
-                    <thead>
-                        <tr>
-                            <th>Action</th>
-                            <th>Score</th>
-                            <th>Statut</th>
-                            <th>Echeance</th>
-                            <th>Responsable</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($topRisks['rows'] as $row)
-                            <tr class="dashboard-row-link" data-row-link="{{ $row['url'] ?? '' }}">
-                                <td class="font-semibold">{{ $row['action'] }}</td>
-                                <td>
-                                    <div class="dashboard-risk-inline">
-                                        <span>{{ number_format((float) $row['score'], 1) }}</span>
-                                        <span class="dashboard-risk-inline-bar">
-                                            <span style="width: {{ min(100, max(6, (float) $row['score'])) }}%;"></span>
-                                        </span>
-                                    </div>
-                                </td>
-                                <td>{{ $row['statut'] }}</td>
-                                <td>{{ $row['echeance'] }}</td>
-                                <td>{{ $row['responsable'] }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5">Aucune action a risque detectee.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
         </article>
     </div>
 
-    <div class="mt-4 grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+    <div class="mt-4 space-y-4">
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Gantt des actions critiques</h2>
-                    <p class="showcase-panel-subtitle">Represente la fenetre planifiee et la progression reelle des actions les plus sensibles.</p>
                 </div>
             </div>
             @if (($criticalGantt['items'] ?? []) !== [])
@@ -212,7 +196,6 @@
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Treemap ressources et budget</h2>
-                    <p class="showcase-panel-subtitle">Chaque carte grossit selon les ressources mobilisees et l effort financier estime.</p>
                 </div>
             </div>
             <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-treemap-chart" class="dashboard-chart-host"></div></div>
@@ -223,7 +206,6 @@
         <div class="dashboard-advanced-head">
             <div>
                 <h2 class="showcase-panel-title">Jauges de performance par direction</h2>
-                <p class="showcase-panel-subtitle">Chaque jauge synthetise la progression moyenne d execution par direction.</p>
             </div>
         </div>
         <div class="dashboard-gauge-grid">
@@ -240,13 +222,14 @@
             @endforelse
         </div>
     </article>
+    @endif
 
-    <div class="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr]">
+    @if ($showTableBlocks)
+    <div class="mt-4 space-y-4">
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Consolidation PAS</h2>
-                    <p class="showcase-panel-subtitle">Vue tabulaire des objets strategiques vraiment utiles au pilotage.</p>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -288,8 +271,7 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Statuts consolides</h2>
-                    <p class="showcase-panel-subtitle">Vue courte par module, sans refaire des sous-tableaux redondants.</p>
+                    <h2 class="showcase-panel-title">Statuts suivis</h2>
                 </div>
             </div>
             <div class="grid gap-3">
@@ -310,12 +292,11 @@
         </article>
     </div>
 
-    <div class="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+    <div class="mt-4 space-y-4">
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
                     <h2 class="showcase-panel-title">Comparaison interannuelle detaillee</h2>
-                    <p class="showcase-panel-subtitle">Table courte conservee pour l arbitrage annuel et la validation.</p>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -355,10 +336,51 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Focus execution</h2>
-                    <p class="showcase-panel-subtitle">Extraction courte des actions qui concentrent les ressources, indicateurs et risques visibles.</p>
+                    <h2 class="showcase-panel-title">Top actions a risque</h2>
                 </div>
-                <span class="showcase-chip">{{ $structureHighlights->count() }} focus</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="dashboard-table dashboard-table-compact">
+                    <thead>
+                        <tr>
+                            <th>Action</th>
+                            <th>Score</th>
+                            <th>Statut</th>
+                            <th>Echeance</th>
+                            <th>Responsable</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($topRisks['rows'] as $row)
+                            <tr class="dashboard-row-link" data-row-link="{{ $row['url'] ?? '' }}">
+                                <td class="font-semibold">{{ $row['action'] }}</td>
+                                <td>
+                                    <div class="dashboard-risk-inline">
+                                        <span>{{ number_format((float) $row['score'], 1) }}</span>
+                                        <span class="dashboard-risk-inline-bar">
+                                            <span style="width: {{ min(100, max(6, (float) $row['score'])) }}%;"></span>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>{{ $row['statut'] }}</td>
+                                <td>{{ $row['echeance'] }}</td>
+                                <td>{{ $row['responsable'] }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5">Aucune action a risque detectee.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <article class="dashboard-advanced-card">
+            <div class="dashboard-advanced-head">
+                <div>
+                    <h2 class="showcase-panel-title">Focus execution</h2>
+                </div>
             </div>
             <div class="grid gap-3">
                 @forelse ($structureHighlights as $row)
@@ -381,4 +403,7 @@
             </div>
         </article>
     </div>
+    @endif
 </div>
+
+

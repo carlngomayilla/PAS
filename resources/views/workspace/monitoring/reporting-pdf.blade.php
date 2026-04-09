@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Reporting consolide ANBG</title>
+    <title>{{ ($exportTemplate ?? null)?->documentTitle() ?? 'Reporting ANBG' }}</title>
     <style>
         :root {
             --anbg-primary: #1E3A8A;
@@ -253,6 +253,19 @@
 </head>
 <body>
     @php
+        $exportTemplate = $exportTemplate ?? null;
+        $templateLayout = $exportTemplate?->layout_config ?? [];
+        $templateBlocks = $exportTemplate?->blocks_config ?? [];
+        $templateTitle = $exportTemplate?->documentTitle() ?? 'Reporting ANBG';
+        $templateSubtitle = $exportTemplate?->documentSubtitle();
+        $templateHeader = trim((string) ($templateLayout['header_text'] ?? ''));
+        $templateFooter = trim((string) ($templateLayout['footer_text'] ?? ''));
+        $templateWatermark = trim((string) ($templateLayout['watermark_text'] ?? ''));
+        $officialPolicy = is_array($officialPolicy ?? null) ? $officialPolicy : [];
+        $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
+        $officialBaseText = 'Base statistique : '.$officialBaseLabel;
+        $showPdfLevelLegend = false;
+        $showPdfKpiCards = (bool) ($templateLayout['pdf_show_kpi_cards'] ?? true);
         $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
         $kpiSummary = $kpiSummary ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'risque' => 0, 'global' => 0, 'progression' => 0];
         $scoreTone = static fn (float $score): string => $score >= 75 ? 'success' : ($score >= 50 ? 'warning' : 'danger');
@@ -302,61 +315,73 @@
             '02' => 'Indicateurs globaux',
             '03' => 'Statuts',
             '04' => 'Alertes de synthese',
-            '05' => 'Vue consolidee du PAS',
+            '05' => 'Vue du PAS',
             '06' => 'Comparaison interannuelle',
             '07' => 'Details actions en retard',
             '08' => 'Details indicateurs sous seuil',
             '09' => 'Structure des rapports strategiques',
         ];
-        $pdfSectionLevels = [
-            '01' => ['Provisoire', 'Valide', 'Officiel'],
-            '02' => ['Provisoire', 'Officiel'],
-            '03' => ['Provisoire'],
-            '04' => ['Provisoire'],
-            '05' => ['Officiel'],
-            '06' => ['Officiel'],
-            '07' => ['Provisoire'],
-            '08' => ['Valide'],
-            '09' => ['Officiel'],
-        ];
-        $levelClass = static fn (string $label): string => match ($label) {
-            'Officiel' => 'level-officiel',
-            'Valide' => 'level-valide',
-            default => 'level-provisoire',
-        };
+        $pdfSectionLevels = collect($pdfSections)
+            ->map(fn (): array => [])
+            ->all();
+        $levelClass = static fn (string $label): string => 'level-provisoire';
+        $enabledPdfSections = collect($pdfSections)->filter(function (string $title, string $number) use ($templateBlocks): bool {
+            return match ($number) {
+                '01' => (bool) ($templateBlocks['include_charts'] ?? true),
+                '04' => (bool) ($templateBlocks['include_alerts'] ?? true),
+                '07', '08', '09' => (bool) ($templateBlocks['include_detail_table'] ?? true),
+                default => (bool) ($templateBlocks['include_summary'] ?? true),
+            };
+        })->all();
     @endphp
 
     <div class="pdf-footer">
-        Reporting ANBG | Page <span class="page-num"></span> / <span class="page-total"></span>
+        {{ $templateFooter !== '' ? $templateFooter : 'Reporting ANBG' }} | Page <span class="page-num"></span> / <span class="page-total"></span>
     </div>
 
-    <div class="cover">
-        <h1>Reporting consolide ANBG</h1>
-        <p class="meta">
-            Genere le {{ $generatedAt->format('Y-m-d H:i:s') }} |
-            Role: {{ $scope['role'] }} |
-            Direction: {{ $scope['direction_id'] ?? '-' }} |
-            Service: {{ $scope['service_id'] ?? '-' }}
-        </p>
-        <div class="level-row">
-            <span class="level-badge level-provisoire">Provisoire</span>
-            <span class="level-badge level-valide">Valide</span>
-            <span class="level-badge level-officiel">Officiel</span>
+    @if ($templateWatermark !== '')
+        <div style="position: fixed; top: 42%; left: 18%; right: 18%; text-align: center; font-size: 72px; font-weight: 900; color: rgba(30,58,138,.08); transform: rotate(-24deg); z-index: -1;">
+            {{ $templateWatermark }}
         </div>
-    </div>
+    @endif
 
-    <div class="toc">
-        <h2>Sommaire</h2>
-        <table class="toc-table">
-            @foreach ($pdfSections as $number => $title)
-                <tr>
-                    <td class="toc-index">{{ $number }}</td>
-                    <td>{{ $title }}</td>
-                </tr>
-            @endforeach
-        </table>
-    </div>
+    @if ($templateHeader !== '')
+        <div class="meta" style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--anbg-primary);">
+            {{ $templateHeader }}
+        </div>
+    @endif
 
+    @if (($templateBlocks['include_cover'] ?? true))
+        <div class="cover">
+            <h1>{{ $templateTitle }}</h1>
+            @if ($templateSubtitle)
+                <p class="meta" style="font-size: 13px; color: var(--anbg-primary);">{{ $templateSubtitle }}</p>
+            @endif
+            <p class="meta">
+                Genere le {{ $generatedAt->format('Y-m-d H:i:s') }} |
+                Role: {{ $scope['role'] }} |
+                Direction: {{ $scope['direction_id'] ?? '-' }} |
+                Service: {{ $scope['service_id'] ?? '-' }}
+            </p>
+            <p class="meta" style="font-weight: 700; color: var(--anbg-primary);">{{ $officialBaseText }}</p>
+        </div>
+    @endif
+
+    @if (($templateBlocks['include_summary'] ?? true))
+        <div class="toc">
+            <h2>Sommaire</h2>
+            <table class="toc-table">
+                @foreach ($enabledPdfSections as $number => $title)
+                    <tr>
+                        <td class="toc-index">{{ $number }}</td>
+                        <td>{{ $title }}</td>
+                    </tr>
+                @endforeach
+            </table>
+        </div>
+    @endif
+
+    @if (($templateBlocks['include_charts'] ?? true))
     <div class="section page-break-section">
         <span class="section-kicker">Section 01</span>
         <h2>Synthese graphique</h2>
@@ -379,18 +404,20 @@
             </tr>
         </table>
 
-        <table class="cards-grid">
-            <tr>
-                @foreach ($kpiCards as $card)
-                    <td>
-                        <div class="metric-card card-{{ $card['class'] }}">
-                            <div class="metric-label">{{ $card['label'] }}</div>
-                            <div class="metric-value">{{ $card['value'] }}</div>
-                        </div>
-                    </td>
-                @endforeach
-            </tr>
-        </table>
+        @if ($showPdfKpiCards)
+            <table class="cards-grid">
+                <tr>
+                    @foreach ($kpiCards as $card)
+                        <td>
+                            <div class="metric-card card-{{ $card['class'] }}">
+                                <div class="metric-label">{{ $card['label'] }}</div>
+                                <div class="metric-value">{{ $card['value'] }}</div>
+                            </div>
+                        </td>
+                    @endforeach
+                </tr>
+            </table>
+        @endif
 
         <table class="visual-grid">
             <tr>
@@ -503,7 +530,9 @@
             </tr>
         </table>
     </div>
+    @endif
 
+    @if (($templateBlocks['include_summary'] ?? true))
     <div class="section page-break-section">
         <span class="section-kicker">Section 02</span>
         <h2>Indicateurs globaux</h2>
@@ -512,6 +541,7 @@
                 <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
             @endforeach
         </div>
+        <p class="meta">{{ $officialBaseText }}</p>
         <table>
             <thead>
                 <tr>
@@ -554,7 +584,9 @@
             </tbody>
         </table>
     </div>
+    @endif
 
+    @if (($templateBlocks['include_summary'] ?? true))
     <div class="section page-break-section">
         <span class="section-kicker">Section 03</span>
         <h2>Statuts</h2>
@@ -584,7 +616,9 @@
             </tbody>
         </table>
     </div>
+    @endif
 
+    @if (($templateBlocks['include_alerts'] ?? true))
     <div class="section page-break-section">
         <span class="section-kicker">Section 04</span>
         <h2>Alertes de synthese</h2>
@@ -610,15 +644,18 @@
             </tbody>
         </table>
     </div>
+    @endif
 
+    @if (($templateBlocks['include_summary'] ?? true))
     <div class="section page-break-section">
         <span class="section-kicker">Section 05</span>
-        <h2>Vue consolidee du PAS</h2>
+        <h2>Vue du PAS</h2>
         <div class="level-row">
             @foreach ($pdfSectionLevels['05'] as $label)
                 <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
             @endforeach
         </div>
+        <p class="meta">{{ $officialBaseText }}</p>
         <table>
             <thead>
                 <tr>
@@ -654,7 +691,9 @@
             </tbody>
         </table>
     </div>
+    @endif
 
+    @if (($templateBlocks['include_summary'] ?? true))
     <div class="section page-break-section">
         <span class="section-kicker">Section 06</span>
         <h2>Comparaison interannuelle</h2>
@@ -663,6 +702,7 @@
                 <span class="level-badge {{ $levelClass($label) }}">{{ $label }}</span>
             @endforeach
         </div>
+        <p class="meta">{{ $officialBaseText }}</p>
         <table>
             <thead>
                 <tr>
@@ -696,7 +736,9 @@
             </tbody>
         </table>
     </div>
+    @endif
 
+    @if (($templateBlocks['include_detail_table'] ?? true))
     <div class="section page-break-section">
         <span class="section-kicker">Section 07</span>
         <h2>Details actions en retard</h2>
@@ -740,7 +782,9 @@
             </tbody>
         </table>
     </div>
+    @endif
 
+    @if (($templateBlocks['include_detail_table'] ?? true))
     <div class="section page-break-section">
         <span class="section-kicker">Section 08</span>
         <h2>Details indicateurs sous seuil</h2>
@@ -778,7 +822,9 @@
             </tbody>
         </table>
     </div>
+    @endif
 
+    @if (($templateBlocks['include_detail_table'] ?? true))
     <div class="section page-break-section">
         <span class="section-kicker">Section 09</span>
         <h2>Structure des rapports strategiques</h2>
@@ -836,5 +882,44 @@
             </tbody>
         </table>
     </div>
+    @endif
+
+    @if (($templateBlocks['include_signatures'] ?? false))
+        <div class="section page-break-section">
+            <span class="section-kicker">Validation</span>
+            <h2>Visa et signatures</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Nom</th>
+                        <th>Date</th>
+                        <th>Visa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Preparation</td>
+                        <td>{{ $scope['role'] }}</td>
+                        <td>{{ $generatedAt->format('Y-m-d') }}</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Validation</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Diffusion</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    @endif
 </body>
 </html>
+

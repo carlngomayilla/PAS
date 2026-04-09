@@ -117,6 +117,7 @@ class PaoController extends Controller
             ...$validated,
             'pas_id' => (int) $objectif->pasAxe->pas_id,
             'pas_objectif_id' => (int) $objectif->id,
+            'service_id' => (int) $validated['service_id'],
         ]);
         $this->recordAudit($request, 'pao', 'create', $pao, null, $pao->toArray());
 
@@ -176,7 +177,10 @@ class PaoController extends Controller
 
         if ($pao->ptas()->exists() && (int) $pao->service_id !== (int) $validated['service_id']) {
             return response()->json([
-                'message' => 'Le service d un PAO deja decliné en PTA ne peut plus etre modifie.',
+                'message' => 'Le service affecte au PAO ne peut plus changer apres creation du PTA.',
+                'errors' => [
+                    'service_id' => ['Le service affecte au PAO ne peut plus changer apres creation du PTA.'],
+                ],
             ], 422);
         }
 
@@ -185,6 +189,7 @@ class PaoController extends Controller
             ...$validated,
             'pas_id' => (int) $objectif->pasAxe->pas_id,
             'pas_objectif_id' => (int) $objectif->id,
+            'service_id' => (int) $validated['service_id'],
         ]);
         $pao->save();
 
@@ -227,19 +232,8 @@ class PaoController extends Controller
 
     private function resolveAccessibleObjectif(User $user, int $objectifId): PasObjectif
     {
-        $objectif = PasObjectif::query()
-            ->with('pasAxe.pas.directions:id')
+        return PasObjectif::query()
+            ->with('pasAxe.pas:id,titre,periode_debut,periode_fin')
             ->findOrFail($objectifId);
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $allowed = $objectif->pasAxe?->pas?->directions
-                ?->contains(static fn ($direction): bool => (int) $direction->id === (int) $user->direction_id);
-
-            if (! $allowed) {
-                abort(403, $this->outOfScopeMessage(UiLabel::object('pas_objectif')));
-            }
-        }
-
-        return $objectif;
     }
 }

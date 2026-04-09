@@ -1,16 +1,18 @@
 @extends('layouts.workspace')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h1>Modifier justificatif #{{ $justificatif->id }}</h1>
         <p class="text-slate-600">
             Type: <strong>{{ $typeAlias }}</strong> |
             Entite: <strong>#{{ $justificatif->justifiable_id }}</strong>
         </p>
+        <p class="mt-2 text-sm text-slate-500">Formats autorises : {{ strtoupper(implode(', ', $documentPolicySettings['allowed_extensions'] ?? [])) }} | Taille max : {{ $documentPolicySettings['max_upload_mb'] ?? 10 }} Mo</p>
     </section>
 
-    <section class="ui-card mb-3.5">
-        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+    <section class="ui-card mb-3.5 app-screen-block">
+        <div class="app-screen-stack">
             <article class="ui-card mb-3.5 !mb-0">
                 <h2>Fichier actuel</h2>
                 <p><strong>{{ $justificatif->nom_original }}</strong></p>
@@ -33,7 +35,7 @@
                         </div>
                         <div class="mt-3">
                             <label for="fichier">Remplacer le fichier (optionnel)</label>
-                            <input id="fichier" name="fichier" type="file">
+                            <input id="fichier" name="fichier" type="file" accept="{{ $documentAccept }}">
                         </div>
                     </div>
                     <div class="form-actions">
@@ -44,4 +46,5 @@
             </article>
         </div>
     </section>
+    </div>
 @endsection

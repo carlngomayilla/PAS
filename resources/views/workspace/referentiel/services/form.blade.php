@@ -4,12 +4,12 @@
     @php
         $isEdit = $mode === 'edit';
     @endphp
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h1>{{ $isEdit ? 'Modifier service' : 'Nouveau service' }}</h1>
-        <p class="text-slate-600">Chaque service est rattache a une direction.</p>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.referentiel.services.update', $row) : route('workspace.referentiel.services.store') }}">
             @csrf
             @if ($isEdit)
@@ -18,8 +18,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Parametrage service</h2>
-                <p class="form-section-subtitle">Structure alignee au standard de saisie moderne.</p>
-                <div class="form-grid">
+                <div class="grid gap-4">
                     <div>
                         <label for="direction_id">Direction</label>
                         <select id="direction_id" name="direction_id" required>
@@ -55,4 +54,5 @@
             </div>
         </form>
     </section>
+    </div>
 @endsection

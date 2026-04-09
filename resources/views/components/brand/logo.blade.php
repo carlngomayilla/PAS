@@ -4,16 +4,12 @@
 ])
 
 @php
-    $logoPath = match($variant) {
-        'mark' => '/images/logo-mark.png',
-        'wordmark' => '/images/logo-wordmark.png',
-        default => '/images/logo-full.png',
-    };
+    $logoPath = $platformSettings->brandAssetUrl($variant);
 @endphp
 
 <img 
     src="{{ $logoPath }}" 
-    alt="ANBG - Agence Nationale des Bourses du Gabon"
+    alt="{{ $platformSettings->get('institution_label', 'ANBG - Agence Nationale des Bourses du Gabon') }}"
     {{ $attributes->merge(['class' => trim('block '.$class)]) }}
     style="object-fit: contain;"
 />

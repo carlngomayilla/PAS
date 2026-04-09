@@ -20,7 +20,7 @@ class JournalAuditController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalReadAccess()) {
+        if (! $user->hasPermission('audit.read')) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -88,7 +88,7 @@ class JournalAuditController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalReadAccess()) {
+        if (! $user->hasPermission('audit.read')) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -97,4 +97,3 @@ class JournalAuditController extends Controller
         ]);
     }
 }
-

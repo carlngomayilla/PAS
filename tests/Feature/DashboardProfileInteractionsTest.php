@@ -36,7 +36,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertSee('Pilotage du service');
         $response->assertSee('Actions a valider');
         $response->assertSee('Performance des agents');
-        $response->assertSee('Diagramme de Gantt compact');
+        $response->assertSee('Diagramme de Gantt');
         $response->assertSee('dashboard-role-status-chart', false);
         $response->assertSee('dashboard-role-support-chart', false);
         $response->assertSee('"dgPayload"', false);
@@ -72,6 +72,8 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertSee('Pilotage directionnel et comparaison des services');
         $response->assertSee('Performance par service');
         $response->assertSee('Actions critiques de la direction');
+        $response->assertSee('SFC');
+        $response->assertSee('AJARH');
         $response->assertSee('dashboard-role-support-chart', false);
     }
 
@@ -86,8 +88,8 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertOk();
         $response->assertSee('Consolidation transverse du pilotage');
         $response->assertSee('Classement des directions');
-        $response->assertSee('Actions critiques consolidees');
-        $response->assertSee('Officiel');
+        $response->assertSee('Actions critiques validees');
+        $response->assertSee('Actions validees');
     }
 
     public function test_seeded_dg_user_sees_dg_dashboard_sections(): void
@@ -100,19 +102,14 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Lecture strategique institutionnelle');
-        $response->assertSee('Statistiques operationnelles');
-        $response->assertSee('Statistiques officielles');
-        $response->assertSee('Jauges operationnelles');
-        $response->assertSee('Jauges officielles');
-        $response->assertSee('Graphiques operationnels');
-        $response->assertSee('Graphiques officiels');
-        $response->assertSee('Operationnel vs officiel');
-        $response->assertSee('Directions : operationnel vs officiel');
-        $response->assertSee('Execution operationnelle');
-        $response->assertSee('Execution officielle');
+        $response->assertSee('Actions validees');
+        $response->assertSee('Taux validation');
+        $response->assertSee('Execution globale');
+        $response->assertSee('Score global');
+        $response->assertSee('Performance par direction');
+        $response->assertSee('Indicateurs mensuels');
         $response->assertSee('Directions en difficulte');
-        $response->assertSee('Officiel');
-        $response->assertSee('dashboard-role-comparison-chart', false);
+        $response->assertSee('dashboard-role-support-chart', false);
     }
 
     public function test_seeded_cabinet_user_sees_cabinet_dashboard_sections(): void
@@ -127,7 +124,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertSee('Suivi transverse et appui decisionnel');
         $response->assertSee('Validations en attente');
         $response->assertSee('Alertes critiques transverses');
-        $response->assertSee('Valide');
+        $response->assertSee('Actions validees');
     }
 
     public function test_seeded_service_user_sees_role_aware_pilotage_page(): void
@@ -140,8 +137,8 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Suivi du service et ruptures de chaine');
-        $response->assertSee('Provisoire');
-        $response->assertSee('Officiel');
+        $response->assertSee('Actions validees');
+        $response->assertSee('Base statistique : Toutes les actions visibles');
     }
 
     public function test_seeded_dg_user_sees_role_aware_reporting_page(): void
@@ -154,13 +151,10 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Centre d export institutionnel');
-        $response->assertSee('Lecture DG : operationnel vs officiel');
-        $response->assertSee('Statistiques operationnelles');
-        $response->assertSee('Statistiques officielles');
-        $response->assertSee('Directions : operationnel vs officiel');
-        $response->assertSee('Execution operationnelle');
-        $response->assertSee('Execution officielle');
-        $response->assertSee('Officiel');
+        $response->assertSee('Actions validees');
+        $response->assertSee('Base statistique : Toutes les actions visibles');
+        $response->assertDontSee('Lecture DG : operationnel vs consolide');
+        $response->assertDontSee('Execution consolidee');
         $response->assertSee('Dashboard analytique');
     }
 
@@ -174,12 +168,10 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Pilotage institutionnel');
-        $response->assertSee('Lecture DG : operationnel vs officiel');
-        $response->assertSee('Statistiques operationnelles');
-        $response->assertSee('Statistiques officielles');
-        $response->assertSee('Directions : operationnel vs officiel');
-        $response->assertSee('Execution operationnelle');
-        $response->assertSee('Execution officielle');
+        $response->assertSee('Actions validees');
+        $response->assertSee('Base statistique : Toutes les actions visibles');
+        $response->assertDontSee('Lecture DG : operationnel vs consolide');
+        $response->assertDontSee('Execution consolidee');
     }
 
     public function test_seeded_cabinet_user_sees_role_aware_reporting_page(): void
@@ -192,7 +184,8 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Centre de diffusion transverse');
-        $response->assertSee('Valide');
-        $response->assertSee('Provisoire');
+        $response->assertSee('Actions validees');
+        $response->assertDontSee('Provisoire');
+        $response->assertDontSee('Officiel');
     }
 }

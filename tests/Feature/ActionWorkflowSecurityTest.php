@@ -13,6 +13,7 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\WorkflowSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -178,6 +179,123 @@ class ActionWorkflowSecurityTest extends TestCase
             'message' => 'Merci de preciser le point de blocage.',
             'utilisateur_id' => $serviceUser->id,
         ]);
+    }
+
+    public function test_workflow_can_finalize_at_service_level_when_direction_step_is_disabled(): void
+    {
+        Storage::fake('local');
+
+        app(WorkflowSettings::class)->updateActionWorkflow([
+            'actions_service_validation_enabled' => '1',
+            'actions_direction_validation_enabled' => '0',
+            'actions_rejection_comment_required' => '1',
+        ]);
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+        $serviceUser = $fixture['service_user'];
+        $directionUser = $fixture['direction_user'];
+        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
+                'quantite_realisee' => 100,
+                'commentaire' => 'Execution complete',
+                'difficultes' => 'Aucune',
+                'mesures_correctives' => 'RAS',
+                'justificatif' => UploadedFile::fake()->create('preuve.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.close', $action), [
+                'date_fin_reelle' => '2026-01-07',
+                'rapport_final' => 'Travail termine',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        self::assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.actions.review', $action), [
+                'decision_validation' => 'valider',
+                'evaluation_note' => 92,
+                'evaluation_commentaire' => 'Validation finale service',
+                'validation_sans_correction' => 1,
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, $action->statut_validation);
+        self::assertTrue((bool) $action->validation_hierarchique);
+
+        $this->actingAs($directionUser)
+            ->post(route('workspace.actions.review-direction', $action), [
+                'decision_validation' => 'valider',
+                'evaluation_note' => 95,
+                'evaluation_commentaire' => 'Tentative hors circuit',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_workflow_can_skip_service_and_send_action_directly_to_direction(): void
+    {
+        Storage::fake('local');
+
+        app(WorkflowSettings::class)->updateActionWorkflow([
+            'actions_service_validation_enabled' => '0',
+            'actions_direction_validation_enabled' => '1',
+            'actions_rejection_comment_required' => '1',
+        ]);
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+        $serviceUser = $fixture['service_user'];
+        $directionUser = $fixture['direction_user'];
+        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
+                'quantite_realisee' => 100,
+                'commentaire' => 'Execution complete',
+                'difficultes' => 'Aucune',
+                'mesures_correctives' => 'RAS',
+                'justificatif' => UploadedFile::fake()->create('preuve.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.close', $action), [
+                'date_fin_reelle' => '2026-01-07',
+                'rapport_final' => 'Travail termine',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.actions.review', $action), [
+                'decision_validation' => 'valider',
+                'evaluation_note' => 92,
+                'evaluation_commentaire' => 'Tentative hors circuit',
+                'validation_sans_correction' => 1,
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($directionUser)
+            ->post(route('workspace.actions.review-direction', $action), [
+                'decision_validation' => 'valider',
+                'evaluation_note' => 95,
+                'evaluation_commentaire' => 'Validation direction',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, $action->statut_validation);
     }
 
     /**

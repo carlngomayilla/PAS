@@ -26,7 +26,18 @@ function bootDashboardRender() {
   const radarDatasets = payload.radar_datasets || [];
   const actionRows = payload.action_rows || [];
   const reportingCharts = reporting.charts || {};
-  const panelKeys = ['overview', 'kpi', 'actions', 'gantt', 'tables', 'analytics'];
+  const panelKeys = ['overview', 'charts', 'tables'];
+  const panelAliases = {
+    overview: 'overview',
+    synthese: 'overview',
+    charts: 'charts',
+    graphes: 'charts',
+    kpi: 'charts',
+    gantt: 'charts',
+    analytics: 'charts',
+    actions: 'tables',
+    tables: 'tables',
+  };
   const chartInstances = {};
   const compactFormatter = new Intl.NumberFormat('fr-FR', {
     notation: 'compact',
@@ -46,6 +57,9 @@ function bootDashboardRender() {
     warning: '#F59E0B',
     danger: '#EF4444',
   };
+  let assetBootstrapPromise = null;
+  let renderInFlight = false;
+  let renderQueued = false;
 
   const centerTextPlugin = {
     id: 'anbgCenterText',
@@ -422,8 +436,80 @@ function bootDashboardRender() {
     const canvas = document.createElement('canvas');
     host.appendChild(canvas);
 
-    chartInstances[id] = new window.Chart(canvas.getContext('2d'), config);
+    chartInstances[id] = new window.Chart(canvas, config);
     bindChartDrilldown(chartInstances[id], drilldownResolver);
+  }
+
+  async function ensureDashboardAssets({ needD3 = false } = {}) {
+    const hasChart = typeof window.Chart !== 'undefined';
+    const hasD3 = typeof window.d3 !== 'undefined';
+
+    if (hasChart && (!needD3 || hasD3)) {
+      return;
+    }
+
+    if (!assetBootstrapPromise) {
+      assetBootstrapPromise = (async () => {
+        try {
+          if (typeof window.Chart === 'undefined') {
+            const [{ Chart, registerables }, chartTheme] = await Promise.all([
+              import('chart.js'),
+              import('./chart-theme'),
+            ]);
+
+            const optionalModules = await Promise.allSettled([
+              import('chartjs-chart-matrix'),
+              import('chartjs-chart-treemap'),
+              import('d3'),
+            ]);
+
+            const matrixModule = optionalModules[0].status === 'fulfilled' ? optionalModules[0].value : null;
+            const treemapModule = optionalModules[1].status === 'fulfilled' ? optionalModules[1].value : null;
+            const d3Module = optionalModules[2].status === 'fulfilled' ? optionalModules[2].value : null;
+
+            Chart.register(...registerables);
+
+            if (matrixModule?.MatrixController && matrixModule?.MatrixElement) {
+              Chart.register(matrixModule.MatrixController, matrixModule.MatrixElement);
+            }
+
+            if (treemapModule?.TreemapController && treemapModule?.TreemapElement) {
+              Chart.register(treemapModule.TreemapController, treemapModule.TreemapElement);
+            }
+
+            chartTheme.applyAnbgChartDefaults(Chart);
+            window.Chart = Chart;
+            window.getAnbgChartTheme = chartTheme.getAnbgChartTheme;
+            window.applyAnbgChartDefaults = chartTheme.applyAnbgChartDefaults;
+
+            if (d3Module) {
+              window.d3 = d3Module;
+            }
+
+            return;
+          }
+
+          if (needD3 && typeof window.d3 === 'undefined') {
+            const d3Module = await import('d3');
+            window.d3 = d3Module;
+          }
+        } catch (error) {
+          console.error('Impossible de charger les ressources du dashboard.', error);
+        }
+      })().finally(() => {
+        assetBootstrapPromise = null;
+      });
+    }
+
+    await assetBootstrapPromise;
+  }
+
+  function safeRenderStep(label, callback) {
+    try {
+      callback();
+    } catch (error) {
+      console.error(`Echec de rendu du bloc dashboard: ${label}`, error);
+    }
   }
 
   window.anbgDashboardRuntime = {
@@ -1107,6 +1193,7 @@ function bootDashboardRender() {
 
   function mountKpiGaugeSet(prefix, scores, official = true) {
     const actionsIndexUrl = payload.actions_index_url || '/workspace/actions';
+    const officialFilters = isObject(payload.official_action_filters) ? payload.official_action_filters : {};
     const definitions = [
       ['delai', 'Delai'],
       ['performance', 'Performance'],
@@ -1117,7 +1204,7 @@ function bootDashboardRender() {
 
     definitions.forEach(([key, label]) => {
       const query = official
-        ? { statut_validation: 'validee_direction', sort: metricSortKey(label) }
+        ? { ...officialFilters, sort: metricSortKey(label) }
         : { sort: metricSortKey(label) };
 
       mountGauge(
@@ -1789,54 +1876,64 @@ function bootDashboardRender() {
     renderGantts();
   }
 
-  function render() {
-    if (typeof window.Chart === 'undefined' || typeof window.d3 === 'undefined') {
+  async function render() {
+    if (renderInFlight) {
+      renderQueued = true;
       return;
     }
 
-    ensurePlugins();
+    renderInFlight = true;
 
-    if (typeof window.applyAnbgChartDefaults === 'function') {
-      window.applyAnbgChartDefaults(window.Chart);
+    try {
+    await ensureDashboardAssets({
+      needD3: Boolean(document.getElementById('dashboard-gantt-chart')),
+    });
+
+    const hasChart = typeof window.Chart !== 'undefined';
+    const hasD3 = typeof window.d3 !== 'undefined';
+
+    if (!hasChart && !hasD3) {
+      return;
     }
 
-    mountRoleCharts();
+    if (hasChart) {
+      safeRenderStep('plugins', ensurePlugins);
 
-    if (payload.dashboard_role === 'dg') {
-      mountKpiGaugeSet('dashboard-kpi-gauge-operational-', payload.operational_global_scores || {}, false);
-      mountKpiGaugeSet('dashboard-kpi-gauge-official-', payload.global_scores || {}, true);
-      mountStatusDonut(
-        'dashboard-status-mix-chart-operational',
-        payload.operational_status_cards || statusCards,
-        (payload.totals && payload.totals.actions_total) || 0
-      );
-      mountStatusDonut(
-        'dashboard-status-mix-chart-official',
-        payload.official_status_cards || [],
-        Array.isArray(payload.official_status_cards)
-          ? payload.official_status_cards.reduce((sum, item) => sum + Number(item.count || 0), 0)
-          : 0
-      );
-      mountMonthlyKpiLine('dashboard-kpi-line-chart-operational', payload.operational_monthly || monthly);
-      mountMonthlyKpiLine('dashboard-kpi-line-chart-official', payload.monthly || monthly);
-    } else {
-      mountKpiGaugeSet('dashboard-kpi-gauge-', payload.global_scores || {}, true);
-      mountStatusDonut();
-      mountMonthlyKpiLine();
+      if (typeof window.applyAnbgChartDefaults === 'function') {
+        window.applyAnbgChartDefaults(window.Chart);
+      }
+
+      safeRenderStep('role charts', mountRoleCharts);
+      safeRenderStep('kpi gauges', () => mountKpiGaugeSet('dashboard-kpi-gauge-', payload.global_scores || {}, true));
+      safeRenderStep('status donut', mountStatusDonut);
+      safeRenderStep('monthly line', mountMonthlyKpiLine);
+      safeRenderStep('unit summary', mountUnitSummary);
+      safeRenderStep('monthly grouped', mountMonthlyKpiGrouped);
+      safeRenderStep('interannual', mountInterannual);
+      safeRenderStep('radar', mountRadar);
+      safeRenderStep('scatter', mountBubble);
+      safeRenderStep('reporting charts', mountReportingCharts);
     }
 
-    mountUnitSummary();
-    mountMonthlyKpiGrouped();
-    mountInterannual();
-    mountRadar();
-    mountBubble();
-    mountReportingCharts();
-    renderGantts();
-    bindRowLinks();
+    if (hasD3) {
+      safeRenderStep('gantt', renderGantts);
+    }
+
+    safeRenderStep('row links', bindRowLinks);
+    } finally {
+      renderInFlight = false;
+
+      if (renderQueued) {
+        renderQueued = false;
+        window.setTimeout(() => {
+          void render();
+        }, 0);
+      }
+    }
   }
 
   function activateTab(key, syncUrl) {
-    let nextKey = key;
+    let nextKey = panelAliases[key] || key;
 
     if (!panelKeys.includes(nextKey)) {
       nextKey = 'overview';
@@ -1847,6 +1944,7 @@ function bootDashboardRender() {
         const active = tabButton.getAttribute('data-dashboard-tab') === nextKey;
         tabButton.classList.toggle('dashboard-tab-active', active);
         tabButton.classList.toggle('dashboard-tab-inactive', !active);
+        tabButton.setAttribute('aria-current', active ? 'page' : 'false');
       });
     }
 
@@ -1861,11 +1959,12 @@ function bootDashboardRender() {
     }
 
     window.setTimeout(() => {
-      render();
-      resizeCharts();
-      window.setTimeout(() => {
+      Promise.resolve(render()).finally(() => {
         resizeCharts();
-      }, 180);
+        window.setTimeout(() => {
+          resizeCharts();
+        }, 180);
+      });
     }, 90);
   }
 
@@ -1873,7 +1972,8 @@ function bootDashboardRender() {
 
   if (tabsRoot) {
     tabsRoot.querySelectorAll('[data-dashboard-tab]').forEach((button) => {
-      button.addEventListener('click', () => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
         activateTab(button.getAttribute('data-dashboard-tab'), true);
       });
     });
@@ -1884,19 +1984,25 @@ function bootDashboardRender() {
       initialKey = window.location.hash.replace('#dashboard-', '');
     }
 
-    activateTab(initialKey || 'overview', false);
+    activateTab(panelAliases[initialKey] || initialKey || 'overview', false);
   }
 
-  document.addEventListener('anbg:dashboard-assets-ready', () => {
-    render();
-  }, { once: true });
+  if (!tabsRoot) {
+    document.addEventListener('anbg:dashboard-assets-ready', () => {
+      void render();
+    }, { once: true });
 
-  if (typeof window.Chart !== 'undefined' && typeof window.d3 !== 'undefined') {
-    render();
+    if (typeof window.Chart !== 'undefined' || typeof window.d3 !== 'undefined') {
+      void render();
+    } else {
+      void ensureDashboardAssets({
+        needD3: Boolean(document.getElementById('dashboard-gantt-chart')),
+      }).then(() => render());
+    }
   }
 
   window.addEventListener('anbg:theme-changed', () => {
-    render();
+    void render();
   });
 
   window.addEventListener('resize', () => {

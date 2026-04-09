@@ -1,14 +1,18 @@
 <!doctype html>
-<html lang="fr" class="h-full">
+<html lang="{{ $platformSettings->htmlLang() }}" class="h-full">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/png" href="{{ $platformSettings->faviconUrl() }}">
+    @php
+        $defaultTheme = $appearanceSettings->get('default_theme', 'dark');
+    @endphp
     <script>
         (function () {
             var themeKey = 'anbg-theme';
             var root = document.documentElement;
-            var theme = 'dark';
+            var theme = @json($defaultTheme);
 
             try {
                 var savedTheme = localStorage.getItem(themeKey);
@@ -16,15 +20,46 @@
                     theme = savedTheme;
                 }
             } catch (error) {
-                theme = 'dark';
+                theme = @json($defaultTheme);
             }
 
             root.classList.toggle('dark', theme === 'dark');
             root.setAttribute('data-theme', theme);
         })();
     </script>
-    <title>@yield('title', 'Dashboard') - ANBG</title>
+    <title>@yield('title', 'Dashboard') - {{ $platformSettings->get('app_short_name', 'ANBG') }}</title>
     @include('partials.vite-assets')
+    <style>
+        body.admin-theme-scope {
+            background: var(--app-body-bg-light);
+        }
+
+        html.dark body.admin-theme-scope {
+            background: var(--app-body-bg-dark);
+        }
+
+        #admin-shell-header {
+            background: var(--app-header-bg-light);
+        }
+
+        html.dark #admin-shell-header {
+            background: var(--app-header-bg-dark);
+        }
+
+        #admin-sidebar {
+            background: var(--app-sidebar-bg);
+        }
+
+        .admin-content-shell {
+            padding-left: 0;
+        }
+
+        @media (min-width: 1024px) {
+            .admin-content-shell {
+                padding-left: var(--app-sidebar-width);
+            }
+        }
+    </style>
     @stack('head')
 </head>
 
@@ -92,8 +127,8 @@
 
         <x-admin.sidebar :notification-counts="$headerSidebarBadges" :unread-total="$headerUnreadCount" />
 
-        <div class="lg:pl-32">
-            <header class="sticky top-0 z-30 border-b border-[#3996d3]/18 bg-[linear-gradient(135deg,rgba(255,255,255,0.96)_0%,rgba(238,244,249,0.94)_100%)] backdrop-blur dark:border-white/10 dark:bg-none dark:bg-[linear-gradient(180deg,rgba(4,17,37,0.94)_0%,rgba(13,24,52,0.92)_100%)]">
+        <div class="admin-content-shell">
+            <header id="admin-shell-header" class="sticky top-0 z-30 border-b border-[#3996d3]/18 backdrop-blur dark:border-white/10">
                 <div class="flex h-16 items-center gap-3 px-4 sm:px-6">
                     <button
                         type="button"
@@ -108,7 +143,7 @@
 
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Administration</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{{ $platformSettings->get('admin_header_eyebrow', 'Administration') }}</p>
                         </div>
                         <h1 class="truncate text-base font-semibold leading-tight sm:text-lg">
                             @yield('title', 'Dashboard')
@@ -358,6 +393,9 @@
                     <div class="flash-error">{{ $errors->first() }}</div>
                 @endif
                 @yield('content')
+                <footer class="mt-8 border-t border-slate-200/80 pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                    {{ $platformSettings->get('footer_text', 'ANBG | Systeme institutionnel de pilotage PAS / PAO / PTA') }}
+                </footer>
             </main>
         </div>
     </div>

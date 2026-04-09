@@ -8,6 +8,7 @@ use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\ActionWeek;
 use App\Models\Direction;
+use App\Models\ExportTemplate;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
 use App\Models\Pao;
@@ -16,11 +17,14 @@ use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\ActionCalculationSettings;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
+use App\Services\Exports\ExportTemplateResolver;
 use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Exports\ReportingWorkbookExporter;
+use App\Support\SafeSql;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -38,10 +42,12 @@ class MonitoringWebController extends Controller
     use AuthorizesPlanningScope;
 
     public function __construct(
+        private readonly ActionCalculationSettings $actionCalculationSettings,
         private readonly AlertCenterService $alertCenter,
         private readonly AlertReadService $alertReadService,
         private readonly ReportingWorkbookExporter $reportingWorkbookExporter,
-        private readonly ReportingAnalyticsService $reportingAnalyticsService
+        private readonly ReportingAnalyticsService $reportingAnalyticsService,
+        private readonly ExportTemplateResolver $exportTemplateResolver
     ) {
     }
 
@@ -53,6 +59,7 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessReportingReader($user);
         $roleProfile = $this->buildMonitoringRoleProfile($user, 'pilotage');
 
         $today = Carbon::today()->toDateString();
@@ -147,6 +154,12 @@ class MonitoringWebController extends Controller
                 'direction_id' => $user->direction_id,
                 'service_id' => $user->service_id,
             ],
+            'officialPolicy' => [
+                'threshold_status' => $this->actionCalculationSettings->officialValidationStatus(),
+                'threshold_label' => $this->actionCalculationSettings->officialThresholdLabel(),
+                'scope_summary' => $this->actionCalculationSettings->officialScopeSummary(),
+                'route_filters' => $this->actionCalculationSettings->officialRouteFilters(),
+            ],
             'totals' => $totals,
             'completion' => [
                 'paos_valides_pct' => $this->completionRate($paosValides, $totals['paos_total']),
@@ -191,12 +204,18 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessReportingReader($user);
 
         $payload = $this->reportingAnalyticsService->buildPayload($user);
         $payload['roleProfile'] = $this->buildMonitoringRoleProfile($user, 'reporting');
         $payload['dgComparison'] = ($payload['roleProfile']['role'] ?? null) === 'dg'
             ? $this->buildDgMonitoringComparison($user)
             : null;
+        $payload['activeExportTemplates'] = [
+            'excel' => $this->resolveReportingExportTemplate($user, 'excel')?->name,
+            'word' => $this->resolveReportingExportTemplate($user, 'word')?->name,
+            'pdf' => $this->resolveReportingExportTemplate($user, 'pdf')?->name,
+        ];
 
         return view('workspace.monitoring.reporting', $payload);
     }
@@ -209,10 +228,23 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessReportingReader($user);
 
         $payload = $this->reportingAnalyticsService->buildPayload($user, true, true);
+        $template = $this->resolveReportingExportTemplate($user, 'excel');
+        if ($template !== null) {
+            $payload['export_template'] = [
+                'name' => $template->name,
+                'title' => $template->documentTitle(),
+                'subtitle' => $template->documentSubtitle(),
+                'filename_prefix' => $template->filenamePrefix(),
+                'layout' => $template->layout_config ?? [],
+                'blocks' => $template->blocks_config ?? [],
+            ];
+        }
         $generatedAt = $payload['generatedAt'];
-        $filename = 'reporting_anbg_'.$generatedAt->format('Ymd_His').'.xlsx';
+        $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
+        $filename = $filenamePrefix.'_'.$generatedAt->format('Ymd_His').'.xlsx';
         $tempPath = $this->reportingWorkbookExporter->create($payload);
 
         return response()->streamDownload(function () use ($tempPath): void {
@@ -249,14 +281,51 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessAlertReader($user);
 
         $payload = $this->reportingAnalyticsService->buildPayload($user, true, true);
+        $template = $this->resolveReportingExportTemplate($user, 'pdf');
+        if ($template !== null) {
+            $payload['exportTemplate'] = $template;
+        }
         $generatedAt = $payload['generatedAt'];
-        $filename = 'reporting_anbg_'.$generatedAt->format('Ymd_His').'.pdf';
+        $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
+        $filename = $filenamePrefix.'_'.$generatedAt->format('Ymd_His').'.pdf';
 
         return Pdf::loadView('workspace.monitoring.reporting-pdf', $payload)
-            ->setPaper('a4', 'landscape')
+            ->setPaper($template?->paperSize() ?? 'a4', $template?->orientation() ?? 'landscape')
             ->download($filename);
+    }
+
+    public function exportWord(Request $request)
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessAlertReader($user);
+
+        $payload = $this->reportingAnalyticsService->buildPayload($user, true, true);
+        $template = $this->resolveReportingExportTemplate($user, 'word');
+        if ($template !== null) {
+            $payload['exportTemplate'] = $template;
+        }
+
+        $generatedAt = $payload['generatedAt'];
+        $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
+        $filename = $filenamePrefix.'_'.$generatedAt->format('Ymd_His').'.doc';
+
+        return response()
+            ->view('workspace.monitoring.reporting-word', $payload)
+            ->header('Content-Type', 'application/msword; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="'.$filename.'"');
+    }
+
+    private function resolveReportingExportTemplate(User $user, string $format): ?ExportTemplate
+    {
+        return $this->exportTemplateResolver->resolve($user, 'reporting', 'consolidated_reporting', $format, 'officiel');
     }
 
     public function alertes(Request $request): View
@@ -267,6 +336,7 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessAlertReader($user);
 
         $limit = max(1, min(100, (int) $request->integer('limit', 20)));
         $activeLevel = in_array((string) $request->string('niveau'), ['all', 'urgence', 'critical', 'warning', 'info'], true)
@@ -328,6 +398,7 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessAlertReader($user);
 
         $limit = max(1, min(12, (int) $request->integer('limit', 6)));
         $readFingerprints = $this->alertReadService->readFingerprintsForUser($user);
@@ -372,6 +443,7 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessAlertReader($user);
 
         $alert = $this->alertCenter->findForUser($user, $type, $id);
         if ($alert === null) {
@@ -430,7 +502,19 @@ class MonitoringWebController extends Controller
 
     private function scopeActionStatistics(Builder $query, string $column = 'statut_validation'): void
     {
-        $query->where($column, ActionTrackingService::VALIDATION_VALIDEE_DIRECTION);
+        $this->actionCalculationSettings->applyOfficialScope($query, $column);
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return Collection<int, Action>
+     */
+    private function officialActions(Collection $actions): Collection
+    {
+        /** @var Collection<int, Action> $official */
+        $official = $this->actionCalculationSettings->filterOfficial($actions, 'statut_validation');
+
+        return $official;
     }
 
     private function resolveActionAlertUrl(Action $action): string
@@ -490,9 +574,7 @@ class MonitoringWebController extends Controller
                 $ptas = $rows->flatMap->ptas;
                 $actions = $ptas->flatMap->actions;
                 $actionsTotal = $actions->count();
-                $actionsValidees = $actions
-                    ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
-                    ->count();
+                $actionsValidees = $this->officialActions($actions)->count();
                 $actionsRetard = $actions
                     ->where('statut_dynamique', ActionTrackingService::STATUS_EN_RETARD)
                     ->count();
@@ -560,18 +642,14 @@ class MonitoringWebController extends Controller
             $ptas = $paos->flatMap->ptas;
             $actions = $ptas->flatMap->actions;
             $actionsTotal = $actions->count();
-            $actionsValidees = $actions
-                ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
-                ->count();
+            $actionsValidees = $this->officialActions($actions)->count();
 
             $axes = $pas->axes->map(function ($axe) use ($directionScopeIds, $paosByObjectif): array {
                 $objectifs = $axe->objectifs->map(function ($objectif) use ($directionScopeIds, $paosByObjectif): array {
                     $objectifPaos = $paosByObjectif->get((int) $objectif->id, collect());
                     $objectifActions = $objectifPaos->flatMap->ptas->flatMap->actions;
                     $objectifActionsTotal = $objectifActions->count();
-                    $objectifActionsValidees = $objectifActions
-                        ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
-                        ->count();
+                    $objectifActionsValidees = $this->officialActions($objectifActions)->count();
                     $coveredDirectionIds = $objectifPaos
                         ->pluck('direction_id')
                         ->filter()
@@ -753,7 +831,6 @@ class MonitoringWebController extends Controller
     {
         $pasRows = $this->buildPasScopedQuery($user)
             ->with([
-                'directions:id',
                 'axes.objectifs.paos:id,pas_objectif_id,direction_id',
                 'axes.objectifs.paos.ptas:id,pao_id,service_id',
             ])
@@ -762,14 +839,9 @@ class MonitoringWebController extends Controller
         $scopedDirectionIds = $this->scopedDirectionIds($user);
 
         return $pasRows->filter(function (Pas $pas) use ($user, $scopedDirectionIds): bool {
-            $pasDirectionIds = $pas->directions
-                ->pluck('id')
-                ->map(static fn ($id): int => (int) $id)
-                ->all();
-
             $expectedDirectionIds = $user->hasGlobalReadAccess()
-                ? array_values(array_intersect($scopedDirectionIds, $pasDirectionIds !== [] ? $pasDirectionIds : $scopedDirectionIds))
-                : (($user->direction_id !== null && in_array((int) $user->direction_id, $pasDirectionIds, true))
+                ? $scopedDirectionIds
+                : (($user->direction_id !== null)
                     ? [(int) $user->direction_id]
                     : []);
 
@@ -824,6 +896,13 @@ class MonitoringWebController extends Controller
      */
     private function countByStatus(Builder $query, string $statusColumn): array
     {
+        $statusColumn = SafeSql::identifier($statusColumn, [
+            'statut',
+            'statut_dynamique',
+            'statut_validation',
+            'statut_realisation',
+        ]);
+
         /** @var array<string, int> $result */
         $result = (clone $query)
             ->selectRaw("{$statusColumn} as status_label, COUNT(*) as total")
@@ -854,9 +933,7 @@ class MonitoringWebController extends Controller
         $this->scopeAction($actions, $user);
 
         $rows = $actions->get();
-        $officialRows = $rows
-            ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
-            ->values();
+        $officialRows = $this->officialActions($rows);
 
         return [
             'operational' => $this->buildMonitoringSnapshot($rows),
@@ -901,9 +978,7 @@ class MonitoringWebController extends Controller
             ->map(function (Collection $rows): array {
                 $first = $rows->first();
                 $directionId = (int) ($first?->pta?->direction?->id ?? 0);
-                $officialRows = $rows
-                    ->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)
-                    ->values();
+                $officialRows = $this->officialActions($rows);
                 $operational = $this->buildMonitoringSnapshot($rows);
                 $official = $this->buildMonitoringSnapshot($officialRows);
 
@@ -977,7 +1052,7 @@ class MonitoringWebController extends Controller
                 'direction' => [
                     'eyebrow' => 'Reporting direction',
                     'title' => 'Centre de diffusion directionnel',
-                    'subtitle' => 'Exports et lectures consolidees de la direction avec un socle officiel base sur la validation finale.',
+                    'subtitle' => 'Exports et lectures consolidees de la direction sans filtre statistique sur la validation.',
                 ],
                 'dg' => [
                     'eyebrow' => 'Reporting DG',
@@ -1116,6 +1191,11 @@ class MonitoringWebController extends Controller
                 ->mapWithKeys(fn ($label, $id): array => [(int) $id => (string) $label])
                 ->toArray();
         }
+
+        $unitColumn = SafeSql::identifier($unitColumn, [
+            'ptas.direction_id',
+            'ptas.service_id',
+        ]);
 
         $statusRows = Action::query()
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
@@ -1836,5 +1916,23 @@ class MonitoringWebController extends Controller
             ->filter(static fn ($notification): bool => strtolower((string) ($notification->data['module'] ?? '')) === 'alertes')
             ->each
             ->markAsRead();
+    }
+
+    private function denyUnlessReportingReader(User $user): void
+    {
+        if ($user->hasPermission('reporting.read')) {
+            return;
+        }
+
+        abort(403, 'Acces non autorise.');
+    }
+
+    private function denyUnlessAlertReader(User $user): void
+    {
+        if ($user->hasPermission('alerts.read')) {
+            return;
+        }
+
+        abort(403, 'Acces non autorise.');
     }
 }

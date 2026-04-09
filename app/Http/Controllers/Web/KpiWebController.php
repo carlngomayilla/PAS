@@ -11,6 +11,7 @@ use App\Http\Requests\UpdateKpiRequest;
 use App\Models\Action;
 use App\Models\Kpi;
 use App\Models\User;
+use App\Services\DynamicReferentialSettings;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -100,6 +101,7 @@ class KpiWebController extends Controller
             'actionOptions' => $this->actionOptions($user),
             'periodiciteOptions' => $this->periodiciteOptions(),
             'modeSaisieOptions' => $this->modeSaisieOptions(),
+            'unitSuggestions' => app(DynamicReferentialSettings::class)->kpiUnitSuggestions(),
         ]);
     }
 
@@ -167,6 +169,7 @@ class KpiWebController extends Controller
             'actionOptions' => $this->actionOptions($user),
             'periodiciteOptions' => $this->periodiciteOptions(),
             'modeSaisieOptions' => $this->modeSaisieOptions(),
+            'unitSuggestions' => app(DynamicReferentialSettings::class)->kpiUnitSuggestions(),
         ]);
     }
 

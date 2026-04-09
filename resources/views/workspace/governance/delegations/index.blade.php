@@ -11,19 +11,17 @@
             'expired' => 'anbg-badge anbg-badge-warning',
         ];
     @endphp
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h1>Delegations temporaires</h1>
-                <p class="text-slate-600">
-                    Gestion de la suppleance pour les validations chef de service et direction.
-                </p>
             </div>
             <a class="btn btn-blue" href="{{ route('workspace.delegations.create') }}">Nouvelle delegation</a>
         </div>
     </section>
 
-    <section class="ui-card">
+    <section class="ui-card app-screen-block">
         <div class="table-wrap">
             <table>
                 <thead>
@@ -92,4 +90,5 @@
 
         <div class="pagination">{{ $rows->links() }}</div>
     </section>
+    </div>
 @endsection

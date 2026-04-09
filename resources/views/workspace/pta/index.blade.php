@@ -9,40 +9,20 @@
         $validatedCount = $visibleRows->filter(fn ($item) => in_array((string) $item->statut, ['valide', 'verrouille'], true))->count();
         $actionsTotal = (int) $visibleRows->sum('actions_count');
         $servicesCovered = $visibleRows->pluck('service_id')->filter()->unique()->count();
-        $tableLevel = in_array($filters['statut'] ?? null, ['valide', 'verrouille', 'valide_ou_verrouille'], true)
-            ? ['label' => 'Valide', 'tone' => 'warning']
-            : ['label' => 'Provisoire', 'tone' => 'info'];
-        $tableLevelClass = $tableLevel['tone'] === 'warning' ? 'anbg-badge anbg-badge-warning' : 'anbg-badge anbg-badge-info';
         $summaryCards = [
-            ['label' => 'Total', 'value' => $rows->total(), 'meta' => 'PTA dans le perimetre courant', 'href' => route('workspace.pta.index'), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
-            ['label' => 'Brouillons visibles', 'value' => $draftCount, 'meta' => 'Plans en construction', 'href' => route('workspace.pta.index', ['statut' => 'brouillon']), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
-            ['label' => 'Valides / verrouilles', 'value' => $validatedCount, 'meta' => 'PTA prets pour l execution', 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille']), 'badge' => 'Valide', 'badge_tone' => 'warning'],
-            ['label' => 'Actions / services', 'value' => $actionsTotal.' / '.$servicesCovered, 'meta' => 'Actions visibles et services couverts', 'href' => route('workspace.actions.index'), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
+            ['label' => 'Total', 'value' => $rows->total(), 'meta' => 'PTA dans le perimetre courant', 'href' => route('workspace.pta.index'), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Brouillons visibles', 'value' => $draftCount, 'meta' => 'Plans en construction', 'href' => route('workspace.pta.index', ['statut' => 'brouillon']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Valides / verrouilles', 'value' => $validatedCount, 'meta' => 'PTA prets pour l execution', 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Actions / services', 'value' => $actionsTotal.' / '.$servicesCovered, 'meta' => 'Actions visibles et services couverts', 'href' => route('workspace.actions.index'), 'badge' => null, 'badge_tone' => 'neutral'],
         ];
     @endphp
 
-    <section class="showcase-hero mb-4">
+    <div class="app-screen-flow">
+    <section class="showcase-hero mb-4 app-screen-block">
         <div class="showcase-hero-body">
             <div>
                 <span class="showcase-eyebrow">Execution par service</span>
                 <h1 class="showcase-title">PTA</h1>
-                <p class="showcase-subtitle">
-                    Plan de travail annuel par service, coherent avec le PAO rattache et la structure direction -> service.
-                </p>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#1E3A8A]"></span>
-                        Un PAO parent
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#3B82F6]"></span>
-                        Un service cible
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#10B981]"></span>
-                        Porte les actions operationnelles
-                    </span>
-                </div>
             </div>
             <div class="showcase-action-row">
                 @if ($canWrite)
@@ -52,13 +32,7 @@
         </div>
     </section>
 
-    <div class="mb-4 flex flex-wrap gap-2">
-        <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
-        <span class="anbg-badge anbg-badge-warning px-3 py-1">Valide</span>
-        <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
-    </div>
-
-    <section class="showcase-summary-grid mb-4">
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
             <x-stat-card-link
                 :href="$card['href']"
@@ -71,11 +45,8 @@
         @endforeach
     </section>
 
-    <section class="showcase-toolbar mb-4">
-        <div>
-            <h2 class="showcase-panel-title">Filtres de lecture</h2>
-            <p class="showcase-panel-subtitle">Recherche par titre, PAO, direction, service ou statut.</p>
-        </div>
+    <section class="showcase-toolbar mb-4 app-screen-block">
+        <div><h2 class="showcase-panel-title">Filtres</h2></div>
         <form method="GET" action="{{ route('workspace.pta.index') }}" class="mt-4">
             <div class="showcase-filter-grid">
                 <div>
@@ -126,29 +97,19 @@
                 <a class="btn btn-blue" href="{{ route('workspace.pta.index') }}">Reinitialiser</a>
             </div>
             @if ($filters['without_action'])
-                <div class="mt-4 showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#F59E0B]"></span>
-                        Drill-down actif : PTA sans action
-                    </span>
+                <div class="mt-4 rounded-[1rem] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                    PTA sans action
                 </div>
             @endif
         </form>
     </section>
 
-    <section class="showcase-panel mb-4">
+    <section class="showcase-panel mb-4 app-screen-block">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Liste des PTA</h2>
-                <p class="showcase-panel-subtitle">Lecture du service porteur, du PAO parent et du volume d actions par plan.</p>
-                <div class="mt-2">
-                    <span class="{{ $tableLevelClass }} px-3 py-1">{{ $tableLevel['label'] }}</span>
-                </div>
             </div>
-            <span class="showcase-chip">
-                <span class="showcase-chip-dot bg-slate-500"></span>
-                {{ $rows->count() }} ligne(s) sur cette page
-            </span>
+            <span class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ $rows->count() }} ligne(s)</span>
         </div>
         <div class="overflow-auto">
             <table>
@@ -256,5 +217,6 @@
         </div>
         <div class="pagination">{{ $rows->links() }}</div>
     </section>
+    </div>
 @endsection
 

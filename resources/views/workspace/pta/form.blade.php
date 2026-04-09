@@ -10,26 +10,12 @@
             ->unique()
             ->count();
     @endphp
-    <section class="showcase-hero mb-4">
+    <div class="app-screen-flow">
+    <section class="showcase-hero mb-4 app-screen-block">
         <div class="showcase-hero-body">
             <div>
-                <span class="showcase-eyebrow">{{ $isEdit ? 'Edition PTA' : 'Nouveau PTA' }}</span>
+                <span class="showcase-eyebrow">PTA</span>
                 <h1 class="showcase-title">{{ $isEdit ? 'Modifier un PTA existant' : 'Enregistrer un nouveau PTA' }}</h1>
-                <p class="showcase-subtitle">Le PTA herite maintenant directement du service porte par le PAO. Le chef du service cible est le seul profil metier autorise a l ouvrir.</p>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
-                        PAO parent
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
-                        Service du PAO
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
-                        Perimetre fige
-                    </span>
-                </div>
             </div>
             <div class="showcase-action-row">
                 <a class="btn btn-secondary" href="{{ route('workspace.pta.index') }}">Retour liste</a>
@@ -37,30 +23,26 @@
         </div>
     </section>
 
-    <section class="showcase-summary-grid mb-4">
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Mode</p>
             <p class="showcase-kpi-number">{{ $isEdit ? 'Edit.' : 'Nouv.' }}</p>
-            <p class="showcase-kpi-meta">{{ $isEdit ? 'Mise a jour d un PTA existant' : 'Creation d un plan de service' }}</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">PAO disponibles</p>
             <p class="showcase-kpi-number">{{ count($paoOptions) }}</p>
-            <p class="showcase-kpi-meta">Plans annuels selectionnables</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Services cibles</p>
             <p class="showcase-kpi-number">{{ $availableServices }}</p>
-            <p class="showcase-kpi-meta">Services deja portes par les PAO</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Workflow</p>
             <p class="showcase-kpi-number text-[1.35rem]">{{ $workflowStatusLabel((string) old('statut', $row->statut ?: 'brouillon')) }}</p>
-            <p class="showcase-kpi-meta">{{ old('titre', $row->titre) ? 'Titre renseigne' : 'Titre a definir' }}</p>
         </article>
     </section>
 
-    <section class="showcase-panel mb-4">
+    <section class="showcase-panel mb-4 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.pta.update', $row) : route('workspace.pta.store') }}">
             @csrf
             @if ($isEdit)
@@ -69,8 +51,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Perimetre PTA</h2>
-                <p class="form-section-subtitle">Le PAO parent impose la direction et le service. Le formulaire reste donc strictement aligne sur son perimetre.</p>
-                <div class="form-grid">
+                <div class="grid gap-4">
                     <div>
                         <label for="pao_id">PAO</label>
                         <select id="pao_id" name="pao_id" required>
@@ -93,13 +74,11 @@
                         <label for="direction_label">Direction</label>
                         <input id="direction_label" type="text" value="" readonly>
                         <input id="direction_id" name="direction_id" type="hidden" value="{{ old('direction_id', $row->direction_id) }}">
-                        <p class="field-hint">Renseignee automatiquement a partir du PAO.</p>
                     </div>
                     <div>
-                        <label for="service_label">Service</label>
+                        <label for="service_label">Service executant</label>
                         <input id="service_label" type="text" value="" readonly>
                         <input id="service_id" name="service_id" type="hidden" value="{{ old('service_id', $row->service_id) }}">
-                        <p class="field-hint">Le PTA sera cree pour ce seul service.</p>
                     </div>
                     <div>
                         <label for="statut">Statut</label>
@@ -132,9 +111,8 @@
     </section>
 
     @if ($isEdit)
-        <section class="showcase-panel mb-4">
+        <section class="showcase-panel mb-4 app-screen-block">
             <h2 class="showcase-panel-title">Timeline validation</h2>
-            <p class="showcase-panel-subtitle">Historique des transitions de statut et des motifs de retour sur ce PTA.</p>
             <div class="overflow-auto">
                 <table>
                     <thead>
@@ -171,6 +149,7 @@
             </div>
         </section>
     @endif
+    </div>
 @endsection
 
 @push('scripts')
@@ -197,12 +176,12 @@
                     directionInput.value = directionId;
                 }
 
-                if (serviceInput) {
-                    serviceInput.value = serviceId;
-                }
-
                 if (directionLabel) {
                     directionLabel.value = directionText;
+                }
+
+                if (serviceInput) {
+                    serviceInput.value = serviceId;
                 }
 
                 if (serviceLabel) {

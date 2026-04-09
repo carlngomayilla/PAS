@@ -8,11 +8,21 @@ use App\Models\ActionLog;
 use App\Models\ActionWeek;
 use App\Models\Justificatif;
 use App\Models\User;
+use App\Services\ActionManagementSettings;
+use App\Services\NotificationPolicySettings;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\WorkflowSettings;
 use Illuminate\Support\Carbon;
 
 class ActionTrackingService
 {
+    public function __construct(
+        private readonly WorkflowSettings $workflowSettings,
+        private readonly ActionManagementSettings $actionManagementSettings,
+        private readonly NotificationPolicySettings $notificationPolicySettings
+    ) {
+    }
+
     public const FREQUENCE_INSTANTANEE = 'instantanee';
     public const FREQUENCE_JOURNALIERE = 'journaliere';
     public const FREQUENCE_HEBDOMADAIRE = 'hebdomadaire';
@@ -227,12 +237,24 @@ class ActionTrackingService
      */
     public function submitClosureForReview(Action $action, array $payload, ?User $actor = null): Action
     {
+        $submissionTarget = $this->workflowSettings->actionSubmissionTarget();
+        $status = match ($submissionTarget) {
+            'direction' => self::VALIDATION_VALIDEE_CHEF,
+            'final' => self::VALIDATION_VALIDEE_DIRECTION,
+            default => self::VALIDATION_SOUMISE_CHEF,
+        };
+        $message = match ($submissionTarget) {
+            'direction' => 'Action soumise directement a la direction.',
+            'final' => 'Action cloturee sans circuit de validation supplementaire.',
+            default => 'Action soumise au chef de service pour evaluation.',
+        };
+
         $action->fill([
             'date_fin_reelle' => $payload['date_fin_reelle'] ?? $action->date_fin_reelle,
             'rapport_final' => $payload['rapport_final'] ?? $action->rapport_final,
-            'validation_hierarchique' => false,
+            'validation_hierarchique' => $submissionTarget === 'final',
             'validation_sans_correction' => null,
-            'statut_validation' => self::VALIDATION_SOUMISE_CHEF,
+            'statut_validation' => $status,
             'soumise_par' => $actor?->id,
             'soumise_le' => now(),
             'evalue_par' => null,
@@ -250,22 +272,28 @@ class ActionTrackingService
             $action,
             'action_soumise_validation',
             'info',
-            'Action soumise au chef de service pour evaluation.',
+            $message,
             [
                 'date_fin_reelle' => optional($action->date_fin_reelle)->toDateString(),
+                'workflow_target' => $submissionTarget,
             ],
-            'chef_service',
+            match ($submissionTarget) {
+                'direction' => 'direction',
+                'final' => 'responsable',
+                default => 'chef_service',
+            },
             $actor?->id
         );
 
         $this->addDiscussionEntry(
             $action,
-            (string) ($payload['rapport_final'] ?? 'Soumission de l action pour validation hierarchique.'),
+            (string) ($payload['rapport_final'] ?? $message),
             'action_soumise_validation',
             'info',
             [
                 'date_fin_reelle' => optional($action->date_fin_reelle)->toDateString(),
                 'rapport_final' => $payload['rapport_final'] ?? null,
+                'workflow_target' => $submissionTarget,
             ],
             $actor
         );
@@ -288,10 +316,13 @@ class ActionTrackingService
     {
         $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
         $isApproved = $decision === 'valider';
+        $directionEnabled = $this->workflowSettings->directionValidationEnabled();
 
         $action->fill([
-            'statut_validation' => $isApproved ? self::VALIDATION_VALIDEE_CHEF : self::VALIDATION_REJETEE_CHEF,
-            'validation_hierarchique' => false,
+            'statut_validation' => $isApproved
+                ? ($directionEnabled ? self::VALIDATION_VALIDEE_CHEF : self::VALIDATION_VALIDEE_DIRECTION)
+                : self::VALIDATION_REJETEE_CHEF,
+            'validation_hierarchique' => $isApproved ? ! $directionEnabled : false,
             'validation_sans_correction' => $isApproved
                 ? ($payload['validation_sans_correction'] ?? $action->validation_sans_correction)
                 : null,
@@ -307,11 +338,14 @@ class ActionTrackingService
             $isApproved ? 'action_validee_chef' : 'action_rejetee_chef',
             $isApproved ? 'info' : 'warning',
             $isApproved
-                ? 'Action validee par le chef de service.'
+                ? ($directionEnabled
+                    ? 'Action validee par le chef de service.'
+                    : 'Action validee par le chef de service. Validation finale du circuit.')
                 : 'Action rejetee par le chef de service.',
             [
                 'evaluation_note' => $action->evaluation_note,
                 'statut_validation' => $action->statut_validation,
+                'workflow_final_stage' => $directionEnabled ? 'direction' : 'service',
             ],
             'responsable',
             $actor?->id
@@ -320,7 +354,7 @@ class ActionTrackingService
         $this->addDiscussionEntry(
             $action,
             (string) ($payload['evaluation_commentaire'] ?? ($isApproved
-                ? 'Validation chef de service.'
+                ? ($directionEnabled ? 'Validation chef de service.' : 'Validation finale chef de service.')
                 : 'Rejet chef de service.')),
             $isApproved ? 'action_validee_chef' : 'action_rejetee_chef',
             $isApproved ? 'info' : 'warning',
@@ -328,6 +362,7 @@ class ActionTrackingService
                 'evaluation_note' => $action->evaluation_note,
                 'statut_validation' => $action->statut_validation,
                 'validation_sans_correction' => $action->validation_sans_correction,
+                'workflow_final_stage' => $directionEnabled ? 'direction' : 'service',
             ],
             $actor
         );
@@ -441,6 +476,13 @@ class ActionTrackingService
         $realProgress = $action->type_cible === 'quantitative'
             ? ($targetQuantity > 0 ? min(100.0, round(($cumulativeQuantity / $targetQuantity) * 100, 2)) : 0.0)
             : min(100.0, max(0.0, $latestQualitativeProgress));
+
+        if ($this->actionManagementSettings->autoCompleteWhenTargetReached()
+            && $action->date_fin_reelle === null
+            && $realProgress >= 100.0
+            && ! in_array((string) ($action->statut ?? ''), [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)) {
+            $action->date_fin_reelle = $referenceDate->copy()->toDateString();
+        }
 
         $theoreticalProgress = $this->calculateTheoreticalProgress($action, $referenceDate->copy()->endOfDay());
         $status = $this->determineDynamicStatus($action, $realProgress, $theoreticalProgress, $referenceDate);
@@ -817,6 +859,8 @@ class ActionTrackingService
             }
         }
 
+        $this->generateTimelineAlerts($action, $referenceDate);
+
         if ($action->date_fin !== null) {
             $daysLeft = $referenceDate
                 ->copy()
@@ -896,6 +940,44 @@ class ActionTrackingService
                     'statut_dynamique' => $action->statut_dynamique,
                 ],
                 'dg'
+            );
+        }
+    }
+
+    private function generateTimelineAlerts(Action $action, Carbon $referenceDate): void
+    {
+        $deadline = $action->date_echeance !== null
+            ? Carbon::parse($action->date_echeance)->startOfDay()
+            : ($action->date_fin !== null ? Carbon::parse($action->date_fin)->startOfDay() : null);
+
+        if ($deadline === null || $action->date_fin_reelle !== null) {
+            return;
+        }
+
+        $offsetDays = $deadline->diffInDays($referenceDate->copy()->startOfDay(), false);
+        $rules = $this->notificationPolicySettings->matchingTimelineRules($offsetDays);
+
+        foreach ($rules as $rule) {
+            $message = trim($this->notificationPolicySettings->renderTimelineRuleMessage($rule, new ActionLog([
+                'action_id' => $action->id,
+                'niveau' => (string) ($rule['level'] ?? 'warning'),
+                'type_evenement' => 'alerte_temporelle',
+                'message' => (string) ($rule['message_template'] ?? ''),
+                'details' => ['offset_days' => $offsetDays, 'timeline_rule' => $rule['code'] ?? ''],
+                'cible_role' => (string) ($rule['target_role'] ?? 'service'),
+            ])));
+
+            $this->createLogIfMissingToday(
+                $action,
+                'alerte_temporelle_'.(string) ($rule['code'] ?? $offsetDays),
+                (string) ($rule['level'] ?? 'warning'),
+                $message !== '' ? $message : sprintf('Alerte temporelle %s sur l echeance de l action.', $offsetDays >= 0 ? 'J+'.$offsetDays : 'J'.$offsetDays),
+                [
+                    'offset_days' => $offsetDays,
+                    'timeline_rule' => (string) ($rule['code'] ?? ''),
+                    'date_echeance' => $deadline->toDateString(),
+                ],
+                (string) ($rule['target_role'] ?? 'service')
             );
         }
     }

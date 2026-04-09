@@ -27,6 +27,7 @@ class MessagingWebController extends Controller
     public function index(Request $request): View
     {
         $user = $this->authUser($request);
+        $this->denyUnlessMessagingReader($user);
 
         $conversationFilters = [
             'search' => (string) $request->query('conversation_search', ''),
@@ -108,6 +109,7 @@ class MessagingWebController extends Controller
     public function profileCard(Request $request, User $target): JsonResponse
     {
         $user = $this->authUser($request);
+        $this->denyUnlessMessagingReader($user);
         $contactCard = $this->resolveContactCard($user, $target);
 
         if ($contactCard === null) {
@@ -130,6 +132,7 @@ class MessagingWebController extends Controller
     public function startDirect(Request $request, User $target): RedirectResponse
     {
         $user = $this->authUser($request);
+        $this->denyUnlessMessagingReader($user);
 
         if (! $this->directoryService->canContactUser($user, $target)) {
             abort(403, 'Contact non autorise.');
@@ -149,6 +152,7 @@ class MessagingWebController extends Controller
     ): RedirectResponse
     {
         $user = $this->authUser($request);
+        $this->denyUnlessMessagingReader($user);
         $activeConversation = $this->messagingService->findAccessibleConversation($user, $conversation->id);
         if (! $activeConversation instanceof Conversation) {
             abort(403, 'Conversation non autorisee.');
@@ -180,6 +184,7 @@ class MessagingWebController extends Controller
     public function updates(Request $request, Conversation $conversation): JsonResponse
     {
         $user = $this->authUser($request);
+        $this->denyUnlessMessagingReader($user);
         $activeConversation = $this->messagingService->findAccessibleConversation($user, $conversation->id);
         if (! $activeConversation instanceof Conversation) {
             abort(403, 'Conversation non autorisee.');
@@ -206,6 +211,7 @@ class MessagingWebController extends Controller
         SecureMessageAttachmentStorage $attachmentStorage
     ): StreamedResponse {
         $user = $this->authUser($request);
+        $this->denyUnlessMessagingReader($user);
         $activeConversation = $this->messagingService->findAccessibleConversation($user, $conversation->id);
         if (! $activeConversation instanceof Conversation || (int) $message->conversation_id !== (int) $activeConversation->id) {
             abort(403, 'Piece jointe non autorisee.');
@@ -217,6 +223,7 @@ class MessagingWebController extends Controller
     public function toggleFavorite(Request $request, Conversation $conversation): RedirectResponse
     {
         $user = $this->authUser($request);
+        $this->denyUnlessMessagingReader($user);
         $activeConversation = $this->messagingService->findAccessibleConversation($user, $conversation->id);
         if (! $activeConversation instanceof Conversation) {
             abort(403, 'Conversation non autorisee.');
@@ -269,6 +276,15 @@ class MessagingWebController extends Controller
         }
 
         return $user;
+    }
+
+    private function denyUnlessMessagingReader(User $user): void
+    {
+        if ($user->hasPermission('messagerie.read')) {
+            return;
+        }
+
+        abort(403, 'Acces non autorise.');
     }
 
     /**

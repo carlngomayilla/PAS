@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\DocumentPolicySettings;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateJustificatifRequest extends FormRequest
@@ -16,13 +17,15 @@ class UpdateJustificatifRequest extends FormRequest
      */
     public function rules(): array
     {
+        $documentPolicy = app(DocumentPolicySettings::class);
+
         return [
             'description' => ['nullable', 'string'],
             'fichier' => [
                 'nullable',
                 'file',
-                'max:10240',
-                'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg',
+                'max:'.$documentPolicy->maxUploadKilobytes(),
+                $documentPolicy->mimesRule(),
             ],
         ];
     }

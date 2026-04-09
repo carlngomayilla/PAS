@@ -13,8 +13,7 @@ trait AuthorizesPlanningScope
     protected function denyUnlessPlanningReader(User $user): void
     {
         if (
-            $user->hasGlobalReadAccess()
-            || $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE)
+            $user->hasPermission('planning.read')
             || $user->hasDelegatedPermission('planning_read')
             || $user->hasDelegatedPermission('planning_write')
         ) {
@@ -84,7 +83,7 @@ trait AuthorizesPlanningScope
         string $directionColumn,
         ?string $serviceColumn = null
     ): void {
-        if ($user->hasGlobalReadAccess()) {
+        if ($this->canReadAllPlanning($user)) {
             return;
         }
 
@@ -141,7 +140,11 @@ trait AuthorizesPlanningScope
 
     protected function canReadDirection(User $user, ?int $directionId): bool
     {
-        if ($user->hasGlobalReadAccess()) {
+        if (! $this->canReadPlanningScope($user)) {
+            return false;
+        }
+
+        if ($this->canReadAllPlanning($user)) {
             return true;
         }
 
@@ -162,7 +165,11 @@ trait AuthorizesPlanningScope
 
     protected function canReadService(User $user, ?int $directionId, ?int $serviceId): bool
     {
-        if ($user->hasGlobalReadAccess()) {
+        if (! $this->canReadPlanningScope($user)) {
+            return false;
+        }
+
+        if ($this->canReadAllPlanning($user)) {
             return true;
         }
 
@@ -192,7 +199,7 @@ trait AuthorizesPlanningScope
 
     protected function canWriteDirection(User $user, ?int $directionId): bool
     {
-        if ($user->hasGlobalWriteAccess()) {
+        if ($this->canWriteAllPlanning($user)) {
             return true;
         }
 
@@ -200,7 +207,7 @@ trait AuthorizesPlanningScope
             return false;
         }
 
-        if ($user->hasRole(User::ROLE_DIRECTION)) {
+        if ($user->hasRole(User::ROLE_DIRECTION) && $user->hasPermission('planning.write.direction')) {
             return (int) $user->direction_id === $directionId;
         }
 
@@ -213,12 +220,12 @@ trait AuthorizesPlanningScope
 
     protected function canWriteStrategicPlanning(User $user): bool
     {
-        return $user->hasGlobalWriteAccess() || $user->hasRole(User::ROLE_CABINET);
+        return $user->hasPermission('planning.strategic.manage');
     }
 
     protected function canManagePao(User $user, ?int $directionId): bool
     {
-        if ($user->hasGlobalWriteAccess()) {
+        if ($this->canWriteAllPlanning($user) || $this->canWriteStrategicPlanning($user)) {
             return true;
         }
 
@@ -226,7 +233,7 @@ trait AuthorizesPlanningScope
             return false;
         }
 
-        if ($user->hasRole(User::ROLE_DIRECTION)) {
+        if ($user->hasRole(User::ROLE_DIRECTION) && $user->hasPermission('planning.write.direction')) {
             return (int) $user->direction_id === $directionId;
         }
 
@@ -235,7 +242,7 @@ trait AuthorizesPlanningScope
 
     protected function canManagePta(User $user, ?int $directionId, ?int $serviceId): bool
     {
-        if ($user->hasGlobalWriteAccess()) {
+        if ($this->canWriteAllPlanning($user) || $this->canWriteStrategicPlanning($user)) {
             return true;
         }
 
@@ -243,7 +250,7 @@ trait AuthorizesPlanningScope
             return false;
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE)) {
+        if ($user->hasRole(User::ROLE_SERVICE) && $user->hasPermission('planning.write.service')) {
             return (int) $user->direction_id === $directionId
                 && (int) $user->service_id === $serviceId;
         }
@@ -253,7 +260,7 @@ trait AuthorizesPlanningScope
 
     protected function canWriteService(User $user, ?int $directionId, ?int $serviceId): bool
     {
-        if ($user->hasGlobalWriteAccess()) {
+        if ($this->canWriteAllPlanning($user)) {
             return true;
         }
 
@@ -261,11 +268,7 @@ trait AuthorizesPlanningScope
             return false;
         }
 
-        if ($user->hasRole(User::ROLE_DIRECTION)) {
-            return (int) $user->direction_id === $directionId;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE)) {
+        if ($user->hasRole(User::ROLE_SERVICE) && $user->hasPermission('planning.write.service')) {
             return (int) $user->direction_id === $directionId
                 && (int) $user->service_id === $serviceId;
         }
@@ -283,52 +286,7 @@ trait AuthorizesPlanningScope
 
     protected function scopePasByUser(Builder|Relation $query, User $user): void
     {
-        if ($user->hasGlobalReadAccess()) {
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('directions', fn (Builder $q) => $q->whereKey((int) $user->direction_id));
-            return;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $serviceId = (int) $user->service_id;
-            $query->where(function (Builder $scopedQuery) use ($serviceId): void {
-                $scopedQuery
-                    ->whereHas('paos', fn (Builder $q) => $q->where('service_id', $serviceId))
-                    ->orWhereHas('paos.ptas', fn (Builder $q) => $q->where('service_id', $serviceId));
-            });
-            return;
-        }
-
-        $delegatedDirectionIds = array_merge(
-            $user->delegatedDirectionIds('planning_read'),
-            $user->delegatedDirectionIds('planning_write')
-        );
-        $delegatedServiceScopes = array_merge(
-            $user->delegatedServiceScopes('planning_read'),
-            $user->delegatedServiceScopes('planning_write')
-        );
-
-        if ($delegatedDirectionIds !== [] || $delegatedServiceScopes !== []) {
-            $query->where(function (Builder $scopedQuery) use ($delegatedDirectionIds, $delegatedServiceScopes): void {
-                foreach ($delegatedDirectionIds as $directionId) {
-                    $scopedQuery->orWhereHas('directions', fn (Builder $q) => $q->whereKey((int) $directionId));
-                }
-                foreach ($delegatedServiceScopes as $scope) {
-                    $scopedQuery->orWhere(function (Builder $serviceQuery) use ($scope): void {
-                        $serviceQuery
-                            ->whereHas('paos', fn (Builder $q) => $q
-                                ->where('direction_id', (int) $scope['direction_id'])
-                                ->where('service_id', (int) $scope['service_id']))
-                            ->orWhereHas('paos.ptas', fn (Builder $q) => $q
-                                ->where('direction_id', (int) $scope['direction_id'])
-                                ->where('service_id', (int) $scope['service_id']));
-                    });
-                }
-            });
-
+        if ($this->canReadPlanningScope($user)) {
             return;
         }
 
@@ -337,72 +295,20 @@ trait AuthorizesPlanningScope
 
     protected function canReadPas(User $user, ?int $pasId): bool
     {
-        if ($user->hasGlobalReadAccess()) {
-            return true;
-        }
-
-        if ($pasId === null) {
+        if (! $this->canReadPlanningScope($user)) {
             return false;
         }
 
-        $query = Pas::query()->whereKey((int) $pasId);
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            return (clone $query)
-                ->whereHas('directions', fn (Builder $q) => $q->whereKey((int) $user->direction_id))
-                ->exists();
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $serviceId = (int) $user->service_id;
-
-            return (clone $query)
-                ->where(function (Builder $scopedQuery) use ($serviceId): void {
-                    $scopedQuery
-                        ->whereHas('paos', fn (Builder $q) => $q->where('service_id', $serviceId))
-                        ->orWhereHas('paos.ptas', fn (Builder $q) => $q->where('service_id', $serviceId));
-                })
-                ->exists();
-        }
-
-        if ($user->delegatedDirectionIds('planning_read') !== [] || $user->delegatedDirectionIds('planning_write') !== []) {
-            $directionIds = array_merge(
-                $user->delegatedDirectionIds('planning_read'),
-                $user->delegatedDirectionIds('planning_write')
-            );
-
-            if ((clone $query)->whereHas('directions', fn (Builder $q) => $q->whereIn('directions.id', $directionIds))->exists()) {
-                return true;
-            }
-        }
-
-        $serviceScopes = array_merge(
-            $user->delegatedServiceScopes('planning_read'),
-            $user->delegatedServiceScopes('planning_write')
-        );
-        foreach ($serviceScopes as $scope) {
-            if ((clone $query)
-                ->where(function (Builder $scopedQuery) use ($scope): void {
-                    $scopedQuery
-                        ->whereHas('paos', fn (Builder $q) => $q
-                            ->where('direction_id', (int) $scope['direction_id'])
-                            ->where('service_id', (int) $scope['service_id']))
-                        ->orWhereHas('paos.ptas', fn (Builder $q) => $q
-                            ->where('direction_id', (int) $scope['direction_id'])
-                            ->where('service_id', (int) $scope['service_id']));
-                })
-                ->exists()
-            ) {
-                return true;
-            }
-        }
-
-        return false;
+        return $pasId !== null && Pas::query()->whereKey((int) $pasId)->exists();
     }
 
     protected function canReadPao(User $user, ?int $paoId, ?int $directionId): bool
     {
-        if ($user->hasGlobalReadAccess()) {
+        if (! $this->canReadPlanningScope($user)) {
+            return false;
+        }
+
+        if ($this->canReadAllPlanning($user)) {
             return true;
         }
 
@@ -449,7 +355,7 @@ trait AuthorizesPlanningScope
 
     protected function scopePlanningActions(Builder|Relation $query, User $user): void
     {
-        if ($user->hasGlobalReadAccess()) {
+        if ($this->canReadAllPlanning($user)) {
             return;
         }
 
@@ -460,7 +366,7 @@ trait AuthorizesPlanningScope
 
     protected function scopePlanningKpis(Builder|Relation $query, User $user): void
     {
-        if ($user->hasGlobalReadAccess()) {
+        if ($this->canReadAllPlanning($user)) {
             return;
         }
 
@@ -471,7 +377,7 @@ trait AuthorizesPlanningScope
 
     protected function scopePlanningKpiMesures(Builder|Relation $query, User $user): void
     {
-        if ($user->hasGlobalReadAccess()) {
+        if ($this->canReadAllPlanning($user)) {
             return;
         }
 
@@ -483,5 +389,22 @@ trait AuthorizesPlanningScope
     protected function scopePlanningUsers(Builder|Relation $query, User $user): void
     {
         $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
+    }
+
+    protected function canReadPlanningScope(User $user): bool
+    {
+        return $user->hasPermission('planning.read')
+            || $user->hasDelegatedPermission('planning_read')
+            || $user->hasDelegatedPermission('planning_write');
+    }
+
+    protected function canReadAllPlanning(User $user): bool
+    {
+        return $user->hasGlobalReadAccess() && $user->hasPermission('planning.read');
+    }
+
+    protected function canWriteAllPlanning(User $user): bool
+    {
+        return $user->hasPermission('planning.write.global');
     }
 }

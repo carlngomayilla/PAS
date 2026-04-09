@@ -6,13 +6,15 @@ use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\User;
 use App\Services\Governance\DelegationService;
+use App\Services\NotificationPolicySettings;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 class AlertRoutingService
 {
     public function __construct(
-        private readonly DelegationService $delegationService
+        private readonly DelegationService $delegationService,
+        private readonly NotificationPolicySettings $notificationPolicySettings
     ) {
     }
 
@@ -39,20 +41,32 @@ class AlertRoutingService
             $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
             $this->delegationService->delegatedDirectionReviewers($directionId)
         );
-        $planificationRecipients = $this->globalUsers([User::ROLE_ADMIN, User::ROLE_PLANIFICATION]);
-        $dgRecipients = $this->globalUsers([User::ROLE_ADMIN, User::ROLE_DG]);
+        $planificationRecipients = $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_PLANIFICATION]);
+        $dgRecipients = $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG]);
 
         if (in_array($targetRole, ['responsable', 'agent'], true)) {
             return $this->mergeRecipients(
                 $this->agentRecipient($action),
-                $this->globalUsers([User::ROLE_ADMIN])
+                $this->mergeRecipients(
+                    $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN]),
+                    $this->mergeRecipients(
+                        $this->escalationOversightRecipients((string) $log->niveau),
+                        $this->ruleBasedRecipients($log, $action, $directionId, $serviceId)
+                    )
+                )
             );
         }
 
         if (in_array($targetRole, ['chef_service', 'service'], true)) {
             return $this->mergeRecipients(
                 $serviceRecipients,
-                $this->globalUsers([User::ROLE_ADMIN])
+                $this->mergeRecipients(
+                    $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN]),
+                    $this->mergeRecipients(
+                        $this->escalationOversightRecipients((string) $log->niveau),
+                        $this->ruleBasedRecipients($log, $action, $directionId, $serviceId)
+                    )
+                )
             );
         }
 
@@ -60,19 +74,37 @@ class AlertRoutingService
         $chainRecipients = $this->mergeRecipients($chainRecipients, $planificationRecipients);
 
         if ($targetRole === 'direction') {
-            return $chainRecipients;
+            return $this->mergeRecipients(
+                $chainRecipients,
+                $this->mergeRecipients(
+                    $this->escalationOversightRecipients((string) $log->niveau),
+                    $this->ruleBasedRecipients($log, $action, $directionId, $serviceId)
+                )
+            );
         }
 
         if (in_array($targetRole, ['planification', 'dg'], true)) {
-            return $this->mergeRecipients($chainRecipients, $dgRecipients);
+            return $this->mergeRecipients(
+                $this->mergeRecipients($chainRecipients, $dgRecipients),
+                $this->mergeRecipients(
+                    $this->escalationOversightRecipients((string) $log->niveau),
+                    $this->ruleBasedRecipients($log, $action, $directionId, $serviceId)
+                )
+            );
         }
 
-        return $this->mergeRecipients($chainRecipients, $dgRecipients);
+        return $this->mergeRecipients(
+            $this->mergeRecipients($chainRecipients, $dgRecipients),
+            $this->mergeRecipients(
+                $this->escalationOversightRecipients((string) $log->niveau),
+                $this->ruleBasedRecipients($log, $action, $directionId, $serviceId)
+            )
+        );
     }
 
     public function userCanSeeActionLog(User $user, ActionLog $log): bool
     {
-        if ($user->hasRole(User::ROLE_ADMIN)) {
+        if ($user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN)) {
             return true;
         }
 
@@ -140,6 +172,60 @@ class AlertRoutingService
         return User::query()
             ->whereKey((int) $action->responsable_id)
             ->get();
+    }
+
+    /**
+     * @return EloquentCollection<int, User>
+     */
+    private function escalationOversightRecipients(string $level): EloquentCollection
+    {
+        $roles = $this->notificationPolicySettings->alertOversightRoles($level);
+
+        if ($roles === []) {
+            return new EloquentCollection();
+        }
+
+        return $this->globalUsers($roles);
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    private function ruleBasedRecipients(ActionLog $log, Action $action, int $directionId, int $serviceId): Collection
+    {
+        $rules = $this->notificationPolicySettings->matchingEscalationRules((string) $log->niveau);
+        if ($rules === []) {
+            return collect();
+        }
+
+        $serviceRecipients = $this->mergeRecipients(
+            $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]),
+            $this->delegationService->delegatedServiceReviewers($directionId, $serviceId)
+        );
+        $directionRecipients = $this->mergeRecipients(
+            $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
+            $this->delegationService->delegatedDirectionReviewers($directionId)
+        );
+
+        $recipients = collect();
+
+        foreach ($rules as $rule) {
+            $extra = match ((string) $rule['target_role']) {
+                'responsable' => $this->agentRecipient($action),
+                'service' => $serviceRecipients,
+                'direction' => $directionRecipients,
+                'planification' => $this->globalUsers([User::ROLE_PLANIFICATION]),
+                'dg' => $this->globalUsers([User::ROLE_DG]),
+                User::ROLE_ADMIN => $this->globalUsers([User::ROLE_ADMIN]),
+                User::ROLE_SUPER_ADMIN => $this->globalUsers([User::ROLE_SUPER_ADMIN]),
+                User::ROLE_CABINET => $this->globalUsers([User::ROLE_CABINET]),
+                default => new EloquentCollection(),
+            };
+
+            $recipients = $this->mergeRecipients($recipients, $extra);
+        }
+
+        return $recipients;
     }
 
     /**

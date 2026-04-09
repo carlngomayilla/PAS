@@ -9,6 +9,8 @@
     $totalUnread = (int) $unreadTotal;
     $workspaceModules = collect($user?->workspaceModules() ?? [])->keyBy('code');
     $canSeeModule = static fn (string $code): bool => $workspaceModules->has($code);
+    $moduleLabel = static fn (string $code, string $fallback): string => (string) (($workspaceModules->get($code)['label'] ?? null) ?: $fallback);
+    $moduleOrder = static fn (string $code, int $fallback = 999): int => (int) ($workspaceModules->get($code)['display_order'] ?? $fallback);
 
     $sections = [];
 
@@ -19,28 +21,31 @@
             'route' => 'dashboard',
             'icon' => 'dashboard',
             'patterns' => ['dashboard', 'admin.dashboard'],
+            'display_order' => -100,
         ],
     ];
 
     if ($canSeeModule('alertes')) {
         $pilotageItems[] = [
             'code' => 'alertes',
-            'label' => 'Alertes',
+            'label' => $moduleLabel('alertes', 'Alertes'),
             'route' => 'workspace.alertes',
             'icon' => 'alert',
             'patterns' => ['workspace.alertes'],
             'badge' => (int) ($moduleBadges['alertes'] ?? 0),
+            'display_order' => $moduleOrder('alertes', 20),
         ];
     }
 
     if ($canSeeModule('reporting')) {
         $pilotageItems[] = [
             'code' => 'reporting',
-            'label' => 'Rapports',
+            'label' => $moduleLabel('reporting', 'Rapports'),
             'route' => 'workspace.reporting',
             'icon' => 'reporting',
             'patterns' => ['workspace.reporting'],
             'badge' => (int) ($moduleBadges['reporting'] ?? 0),
+            'display_order' => $moduleOrder('reporting', 30),
         ];
     }
 
@@ -51,8 +56,11 @@
             'route' => 'workspace.pilotage',
             'icon' => 'pilotage',
             'patterns' => ['workspace.pilotage'],
+            'display_order' => 35,
         ];
     }
+
+    usort($pilotageItems, static fn (array $left, array $right): int => ((int) ($left['display_order'] ?? 999)) <=> ((int) ($right['display_order'] ?? 999)));
 
     $sections[] = ['title' => 'Pilotage', 'items' => $pilotageItems];
 
@@ -61,34 +69,39 @@
     if ($canSeeModule('pas')) {
         $planificationItems[] = [
             'code' => 'pas',
-            'label' => 'PAS',
+            'label' => $moduleLabel('pas', 'PAS'),
             'route' => 'workspace.pas.index',
             'icon' => 'pas',
             'patterns' => ['workspace.pas.*'],
+            'display_order' => $moduleOrder('pas', 40),
         ];
     }
 
     if ($canSeeModule('pao')) {
         $planificationItems[] = [
             'code' => 'pao',
-            'label' => 'PAO',
+            'label' => $moduleLabel('pao', 'PAO'),
             'route' => 'workspace.pao.index',
             'icon' => 'pao',
             'patterns' => ['workspace.pao.*'],
             'badge' => (int) ($moduleBadges['pao'] ?? 0),
+            'display_order' => $moduleOrder('pao', 50),
         ];
     }
 
     if ($canSeeModule('pta')) {
         $planificationItems[] = [
             'code' => 'pta',
-            'label' => 'PTA',
+            'label' => $moduleLabel('pta', 'PTA'),
             'route' => 'workspace.pta.index',
             'icon' => 'pta',
             'patterns' => ['workspace.pta.*'],
             'badge' => (int) ($moduleBadges['pta'] ?? 0),
+            'display_order' => $moduleOrder('pta', 60),
         ];
     }
+
+    usort($planificationItems, static fn (array $left, array $right): int => ((int) ($left['display_order'] ?? 999)) <=> ((int) ($right['display_order'] ?? 999)));
 
     if ($planificationItems !== []) {
         $sections[] = ['title' => 'Planification', 'items' => $planificationItems];
@@ -99,13 +112,17 @@
     if ($canSeeModule('execution')) {
         $executionItems[] = [
             'code' => 'actions',
-            'label' => 'Actions',
+            'module_code' => 'execution',
+            'label' => $moduleLabel('execution', 'Actions'),
             'route' => 'workspace.actions.index',
             'icon' => 'actions',
             'patterns' => ['workspace.actions.*'],
             'badge' => (int) ($moduleBadges['actions'] ?? 0),
+            'display_order' => $moduleOrder('execution', 70),
         ];
     }
+
+    usort($executionItems, static fn (array $left, array $right): int => ((int) ($left['display_order'] ?? 999)) <=> ((int) ($right['display_order'] ?? 999)));
 
     if ($executionItems !== []) {
         $sections[] = ['title' => 'Execution', 'items' => $executionItems];
@@ -116,55 +133,78 @@
     if ($canSeeModule('referentiel')) {
         $gouvernanceItems[] = [
             'code' => 'referentiel',
-            'label' => 'Refer.',
+            'label' => $moduleLabel('referentiel', 'Refer.'),
             'route' => 'workspace.referentiel.directions.index',
             'icon' => 'referentiel',
             'patterns' => ['workspace.referentiel.*'],
+            'display_order' => $moduleOrder('referentiel', 80),
         ];
     }
 
     if ($canSeeModule('delegations')) {
         $gouvernanceItems[] = [
             'code' => 'delegations',
-            'label' => 'Deleg.',
+            'label' => $moduleLabel('delegations', 'Deleg.'),
             'route' => 'workspace.delegations.index',
             'icon' => 'delegations',
             'patterns' => ['workspace.delegations.*'],
+            'display_order' => $moduleOrder('delegations', 90),
         ];
     }
 
     if ($canSeeModule('retention')) {
         $gouvernanceItems[] = [
             'code' => 'retention',
-            'label' => 'Retention',
+            'label' => $moduleLabel('retention', 'Retention'),
             'route' => 'workspace.retention.index',
             'icon' => 'retention',
             'patterns' => ['workspace.retention.*'],
+            'display_order' => $moduleOrder('retention', 100),
         ];
     }
 
     if ($canSeeModule('api_docs')) {
         $gouvernanceItems[] = [
             'code' => 'api_docs',
-            'label' => 'API Docs',
+            'label' => $moduleLabel('api_docs', 'API Docs'),
             'route' => 'workspace.api-docs.index',
             'icon' => 'docs',
             'patterns' => ['workspace.api-docs.*'],
+            'display_order' => $moduleOrder('api_docs', 110),
         ];
     }
 
     if ($canSeeModule('audit')) {
         $gouvernanceItems[] = [
             'code' => 'audit',
-            'label' => 'Audit',
+            'label' => $moduleLabel('audit', 'Audit'),
             'route' => 'workspace.audit.index',
             'icon' => 'audit',
             'patterns' => ['workspace.audit.*'],
+            'display_order' => $moduleOrder('audit', 120),
         ];
     }
 
+    usort($gouvernanceItems, static fn (array $left, array $right): int => ((int) ($left['display_order'] ?? 999)) <=> ((int) ($right['display_order'] ?? 999)));
+
     if ($gouvernanceItems !== []) {
         $sections[] = ['title' => 'Gouvernance', 'items' => $gouvernanceItems];
+    }
+
+    if ($canSeeModule('super_admin')) {
+        $sections[] = [
+            'title' => 'Plateforme',
+            'items' => [
+                [
+                    'code' => 'super_admin',
+                    'label' => $moduleLabel('super_admin', 'Super Admin'),
+                    'route' => 'workspace.super-admin.index',
+                    'icon' => 'super_admin',
+                    'patterns' => ['workspace.super-admin.*'],
+                    'display_order' => $moduleOrder('super_admin', 130),
+                ],
+            ],
+        ];
     }
 
     $isActive = static function (array $patterns): bool {
@@ -194,14 +234,15 @@
         'retention' => 'M7 3h8l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm8 1v5h5',
         'docs' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
         'audit' => 'M12 3l7 3v6c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V6l7-3z',
+        'super_admin' => 'M12 2l2.4 5 5.6.8-4 3.9.95 5.6L12 15.8 7.05 18.3 8 12.7 4 8.8l5.6-.8L12 2z',
     ];
 @endphp
 
-<aside id="admin-sidebar" class="sidebar-anbg gooey-sidebar fixed inset-y-0 left-0 z-50 flex h-screen w-32 -translate-x-full flex-col overflow-visible border-r border-white/6 shadow-2xl transition-transform duration-200 ease-out lg:translate-x-0">
+<aside id="admin-sidebar" class="sidebar-anbg gooey-sidebar fixed inset-y-0 left-0 z-50 flex h-screen -translate-x-full flex-col overflow-visible border-r border-white/6 shadow-2xl transition-transform duration-200 ease-out lg:translate-x-0" style="width: var(--app-sidebar-width);">
     <div class="relative shrink-0 flex min-h-[5.75rem] flex-col items-center justify-center px-3 py-4 text-center">
         <div class="flex w-full flex-col items-center justify-center">
             <x-brand.logo variant="wordmark" class="gooey-sidebar-wordmark block h-auto" />
-            <p class="mt-2 w-full text-center text-[11px] font-medium tracking-[0.16em] text-white/55">PILOTAGE</p>
+            <p class="mt-2 w-full text-center text-[11px] font-medium tracking-[0.16em] text-white/55">{{ $platformSettings->get('sidebar_caption', 'PILOTAGE') }}</p>
         </div>
 
         <button
@@ -224,7 +265,7 @@
                         @php
                             $active = $isActive($item['patterns']);
                             $badgeCount = (int) ($item['badge'] ?? 0);
-                            $itemCode = (string) ($item['code'] ?? $item['route']);
+                            $itemCode = (string) ($item['module_code'] ?? $item['code'] ?? $item['route']);
                             $iconPath = $icons[$item['icon']] ?? $icons['dashboard'];
                         @endphp
 

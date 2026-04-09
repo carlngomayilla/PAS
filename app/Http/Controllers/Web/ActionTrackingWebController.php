@@ -10,10 +10,14 @@ use App\Models\Action;
 use App\Models\ActionWeek;
 use App\Models\Justificatif;
 use App\Models\User;
+use App\Services\ActionManagementSettings;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\DocumentPolicySettings;
+use App\Services\DynamicReferentialSettings;
 use App\Services\Governance\DelegationService;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\Security\SecureJustificatifStorage;
+use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,6 +68,11 @@ class ActionTrackingWebController extends Controller
             'canSubmitClosure' => $this->canSubmitClosure($user, $action) && $this->isExecutionEditableByAgent($action),
             'canReviewClosure' => $this->canReviewByChef($user, $action),
             'canReviewDirection' => $this->canReviewByDirection($user, $action),
+            'workflowConfig' => $this->workflowSettings()->actionValidationSummary(),
+            'justificatifCategoryLabels' => app(DynamicReferentialSettings::class)->justificatifCategoryLabels(),
+            'alertLevelLabels' => app(DynamicReferentialSettings::class)->alertLevelLabels(),
+            'validationStatusLabels' => app(DynamicReferentialSettings::class)->validationStatusLabels(),
+            'documentAccept' => app(DocumentPolicySettings::class)->acceptAttribute(),
         ]);
     }
 
@@ -104,7 +113,7 @@ class ActionTrackingWebController extends Controller
             'commentaire' => ['nullable', 'string'],
             'difficultes' => ['required', 'string'],
             'mesures_correctives' => ['required', 'string'],
-            'justificatif' => ['required', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg'],
+            'justificatif' => ['required', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
         ];
 
         if ($action->type_cible === 'quantitative') {
@@ -154,6 +163,7 @@ class ActionTrackingWebController extends Controller
         Request $request,
         Action $action,
         ActionTrackingService $trackingService,
+        ActionManagementSettings $actionManagementSettings,
         WorkspaceNotificationService $notificationService,
         SecureJustificatifStorage $secureStorage
     ): RedirectResponse {
@@ -198,13 +208,32 @@ class ActionTrackingWebController extends Controller
         $validated = $request->validate([
             'date_fin_reelle' => ['required', 'date'],
             'rapport_final' => ['required', 'string'],
-            'justificatif_final' => ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg'],
+            'justificatif_final' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
         ]);
 
         if ($action->date_debut !== null && (string) $validated['date_fin_reelle'] < (string) $action->date_debut) {
             return back()->withErrors([
                 'date_fin_reelle' => 'La date de fin reelle doit etre superieure ou egale a la date de debut.',
             ]);
+        }
+
+        $minimumProgress = $actionManagementSettings->minProgressForClosure();
+        if ((float) ($action->progression_reelle ?? 0) < $minimumProgress) {
+            return back()->withErrors([
+                'general' => 'Soumission impossible: la progression minimale de cloture est fixee a '.$minimumProgress.'%.',
+            ]);
+        }
+
+        if ($actionManagementSettings->finalJustificatifRequired()) {
+            $hasExistingFinalJustificatif = $action->justificatifs()
+                ->where('categorie', 'final')
+                ->exists();
+
+            if (! $request->hasFile('justificatif_final') && ! $hasExistingFinalJustificatif) {
+                return back()->withErrors([
+                    'justificatif_final' => 'Le justificatif final est obligatoire selon la politique metier des actions.',
+                ]);
+            }
         }
 
         $before = $action->toArray();
@@ -232,11 +261,19 @@ class ActionTrackingWebController extends Controller
 
         $action->refresh();
         $this->recordAudit($request, 'action', 'submit_for_validation', $action, $before, $action->toArray());
-        $notificationService->notifyActionSubmittedToChef($action, $user);
+        $submissionTarget = $this->workflowSettings()->actionSubmissionTarget();
+
+        if ($submissionTarget === 'service') {
+            $notificationService->notifyActionSubmittedToChef($action, $user);
+        } elseif ($submissionTarget === 'direction') {
+            $notificationService->notifyActionSubmittedToDirection($action, $user);
+        } else {
+            $notificationService->notifyActionFinalizedWithoutWorkflow($action, $user);
+        }
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Action soumise au chef de service pour evaluation.');
+            ->with('success', $this->submissionSuccessMessage());
     }
 
     public function comment(
@@ -301,13 +338,7 @@ class ActionTrackingWebController extends Controller
         }
 
         /** @var array<string, mixed> $validated */
-        $validated = $request->validate([
-            'decision_validation' => ['required', Rule::in(['valider', 'rejeter'])],
-            'evaluation_note' => ['required', 'numeric', 'min:0', 'max:100'],
-            'evaluation_commentaire' => ['required', 'string'],
-            'validation_sans_correction' => ['nullable', Rule::in(['0', '1', 0, 1, true, false])],
-            'justificatif_evaluation' => ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg'],
-        ]);
+        $validated = $request->validate($this->reviewValidationRules($request, true));
 
         $validated['validation_sans_correction'] = $request->filled('validation_sans_correction')
             ? (bool) $request->boolean('validation_sans_correction')
@@ -340,12 +371,18 @@ class ActionTrackingWebController extends Controller
         $this->recordAudit($request, 'action', 'review_closure', $action, $before, $action->toArray());
 
         $decision = (string) ($validated['decision_validation'] ?? 'rejeter');
-        $notificationService->notifyActionReviewedByChef($action, $decision === 'valider', $user);
+        $directionEnabled = $this->workflowSettings()->directionValidationEnabled();
+
+        if ($decision === 'valider' && ! $directionEnabled) {
+            $notificationService->notifyActionFinalizedByChef($action, $user);
+        } else {
+            $notificationService->notifyActionReviewedByChef($action, $decision === 'valider', $user);
+        }
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', $decision === 'valider'
-                ? 'Action validee par le chef de service et transmise a la direction.'
+                ? $this->workflowSettings()->actionValidationSummary()['service_review_success_text']
                 : 'Action rejetee. L agent peut mettre a jour et resoumettre.');
     }
 
@@ -377,12 +414,7 @@ class ActionTrackingWebController extends Controller
         }
 
         /** @var array<string, mixed> $validated */
-        $validated = $request->validate([
-            'decision_validation' => ['required', Rule::in(['valider', 'rejeter'])],
-            'evaluation_note' => ['required', 'numeric', 'min:0', 'max:100'],
-            'evaluation_commentaire' => ['required', 'string'],
-            'justificatif_evaluation_direction' => ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg'],
-        ]);
+        $validated = $request->validate($this->reviewValidationRules($request, false));
 
         $before = $action->toArray();
 
@@ -500,6 +532,10 @@ class ActionTrackingWebController extends Controller
 
     private function canReviewByChef(User $user, Action $action): bool
     {
+        if (! $this->workflowSettings()->serviceValidationEnabled()) {
+            return false;
+        }
+
         return ($user->hasRole(User::ROLE_SERVICE)
                 && $this->canManageAction($user, $action))
             || app(DelegationService::class)->canReviewServiceAction(
@@ -511,6 +547,10 @@ class ActionTrackingWebController extends Controller
 
     private function canReviewByDirection(User $user, Action $action): bool
     {
+        if (! $this->workflowSettings()->directionValidationEnabled()) {
+            return false;
+        }
+
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             return (int) $user->direction_id === (int) $action->pta?->direction_id;
         }
@@ -530,5 +570,48 @@ class ActionTrackingWebController extends Controller
             ActionTrackingService::VALIDATION_REJETEE_CHEF,
             ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
         ], true);
+    }
+
+    private function workflowSettings(): WorkflowSettings
+    {
+        return app(WorkflowSettings::class);
+    }
+
+    private function submissionSuccessMessage(): string
+    {
+        return match ($this->workflowSettings()->actionSubmissionTarget()) {
+            'direction' => 'Action soumise directement a la direction pour evaluation.',
+            'final' => 'Action cloturee sans validation supplementaire. Elle est maintenant prise en compte dans les statistiques.',
+            default => 'Action soumise au chef de service pour evaluation.',
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function reviewValidationRules(Request $request, bool $serviceStep): array
+    {
+        $commentRules = ['nullable', 'string'];
+
+        if ($this->workflowSettings()->rejectionCommentRequired() && (string) $request->input('decision_validation') === 'rejeter') {
+            array_unshift($commentRules, 'required');
+        }
+
+        $rules = [
+            'decision_validation' => ['required', Rule::in(['valider', 'rejeter'])],
+            'evaluation_note' => ['required', 'numeric', 'min:0', 'max:100'],
+            'evaluation_commentaire' => $commentRules,
+        ];
+
+        if ($serviceStep) {
+            $rules['validation_sans_correction'] = ['nullable', Rule::in(['0', '1', 0, 1, true, false])];
+            $rules['justificatif_evaluation'] = ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()];
+
+            return $rules;
+        }
+
+        $rules['justificatif_evaluation_direction'] = ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()];
+
+        return $rules;
     }
 }

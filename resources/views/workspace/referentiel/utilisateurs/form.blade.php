@@ -4,12 +4,12 @@
     @php
         $isEdit = $mode === 'edit';
     @endphp
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h1>{{ $isEdit ? 'Modifier utilisateur' : 'Nouvel utilisateur' }}</h1>
-        <p class="text-slate-600">Configuration du profil et du scope organisationnel.</p>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <form method="POST" enctype="multipart/form-data" class="form-shell" action="{{ $isEdit ? route('workspace.referentiel.utilisateurs.update', $row) : route('workspace.referentiel.utilisateurs.store') }}">
             @csrf
             @if ($isEdit)
@@ -18,12 +18,11 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Profil et rattachement</h2>
-                <p class="form-section-subtitle">Les champs agents sont figes automatiquement quand le role n est pas <code>agent</code>.</p>
-                <div class="form-grid">
+                <div class="grid gap-4">
                     <div>
                         <label for="profile_photo">Photo de profil</label>
                         <input id="profile_photo" name="profile_photo" type="file" accept=".jpg,.jpeg,.png,.webp">
-                        <p class="field-hint">Formats: JPG, PNG, WEBP (max 3 Mo).</p>
+                        <p class="field-hint">JPG, PNG ou WEBP. Max 3 Mo.</p>
                         @if ($isEdit && $row->profile_photo_url)
                             <div class="mt-2 flex items-center gap-2">
                                 <img src="{{ $row->profile_photo_url }}" alt="Photo actuelle de {{ $row->name }}" class="h-12 w-12 rounded-full object-cover ring-2 ring-white shadow-sm">
@@ -59,10 +58,6 @@
                         </label>
                     </div>
                     <div>
-                        <label for="agent_hint">Profil execution</label>
-                        <input id="agent_hint" type="text" value="Selectionner le role agent pour l execution des actions" disabled>
-                    </div>
-                    <div>
                         <label for="direction_id">Direction</label>
                         <select id="direction_id" name="direction_id">
                             <option value="">Aucune</option>
@@ -87,7 +82,6 @@
                 </div>
 
                 <div id="agent-fields" class="conditional-block mt-4">
-                    <p class="field-hint mt-0">Informations complementaires reservees aux comptes agents.</p>
                     <div class="form-grid-compact mt-2">
                         <div>
                             <label for="agent_matricule">Matricule agent</label>
@@ -104,16 +98,11 @@
                     </div>
                 </div>
 
-                <p class="field-hint mt-3">
-                    Regles: <code>direction</code> requiert une direction. <code>service</code> requiert direction + service.
-                    Les roles globaux (<code>admin</code>, <code>dg</code>, <code>planification</code>, <code>cabinet</code>) ne doivent pas etre rattaches a une direction/service.
-                    Le role <code>agent</code> doit etre rattache a une direction + un service.
-                </p>
             </div>
 
             <div class="form-section">
                 <h2 class="form-section-title">Securite du compte</h2>
-                <div class="form-grid">
+                <div class="grid gap-4">
                     <div>
                         <label for="password">{{ $isEdit ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe' }}</label>
                         <input id="password" name="password" type="password" {{ $isEdit ? '' : 'required' }}>
@@ -131,6 +120,7 @@
             </div>
         </form>
     </section>
+    </div>
 @endsection
 
 @push('scripts')

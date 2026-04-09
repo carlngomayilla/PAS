@@ -8,6 +8,7 @@ use App\Models\Action;
 use App\Models\ActionWeek;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\DocumentPolicySettings;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,7 +69,7 @@ class ActionWeekController extends Controller
             'commentaire' => ['nullable', 'string'],
             'difficultes' => ['required', 'string'],
             'mesures_correctives' => ['required', 'string'],
-            'justificatif' => ['required', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg'],
+            'justificatif' => ['required', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
         ];
 
         if ($action->type_cible === 'quantitative') {

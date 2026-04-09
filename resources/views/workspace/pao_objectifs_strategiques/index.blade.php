@@ -1,17 +1,17 @@
 @extends('layouts.workspace')
 
 @section('content')
-    <section class="ui-card mb-3.5">
-        <h1>PAO - Objectifs strategiques</h1>
-        <p class="text-slate-600">Objectifs strategiques annuels relies aux axes du PAO.</p>
-        @if ($canWrite)
-            <p class="mt-2.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <h1>PAO - Objectifs strategiques</h1>
+            @if ($canWrite)
                 <a class="btn btn-green" href="{{ route('workspace.pao-objectifs-strategiques.create') }}">Nouvel objectif strategique</a>
-            </p>
-        @endif
+            @endif
+        </div>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h2>Filtres</h2>
         <form method="GET" action="{{ route('workspace.pao-objectifs-strategiques.index') }}">
             <div class="form-grid-compact mb-2">
@@ -38,7 +38,7 @@
         </form>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h2>Liste des objectifs strategiques</h2>
         <div class="overflow-auto">
             <table>
@@ -93,4 +93,5 @@
         </div>
         <div class="pagination">{{ $rows->links() }}</div>
     </section>
+    </div>
 @endsection

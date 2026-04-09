@@ -1,10 +1,23 @@
 @php
+    $displayMode = $displayMode ?? 'full';
+    $showHeroBlock = in_array($displayMode, ['full', 'overview'], true);
+    $showChartBlocks = in_array($displayMode, ['full', 'charts'], true);
+    $showTableBlocks = in_array($displayMode, ['full', 'tables'], true);
     $primaryRows = $roleDashboard['primary_rows'] ?? [];
     $secondaryRows = $roleDashboard['secondary_rows'] ?? [];
     $comparisonChart = $roleDashboard['comparison_chart'] ?? [];
     $statusChart = $roleDashboard['status_chart'] ?? [];
     $trendChart = $roleDashboard['trend_chart'] ?? [];
     $supportChart = $roleDashboard['support_chart'] ?? [];
+    $showOverview = (bool) ($roleDashboard['overview_enabled'] ?? true);
+    $showComparisonChart = (bool) ($roleDashboard['comparison_chart_enabled'] ?? true);
+    $showStatusChart = (bool) ($roleDashboard['status_chart_enabled'] ?? true);
+    $showTrendChart = (bool) ($roleDashboard['trend_chart_enabled'] ?? true);
+    $showSupportChart = (bool) ($roleDashboard['support_chart_enabled'] ?? true);
+    $officialPolicy = is_array(($officialPolicy ?? null)) ? $officialPolicy : [];
+    $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
+    $officialBaseLower = mb_strtolower($officialBaseLabel);
+    $officialBaseText = 'Base statistique : '.$officialBaseLabel;
     $validationTone = static function (string $status): string {
         return match ($status) {
             \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
@@ -17,22 +30,22 @@
     };
 @endphp
 
-<div class="showcase-panel mb-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h2 class="showcase-panel-title">{{ $roleDashboard['hero']['title'] ?? 'Lecture par profil' }}</h2>
-            <p class="showcase-panel-subtitle">{{ $roleDashboard['hero']['subtitle'] ?? 'Synthese metier specifique au profil connecte.' }}</p>
+@if ($showHeroBlock)
+    <div class="showcase-panel mb-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="showcase-panel-title">{{ $roleDashboard['hero']['title'] ?? 'Lecture par profil' }}</h2>
+            </div>
+            <span class="showcase-chip">{{ strtoupper((string) ($roleDashboard['role'] ?? $dashboardRole)) }}</span>
         </div>
-        <span class="showcase-chip">{{ strtoupper((string) ($roleDashboard['role'] ?? $dashboardRole)) }}</span>
     </div>
-</div>
+@endif
 
-@if (count($comparisonChart['labels'] ?? []) > 0)
+@if ($showChartBlocks && $showComparisonChart && count($comparisonChart['labels'] ?? []) > 0)
     <article class="showcase-panel mb-4">
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">{{ $comparisonChart['title'] ?? 'Operationnel vs officiel' }}</h2>
-                <p class="showcase-panel-subtitle">{{ $comparisonChart['subtitle'] ?? 'Lecture comparee des deux niveaux de lecture.' }}</p>
+                <h2 class="showcase-panel-title">{{ $comparisonChart['title'] ?? 'Comparaison des indicateurs' }}</h2>
             </div>
             <span class="showcase-chip">{{ count($comparisonChart['labels'] ?? []) }} indicateurs</span>
         </div>
@@ -40,48 +53,54 @@
     </article>
 @endif
 
-<div class="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-    <article class="showcase-panel">
-        <div class="mb-4 flex items-center justify-between gap-3">
-            <div>
-                <h2 class="showcase-panel-title">{{ $statusChart['title'] ?? 'Repartition des statuts' }}</h2>
-                <p class="showcase-panel-subtitle">{{ $statusChart['subtitle'] ?? 'Repartition des actions par statut.' }}</p>
-            </div>
-            <span class="showcase-chip">{{ count($statusChart['labels'] ?? []) }} statuts</span>
-        </div>
-        <div class="dashboard-canvas"><div id="dashboard-role-status-chart" class="dashboard-chart-host"></div></div>
-    </article>
+@if ($showChartBlocks && ($showStatusChart || $showTrendChart))
+    <div class="space-y-4">
+        @if ($showStatusChart)
+            <article class="showcase-panel">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="showcase-panel-title">{{ $statusChart['title'] ?? 'Repartition des statuts' }}</h2>
+                    </div>
+                    <span class="showcase-chip">{{ count($statusChart['labels'] ?? []) }} statuts</span>
+                </div>
+                <div class="dashboard-canvas"><div id="dashboard-role-status-chart" class="dashboard-chart-host"></div></div>
+            </article>
+        @endif
 
-    <article class="showcase-panel">
-        <div class="mb-4 flex items-center justify-between gap-3">
-            <div>
-                <h2 class="showcase-panel-title">{{ $trendChart['title'] ?? 'Tendance' }}</h2>
-                <p class="showcase-panel-subtitle">{{ $trendChart['subtitle'] ?? 'Evolution temporelle du perimetre courant.' }}</p>
-            </div>
-            <span class="showcase-chip">{{ count($trendChart['labels'] ?? []) }} points</span>
-        </div>
-        <div class="dashboard-canvas"><div id="dashboard-role-trend-chart" class="dashboard-chart-host"></div></div>
-    </article>
-</div>
+        @if ($showTrendChart)
+            <article class="showcase-panel">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="showcase-panel-title">{{ $trendChart['title'] ?? 'Tendance' }}</h2>
+                    </div>
+                    <span class="showcase-chip">{{ count($trendChart['labels'] ?? []) }} points</span>
+                </div>
+                <div class="dashboard-canvas"><div id="dashboard-role-trend-chart" class="dashboard-chart-host"></div></div>
+            </article>
+        @endif
+    </div>
+@endif
 
-<div class="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+@if (($showChartBlocks && $showSupportChart) || ($showTableBlocks && $showOverview))
+<div class="mt-4 space-y-4">
+    @if ($showChartBlocks && $showSupportChart)
     <article class="showcase-panel">
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">{{ $supportChart['title'] ?? 'Lecture metier' }}</h2>
-                <p class="showcase-panel-subtitle">{{ $supportChart['subtitle'] ?? 'Analyse specifique au profil.' }}</p>
             </div>
             <span class="showcase-chip">{{ count($supportChart['labels'] ?? []) }} lignes</span>
         </div>
         <div class="dashboard-canvas"><div id="dashboard-role-support-chart" class="dashboard-chart-host"></div></div>
     </article>
+    @endif
 
+    @if ($showTableBlocks && $showOverview)
     <article class="showcase-panel">
         @if ($dashboardRole === 'agent')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
                     <h2 class="showcase-panel-title">Mes actions prioritaires</h2>
-                    <p class="showcase-panel-subtitle">Actions a suivre en premier, avec lecture execution et validation.</p>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
@@ -108,7 +127,6 @@
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
                     <h2 class="showcase-panel-title">Actions a valider</h2>
-                    <p class="showcase-panel-subtitle">Soumissions en attente d evaluation chef de service.</p>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
@@ -135,13 +153,12 @@
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
                     <h2 class="showcase-panel-title">Performance par service</h2>
-                    <p class="showcase-panel-subtitle">Comparaison directe des services de la direction.</p>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} services</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="dashboard-table">
-                    <thead><tr><th>Service</th><th>Actions</th><th>Achevees</th><th>Retard</th><th>Validees direction</th><th>Score</th></tr></thead>
+                    <thead><tr><th>Service</th><th>Actions</th><th>Achevees</th><th>Retard</th><th>Validees</th><th>Score</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
@@ -153,7 +170,7 @@
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 0) }}</span></td>
                             </tr>
                         @empty
-                            <tr><td colspan="6">Aucun service consolide pour cette direction.</td></tr>
+                            <tr><td colspan="6">Aucun service disponible pour cette direction.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -161,27 +178,26 @@
         @elseif ($dashboardRole === 'dg')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Directions : operationnel vs officiel</h2>
-                    <p class="showcase-panel-subtitle">Comparer direction par direction le portefeuille total et le socle officiel valide direction.</p>
+                    <h2 class="showcase-panel-title">Directions : suivi strategique</h2>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} directions</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="dashboard-table">
-                    <thead><tr><th>Direction</th><th>Actions</th><th>Officiel</th><th>Exec. op.</th><th>Exec. off.</th><th>Score op.</th><th>Score off.</th></tr></thead>
+                    <thead><tr><th>Direction</th><th>Actions</th><th>Validees</th><th>Exec.</th><th>Taux validation</th><th>Retards</th><th>Score</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
                                 <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['direction'] }}</td>
                                 <td>{{ $row['actions_total'] }}</td>
-                                <td>{{ $row['actions_officielles'] }}</td>
-                                <td>{{ number_format((float) ($row['taux_execution_operationnel'] ?? 0), 0) }}%</td>
-                                <td>{{ number_format((float) ($row['taux_execution_officiel'] ?? 0), 0) }}%</td>
-                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score_operationnel'] ?? 0))) }}">{{ number_format((float) ($row['score_operationnel'] ?? 0), 0) }}</span></td>
-                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score_officiel'] ?? 0))) }}">{{ number_format((float) ($row['score_officiel'] ?? 0), 0) }}</span></td>
+                                <td>{{ $row['validees_direction'] }}</td>
+                                <td>{{ number_format((float) ($row['taux_execution'] ?? 0), 0) }}%</td>
+                                <td>{{ number_format((float) ($row['taux_validation'] ?? 0), 0) }}%</td>
+                                <td>{{ $row['retards'] }}</td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 0) }}</span></td>
                             </tr>
                         @empty
-                            <tr><td colspan="7">Aucune direction consolidee disponible.</td></tr>
+                            <tr><td colspan="7">Aucune direction disponible.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -190,13 +206,12 @@
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
                     <h2 class="showcase-panel-title">Classement des directions</h2>
-                    <p class="showcase-panel-subtitle">Comparaison directe des directions sur execution, validation et score.</p>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} directions</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="dashboard-table">
-                    <thead><tr><th>Direction</th><th>Actions</th><th>Achevees</th><th>Retard</th><th>Validees direction</th><th>Score</th></tr></thead>
+                    <thead><tr><th>Direction</th><th>Actions</th><th>Achevees</th><th>Retard</th><th>Validees</th><th>Score</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
@@ -208,7 +223,7 @@
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 0) }}</span></td>
                             </tr>
                         @empty
-                            <tr><td colspan="6">Aucune direction consolidee disponible.</td></tr>
+                            <tr><td colspan="6">Aucune direction disponible.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -217,7 +232,6 @@
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
                     <h2 class="showcase-panel-title">Validations en attente</h2>
-                    <p class="showcase-panel-subtitle">Actions soumises a suivre pour preparer l arbitrage et l accompagnement.</p>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
@@ -242,14 +256,16 @@
             </div>
         @endif
     </article>
+    @endif
 </div>
+@endif
 
+@if ($showTableBlocks && $showOverview)
 <article class="showcase-panel mt-4">
     @if ($dashboardRole === 'agent')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Mes actions en retard</h2>
-                <p class="showcase-panel-subtitle">Retards individuels a traiter en priorite.</p>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -276,7 +292,6 @@
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Performance des agents</h2>
-                <p class="showcase-panel-subtitle">Lecture simple de la charge et du taux d execution par agent.</p>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} agents</span>
         </div>
@@ -302,7 +317,6 @@
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Actions critiques de la direction</h2>
-                <p class="showcase-panel-subtitle">Retards, validations et risques sur les actions les plus sensibles.</p>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -330,13 +344,12 @@
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Directions en difficulte</h2>
-                <p class="showcase-panel-subtitle">Directions avec retards ou ecart marque entre portefeuille operationnel et socle officiel.</p>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
         <div class="overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Direction</th><th>Service critique</th><th>Retard</th><th>Validation off.</th><th>Score op.</th><th>Score off.</th></tr></thead>
+                <thead><tr><th>Direction</th><th>Service critique</th><th>Retard</th><th>Taux validation</th><th>Score</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
@@ -344,11 +357,10 @@
                             <td>{{ $row['service_critique'] }}</td>
                             <td>{{ $row['retards'] }}</td>
                             <td>{{ number_format((float) ($row['taux_validation'] ?? 0), 0) }}%</td>
-                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score_operationnel'] ?? 0))) }}">{{ number_format((float) ($row['score_operationnel'] ?? 0), 0) }}</span></td>
-                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score_officiel'] ?? 0))) }}">{{ number_format((float) ($row['score_officiel'] ?? 0), 0) }}</span></td>
+                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 0) }}</span></td>
                         </tr>
                     @empty
-                        <tr><td colspan="6">Aucune direction en difficulte actuellement.</td></tr>
+                        <tr><td colspan="5">Aucune direction en difficulte actuellement.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -356,8 +368,7 @@
     @elseif ($dashboardRole === 'planification')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Actions critiques consolidees</h2>
-                <p class="showcase-panel-subtitle">Actions les plus sensibles a l echelle transverse.</p>
+                <h2 class="showcase-panel-title">Actions critiques validees</h2>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -375,7 +386,7 @@
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['niveau_risque'] ?? 0))) }}">{{ number_format((float) ($row['niveau_risque'] ?? 0), 0) }}</span></td>
                         </tr>
                     @empty
-                        <tr><td colspan="6">Aucune action critique consolidee.</td></tr>
+                        <tr><td colspan="6">Aucune action critique validee.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -384,7 +395,6 @@
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Alertes critiques transverses</h2>
-                <p class="showcase-panel-subtitle">Points bloquants et actions sensibles a remonter rapidement.</p>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -410,3 +420,5 @@
         </div>
     @endif
 </article>
+@endif
+

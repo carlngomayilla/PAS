@@ -30,6 +30,7 @@ class WorkspaceController extends Controller
                 'referentiel' => route('workspace.referentiel.directions.index'),
                 'reporting' => route('workspace.reporting'),
                 'alertes' => route('workspace.alertes'),
+                'super_admin' => route('workspace.super-admin.index'),
                 'audit' => route('workspace.audit.index'),
                 'api_docs' => route('workspace.api-docs.index'),
                 'retention' => route('workspace.retention.index'),

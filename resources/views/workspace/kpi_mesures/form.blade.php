@@ -6,7 +6,7 @@
     @endphp
     <section class="ui-card mb-3.5">
         <h1>{{ $isEdit ? 'Modifier mesure indicateur' : 'Nouvelle mesure indicateur' }}</h1>
-        <p class="text-slate-600">Saisie de la valeur mesuree pour une periode donnee sur les seuls indicateurs a renseigner.</p>
+        <p class="text-slate-600">Saisir une valeur sur un indicateur ouvert a la collecte.</p>
     </section>
 
     <section class="ui-card mb-3.5">
@@ -18,7 +18,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Saisie de mesure</h2>
-                <p class="form-section-subtitle">Le format de periode se fige selon la periodicite de l indicateur choisi. Les indicateurs sans saisie sont exclus.</p>
+                <p class="form-section-subtitle">Le format de periode depend de l indicateur choisi.</p>
                 <div class="form-grid">
                     <div>
                         <label for="kpi_id">Indicateur</label>
@@ -37,14 +37,12 @@
                         </select>
                         @if ($kpiOptions->isEmpty())
                             <p class="field-hint text-amber-700">Aucun indicateur a renseigner n est disponible sur votre perimetre.</p>
-                        @else
-                            <p class="field-hint">Seuls les indicateurs <strong>a renseigner</strong> sont proposes.</p>
                         @endif
                     </div>
                     <div id="periode_block" class="conditional-block">
                         <label for="periode">Periode</label>
                         <input id="periode" name="periode" type="text" maxlength="20" value="{{ old('periode', $row->periode) }}" required>
-                        <p id="periode_hint" class="field-hint">Selectionner un indicateur pour obtenir le format attendu.</p>
+                        <p id="periode_hint" class="field-hint">Format selon periodicite.</p>
                     </div>
                     <div>
                         <label for="valeur">Valeur</label>
@@ -100,7 +98,7 @@
                     case 'ponctuel':
                         return 'Format libre: date ou libelle ponctuel.';
                     default:
-                        return 'Selectionner un indicateur pour obtenir le format attendu.';
+                        return 'Format selon periodicite.';
                 }
             }
 
@@ -124,7 +122,7 @@
                 }
 
                 if (!requiresInput && option && option.value) {
-                    periodeHint.textContent = 'Cet indicateur n attend pas de saisie manuelle.';
+                    periodeHint.textContent = 'Cet indicateur ne prend pas de saisie manuelle.';
                 } else {
                     periodeHint.textContent = periodiciteHint(periodicite);
                 }

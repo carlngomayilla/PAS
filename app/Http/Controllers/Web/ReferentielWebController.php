@@ -54,6 +54,14 @@ class ReferentielWebController extends Controller
             });
         });
 
+        if (! $user->hasGlobalReadAccess()) {
+            if ($user->direction_id !== null) {
+                $query->whereKey((int) $user->direction_id);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
         return view('workspace.referentiel.directions.index', [
             'rows' => $query->paginate(20)->withQueryString(),
             'canWrite' => $this->canWrite($user),
@@ -176,6 +184,18 @@ class ReferentielWebController extends Controller
             });
         });
 
+        if (! $user->hasGlobalReadAccess()) {
+            if ($user->direction_id !== null) {
+                $query->where('direction_id', (int) $user->direction_id);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
+            $query->whereKey((int) $user->service_id);
+        }
+
         return view('workspace.referentiel.services.index', [
             'rows' => $query->paginate(20)->withQueryString(),
             'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle', 'actif']),
@@ -297,7 +317,7 @@ class ReferentielWebController extends Controller
     public function utilisateursIndex(Request $request): View
     {
         $user = $this->authUser($request);
-        $this->denyUnlessRoleManager($user);
+        $this->denyUnlessUserManager($user);
 
         $query = User::query()
             ->with([
@@ -305,6 +325,22 @@ class ReferentielWebController extends Controller
                 'service:id,direction_id,code,libelle',
             ])
             ->orderBy('name');
+
+        if (! $user->isSuperAdmin()) {
+            $query->where('role', '!=', User::ROLE_SUPER_ADMIN);
+        }
+
+        if (! $user->hasGlobalReadAccess()) {
+            if ($user->direction_id !== null) {
+                $query->where('direction_id', (int) $user->direction_id);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
+            $query->where('service_id', (int) $user->service_id);
+        }
 
         $query->when(
             $request->filled('direction_id'),
@@ -332,11 +368,12 @@ class ReferentielWebController extends Controller
 
         return view('workspace.referentiel.utilisateurs.index', [
             'rows' => $query->paginate(20)->withQueryString(),
-            'canWrite' => $this->canManageRoles($user),
+            'canWrite' => $this->canManageUsers($user),
+            'canManageRoles' => $this->canManageRoles($user),
             'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
-            'roleOptions' => $this->roleOptions(),
+            'roleOptions' => $this->roleOptions($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
                 'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
@@ -350,7 +387,7 @@ class ReferentielWebController extends Controller
     public function utilisateursCreate(Request $request): View
     {
         $user = $this->authUser($request);
-        $this->denyUnlessRoleManager($user);
+        $this->denyUnlessUserManager($user);
 
         return view('workspace.referentiel.utilisateurs.form', [
             'mode' => 'create',
@@ -358,17 +395,19 @@ class ReferentielWebController extends Controller
             'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
-            'roleOptions' => $this->roleOptions(),
+            'roleOptions' => $this->roleOptions($user),
+            'canManageRoles' => $this->canManageRoles($user),
         ]);
     }
 
     public function utilisateursStore(Request $request): RedirectResponse
     {
         $user = $this->authUser($request);
-        $this->denyUnlessRoleManager($user);
+        $this->denyUnlessUserManager($user);
 
-        $validated = $this->validateUtilisateur($request, true);
+        $validated = $this->validateUtilisateur($request, true, $user);
         $this->applyRoleScopeRules($validated);
+        $this->enforceManagedUserScope($user, $validated);
         $profilePhotoPath = $this->storeProfilePhoto($request);
 
         $created = DB::transaction(function () use ($validated, $profilePhotoPath, $request): User {
@@ -403,7 +442,9 @@ class ReferentielWebController extends Controller
     public function utilisateursEdit(Request $request, User $utilisateur): View
     {
         $user = $this->authUser($request);
-        $this->denyUnlessRoleManager($user);
+        $this->denyUnlessUserManager($user);
+        $this->denyUnlessManagedUserAccessible($user, $utilisateur);
+        $this->denyIfSuperAdminTargetIsLocked($user, $utilisateur);
 
         return view('workspace.referentiel.utilisateurs.form', [
             'mode' => 'edit',
@@ -411,17 +452,21 @@ class ReferentielWebController extends Controller
             'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
-            'roleOptions' => $this->roleOptions(),
+            'roleOptions' => $this->roleOptions($user, $utilisateur),
+            'canManageRoles' => $this->canManageRoles($user),
         ]);
     }
 
     public function utilisateursUpdate(Request $request, User $utilisateur): RedirectResponse
     {
         $user = $this->authUser($request);
-        $this->denyUnlessRoleManager($user);
+        $this->denyUnlessUserManager($user);
+        $this->denyUnlessManagedUserAccessible($user, $utilisateur);
+        $this->denyIfSuperAdminTargetIsLocked($user, $utilisateur);
 
-        $validated = $this->validateUtilisateur($request, false, $utilisateur);
+        $validated = $this->validateUtilisateur($request, false, $user, $utilisateur);
         $this->applyRoleScopeRules($validated);
+        $this->enforceManagedUserScope($user, $validated);
 
         $payload = [
             'name' => (string) $validated['name'],
@@ -463,7 +508,9 @@ class ReferentielWebController extends Controller
     public function utilisateursDestroy(Request $request, User $utilisateur): RedirectResponse
     {
         $user = $this->authUser($request);
-        $this->denyUnlessRoleManager($user);
+        $this->denyUnlessUserManager($user);
+        $this->denyUnlessManagedUserAccessible($user, $utilisateur);
+        $this->denyIfSuperAdminTargetIsLocked($user, $utilisateur);
 
         if ((int) $utilisateur->id === (int) $user->id) {
             return back()->withErrors(['general' => 'Vous ne pouvez pas supprimer votre propre compte.']);
@@ -499,7 +546,7 @@ class ReferentielWebController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validateUtilisateur(Request $request, bool $creating, ?User $utilisateur = null): array
+    private function validateUtilisateur(Request $request, bool $creating, User $actor, ?User $utilisateur = null): array
     {
         $emailRule = Rule::unique('users', 'email');
         if (! $creating && $utilisateur !== null) {
@@ -509,7 +556,7 @@ class ReferentielWebController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', $emailRule],
-            'role' => ['required', Rule::in($this->roleOptions())],
+            'role' => ['required', Rule::in($this->roleOptions($actor, $utilisateur))],
             'is_active' => ['nullable', 'boolean'],
             'agent_matricule' => ['nullable', 'string', 'max:80'],
             'agent_fonction' => ['nullable', 'string', 'max:120'],
@@ -668,7 +715,7 @@ class ReferentielWebController extends Controller
 
     private function denyUnlessReferentielReader(User $user): void
     {
-        if ($user->hasGlobalReadAccess()) {
+        if ($user->hasAnyPermission('referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles')) {
             return;
         }
 
@@ -677,34 +724,50 @@ class ReferentielWebController extends Controller
 
     private function denyUnlessReferentielWriter(User $user): void
     {
-        $this->denyUnlessGlobalWriter($user);
-    }
-
-    private function denyUnlessRoleManager(User $user): void
-    {
-        if ($this->canManageRoles($user)) {
+        if ($user->hasPermission('referentiel.write') && $user->hasGlobalWriteAccess()) {
             return;
         }
 
         abort(403, 'Acces non autorise.');
     }
 
+    private function denyUnlessUserManager(User $user): void
+    {
+        if ($this->canManageUsers($user)) {
+            return;
+        }
+
+        abort(403, 'Acces non autorise.');
+    }
+
+    private function denyIfSuperAdminTargetIsLocked(User $actor, User $target): void
+    {
+        if ($target->isSuperAdmin() && ! $actor->isSuperAdmin()) {
+            abort(403, 'Acces non autorise.');
+        }
+    }
+
     private function canWrite(User $user): bool
     {
-        return $user->hasGlobalWriteAccess();
+        return $user->hasPermission('referentiel.write') && $user->hasGlobalWriteAccess();
+    }
+
+    private function canManageUsers(User $user): bool
+    {
+        return $user->hasAnyPermission('users.manage', 'users.manage_roles');
     }
 
     private function canManageRoles(User $user): bool
     {
-        return $user->hasRole(User::ROLE_ADMIN);
+        return $user->hasPermission('users.manage_roles');
     }
 
     /**
      * @return array<int, string>
      */
-    private function roleOptions(): array
+    private function roleOptions(?User $actor = null, ?User $subject = null): array
     {
-        return [
+        $roles = [
             User::ROLE_ADMIN,
             User::ROLE_DG,
             User::ROLE_PLANIFICATION,
@@ -713,5 +776,84 @@ class ReferentielWebController extends Controller
             User::ROLE_AGENT,
             User::ROLE_CABINET,
         ];
+
+        if ($actor === null) {
+            return $roles;
+        }
+
+        if ($actor->isSuperAdmin()) {
+            array_unshift($roles, User::ROLE_SUPER_ADMIN);
+
+            return $roles;
+        }
+
+        if (! $this->canManageRoles($actor)) {
+            return $subject instanceof User ? [$subject->role] : [User::ROLE_AGENT];
+        }
+
+        if ($actor->hasGlobalReadAccess()) {
+            return $roles;
+        }
+
+        if ($actor->hasRole(User::ROLE_DIRECTION)) {
+            return [User::ROLE_SERVICE, User::ROLE_AGENT];
+        }
+
+        if ($actor->hasRole(User::ROLE_SERVICE)) {
+            return [User::ROLE_AGENT];
+        }
+
+        return [User::ROLE_AGENT];
+    }
+
+    private function denyUnlessManagedUserAccessible(User $actor, User $target): void
+    {
+        if ($actor->hasGlobalReadAccess()) {
+            return;
+        }
+
+        if ($actor->hasRole(User::ROLE_DIRECTION) && (int) $actor->direction_id === (int) $target->direction_id) {
+            return;
+        }
+
+        if ($actor->hasRole(User::ROLE_SERVICE)
+            && (int) $actor->direction_id === (int) $target->direction_id
+            && (int) $actor->service_id === (int) $target->service_id
+        ) {
+            return;
+        }
+
+        abort(403, 'Acces non autorise.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function enforceManagedUserScope(User $actor, array $validated): void
+    {
+        if ($actor->hasGlobalReadAccess()) {
+            return;
+        }
+
+        $directionId = isset($validated['direction_id']) ? (int) $validated['direction_id'] : null;
+        $serviceId = isset($validated['service_id']) ? (int) $validated['service_id'] : null;
+
+        if ($actor->hasRole(User::ROLE_DIRECTION)) {
+            if ($directionId !== (int) $actor->direction_id) {
+                throw ValidationException::withMessages([
+                    'direction_id' => 'Le compte doit rester dans votre direction.',
+                ]);
+            }
+
+            return;
+        }
+
+        if ($actor->hasRole(User::ROLE_SERVICE)) {
+            if ($directionId !== (int) $actor->direction_id || $serviceId !== (int) $actor->service_id) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Le compte doit rester dans votre service.',
+                ]);
+            }
+        }
     }
 }

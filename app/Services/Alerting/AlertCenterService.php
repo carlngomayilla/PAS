@@ -11,6 +11,7 @@ use App\Models\KpiMesure;
 use App\Models\PasObjectif;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\DynamicReferentialSettings;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -23,7 +24,8 @@ class AlertCenterService
     private const CACHE_TTL_SECONDS = 60;
 
     public function __construct(
-        private readonly AlertRoutingService $alertRoutingService
+        private readonly AlertRoutingService $alertRoutingService,
+        private readonly DynamicReferentialSettings $dynamicReferentialSettings
     ) {
     }
 
@@ -819,13 +821,7 @@ class AlertCenterService
 
     private function levelLabel(string $level): string
     {
-        return match ($level) {
-            'urgence' => 'Urgence',
-            'critical' => 'Critique',
-            'warning' => 'Attention',
-            'info' => 'Info',
-            default => ucfirst($level),
-        };
+        return $this->dynamicReferentialSettings->alertLevelLabels()[$level] ?? ucfirst($level);
     }
 
     private function typeLabel(string $type): string

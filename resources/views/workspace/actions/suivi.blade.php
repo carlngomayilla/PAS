@@ -34,12 +34,27 @@
             default => 'semaines',
         };
         $validationStatus = (string) ($action->statut_validation ?: 'non_soumise');
-        $validationLabel = $validationStatusLabel($validationStatus);
+        $validationStatusLabels = is_array($validationStatusLabels ?? null) ? $validationStatusLabels : [];
+        $justificatifCategoryLabels = is_array($justificatifCategoryLabels ?? null) ? $justificatifCategoryLabels : [];
+        $alertLevelLabels = is_array($alertLevelLabels ?? null) ? $alertLevelLabels : [];
+        $validationLabel = $validationStatusLabels[$validationStatus] ?? $validationStatusLabel($validationStatus);
+        $workflow = $workflowConfig ?? [
+            'service_enabled' => true,
+            'direction_enabled' => true,
+            'submission_target' => 'service',
+            'chain_label' => 'Agent -> Chef de service -> Direction',
+            'submission_help_text' => 'L action est d abord revue par le chef de service, puis par la direction.',
+            'submission_button_label' => 'Soumettre au chef de service',
+            'service_review_button_label' => 'Valider la revue chef',
+            'service_review_success_text' => 'Action validee par le chef de service et transmise a la direction.',
+            'final_statistics_hint' => 'Oui apres validation direction.',
+            'rejection_comment_required' => true,
+        ];
         $agentLocked = auth()->check()
             && (int) auth()->id() === (int) $action->responsable_id
             && !in_array($validationStatus, ['non_soumise', 'rejetee_chef', 'rejetee_direction'], true);
-        $isAwaitingChef = $validationStatus === 'soumise_chef';
-        $isAwaitingDirection = $validationStatus === 'validee_chef';
+        $isAwaitingChef = $workflow['service_enabled'] && $validationStatus === 'soumise_chef';
+        $isAwaitingDirection = $workflow['direction_enabled'] && $validationStatus === 'validee_chef';
         $isValidatedDirection = $validationStatus === 'validee_direction';
         $ressources = [];
         if ($action->ressource_main_oeuvre) {
@@ -104,12 +119,6 @@
             <div class="max-w-4xl">
                 <span class="showcase-eyebrow">Action #{{ $action->id }}</span>
                 <h1 class="showcase-title">{{ $action->libelle }}</h1>
-                <p class="showcase-subtitle">
-                    {{ $pta?->direction?->libelle ?? 'Direction non definie' }} /
-                    {{ $pta?->service?->libelle ?? 'Service non defini' }} /
-                    {{ $pta?->titre ?? 'PTA non defini' }}.
-                    Responsable principal: {{ $action->responsable?->name ?? '-' }}.
-                </p>
                 <div class="showcase-chip-row">
                     <span class="showcase-chip">
                         <span class="showcase-chip-dot bg-blue-600"></span>
@@ -170,7 +179,6 @@
 
     <section id="action-validation" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Circuit de validation</h2>
-        <p class="showcase-panel-subtitle">Chaine de validation agent -> chef de service -> direction avec gel automatique des saisies apres soumission.</p>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
             <article class="showcase-inline-stat action-detail-card">
                 <strong>Etape 1 - Soumission agent</strong>
@@ -178,25 +186,25 @@
                 <p class="text-slate-600">Soumis par: <strong>{{ $action->soumisPar?->name ?? '-' }}</strong></p>
                 <p class="text-slate-600">Date soumission: <strong>{{ optional($action->soumise_le)->format('Y-m-d H:i') ?: '-' }}</strong></p>
             </article>
-            <article class="showcase-inline-stat action-detail-card">
-                <strong>Etape 2 - Evaluation chef de service</strong>
-                <p class="mt-2 text-slate-600">Statut: <strong>{{ in_array($validationStatus, ['validee_chef', 'rejetee_direction', 'validee_direction'], true) ? 'Effectuee' : ($isAwaitingChef ? 'En attente' : '-') }}</strong></p>
-                <p class="text-slate-600">Evaluateur: <strong>{{ $action->evaluePar?->name ?? '-' }}</strong></p>
-                <p class="text-slate-600">Note: <strong>{{ $action->evaluation_note !== null ? number_format((float) $action->evaluation_note, 2) . '/100' : '-' }}</strong></p>
-                <p class="text-slate-600">Date: <strong>{{ optional($action->evalue_le)->format('Y-m-d H:i') ?: '-' }}</strong></p>
-            </article>
-            <article class="showcase-inline-stat action-detail-card">
-                <strong>Etape 3 - Validation direction</strong>
-                <p class="mt-2 text-slate-600">Statut: <strong>{{ $isValidatedDirection ? 'Validee' : ($isAwaitingDirection ? 'En attente' : '-') }}</strong></p>
-                <p class="text-slate-600">Evaluateur: <strong>{{ $action->directionValidePar?->name ?? '-' }}</strong></p>
-                <p class="text-slate-600">Note: <strong>{{ $action->direction_evaluation_note !== null ? number_format((float) $action->direction_evaluation_note, 2) . '/100' : '-' }}</strong></p>
-                <p class="text-slate-600">Date: <strong>{{ optional($action->direction_valide_le)->format('Y-m-d H:i') ?: '-' }}</strong></p>
-            </article>
+            @if ($workflow['service_enabled'])
+                <article class="showcase-inline-stat action-detail-card">
+                    <strong>Etape 2 - Evaluation chef de service</strong>
+                    <p class="mt-2 text-slate-600">Statut: <strong>{{ in_array($validationStatus, ['validee_chef', 'rejetee_direction', 'validee_direction'], true) ? 'Effectuee' : ($isAwaitingChef ? 'En attente' : '-') }}</strong></p>
+                    <p class="text-slate-600">Evaluateur: <strong>{{ $action->evaluePar?->name ?? '-' }}</strong></p>
+                    <p class="text-slate-600">Note: <strong>{{ $action->evaluation_note !== null ? number_format((float) $action->evaluation_note, 2) . '/100' : '-' }}</strong></p>
+                    <p class="text-slate-600">Date: <strong>{{ optional($action->evalue_le)->format('Y-m-d H:i') ?: '-' }}</strong></p>
+                </article>
+            @endif
+            @if ($workflow['direction_enabled'])
+                <article class="showcase-inline-stat action-detail-card">
+                    <strong>Etape {{ $workflow['service_enabled'] ? '3' : '2' }} - Validation direction</strong>
+                    <p class="mt-2 text-slate-600">Statut: <strong>{{ $isValidatedDirection ? 'Validee' : ($isAwaitingDirection ? 'En attente' : '-') }}</strong></p>
+                    <p class="text-slate-600">Evaluateur: <strong>{{ $action->directionValidePar?->name ?? '-' }}</strong></p>
+                    <p class="text-slate-600">Note: <strong>{{ $action->direction_evaluation_note !== null ? number_format((float) $action->direction_evaluation_note, 2) . '/100' : '-' }}</strong></p>
+                    <p class="text-slate-600">Date: <strong>{{ optional($action->direction_valide_le)->format('Y-m-d H:i') ?: '-' }}</strong></p>
+                </article>
+            @endif
         </div>
-        <p class="mt-3 text-sm text-slate-600">
-            Prise en compte statistique:
-            <strong>{{ $isValidatedDirection ? 'Oui (action comptabilisee)' : 'Non (en attente validation direction)' }}</strong>
-        </p>
         @if ($validationStatus === 'rejetee_chef')
             <p class="mt-2 text-sm text-[#f9b13c]">Motif rejet chef: <strong>{{ $action->evaluation_commentaire ?: '-' }}</strong></p>
         @elseif ($validationStatus === 'rejetee_direction')
@@ -206,7 +214,6 @@
 
     <section id="action-fiche" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Fiche complete de l'action</h2>
-        <p class="showcase-panel-subtitle">Lecture consolidee des informations strategiques, des ressources et des criteres de performance.</p>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
             <article class="showcase-inline-stat action-detail-card">
                 <strong>Contexte planification</strong>
@@ -289,7 +296,6 @@
 
     <section id="action-status" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Etat d'avancement</h2>
-        <p class="showcase-panel-subtitle">Synthese du niveau de progression reel, theorique et des indicateurs utilises pour la decision.</p>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             <article class="showcase-inline-stat">
                 <strong>Progression reelle</strong>
@@ -328,7 +334,6 @@
 
     <section id="action-weeks" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Suivi {{ $periodeLabelPluriel }}</h2>
-        <p class="showcase-panel-subtitle">Execution periodique detaillee avec blocage automatique apres soumission pour validation.</p>
         @if ($agentLocked)
             <p class="action-section-note mb-3">Saisie gelee: action soumise. Modifications possibles uniquement apres rejet motive.</p>
         @endif
@@ -387,7 +392,7 @@
                             </div>
                             <div>
                                 <label for="justificatif_{{ $week->id }}">Justificatif</label>
-                                <input id="justificatif_{{ $week->id }}" name="justificatif" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required>
+                                <input id="justificatif_{{ $week->id }}" name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}" required>
                             </div>
                         </div>
                         <button class="btn btn-green" type="submit">
@@ -404,7 +409,7 @@
     @if ($canSubmitClosure)
         <section id="action-cloture" class="showcase-panel mb-4">
             <h2 class="showcase-panel-title">Soumission de cloture (Agent)</h2>
-            <p class="mb-2 text-sm text-slate-600">L'action sera envoyee au chef de service pour evaluation, puis a la direction apres validation chef. Aucun justificatif supplementaire n'est requis a cette etape.</p>
+            <p class="mb-2 text-sm text-slate-600">{{ $workflow['submission_help_text'] }} Aucun justificatif supplementaire n'est requis a cette etape.</p>
             <form method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.close', $action) }}">
                 @csrf
                 <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
@@ -418,7 +423,7 @@
                     <textarea id="rapport_final" name="rapport_final" required>{{ old('rapport_final', $action->rapport_final) }}</textarea>
                 </div>
                 <button class="btn btn-primary mt-2.5" type="submit">
-                    Soumettre au chef de service
+                    {{ $workflow['submission_button_label'] }}
                 </button>
             </form>
         </section>
@@ -452,15 +457,15 @@
                         </div>
                         <div>
                         <label for="justificatif_evaluation">Justificatif evaluation chef (optionnel)</label>
-                            <input id="justificatif_evaluation" name="justificatif_evaluation" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
+                            <input id="justificatif_evaluation" name="justificatif_evaluation" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
                         </div>
                     </div>
                     <div>
-                        <label for="evaluation_commentaire">Commentaire d'evaluation</label>
-                        <textarea id="evaluation_commentaire" name="evaluation_commentaire" required>{{ old('evaluation_commentaire') }}</textarea>
+                        <label for="evaluation_commentaire">Commentaire d'evaluation{{ $workflow['rejection_comment_required'] ? ' (obligatoire au rejet)' : '' }}</label>
+                        <textarea id="evaluation_commentaire" name="evaluation_commentaire">{{ old('evaluation_commentaire') }}</textarea>
                     </div>
                     <button class="btn btn-blue mt-2.5" type="submit">
-                        Valider la revue chef
+                        {{ $workflow['service_review_button_label'] }}
                     </button>
                 </form>
             @else
@@ -489,12 +494,12 @@
                         </div>
                         <div>
                         <label for="justificatif_evaluation_direction">Justificatif evaluation direction (optionnel)</label>
-                            <input id="justificatif_evaluation_direction" name="justificatif_evaluation_direction" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
+                            <input id="justificatif_evaluation_direction" name="justificatif_evaluation_direction" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
                         </div>
                     </div>
                     <div>
-                        <label for="direction_evaluation_commentaire">Commentaire d'evaluation direction</label>
-                        <textarea id="direction_evaluation_commentaire" name="evaluation_commentaire" required>{{ old('evaluation_commentaire') }}</textarea>
+                        <label for="direction_evaluation_commentaire">Commentaire d'evaluation direction{{ $workflow['rejection_comment_required'] ? ' (obligatoire au rejet)' : '' }}</label>
+                        <textarea id="direction_evaluation_commentaire" name="evaluation_commentaire">{{ old('evaluation_commentaire') }}</textarea>
                     </div>
                     <button class="btn btn-blue mt-2.5" type="submit">
                         Valider la revue direction
@@ -552,7 +557,7 @@
                     @forelse ($action->justificatifs as $doc)
                         <tr>
                             <td>{{ optional($doc->created_at)->format('Y-m-d H:i') }}</td>
-                            <td>{{ $doc->categorie }}</td>
+                            <td>{{ $justificatifCategoryLabels[$doc->categorie] ?? $doc->categorie }}</td>
                             <td>{{ $doc->action_week_id ?: '-' }}</td>
                             <td>
                                 <a class="action-download-link" href="{{ route('workspace.actions.justificatifs.download', [$action, $doc]) }}">
@@ -586,7 +591,7 @@
                     @forelse ($action->actionLogs as $log)
                         <tr>
                             <td>{{ optional($log->created_at)->format('Y-m-d H:i') }}</td>
-                            <td>{{ $log->niveau }}</td>
+                            <td>{{ $alertLevelLabels[$log->niveau] ?? $log->niveau }}</td>
                             <td>{{ $log->type_evenement }}</td>
                             <td>{{ $log->message }}</td>
                             <td>{{ $log->cible_role ?: '-' }}</td>

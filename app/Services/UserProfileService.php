@@ -14,6 +14,18 @@ class UserProfileService
     public function interactionsFor(User $user): array
     {
         $items = match ($user->role) {
+            User::ROLE_SUPER_ADMIN => [
+                [
+                    'module'     => 'Super Administration',
+                    'operations' => ['Piloter plateforme', 'Configurer exports', 'Publier regles globales', 'Auditer'],
+                    'portee'     => 'Globale',
+                ],
+                [
+                    'module'     => 'Gouvernance systeme',
+                    'operations' => ['Gerer modules', 'Ajuster navigation', 'Maintenir coherence des parametres'],
+                    'portee'     => 'Globale',
+                ],
+            ],
             User::ROLE_ADMIN => [
                 [
                     'module'     => 'Gouvernance PAS/PAO/PTA',

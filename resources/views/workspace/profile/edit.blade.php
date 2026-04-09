@@ -1,15 +1,13 @@
 @extends('layouts.workspace')
 
 @section('content')
-    <section class="showcase-hero mb-4">
+    <div class="app-screen-flow">
+    <section class="showcase-hero mb-4 app-screen-block">
         <div class="showcase-hero-body">
             <div class="max-w-3xl">
                 <span class="showcase-eyebrow">Mon profil</span>
                 <h1 class="showcase-title">Parametres personnels et securite</h1>
-                <p class="showcase-subtitle">
-                    Mise a jour de vos informations, de votre photo de profil et de vos acces actifs.
-                    Les regles de mot de passe appliquees a ce compte sont: {{ $passwordPolicyHelp }}
-                </p>
+                <p class="showcase-subtitle">Regles de mot de passe : {{ $passwordPolicyHelp }}</p>
                 <div class="showcase-chip-row">
                     <span class="showcase-chip">
                         <span class="showcase-chip-dot bg-blue-600"></span>
@@ -38,8 +36,8 @@
         </div>
     </section>
 
-    <section class="mb-4 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
-        <article class="showcase-panel">
+    <section class="app-screen-stack mb-4">
+        <article class="showcase-panel app-screen-block">
             <div class="mb-4 flex flex-wrap items-center gap-4">
                 @if ($user->profile_photo_url)
                     <img src="{{ $user->profile_photo_url }}" alt="Photo de {{ $user->name }}" class="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow-sm">
@@ -73,9 +71,8 @@
             </div>
         </article>
 
-        <article class="showcase-panel">
+        <article class="showcase-panel app-screen-block">
             <h2 class="showcase-panel-title">Synthese securite</h2>
-            <p class="showcase-panel-subtitle">Vue rapide de votre hygiene de compte et des acces en cours.</p>
             <div class="mt-4 showcase-summary-grid">
                 <article class="showcase-kpi-card">
                     <p class="showcase-kpi-label">Sessions actives</p>
@@ -91,14 +88,13 @@
         </article>
     </section>
 
-    <section class="showcase-panel mb-4">
+    <section class="showcase-panel mb-4 app-screen-block">
         <form method="POST" enctype="multipart/form-data" class="form-shell" action="{{ route('workspace.profile.update') }}">
             @csrf
             @method('PUT')
 
             <div class="form-section">
                 <h2 class="form-section-title">Informations personnelles</h2>
-                <p class="form-section-subtitle">Photo de profil et informations d identification du compte.</p>
                 <div class="form-grid">
                     <div>
                         <label for="profile_photo">Photo de profil</label>
@@ -127,7 +123,6 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Securite</h2>
-                <p class="form-section-subtitle">Le changement de mot de passe exige le mot de passe actuel.</p>
                 <div class="form-grid">
                     <div>
                         <label for="current_password">Mot de passe actuel</label>
@@ -151,11 +146,10 @@
         </form>
     </section>
 
-    <section class="showcase-panel">
+    <section class="showcase-panel app-screen-block">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Sessions actives</h2>
-                <p class="showcase-panel-subtitle">Liste des acces web actuellement ouverts sur votre compte.</p>
             </div>
             <form method="POST" action="{{ route('workspace.profile.sessions.revoke_others') }}">
                 @csrf
@@ -209,4 +203,5 @@
             </table>
         </div>
     </section>
+    </div>
 @endsection

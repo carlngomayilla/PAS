@@ -14,6 +14,7 @@ use App\Models\Pas;
 use App\Models\User;
 use App\Services\PasStructureService;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
@@ -49,9 +50,8 @@ class PasWebController extends Controller
                     ->orderBy('ordre')
                     ->orderBy('id')
                     ->with(['objectifs:id,pas_axe_id,code,libelle,ordre,valeurs_cible']),
-                'directions:id,code,libelle',
             ])
-            ->withCount(['axes', 'directions', 'paos']);
+            ->withCount(['axes', 'paos']);
 
         $this->scopePasByUser($query, $user);
 
@@ -63,13 +63,6 @@ class PasWebController extends Controller
                 $query->where('statut', $statusFilter);
             }
         }
-        $query->when(
-            $request->filled('direction_id'),
-            fn ($q) => $q->whereHas(
-                'directions',
-                fn ($subQuery) => $subQuery->whereKey((int) $request->integer('direction_id'))
-            )
-        );
         $query->when(
             $request->boolean('without_pao'),
             fn ($q) => $q->doesntHave('paos')
@@ -84,11 +77,9 @@ class PasWebController extends Controller
             'rows' => $query->orderByDesc('periode_debut')->orderByDesc('id')->paginate(15)->withQueryString(),
             'canWrite' => $this->canWrite($user),
             'statusOptions' => array_merge($this->statusOptions($user), ['valide_ou_verrouille']),
-            'directionOptions' => $this->directionOptions($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
                 'statut' => $statusFilter,
-                'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
                 'without_pao' => $request->boolean('without_pao'),
             ],
         ]);
@@ -291,18 +282,26 @@ class PasWebController extends Controller
         }
 
         $before = $pas->toArray();
+        $workflow = $this->planningWorkflowSummary();
+        if (! $workflow['submit_enabled']) {
+            return back()->withErrors(['general' => 'La soumission est desactivee pour le workflow PAS actif.']);
+        }
+
+        $targetStatus = (string) $workflow['submit_target_status'];
         $pas->update([
-            'statut' => 'soumis',
-            'valide_le' => null,
-            'valide_par' => null,
+            'statut' => $targetStatus,
+            'valide_le' => in_array($targetStatus, ['valide', 'verrouille'], true) ? now() : null,
+            'valide_par' => in_array($targetStatus, ['valide', 'verrouille'], true) ? $user->id : null,
         ]);
 
         $this->recordAudit($request, 'pas', 'submit', $pas, $before, $pas->toArray());
-        $notificationService->notifyPasStatus($pas, 'submitted', $user);
+        $notificationService->notifyPasStatus($pas, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', 'PAS soumis pour validation.');
+            ->with('success', $targetStatus === 'soumis'
+                ? 'PAS soumis pour validation.'
+                : 'PAS valide directement selon le workflow configure.');
     }
 
     public function approve(Request $request, Pas $pas, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -314,6 +313,11 @@ class PasWebController extends Controller
 
         if (! $this->canApprove($user)) {
             abort(403, 'Acces non autorise.');
+        }
+
+        $workflow = $this->planningWorkflowSummary();
+        if (! $workflow['approve_enabled']) {
+            return back()->withErrors(['general' => 'La validation intermediaire est desactivee pour le workflow PAS actif.']);
         }
 
         if ($pas->statut !== 'soumis') {
@@ -346,6 +350,11 @@ class PasWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
+        $workflow = $this->planningWorkflowSummary();
+        if (! $workflow['lock_enabled']) {
+            return back()->withErrors(['general' => 'Le verrouillage final est desactive pour le workflow PAS actif.']);
+        }
+
         if ($pas->statut !== 'valide') {
             return back()->withErrors(['general' => $this->requiredStateMessage('PAS', 'valide', 'verrouille')]);
         }
@@ -376,8 +385,11 @@ class PasWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        if (! in_array($pas->statut, ['soumis', 'valide'], true)) {
-            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage(['soumis', 'valide'])]);
+        $workflow = $this->planningWorkflowSummary();
+        $allowedStatuses = $workflow['reopen_allowed_statuses'];
+
+        if (! in_array($pas->statut, $allowedStatuses, true)) {
+            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage($allowedStatuses)]);
         }
 
         $validated = $request->validate([
@@ -409,7 +421,7 @@ class PasWebController extends Controller
 
     private function canApprove(User $user): bool
     {
-        return $user->hasRole(User::ROLE_ADMIN, User::ROLE_DG);
+        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG);
     }
 
     /**
@@ -530,10 +542,20 @@ class PasWebController extends Controller
      */
     private function statusOptions(User $user): array
     {
+        $workflow = $this->planningWorkflowSummary();
+
         if ($user->hasGlobalWriteAccess()) {
-            return ['brouillon', 'soumis', 'valide', 'verrouille'];
+            return $workflow['status_options_global'];
         }
 
-        return ['brouillon', 'soumis'];
+        return $workflow['status_options_writer'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function planningWorkflowSummary(): array
+    {
+        return app(WorkflowSettings::class)->planningWorkflowSummary('pas');
     }
 }

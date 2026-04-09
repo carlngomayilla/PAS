@@ -4,12 +4,12 @@
     @php
         $isEdit = $mode === 'edit';
     @endphp
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h1>{{ $isEdit ? 'Modifier objectif strategique PAO' : 'Nouvel objectif strategique PAO' }}</h1>
-        <p class="text-slate-600">Declinaison strategique annuelle par axe PAO.</p>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.pao-objectifs-strategiques.update', $row) : route('workspace.pao-objectifs-strategiques.store') }}">
             @csrf
             @if ($isEdit)
@@ -18,7 +18,6 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Objectif strategique</h2>
-                <p class="form-section-subtitle">Organisation claire et uniforme des champs de saisie.</p>
                 <div class="form-grid">
                     <div>
                         <label for="pao_axe_id">Axe PAO</label>
@@ -57,4 +56,5 @@
             </div>
         </form>
     </section>
+    </div>
 @endsection

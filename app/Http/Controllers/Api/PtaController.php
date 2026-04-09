@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePtaRequest;
 use App\Http\Requests\UpdatePtaRequest;
+use App\Models\Pao;
 use App\Models\Pta;
 use App\Models\User;
 use App\Support\UiLabel;
@@ -87,24 +88,27 @@ class PtaController extends Controller
         }
 
         $validated = $request->validated();
-        $pao = \App\Models\Pao::query()->findOrFail((int) $validated['pao_id']);
-        $paoServiceId = $pao->service_id !== null ? (int) $pao->service_id : null;
-        if ($paoServiceId === null) {
+        $pao = Pao::query()->findOrFail((int) $validated['pao_id']);
+        $serviceId = $pao->service_id !== null ? (int) $pao->service_id : null;
+        if ($serviceId === null) {
             return response()->json([
-                'message' => 'Le PAO selectionne n est pas encore rattache a un service.',
+                'message' => 'Le PAO selectionne n est pas encore affecte a un service.',
+                'errors' => [
+                    'pao_id' => ['Le PAO selectionne n est pas encore affecte a un service.'],
+                ],
             ], 422);
         }
 
         $this->denyUnlessManagePta(
             $user,
             (int) $pao->direction_id,
-            $paoServiceId
+            $serviceId
         );
 
         $pta = Pta::query()->create([
             'pao_id' => (int) $pao->id,
             'direction_id' => (int) $pao->direction_id,
-            'service_id' => $paoServiceId,
+            'service_id' => $serviceId,
             'titre' => (string) $validated['titre'],
             'description' => $validated['description'] ?? null,
             'statut' => (string) ($validated['statut'] ?? 'brouillon'),
@@ -166,11 +170,14 @@ class PtaController extends Controller
         }
 
         $validated = $request->validated();
-        $targetPao = \App\Models\Pao::query()->findOrFail((int) $validated['pao_id']);
+        $targetPao = Pao::query()->findOrFail((int) $validated['pao_id']);
         $targetServiceId = $targetPao->service_id !== null ? (int) $targetPao->service_id : null;
         if ($targetServiceId === null) {
             return response()->json([
-                'message' => 'Le PAO selectionne n est pas encore rattache a un service.',
+                'message' => 'Le PAO selectionne n est pas encore affecte a un service.',
+                'errors' => [
+                    'pao_id' => ['Le PAO selectionne n est pas encore affecte a un service.'],
+                ],
             ], 422);
         }
 

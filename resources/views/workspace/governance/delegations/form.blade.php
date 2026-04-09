@@ -3,9 +3,9 @@
 @section('title', 'Nouvelle delegation')
 
 @section('content')
-    <section class="ui-card">
+    <div class="app-screen-flow">
+    <section class="ui-card app-screen-block">
         <h1>Nouvelle delegation</h1>
-        <p class="text-slate-600">Configurer une suppleance temporaire avec perimetre et permissions limites.</p>
 
         <form method="POST" action="{{ route('workspace.delegations.store') }}" class="form-shell mt-4">
             @csrf
@@ -98,4 +98,5 @@
             </div>
         </form>
     </section>
+    </div>
 @endsection

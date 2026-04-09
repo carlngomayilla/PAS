@@ -16,6 +16,7 @@ use App\Http\Controllers\Web\PasWebController;
 use App\Http\Controllers\Web\ProfileWebController;
 use App\Http\Controllers\Web\PtaWebController;
 use App\Http\Controllers\Web\ReferentielWebController;
+use App\Http\Controllers\Web\SuperAdminWebController;
 use App\Http\Middleware\EnsureActiveAccount;
 use App\Http\Middleware\EnsurePasswordIsFresh;
 use App\Models\Kpi;
@@ -222,6 +223,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.reporting');
         Route::get('/workspace/reporting/export/excel', [MonitoringWebController::class, 'exportExcel'])
             ->name('workspace.reporting.export.excel');
+        Route::get('/workspace/reporting/export/word', [MonitoringWebController::class, 'exportWord'])
+            ->name('workspace.reporting.export.word');
         Route::get('/workspace/reporting/export/pdf', [MonitoringWebController::class, 'exportPdf'])
             ->name('workspace.reporting.export.pdf');
         Route::get('/workspace/pilotage', [MonitoringWebController::class, 'pilotage'])
@@ -238,5 +241,87 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
 
         Route::get('/workspace/audit', [AuditWebController::class, 'index'])
             ->name('workspace.audit.index');
+        Route::get('/workspace/audit/export', [AuditWebController::class, 'export'])
+            ->name('workspace.audit.export');
+
+        Route::prefix('/workspace/super-admin')->name('workspace.super-admin.')->group(function (): void {
+            Route::get('/', [SuperAdminWebController::class, 'index'])->name('index');
+            Route::get('/parametres-generaux', [SuperAdminWebController::class, 'settingsEdit'])->name('settings.edit');
+            Route::post('/parametres-generaux/brouillon', [SuperAdminWebController::class, 'settingsDraftUpdate'])->name('settings.draft');
+            Route::post('/parametres-generaux/publier-brouillon', [SuperAdminWebController::class, 'settingsPublishDraft'])->name('settings.publish-draft');
+            Route::post('/parametres-generaux/supprimer-brouillon', [SuperAdminWebController::class, 'settingsDiscardDraft'])->name('settings.discard-draft');
+            Route::put('/parametres-generaux', [SuperAdminWebController::class, 'settingsUpdate'])->name('settings.update');
+            Route::get('/modules-navigation', [SuperAdminWebController::class, 'modulesEdit'])->name('modules.edit');
+            Route::post('/modules-navigation/brouillon', [SuperAdminWebController::class, 'modulesDraftUpdate'])->name('modules.draft');
+            Route::post('/modules-navigation/publier-brouillon', [SuperAdminWebController::class, 'modulesPublishDraft'])->name('modules.publish-draft');
+            Route::post('/modules-navigation/supprimer-brouillon', [SuperAdminWebController::class, 'modulesDiscardDraft'])->name('modules.discard-draft');
+            Route::put('/modules-navigation', [SuperAdminWebController::class, 'modulesUpdate'])->name('modules.update');
+            Route::get('/roles-permissions', [SuperAdminWebController::class, 'rolesEdit'])->name('roles.edit');
+            Route::put('/roles-permissions', [SuperAdminWebController::class, 'rolesUpdate'])->name('roles.update');
+            Route::put('/roles-permissions/registry', [SuperAdminWebController::class, 'rolesRegistryUpdate'])->name('roles.registry.update');
+            Route::post('/roles-permissions/registry/duplicate', [SuperAdminWebController::class, 'rolesRegistryDuplicate'])->name('roles.registry.duplicate');
+            Route::post('/roles-permissions/registry/restore/{versionId}', [SuperAdminWebController::class, 'rolesRegistryRestore'])->name('roles.registry.restore');
+            Route::get('/organisation-utilisateurs', [SuperAdminWebController::class, 'organizationIndex'])->name('organization.index');
+            Route::post('/organisation-utilisateurs/directions', [SuperAdminWebController::class, 'organizationDirectionStore'])->name('organization.directions.store');
+            Route::put('/organisation-utilisateurs/directions/{direction}', [SuperAdminWebController::class, 'organizationDirectionUpdate'])->name('organization.directions.update');
+            Route::post('/organisation-utilisateurs/directions/{direction}/toggle', [SuperAdminWebController::class, 'organizationDirectionToggle'])->name('organization.directions.toggle');
+            Route::post('/organisation-utilisateurs/services', [SuperAdminWebController::class, 'organizationServiceStore'])->name('organization.services.store');
+            Route::put('/organisation-utilisateurs/services/{service}', [SuperAdminWebController::class, 'organizationServiceUpdate'])->name('organization.services.update');
+            Route::post('/organisation-utilisateurs/services/{service}/toggle', [SuperAdminWebController::class, 'organizationServiceToggle'])->name('organization.services.toggle');
+            Route::post('/organisation-utilisateurs/utilisateurs', [SuperAdminWebController::class, 'organizationUserStore'])->name('organization.users.store');
+            Route::put('/organisation-utilisateurs/utilisateurs/{managedUser}', [SuperAdminWebController::class, 'organizationUserUpdate'])->name('organization.users.update');
+            Route::post('/organisation-utilisateurs/utilisateurs/{managedUser}/toggle', [SuperAdminWebController::class, 'organizationUserToggle'])->name('organization.users.toggle');
+            Route::post('/organisation-utilisateurs/utilisateurs/{managedUser}/reset-password', [SuperAdminWebController::class, 'organizationUserResetPassword'])->name('organization.users.reset-password');
+            Route::post('/organisation-utilisateurs/utilisateurs/{managedUser}/revoke-sessions', [SuperAdminWebController::class, 'organizationUserRevokeSessions'])->name('organization.users.revoke-sessions');
+            Route::get('/organisation-utilisateurs/utilisateurs/export', [SuperAdminWebController::class, 'organizationUsersExport'])->name('organization.users.export');
+            Route::get('/organisation-utilisateurs/connexions/export', [SuperAdminWebController::class, 'organizationLoginHistoryExport'])->name('organization.login-history.export');
+            Route::post('/organisation-utilisateurs/utilisateurs/import', [SuperAdminWebController::class, 'organizationUsersImport'])->name('organization.users.import');
+            Route::post('/organisation-utilisateurs/utilisateurs/bulk', [SuperAdminWebController::class, 'organizationUsersBulk'])->name('organization.users.bulk');
+            Route::get('/dashboards-profils', [SuperAdminWebController::class, 'dashboardProfilesEdit'])->name('dashboard-profiles.edit');
+            Route::put('/dashboards-profils', [SuperAdminWebController::class, 'dashboardProfilesUpdate'])->name('dashboard-profiles.update');
+            Route::get('/referentiels-dynamiques', [SuperAdminWebController::class, 'referentialsEdit'])->name('referentials.edit');
+            Route::put('/referentiels-dynamiques', [SuperAdminWebController::class, 'referentialsUpdate'])->name('referentials.update');
+            Route::get('/documents-justificatifs', [SuperAdminWebController::class, 'documentsEdit'])->name('documents.edit');
+            Route::put('/documents-justificatifs', [SuperAdminWebController::class, 'documentsUpdate'])->name('documents.update');
+            Route::get('/kpis-pilotes', [SuperAdminWebController::class, 'kpisEdit'])->name('kpis.edit');
+            Route::put('/kpis-pilotes', [SuperAdminWebController::class, 'kpisUpdate'])->name('kpis.update');
+            Route::get('/apparence', [SuperAdminWebController::class, 'appearanceEdit'])->name('appearance.edit');
+            Route::post('/apparence/apercu', [SuperAdminWebController::class, 'appearancePreview'])->name('appearance.preview');
+            Route::post('/apparence/brouillon', [SuperAdminWebController::class, 'appearanceDraftUpdate'])->name('appearance.draft');
+            Route::post('/apparence/publier-brouillon', [SuperAdminWebController::class, 'appearancePublishDraft'])->name('appearance.publish-draft');
+            Route::post('/apparence/supprimer-brouillon', [SuperAdminWebController::class, 'appearanceDiscardDraft'])->name('appearance.discard-draft');
+            Route::put('/apparence', [SuperAdminWebController::class, 'appearanceUpdate'])->name('appearance.update');
+            Route::get('/workflow-validations', [SuperAdminWebController::class, 'workflowEdit'])->name('workflow.edit');
+            Route::put('/workflow-validations', [SuperAdminWebController::class, 'workflowUpdate'])->name('workflow.update');
+            Route::get('/politique-calcul-actions', [SuperAdminWebController::class, 'calculationEdit'])->name('calculation.edit');
+            Route::put('/politique-calcul-actions', [SuperAdminWebController::class, 'calculationUpdate'])->name('calculation.update');
+            Route::get('/alertes-notifications', [SuperAdminWebController::class, 'notificationsEdit'])->name('notifications.edit');
+            Route::put('/alertes-notifications', [SuperAdminWebController::class, 'notificationsUpdate'])->name('notifications.update');
+            Route::get('/parametres-metier-actions', [SuperAdminWebController::class, 'actionPoliciesEdit'])->name('action-policies.edit');
+            Route::put('/parametres-metier-actions', [SuperAdminWebController::class, 'actionPoliciesUpdate'])->name('action-policies.update');
+            Route::get('/snapshots-configuration', [SuperAdminWebController::class, 'snapshotsIndex'])->name('snapshots.index');
+            Route::post('/snapshots-configuration', [SuperAdminWebController::class, 'snapshotsStore'])->name('snapshots.store');
+            Route::post('/snapshots-configuration/{snapshot}/restore', [SuperAdminWebController::class, 'snapshotsRestore'])->name('snapshots.restore');
+            Route::get('/simulation', [SuperAdminWebController::class, 'simulationIndex'])->name('simulation.index');
+            Route::post('/simulation', [SuperAdminWebController::class, 'simulationRun'])->name('simulation.run');
+            Route::get('/audit-diagnostic', [SuperAdminWebController::class, 'auditDiagnosticIndex'])->name('audit-diagnostic.index');
+            Route::get('/maintenance', [SuperAdminWebController::class, 'maintenanceIndex'])->name('maintenance.index');
+            Route::post('/maintenance/{action}', [SuperAdminWebController::class, 'maintenanceRun'])->name('maintenance.run');
+            Route::get('/templates-export', [SuperAdminWebController::class, 'templatesIndex'])->name('templates.index');
+            Route::get('/templates-export/create', [SuperAdminWebController::class, 'templatesCreate'])->name('templates.create');
+            Route::post('/templates-export', [SuperAdminWebController::class, 'templatesStore'])->name('templates.store');
+            Route::get('/templates-export/{template}', [SuperAdminWebController::class, 'templatesShow'])->name('templates.show');
+            Route::get('/templates-export/{template}/edit', [SuperAdminWebController::class, 'templatesEdit'])->name('templates.edit');
+            Route::put('/templates-export/{template}', [SuperAdminWebController::class, 'templatesUpdate'])->name('templates.update');
+            Route::post('/templates-export/{template}/publish', [SuperAdminWebController::class, 'templatesPublish'])->name('templates.publish');
+            Route::post('/templates-export/{template}/archive', [SuperAdminWebController::class, 'templatesArchive'])->name('templates.archive');
+            Route::post('/templates-export/{template}/duplicate', [SuperAdminWebController::class, 'templatesDuplicate'])->name('templates.duplicate');
+            Route::get('/templates-export/{template}/preview', [SuperAdminWebController::class, 'templatesPreview'])->name('templates.preview');
+            Route::get('/templates-export/{template}/json', [SuperAdminWebController::class, 'templatesExportJson'])->name('templates.export-json');
+            Route::post('/templates-export/import-json', [SuperAdminWebController::class, 'templatesImportJson'])->name('templates.import-json');
+            Route::post('/templates-export/{template}/versions/{version}/restore', [SuperAdminWebController::class, 'templateVersionRestore'])->name('templates.versions.restore');
+            Route::post('/templates-export/{template}/assignments', [SuperAdminWebController::class, 'assignmentStore'])->name('templates.assignments.store');
+            Route::post('/templates-export/assignments/{assignment}/toggle', [SuperAdminWebController::class, 'assignmentToggle'])->name('templates.assignments.toggle');
+        });
     });
 });

@@ -20,24 +20,23 @@ class UpdatePaoRequest extends FormRequest
      */
     public function rules(): array
     {
-        $uniqueQuadrupletRule = Rule::unique('paos')
+        $uniqueDirectionRule = Rule::unique('paos')
             ->where(fn ($query) => $query
                 ->where('pas_objectif_id', $this->input('pas_objectif_id'))
                 ->where('annee', $this->input('annee'))
                 ->where('direction_id', $this->input('direction_id'))
-                ->where('service_id', $this->input('service_id'))
             );
 
         $currentId = $this->resolveCurrentPaoId();
         if ($currentId !== null) {
-            $uniqueQuadrupletRule = $uniqueQuadrupletRule->ignore($currentId);
+            $uniqueDirectionRule = $uniqueDirectionRule->ignore($currentId);
         }
 
         return [
             'pas_objectif_id' => ['required', 'integer', 'exists:pas_objectifs,id'],
             'direction_id' => ['required', 'integer', 'exists:directions,id'],
             'service_id' => ['required', 'integer', 'exists:services,id'],
-            'annee' => ['required', 'integer', 'digits:4', 'min:2000', $uniqueQuadrupletRule],
+            'annee' => ['required', 'integer', 'digits:4', 'min:2000', $uniqueDirectionRule],
             'titre' => ['required', 'string', 'max:255'],
             'echeance' => ['nullable', 'date', 'date_format:Y-m-d'],
             'objectif_operationnel' => ['nullable', 'string'],
@@ -55,7 +54,8 @@ class UpdatePaoRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'annee.unique' => 'Un PAO existe deja pour cette direction, ce service, cette annee et cet objectif strategique.',
+            'annee.unique' => 'Un PAO existe deja pour cette direction, cette annee et cet objectif strategique.',
+            'service_id.required' => 'Le service affecte au PAO est obligatoire.',
         ];
     }
 

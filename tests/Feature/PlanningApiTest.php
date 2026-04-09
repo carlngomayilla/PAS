@@ -96,7 +96,7 @@ class PlanningApiTest extends TestCase
 
         $objectifId = (int) PasObjectif::query()->value('id');
         $dafDirectionId = (int) Direction::query()->where('code', 'DAF')->value('id');
-        $dafServiceId = (int) Service::query()->where('direction_id', $dafDirectionId)->value('id');
+        $dafServiceId = (int) Service::query()->where('direction_id', $dafDirectionId)->orderBy('id')->value('id');
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
             ->postJson('/api/v1/paos', [
@@ -136,7 +136,7 @@ class PlanningApiTest extends TestCase
         $response->assertForbidden();
     }
 
-    public function test_direction_user_cannot_create_pao_when_pas_is_not_shared_with_his_direction(): void
+    public function test_direction_user_can_create_pao_even_when_pas_has_no_explicit_direction_sharing(): void
     {
         $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'directeur.daf@anbg.ga',
@@ -146,25 +146,24 @@ class PlanningApiTest extends TestCase
 
         $token = (string) $loginResponse->json('access_token');
         $dafDirectionId = (int) Direction::query()->where('code', 'DAF')->value('id');
-        $dsicDirectionId = (int) Direction::query()->where('code', 'DSIC')->value('id');
+        $dafServiceId = (int) Service::query()->where('direction_id', $dafDirectionId)->orderBy('id')->value('id');
 
         $pas = Pas::query()->create([
-            'titre' => 'PAS non partage DAF',
+            'titre' => 'PAS global sans partage explicite',
             'periode_debut' => 2026,
             'periode_fin' => 2028,
             'statut' => 'brouillon',
         ]);
-        $pas->directions()->sync([$dsicDirectionId]);
         $axe = PasAxe::query()->create([
             'pas_id' => $pas->id,
-            'code' => 'AXE-HORS-SCOPE',
-            'libelle' => 'Axe hors scope',
+            'code' => 'AXE-GLOBAL',
+            'libelle' => 'Axe global',
             'ordre' => 1,
         ]);
         $objectif = PasObjectif::query()->create([
             'pas_axe_id' => $axe->id,
-            'code' => 'OS-HORS-SCOPE',
-            'libelle' => 'Objectif hors scope',
+            'code' => 'OS-GLOBAL',
+            'libelle' => 'Objectif global',
             'ordre' => 1,
         ]);
 
@@ -172,16 +171,18 @@ class PlanningApiTest extends TestCase
             ->postJson('/api/v1/paos', [
                 'pas_objectif_id' => (int) $objectif->id,
                 'direction_id' => $dafDirectionId,
-                'service_id' => (int) Service::query()->where('direction_id', $dafDirectionId)->value('id'),
+                'service_id' => $dafServiceId,
                 'annee' => 2027,
-                'titre' => 'PAO DAF hors perimetre PAS',
+                'titre' => 'PAO DAF dans PAS global',
                 'statut' => 'brouillon',
             ]);
 
-        $response->assertForbidden();
+        $response->assertCreated()
+            ->assertJsonPath('data.direction_id', $dafDirectionId)
+            ->assertJsonPath('data.service_id', $dafServiceId);
     }
 
-    public function test_direction_user_can_create_pao_for_his_own_direction_and_service(): void
+    public function test_direction_user_can_create_pao_for_his_own_direction_on_an_accessible_objectif(): void
     {
         $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'directeur.daf@anbg.ga',
@@ -219,13 +220,86 @@ class PlanningApiTest extends TestCase
                 'direction_id' => $directionId,
                 'service_id' => $serviceId,
                 'annee' => 2027,
-                'titre' => 'PAO DAF service autorise',
+                'titre' => 'PAO DAF direction autorise',
                 'statut' => 'brouillon',
             ]);
 
         $response->assertCreated()
             ->assertJsonPath('data.direction_id', $directionId)
             ->assertJsonPath('data.service_id', $serviceId);
+    }
+
+    public function test_direction_user_can_create_multiple_paos_for_distinct_objectifs_of_the_same_axe(): void
+    {
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => 'directeur.daf@anbg.ga',
+            'password' => 'Pass@12345',
+            'device_name' => 'phpunit-direction-multi-pao',
+        ]);
+
+        $token = (string) $loginResponse->json('access_token');
+        $directionId = (int) Direction::query()->where('code', 'DAF')->value('id');
+        $serviceId = (int) Service::query()->where('direction_id', $directionId)->orderBy('id')->value('id');
+
+        $pas = Pas::query()->create([
+            'titre' => 'PAS DAF multi objectifs',
+            'periode_debut' => 2027,
+            'periode_fin' => 2029,
+            'statut' => 'brouillon',
+        ]);
+        $pas->directions()->sync([$directionId]);
+
+        $axe = PasAxe::query()->create([
+            'pas_id' => $pas->id,
+            'code' => 'AXE-DAF-MULTI',
+            'libelle' => 'Axe DAF multiple',
+            'ordre' => 1,
+        ]);
+
+        $objectifOne = PasObjectif::query()->create([
+            'pas_axe_id' => $axe->id,
+            'code' => 'OS-DAF-1',
+            'libelle' => 'Objectif DAF 1',
+            'ordre' => 1,
+        ]);
+
+        $objectifTwo = PasObjectif::query()->create([
+            'pas_axe_id' => $axe->id,
+            'code' => 'OS-DAF-2',
+            'libelle' => 'Objectif DAF 2',
+            'ordre' => 2,
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/paos', [
+                'pas_objectif_id' => (int) $objectifOne->id,
+                'direction_id' => $directionId,
+                'service_id' => $serviceId,
+                'annee' => 2027,
+                'titre' => 'PAO DAF OS 1',
+                'statut' => 'brouillon',
+            ])
+            ->assertCreated();
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/paos', [
+                'pas_objectif_id' => (int) $objectifTwo->id,
+                'direction_id' => $directionId,
+                'service_id' => $serviceId,
+                'annee' => 2027,
+                'titre' => 'PAO DAF OS 2',
+                'statut' => 'brouillon',
+            ])
+            ->assertCreated();
+
+        $this->assertSame(
+            2,
+            Pao::query()
+                ->where('direction_id', $directionId)
+                ->where('annee', 2027)
+                ->whereIn('pas_objectif_id', [(int) $objectifOne->id, (int) $objectifTwo->id])
+                ->count()
+        );
     }
 
     public function test_service_user_can_create_pta_only_for_his_service_pao(): void
@@ -245,7 +319,7 @@ class PlanningApiTest extends TestCase
             'direction_id' => (int) $serviceUser->direction_id,
             'service_id' => (int) $serviceUser->service_id,
             'annee' => 2029,
-            'titre' => 'PAO service pour PTA',
+            'titre' => 'PAO direction pour PTA',
             'statut' => 'brouillon',
         ]);
 

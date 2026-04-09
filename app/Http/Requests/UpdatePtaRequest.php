@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Pao;
+use App\Models\Service;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -57,8 +58,10 @@ class UpdatePtaRequest extends FormRequest
             }
 
             $pao = Pao::query()->find((int) $this->input('pao_id'));
+            $service = $this->filled('service_id')
+                ? Service::query()->find((int) $this->input('service_id'))
+                : null;
             $directionId = $this->filled('direction_id') ? (int) $this->input('direction_id') : null;
-            $serviceId = $this->filled('service_id') ? (int) $this->input('service_id') : null;
 
             if ($pao !== null && $directionId !== null && (int) $pao->direction_id !== $directionId) {
                 $validator->errors()->add(
@@ -67,17 +70,29 @@ class UpdatePtaRequest extends FormRequest
                 );
             }
 
-            if ($pao !== null && $serviceId !== null && (int) $pao->service_id !== $serviceId) {
-                $validator->errors()->add(
-                    'service_id',
-                    'Le service du PTA doit correspondre au service du PAO parent.'
-                );
-            }
-
             if ($pao !== null && $pao->service_id === null) {
                 $validator->errors()->add(
                     'pao_id',
-                    'Le PAO selectionne n est pas encore rattache a un service.'
+                    'Le PAO selectionne n est pas encore affecte a un service.'
+                );
+            }
+
+            if (
+                $pao !== null
+                && $pao->service_id !== null
+                && $service !== null
+                && (int) $service->id !== (int) $pao->service_id
+            ) {
+                $validator->errors()->add(
+                    'service_id',
+                    'Le service du PTA doit reprendre le service affecte au PAO.'
+                );
+            }
+
+            if ($pao !== null && $service !== null && (int) $service->direction_id !== (int) $pao->direction_id) {
+                $validator->errors()->add(
+                    'service_id',
+                    'Le service selectionne doit appartenir a la direction du PAO parent.'
                 );
             }
 

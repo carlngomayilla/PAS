@@ -13,6 +13,7 @@ use App\Models\Justificatif;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
 use App\Models\User;
+use App\Services\DocumentPolicySettings;
 use App\Services\Security\SecureJustificatifStorage;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,6 +35,11 @@ class JustificatifWebController extends Controller
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
+        }
+
+        $documentPolicy = app(DocumentPolicySettings::class);
+        if (! $documentPolicy->canView($user)) {
+            abort(403, 'Acces non autorise.');
         }
 
         $this->denyUnlessPlanningReader($user);
@@ -63,6 +69,11 @@ class JustificatifWebController extends Controller
         });
 
         $justificatifs = $query->orderByDesc('id')->paginate(15)->withQueryString();
+        $justificatifs->setCollection(
+            $justificatifs->getCollection()->filter(
+                fn (Justificatif $justificatif): bool => $documentPolicy->canViewCategory($user, $justificatif->categorie)
+            )->values()
+        );
         $canWriteByJustificatif = [];
         foreach ($justificatifs as $item) {
             if (! $item instanceof Justificatif) {
@@ -97,6 +108,8 @@ class JustificatifWebController extends Controller
         return view('workspace.justificatifs.create', [
             'typeOptions' => $this->typeOptions(),
             'references' => $this->loadReferences($user),
+            'documentAccept' => app(DocumentPolicySettings::class)->acceptAttribute(),
+            'documentPolicySettings' => app(DocumentPolicySettings::class)->all(),
         ]);
     }
 
@@ -108,6 +121,10 @@ class JustificatifWebController extends Controller
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
+        }
+
+        if (! app(DocumentPolicySettings::class)->canUpload($user)) {
+            abort(403, 'Acces non autorise.');
         }
 
         $validated = $request->validated();
@@ -165,6 +182,9 @@ class JustificatifWebController extends Controller
         }
 
         $justificatif->loadMissing('justifiable');
+        if (! app(DocumentPolicySettings::class)->canViewCategory($user, $justificatif->categorie)) {
+            abort(403, 'Acces non autorise.');
+        }
         $this->assertUserCanReadEntity($user, $justificatif->justifiable);
         $scope = $this->resolveEntityScope($justificatif->justifiable);
         $this->denyUnlessWriteService($user, $scope['direction_id'], $scope['service_id']);
@@ -172,6 +192,8 @@ class JustificatifWebController extends Controller
         return view('workspace.justificatifs.edit', [
             'justificatif' => $justificatif,
             'typeAlias' => $this->aliasForClass((string) $justificatif->justifiable_type),
+            'documentAccept' => app(DocumentPolicySettings::class)->acceptAttribute(),
+            'documentPolicySettings' => app(DocumentPolicySettings::class)->all(),
         ]);
     }
 
@@ -183,6 +205,10 @@ class JustificatifWebController extends Controller
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
+        }
+
+        if (! app(DocumentPolicySettings::class)->canUpload($user)) {
+            abort(403, 'Acces non autorise.');
         }
 
         $validated = $request->validated();
@@ -243,6 +269,10 @@ class JustificatifWebController extends Controller
             abort(401);
         }
 
+        if (! app(DocumentPolicySettings::class)->canUpload($user)) {
+            abort(403, 'Acces non autorise.');
+        }
+
         $justificatif->loadMissing('justifiable');
         $scope = $this->resolveEntityScope($justificatif->justifiable);
         $this->denyUnlessWriteService($user, $scope['direction_id'], $scope['service_id']);
@@ -287,6 +317,9 @@ class JustificatifWebController extends Controller
         }
 
         $justificatif->loadMissing('justifiable');
+        if (! app(DocumentPolicySettings::class)->canViewCategory($user, $justificatif->categorie)) {
+            abort(403, 'Acces non autorise.');
+        }
         $this->assertUserCanReadEntity($user, $justificatif->justifiable);
 
         return $secureStorage->download($justificatif);
@@ -440,9 +473,12 @@ class JustificatifWebController extends Controller
 
     private function canWrite(User $user): bool
     {
-        return $user->hasGlobalWriteAccess()
-            || $user->hasRole(User::ROLE_DIRECTION)
-            || $user->hasRole(User::ROLE_SERVICE);
+        return app(DocumentPolicySettings::class)->canUpload($user)
+            && (
+                $user->hasGlobalWriteAccess()
+                || $user->hasRole(User::ROLE_DIRECTION)
+                || $user->hasRole(User::ROLE_SERVICE)
+            );
     }
 
     private function canMutateJustificatif(User $user, Justificatif $justificatif): bool

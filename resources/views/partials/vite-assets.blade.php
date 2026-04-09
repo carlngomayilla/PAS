@@ -1,16 +1,36 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=Source+Serif+4:wght@600;700&family=Manrope:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 
 <style>
+    :root {
+        {{ $appearanceSettings->cssVariablesInline() }};
+    }
+
+    html,
+    body {
+        font-family: var(--app-font-family);
+        color: var(--app-text-color);
+    }
+
+    h1,
+    h2,
+    h3,
+    .showcase-title,
+    .form-section-title,
+    .showcase-panel-title {
+        font-family: var(--app-heading-font-family);
+        letter-spacing: -0.02em;
+    }
+
     .ui-card {
-        border: 1px solid rgba(226, 232, 240, 0.9);
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 1rem;
+        border: 1px solid rgb(var(--app-border-color-rgb) / 0.9);
+        background: var(--app-card-surface-light);
+        border-radius: var(--app-card-radius);
         padding: 1rem;
-        box-shadow: 0 14px 32px -22px rgba(15, 23, 42, 0.45);
-        backdrop-filter: blur(4px);
+        box-shadow: var(--app-card-shadow);
+        backdrop-filter: blur(var(--app-card-blur));
     }
 
     .ui-card-lg {
@@ -41,29 +61,29 @@
 
     th,
     td {
-        border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+        border-bottom: 1px solid rgb(var(--app-border-color-rgb) / 0.85);
         padding: 0.625rem 0.75rem;
         text-align: left;
         vertical-align: top;
     }
 
     th {
-        background: rgba(248, 250, 252, 0.9);
+        background: var(--app-table-head-bg-light);
         font-size: 0.6875rem;
         font-weight: 600;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: rgb(71, 85, 105);
+        color: var(--app-muted-text-color);
     }
 
     tbody tr:hover td {
-        background: rgba(248, 250, 252, 0.7);
+        background: var(--app-table-row-hover-light);
     }
 
     .dark .ui-card {
-        border-color: rgba(51, 65, 85, 0.85);
-        background: rgba(15, 23, 42, 0.8);
-        box-shadow: 0 22px 48px -30px rgba(0, 0, 0, 0.86);
+        border-color: rgb(var(--app-border-color-rgb) / 0.35);
+        background: var(--app-card-surface-dark);
+        box-shadow: var(--app-card-shadow-dark);
     }
 
     .dark .admin-theme-scope main > section > h1:first-child,
@@ -73,20 +93,20 @@
 
     .dark th,
     .dark .admin-theme-scope th {
-        border-bottom-color: rgba(51, 65, 85, 0.85);
-        background: rgba(15, 23, 42, 0.9);
-        color: rgb(203, 213, 225);
+        border-bottom-color: rgb(var(--app-border-color-rgb) / 0.35);
+        background: var(--app-table-head-bg-dark);
+        color: rgb(226 232 240);
     }
 
     .dark td,
     .dark .admin-theme-scope td {
-        border-bottom-color: rgba(51, 65, 85, 0.85);
+        border-bottom-color: rgb(var(--app-border-color-rgb) / 0.35);
         color: rgb(226, 232, 240);
     }
 
     .dark tbody tr:hover td,
     .dark .admin-theme-scope tbody tr:hover td {
-        background: rgba(30, 41, 59, 0.6);
+        background: var(--app-table-row-hover-dark);
     }
 
     .form-shell {
@@ -96,11 +116,11 @@
     }
 
     .form-section {
-        border: 1px solid rgba(226, 232, 240, 0.9);
+        border: 1px solid rgb(var(--app-border-color-rgb) / 0.9);
         border-radius: 1.25rem;
         padding: 1.25rem;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
-        box-shadow: 0 22px 42px -30px rgba(15, 23, 42, 0.42);
+        background: var(--app-form-surface-light);
+        box-shadow: var(--app-card-shadow);
     }
 
     .form-section-title {
@@ -114,7 +134,7 @@
     .form-section-subtitle {
         margin: 0 0 1rem;
         font-size: 0.75rem;
-        color: rgb(71, 85, 105);
+        color: var(--app-muted-text-color);
     }
 
     .form-grid {
@@ -138,7 +158,7 @@
     .form-actions {
         margin-top: 0.25rem;
         padding-top: 0.75rem;
-        border-top: 1px solid rgba(226, 232, 240, 0.85);
+        border-top: 1px solid rgb(var(--app-border-color-rgb) / 0.85);
         display: flex;
         flex-wrap: wrap;
         gap: 0.4rem;
@@ -147,7 +167,7 @@
     .field-hint {
         margin-top: 0.25rem;
         font-size: 0.75rem;
-        color: rgb(100, 116, 139);
+        color: var(--app-muted-text-color);
     }
 
     .checkbox-pill {
@@ -155,18 +175,77 @@
         align-items: center;
         gap: 0.5rem;
         min-height: 46px;
-        border: 1px solid rgba(226, 232, 240, 0.95);
-        border-radius: 1rem;
-        background: #fff;
+        border: 1px solid rgb(var(--app-border-color-rgb) / 0.95);
+        border-radius: var(--app-card-radius);
+        background: rgb(var(--app-card-background-rgb) / 0.98);
         padding: 0.5rem 0.75rem;
         font-size: 0.875rem;
     }
 
     .conditional-block {
-        border: 1px dashed rgba(148, 163, 184, 0.9);
-        border-radius: 1rem;
-        background: rgba(255, 255, 255, 0.92);
+        border: 1px dashed rgb(var(--app-border-color-rgb) / 0.9);
+        border-radius: var(--app-card-radius);
+        background: rgb(var(--app-card-background-rgb) / 0.92);
         padding: 0.875rem;
+    }
+
+    .btn {
+        border-radius: var(--app-button-radius);
+        box-shadow: 0 4px 14px rgb(var(--app-secondary-rgb) / 0.18);
+    }
+
+    .btn:hover {
+        box-shadow: 0 8px 20px rgb(var(--app-primary-rgb) / 0.24);
+    }
+
+    .btn-primary,
+    .btn-blue,
+    .btn-green {
+        background: var(--app-button-primary-bg) !important;
+        box-shadow: 0 4px 14px rgb(var(--app-primary-rgb) / 0.18) !important;
+        color: var(--app-button-primary-text) !important;
+    }
+
+    .btn-secondary {
+        background: var(--app-button-secondary-bg) !important;
+        box-shadow: 0 4px 14px rgb(var(--app-secondary-rgb) / 0.18) !important;
+        color: var(--app-button-secondary-text) !important;
+    }
+
+    .btn-primary:hover,
+    .btn-blue:hover,
+    .btn-green:hover {
+        background: var(--app-button-primary-bg-hover) !important;
+        box-shadow: 0 8px 20px rgb(var(--app-primary-rgb) / 0.22) !important;
+        color: var(--app-button-primary-text) !important;
+    }
+
+    .btn-secondary:hover {
+        background: var(--app-button-secondary-bg-hover) !important;
+        box-shadow: 0 8px 20px rgb(var(--app-secondary-rgb) / 0.22) !important;
+        color: var(--app-button-secondary-text) !important;
+    }
+
+    .btn-red {
+        background: var(--app-button-danger-bg) !important;
+        box-shadow: 0 4px 14px rgb(var(--app-danger-rgb) / 0.24) !important;
+        color: var(--app-button-danger-text) !important;
+    }
+
+    .btn-red:hover {
+        background: var(--app-button-danger-bg-hover) !important;
+        box-shadow: 0 8px 20px rgb(var(--app-danger-rgb) / 0.32) !important;
+    }
+
+    .btn-amber {
+        background: var(--app-button-warning-bg) !important;
+        color: var(--app-button-warning-text) !important;
+        box-shadow: 0 4px 14px rgb(var(--app-warning-rgb) / 0.16) !important;
+    }
+
+    .btn-amber:hover {
+        background: var(--app-button-warning-bg-hover) !important;
+        box-shadow: 0 8px 20px rgb(var(--app-warning-rgb) / 0.3) !important;
     }
 
     .conditional-block.is-frozen {
@@ -176,8 +255,8 @@
     }
 
     .dark .form-section {
-        border-color: rgba(51, 65, 85, 0.85);
-        background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(15, 23, 42, 0.82) 100%);
+        border-color: rgb(var(--app-border-color-rgb) / 0.35);
+        background: var(--app-form-surface-dark);
     }
 
     .dark .form-section-subtitle {
@@ -185,7 +264,7 @@
     }
 
     .dark .form-actions {
-        border-top-color: rgba(51, 65, 85, 0.85);
+        border-top-color: rgb(var(--app-border-color-rgb) / 0.35);
     }
 
     .dark .field-hint {
@@ -193,8 +272,8 @@
     }
 
     .dark .checkbox-pill {
-        border-color: rgba(71, 85, 105, 0.85);
-        background: rgba(15, 23, 42, 0.9);
+        border-color: rgb(var(--app-border-color-rgb) / 0.35);
+        background: rgb(var(--app-surface-rgb) / 0.9);
         color: rgb(226, 232, 240);
     }
 
@@ -208,12 +287,12 @@
     }
 
     .dark .conditional-block {
-        border-color: rgba(71, 85, 105, 0.85);
-        background: rgba(15, 23, 42, 0.82);
+        border-color: rgb(var(--app-border-color-rgb) / 0.35);
+        background: rgb(var(--app-surface-rgb) / 0.82);
     }
 
     .dark .conditional-block.is-frozen {
-        border-color: rgba(71, 85, 105, 0.7);
+        border-color: rgb(var(--app-border-color-rgb) / 0.3);
         background: rgba(30, 41, 59, 0.82);
     }
 
@@ -221,10 +300,10 @@
     .admin-theme-scope select,
     .admin-theme-scope textarea {
         width: 100%;
-        border-radius: 0.85rem;
-        border: 1px solid rgba(203, 213, 225, 0.95);
-        background-color: rgba(255, 255, 255, 0.98) !important;
-        color: rgb(15, 23, 42) !important;
+        border-radius: var(--app-input-radius);
+        border: 1px solid var(--app-input-border-color);
+        background: var(--app-input-surface-light) !important;
+        color: var(--app-text-color) !important;
         box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
     }
 
@@ -278,8 +357,8 @@
     .dark .admin-theme-scope input:not([type='checkbox']):not([type='radio']),
     .dark .admin-theme-scope select,
     .dark .admin-theme-scope textarea {
-        background: linear-gradient(135deg, rgba(10, 20, 46, 0.96) 0%, rgba(18, 35, 72, 0.92) 100%) !important;
-        border-color: rgba(255, 255, 255, 0.10) !important;
+        background: var(--app-input-surface-dark) !important;
+        border-color: rgb(var(--app-border-color-rgb) / 0.35) !important;
         color: rgb(241, 245, 249) !important;
         caret-color: rgb(248, 250, 252);
         box-shadow:
@@ -291,7 +370,7 @@
     .dark select {
         background-image:
             url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7 5 5 5-5' stroke='%23cbd5e1' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
-            linear-gradient(135deg, rgba(10, 20, 46, 0.96) 0%, rgba(18, 35, 72, 0.92) 100%) !important;
+            var(--app-input-surface-dark) !important;
         background-repeat: no-repeat, repeat !important;
         background-position: right 0.95rem center, center !important;
         background-size: 0.95rem, 100% 100% !important;
@@ -341,9 +420,9 @@
     .admin-theme-scope input:disabled,
     .admin-theme-scope select:disabled,
     .admin-theme-scope textarea:disabled {
-        background-color: rgba(241, 245, 249, 0.95) !important;
-        color: rgb(100, 116, 139) !important;
-        border-color: rgba(203, 213, 225, 0.9) !important;
+        background-color: rgb(var(--app-card-background-rgb) / 0.7) !important;
+        color: var(--app-muted-text-color) !important;
+        border-color: rgb(var(--app-border-color-rgb) / 0.8) !important;
     }
 
     .dark .admin-theme-scope input:disabled,

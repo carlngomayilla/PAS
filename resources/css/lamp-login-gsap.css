@@ -1,10 +1,10 @@
 /* Fond OFF */
 .lamp-page {
   background:
-    radial-gradient(1200px 600px at 18% 10%, rgba(57, 150, 211, .22), transparent 60%),
-    radial-gradient(900px 500px at 80% 18%, rgba(143, 192, 67, .16), transparent 56%),
-    radial-gradient(1000px 540px at 72% 64%, rgba(249, 177, 60, .14), transparent 58%),
-    #1c203d;
+    radial-gradient(1200px 600px at 18% 10%, rgba(36, 59, 90, .24), transparent 60%),
+    radial-gradient(900px 500px at 80% 18%, rgba(81, 107, 139, .14), transparent 56%),
+    radial-gradient(1000px 540px at 72% 64%, rgba(167, 143, 99, .10), transparent 58%),
+    #162338;
 }
 
 /* Lampe */
@@ -12,6 +12,21 @@
   position: relative;
   width: 280px;
   height: 320px;
+  transform-origin: 50% 18%;
+}
+
+.lamp-flash {
+  position: absolute;
+  top: 82px;
+  left: 50%;
+  width: 210px;
+  height: 210px;
+  opacity: 0;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 247, 200, .98) 0%, rgba(255, 221, 137, .88) 28%, rgba(255, 214, 102, .34) 56%, rgba(255, 214, 102, 0) 78%);
+  filter: blur(10px);
+  pointer-events: none;
 }
 
 .lamp-head {
@@ -61,9 +76,9 @@
   border-radius: 999px;
   opacity: 0;
   background: radial-gradient(circle at 50% 0%,
-    rgba(255, 220, 130, .75),
-    rgba(255, 220, 130, .22) 40%,
-    rgba(255, 220, 130, 0) 70%
+    rgba(214, 190, 144, .62),
+    rgba(214, 190, 144, .18) 40%,
+    rgba(214, 190, 144, 0) 70%
   );
   filter: blur(2px);
   pointer-events: none;
@@ -80,11 +95,11 @@
   opacity: 0;
   background: conic-gradient(
     from 180deg at 50% 0%,
-    rgba(255, 214, 102, 0) 0deg,
-    rgba(255, 214, 102, .20) 35deg,
-    rgba(255, 214, 102, .35) 55deg,
-    rgba(255, 214, 102, .20) 75deg,
-    rgba(255, 214, 102, 0) 110deg
+    rgba(214, 190, 144, 0) 0deg,
+    rgba(214, 190, 144, .16) 35deg,
+    rgba(214, 190, 144, .26) 55deg,
+    rgba(214, 190, 144, .16) 75deg,
+    rgba(214, 190, 144, 0) 110deg
   );
   filter: blur(10px);
   border-radius: 0 0 999px 999px;
@@ -106,20 +121,28 @@
   border: 0;
   cursor: pointer;
   padding: 0;
+  transform-origin: top center;
+}
+
+.lamp-pull[disabled],
+.lamp-pull.lamp-pull-submitting {
+  cursor: wait;
+  opacity: .82;
 }
 
 .lamp-cord {
   width: 2px;
   height: 130px;
-  background: rgba(255, 255, 255, .35);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .7) 0%, rgba(255, 255, 255, .26) 100%);
   border-radius: 999px;
+  box-shadow: 0 0 10px rgba(255, 255, 255, .08);
 }
 
 .lamp-knob {
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .25);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 248, 214, .95) 0%, rgba(255, 214, 102, .68) 46%, rgba(161, 111, 34, .82) 100%);
   border: 1px solid rgba(255, 255, 255, .22);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
 }
@@ -128,6 +151,16 @@
 .lamp-card {
   transform: translateY(0);
   border-color: rgba(255, 255, 255, .10);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform-origin: center left;
+  will-change: transform, opacity;
+}
+
+.lamp-page.lamp-is-on .lamp-card {
+  visibility: visible;
+  pointer-events: auto;
 }
 
 @media (max-width: 640px) {
@@ -158,6 +191,12 @@
     top: 78px;
     width: 220px;
     height: 190px;
+  }
+
+  .lamp-flash {
+    top: 70px;
+    width: 180px;
+    height: 180px;
   }
 
   .lamp-cone {
@@ -214,6 +253,12 @@
     height: 166px;
   }
 
+  .lamp-flash {
+    top: 58px;
+    width: 152px;
+    height: 152px;
+  }
+
   .lamp-cone {
     top: 88px;
     width: 246px;
@@ -237,3 +282,4 @@
     height: 14px;
   }
 }
+

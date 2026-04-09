@@ -4,37 +4,21 @@
     @php
         $isEdit = $mode === 'edit';
         $targetType = old('type_cible', $row->type_cible ?: 'quantitative');
+        $targetTypeLabel = $targetTypeOptions[$targetType] ?? ucfirst($targetType);
         $selectedPta = $ptaOptions->firstWhere('id', (int) old('pta_id', $row->pta_id));
         $selectedResponsable = $responsableOptions->firstWhere('id', (int) old('responsable_id', $row->responsable_id));
         $primaryKpi = $row->relationLoaded('primaryKpi') ? $row->primaryKpi : null;
         $derivedIndicatorUnit = trim((string) old('unite_cible', $row->unite_cible ?: $primaryKpi?->unite));
         $derivedIndicatorTarget = old('quantite_cible', $row->quantite_cible ?? $primaryKpi?->cible);
+        $manualSuspendEnabled = $actionManagementSettings->manualSuspendEnabled();
     @endphp
 
     <section class="showcase-hero mb-4">
         <div class="showcase-hero-body">
             <div class="max-w-3xl">
-                <span class="showcase-eyebrow">{{ $isEdit ? 'Edition action' : 'Nouvelle action' }}</span>
+                <span class="showcase-eyebrow">Action</span>
                 <h1 class="showcase-title">{{ $isEdit ? 'Modifier une action existante' : 'Enregistrer une nouvelle action' }}</h1>
-                <p class="showcase-subtitle">
-                    Creation d action avec generation automatique des periodes de suivi, calcul des indicateurs,
-                    gestion des ressources mobilisees, parametrage direct de l indicateur principal
-                    et circuit de validation agent -> chef de service -> direction.
-                </p>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
-                        {{ $ptaOptions->count() }} PTA disponibles
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
-                        {{ $responsableOptions->count() }} agents executants eligibles
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot {{ $targetType === 'quantitative' ? 'bg-[#3996d3]' : 'bg-[#f0e509]' }}"></span>
-                        Cible {{ $targetType }}
-                    </span>
-                </div>
+                <p class="showcase-subtitle">Renseignez le PTA, le responsable, la cible et le cadre de pilotage.</p>
             </div>
             <div class="showcase-action-row">
                 @if ($isEdit)
@@ -87,7 +71,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">1) Identification de l action</h2>
-                <p class="form-section-subtitle">Informations de base et acteur responsable de l execution.</p>
+                <p class="form-section-subtitle">Perimetre, responsable et calendrier.</p>
                 <div class="form-grid">
                     <div>
                         <label for="pta_id">PTA</label>
@@ -143,7 +127,6 @@
                             <option value="mensuelle" @selected($frequence === 'mensuelle')>Mensuelle</option>
                             <option value="annuelle" @selected($frequence === 'annuelle')>Annuelle</option>
                         </select>
-                        <p class="field-hint">Le systeme genere automatiquement les periodes de suivi selon cette frequence.</p>
                     </div>
                     <div>
                         <label for="statut">Statut manuel</label>
@@ -152,10 +135,18 @@
                         @endphp
                         <select id="statut" name="statut">
                             <option value="non_demarre" @selected($manualStatus === 'non_demarre')>Pilotage automatique</option>
-                            <option value="suspendu" @selected($manualStatus === 'suspendu')>Suspendu</option>
+                            @if ($manualSuspendEnabled || $manualStatus === 'suspendu')
+                                <option value="suspendu" @selected($manualStatus === 'suspendu')>Suspendu</option>
+                            @endif
                             <option value="annule" @selected($manualStatus === 'annule')>Annule</option>
                         </select>
-                        <p class="field-hint">Suspendu gele les indicateurs. Annule sort l action du pilotage automatique.</p>
+                        <p class="field-hint">
+                            @if ($manualSuspendEnabled)
+                                Suspendu ou annule remplacent le pilotage automatique.
+                            @else
+                                Seule l annulation est disponible.
+                            @endif
+                        </p>
                     </div>
                 </div>
                 <div class="mt-3">
@@ -170,13 +161,14 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">2) Definition de la cible</h2>
-                <p class="form-section-subtitle">Les champs sont automatiquement figes selon le type de cible choisi.</p>
+                <p class="form-section-subtitle">La saisie s adapte au type de cible choisi.</p>
                 <div class="form-grid">
                     <div>
                         <label for="type_cible">Type de cible</label>
                         <select id="type_cible" name="type_cible" required>
-                            <option value="quantitative" @selected($targetType === 'quantitative')>Quantitative</option>
-                            <option value="qualitative" @selected($targetType === 'qualitative')>Qualitative</option>
+                            @foreach ($targetTypeOptions as $value => $label)
+                                <option value="{{ $value }}" @selected($targetType === $value)>{{ $label }}</option>
+                            @endforeach
                         </select>
                     </div>
                     <div>
@@ -186,11 +178,15 @@
                 </div>
 
                 <div id="zone_quantitative" class="conditional-block mt-3 {{ $targetType === 'quantitative' ? '' : 'hidden' }}">
-                    <p class="field-hint mt-0">Cible mesuree avec une unite et une quantite.</p>
                     <div class="form-grid">
                         <div>
                             <label for="unite_cible">Unite</label>
-                            <input id="unite_cible" data-required-when="quant" name="unite_cible" type="text" value="{{ old('unite_cible', $row->unite_cible) }}" placeholder="dossiers, formations, inspections...">
+                            <input id="unite_cible" data-required-when="quant" name="unite_cible" type="text" list="action_unit_suggestions" value="{{ old('unite_cible', $row->unite_cible) }}" placeholder="dossiers, formations, inspections...">
+                            <datalist id="action_unit_suggestions">
+                                @foreach ($actionUnitSuggestions as $unitSuggestion)
+                                    <option value="{{ $unitSuggestion }}"></option>
+                                @endforeach
+                            </datalist>
                         </div>
                         <div>
                             <label for="quantite_cible">Quantite cible</label>
@@ -200,7 +196,6 @@
                 </div>
 
                 <div id="zone_qualitative" class="conditional-block mt-3 {{ $targetType === 'qualitative' ? '' : 'hidden' }}">
-                    <p class="field-hint mt-0">Cible exprimee par resultat, criteres et livrable.</p>
                     <div class="mt-2">
                         <label for="resultat_attendu">Resultat attendu</label>
                         <textarea id="resultat_attendu" data-required-when="qual" name="resultat_attendu">{{ old('resultat_attendu', $row->resultat_attendu) }}</textarea>
@@ -218,19 +213,17 @@
 
             <div id="action-indicator-settings" class="form-section">
                 <h2 class="form-section-title">3) Indicateur principal</h2>
-                <p class="form-section-subtitle">Seuls les reglages non redondants restent ici. L unite et la cible de l indicateur sont heritees automatiquement de l action quantitative.</p>
+                <p class="form-section-subtitle">Reglages de l indicateur principal.</p>
                 <div class="rounded-[1.15rem] border border-slate-200/85 bg-slate-50/90 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
                     <p id="indicator-derived-hint" class="font-medium text-slate-800 dark:text-slate-100">
                         {{ $targetType === 'quantitative' ? 'Les valeurs de mesure de l indicateur reprennent automatiquement la cible de l action.' : 'Pour une action qualitative, l indicateur conserve un reglage simple de suivi sans dupliquer la cible metier.' }}
                     </p>
-                    <div class="mt-3 showcase-chip-row">
-                        <span id="indicator-derived-unit-chip" class="showcase-chip {{ $targetType === 'quantitative' ? '' : 'hidden' }}">
-                            <span class="showcase-chip-dot bg-[#3B82F6]"></span>
-                            Unite heritee: <strong class="ml-1">{{ $derivedIndicatorUnit !== '' ? $derivedIndicatorUnit : 'A definir dans la cible' }}</strong>
+                    <div class="mt-2 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
+                        <span id="indicator-derived-unit-chip" class="{{ $targetType === 'quantitative' ? '' : 'hidden' }}">
+                            Unite: <strong class="ml-1 text-slate-700 dark:text-slate-200">{{ $derivedIndicatorUnit !== '' ? $derivedIndicatorUnit : 'A definir' }}</strong>
                         </span>
-                        <span id="indicator-derived-target-chip" class="showcase-chip {{ $targetType === 'quantitative' ? '' : 'hidden' }}">
-                            <span class="showcase-chip-dot bg-[#10B981]"></span>
-                            Cible heritee: <strong class="ml-1">{{ ($derivedIndicatorTarget !== null && $derivedIndicatorTarget !== '') ? $derivedIndicatorTarget : 'A definir dans la cible' }}</strong>
+                        <span id="indicator-derived-target-chip" class="{{ $targetType === 'quantitative' ? '' : 'hidden' }}">
+                            Cible: <strong class="ml-1 text-slate-700 dark:text-slate-200">{{ ($derivedIndicatorTarget !== null && $derivedIndicatorTarget !== '') ? $derivedIndicatorTarget : 'A definir' }}</strong>
                         </span>
                     </div>
                 </div>
@@ -244,7 +237,6 @@
                             value="{{ old('kpi_libelle', $primaryKpi?->libelle) }}"
                             placeholder="Laisser vide pour reprendre le titre de l action"
                         >
-                        <p class="field-hint">Si vous laissez ce champ vide, l indicateur reprendra le titre de l action.</p>
                     </div>
                     <div>
                         <label for="kpi_periodicite">Periodicite</label>
@@ -272,14 +264,26 @@
                             min="0"
                             value="{{ old('kpi_seuil_alerte', $primaryKpi?->seuil_alerte) }}"
                         >
-                        <p class="field-hint">Le seuil est compare a la cible effective de l indicateur quand elle existe.</p>
                     </div>
                 </div>
+                @if (!empty($kpiUnitSuggestions ?? []))
+                    <div class="mt-3">
+                        <p class="field-hint mt-0">Unites suggerees :</p>
+                        <div class="showcase-chip-row mt-2">
+                            @foreach ($kpiUnitSuggestions as $kpiUnitSuggestion)
+                                <span class="showcase-chip">
+                                    <span class="showcase-chip-dot bg-[#0EA5E9]"></span>
+                                    {{ $kpiUnitSuggestion }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <div class="form-section">
                 <h2 class="form-section-title">4) Ressources et financement</h2>
-                <p class="form-section-subtitle">Les sous-champs se debloquent uniquement si necessaire.</p>
+                <p class="form-section-subtitle">Renseignez uniquement les ressources utiles.</p>
 
                 <div class="form-grid-compact">
                     <label class="checkbox-pill">
@@ -338,24 +342,24 @@
                         <label for="justificatif_financement">Justificatif financement</label>
                         <div class="showcase-upload-zone">
                             <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">Depot du justificatif financier</p>
-                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PDF, Office ou image. Le fichier est securise par le pipeline de stockage de l application.</p>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PDF, Office ou image.</p>
                             <input
                                 id="justificatif_financement"
                                 class="mt-4"
                                 name="justificatif_financement"
                                 type="file"
                                 data-required-when="{{ $isEdit ? 'finance-optional' : 'finance-create' }}"
-                                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                accept="{{ app(\App\Services\DocumentPolicySettings::class)->acceptAttribute() }}"
                             >
                         </div>
-                        <p class="field-hint">Fichier requis a la creation si le financement est active.</p>
+                        <p class="field-hint">Requis a la creation si le financement est active.</p>
                     </div>
                 </div>
             </div>
 
             <div class="form-section">
                 <h2 class="form-section-title">5) Risques et pilotage</h2>
-                <p class="form-section-subtitle">Anticiper les blocages et definir les mesures preventives.</p>
+                <p class="form-section-subtitle">Risques et mesures preventives.</p>
                 <div class="form-grid">
                     <div>
                         <label for="risques">Risques potentiels</label>

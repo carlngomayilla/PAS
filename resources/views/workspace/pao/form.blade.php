@@ -11,26 +11,12 @@
         $selectedMeta = $selectedObjectifId > 0 && isset($objectifMeta[$selectedObjectifId]) ? $objectifMeta[$selectedObjectifId] : null;
     @endphp
 
-    <section class="showcase-hero mb-4">
+    <div class="app-screen-flow">
+    <section class="showcase-hero mb-4 app-screen-block">
         <div class="showcase-hero-body">
             <div>
-                <span class="showcase-eyebrow">{{ $isEdit ? 'Edition PAO' : 'Nouveau PAO' }}</span>
+                <span class="showcase-eyebrow">PAO</span>
                 <h1 class="showcase-title">{{ $isEdit ? 'Modifier un PAO existant' : 'Enregistrer un nouveau PAO' }}</h1>
-                <p class="showcase-subtitle">Le PAO est cree a partir d un objectif strategique du PAS. Le PAS parent et l axe sont deduits automatiquement.</p>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
-                        Objectif strategique source
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
-                        Axe et PAS deduits
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
-                        Direction et service cibles
-                    </span>
-                </div>
             </div>
             <div class="showcase-action-row">
                 <a class="btn btn-secondary" href="{{ route('workspace.pao.index') }}">Retour liste</a>
@@ -38,30 +24,26 @@
         </div>
     </section>
 
-    <section class="showcase-summary-grid mb-4">
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Mode</p>
             <p class="showcase-kpi-number">{{ $isEdit ? 'Edit.' : 'Nouv.' }}</p>
-            <p class="showcase-kpi-meta">{{ $isEdit ? 'Mise a jour d un PAO existant' : 'Creation d une declinaison annuelle' }}</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">OS disponibles</p>
             <p class="showcase-kpi-number">{{ count($objectifOptions) }}</p>
-            <p class="showcase-kpi-meta">Objectifs strategiques selectionnables</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">PAS parents</p>
             <p class="showcase-kpi-number">{{ count($pasOptions) }}</p>
-            <p class="showcase-kpi-meta">Plans strategiques accessibles</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Workflow</p>
             <p class="showcase-kpi-number text-[1.35rem]">{{ $workflowStatusLabel((string) old('statut', $row->statut ?: 'brouillon')) }}</p>
-            <p class="showcase-kpi-meta">{{ old('annee', $row->annee) ?: 'Annee non renseignee' }}</p>
         </article>
     </section>
 
-    <section class="showcase-panel mb-4">
+    <section class="showcase-panel mb-4 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.pao.update', $row) : route('workspace.pao.store') }}">
             @csrf
             @if ($isEdit)
@@ -70,9 +52,8 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Perimetre PAO</h2>
-                <p class="form-section-subtitle">Choisissez l objectif strategique. Le PAS parent et l axe sont ensuite renseignes automatiquement.</p>
-                <div class="form-grid">
-                    <div class="md:col-span-2">
+                <div class="grid gap-4">
+                    <div>
                         <label for="pas_objectif_id">Objectif strategique</label>
                         <select id="pas_objectif_id" name="pas_objectif_id" required>
                             <option value="">Selectionner</option>
@@ -86,7 +67,7 @@
                     <div>
                         <label for="pas_parent">PAS parent</label>
                         <input id="pas_parent" type="text" value="{{ $selectedMeta['pas'] ?? '' }}" readonly>
-                        <p id="pas_parent_help" class="mt-2 text-xs text-slate-500">Selectionnez un OS pour afficher le PAS parent.</p>
+                        <p id="pas_parent_help" class="mt-2 text-xs text-slate-500">Renseigne a partir de l OS.</p>
                     </div>
                     <div>
                         <label for="axe_parent">Axe strategique</label>
@@ -102,10 +83,9 @@
                                 </option>
                             @endforeach
                         </select>
-                        <p class="mt-2 text-xs text-slate-500">Le directeur fixe d abord la direction, puis le service qui portera le PTA.</p>
                     </div>
                     <div>
-                        <label for="service_id">Service</label>
+                        <label for="service_id">Service affecte</label>
                         <select id="service_id" name="service_id" required>
                             <option value="">Selectionner</option>
                             @foreach ($serviceOptions as $service)
@@ -118,7 +98,6 @@
                                 </option>
                             @endforeach
                         </select>
-                        <p class="mt-2 text-xs text-slate-500">Un PAO est maintenant rattache a un seul service.</p>
                     </div>
                     <div>
                         <label for="annee">Annee</label>
@@ -146,7 +125,7 @@
                     <input id="titre" name="titre" type="text" value="{{ old('titre', $row->titre) }}" required>
                 </div>
 
-                <div class="form-grid mt-3">
+                <div class="grid gap-4 mt-3">
                     <div>
                         <label for="objectif_operationnel">Objectif operationnel</label>
                         <textarea id="objectif_operationnel" name="objectif_operationnel">{{ old('objectif_operationnel', $row->objectif_operationnel) }}</textarea>
@@ -170,9 +149,8 @@
     </section>
 
     @if ($isEdit)
-        <section class="showcase-panel mb-4">
+        <section class="showcase-panel mb-4 app-screen-block">
             <h2 class="showcase-panel-title">Timeline validation</h2>
-            <p class="showcase-panel-subtitle">Historique du circuit brouillon -> soumis -> valide -> verrouille pour ce PAO.</p>
             <div class="overflow-auto">
                 <table>
                     <thead>
@@ -209,6 +187,7 @@
             </div>
         </section>
     @endif
+    </div>
 @endsection
 
 @push('scripts')

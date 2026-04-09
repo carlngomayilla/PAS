@@ -9,40 +9,20 @@
         $validatedCount = $visibleRows->filter(fn ($item) => in_array((string) $item->statut, ['valide', 'verrouille'], true))->count();
         $axesTotal = (int) $visibleRows->sum('axes_count');
         $paoTotal = (int) $visibleRows->sum('paos_count');
-        $tableLevel = in_array($filters['statut'] ?? null, ['valide', 'verrouille', 'valide_ou_verrouille'], true)
-            ? ['label' => 'Valide', 'tone' => 'warning']
-            : ['label' => 'Provisoire', 'tone' => 'info'];
-        $tableLevelClass = $tableLevel['tone'] === 'warning' ? 'anbg-badge anbg-badge-warning' : 'anbg-badge anbg-badge-info';
         $summaryCards = [
-            ['label' => 'Total', 'value' => $rows->total(), 'meta' => 'PAS dans le perimetre courant', 'href' => route('workspace.pas.index'), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
-            ['label' => 'Brouillons visibles', 'value' => $draftCount, 'meta' => 'Elements encore modifiables', 'href' => route('workspace.pas.index', ['statut' => 'brouillon']), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
-            ['label' => 'Valides / verrouilles', 'value' => $validatedCount, 'meta' => 'Prets a alimenter les PAO', 'href' => route('workspace.pas.index', ['statut' => 'valide_ou_verrouille']), 'badge' => 'Valide', 'badge_tone' => 'warning'],
-            ['label' => 'Axes / PAO', 'value' => $axesTotal.' / '.$paoTotal, 'meta' => 'Axes visibles et declinaisons detectees', 'href' => route('workspace.pao.index'), 'badge' => 'Provisoire', 'badge_tone' => 'info'],
+            ['label' => 'Total', 'value' => $rows->total(), 'meta' => 'PAS dans le perimetre courant', 'href' => route('workspace.pas.index'), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Brouillons visibles', 'value' => $draftCount, 'meta' => 'Elements encore modifiables', 'href' => route('workspace.pas.index', ['statut' => 'brouillon']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Valides / verrouilles', 'value' => $validatedCount, 'meta' => 'Prets a alimenter les PAO', 'href' => route('workspace.pas.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Axes / PAO', 'value' => $axesTotal.' / '.$paoTotal, 'meta' => 'Axes visibles et declinaisons detectees', 'href' => route('workspace.pao.index'), 'badge' => null, 'badge_tone' => 'neutral'],
         ];
     @endphp
 
-    <section class="showcase-hero mb-4">
+    <div class="app-screen-flow">
+    <section class="showcase-hero mb-4 app-screen-block">
         <div class="showcase-hero-body">
             <div>
                 <span class="showcase-eyebrow">Planification strategique</span>
                 <h1 class="showcase-title">PAS</h1>
-                <p class="showcase-subtitle">
-                    Gestion de la vision strategique pluriannuelle, des axes, des objectifs strategiques et de la chaine PAS -> PAO.
-                </p>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#1E3A8A]"></span>
-                        Periode pluriannuelle
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#3B82F6]"></span>
-                        Axes strategiques
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#10B981]"></span>
-                        Couverture par direction sur chaque OS
-                    </span>
-                </div>
             </div>
             <div class="showcase-action-row">
                 @if ($canWrite)
@@ -52,13 +32,7 @@
         </div>
     </section>
 
-    <div class="mb-4 flex flex-wrap gap-2">
-        <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
-        <span class="anbg-badge anbg-badge-warning px-3 py-1">Valide</span>
-        <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
-    </div>
-
-    <section class="showcase-summary-grid mb-4">
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
             <x-stat-card-link
                 :href="$card['href']"
@@ -71,11 +45,8 @@
         @endforeach
     </section>
 
-    <section class="showcase-toolbar mb-4">
-        <div>
-            <h2 class="showcase-panel-title">Filtres de lecture</h2>
-            <p class="showcase-panel-subtitle">Recherche par titre, statut ou direction concernee.</p>
-        </div>
+    <section class="showcase-toolbar mb-4 app-screen-block">
+        <div><h2 class="showcase-panel-title">Filtres</h2></div>
         <form method="GET" action="{{ route('workspace.pas.index') }}" class="mt-4">
             <div class="showcase-filter-grid">
                 <div>
@@ -91,17 +62,6 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
-                    <label for="direction_id">Direction concernee</label>
-                    <select id="direction_id" name="direction_id">
-                        <option value="">Toutes</option>
-                        @foreach ($directionOptions as $direction)
-                            <option value="{{ $direction->id }}" @selected(($filters['direction_id'] ?? null) === (int) $direction->id)>
-                                {{ $direction->code }} - {{ $direction->libelle }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
             </div>
             @if ($filters['without_pao'])
                 <input type="hidden" name="without_pao" value="1">
@@ -111,29 +71,19 @@
                 <a class="btn btn-blue" href="{{ route('workspace.pas.index') }}">Reinitialiser</a>
             </div>
             @if ($filters['without_pao'])
-                <div class="mt-4 showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#F59E0B]"></span>
-                        Drill-down actif : PAS sans PAO
-                    </span>
+                <div class="mt-4 rounded-[1rem] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                    PAS sans PAO
                 </div>
             @endif
         </form>
     </section>
 
-    <section class="showcase-panel mb-4">
+    <section class="showcase-panel mb-4 app-screen-block">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Liste des PAS</h2>
-                <p class="showcase-panel-subtitle">Lecture consolidee des periodes, axes, objectifs strategiques et volumes PAO par PAS.</p>
-                <div class="mt-2">
-                    <span class="{{ $tableLevelClass }} px-3 py-1">{{ $tableLevel['label'] }}</span>
-                </div>
             </div>
-            <span class="showcase-chip">
-                <span class="showcase-chip-dot bg-slate-500"></span>
-                {{ $rows->count() }} ligne(s) sur cette page
-            </span>
+            <span class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ $rows->count() }} ligne(s)</span>
         </div>
         <div class="overflow-auto">
             <table>
@@ -143,7 +93,7 @@
                         <th>Titre</th>
                         <th>Periode</th>
                         <th>Statut</th>
-                        <th>Axes / OS / Directions</th>
+                        <th>Axes / OS / Portee</th>
                         <th>PAO</th>
                         <th>Validateur</th>
                         @if ($canWrite)
@@ -177,7 +127,7 @@
                             <td>
                                 <div class="mb-1">
                                     <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                                        {{ $row->axes_count }} axe(s) · {{ $row->directions_count }} direction(s)
+                                        {{ $row->axes_count }} axe(s) - Toutes les directions
                                     </span>
                                 </div>
                                 @forelse ($row->axes as $axe)
@@ -201,12 +151,9 @@
                                 @empty
                                     <span class="text-slate-500 dark:text-slate-400">-</span>
                                 @endforelse
-                                @if ($row->directions->isNotEmpty())
-                                    <div class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                        Directions attendues:
-                                        {{ $row->directions->map(fn ($direction) => $direction->code)->implode(', ') }}
-                                    </div>
-                                @endif
+                                <div class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                    Portee: PAS partage a toutes les directions.
+                                </div>
                             </td>
                             <td>{{ $row->paos_count }}</td>
                             <td>{{ $row->validateur?->name ?? '-' }}</td>
@@ -258,4 +205,5 @@
         </div>
         <div class="pagination">{{ $rows->links() }}</div>
     </section>
+    </div>
 @endsection

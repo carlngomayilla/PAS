@@ -4,12 +4,12 @@
     @php
         $isEdit = $mode === 'edit';
     @endphp
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h1>{{ $isEdit ? 'Modifier axe PAO' : 'Nouvel axe PAO' }}</h1>
-        <p class="text-slate-600">Un axe PAO doit etre rattache a un PAO de direction.</p>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.pao-axes.update', $row) : route('workspace.pao-axes.store') }}">
             @csrf
             @if ($isEdit)
@@ -18,7 +18,6 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Definition de l axe</h2>
-                <p class="form-section-subtitle">Structure normalisee avec champs alignes et longueur uniforme.</p>
                 <div class="form-grid">
                     <div>
                         <label for="pao_id">PAO</label>
@@ -57,4 +56,5 @@
             </div>
         </form>
     </section>
+    </div>
 @endsection

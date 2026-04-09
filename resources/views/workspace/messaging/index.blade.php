@@ -23,15 +23,12 @@
         $selectedTreeUserId = (int) (($contactCard['user'] ?? null)?->id ?? 0);
         $activeConversationId = (int) ($activeConversation?->id ?? 0);
     @endphp
-    <section class="showcase-hero mb-4">
+    <div class="app-screen-flow">
+    <section class="showcase-hero mb-4 app-screen-block">
         <div class="showcase-hero-body">
             <div class="max-w-3xl">
                 <span class="showcase-eyebrow">Messagerie</span>
-                <h1 class="showcase-title">Messagerie interne et annuaire organisationnel</h1>
-                <p class="showcase-subtitle">
-                    Centralisez les echanges PAS, parcourez l organigramme ANBG et contactez directement les responsables,
-                    directions, services et agents visibles dans votre perimetre.
-                </p>
+                <h1 class="showcase-title">Messagerie interne</h1>
                 <div class="showcase-chip-row">
                     <span class="showcase-chip">
                         <span class="showcase-chip-dot bg-[#3996d3]"></span>
@@ -55,11 +52,10 @@
         </div>
     </section>
 
-    <section class="messaging-layout mb-4" data-messaging-page="1">
+    <section class="messaging-layout mb-4 app-screen-block" data-messaging-page="1">
         <aside class="showcase-panel messaging-column">
             <div class="mb-4">
                 <h2 class="showcase-panel-title">Recherche et filtres</h2>
-                <p class="showcase-panel-subtitle">Recherche rapide de personnes, conversations et perimetres.</p>
             </div>
 
             <form method="GET" action="{{ route('workspace.messaging.index') }}" class="form-shell">
@@ -120,7 +116,6 @@
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <div>
                         <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Conversations</h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Historique direct et conversations favorites.</p>
                     </div>
                     <span class="anbg-badge anbg-badge-info">{{ $conversations->count() }}</span>
                 </div>
@@ -172,7 +167,6 @@
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <div>
                         <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Collaborateurs accessibles</h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Recherche rapide pour demarrer une discussion.</p>
                     </div>
                     <span class="anbg-badge anbg-badge-success">{{ $directoryUsers->count() }}</span>
                 </div>
@@ -292,12 +286,10 @@
                         <div class="md:col-span-2">
                             <label for="body">Votre message</label>
                             <textarea id="body" name="body" rows="5" placeholder="Saisissez votre message, votre relance ou votre demande de coordination...">{{ old('body') }}</textarea>
-                            <p class="field-hint">Texte libre ou piece jointe. L un des deux est requis.</p>
                         </div>
                         <div>
                             <label for="attachment">Piece jointe</label>
                             <input id="attachment" name="attachment" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv">
-                            <p class="field-hint">Fichier chiffre, scanne et telechargeable dans la conversation.</p>
                         </div>
                     </div>
                     <div class="form-actions">
@@ -315,7 +307,6 @@
         <aside id="messaging-profile-card" class="showcase-panel messaging-column">
             <div class="mb-4">
                 <h2 class="showcase-panel-title">Fiche collaborateur</h2>
-                <p class="showcase-panel-subtitle">Informations professionnelles detaillees et acces direct a la discussion.</p>
             </div>
             <div
                 data-messaging-profile-content="1"
@@ -330,11 +321,10 @@
         </aside>
     </section>
 
-    <section id="messaging-orgchart" class="showcase-panel">
+    <section id="messaging-orgchart" class="showcase-panel app-screen-block">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Organigramme interactif</h2>
-                <p class="showcase-panel-subtitle">Vue organisationnelle structuree pour identifier rapidement les interlocuteurs du PAS.</p>
             </div>
             <a class="btn btn-secondary" href="{{ route('workspace.messaging.index') }}#messaging-orgchart">Ancre organigramme</a>
         </div>
@@ -435,4 +425,5 @@
             @endif
         </div>
     </section>
+    </div>
 @endsection

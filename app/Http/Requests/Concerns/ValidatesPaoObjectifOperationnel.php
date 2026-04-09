@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Concerns;
 
+use App\Services\DynamicReferentialSettings;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -45,7 +46,7 @@ trait ValidatesPaoObjectifOperationnel
             'indicateur_performance' => ['required', 'string', 'max:255'],
             'risques_potentiels' => ['nullable', 'string'],
             'echeance' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_fin'],
-            'priorite' => ['required', Rule::in(['basse', 'moyenne', 'haute', 'critique'])],
+            'priorite' => ['required', Rule::in(app(DynamicReferentialSettings::class)->paoOperationalPriorities())],
             'progression_pourcentage' => ['required', 'integer', 'between:0,100'],
             'date_realisation' => [
                 'nullable',
@@ -175,4 +176,3 @@ trait ValidatesPaoObjectifOperationnel
         return null;
     }
 }
-

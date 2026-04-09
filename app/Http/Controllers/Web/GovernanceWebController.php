@@ -25,7 +25,7 @@ class GovernanceWebController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalReadAccess()) {
+        if (! $user->hasPermission('api_docs.read')) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -41,7 +41,7 @@ class GovernanceWebController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalReadAccess()) {
+        if (! $user->hasPermission('api_docs.read')) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -62,13 +62,13 @@ class GovernanceWebController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalReadAccess()) {
+        if (! $user->hasAnyPermission('retention.read', 'retention.manage')) {
             abort(403, 'Acces non autorise.');
         }
 
         return view('workspace.governance.retention', [
             'summary' => $retentionService->summary(),
-            'canRun' => $user->hasGlobalWriteAccess(),
+            'canRun' => $user->hasPermission('retention.manage'),
         ]);
     }
 
@@ -79,7 +79,7 @@ class GovernanceWebController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalWriteAccess()) {
+        if (! $user->hasPermission('retention.manage')) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -105,7 +105,7 @@ class GovernanceWebController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalWriteAccess()) {
+        if (! $user->hasPermission('delegations.manage')) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -133,7 +133,7 @@ class GovernanceWebController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalWriteAccess()) {
+        if (! $user->hasPermission('delegations.manage')) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -158,7 +158,7 @@ class GovernanceWebController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalWriteAccess()) {
+        if (! $user->hasPermission('delegations.manage')) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -237,7 +237,7 @@ class GovernanceWebController extends Controller
             abort(401);
         }
 
-        if (! $user->hasGlobalWriteAccess()) {
+        if (! $user->hasPermission('delegations.manage')) {
             abort(403, 'Acces non autorise.');
         }
 

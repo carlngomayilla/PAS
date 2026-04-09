@@ -1,17 +1,17 @@
 @extends('layouts.workspace')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h1>Ajouter un justificatif</h1>
-        <p class="text-slate-600">Associez une preuve documentaire a une action, un indicateur ou une mesure d indicateur.</p>
+        <p class="mt-2 text-sm text-slate-500">Formats autorises : {{ strtoupper(implode(', ', $documentPolicySettings['allowed_extensions'] ?? [])) }} | Taille max : {{ $documentPolicySettings['max_upload_mb'] ?? 10 }} Mo</p>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <form method="POST" class="form-shell" action="{{ route('workspace.justificatifs.store') }}" enctype="multipart/form-data">
             @csrf
             <div class="form-section">
                 <h2 class="form-section-title">Saisie du justificatif</h2>
-                <p class="form-section-subtitle">Format uniforme avec champs alignes sur toute la largeur disponible.</p>
                 <div class="form-grid">
                     <div>
                         <label for="justifiable_type">Type d'entite</label>
@@ -28,7 +28,8 @@
                     </div>
                     <div>
                         <label for="fichier">Fichier</label>
-                        <input id="fichier" name="fichier" type="file" required>
+                        <input id="fichier" name="fichier" type="file" accept="{{ $documentAccept }}" required>
+                        <p class="mt-1 text-xs text-slate-500">Retention indicative : {{ $documentPolicySettings['retention_days'] ?? 365 }} jours.</p>
                     </div>
                 </div>
                 <div class="mt-3">
@@ -43,9 +44,9 @@
         </form>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h2>References rapides (IDs utilisables)</h2>
-        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+        <div class="app-screen-stack">
             <article class="ui-card mb-3.5 !mb-0">
                 <strong>Actions</strong>
                 <div class="overflow-auto mt-2">
@@ -95,4 +96,5 @@
             </article>
         </div>
     </section>
+    </div>
 @endsection

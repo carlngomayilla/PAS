@@ -1,9 +1,9 @@
 @extends('layouts.workspace')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h1>Referentiel - Directions</h1>
-        <p class="text-slate-600">Gestion des directions institutionnelles.</p>
         @if ($canWrite)
             <p class="mt-2.5">
                 <a class="btn btn-green" href="{{ route('workspace.referentiel.directions.create') }}">Nouvelle direction</a>
@@ -11,8 +11,8 @@
         @endif
     </section>
 
-    <section class="ui-card mb-3.5">
-        <h2>Navigation du referentiel</h2>
+    <section class="ui-card mb-3.5 app-screen-block">
+        <h2>Navigation</h2>
         <div class="flex flex-wrap gap-1.5">
             <a class="btn btn-primary" href="{{ route('workspace.referentiel.directions.index') }}">Directions</a>
             <a class="btn btn-blue" href="{{ route('workspace.referentiel.services.index') }}">Services</a>
@@ -22,7 +22,7 @@
         </div>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h2>Filtres</h2>
         <form method="GET" action="{{ route('workspace.referentiel.directions.index') }}">
             <div class="form-grid-compact mb-2">
@@ -46,7 +46,7 @@
         </form>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h2>Liste des directions</h2>
         <div class="overflow-auto">
             <table>
@@ -99,4 +99,5 @@
         </div>
         <div class="pagination">{{ $rows->links() }}</div>
     </section>
+    </div>
 @endsection

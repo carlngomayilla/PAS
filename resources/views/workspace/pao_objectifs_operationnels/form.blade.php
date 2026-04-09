@@ -5,12 +5,12 @@
         $isEdit = $mode === 'edit';
         $operationalStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
     @endphp
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h1>{{ $isEdit ? 'Modifier objectif operationnel' : 'Nouvel objectif operationnel' }}</h1>
-        <p class="text-slate-600">Action detaillee, responsable, cible, dates, statut, ressources, risques et livrables.</p>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.pao-objectifs-operationnels.update', $row) : route('workspace.pao-objectifs-operationnels.store') }}">
             @csrf
             @if ($isEdit)
@@ -19,7 +19,6 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Planification et execution</h2>
-                <p class="form-section-subtitle">Les champs principaux sont alignes sur la meme grille et la meme longueur.</p>
                 <div class="form-grid">
                     <div>
                         <label for="pao_objectif_strategique_id">Objectif strategique PAO</label>
@@ -154,4 +153,5 @@
             </div>
         </form>
     </section>
+    </div>
 @endsection

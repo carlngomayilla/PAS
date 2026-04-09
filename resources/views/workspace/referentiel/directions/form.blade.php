@@ -4,12 +4,12 @@
     @php
         $isEdit = $mode === 'edit';
     @endphp
-    <section class="ui-card mb-3.5">
+    <div class="app-screen-flow">
+    <section class="ui-card mb-3.5 app-screen-block">
         <h1>{{ $isEdit ? 'Modifier direction' : 'Nouvelle direction' }}</h1>
-        <p class="text-slate-600">Parametrage du referentiel direction.</p>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="ui-card mb-3.5 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.referentiel.directions.update', $row) : route('workspace.referentiel.directions.store') }}">
             @csrf
             @if ($isEdit)
@@ -18,8 +18,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Parametrage direction</h2>
-                <p class="form-section-subtitle">Meme format visuel que les autres ecrans CRUD.</p>
-                <div class="form-grid">
+                <div class="grid gap-4">
                     <div>
                         <label for="code">Code</label>
                         <input id="code" name="code" type="text" maxlength="30" value="{{ old('code', $row->code) }}" required>
@@ -44,4 +43,5 @@
             </div>
         </form>
     </section>
+    </div>
 @endsection

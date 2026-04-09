@@ -10,6 +10,7 @@ use App\Http\Requests\StorePaoObjectifOperationnelRequest;
 use App\Http\Requests\UpdatePaoObjectifOperationnelRequest;
 use App\Models\PaoObjectifOperationnel;
 use App\Models\PaoObjectifStrategique;
+use App\Services\DynamicReferentialSettings;
 use App\Models\User;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
@@ -371,6 +372,6 @@ class PaoObjectifOperationnelWebController extends Controller
      */
     private function prioriteOptions(): array
     {
-        return ['basse', 'moyenne', 'haute', 'critique'];
+        return app(DynamicReferentialSettings::class)->paoOperationalPriorities();
     }
 }

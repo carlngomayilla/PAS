@@ -119,4 +119,28 @@ class SessionLoginTest extends TestCase
 
         $this->assertGuest();
     }
+
+    public function test_suspended_user_cannot_login_via_web_form(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'suspended@anbg.test',
+            'password' => Hash::make('Pass@12345'),
+            'password_changed_at' => now(),
+            'role' => User::ROLE_AGENT,
+            'agent_matricule' => 'S1-10',
+            'is_active' => true,
+            'suspended_until' => now()->addDays(3),
+            'suspension_reason' => 'Controle interne',
+        ]);
+
+        $this->from(route('login.form'))
+            ->post(route('login'), [
+                'email' => $user->email,
+                'password' => 'Pass@12345',
+            ])
+            ->assertRedirect(route('login.form'))
+            ->assertSessionHasErrors('email');
+
+        $this->assertGuest();
+    }
 }

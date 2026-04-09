@@ -41,6 +41,12 @@ class AuthController extends Controller
             ], 403);
         }
 
+        if ($user->isSuspended()) {
+            return response()->json([
+                'message' => 'Compte temporairement suspendu.',
+            ], 403);
+        }
+
         if ($this->passwordPolicy->isExpired($user)) {
             return response()->json([
                 'message' => $this->passwordPolicy->expirationMessage(),

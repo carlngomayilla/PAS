@@ -16,6 +16,7 @@ use App\Models\PasObjectif;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
@@ -262,7 +263,7 @@ class PaoWebController extends Controller
 
         if ($pao->ptas()->exists() && (int) $pao->service_id !== (int) $validated['service_id']) {
             return back()->withInput()->withErrors([
-                'service_id' => 'Le service d un PAO deja decliné en PTA ne peut plus etre modifie.',
+                'service_id' => 'Le service affecte au PAO ne peut plus changer apres creation du PTA.',
             ]);
         }
 
@@ -337,20 +338,27 @@ class PaoWebController extends Controller
         }
 
         $this->denyUnlessWriteDirection($user, (int) $pao->direction_id);
+        $workflow = $this->planningWorkflowSummary();
+        if (! $workflow['submit_enabled']) {
+            return back()->withErrors(['general' => 'La soumission est desactivee pour le workflow PAO actif.']);
+        }
 
         $before = $pao->toArray();
+        $targetStatus = (string) $workflow['submit_target_status'];
         $pao->update([
-            'statut' => 'soumis',
-            'valide_le' => null,
-            'valide_par' => null,
+            'statut' => $targetStatus,
+            'valide_le' => in_array($targetStatus, ['valide', 'verrouille'], true) ? now() : null,
+            'valide_par' => in_array($targetStatus, ['valide', 'verrouille'], true) ? $user->id : null,
         ]);
 
         $this->recordAudit($request, 'pao', 'submit', $pao, $before, $pao->toArray());
-        $notificationService->notifyPaoStatus($pao, 'submitted', $user);
+        $notificationService->notifyPaoStatus($pao, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', 'PAO soumis pour validation.');
+            ->with('success', $targetStatus === 'soumis'
+                ? 'PAO soumis pour validation.'
+                : 'PAO valide directement selon le workflow configure.');
     }
 
     public function approve(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -362,6 +370,11 @@ class PaoWebController extends Controller
 
         if (! $this->canApprove($user)) {
             abort(403, 'Acces non autorise.');
+        }
+
+        $workflow = $this->planningWorkflowSummary();
+        if (! $workflow['approve_enabled']) {
+            return back()->withErrors(['general' => 'La validation intermediaire est desactivee pour le workflow PAO actif.']);
         }
 
         if ($pao->statut !== 'soumis') {
@@ -394,6 +407,11 @@ class PaoWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
+        $workflow = $this->planningWorkflowSummary();
+        if (! $workflow['lock_enabled']) {
+            return back()->withErrors(['general' => 'Le verrouillage final est desactive pour le workflow PAO actif.']);
+        }
+
         if ($pao->statut !== 'valide') {
             return back()->withErrors(['general' => $this->requiredStateMessage('PAO', 'valide', 'verrouille')]);
         }
@@ -424,11 +442,17 @@ class PaoWebController extends Controller
             return back()->withErrors(['general' => $this->lockedCannotBeReopenedMessage('PAO')]);
         }
 
-        if (! in_array($pao->statut, ['soumis', 'valide'], true)) {
-            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage(['soumis', 'valide'])]);
+        $workflow = $this->planningWorkflowSummary();
+        $allowedStatuses = $workflow['reopen_allowed_statuses'];
+
+        if (! in_array($pao->statut, $allowedStatuses, true)) {
+            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage($allowedStatuses)]);
         }
 
-        if ($pao->statut === 'valide' && ! $this->canApprove($user)) {
+        if ($pao->statut === 'valide'
+            && $workflow['approve_enabled']
+            && ! $this->canApprove($user)
+        ) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -467,7 +491,7 @@ class PaoWebController extends Controller
 
     private function canApprove(User $user): bool
     {
-        return $user->hasRole(User::ROLE_ADMIN, User::ROLE_DG);
+        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG);
     }
 
     /**
@@ -582,11 +606,13 @@ class PaoWebController extends Controller
      */
     private function statusOptions(User $user): array
     {
+        $workflow = $this->planningWorkflowSummary();
+
         if ($user->hasGlobalWriteAccess()) {
-            return ['brouillon', 'soumis', 'valide', 'verrouille'];
+            return $workflow['status_options_global'];
         }
 
-        return ['brouillon', 'soumis'];
+        return $workflow['status_options_writer'];
     }
 
     /**
@@ -598,17 +624,6 @@ class PaoWebController extends Controller
             ->with(['directions:id,code,libelle'])
             ->orderByDesc('periode_debut')
             ->orderByDesc('id');
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $directionId = (int) $user->direction_id;
-            $query->where(function ($q) use ($directionId, $forcePasId): void {
-                $q->whereHas('directions', fn ($subQuery) => $subQuery->whereKey($directionId));
-
-                if ($forcePasId !== null) {
-                    $q->orWhere('id', $forcePasId);
-                }
-            });
-        }
 
         return $query->get(['id', 'titre', 'periode_debut', 'periode_fin']);
     }
@@ -626,17 +641,6 @@ class PaoWebController extends Controller
             ->orderBy('pas_axe_id')
             ->orderBy('ordre')
             ->orderBy('id');
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $directionId = (int) $user->direction_id;
-            $query->where(function ($subQuery) use ($directionId, $forceObjectifId): void {
-                $subQuery->whereHas('pasAxe.pas.directions', fn ($pasQuery) => $pasQuery->whereKey($directionId));
-
-                if ($forceObjectifId !== null) {
-                    $subQuery->orWhereKey($forceObjectifId);
-                }
-            });
-        }
 
         return $query->get(['id', 'pas_axe_id', 'code', 'libelle', 'ordre']);
     }
@@ -666,19 +670,16 @@ class PaoWebController extends Controller
 
     private function resolveAccessibleObjectif(User $user, int $objectifId): PasObjectif
     {
-        $objectif = PasObjectif::query()
-            ->with('pasAxe.pas.directions:id')
+        return PasObjectif::query()
+            ->with('pasAxe.pas:id,titre,periode_debut,periode_fin')
             ->findOrFail($objectifId);
+    }
 
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $allowed = $objectif->pasAxe?->pas?->directions
-                ?->contains(static fn (Direction $direction): bool => (int) $direction->id === (int) $user->direction_id);
-
-            if (! $allowed) {
-                abort(403, 'Objectif strategique hors perimetre.');
-            }
-        }
-
-        return $objectif;
+    /**
+     * @return array<string, mixed>
+     */
+    private function planningWorkflowSummary(): array
+    {
+        return app(WorkflowSettings::class)->planningWorkflowSummary('pao');
     }
 }

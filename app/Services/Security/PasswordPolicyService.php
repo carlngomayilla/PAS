@@ -33,7 +33,11 @@ class PasswordPolicyService
             $rule = $rule->symbols();
         }
 
-        if (config('security.passwords.check_pwned', true)) {
+        if (
+            config('security.passwords.check_pwned', true)
+            && ! app()->runningUnitTests()
+            && ! app()->environment(['local', 'testing'])
+        ) {
             $rule = $rule->uncompromised();
         }
 

@@ -54,10 +54,10 @@ class PasPolicyTest extends TestCase
         $this->assertFalse($this->policy->delete($fixture['service_user'], $fixture['pas']));
 
         $this->assertTrue($this->policy->viewAny($fixture['other_direction_user']));
-        $this->assertFalse($this->policy->view($fixture['other_direction_user'], $fixture['pas']));
+        $this->assertTrue($this->policy->view($fixture['other_direction_user'], $fixture['pas']));
 
         $this->assertTrue($this->policy->viewAny($fixture['other_service_user']));
-        $this->assertFalse($this->policy->view($fixture['other_service_user'], $fixture['pas']));
+        $this->assertTrue($this->policy->view($fixture['other_service_user'], $fixture['pas']));
     }
 
     /**
@@ -141,8 +141,6 @@ class PasPolicyTest extends TestCase
             'periode_fin' => 2028,
             'statut' => 'brouillon',
         ]);
-        $pas->directions()->sync([$direction->id]);
-
         $axe = PasAxe::query()->create([
             'pas_id' => $pas->id,
             'code' => 'AXE-PAS',

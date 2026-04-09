@@ -14,7 +14,18 @@ class EnsureActiveAccount
     public function handle(Request $request, Closure $next): Response|RedirectResponse|JsonResponse
     {
         $user = $request->user();
-        if ($user === null || (bool) ($user->is_active ?? true)) {
+        if ($user === null) {
+            return $next($request);
+        }
+
+        $message = null;
+        if (! (bool) ($user->is_active ?? true)) {
+            $message = 'Compte desactive.';
+        } elseif (method_exists($user, 'isSuspended') && $user->isSuspended()) {
+            $message = 'Compte temporairement suspendu.';
+        }
+
+        if ($message === null) {
             return $next($request);
         }
 
@@ -22,7 +33,7 @@ class EnsureActiveAccount
             $request->user()?->currentAccessToken()?->delete();
 
             return response()->json([
-                'message' => 'Compte desactive.',
+                'message' => $message,
             ], 403);
         }
 
@@ -34,6 +45,6 @@ class EnsureActiveAccount
 
         return redirect()
             ->route('login.form')
-            ->withErrors(['email' => 'Compte desactive.']);
+            ->withErrors(['email' => $message]);
     }
 }

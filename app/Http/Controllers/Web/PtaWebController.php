@@ -14,6 +14,7 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -132,10 +133,10 @@ class PtaWebController extends Controller
 
         $validated = $request->validated();
         $pao = Pao::query()->findOrFail((int) $validated['pao_id']);
-        $paoServiceId = $pao->service_id !== null ? (int) $pao->service_id : null;
-        if ($paoServiceId === null) {
+        $serviceId = $pao->service_id !== null ? (int) $pao->service_id : null;
+        if ($serviceId === null) {
             return back()->withInput()->withErrors([
-                'pao_id' => 'Le PAO selectionne n est pas encore rattache a un service.',
+                'pao_id' => 'Le PAO selectionne n est pas encore affecte a un service.',
             ]);
         }
 
@@ -149,13 +150,13 @@ class PtaWebController extends Controller
         $this->denyUnlessManagePta(
             $user,
             (int) $pao->direction_id,
-            $paoServiceId
+            $serviceId
         );
 
         $payload = [
             'pao_id' => (int) $pao->id,
             'direction_id' => (int) $pao->direction_id,
-            'service_id' => $paoServiceId,
+            'service_id' => $serviceId,
             'titre' => (string) $validated['titre'],
             'description' => $validated['description'] ?? null,
             'statut' => $statut,
@@ -216,7 +217,7 @@ class PtaWebController extends Controller
         $targetServiceId = $targetPao->service_id !== null ? (int) $targetPao->service_id : null;
         if ($targetServiceId === null) {
             return back()->withInput()->withErrors([
-                'pao_id' => 'Le PAO selectionne n est pas encore rattache a un service.',
+                'pao_id' => 'Le PAO selectionne n est pas encore affecte a un service.',
             ]);
         }
 
@@ -308,20 +309,27 @@ class PtaWebController extends Controller
         }
 
         $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
+        $workflow = $this->planningWorkflowSummary();
+        if (! $workflow['submit_enabled']) {
+            return back()->withErrors(['general' => 'La soumission est desactivee pour le workflow PTA actif.']);
+        }
 
         $before = $pta->toArray();
+        $targetStatus = (string) $workflow['submit_target_status'];
         $pta->update([
-            'statut' => 'soumis',
-            'valide_le' => null,
-            'valide_par' => null,
+            'statut' => $targetStatus,
+            'valide_le' => in_array($targetStatus, ['valide', 'verrouille'], true) ? now() : null,
+            'valide_par' => in_array($targetStatus, ['valide', 'verrouille'], true) ? $user->id : null,
         ]);
 
         $this->recordAudit($request, 'pta', 'submit', $pta, $before, $pta->toArray());
-        $notificationService->notifyPtaStatus($pta, 'submitted', $user);
+        $notificationService->notifyPtaStatus($pta, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA soumis pour validation.');
+            ->with('success', $targetStatus === 'soumis'
+                ? 'PTA soumis pour validation.'
+                : 'PTA valide directement selon le workflow configure.');
     }
 
     public function approve(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
@@ -333,6 +341,11 @@ class PtaWebController extends Controller
 
         if (! $this->canApprove($user, $pta)) {
             abort(403, 'Acces non autorise.');
+        }
+
+        $workflow = $this->planningWorkflowSummary();
+        if (! $workflow['approve_enabled']) {
+            return back()->withErrors(['general' => 'La validation intermediaire est desactivee pour le workflow PTA actif.']);
         }
 
         if ($pta->statut !== 'soumis') {
@@ -365,6 +378,11 @@ class PtaWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
+        $workflow = $this->planningWorkflowSummary();
+        if (! $workflow['lock_enabled']) {
+            return back()->withErrors(['general' => 'Le verrouillage final est desactive pour le workflow PTA actif.']);
+        }
+
         if ($pta->statut !== 'valide') {
             return back()->withErrors(['general' => $this->requiredStateMessage('PTA', 'valide', 'verrouille')]);
         }
@@ -395,8 +413,11 @@ class PtaWebController extends Controller
             return back()->withErrors(['general' => $this->lockedCannotBeReopenedMessage('PTA')]);
         }
 
-        if (! in_array($pta->statut, ['soumis', 'valide'], true)) {
-            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage(['soumis', 'valide'])]);
+        $workflow = $this->planningWorkflowSummary();
+        $allowedStatuses = $workflow['reopen_allowed_statuses'];
+
+        if (! in_array($pta->statut, $allowedStatuses, true)) {
+            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage($allowedStatuses)]);
         }
 
         if ($pta->statut === 'soumis'
@@ -405,7 +426,10 @@ class PtaWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        if ($pta->statut === 'valide' && ! $this->canApprove($user, $pta)) {
+        if ($pta->statut === 'valide'
+            && $workflow['approve_enabled']
+            && ! $this->canApprove($user, $pta)
+        ) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -522,7 +546,9 @@ class PtaWebController extends Controller
 
         $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
 
-        return $query->whereNotNull('service_id')->get(['id', 'direction_id', 'service_id', 'annee', 'titre']);
+        return $query
+            ->whereNotNull('service_id')
+            ->get(['id', 'direction_id', 'service_id', 'annee', 'titre']);
     }
 
     /**
@@ -552,10 +578,20 @@ class PtaWebController extends Controller
      */
     private function statusOptions(User $user): array
     {
+        $workflow = $this->planningWorkflowSummary();
+
         if ($user->hasGlobalWriteAccess()) {
-            return ['brouillon', 'soumis', 'valide', 'verrouille'];
+            return $workflow['status_options_global'];
         }
 
-        return ['brouillon', 'soumis'];
+        return $workflow['status_options_writer'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function planningWorkflowSummary(): array
+    {
+        return app(WorkflowSettings::class)->planningWorkflowSummary('pta');
     }
 }

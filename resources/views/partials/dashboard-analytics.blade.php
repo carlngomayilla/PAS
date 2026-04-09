@@ -24,14 +24,37 @@
     $alertRows = $analytics['alert_rows'] ?? [];
     $interannualRows = $analytics['interannual'] ?? [];
     $unitModeLabel = $analytics['unit_mode_label'] ?? 'Unites';
-    $summaryGroups = $roleDashboard['summary_groups'] ?? [];
+    $officialPolicy = is_array(($reportingAnalytics['officialPolicy'] ?? null)) ? $reportingAnalytics['officialPolicy'] : [];
+    $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
+    $officialBaseLower = mb_strtolower($officialBaseLabel);
+    $officialBaseText = 'Base statistique : '.$officialBaseLabel;
+    $officialAverageText = 'Moyenne sur '.$officialBaseLabel;
+    $officialFilters = (array) ($officialPolicy['route_filters'] ?? []);
+    $availableDashboardTabs = [
+        'overview' => 'Synthese',
+        'charts' => 'Graphiques',
+        'tables' => 'Tableaux',
+    ];
+    $dashboardTabAliases = [
+        'overview' => 'overview',
+        'synthese' => 'overview',
+        'charts' => 'charts',
+        'graphes' => 'charts',
+        'kpi' => 'charts',
+        'gantt' => 'charts',
+        'analytics' => 'charts',
+        'actions' => 'tables',
+        'tables' => 'tables',
+    ];
+    $requestedDashboardTab = request()->query('dashboardTab', 'overview');
+    $currentDashboardTab = $dashboardTabAliases[$requestedDashboardTab] ?? 'overview';
 
     $summaryStrip = ($roleDashboard['summary_cards'] ?? []) !== [] ? $roleDashboard['summary_cards'] : [
         ['label' => 'Actions totales', 'value' => $metrics['totals']['actions_total'] ?? 0, 'accent' => '#1F2937', 'bg' => '#F8FBFF', 'meta' => 'Portefeuille scope', 'href' => route('workspace.actions.index')],
         ['label' => $metricLabel('global'), 'value' => number_format((float) ($globalScores['global'] ?? 0), 0), 'accent' => '#10B981', 'bg' => '#ECFDF5', 'meta' => 'Moyenne des indicateurs d action', 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc'])],
         ['label' => 'En retard', 'value' => $metrics['alerts']['actions_en_retard'] ?? 0, 'accent' => '#EF4444', 'bg' => '#FEF2F2', 'meta' => 'Actions hors delai', 'href' => route('workspace.actions.index', ['statut' => 'en_retard'])],
         ['label' => 'Non demarrees', 'value' => collect($statusCards)->firstWhere('label', 'Non demarre')['count'] ?? 0, 'accent' => '#6B7280', 'bg' => '#F1F5F9', 'meta' => 'Aucune progression', 'href' => route('workspace.actions.index', ['statut' => 'non_demarre'])],
-        ['label' => 'Taux validation', 'value' => ($metrics['totals']['actions_total'] ?? 0) > 0 ? number_format(((($metrics['totals']['actions_validees'] ?? 0) / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100), 0).'%' : '0%', 'accent' => '#3B82F6', 'bg' => '#EFF6FF', 'meta' => 'Validation direction', 'href' => route('workspace.actions.index', ['statut_validation' => \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_DIRECTION])],
+        ['label' => 'Taux validation', 'value' => ($metrics['totals']['actions_total'] ?? 0) > 0 ? number_format(((($metrics['totals']['actions_validees'] ?? 0) / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100), 0).'%' : '0%', 'accent' => '#3B82F6', 'bg' => '#EFF6FF', 'meta' => $officialBaseText, 'href' => route('workspace.actions.index', $officialFilters)],
     ];
 
     $ganttStart = \Illuminate\Support\Carbon::create(now()->year, 1, 1)->startOfDay();
@@ -92,7 +115,7 @@
 @once
     @push('head')
         <style>
-            .dashboard-tab{border:0;border-radius:9999px;padding:.75rem 1rem;font-size:.8rem;font-weight:800;white-space:nowrap;transition:all .15s ease}
+            .dashboard-tab{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:9999px;padding:.75rem 1rem;font-size:.8rem;font-weight:800;white-space:nowrap;transition:all .15s ease;text-decoration:none}
             .dashboard-tab-active{background:linear-gradient(135deg,#1E3A8A 0%,#3B82F6 52%,#1E3A8A 100%);color:#fff;box-shadow:0 12px 22px -18px rgba(59,130,246,.42)}
             .dashboard-tab-inactive{background:transparent;color:rgb(71 85 105)}
             .dashboard-tab-panel{display:none;animation:dashboardFadeUp .24s ease}
@@ -132,11 +155,11 @@
             .dashboard-gantt-right{font-size:.72rem;fill:#1F2937;font-weight:900}
             .dashboard-advanced-shell{display:flex;flex-direction:column;gap:1rem}
             .dashboard-advanced-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
-            .dashboard-advanced-card{position:relative;overflow:hidden;border:1px solid rgba(59,130,246,.18);border-radius:1.45rem;padding:1rem 1rem 1.1rem;background:linear-gradient(180deg,rgba(255,255,255,.99) 0%,rgba(239,246,255,.94) 100%);box-shadow:0 24px 46px -38px rgba(31,41,55,.32)}
-            .dashboard-advanced-card::before{content:'';position:absolute;inset:0 0 auto 0;height:4px;background:linear-gradient(90deg,#1E3A8A 0%,#3B82F6 46%,#10B981 74%,#F59E0B 100%);opacity:.95}
+            .dashboard-advanced-card{position:relative;overflow:hidden;border:1px solid rgba(203,213,225,.82);border-radius:1.45rem;padding:1rem 1rem 1.1rem;background:linear-gradient(180deg,rgba(255,255,255,.99) 0%,rgba(248,250,252,.95) 100%);box-shadow:0 20px 34px -30px rgba(15,23,42,.12)}
+            .dashboard-advanced-card::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,rgba(100,116,139,.42) 0%,rgba(59,130,246,.28) 100%);opacity:.9}
             .dashboard-advanced-card:hover{transform:translateY(-2px);box-shadow:0 28px 48px -36px rgba(15,23,42,.62)}
             .dashboard-advanced-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.85rem;margin-bottom:.9rem}
-            .dashboard-advanced-kpi{border-radius:1.2rem;border:1px solid rgba(59,130,246,.14);padding:1rem;background:linear-gradient(180deg,rgba(255,255,255,.99) 0%,rgba(239,246,255,.92) 100%);box-shadow:0 18px 34px -30px rgba(31,41,55,.28)}
+            .dashboard-advanced-kpi{border-radius:1.2rem;border:1px solid rgba(203,213,225,.82);padding:1rem;background:linear-gradient(180deg,rgba(255,255,255,.99) 0%,rgba(248,250,252,.94) 100%);box-shadow:0 18px 28px -28px rgba(15,23,42,.1)}
             .dashboard-advanced-kpi .dashboard-summary-value{color:#1F2937}
             .dashboard-advanced-kpi-blue .dashboard-summary-value{color:#3B82F6}
             .dashboard-advanced-kpi-green .dashboard-summary-value{color:#10B981}
@@ -155,14 +178,14 @@
             .dashboard-critical-gantt-bar{position:absolute;top:0;bottom:0;border-radius:9999px;background:linear-gradient(90deg,rgba(249,177,60,.32) 0%,rgba(57,150,211,.38) 100%)}
             .dashboard-critical-gantt-progress{display:block;height:100%;border-radius:9999px;background:linear-gradient(90deg,#F59E0B 0%,#EF4444 100%);box-shadow:0 0 22px -8px rgba(239,68,68,.38)}
             .dashboard-treemap-wrap{display:flex;flex-wrap:wrap;gap:.7rem}
-            .dashboard-treemap-item{min-width:170px;border-radius:1rem;padding:.82rem;background:linear-gradient(145deg,rgba(57,150,211,.12) 0%,rgba(143,192,67,.18) 100%);border:1px solid rgba(57,150,211,.16);transition:transform .18s ease,box-shadow .18s ease}
-            .dashboard-treemap-item:hover{transform:translateY(-2px);box-shadow:0 18px 28px -24px rgba(15,23,42,.6)}
+            .dashboard-treemap-item{min-width:170px;border-radius:1rem;padding:.82rem;background:linear-gradient(145deg,rgba(255,255,255,.99) 0%,rgba(248,250,252,.94) 100%);border:1px solid rgba(203,213,225,.82);transition:transform .18s ease,box-shadow .18s ease}
+            .dashboard-treemap-item:hover{transform:translateY(-2px);box-shadow:0 18px 28px -24px rgba(15,23,42,.16)}
             .dashboard-treemap-item strong{display:block;font-size:.78rem;color:#1F2937}
             .dashboard-treemap-item span{display:block;margin-top:.25rem;font-size:.74rem;color:#475569}
             .dashboard-risk-inline{display:flex;align-items:center;gap:.55rem}
             .dashboard-risk-inline-bar{display:inline-flex;align-items:center;flex:1;min-width:86px;height:.5rem;border-radius:9999px;background:rgba(226,232,240,.95);overflow:hidden}
             .dashboard-risk-inline-bar span{display:block;height:100%;border-radius:9999px;background:linear-gradient(90deg,#F59E0B 0%,#EF4444 100%)}
-            .dashboard-gauge-grid{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+            .dashboard-gauge-grid{display:grid;gap:.8rem;grid-template-columns:minmax(0,1fr)}
             .dashboard-gauge-card{border-radius:1rem;border:1px solid rgba(203,213,225,.85);padding:.75rem;background:rgba(255,255,255,.94);text-align:center}
             .dashboard-gauge-card strong{display:block;min-height:2rem;font-size:.76rem;color:#1F2937}
             .dashboard-gauge-card p{margin:.1rem 0 0;font-size:.78rem;color:#64748B}
@@ -173,8 +196,8 @@
             .dashboard-chart-legend{display:flex;flex-wrap:wrap;gap:.5rem .65rem;margin-top:.75rem}
             .dashboard-chart-legend span{display:inline-flex;align-items:center;gap:.4rem;border-radius:9999px;padding:.32rem .64rem;font-size:.69rem;font-weight:800;background:rgba(241,245,249,.96);color:#1F2937}
             .dashboard-chart-legend i{display:inline-block;width:.65rem;height:.65rem;border-radius:9999px}
-            .dashboard-reporting-jump{display:inline-flex;align-items:center;justify-content:center;border-radius:1rem;padding:.78rem 1rem;font-size:.78rem;font-weight:800;color:#1E3A8A;background:linear-gradient(135deg,rgba(239,246,255,.98) 0%,rgba(59,130,246,.12) 100%);border:1px solid rgba(59,130,246,.2);transition:all .16s ease}
-            .dashboard-reporting-jump:hover{background:linear-gradient(135deg,rgba(239,246,255,1) 0%,rgba(59,130,246,.18) 100%);transform:translateY(-1px)}
+            .dashboard-reporting-jump{display:inline-flex;align-items:center;justify-content:center;border-radius:1rem;padding:.78rem 1rem;font-size:.78rem;font-weight:800;color:#1E3A8A;background:linear-gradient(135deg,rgba(255,255,255,.99) 0%,rgba(248,250,252,.96) 100%);border:1px solid rgba(148,163,184,.24);transition:all .16s ease}
+            .dashboard-reporting-jump:hover{background:linear-gradient(135deg,rgba(255,255,255,1) 0%,rgba(241,245,249,.96) 100%);transform:translateY(-1px)}
             @keyframes dashboardFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
             .dark .dashboard-tab-inactive{color:rgb(148 163 184)}
             .dark .dashboard-table th{background:linear-gradient(180deg,rgba(28,32,61,.96)_0%,rgba(20,24,47,.98)_100%);border-bottom-color:rgb(51 65 85 / .88);color:rgb(248 250 252)}
@@ -190,19 +213,19 @@
             .dark .dashboard-gantt-axis line,.dark .dashboard-gantt-axis path{stroke:rgba(100,116,139,.24)}
             .dark .dashboard-gantt-label,.dark .dashboard-gantt-right{fill:#F8FAFC}
             .dark .dashboard-gantt-bg{fill:rgba(51,65,85,.78)}
-            .dark .dashboard-advanced-card,.dark .dashboard-advanced-kpi{border-color:rgba(57,150,211,.18);background:linear-gradient(180deg,rgba(15,23,42,.96) 0%,rgba(15,23,42,.88) 100%)}
+            .dark .dashboard-advanced-card,.dark .dashboard-advanced-kpi{border-color:rgba(71,85,105,.72);background:linear-gradient(180deg,rgba(15,23,42,.96) 0%,rgba(17,24,39,.9) 100%)}
             .dark .dashboard-advanced-kpi .dashboard-summary-meta,.dark .dashboard-advanced-kpi .dashboard-summary-label{color:#94A3B8}
             .dark .dashboard-heatmap-table th{color:#94A3B8}
             .dark .dashboard-heatmap-cell{color:#F8FAFC;box-shadow:inset 0 -1px 0 rgba(255,255,255,.06)}
             .dark .dashboard-critical-gantt-track{background:linear-gradient(180deg,rgba(51,65,85,.72) 0%,rgba(30,41,59,.86) 100%)}
-            .dark .dashboard-treemap-item{border-color:rgba(57,150,211,.2);background:linear-gradient(145deg,rgba(57,150,211,.18) 0%,rgba(143,192,67,.14) 100%)}
+            .dark .dashboard-treemap-item{border-color:rgba(71,85,105,.72);background:linear-gradient(145deg,rgba(15,23,42,.96) 0%,rgba(17,24,39,.9) 100%)}
             .dark .dashboard-treemap-item strong{color:#F8FAFC}
             .dark .dashboard-treemap-item span,.dark .dashboard-gauge-card p{color:#CBD5E1}
             .dark .dashboard-risk-inline-bar{background:rgba(30,41,59,.95)}
             .dark .dashboard-gauge-card,.dark .dashboard-status-block{border-color:rgba(51,65,85,.88);background:rgba(15,23,42,.82)}
             .dark .dashboard-gauge-card strong,.dark .dashboard-status-block-title{color:#F8FAFC}
             .dark .dashboard-chart-legend span{background:rgba(15,23,42,.9);color:#F8FAFC}
-            .dark .dashboard-reporting-jump{color:#F8FAFC;background:linear-gradient(135deg,rgba(248,233,50,.16) 0%,rgba(57,150,211,.16) 100%);border-color:rgba(57,150,211,.26)}
+            .dark .dashboard-reporting-jump{color:#F8FAFC;background:linear-gradient(135deg,rgba(15,23,42,.96) 0%,rgba(17,24,39,.92) 100%);border-color:rgba(71,85,105,.72)}
             @media (max-width:1024px){.dashboard-bullet,.dashboard-gantt-grid,.dashboard-gantt-head,.dashboard-critical-gantt-row{grid-template-columns:1fr}}
         </style>
     @endpush
@@ -213,7 +236,6 @@
         <div class="max-w-3xl">
             <span class="showcase-eyebrow">{{ $roleHero['eyebrow'] ?? 'Cockpit analytique' }}</span>
             <h1 class="showcase-title">{{ $roleHero['title'] ?? 'Tableau de bord strategique et operationnel' }}</h1>
-            <p class="showcase-subtitle mt-1">{{ $roleHero['subtitle'] ?? 'Vue consolidee du portefeuille PAS / PAO / PTA / Actions avec un rendu analytique plus riche, sans sortir du perimetre metier actuel.' }}</p>
             <div class="showcase-chip-row">
                 <span class="showcase-chip"><span class="showcase-chip-dot bg-[#1E3A8A]"></span>{{ $user->name }}</span>
                 <span class="showcase-chip"><span class="showcase-chip-dot bg-[#3B82F6]"></span>{{ $profil['role_label'] }}</span>
@@ -228,280 +250,76 @@
         <div class="showcase-action-row">
             <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.pilotage') }}">Pilotage global</a>
             <a class="btn btn-blue rounded-2xl px-4 py-2.5" href="{{ route('workspace.alertes') }}">Centre d alertes</a>
-            <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting') }}">Reporting consolide</a>
+            <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting') }}">Reporting</a>
         </div>
     </div>
 </section>
 
 <div class="mb-4 flex flex-wrap gap-2 rounded-[1.35rem] border border-[#3996d3]/18 bg-white/95 p-2 shadow-[0_20px_44px_-36px_rgba(15,23,42,0.45)] dark:border-white/10 dark:bg-slate-950/80" data-dashboard-tabs>
-    <button type="button" class="dashboard-tab dashboard-tab-active" data-dashboard-tab="overview">Vue generale</button>
-    <button type="button" class="dashboard-tab dashboard-tab-inactive" data-dashboard-tab="kpi">Indicateurs et tendances</button>
-    <button type="button" class="dashboard-tab dashboard-tab-inactive" data-dashboard-tab="actions">Actions</button>
-    <button type="button" class="dashboard-tab dashboard-tab-inactive" data-dashboard-tab="gantt">Gantt</button>
-    <button type="button" class="dashboard-tab dashboard-tab-inactive" data-dashboard-tab="tables">Tableaux</button>
-    <button type="button" class="dashboard-tab dashboard-tab-inactive" data-dashboard-tab="analytics">Analytique avancee</button>
+    @foreach ($availableDashboardTabs as $tabKey => $tabLabel)
+        <a
+            href="{{ request()->fullUrlWithQuery(['dashboardTab' => $tabKey]) }}"
+            class="dashboard-tab {{ $currentDashboardTab === $tabKey ? 'dashboard-tab-active' : 'dashboard-tab-inactive' }}"
+            data-dashboard-tab="{{ $tabKey }}"
+            aria-current="{{ $currentDashboardTab === $tabKey ? 'page' : 'false' }}"
+        >
+            {{ $tabLabel }}
+        </a>
+    @endforeach
 </div>
 
-<section class="dashboard-tab-panel active" data-dashboard-panel="overview">
-    @if ($summaryGroups !== [])
-        @foreach ($summaryGroups as $groupIndex => $group)
-            <section class="showcase-panel mb-4">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="showcase-panel-title">{{ $group['title'] ?? 'Statistiques' }}</h2>
-                        <p class="showcase-panel-subtitle">{{ $group['subtitle'] ?? 'Lecture consolidee du perimetre courant.' }}</p>
-                    </div>
-                    <span class="showcase-chip">{{ count($group['cards'] ?? []) }} indicateurs</span>
-                </div>
-                <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
-                    @foreach (($group['cards'] ?? []) as $card)
-                        <x-stat-card-link
-                            :href="$card['href']"
-                            :label="$card['label']"
-                            :value="$card['value']"
-                            :meta="$card['meta']"
-                            :badge="$card['badge'] ?? null"
-                            :badge-tone="$card['badge_tone'] ?? 'neutral'"
-                            card-class="dashboard-summary-card dashboard-summary-card-{{ ($groupIndex + $loop->index) % 5 }} rounded-[1.2rem] border p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.45)]"
-                            label-class="dashboard-summary-label"
-                            value-class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none"
-                            meta-class="dashboard-summary-meta mt-2 text-xs"
-                            :value-style="'color: '.$card['accent'].';'"
-                        />
-                    @endforeach
-                </div>
-            </section>
+@php
+    $showRoleOverview = ($roleDashboard['enabled'] ?? false)
+        && (
+            ($roleDashboard['overview_enabled'] ?? true)
+            || ($roleDashboard['comparison_chart_enabled'] ?? true)
+            || ($roleDashboard['status_chart_enabled'] ?? true)
+            || ($roleDashboard['trend_chart_enabled'] ?? true)
+            || ($roleDashboard['support_chart_enabled'] ?? true)
+        );
+@endphp
+
+<section class="dashboard-tab-panel {{ $currentDashboardTab === 'overview' ? 'active' : '' }}" data-dashboard-panel="overview">
+    <div class="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+        @foreach ($summaryStrip as $card)
+            @php
+                $dashboardSizeClass = match ($card['dashboard_size'] ?? 'md') {
+                    'lg' => 'sm:col-span-2 xl:col-span-2',
+                    'sm' => 'max-w-none',
+                    default => '',
+                };
+            @endphp
+            <x-stat-card-link
+                :href="$card['href']"
+                :label="$card['label']"
+                :value="$card['value']"
+                :meta="$card['meta']"
+                :badge="$card['badge'] ?? null"
+                :badge-tone="$card['badge_tone'] ?? 'neutral'"
+                :tone="$card['tone'] ?? null"
+                card-class="dashboard-summary-card dashboard-summary-card-{{ $loop->index % 5 }} {{ $dashboardSizeClass }} rounded-[1.2rem] border p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.45)]"
+                label-class="dashboard-summary-label"
+                value-class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none"
+                meta-class="dashboard-summary-meta mt-2 text-xs"
+                :value-style="'color: '.$card['accent'].';'"
+            />
         @endforeach
-    @else
-        <div class="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
-            @foreach ($summaryStrip as $card)
-                <x-stat-card-link
-                    :href="$card['href']"
-                    :label="$card['label']"
-                    :value="$card['value']"
-                    :meta="$card['meta']"
-                    :badge="$card['badge'] ?? null"
-                    :badge-tone="$card['badge_tone'] ?? 'neutral'"
-                    card-class="dashboard-summary-card dashboard-summary-card-{{ $loop->index % 5 }} rounded-[1.2rem] border p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.45)]"
-                    label-class="dashboard-summary-label"
-                    value-class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none"
-                    meta-class="dashboard-summary-meta mt-2 text-xs"
-                    :value-style="'color: '.$card['accent'].';'"
-                />
-            @endforeach
-        </div>
-    @endif
-
-    @includeWhen(($roleDashboard['enabled'] ?? false), 'partials.dashboard-role-overview', ['roleDashboard' => $roleDashboard, 'dashboardRole' => $dashboardRole])
-
-    @if ($dashboardRole === 'dg')
-        <section class="showcase-panel mb-4">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="showcase-panel-title">Jauges operationnelles</h2>
-                    <p class="showcase-panel-subtitle">Moyennes calculees sur tout le portefeuille visible par la DG.</p>
-                </div>
-                <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
-            </div>
-            <div class="grid gap-4 xl:grid-cols-5">
-                @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')],['key' => 'conformite', 'label' => $metricLabel('conformite')],['key' => 'qualite', 'label' => $metricLabel('qualite')],['key' => 'risque', 'label' => $metricLabel('risque')]] as $gauge)
-                    <article class="showcase-panel">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{{ $gauge['label'] }}</p>
-                        <div class="dashboard-canvas !min-h-[140px]"><div id="dashboard-kpi-gauge-operational-{{ $gauge['key'] }}" class="dashboard-chart-host"></div></div>
-                        <p class="text-center text-xs text-slate-500">Lecture operationnelle DG.</p>
-                    </article>
-                @endforeach
-            </div>
-        </section>
-
-        <section class="showcase-panel mb-4">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="showcase-panel-title">Jauges officielles</h2>
-                    <p class="showcase-panel-subtitle">Moyennes calculees sur le socle valide direction uniquement.</p>
-                </div>
-                <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
-            </div>
-            <div class="grid gap-4 xl:grid-cols-5">
-                @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')],['key' => 'conformite', 'label' => $metricLabel('conformite')],['key' => 'qualite', 'label' => $metricLabel('qualite')],['key' => 'risque', 'label' => $metricLabel('risque')]] as $gauge)
-                    <article class="showcase-panel">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{{ $gauge['label'] }}</p>
-                        <div class="dashboard-canvas !min-h-[140px]"><div id="dashboard-kpi-gauge-official-{{ $gauge['key'] }}" class="dashboard-chart-host"></div></div>
-                        <p class="text-center text-xs text-slate-500">Lecture officielle DG.</p>
-                    </article>
-                @endforeach
-            </div>
-        </section>
-
-        <div class="mb-4 grid gap-4 xl:grid-cols-2">
-            <article class="showcase-panel">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="showcase-panel-title">Graphiques operationnels</h2>
-                        <p class="showcase-panel-subtitle">Statuts et tendances sur le portefeuille total.</p>
-                    </div>
-                    <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
-                </div>
-                <div class="grid gap-4">
-                    <div>
-                        <div class="mb-3 flex items-center justify-between gap-3">
-                            <div>
-                                <h3 class="showcase-panel-title !text-base">Repartition des statuts</h3>
-                                <p class="showcase-panel-subtitle">Mix global des actions.</p>
-                            </div>
-                            <span class="showcase-chip">{{ $metrics['totals']['actions_total'] ?? 0 }} actions</span>
-                        </div>
-                        <div class="dashboard-canvas"><div id="dashboard-status-mix-chart-operational" class="dashboard-chart-host"></div></div>
-                    </div>
-                    <div>
-                        <div class="mb-3 flex items-center justify-between gap-3">
-                            <div>
-                                <h3 class="showcase-panel-title !text-base">Indicateurs mensuels</h3>
-                                <p class="showcase-panel-subtitle">Moyennes par mois de demarrage sur tout le portefeuille.</p>
-                            </div>
-                            <span class="showcase-chip">{{ count($operationalMonthly) }} mois</span>
-                        </div>
-                        <div class="dashboard-canvas"><div id="dashboard-kpi-line-chart-operational" class="dashboard-chart-host"></div></div>
-                    </div>
-                </div>
-            </article>
-
-            <article class="showcase-panel">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="showcase-panel-title">Graphiques officiels</h2>
-                        <p class="showcase-panel-subtitle">Statuts et tendances sur le socle valide direction.</p>
-                    </div>
-                    <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
-                </div>
-                <div class="grid gap-4">
-                    <div>
-                        <div class="mb-3 flex items-center justify-between gap-3">
-                            <div>
-                                <h3 class="showcase-panel-title !text-base">Repartition des statuts</h3>
-                                <p class="showcase-panel-subtitle">Mix du socle officiel.</p>
-                            </div>
-                            <span class="showcase-chip">{{ collect($officialStatusCards)->sum('count') }} actions</span>
-                        </div>
-                        <div class="dashboard-canvas"><div id="dashboard-status-mix-chart-official" class="dashboard-chart-host"></div></div>
-                    </div>
-                    <div>
-                        <div class="mb-3 flex items-center justify-between gap-3">
-                            <div>
-                                <h3 class="showcase-panel-title !text-base">Indicateurs mensuels</h3>
-                                <p class="showcase-panel-subtitle">Moyennes par mois de demarrage sur les actions validees direction.</p>
-                            </div>
-                            <span class="showcase-chip">{{ count($monthlyOfficial) }} mois</span>
-                        </div>
-                        <div class="dashboard-canvas"><div id="dashboard-kpi-line-chart-official" class="dashboard-chart-host"></div></div>
-                    </div>
-                </div>
-            </article>
-        </div>
-
-        <div class="grid gap-4">
-            <article class="showcase-panel">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="showcase-panel-title">Synthese officielle par {{ strtolower($unitModeLabel) }}</h2>
-                        <p class="showcase-panel-subtitle">Lecture rapide des charges et performances sur le socle officiel.</p>
-                    </div>
-                    <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
-                </div>
-                <div class="dashboard-canvas"><div id="dashboard-unit-summary-chart" class="dashboard-chart-host"></div></div>
-            </article>
-        </div>
-    @else
-        <div class="mb-4 grid gap-4 xl:grid-cols-[repeat(5,minmax(0,1fr))_1.2fr]">
-            @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')],['key' => 'conformite', 'label' => $metricLabel('conformite')],['key' => 'qualite', 'label' => $metricLabel('qualite')],['key' => 'risque', 'label' => $metricLabel('risque')]] as $gauge)
-                @php
-                    $value = (float) ($globalScores[$gauge['key']] ?? 0);
-                @endphp
-                <article class="showcase-panel">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{{ $gauge['label'] }}</p>
-                    <div class="dashboard-canvas !min-h-[140px]"><div id="dashboard-kpi-gauge-{{ $gauge['key'] }}" class="dashboard-chart-host"></div></div>
-                    <p class="text-center text-xs text-slate-500">Moyenne scopee sur les actions calculees.</p>
-                </article>
-            @endforeach
-
-            <article class="showcase-panel">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="showcase-panel-title">Repartition des statuts</h2>
-                        <p class="showcase-panel-subtitle">Mix global des actions.</p>
-                    </div>
-                    <span class="showcase-chip">{{ $metrics['totals']['actions_total'] ?? 0 }} actions</span>
-                </div>
-                <div class="dashboard-canvas"><div id="dashboard-status-mix-chart" class="dashboard-chart-host"></div></div>
-            </article>
-        </div>
-
-        <div class="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
-            <article class="showcase-panel">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="showcase-panel-title">Indicateurs mensuels par cohortes d actions</h2>
-                        <p class="showcase-panel-subtitle">Moyennes des indicateurs par mois de demarrage.</p>
-                    </div>
-                    <span class="showcase-chip">{{ count($analytics['monthly'] ?? []) }} mois</span>
-                </div>
-                <div class="dashboard-canvas"><div id="dashboard-kpi-line-chart" class="dashboard-chart-host"></div></div>
-            </article>
-
-            <article class="showcase-panel">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="showcase-panel-title">Synthese par {{ strtolower($unitModeLabel) }}</h2>
-                        <p class="showcase-panel-subtitle">Lecture rapide des charges et performances.</p>
-                    </div>
-                    <span class="showcase-chip">{{ count($unitRows) }} {{ strtolower($unitModeLabel) }}</span>
-                </div>
-                <div class="dashboard-canvas"><div id="dashboard-unit-summary-chart" class="dashboard-chart-host"></div></div>
-            </article>
-        </div>
-    @endif
-
-    <div class="showcase-panel mt-4">
-        <div class="mb-4 flex items-center justify-between gap-3">
-            <div>
-                <h2 class="showcase-panel-title">Tableau de synthese par {{ strtolower($unitModeLabel) }}</h2>
-                <p class="showcase-panel-subtitle">Actions, progression, indicateur moyen, alertes et validation.</p>
-            </div>
-            <span class="showcase-chip">{{ count($unitRows) }} lignes</span>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="dashboard-table">
-                <thead><tr><th>{{ $unitModeLabel }}</th><th>Actions</th><th>Progression</th><th>Indicateur moyen</th><th>Alertes</th><th>Validation</th></tr></thead>
-                <tbody>
-                    @forelse ($unitRows as $row)
-                        @php
-                            $progress = (float) ($row['progression_moyenne'] ?? 0);
-                            $progressColor = $progress >= 80 ? '#10B981' : ($progress >= 60 ? '#3B82F6' : ($progress > 0 ? '#F59E0B' : '#94A3B8'));
-                            $kpi = (float) ($row['kpi_global'] ?? 0);
-                        @endphp
-                        <tr class="dashboard-row-link" data-row-link="{{ $row['url'] ?? '' }}">
-                            <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['label'] }}</td>
-                            <td>{{ $row['actions_total'] }}</td>
-                            <td>
-                                <div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 0) }}%</span></div>
-                            </td>
-                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpi)) }}">{{ number_format($kpi, 0) }}</span></td>
-                            <td>@if (($row['alertes'] ?? 0) > 0)<span class="dashboard-pill" style="{{ $dashboardPillVars('danger') }}">{{ $row['alertes'] }}</span>@else<span class="dashboard-pill" style="{{ $dashboardPillVars('success') }}">0</span>@endif</td>
-                            <td>{{ number_format((float) ($row['validation_pct'] ?? 0), 0) }}%</td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="6">Aucune donnee consolidee disponible.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
     </div>
 
-    <div class="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.9fr]">
+    @if ($showRoleOverview)
+        @include('partials.dashboard-role-overview', [
+            'roleDashboard' => $roleDashboard,
+            'dashboardRole' => $dashboardRole,
+            'officialPolicy' => $officialPolicy,
+            'displayMode' => 'overview',
+        ])
+    @endif
+
+    <div class="mt-4 space-y-4">
         <article class="showcase-panel">
             <div class="mb-4 flex items-center justify-between gap-3">
-                <div><h2 class="showcase-panel-title">Mes notifications recentes</h2><p class="showcase-panel-subtitle">Evenements recents avec acces direct.</p></div>
-                <span class="showcase-chip">{{ $dashboardNotifications->count() }} visibles</span>
+                <div><h2 class="showcase-panel-title">Mes notifications recentes</h2></div>
+                <span class="showcase-chip">{{ $dashboardNotifications->count() }}</span>
             </div>
             <div class="grid gap-3">
                 @forelse ($dashboardNotifications as $notification)
@@ -517,7 +335,7 @@
         </article>
 
         <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Profil utilisateur</h2><p class="showcase-panel-subtitle">Identite et perimetre d'utilisation.</p></div><span class="showcase-chip">{{ $profil['role_label'] }}</span></div>
+            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Profil utilisateur</h2></div><span class="showcase-chip">{{ $profil['role_label'] }}</span></div>
             <div class="showcase-data-list">
                 <div class="showcase-data-point"><p class="showcase-data-key">Utilisateur</p><p class="showcase-data-value">{{ $user->name }}</p></div>
                 <div class="showcase-data-point"><p class="showcase-data-key">Email</p><p class="showcase-data-value">{{ $user->email }}</p></div>
@@ -529,9 +347,9 @@
         </article>
     </div>
 
-    <div class="mt-4 grid gap-4 xl:grid-cols-[1.15fr_1fr]">
+    <div class="mt-4 space-y-4">
         <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Interactions disponibles pour ce profil</h2><p class="showcase-panel-subtitle">Operations metier permises dans l application.</p></div><span class="showcase-chip">{{ count($profil['items']) }} modules</span></div>
+            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Interactions disponibles pour ce profil</h2></div><span class="showcase-chip">{{ count($profil['items']) }}</span></div>
             <div class="grid gap-3">
                 @forelse ($profil['items'] as $item)
                     <article class="rounded-[1.15rem] border border-slate-200/85 bg-slate-50/90 p-4 dark:border-slate-800 dark:bg-slate-900/70"><div class="flex items-center justify-between gap-3"><strong class="text-slate-900 dark:text-slate-100">{{ $item['module'] }}</strong><span class="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">{{ $item['portee'] }}</span></div><p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ implode(' | ', $item['operations']) }}</p></article>
@@ -542,10 +360,10 @@
         </article>
 
         <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Espace de travail (interactions utilisables)</h2><p class="showcase-panel-subtitle">Modules directement actionnables depuis ce tableau de bord.</p></div><span class="showcase-chip">{{ count($modules) }} modules</span></div>
+            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Espace de travail (interactions utilisables)</h2></div><span class="showcase-chip">{{ count($modules) }}</span></div>
             <div class="grid gap-3">
                 @forelse ($modules as $module)
-                    <article class="rounded-[1.15rem] border border-slate-200/85 bg-slate-50/90 p-4 dark:border-slate-800 dark:bg-slate-900/70"><div class="flex items-center justify-between gap-2"><strong class="text-slate-900 dark:text-slate-100">{{ $module['label'] }}</strong><span class="{{ $module['can_write'] ? 'anbg-badge anbg-badge-success' : 'anbg-badge anbg-badge-neutral' }} px-2.5 py-1 text-[11px] font-semibold">{{ $module['can_write'] ? 'Ecriture' : 'Lecture' }}</span></div><p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ $module['description'] }}</p><div class="mt-3 flex items-center justify-between gap-2"><code class="rounded bg-slate-100 px-2 py-1 text-[11px] dark:bg-slate-800">{{ $module['endpoint'] }}</code><a href="{{ $module['endpoint'] }}" class="btn btn-primary btn-sm rounded-xl">Ouvrir</a></div></article>
+                    <article class="rounded-[1.15rem] border border-slate-200/85 bg-slate-50/90 p-4 dark:border-slate-800 dark:bg-slate-900/70"><div class="flex items-center justify-between gap-2"><strong class="text-slate-900 dark:text-slate-100">{{ $module['label'] }}</strong><span class="{{ $module['can_write'] ? 'anbg-badge anbg-badge-success' : 'anbg-badge anbg-badge-neutral' }} px-2.5 py-1 text-[11px] font-semibold">{{ $module['can_write'] ? 'Ecriture' : 'Lecture' }}</span></div><div class="mt-3 flex items-center justify-between gap-2"><code class="rounded bg-slate-100 px-2 py-1 text-[11px] dark:bg-slate-800">{{ $module['endpoint'] }}</code><a href="{{ $module['endpoint'] }}" class="btn btn-primary btn-sm rounded-xl">Ouvrir</a></div></article>
                 @empty
                     <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucun module directement accessible.</div>
                 @endforelse
@@ -554,101 +372,175 @@
     </div>
 </section>
 
-<section class="dashboard-tab-panel" data-dashboard-panel="kpi">
-    <div class="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Indicateurs par mois</h2><p class="showcase-panel-subtitle">Comparaison delai, performance, conformite, qualite, risque et global.</p></div><span class="showcase-chip">12 mois</span></div><div class="dashboard-canvas"><div id="dashboard-kpi-grouped-chart" class="dashboard-chart-host"></div></div></article>
-        <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">{{ $metricLabel('global') }}</h2><p class="showcase-panel-subtitle">Vue macro du perimetre actuellement scope.</p></div><span class="showcase-chip">Seuil 60</span></div>
-            <div class="rounded-[1.4rem] p-5 text-white" style="background: linear-gradient(135deg, #10B981 0%, #3B82F6 52%, #1E3A8A 100%);"><p class="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/75">Score actuel</p><p class="mt-3 text-5xl font-black leading-none">{{ number_format((float) ($globalScores['global'] ?? 0), 0) }}</p><p class="mt-3 text-sm text-white/80">Progression moyenne: {{ number_format((float) ($globalScores['progression'] ?? 0), 0) }}%</p><div class="mt-4 h-2 rounded-full bg-white/20"><div class="h-2 rounded-full bg-white" style="width: {{ min(100, max(0, (float) ($globalScores['global'] ?? 0))) }}%;"></div></div></div>
-            <div class="mt-4 grid gap-2">@foreach ($statusCards as $card)<div class="rounded-2xl border border-slate-200/80 bg-slate-50/90 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/70"><div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: {{ $card['color'] }};"></span><span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $card['label'] }}</span></div><span class="text-sm font-black" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span></div></div>@endforeach</div>
-        </article>
-    </div>
+<section class="dashboard-tab-panel {{ $currentDashboardTab === 'charts' ? 'active' : '' }}" data-dashboard-panel="charts">
+    @if ($showRoleOverview)
+        @include('partials.dashboard-role-overview', [
+            'roleDashboard' => $roleDashboard,
+            'dashboardRole' => $dashboardRole,
+            'officialPolicy' => $officialPolicy,
+            'displayMode' => 'charts',
+        ])
+    @endif
 
-    <div class="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Comparaison interannuelle</h2><p class="showcase-panel-subtitle">Actions total, actions validees et progression moyenne.</p></div><span class="showcase-chip">{{ count($interannualRows) }} annee(s)</span></div><div class="dashboard-canvas"><div id="dashboard-interannual-chart" class="dashboard-chart-host"></div></div></article>
-        <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Cible vs realise</h2><p class="showcase-panel-subtitle">Lecture type bullet chart sur les actions prioritaires.</p></div><span class="showcase-chip">Cible 80</span></div>
-            @if ($bulletRows !== [])
-                <div class="grid gap-3">@foreach ($bulletRows as $row)@php $real = (float) ($row['real'] ?? 0); $bulletColor = $real >= 80 ? '#10B981' : ($real >= 60 ? '#3B82F6' : '#F59E0B'); @endphp<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#EFF6FF]/70 dark:hover:bg-slate-900/60"><span class="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-threshold"></span><span class="dashboard-bullet-target"></span><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, $real)) }}%; background: {{ $bulletColor }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $bulletColor }};">{{ number_format($real, 0) }}</span></a>@endforeach</div>
-            @else
-                <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune action avec indicateur disponible pour cette lecture.</div>
-            @endif
-        </article>
-    </div>
-</section>
-<section class="dashboard-tab-panel" data-dashboard-panel="actions">
-    <div class="grid gap-4 xl:grid-cols-[1fr_1.15fr]">
-        <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Classement des actions par indicateur</h2><p class="showcase-panel-subtitle">Top des actions les mieux notees.</p></div><span class="showcase-chip">Top 6</span></div>
-            @if ($analytics['top_action_bars'] ?? false)
-                <div class="grid gap-3">@foreach ($analytics['top_action_bars'] as $row)<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#EFF6FF]/70 dark:hover:bg-slate-900/60"><span class="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, (float) $row['value'])) }}%; background: {{ $row['color'] }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 0) }}</span></a>@endforeach</div>
-            @else
-                <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune action classee pour le moment.</div>
-            @endif
-        </article>
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Radar de comparaison</h2><p class="showcase-panel-subtitle">Delai, performance, conformite et progression.</p></div><span class="showcase-chip">{{ min(3, count($unitRows)) }} jeux</span></div><div class="dashboard-canvas"><div id="dashboard-radar-chart" class="dashboard-chart-host"></div></div></article>
-    </div>
-
-    <div class="showcase-panel mt-4"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Scatter performance / conformite</h2><p class="showcase-panel-subtitle">Repere visuel pour isoler les actions solides ou fragiles.</p></div><span class="showcase-chip">{{ count($analytics['scatter_points'] ?? []) }} points</span></div><div class="dashboard-canvas"><div id="dashboard-scatter-chart" class="dashboard-chart-host"></div></div></div>
-
-    <div class="showcase-panel mt-4">
-        <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Actions prioritaires</h2><p class="showcase-panel-subtitle">Vue decisionnelle compacte sur les actions les plus visibles du portefeuille.</p></div><span class="showcase-chip">{{ count($priorityActionRows) }} lignes</span></div>
-        <div class="overflow-x-auto">
-            <table class="dashboard-table">
-                <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Progression</th><th>Indicateur</th><th>Delai</th><th>Perf.</th><th>Conf.</th><th>Qual.</th><th>Risque</th></tr></thead>
-                <tbody>
-                    @forelse ($priorityActionRows as $row)
-                        @php
-                            $statusColor = match ($row['statut']) {'acheve' => '#1E3A8A','en_avance' => '#10B981','a_risque' => '#F59E0B','en_retard' => '#EF4444','suspendu' => '#EF4444','annule' => '#6B7280','non_demarre' => '#6B7280',default => '#3B82F6'};
-                            $progress = (float) ($row['progression'] ?? 0);
-                            $progressColor = $progress >= 80 ? '#10B981' : ($progress >= 60 ? '#3B82F6' : ($progress > 0 ? '#F59E0B' : '#94A3B8'));
-                        @endphp
-                        <tr>
-                            <td><a href="{{ $row['url'] }}" class="font-semibold text-slate-900 hover:text-[#3B82F6] dark:text-slate-100">{{ $row['libelle'] }}</a><div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{{ $row['responsable'] }} | {{ $row['service'] }}</div></td>
-                            <td>{{ $row['direction'] }}</td>
-                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}"><span class="h-2 w-2 rounded-full" style="background: {{ $statusColor }};"></span>{{ $actionStatusLabel($row['statut']) }}</span></td>
-                            <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 0) }}%</span></div></td>
-                            @foreach (['kpi_global', 'kpi_delai', 'kpi_performance', 'kpi_conformite', 'kpi_qualite', 'kpi_risque'] as $metricKey)
-                                @php $metricValue = (float) ($row[$metricKey] ?? 0); $metricColor = $metricValue >= 80 ? '#10B981' : ($metricValue >= 60 ? '#3B82F6' : ($metricValue > 0 ? '#F59E0B' : '#6B7280')); $metricBg = $metricValue >= 80 ? '#ECFDF5' : ($metricValue >= 60 ? '#EFF6FF' : ($metricValue > 0 ? '#FFFBEB' : '#F1F5F9')); @endphp
-                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($metricValue)) }}">{{ number_format($metricValue, 0) }}</span></td>
-                            @endforeach
-                        </tr>
-                    @empty
-                        <tr><td colspan="10">Aucune action disponible sur ce perimetre.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
+    <article class="showcase-panel mb-4">
+        <div class="mb-4 flex items-center justify-between gap-3">
+            <div><h2 class="showcase-panel-title">Jauges KPI</h2></div>
+            <span class="showcase-chip">5 mesures</span>
         </div>
-    </div>
-</section>
-
-<section class="dashboard-tab-panel" data-dashboard-panel="gantt">
-    <article class="showcase-panel">
-        <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Diagramme de Gantt compact</h2><p class="showcase-panel-subtitle">Barre grise = duree planifiee, barre couleur = progression reelle, ligne orange = aujourd'hui.</p></div><span class="showcase-chip">{{ count($ganttRows) }} actions</span></div>
-        @if ($ganttRows !== [])
-            <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-gantt-chart" class="dashboard-chart-host"></div></div>
-        @else
-            <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune action datee disponible pour produire un Gantt.</div>
-        @endif
+        <div class="dashboard-gauge-grid">
+            @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')],['key' => 'conformite', 'label' => $metricLabel('conformite')],['key' => 'qualite', 'label' => $metricLabel('qualite')],['key' => 'risque', 'label' => $metricLabel('risque')]] as $gauge)
+                <article class="dashboard-gauge-card">
+                    <strong>{{ $gauge['label'] }}</strong>
+                    <div class="dashboard-gauge-canvas">
+                        <div id="dashboard-kpi-gauge-{{ $gauge['key'] }}" class="dashboard-chart-host"></div>
+                    </div>
+                </article>
+            @endforeach
+        </div>
     </article>
-</section>
 
-<section class="dashboard-tab-panel" data-dashboard-panel="tables">
-    <div class="grid gap-4">
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Alertes actives</h2><p class="showcase-panel-subtitle">Tableau principal de decision: retards, indicateurs critiques, ecarts de progression et validations bloquees.</p></div><span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span></div><div class="overflow-x-auto"><table class="dashboard-table"><thead><tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Detail</th><th>{{ $metricLabel('global') }}</th><th>Qual.</th><th>Risque</th><th>Acces</th></tr></thead><tbody>@forelse ($alertRows as $row)<tr><td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['titre'] }}</td><td>{{ $row['direction'] }}</td><td>{{ $row['action'] }}</td><td><span class="dashboard-pill" style="{{ $dashboardPillVars(in_array($row['niveau'], ['Critique', 'Urgence'], true) ? 'danger' : 'warning') }}">{{ $row['niveau'] }}</span></td><td>{{ $row['details'] }}</td>@php $kpiValue = (float) ($row['kpi'] ?? 0); $qualityValue = (float) ($row['kpi_qualite'] ?? 0); $riskValue = (float) ($row['kpi_risque'] ?? 0); @endphp<td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpiValue)) }}">{{ number_format($kpiValue, 0) }}</span></td><td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($qualityValue)) }}">{{ number_format($qualityValue, 0) }}</span></td><td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($riskValue)) }}">{{ number_format($riskValue, 0) }}</span></td><td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td></tr>@empty<tr><td colspan="9">Aucune alerte active sur ce perimetre.</td></tr>@endforelse</tbody></table></div></article>
-    </div>
-</section>
-
-<section class="dashboard-tab-panel" data-dashboard-panel="analytics">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h2 class="showcase-panel-title">Analytique avancee consolidee</h2>
-            <p class="showcase-panel-subtitle">Tous les graphes et les tableaux de reporting sont embarques ici pour concentrer la lecture decisionnelle sur le dashboard.</p>
+    <article class="showcase-panel mb-4">
+        <div class="mb-4 flex items-center justify-between gap-3">
+            <div><h2 class="showcase-panel-title">Repartition des statuts</h2></div>
+            <span class="showcase-chip">{{ $metrics['totals']['actions_total'] ?? 0 }} actions</span>
         </div>
-        <a href="{{ route('workspace.reporting') }}" class="dashboard-reporting-jump">Exports et centre de diffusion</a>
+        <div class="dashboard-canvas"><div id="dashboard-status-mix-chart" class="dashboard-chart-host"></div></div>
+    </article>
+
+    <div class="space-y-4">
+        <article class="showcase-panel">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <div><h2 class="showcase-panel-title">Indicateurs mensuels</h2></div>
+                <span class="showcase-chip">{{ count($analytics['monthly'] ?? []) }} mois</span>
+            </div>
+            <div class="dashboard-canvas"><div id="dashboard-kpi-line-chart" class="dashboard-chart-host"></div></div>
+        </article>
+
+        <article class="showcase-panel">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <div><h2 class="showcase-panel-title">Synthese par {{ strtolower($unitModeLabel) }}</h2></div>
+                <span class="showcase-chip">{{ count($unitRows) }} {{ strtolower($unitModeLabel) }}</span>
+            </div>
+            <div class="dashboard-canvas"><div id="dashboard-unit-summary-chart" class="dashboard-chart-host"></div></div>
+        </article>
     </div>
 
-    @include('partials.dashboard-reporting-analytics', ['reportingAnalytics' => $reportingAnalytics ?? []])
+    <div class="mt-4 space-y-4">
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Indicateurs par mois</h2></div><span class="showcase-chip">12 mois</span></div><div class="dashboard-canvas"><div id="dashboard-kpi-grouped-chart" class="dashboard-chart-host"></div></div></article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">{{ $metricLabel('global') }}</h2></div><span class="showcase-chip">Seuil 60</span></div><div class="rounded-[1.4rem] border border-slate-200/85 p-5 text-white dark:border-slate-700" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 52%, #334155 100%);"><p class="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/75">Score actuel</p><p class="mt-3 text-5xl font-black leading-none">{{ number_format((float) ($globalScores['global'] ?? 0), 0) }}</p><p class="mt-3 text-sm text-white/80">Progression moyenne: {{ number_format((float) ($globalScores['progression'] ?? 0), 0) }}%</p><div class="mt-4 h-2 rounded-full bg-white/20"><div class="h-2 rounded-full bg-white" style="width: {{ min(100, max(0, (float) ($globalScores['global'] ?? 0))) }}%;"></div></div></div><div class="mt-4 grid gap-2">@foreach ($statusCards as $card)<div class="rounded-2xl border border-slate-200/80 bg-slate-50/90 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/70"><div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: {{ $card['color'] }};"></span><span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $card['label'] }}</span></div><span class="text-sm font-black" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span></div></div>@endforeach</div></article>
+    </div>
+
+    <div class="mt-4 space-y-4">
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Comparaison interannuelle</h2></div><span class="showcase-chip">{{ count($interannualRows) }} annee(s)</span></div><div class="dashboard-canvas"><div id="dashboard-interannual-chart" class="dashboard-chart-host"></div></div></article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Cible vs realise</h2></div><span class="showcase-chip">Cible 80</span></div>@if ($bulletRows !== [])<div class="grid gap-3">@foreach ($bulletRows as $row)@php $real = (float) ($row['real'] ?? 0); $bulletColor = $real >= 80 ? '#10B981' : ($real >= 60 ? '#3B82F6' : '#F59E0B'); @endphp<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#EFF6FF]/70 dark:hover:bg-slate-900/60"><span class="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-threshold"></span><span class="dashboard-bullet-target"></span><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, $real)) }}%; background: {{ $bulletColor }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $bulletColor }};">{{ number_format($real, 0) }}</span></a>@endforeach</div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune action avec indicateur disponible pour cette lecture.</div>@endif</article>
+    </div>
+
+    <div class="mt-4 space-y-4">
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Classement des actions par indicateur</h2></div><span class="showcase-chip">Top 6</span></div>@if ($analytics['top_action_bars'] ?? false)<div class="grid gap-3">@foreach ($analytics['top_action_bars'] as $row)<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#EFF6FF]/70 dark:hover:bg-slate-900/60"><span class="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, (float) $row['value'])) }}%; background: {{ $row['color'] }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 0) }}</span></a>@endforeach</div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune action classee pour le moment.</div>@endif</article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Radar de comparaison</h2></div><span class="showcase-chip">{{ min(3, count($unitRows)) }} jeux</span></div><div class="dashboard-canvas"><div id="dashboard-radar-chart" class="dashboard-chart-host"></div></div></article>
+    </div>
+
+    <article class="showcase-panel mt-4"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Scatter performance / conformite</h2></div><span class="showcase-chip">{{ count($analytics['scatter_points'] ?? []) }} points</span></div><div class="dashboard-canvas"><div id="dashboard-scatter-chart" class="dashboard-chart-host"></div></div></article>
+
+    <article class="showcase-panel mt-4"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Diagramme de Gantt</h2></div><span class="showcase-chip">{{ count($ganttRows) }} actions</span></div>@if ($ganttRows !== [])<div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-gantt-chart" class="dashboard-chart-host"></div></div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune action datee disponible pour produire un Gantt.</div>@endif</article>
+
+    <section class="mt-4">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div><h2 class="showcase-panel-title">Analytique avancee</h2></div>
+            <a href="{{ route('workspace.reporting') }}" class="dashboard-reporting-jump">Exports</a>
+        </div>
+        @include('partials.dashboard-reporting-analytics', [
+            'reportingAnalytics' => $reportingAnalytics ?? [],
+            'displayMode' => 'charts',
+        ])
+    </section>
+</section>
+
+<section class="dashboard-tab-panel {{ $currentDashboardTab === 'tables' ? 'active' : '' }}" data-dashboard-panel="tables">
+    <div class="space-y-4">
+        @if ($showRoleOverview)
+            @include('partials.dashboard-role-overview', [
+                'roleDashboard' => $roleDashboard,
+                'dashboardRole' => $dashboardRole,
+                'officialPolicy' => $officialPolicy,
+                'displayMode' => 'tables',
+            ])
+        @endif
+
+        <article class="showcase-panel">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <div><h2 class="showcase-panel-title">Tableau de synthese par {{ strtolower($unitModeLabel) }}</h2></div>
+                <span class="showcase-chip">{{ count($unitRows) }} lignes</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="dashboard-table">
+                    <thead><tr><th>{{ $unitModeLabel }}</th><th>Actions</th><th>Progression</th><th>Indicateur moyen</th><th>Alertes</th><th>Validation</th></tr></thead>
+                    <tbody>
+                        @forelse ($unitRows as $row)
+                            @php
+                                $progress = (float) ($row['progression_moyenne'] ?? 0);
+                                $progressColor = $progress >= 80 ? '#10B981' : ($progress >= 60 ? '#3B82F6' : ($progress > 0 ? '#F59E0B' : '#94A3B8'));
+                                $kpi = (float) ($row['kpi_global'] ?? 0);
+                            @endphp
+                            <tr class="dashboard-row-link" data-row-link="{{ $row['url'] ?? '' }}">
+                                <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['label'] }}</td>
+                                <td>{{ $row['actions_total'] }}</td>
+                                <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 0) }}%</span></div></td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpi)) }}">{{ number_format($kpi, 0) }}</span></td>
+                                <td>@if (($row['alertes'] ?? 0) > 0)<span class="dashboard-pill" style="{{ $dashboardPillVars('danger') }}">{{ $row['alertes'] }}</span>@else<span class="dashboard-pill" style="{{ $dashboardPillVars('success') }}">0</span>@endif</td>
+                                <td>{{ number_format((float) ($row['validation_pct'] ?? 0), 0) }}%</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6">Aucune donnee disponible.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <article class="showcase-panel">
+            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Actions prioritaires</h2></div><span class="showcase-chip">{{ count($priorityActionRows) }} lignes</span></div>
+            <div class="overflow-x-auto">
+                <table class="dashboard-table">
+                    <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Progression</th><th>Indicateur</th><th>Delai</th><th>Perf.</th><th>Conf.</th><th>Qual.</th><th>Risque</th></tr></thead>
+                    <tbody>
+                        @forelse ($priorityActionRows as $row)
+                            @php
+                                $statusColor = match ($row['statut']) {'acheve' => '#1E3A8A','en_avance' => '#10B981','a_risque' => '#F59E0B','en_retard' => '#EF4444','suspendu' => '#EF4444','annule' => '#6B7280','non_demarre' => '#6B7280',default => '#3B82F6'};
+                                $progress = (float) ($row['progression'] ?? 0);
+                                $progressColor = $progress >= 80 ? '#10B981' : ($progress >= 60 ? '#3B82F6' : ($progress > 0 ? '#F59E0B' : '#94A3B8'));
+                            @endphp
+                            <tr>
+                                <td><a href="{{ $row['url'] }}" class="font-semibold text-slate-900 hover:text-[#3B82F6] dark:text-slate-100">{{ $row['libelle'] }}</a><div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{{ $row['responsable'] }} | {{ $row['service'] }}</div></td>
+                                <td>{{ $row['direction'] }}</td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}"><span class="h-2 w-2 rounded-full" style="background: {{ $statusColor }};"></span>{{ $actionStatusLabel($row['statut']) }}</span></td>
+                                <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 0) }}%</span></div></td>
+                                @foreach (['kpi_global', 'kpi_delai', 'kpi_performance', 'kpi_conformite', 'kpi_qualite', 'kpi_risque'] as $metricKey)
+                                    @php $metricValue = (float) ($row[$metricKey] ?? 0); @endphp
+                                    <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($metricValue)) }}">{{ number_format($metricValue, 0) }}</span></td>
+                                @endforeach
+                            </tr>
+                        @empty
+                            <tr><td colspan="10">Aucune action disponible sur ce perimetre.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Alertes actives</h2></div><span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span></div><div class="overflow-x-auto"><table class="dashboard-table"><thead><tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Detail</th><th>{{ $metricLabel('global') }}</th><th>Qual.</th><th>Risque</th><th>Acces</th></tr></thead><tbody>@forelse ($alertRows as $row)<tr><td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['titre'] }}</td><td>{{ $row['direction'] }}</td><td>{{ $row['action'] }}</td><td><span class="dashboard-pill" style="{{ $dashboardPillVars(in_array($row['niveau'], ['Critique', 'Urgence'], true) ? 'danger' : 'warning') }}">{{ $row['niveau'] }}</span></td><td>{{ $row['details'] }}</td>@php $kpiValue = (float) ($row['kpi'] ?? 0); $qualityValue = (float) ($row['kpi_qualite'] ?? 0); $riskValue = (float) ($row['kpi_risque'] ?? 0); @endphp<td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpiValue)) }}">{{ number_format($kpiValue, 0) }}</span></td><td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($qualityValue)) }}">{{ number_format($qualityValue, 0) }}</span></td><td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($riskValue)) }}">{{ number_format($riskValue, 0) }}</span></td><td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td></tr>@empty<tr><td colspan="9">Aucune alerte active sur ce perimetre.</td></tr>@endforelse</tbody></table></div></article>
+
+        <section>
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div><h2 class="showcase-panel-title">Tables analytiques</h2></div>
+                <a href="{{ route('workspace.reporting') }}" class="dashboard-reporting-jump">Exports</a>
+            </div>
+            @include('partials.dashboard-reporting-analytics', [
+                'reportingAnalytics' => $reportingAnalytics ?? [],
+                'displayMode' => 'tables',
+            ])
+        </section>
+    </div>
 </section>
 
 @once
@@ -663,3 +555,4 @@
         </script>
     @endpush
 @endonce
+

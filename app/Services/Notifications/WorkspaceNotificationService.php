@@ -5,27 +5,35 @@ namespace App\Services\Notifications;
 use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\Delegation;
+use App\Models\JournalAudit;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\User;
 use App\Services\Alerting\AlertRoutingService;
 use App\Services\Governance\DelegationService;
+use App\Services\NotificationPolicySettings;
 use App\Notifications\WorkspaceModuleNotification;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 class WorkspaceNotificationService
 {
     public function __construct(
         private readonly DelegationService $delegationService,
-        private readonly AlertRoutingService $alertRoutingService
+        private readonly AlertRoutingService $alertRoutingService,
+        private readonly NotificationPolicySettings $notificationPolicySettings
     ) {
     }
 
     public function notifyActionAssigned(Action $action, ?User $actor = null): void
     {
+        if (! $this->notificationPolicySettings->eventEnabled('action_assigned')) {
+            return;
+        }
+
         if ($action->responsable_id === null) {
             return;
         }
@@ -35,7 +43,8 @@ class WorkspaceNotificationService
             ->whereKey((int) $action->responsable_id)
             ->get();
 
-        $this->dispatch(
+        $this->dispatchEvent(
+            'action_assigned',
             $users,
             [
                 'title' => 'Nouvelle action attribuee',
@@ -48,12 +57,20 @@ class WorkspaceNotificationService
                 'status' => 'info',
                 'priority' => 'normal',
             ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
             null
         );
     }
 
     public function notifyActionSubmittedToChef(Action $action, ?User $actor = null): void
     {
+        if (! $this->notificationPolicySettings->eventEnabled('action_submitted_to_chef')) {
+            return;
+        }
+
         $action->loadMissing('pta:id,direction_id,service_id');
 
         $directionId = (int) ($action->pta?->direction_id ?? 0);
@@ -65,7 +82,8 @@ class WorkspaceNotificationService
             $this->delegationService->delegatedServiceReviewers($directionId, $serviceId)
         );
 
-        $this->dispatch(
+        $this->dispatchEvent(
+            'action_submitted_to_chef',
             $users,
             [
                 'title' => 'Action soumise pour validation',
@@ -78,12 +96,81 @@ class WorkspaceNotificationService
                 'status' => 'info',
                 'priority' => 'high',
             ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyActionSubmittedToDirection(Action $action, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_submitted_to_direction')) {
+            return;
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id');
+
+        $directionId = (int) ($action->pta?->direction_id ?? 0);
+        $directionRecipients = $this->mergeRecipients(
+            $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
+            $this->delegationService->delegatedDirectionReviewers($directionId)
+        );
+        $directionRecipients = $this->mergeRecipients(
+            $directionRecipients,
+            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION])
+        );
+
+        $this->dispatchEvent(
+            'action_submitted_to_direction',
+            $directionRecipients,
+            [
+                'title' => 'Action soumise a la direction',
+                'message' => sprintf('L action "%s" attend directement votre evaluation finale.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'arrow-up-right',
+                'status' => 'info',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
+            $actor?->id
+        );
+
+        $this->dispatchEvent(
+            'action_submitted_to_direction',
+            $this->agentRecipient($action),
+            [
+                'title' => 'Action transmise directement a la direction',
+                'message' => sprintf('Votre action "%s" est en attente de validation direction.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'check-circle',
+                'status' => 'info',
+                'priority' => 'normal',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
             $actor?->id
         );
     }
 
     public function notifyActionReviewedByChef(Action $action, bool $approved, ?User $actor = null): void
     {
+        if (! $this->notificationPolicySettings->eventEnabled('action_reviewed_by_chef')) {
+            return;
+        }
+
         $action->loadMissing('pta:id,direction_id,service_id');
 
         $directionId = (int) ($action->pta?->direction_id ?? 0);
@@ -96,10 +183,11 @@ class WorkspaceNotificationService
             );
             $directionRecipients = $this->mergeRecipients(
                 $directionRecipients,
-                $this->globalUsers([User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION])
+                $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION])
             );
 
-            $this->dispatch(
+            $this->dispatchEvent(
+                'action_reviewed_by_chef',
                 $directionRecipients,
                 [
                     'title' => 'Action validee par le chef',
@@ -112,10 +200,16 @@ class WorkspaceNotificationService
                     'status' => 'info',
                     'priority' => 'high',
                 ],
+                [
+                    'action_label' => (string) $action->libelle,
+                    'decision' => 'Action validee par le chef',
+                    'actor_name' => (string) ($actor?->name ?? ''),
+                ],
                 $actor?->id
             );
 
-            $this->dispatch(
+            $this->dispatchEvent(
+                'action_reviewed_by_chef',
                 $agentRecipients,
                 [
                     'title' => 'Action transmise a la direction',
@@ -128,13 +222,19 @@ class WorkspaceNotificationService
                     'status' => 'success',
                     'priority' => 'normal',
                 ],
+                [
+                    'action_label' => (string) $action->libelle,
+                    'decision' => 'Action validee par le chef',
+                    'actor_name' => (string) ($actor?->name ?? ''),
+                ],
                 $actor?->id
             );
 
             return;
         }
 
-        $this->dispatch(
+        $this->dispatchEvent(
+            'action_reviewed_by_chef',
             $agentRecipients,
             [
                 'title' => 'Action rejetee par le chef',
@@ -147,12 +247,21 @@ class WorkspaceNotificationService
                 'status' => 'warning',
                 'priority' => 'high',
             ],
+            [
+                'action_label' => (string) $action->libelle,
+                'decision' => 'Action rejetee par le chef',
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
             $actor?->id
         );
     }
 
     public function notifyActionReviewedByDirection(Action $action, bool $approved, ?User $actor = null): void
     {
+        if (! $this->notificationPolicySettings->eventEnabled('action_reviewed_by_direction')) {
+            return;
+        }
+
         $action->loadMissing('pta:id,direction_id,service_id');
 
         $directionId = (int) ($action->pta?->direction_id ?? 0);
@@ -168,10 +277,11 @@ class WorkspaceNotificationService
             $targets = $this->mergeRecipients($serviceRecipients, $agentRecipients);
             $targets = $this->mergeRecipients(
                 $targets,
-                $this->globalUsers([User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET])
+                $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET])
             );
 
-            $this->dispatch(
+            $this->dispatchEvent(
+                'action_reviewed_by_direction',
                 $targets,
                 [
                     'title' => 'Action validee par la direction',
@@ -184,6 +294,11 @@ class WorkspaceNotificationService
                     'status' => 'success',
                     'priority' => 'normal',
                 ],
+                [
+                    'action_label' => (string) $action->libelle,
+                    'decision' => 'Action validee par la direction',
+                    'actor_name' => (string) ($actor?->name ?? ''),
+                ],
                 $actor?->id
             );
 
@@ -191,7 +306,8 @@ class WorkspaceNotificationService
         }
 
         $targets = $this->mergeRecipients($serviceRecipients, $agentRecipients);
-        $this->dispatch(
+        $this->dispatchEvent(
+            'action_reviewed_by_direction',
             $targets,
             [
                 'title' => 'Action rejetee par la direction',
@@ -204,12 +320,109 @@ class WorkspaceNotificationService
                 'status' => 'warning',
                 'priority' => 'high',
             ],
+            [
+                'action_label' => (string) $action->libelle,
+                'decision' => 'Action rejetee par la direction',
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyActionFinalizedByChef(Action $action, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_finalized_by_chef')) {
+            return;
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id');
+
+        $directionId = (int) ($action->pta?->direction_id ?? 0);
+        $serviceId = (int) ($action->pta?->service_id ?? 0);
+
+        $targets = $this->mergeRecipients(
+            $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]),
+            $this->agentRecipient($action)
+        );
+        $targets = $this->mergeRecipients(
+            $targets,
+            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET])
+        );
+
+        $this->dispatchEvent(
+            'action_finalized_by_chef',
+            $targets,
+            [
+                'title' => 'Action validee par le chef',
+                'message' => sprintf('L action "%s" est finalisee sans etape direction supplementaire.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'badge-check',
+                'status' => 'success',
+                'priority' => 'normal',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyActionFinalizedWithoutWorkflow(Action $action, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_finalized_without_workflow')) {
+            return;
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id');
+
+        $directionId = (int) ($action->pta?->direction_id ?? 0);
+        $serviceId = (int) ($action->pta?->service_id ?? 0);
+
+        $targets = $this->mergeRecipients(
+            $this->agentRecipient($action),
+            $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE])
+        );
+        $targets = $this->mergeRecipients(
+            $targets,
+            $this->directionUsers($directionId, [User::ROLE_DIRECTION])
+        );
+        $targets = $this->mergeRecipients(
+            $targets,
+            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION])
+        );
+
+        $this->dispatchEvent(
+            'action_finalized_without_workflow',
+            $targets,
+            [
+                'title' => 'Action cloturee',
+                'message' => sprintf('L action "%s" a ete cloturee sans circuit de validation supplementaire.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'badge-check',
+                'status' => 'success',
+                'priority' => 'normal',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
             $actor?->id
         );
     }
 
     public function notifyActionAlertEscalation(ActionLog $log, ?int $excludeUserId = null): void
     {
+        if (! $this->notificationPolicySettings->eventEnabled('action_alert_escalation')) {
+            return;
+        }
+
         if (! in_array((string) $log->niveau, ['warning', 'critical', 'urgence'], true)) {
             return;
         }
@@ -233,7 +446,12 @@ class WorkspaceNotificationService
             default => 'warning',
         };
 
-        $this->dispatch(
+        if (! $this->notificationPolicySettings->alertLevelEnabled($level)) {
+            return;
+        }
+
+        $this->dispatchEvent(
+            'action_alert_escalation',
             $targets,
             [
                 'title' => match ($level) {
@@ -241,7 +459,7 @@ class WorkspaceNotificationService
                     'critical' => 'Alerte critique action',
                     default => 'Alerte action',
                 },
-                'message' => (string) $log->message,
+                'message' => $this->notificationPolicySettings->renderActionAlertMessage($log),
                 'module' => 'alertes',
                 'entity_type' => 'action_log',
                 'entity_id' => $log->id,
@@ -257,12 +475,22 @@ class WorkspaceNotificationService
                     'niveau' => $level,
                 ],
             ],
+            [
+                'action_label' => (string) $action->libelle,
+                'level' => $level,
+                'message' => (string) $log->message,
+                'actor_name' => (string) ($log->utilisateur?->name ?? ''),
+            ],
             $excludeUserId
         );
     }
 
     public function notifyPasStatus(Pas $pas, string $event, ?User $actor = null): void
     {
+        if (! $this->notificationPolicySettings->eventEnabled('pas_status')) {
+            return;
+        }
+
         $pas->loadMissing('directions:id');
         $directionIds = $pas->directions
             ->pluck('id')
@@ -272,13 +500,14 @@ class WorkspaceNotificationService
             ->all();
 
         $targets = $this->mergeRecipients(
-            $this->globalUsers([User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET]),
+            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET]),
             $this->directionUsers($directionIds, [User::ROLE_DIRECTION, User::ROLE_SERVICE])
         );
 
         [$title, $message, $status] = $this->resolveStatusPayload('PAS', (string) $pas->titre, $event);
 
-        $this->dispatch(
+        $this->dispatchEvent(
+            'pas_status',
             $targets,
             [
                 'title' => $title,
@@ -291,21 +520,31 @@ class WorkspaceNotificationService
                 'status' => $status,
                 'priority' => 'normal',
             ],
+            [
+                'module_label' => 'PAS',
+                'entity_title' => (string) $pas->titre,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
             $actor?->id
         );
     }
 
     public function notifyPaoStatus(Pao $pao, string $event, ?User $actor = null): void
     {
+        if (! $this->notificationPolicySettings->eventEnabled('pao_status')) {
+            return;
+        }
+
         $directionId = (int) $pao->direction_id;
         $targets = $this->mergeRecipients(
-            $this->globalUsers([User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET]),
+            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET]),
             $this->directionUsers($directionId, [User::ROLE_DIRECTION, User::ROLE_SERVICE])
         );
 
         [$title, $message, $status] = $this->resolveStatusPayload('PAO', (string) $pao->titre, $event);
 
-        $this->dispatch(
+        $this->dispatchEvent(
+            'pao_status',
             $targets,
             [
                 'title' => $title,
@@ -318,17 +557,26 @@ class WorkspaceNotificationService
                 'status' => $status,
                 'priority' => 'normal',
             ],
+            [
+                'module_label' => 'PAO',
+                'entity_title' => (string) $pao->titre,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
             $actor?->id
         );
     }
 
     public function notifyPtaStatus(Pta $pta, string $event, ?User $actor = null): void
     {
+        if (! $this->notificationPolicySettings->eventEnabled('pta_status')) {
+            return;
+        }
+
         $directionId = (int) $pta->direction_id;
         $serviceId = (int) $pta->service_id;
 
         $targets = $this->mergeRecipients(
-            $this->globalUsers([User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET]),
+            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET]),
             $this->directionUsers($directionId, [User::ROLE_DIRECTION])
         );
         $targets = $this->mergeRecipients(
@@ -338,7 +586,8 @@ class WorkspaceNotificationService
 
         [$title, $message, $status] = $this->resolveStatusPayload('PTA', (string) $pta->titre, $event);
 
-        $this->dispatch(
+        $this->dispatchEvent(
+            'pta_status',
             $targets,
             [
                 'title' => $title,
@@ -351,12 +600,21 @@ class WorkspaceNotificationService
                 'status' => $status,
                 'priority' => 'normal',
             ],
+            [
+                'module_label' => 'PTA',
+                'entity_title' => (string) $pta->titre,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
             $actor?->id
         );
     }
 
     public function notifyDelegationCreated(Delegation $delegation, ?User $actor = null): void
     {
+        if (! $this->notificationPolicySettings->eventEnabled('delegation_created')) {
+            return;
+        }
+
         $delegation->loadMissing([
             'delegant:id,name',
             'delegue:id,name',
@@ -373,7 +631,8 @@ class WorkspaceNotificationService
             ? trim((string) ($delegation->direction?->code.' / '.$delegation->service?->code.' - '.$delegation->service?->libelle))
             : trim((string) ($delegation->direction?->code.' - '.$delegation->direction?->libelle));
 
-        $this->dispatch(
+        $this->dispatchEvent(
+            'delegation_created',
             new EloquentCollection([$delegate]),
             [
                 'title' => 'Nouvelle delegation recue',
@@ -389,6 +648,10 @@ class WorkspaceNotificationService
                 'icon' => 'users',
                 'status' => 'info',
                 'priority' => 'high',
+            ],
+            [
+                'actor_name' => (string) ($delegation->delegant?->name ?? 'un responsable'),
+                'scope_label' => $scopeLabel !== '' ? $scopeLabel : 'non renseigne',
             ],
             $actor?->id
         );
@@ -437,6 +700,10 @@ class WorkspaceNotificationService
 
         if ($log->week !== null) {
             return route('workspace.actions.suivi', $action).'#action-week-'.$log->week->id;
+        }
+
+        if (Str::startsWith((string) $log->type_evenement, 'alerte_temporelle_')) {
+            return route('workspace.actions.suivi', $action).'#action-status';
         }
 
         return match ((string) $log->type_evenement) {
@@ -523,6 +790,83 @@ class WorkspaceNotificationService
             ->filter(static fn ($user): bool => $user instanceof User)
             ->unique('id')
             ->values();
+    }
+
+    /**
+     * @param Collection<int, User>|EloquentCollection<int, User> $users
+     * @param array<string, mixed> $payload
+     * @param array<string, scalar|null> $replacements
+     */
+    private function dispatchEvent(
+        string $event,
+        Collection|EloquentCollection $users,
+        array $payload,
+        array $replacements = [],
+        ?int $excludeUserId = null
+    ): void {
+        if (! $this->notificationPolicySettings->eventEnabled($event)) {
+            return;
+        }
+
+        $rendered = $this->notificationPolicySettings->renderEventPayload($event, $payload, $replacements);
+        $channels = collect(is_array($rendered['channels'] ?? null) ? $rendered['channels'] : [])
+            ->map(fn ($channel): string => trim((string) $channel))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (in_array('audit', $channels, true)) {
+            $this->dispatchAuditTrace($event, $users, $rendered, $excludeUserId);
+        }
+
+        if (! in_array('in_app', $channels, true)) {
+            return;
+        }
+
+        unset($rendered['channels']);
+
+        $this->dispatch($users, $rendered, $excludeUserId);
+    }
+
+    /**
+     * @param Collection<int, User>|EloquentCollection<int, User> $users
+     * @param array<string, mixed> $payload
+     */
+    private function dispatchAuditTrace(string $event, Collection|EloquentCollection $users, array $payload, ?int $excludeUserId = null): void
+    {
+        $targets = $users
+            ->filter(static fn ($user): bool => $user instanceof User)
+            ->unique('id')
+            ->values();
+
+        if ($excludeUserId !== null) {
+            $targets = $targets
+                ->reject(static fn (User $user): bool => (int) $user->id === (int) $excludeUserId)
+                ->values();
+        }
+
+        if ($targets->isEmpty()) {
+            return;
+        }
+
+        JournalAudit::query()->create([
+            'user_id' => $excludeUserId,
+            'module' => (string) ($payload['module'] ?? 'notifications'),
+            'entite_type' => (string) ($payload['entity_type'] ?? 'notification'),
+            'entite_id' => isset($payload['entity_id']) ? (int) $payload['entity_id'] : null,
+            'action' => 'notification_'.$event,
+            'ancienne_valeur' => null,
+            'nouvelle_valeur' => [
+                'title' => (string) ($payload['title'] ?? ''),
+                'message' => (string) ($payload['message'] ?? ''),
+                'channels' => $payload['channels'] ?? [],
+                'recipient_ids' => $targets->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+                'recipient_count' => $targets->count(),
+            ],
+            'adresse_ip' => null,
+            'user_agent' => 'workspace_notification_service',
+        ]);
     }
 
     /**

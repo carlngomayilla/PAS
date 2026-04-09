@@ -14,16 +14,6 @@
             'en_cours' => $listing->where('statut_dynamique', 'en_cours')->count(),
             'achevees' => $listing->filter(fn ($item) => in_array($item->statut_dynamique, ['acheve_dans_delai', 'acheve_hors_delai'], true))->count(),
         ];
-        $tableLevel = match ($filters['statut_validation'] ?? null) {
-            \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_DIRECTION => ['label' => 'Officiel', 'tone' => 'success'],
-            \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_CHEF => ['label' => 'Valide', 'tone' => 'warning'],
-            default => ['label' => 'Provisoire', 'tone' => 'info'],
-        };
-        $tableLevelClass = match ($tableLevel['tone']) {
-            'success' => 'anbg-badge anbg-badge-success',
-            'warning' => 'anbg-badge anbg-badge-warning',
-            default => 'anbg-badge anbg-badge-info',
-        };
         $statusStyles = [
             'non_demarre' => 'anbg-badge anbg-badge-neutral',
             'en_cours' => 'anbg-badge anbg-badge-info',
@@ -41,32 +31,32 @@
                 'value' => $listing->count(),
                 'meta' => 'Elements affiches sur cette page',
                 'href' => route('workspace.actions.index'),
-                'badge' => $tableLevel['label'],
-                'badge_tone' => $tableLevel['tone'],
+                'badge' => null,
+                'badge_tone' => 'neutral',
             ],
             [
                 'label' => 'Progression moyenne',
                 'value' => number_format($avgProgression, 1).'%',
                 'meta' => $statusCounts['en_cours'].' actions en cours',
                 'href' => route('workspace.actions.index', ['statut' => 'en_cours']),
-                'badge' => $tableLevel['label'],
-                'badge_tone' => $tableLevel['tone'],
+                'badge' => null,
+                'badge_tone' => 'neutral',
             ],
             [
                 'label' => $metricLabel('global'),
                 'value' => number_format($avgKpi, 1),
                 'meta' => 'Lecture directe de la performance courante',
                 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc']),
-                'badge' => $tableLevel['label'],
-                'badge_tone' => $tableLevel['tone'],
+                'badge' => null,
+                'badge_tone' => 'neutral',
             ],
             [
                 'label' => 'Financement requis',
                 'value' => $fundedCount,
                 'meta' => 'Actions avec besoin financier sur cette page',
                 'href' => route('workspace.actions.index', ['financement_requis' => 1]),
-                'badge' => $tableLevel['label'],
-                'badge_tone' => $tableLevel['tone'],
+                'badge' => null,
+                'badge_tone' => 'neutral',
             ],
         ];
     @endphp
@@ -76,10 +66,6 @@
             <div class="max-w-3xl">
                 <span class="showcase-eyebrow">Execution operationnelle</span>
                 <h1 class="showcase-title">Actions</h1>
-                <p class="showcase-subtitle">
-                    Pilotage des actions rattachees aux PTA avec suivi periodique intelligent, progression reelle vs theorique,
-                    circuit de validation et indicateurs consolides.
-                </p>
                 <div class="showcase-chip-row">
                     <span class="showcase-chip">
                         <span class="showcase-chip-dot bg-blue-600"></span>
@@ -108,12 +94,6 @@
         </div>
     </section>
 
-    <div class="mb-4 flex flex-wrap gap-2">
-        <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
-        <span class="anbg-badge anbg-badge-warning px-3 py-1">Valide</span>
-        <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
-    </div>
-
     <section class="showcase-summary-grid mb-4">
         @foreach ($summaryCards as $card)
             <x-stat-card-link
@@ -131,13 +111,15 @@
         <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Filtres de navigation</h2>
-                <p class="showcase-panel-subtitle">Affinez le listing par contenu, PTA, statut dynamique et besoin de financement.</p>
             </div>
             <a class="btn btn-secondary rounded-2xl px-4 py-2" href="{{ route('workspace.actions.index') }}">
                 Reinitialiser
             </a>
         </div>
         <form method="GET" action="{{ route('workspace.actions.index') }}">
+            @if ($filters['statut_validation_min'] !== '')
+                <input type="hidden" name="statut_validation_min" value="{{ $filters['statut_validation_min'] }}">
+            @endif
             <div class="showcase-filter-grid">
                 <div>
                     <label for="q">Recherche</label>
@@ -211,7 +193,7 @@
                 <div class="mt-4 showcase-chip-row">
                     <span class="showcase-chip">
                         <span class="showcase-chip-dot bg-[#F59E0B]"></span>
-                        Drill-down actif : actions sans indicateur
+                        Actions sans indicateur
                     </span>
                 </div>
             @endif
@@ -247,10 +229,6 @@
         <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Liste des actions</h2>
-                <p class="showcase-panel-subtitle">Vue complete des actions accessibles dans votre perimetre metier.</p>
-                <div class="mt-2">
-                    <span class="{{ $tableLevelClass }} px-3 py-1">{{ $tableLevel['label'] }}</span>
-                </div>
             </div>
             <span class="showcase-chip">{{ $rows->total() }} lignes au total</span>
         </div>

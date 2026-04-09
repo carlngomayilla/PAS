@@ -47,6 +47,7 @@ class MessagingDirectoryService
         }
 
         $strategicRoles = [
+            User::ROLE_SUPER_ADMIN,
             User::ROLE_ADMIN,
             User::ROLE_DG,
             User::ROLE_PLANIFICATION,
@@ -119,7 +120,7 @@ class MessagingDirectoryService
             ->groupBy('direction_id');
 
         $strategic = [
-            'leadership' => $users->filter(fn (User $user): bool => $user->hasRole(User::ROLE_ADMIN, User::ROLE_DG))->values(),
+            'leadership' => $users->filter(fn (User $user): bool => $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG))->values(),
             'cabinet' => $users->filter(fn (User $user): bool => $user->hasRole(User::ROLE_CABINET))->values(),
             'planification' => $users->filter(fn (User $user): bool => $user->hasRole(User::ROLE_PLANIFICATION))->values(),
         ];
@@ -366,7 +367,7 @@ class MessagingDirectoryService
         /** @var User|null $dg */
         $dg = $users->first(fn (User $user): bool => $user->hasRole(User::ROLE_DG));
 
-        if ($subject->hasRole(User::ROLE_ADMIN, User::ROLE_DG)) {
+        if ($subject->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG)) {
             return null;
         }
 
@@ -427,7 +428,7 @@ class MessagingDirectoryService
         $leadership = collect($strategic['leadership'] ?? collect())->values();
         /** @var User|null $rootLeader */
         $rootLeader = $leadership->first(fn (User $user): bool => $user->hasRole(User::ROLE_DG))
-            ?? $leadership->first(fn (User $user): bool => $user->hasRole(User::ROLE_ADMIN))
+            ?? $leadership->first(fn (User $user): bool => $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN))
             ?? $leadership->first();
 
         $directionChildren = collect($directionBlocks)
@@ -655,7 +656,7 @@ class MessagingDirectoryService
     private function userTheme(User $user): string
     {
         return match ($user->role) {
-            User::ROLE_ADMIN, User::ROLE_DG => 'blue',
+            User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG => 'blue',
             User::ROLE_CABINET => 'amber',
             User::ROLE_PLANIFICATION => 'green',
             User::ROLE_DIRECTION => 'rose',
@@ -705,7 +706,7 @@ class MessagingDirectoryService
     private function userOrgRank(User $user): int
     {
         return match (true) {
-            $user->hasRole(User::ROLE_DG, User::ROLE_ADMIN) => 0,
+            $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_DG, User::ROLE_ADMIN) => 0,
             $user->hasRole(User::ROLE_DIRECTION) => 1,
             $user->hasRole(User::ROLE_CABINET) => 2,
             $user->hasRole(User::ROLE_PLANIFICATION, User::ROLE_SERVICE) => 3,
@@ -716,7 +717,7 @@ class MessagingDirectoryService
     private function userHierarchyLevel(User $user): string
     {
         return match (true) {
-            $user->hasRole(User::ROLE_DG, User::ROLE_ADMIN, User::ROLE_DIRECTION) => 'direction',
+            $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_DG, User::ROLE_ADMIN, User::ROLE_DIRECTION) => 'direction',
             $user->hasRole(User::ROLE_CABINET, User::ROLE_PLANIFICATION, User::ROLE_SERVICE) => 'service',
             default => 'agent',
         };

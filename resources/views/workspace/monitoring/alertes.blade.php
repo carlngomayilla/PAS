@@ -51,7 +51,7 @@
                 'meta' => 'Escalade DG immediate',
                 'href' => route('workspace.alertes', ['niveau' => 'urgence', 'limit' => 100]),
                 'valueClass' => 'showcase-kpi-number text-red-600 dark:text-red-300',
-                'badge' => 'Provisoire',
+                'badge' => null,
                 'badge_tone' => 'info',
             ],
             [
@@ -60,7 +60,7 @@
                 'meta' => 'Alertes a traiter',
                 'href' => route('workspace.alertes', ['etat' => 'unread', 'limit' => 100]),
                 'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
-                'badge' => 'Provisoire',
+                'badge' => null,
                 'badge_tone' => 'info',
             ],
             [
@@ -69,7 +69,7 @@
                 'meta' => 'Escalade immediate',
                 'href' => route('workspace.alertes', ['niveau' => 'critical', 'limit' => 100]),
                 'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
-                'badge' => 'Provisoire',
+                'badge' => null,
                 'badge_tone' => 'info',
             ],
             [
@@ -78,7 +78,7 @@
                 'meta' => 'Surveillance rapprochee',
                 'href' => route('workspace.alertes', ['niveau' => 'warning', 'limit' => 100]),
                 'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
-                'badge' => 'Provisoire',
+                'badge' => null,
                 'badge_tone' => 'info',
             ],
             [
@@ -87,7 +87,7 @@
                 'meta' => 'Information de contexte',
                 'href' => route('workspace.alertes', ['niveau' => 'info', 'limit' => 100]),
                 'valueClass' => 'showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]',
-                'badge' => 'Provisoire',
+                'badge' => null,
                 'badge_tone' => 'info',
             ],
         ];
@@ -98,7 +98,7 @@
                 'meta' => 'Synthese DG des actions validees direction',
                 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc']),
                 'valueClass' => 'showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]',
-                'badge' => 'Officiel',
+                'badge' => null,
                 'badge_tone' => 'success',
             ],
             [
@@ -107,7 +107,7 @@
                 'meta' => 'Conformite des preuves et du suivi',
                 'href' => route('workspace.actions.index', ['sort' => 'kpi_qualite_desc']),
                 'valueClass' => 'showcase-kpi-number text-[#8fc043] dark:text-[#f8e932]',
-                'badge' => 'Officiel',
+                'badge' => null,
                 'badge_tone' => 'success',
             ],
             [
@@ -116,7 +116,7 @@
                 'meta' => 'Exposition globale et actions fragiles',
                 'href' => route('workspace.actions.index', ['sort' => 'kpi_risque_desc']),
                 'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
-                'badge' => 'Officiel',
+                'badge' => null,
                 'badge_tone' => 'success',
             ],
             [
@@ -125,20 +125,17 @@
                 'meta' => 'Execution moyenne consolidee',
                 'href' => route('workspace.actions.index', ['sort' => 'progression_desc']),
                 'valueClass' => 'showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]',
-                'badge' => 'Officiel',
+                'badge' => null,
                 'badge_tone' => 'success',
             ],
         ];
     @endphp
-    <section class="showcase-hero mb-4">
+    <div class="app-screen-flow">
+    <section class="showcase-hero mb-4 app-screen-block">
         <div class="showcase-hero-body">
             <div>
                 <span class="showcase-eyebrow">Alertes operationnelles</span>
                 <h1 class="showcase-title">Centre d'alertes</h1>
-                <p class="showcase-subtitle">
-                    Vue unifiee des retards, indicateurs sous seuil, incidents de suivi et delegations proches d'expiration.
-                    Cliquer sur une alerte ouvre directement la cause dans le module concerne.
-                </p>
             </div>
 
             <div class="showcase-action-row">
@@ -164,13 +161,7 @@
         </div>
     </section>
 
-    <div class="mb-4 flex flex-wrap gap-2">
-        <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
-        <span class="anbg-badge anbg-badge-warning px-3 py-1">Valide</span>
-        <span class="anbg-badge anbg-badge-success px-3 py-1">Officiel</span>
-    </div>
-
-    <section class="showcase-summary-grid mb-4">
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($alertSummaryCards as $card)
             <x-stat-card-link
                 :href="$card['href']"
@@ -184,7 +175,7 @@
         @endforeach
     </section>
 
-    <section class="showcase-summary-grid mb-4">
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($kpiCards as $card)
             <x-stat-card-link
                 :href="$card['href']"
@@ -198,7 +189,7 @@
         @endforeach
     </section>
 
-    <section class="showcase-toolbar mb-4">
+    <section class="showcase-toolbar mb-4 app-screen-block">
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 dark:border-slate-800 dark:bg-slate-950/50">
                 <button class="{{ $filterButtonBase }} border-slate-300 bg-slate-900 text-white dark:border-slate-700 dark:bg-slate-100 dark:text-slate-900" data-level-filter="all" type="button">
@@ -233,12 +224,10 @@
         </div>
     </section>
 
-    <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3 app-screen-block">
         <div>
             <h2 class="showcase-panel-title">Fil d alertes</h2>
-            <p class="showcase-panel-subtitle">Evenements operationnels en cours, filtres selon votre perimetre et vos niveaux de lecture.</p>
         </div>
-        <span class="anbg-badge anbg-badge-info px-3 py-1">Provisoire</span>
     </div>
 
     <section class="space-y-3" id="alert-feed">
@@ -338,6 +327,7 @@
             Aucune alerte ne correspond aux filtres selectionnes.
         </div>
     </section>
+    </div>
 @endsection
 
 @push('scripts')
@@ -427,3 +417,4 @@
         })();
     </script>
 @endpush
+

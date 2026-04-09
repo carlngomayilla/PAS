@@ -30,26 +30,12 @@
         }
     @endphp
 
-    <section class="showcase-hero mb-4">
+    <div class="app-screen-flow">
+    <section class="showcase-hero mb-4 app-screen-block">
         <div class="showcase-hero-body">
             <div>
-                <span class="showcase-eyebrow">{{ $isEdit ? 'Edition PAS' : 'Nouveau PAS' }}</span>
+                <span class="showcase-eyebrow">PAS</span>
                 <h1 class="showcase-title">{{ $isEdit ? 'Modifier un PAS existant' : 'Enregistrer un nouveau PAS' }}</h1>
-                <p class="showcase-subtitle">Le flux strategique est desormais structure en trois niveaux: PAS, axes strategiques, puis objectifs strategiques. Les directions interviennent ensuite sur la creation des PAO pour chaque OS.</p>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
-                        Etape 1: PAS
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
-                        Etape 2: Axes
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
-                        Etape 3: OS
-                    </span>
-                </div>
             </div>
             <div class="showcase-action-row">
                 <a class="btn btn-blue" href="{{ route('workspace.pas.index') }}">Retour liste</a>
@@ -57,48 +43,26 @@
         </div>
     </section>
 
-    <section class="showcase-summary-grid mb-4">
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Mode</p>
             <p class="showcase-kpi-number">{{ $isEdit ? 'Edit.' : 'Nouv.' }}</p>
-            <p class="showcase-kpi-meta">{{ $isEdit ? 'Mise a jour d un PAS existant' : 'Creation d une nouvelle vision strategique' }}</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Periode</p>
             <p class="showcase-kpi-number text-[1.35rem]">{{ old('periode_debut', $row->periode_debut) ?: '--' }} - {{ old('periode_fin', $row->periode_fin) ?: '--' }}</p>
-            <p class="showcase-kpi-meta">Fenetre strategique renseignee</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Axes prepares</p>
             <p class="showcase-kpi-number">{{ count($initialAxes) }}</p>
-            <p class="showcase-kpi-meta">Axes initialises dans le formulaire</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Workflow</p>
             <p class="showcase-kpi-number text-[1.35rem]">{{ $workflowStatusLabel((string) old('statut', $row->statut ?: 'brouillon')) }}</p>
-            <p class="showcase-kpi-meta">Etat administratif courant</p>
         </article>
     </section>
 
-    <section class="showcase-panel mb-4">
-        <div class="mb-4 grid gap-3 md:grid-cols-3">
-            <article class="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Etape 1</p>
-                <h2 class="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">Creer le PAS</h2>
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Titre, periode pluriannuelle et statut administratif du plan.</p>
-            </article>
-            <article class="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Etape 2</p>
-                <h2 class="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">Ajouter les axes</h2>
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Chaque axe porte un code, une fenetre de travail et une description strategique.</p>
-            </article>
-            <article class="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Etape 3</p>
-                <h2 class="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">Ajouter les OS</h2>
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Chaque OS porte ses cibles strategiques et sera ensuite couvert par un PAO de chaque direction.</p>
-            </article>
-        </div>
-
+    <section class="showcase-panel mb-4 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.pas.update', $row) : route('workspace.pas.store') }}">
             @csrf
             @if ($isEdit)
@@ -110,29 +74,28 @@
                     <span class="wizard-step-index">1</span>
                     <span class="wizard-step-text">
                         <strong>Plan strategique</strong>
-                        <small>Identite, periode et statut du PAS</small>
+                        <small>Identite et periode</small>
                     </span>
                 </button>
                 <button type="button" class="wizard-step-card" data-wizard-step="axes">
                     <span class="wizard-step-index">2</span>
                     <span class="wizard-step-text">
                         <strong>Axes</strong>
-                        <small>Structurer les axes du PAS</small>
+                        <small>Structurer le plan</small>
                     </span>
                 </button>
                 <button type="button" class="wizard-step-card" data-wizard-step="objectifs">
                     <span class="wizard-step-index">3</span>
                     <span class="wizard-step-text">
                         <strong>Objectifs strategiques</strong>
-                        <small>Declarer les OS qui ouvriront les PAO</small>
+                        <small>Declarer les objectifs</small>
                     </span>
                 </button>
             </div>
 
             <div class="form-section" data-step="pas">
                 <h2 class="form-section-title">Informations strategiques</h2>
-                <p class="form-section-subtitle">La periode de fin ne peut pas etre inferieure a la periode de debut.</p>
-                <div class="form-grid">
+                <div class="grid gap-4">
                     <div>
                         <label for="titre">Titre</label>
                         <input id="titre" name="titre" type="text" value="{{ old('titre', $row->titre) }}" required>
@@ -160,7 +123,6 @@
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <h2 class="form-section-title" id="structure-title">Axes strategiques</h2>
-                        <p class="form-section-subtitle" id="structure-subtitle">Chaque axe structure le PAS. Les objectifs strategiques seront renseignes a l etape suivante.</p>
                     </div>
                     <button
                         type="button"
@@ -185,9 +147,8 @@
     </section>
 
     @if ($isEdit)
-        <section class="showcase-panel mb-4">
+        <section class="showcase-panel mb-4 app-screen-block">
             <h2 class="showcase-panel-title">Timeline validation</h2>
-            <p class="showcase-panel-subtitle">Historique des soumissions, validations, verrous et retours brouillon du PAS.</p>
             <div class="overflow-auto">
                 <table>
                     <thead>
@@ -224,6 +185,7 @@
             </div>
         </section>
     @endif
+    </div>
 @endsection
 
 @push('styles')

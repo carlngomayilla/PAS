@@ -13,8 +13,11 @@ use App\Models\ActionKpi;
 use App\Models\Pta;
 use App\Models\User;
 use App\Support\UiLabel;
+use App\Services\ActionCalculationSettings;
+use App\Services\ActionManagementSettings;
 use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\DynamicReferentialSettings;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Database\Eloquent\Builder;
@@ -131,6 +134,13 @@ class ActionWebController extends Controller
             $request->filled('statut_validation'),
             fn (Builder $q) => $q->where('statut_validation', (string) $request->string('statut_validation'))
         );
+        $query->when($request->filled('statut_validation_min'), function (Builder $q) use ($request): void {
+            $threshold = trim((string) $request->string('statut_validation_min'));
+            $settings = app(ActionCalculationSettings::class);
+            $statuses = $settings->validationStatusesFrom($threshold);
+
+            $q->whereIn('statut_validation', $statuses);
+        });
 
         $query->when(
             $request->filled('financement_requis'),
@@ -196,6 +206,7 @@ class ActionWebController extends Controller
                 'risque_label' => $request->filled('risque_label') ? trim((string) $request->string('risque_label')) : '',
                 'statut' => $statusFilter,
                 'statut_validation' => (string) $request->string('statut_validation'),
+                'statut_validation_min' => (string) $request->string('statut_validation_min'),
                 'financement_requis' => $request->filled('financement_requis')
                     ? (int) $request->integer('financement_requis')
                     : null,
@@ -231,6 +242,10 @@ class ActionWebController extends Controller
             'statusOptions' => ActionTrackingService::dynamicStatusOptions(),
             'indicatorPeriodicityOptions' => $this->indicatorPeriodicityOptions(),
             'indicatorModeOptions' => $this->indicatorInputModeOptions(),
+            'targetTypeOptions' => $this->actionTargetTypeOptions(),
+            'actionUnitSuggestions' => $this->actionUnitSuggestions(),
+            'kpiUnitSuggestions' => app(DynamicReferentialSettings::class)->kpiUnitSuggestions(),
+            'actionManagementSettings' => app(ActionManagementSettings::class),
         ]);
     }
 
@@ -345,6 +360,10 @@ class ActionWebController extends Controller
             'statusOptions' => ActionTrackingService::dynamicStatusOptions(),
             'indicatorPeriodicityOptions' => $this->indicatorPeriodicityOptions(),
             'indicatorModeOptions' => $this->indicatorInputModeOptions(),
+            'targetTypeOptions' => $this->actionTargetTypeOptions(),
+            'actionUnitSuggestions' => $this->actionUnitSuggestions(),
+            'kpiUnitSuggestions' => app(DynamicReferentialSettings::class)->kpiUnitSuggestions(),
+            'actionManagementSettings' => app(ActionManagementSettings::class),
         ]);
     }
 
@@ -549,6 +568,22 @@ class ActionWebController extends Controller
             '1' => UiLabel::indicatorInputMode(true),
             '0' => UiLabel::indicatorInputMode(false),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function actionTargetTypeOptions(): array
+    {
+        return app(DynamicReferentialSettings::class)->actionTargetTypeLabels();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function actionUnitSuggestions(): array
+    {
+        return app(DynamicReferentialSettings::class)->actionUnitSuggestions();
     }
 
     private function denyUnlessActionManager(User $user, ?int $directionId, ?int $serviceId): void

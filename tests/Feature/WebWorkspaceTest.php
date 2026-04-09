@@ -9,6 +9,8 @@ use App\Models\KpiMesure;
 use App\Models\Kpi;
 use App\Models\Pta;
 use App\Models\User;
+use App\Services\ActionCalculationSettings;
+use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
 use App\Services\Analytics\ReportingAnalyticsService;
@@ -44,7 +46,7 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/workspace/messagerie')
             ->assertOk()
-            ->assertSee('Messagerie interne et annuaire organisationnel');
+            ->assertSee('Messagerie interne');
 
         $this->actingAs($admin)
             ->get('/workspace/pilotage')
@@ -206,6 +208,54 @@ class WebWorkspaceTest extends TestCase
         }
     }
 
+    public function test_official_reporting_counts_follow_super_admin_calculation_policy(): void
+    {
+        $admin = $this->createAdminUser();
+        [$pta, $responsable] = $this->firstUnlockedPtaAndAgent();
+
+        Action::query()->create([
+            'pta_id' => (int) $pta->id,
+            'responsable_id' => (int) $responsable->id,
+            'libelle' => 'Action test politique officielle',
+            'description' => 'Action prise en compte des validation chef.',
+            'type_cible' => 'quantitative',
+            'unite_cible' => 'dossiers',
+            'quantite_cible' => 10,
+            'date_debut' => '2026-04-01',
+            'date_fin' => '2026-04-30',
+            'date_echeance' => '2026-04-30',
+            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
+            'statut' => 'en_cours',
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'progression_reelle' => 40,
+            'progression_theorique' => 35,
+            'validation_hierarchique' => false,
+            'financement_requis' => false,
+            'ressource_main_oeuvre' => true,
+        ]);
+
+        app(ActionCalculationSettings::class)->updateOfficialPolicy([
+            'actions_official_validation_status' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertDontSee('statut_validation_min=validee_chef', false)
+            ->assertDontSee('statut_validation=validee_direction', false);
+
+        $this->actingAs($admin)
+            ->get('/workspace/actions?statut_validation=validee_direction')
+            ->assertOk()
+            ->assertDontSee('Action test politique officielle');
+
+        $this->actingAs($admin)
+            ->get('/workspace/actions')
+            ->assertOk()
+            ->assertSee('Action test politique officielle');
+    }
+
     public function test_pilotage_stat_cards_expose_drilldown_links(): void
     {
         $admin = $this->createAdminUser();
@@ -267,40 +317,40 @@ class WebWorkspaceTest extends TestCase
             ->assertSee('name="mois_demarrage" value="'.$action->date_debut->format('Y-m').'"', false);
     }
 
-    public function test_workspace_list_pages_show_reading_level_badges(): void
+    public function test_workspace_list_pages_use_simple_statistics_labels(): void
     {
         $admin = $this->createAdminUser();
 
         $this->actingAs($admin)
             ->get('/workspace/actions')
             ->assertOk()
-            ->assertSee('Provisoire');
+            ->assertDontSee('Provisoire');
 
         $this->actingAs($admin)
             ->get('/workspace/actions?statut_validation=validee_direction')
             ->assertOk()
-            ->assertSee('Officiel');
+            ->assertDontSee('Officiel');
 
         $this->actingAs($admin)
             ->get('/workspace/pas?statut=valide_ou_verrouille')
             ->assertOk()
-            ->assertSee('Valide');
+            ->assertSee('Liste des PAS');
 
         $this->actingAs($admin)
             ->get('/workspace/pao?statut=valide_ou_verrouille')
             ->assertOk()
-            ->assertSee('Valide');
+            ->assertSee('Liste des PAO');
 
         $this->actingAs($admin)
             ->get('/workspace/pta?statut=valide_ou_verrouille')
             ->assertOk()
-            ->assertSee('Valide');
+            ->assertSee('Liste des PTA');
 
         $this->actingAs($admin)
             ->get('/workspace/alertes')
             ->assertOk()
-            ->assertSee('Provisoire')
-            ->assertSee('Officiel');
+            ->assertDontSee('Provisoire')
+            ->assertDontSee('Officiel');
     }
 
     public function test_service_user_has_no_audit_access_and_removed_modules_are_unavailable(): void
@@ -896,15 +946,17 @@ class WebWorkspaceTest extends TestCase
         $this->assertNotFalse($chartOneXml);
         $this->assertNotFalse($drawingXml);
         $this->assertStringContainsString('Synthese graphique', (string) $workbookXml);
-        $this->assertStringContainsString('Niveaux de lecture', (string) $sheetOneXml);
-        $this->assertStringContainsString('Synthese indicateurs validee direction', (string) $sheetOneXml);
-        $this->assertStringContainsString('[Officiel] Vue consolidee du PAS', (string) $sheetOneXml);
-        $this->assertStringContainsString('[Valide] Details - indicateurs sous seuil', (string) $sheetOneXml);
+        $this->assertStringContainsString('Repères de lecture', (string) $sheetOneXml);
+        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetOneXml);
+        $this->assertStringContainsString('Synthese des indicateurs', (string) $sheetOneXml);
+        $this->assertStringContainsString('Vue du PAS', (string) $sheetOneXml);
+        $this->assertStringContainsString('Details - indicateurs sous seuil', (string) $sheetOneXml);
         $this->assertStringContainsString('Indicateur qualite', (string) $sheetOneXml);
         $this->assertStringContainsString('Indicateur risque', (string) $sheetOneXml);
-        $this->assertStringContainsString('Niveaux de lecture : Provisoire | Valide | Officiel', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Funnel de pilotage [Provisoire]', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Vue interannuelle [Officiel]', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Lecture statistique unifiee', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Funnel de pilotage', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Vue interannuelle', (string) $sheetTwoXml);
         $this->assertStringContainsString('<c:barChart>', (string) $chartOneXml);
         $this->assertStringContainsString('rId1', (string) $drawingXml);
 
@@ -925,10 +977,108 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringContainsString('Indicateur qualite', $html);
         $this->assertStringContainsString('Indicateur risque', $html);
         $this->assertStringContainsString('Indicateur global', $html);
-        $this->assertStringContainsString('Provisoire', $html);
-        $this->assertStringContainsString('Valide', $html);
-        $this->assertStringContainsString('Officiel', $html);
-        $this->assertStringContainsString('level-badge level-officiel', $html);
+        $this->assertStringNotContainsString('Provisoire', $html);
+        $this->assertStringNotContainsString('Officiel', $html);
+        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
+        $this->assertStringNotContainsString('level-badge level-officiel', $html);
+    }
+
+    public function test_reporting_exports_display_super_admin_official_basis(): void
+    {
+        $admin = $this->createAdminUser();
+        app(ActionCalculationSettings::class)->updateOfficialPolicy([
+            'actions_official_validation_status' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ]);
+
+        $payload = app(ReportingAnalyticsService::class)->buildPayload($admin, true, true);
+        $html = view('workspace.monitoring.reporting-pdf', $payload)->render();
+
+        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
+        $this->assertStringContainsString('Validees', $html);
+
+        $xlsxResponse = $this->actingAs($admin)
+            ->get(route('workspace.reporting.export.excel'));
+
+        $xlsxResponse->assertOk();
+        $xlsxBinary = $xlsxResponse->streamedContent();
+        $tempFile = tempnam(sys_get_temp_dir(), 'xlsx_policy_');
+        $this->assertNotFalse($tempFile);
+        file_put_contents($tempFile, $xlsxBinary);
+
+        if (class_exists(ZipArchive::class)) {
+            $zip = new ZipArchive();
+            $this->assertTrue($zip->open($tempFile) === true);
+            $sheetOneXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+            $sheetTwoXml = $zip->getFromName('xl/worksheets/sheet2.xml');
+            $zip->close();
+        } else {
+            $entries = app(SimpleZipReader::class)->read($tempFile);
+            $sheetOneXml = $entries['xl/worksheets/sheet1.xml'] ?? false;
+            $sheetTwoXml = $entries['xl/worksheets/sheet2.xml'] ?? false;
+        }
+        @unlink($tempFile);
+
+        $this->assertNotFalse($sheetOneXml);
+        $this->assertNotFalse($sheetTwoXml);
+        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetOneXml);
+        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Synthese des indicateurs', (string) $sheetOneXml);
+    }
+
+    public function test_reporting_hub_displays_super_admin_official_basis(): void
+    {
+        $admin = $this->createAdminUser();
+        app(ActionCalculationSettings::class)->updateOfficialPolicy([
+            'actions_official_validation_status' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/workspace/reporting')
+            ->assertOk()
+            ->assertSee('Base statistique : Toutes les actions visibles')
+            ->assertSee('Actions validees')
+            ->assertDontSee('statut_validation_min=validee_chef', false)
+            ->assertDontSee('statut_validation=validee_direction', false)
+            ->assertDontSee('Moyenne validee direction')
+            ->assertDontSee('Lecture DG : operationnel vs consolide');
+    }
+
+    public function test_pilotage_displays_super_admin_official_basis(): void
+    {
+        $admin = $this->createAdminUser();
+        app(ActionCalculationSettings::class)->updateOfficialPolicy([
+            'actions_official_validation_status' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/workspace/pilotage')
+            ->assertOk()
+            ->assertSee('Base statistique : Toutes les actions visibles')
+            ->assertSee('Actions validees')
+            ->assertDontSee('statut_validation_min=validee_chef', false)
+            ->assertDontSee('statut_validation=validee_direction', false)
+            ->assertDontSee('Moyenne validee direction')
+            ->assertDontSee('socle officiel valide direction')
+            ->assertDontSee('Lecture DG : operationnel vs consolide');
+    }
+
+    public function test_dashboard_reporting_analytics_partial_displays_super_admin_official_basis(): void
+    {
+        $admin = $this->createAdminUser();
+        app(ActionCalculationSettings::class)->updateOfficialPolicy([
+            'actions_official_validation_status' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ]);
+
+        $payload = app(ReportingAnalyticsService::class)->buildPayload($admin, true, true);
+        $html = view('partials.dashboard-reporting-analytics', [
+            'reportingAnalytics' => $payload,
+        ])->render();
+
+        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
+        $this->assertStringContainsString('Toutes les actions visibles', $html);
+        $this->assertStringContainsString('Validees', $html);
+        $this->assertStringNotContainsString('Moyenne validee direction', $html);
+        $this->assertStringNotContainsString('socle officiel valide direction', $html);
     }
 
     public function test_agent_cannot_manage_actions_but_can_submit_weekly_tracking(): void

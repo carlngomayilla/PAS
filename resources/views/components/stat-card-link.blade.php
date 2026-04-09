@@ -10,7 +10,7 @@
     'valueClass' => 'showcase-kpi-number',
     'metaClass' => 'showcase-kpi-meta',
     'valueStyle' => null,
-    'hint' => 'Cliquer pour voir le detail',
+    'hint' => null,
     'tone' => null,
 ])
 

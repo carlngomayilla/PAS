@@ -18,6 +18,7 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
+    public const ROLE_SUPER_ADMIN = 'super_admin';
     public const ROLE_ADMIN = 'admin';
     public const ROLE_DG = 'dg';
     public const ROLE_PLANIFICATION = 'planification';
@@ -38,7 +39,10 @@ class User extends Authenticatable
         'password',
         'password_changed_at',
         'role',
+        'custom_role_code',
         'is_active',
+        'suspended_until',
+        'suspension_reason',
         'is_agent',
         'agent_matricule',
         'agent_fonction',
@@ -75,6 +79,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password_changed_at' => 'datetime',
+            'suspended_until' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
             'is_agent' => 'boolean',
@@ -181,32 +186,74 @@ class User extends Authenticatable
         return in_array($this->role, $roles, true);
     }
 
+    public function hasEffectiveRole(string ...$roles): bool
+    {
+        return in_array($this->effectiveRoleCode(), $roles, true);
+    }
+
+    public function effectiveRoleCode(): string
+    {
+        $customRoleCode = trim((string) ($this->custom_role_code ?? ''));
+
+        return $customRoleCode !== '' ? $customRoleCode : (string) $this->role;
+    }
+
+    public function baseRoleCode(): string
+    {
+        return (string) $this->role;
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole(self::ROLE_SUPER_ADMIN);
+    }
+
+    public function isSuspended(): bool
+    {
+        return $this->suspended_until !== null && $this->suspended_until->isFuture();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function grantedPermissions(): array
+    {
+        return app(\App\Services\RolePermissionSettings::class)->forUser($this);
+    }
+
+    public function hasPermission(string $permission): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return app(\App\Services\RolePermissionSettings::class)->has($this, $permission);
+    }
+
+    public function hasAnyPermission(string ...$permissions): bool
+    {
+        foreach ($permissions as $permission) {
+            if ($this->hasPermission($permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function hasGlobalWriteAccess(): bool
     {
-        return $this->hasRole(
-            self::ROLE_ADMIN,
-            self::ROLE_DG,
-            self::ROLE_PLANIFICATION
-        );
+        return $this->hasPermission('scope.global.write');
     }
 
     public function hasGlobalReadAccess(): bool
     {
-        return $this->hasGlobalWriteAccess() || $this->hasRole(self::ROLE_CABINET);
+        return $this->hasGlobalWriteAccess() || $this->hasPermission('scope.global.read');
     }
 
     public function roleLabel(): string
     {
-        return match ($this->role) {
-            self::ROLE_ADMIN => 'Administrateur',
-            self::ROLE_DG => 'DG',
-            self::ROLE_PLANIFICATION => 'PLANIFICATION',
-            self::ROLE_DIRECTION => 'DIRECTION',
-            self::ROLE_SERVICE => 'SERVICES',
-            self::ROLE_AGENT => 'AGENT',
-            self::ROLE_CABINET => 'CABINET',
-            default => 'Profil non defini',
-        };
+        return app(\App\Services\RoleRegistryService::class)->label($this->effectiveRoleCode());
     }
 
     public function isAgent(): bool
@@ -216,6 +263,10 @@ class User extends Authenticatable
 
     public function profileScopeLabel(): string
     {
+        if ($this->isSuperAdmin()) {
+            return 'Portee globale plateforme';
+        }
+
         if ($this->hasGlobalWriteAccess()) {
             return 'Portee globale (lecture/ecriture)';
         }

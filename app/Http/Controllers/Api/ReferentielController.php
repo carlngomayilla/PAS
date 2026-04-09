@@ -83,7 +83,7 @@ class ReferentielController extends Controller
             abort(401);
         }
 
-        if (! $user->hasRole(User::ROLE_ADMIN)) {
+        if (! $user->hasAnyPermission('users.manage', 'users.manage_roles')) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -95,6 +95,10 @@ class ReferentielController extends Controller
                 'service:id,direction_id,code,libelle',
             ])
             ->orderBy('name');
+
+        if (! $user->isSuperAdmin()) {
+            $query->where('role', '!=', User::ROLE_SUPER_ADMIN);
+        }
 
         if (! $user->hasGlobalReadAccess()) {
             if ($user->direction_id !== null) {

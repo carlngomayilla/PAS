@@ -153,6 +153,7 @@ class AnbgOrganizationSeeder extends Seeder
     private function users(): array
     {
         return [
+            ['name' => 'Super Administrateur PAS', 'email' => 'superadmin@anbg.ga', 'direction_code' => '', 'service_code' => null, 'fonction' => 'Super administration de la plateforme', 'role' => User::ROLE_SUPER_ADMIN],
             ['name' => 'Administrateur ANBG', 'email' => 'admin@anbg.ga', 'direction_code' => '', 'service_code' => null, 'fonction' => "Administrateur de l'application", 'role' => User::ROLE_ADMIN],
             ['name' => 'Ingrid', 'email' => 'ingrid@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'DIRGEN', 'fonction' => 'Directeur General', 'role' => User::ROLE_DG],
             ['name' => 'ADAN-GBLENOU Loick Eklu Gagnon', 'email' => 'loick.adan@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Conseiller Technique', 'role' => User::ROLE_CABINET],
@@ -246,6 +247,7 @@ class AnbgOrganizationSeeder extends Seeder
     private function buildMatricule(string $role, int $sequence): string
     {
         $prefix = match ($role) {
+            User::ROLE_SUPER_ADMIN => 'SAD',
             User::ROLE_ADMIN => 'ADM',
             User::ROLE_DG => 'DG',
             User::ROLE_CABINET => 'CAB',

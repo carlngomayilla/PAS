@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\DocumentPolicySettings;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,6 +18,8 @@ class StoreJustificatifRequest extends FormRequest
      */
     public function rules(): array
     {
+        $documentPolicy = app(DocumentPolicySettings::class);
+
         return [
             'justifiable_type' => [
                 'required',
@@ -35,8 +38,8 @@ class StoreJustificatifRequest extends FormRequest
             'fichier' => [
                 'required',
                 'file',
-                'max:10240',
-                'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg',
+                'max:'.$documentPolicy->maxUploadKilobytes(),
+                $documentPolicy->mimesRule(),
             ],
         ];
     }
@@ -47,7 +50,7 @@ class StoreJustificatifRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'fichier.max' => 'La taille du fichier ne doit pas depasser 10 Mo.',
+            'fichier.max' => 'La taille du fichier ne doit pas depasser '.app(DocumentPolicySettings::class)->maxUploadMb().' Mo.',
             'fichier.mimes' => 'Format de fichier non pris en charge.',
         ];
     }
