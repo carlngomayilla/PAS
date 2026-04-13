@@ -117,8 +117,20 @@
             'route' => 'workspace.actions.index',
             'icon' => 'actions',
             'patterns' => ['workspace.actions.*'],
+            'active_when' => static fn (): bool => request()->routeIs('workspace.actions.*') && request('vue') !== 'mes_actions',
             'badge' => (int) ($moduleBadges['actions'] ?? 0),
             'display_order' => $moduleOrder('execution', 70),
+        ];
+        $executionItems[] = [
+            'code' => 'mes_actions',
+            'module_code' => 'execution',
+            'label' => 'Mes actions',
+            'route' => 'workspace.actions.index',
+            'route_params' => ['vue' => 'mes_actions'],
+            'icon' => 'user',
+            'patterns' => ['workspace.actions.*'],
+            'active_when' => static fn (): bool => request()->routeIs('workspace.actions.*') && request('vue') === 'mes_actions',
+            'display_order' => $moduleOrder('execution', 70) + 1,
         ];
     }
 
@@ -263,15 +275,18 @@
                 <div class="gooey-nav-group">
                     @foreach ($section['items'] as $item)
                         @php
-                            $active = $isActive($item['patterns']);
+                            $active = is_callable($item['active_when'] ?? null)
+                                ? (bool) $item['active_when']()
+                                : $isActive($item['patterns']);
                             $badgeCount = (int) ($item['badge'] ?? 0);
                             $itemCode = (string) ($item['module_code'] ?? $item['code'] ?? $item['route']);
                             $iconPath = $icons[$item['icon']] ?? $icons['dashboard'];
+                            $routeParams = is_array($item['route_params'] ?? null) ? $item['route_params'] : [];
                         @endphp
 
                         <div class="gooey-item" data-active="{{ $active ? '1' : '0' }}" data-label="{{ $item['label'] }}" data-sidebar-module="{{ $itemCode }}">
                             <a
-                                href="{{ route($item['route']) }}"
+                                href="{{ route($item['route'], $routeParams) }}"
                                 class="gooey-link{{ $active ? ' gooey-link-active' : '' }}"
                                 aria-label="{{ $item['label'] }}"
                                 @if ($active) aria-current="page" @endif

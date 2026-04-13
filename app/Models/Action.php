@@ -14,6 +14,14 @@ class Action extends Model
 {
     use HasFactory;
 
+    public const CONTEXT_PILOTAGE = 'pilotage';
+    public const CONTEXT_OPERATIONNEL = 'operationnel';
+
+    public const ORIGIN_PAS = 'PAS';
+    public const ORIGIN_PAO = 'PAO';
+    public const ORIGIN_PTA = 'PTA';
+    public const ORIGIN_INTERNE = 'INTERNE';
+
     /**
      * @var list<string>
      */
@@ -41,6 +49,8 @@ class Action extends Model
         'date_fin_reelle',
         'date_echeance',
         'responsable_id',
+        'contexte_action',
+        'origine_action',
         'statut',
         'statut_dynamique',
         'progression_reelle',
@@ -169,6 +179,40 @@ class Action extends Model
     public function directionValidePar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'direction_valide_par');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function contextOptions(): array
+    {
+        return [
+            self::CONTEXT_PILOTAGE => 'Pilotage',
+            self::CONTEXT_OPERATIONNEL => 'Operationnel',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function originOptions(): array
+    {
+        return [
+            self::ORIGIN_PAS => 'PAS',
+            self::ORIGIN_PAO => 'PAO',
+            self::ORIGIN_PTA => 'PTA',
+            self::ORIGIN_INTERNE => 'Interne',
+        ];
+    }
+
+    public function isOperationalContext(): bool
+    {
+        return (string) ($this->contexte_action ?? self::CONTEXT_PILOTAGE) === self::CONTEXT_OPERATIONNEL;
+    }
+
+    public function isResponsible(User $user): bool
+    {
+        return (int) ($this->responsable_id ?? 0) === (int) $user->id;
     }
 
     public function getStatusLabelAttribute(): string

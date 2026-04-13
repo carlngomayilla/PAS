@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Schema;
 class ActionCalculationSettings
 {
     public const OFFICIAL_SCOPE_ALL_VISIBLE = 'all_visible';
+    public const STATISTICAL_SCOPE_ALL_VISIBLE = self::OFFICIAL_SCOPE_ALL_VISIBLE;
+    public const SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS = 'actions_official_validation_status';
+    public const SETTING_ACTIONS_STATISTICAL_SCOPE = 'actions_statistical_scope';
 
     /**
      * @var array<string, string>|null
@@ -55,31 +58,32 @@ class ActionCalculationSettings
     public function defaults(): array
     {
         return [
-            'actions_official_validation_status' => self::OFFICIAL_SCOPE_ALL_VISIBLE,
+            self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => self::OFFICIAL_SCOPE_ALL_VISIBLE,
+            self::SETTING_ACTIONS_STATISTICAL_SCOPE => self::STATISTICAL_SCOPE_ALL_VISIBLE,
         ];
     }
 
-    public function officialValidationStatus(): string
+    public function statisticalScope(): string
     {
-        return self::OFFICIAL_SCOPE_ALL_VISIBLE;
+        return self::STATISTICAL_SCOPE_ALL_VISIBLE;
     }
 
     /**
      * @return array<string, string>
      */
-    public function officialValidationStatusOptions(): array
+    public function statisticalScopeOptions(): array
     {
         return [
-            self::OFFICIAL_SCOPE_ALL_VISIBLE => 'Toutes les actions visibles',
+            self::STATISTICAL_SCOPE_ALL_VISIBLE => 'Toutes les actions visibles',
         ];
     }
 
     /**
      * @return list<string>
      */
-    public function officialValidationStatuses(): array
+    public function statisticalValidationStatuses(): array
     {
-        return $this->validationStatusesFrom($this->officialValidationStatus());
+        return $this->validationStatusesFrom($this->statisticalScope());
     }
 
     /**
@@ -111,18 +115,18 @@ class ActionCalculationSettings
         };
     }
 
-    public function officialThresholdLabel(): string
+    public function statisticalScopeLabel(): string
     {
-        return $this->officialValidationStatusOptions()[$this->officialValidationStatus()]
+        return $this->statisticalScopeOptions()[$this->statisticalScope()]
             ?? 'Toutes les actions visibles';
     }
 
-    public function officialScopeSummary(): string
+    public function statisticalScopeSummary(): string
     {
         return 'Les statistiques et les KPI sont calcules sur toutes les actions visibles. Les validations chef et direction restent purement workflow.';
     }
 
-    public function officialAverageSummary(): string
+    public function statisticalAverageSummary(): string
     {
         return 'Moyenne calculee sur toutes les actions visibles.';
     }
@@ -130,12 +134,12 @@ class ActionCalculationSettings
     /**
      * @return array<string, string>
      */
-    public function officialRouteFilters(): array
+    public function statisticalRouteFilters(): array
     {
         return [];
     }
 
-    public function applyOfficialScope(Builder $query, string $column = 'statut_validation'): void
+    public function applyStatisticalScope(Builder $query, string $column = 'statut_validation'): void
     {
         unset($query, $column);
     }
@@ -144,7 +148,7 @@ class ActionCalculationSettings
      * @param  Collection<int, mixed>  $items
      * @return Collection<int, mixed>
      */
-    public function filterOfficial(Collection $items, string $field = 'statut_validation'): Collection
+    public function filterStatistical(Collection $items, string $field = 'statut_validation'): Collection
     {
         unset($field);
 
@@ -155,21 +159,93 @@ class ActionCalculationSettings
      * @param  array<string, string|null>  $payload
      * @return array<string, string>
      */
-    public function updateOfficialPolicy(array $payload, ?User $actor = null): array
+    public function updateStatisticalPolicy(array $payload, ?User $actor = null): array
     {
-        $status = (string) ($payload['actions_official_validation_status'] ?? self::OFFICIAL_SCOPE_ALL_VISIBLE);
-        if (! array_key_exists($status, $this->officialValidationStatusOptions())) {
-            $status = self::OFFICIAL_SCOPE_ALL_VISIBLE;
+        $status = (string) ($payload[self::SETTING_ACTIONS_STATISTICAL_SCOPE]
+            ?? $payload[self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS]
+            ?? self::STATISTICAL_SCOPE_ALL_VISIBLE);
+
+        if (! array_key_exists($status, $this->statisticalScopeOptions())) {
+            $status = self::STATISTICAL_SCOPE_ALL_VISIBLE;
         }
 
-        PlatformSetting::query()->updateOrCreate(
-            ['group' => 'action_calculation', 'key' => 'actions_official_validation_status'],
-            ['value' => $status, 'updated_by' => $actor?->id]
-        );
+        foreach ([self::SETTING_ACTIONS_STATISTICAL_SCOPE, self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS] as $key) {
+            PlatformSetting::query()->updateOrCreate(
+                ['group' => 'action_calculation', 'key' => $key],
+                ['value' => $status, 'updated_by' => $actor?->id]
+            );
+        }
 
         $this->flush();
 
         return $this->all();
+    }
+
+    public function officialValidationStatus(): string
+    {
+        return $this->statisticalScope();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function officialValidationStatusOptions(): array
+    {
+        return $this->statisticalScopeOptions();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function officialValidationStatuses(): array
+    {
+        return $this->statisticalValidationStatuses();
+    }
+
+    public function officialThresholdLabel(): string
+    {
+        return $this->statisticalScopeLabel();
+    }
+
+    public function officialScopeSummary(): string
+    {
+        return $this->statisticalScopeSummary();
+    }
+
+    public function officialAverageSummary(): string
+    {
+        return $this->statisticalAverageSummary();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function officialRouteFilters(): array
+    {
+        return $this->statisticalRouteFilters();
+    }
+
+    public function applyOfficialScope(Builder $query, string $column = 'statut_validation'): void
+    {
+        $this->applyStatisticalScope($query, $column);
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $items
+     * @return Collection<int, mixed>
+     */
+    public function filterOfficial(Collection $items, string $field = 'statut_validation'): Collection
+    {
+        return $this->filterStatistical($items, $field);
+    }
+
+    /**
+     * @param  array<string, string|null>  $payload
+     * @return array<string, string>
+     */
+    public function updateOfficialPolicy(array $payload, ?User $actor = null): array
+    {
+        return $this->updateStatisticalPolicy($payload, $actor);
     }
 
     public function flush(): void

@@ -14,8 +14,10 @@
     $showStatusChart = (bool) ($roleDashboard['status_chart_enabled'] ?? true);
     $showTrendChart = (bool) ($roleDashboard['trend_chart_enabled'] ?? true);
     $showSupportChart = (bool) ($roleDashboard['support_chart_enabled'] ?? true);
+    $statisticalPolicy = is_array(($statisticalPolicy ?? null)) ? $statisticalPolicy : [];
     $officialPolicy = is_array(($officialPolicy ?? null)) ? $officialPolicy : [];
-    $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
+    $basePolicy = $statisticalPolicy !== [] ? $statisticalPolicy : $officialPolicy;
+    $officialBaseLabel = (string) ($basePolicy['scope_label'] ?? $basePolicy['threshold_label'] ?? 'Toutes les actions visibles');
     $officialBaseLower = mb_strtolower($officialBaseLabel);
     $officialBaseText = 'Base statistique : '.$officialBaseLabel;
     $validationTone = static function (string $status): string {

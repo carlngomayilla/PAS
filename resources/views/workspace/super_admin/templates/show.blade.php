@@ -3,6 +3,11 @@
 @section('title', $template->name)
 
 @section('content')
+    @php
+        $readingLevelLabels = ['interne' => 'Interne', 'provisoire' => 'Travail', 'valide' => 'Valide', 'officiel' => 'Consolide'];
+        $readingLevelLabel = static fn (?string $value): string => $value ? ($readingLevelLabels[$value] ?? $value) : 'Non borne';
+    @endphp
+
     <section class="ui-card mb-3.5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -13,7 +18,7 @@
                     <span class="anbg-badge anbg-badge-info">{{ $template->formatLabel() }}</span>
                     <span class="anbg-badge anbg-badge-neutral">{{ $template->module }}</span>
                     <span class="anbg-badge anbg-badge-warning">{{ $template->statusLabel() }}</span>
-                    <span class="anbg-badge anbg-badge-success">{{ $template->reading_level ?: 'non borne' }}</span>
+                    <span class="anbg-badge anbg-badge-success">{{ $readingLevelLabel($template->reading_level) }}</span>
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -74,7 +79,7 @@
                         @forelse ($template->assignments as $assignment)
                             <tr>
                                 <td class="px-3 py-2">{{ $assignment->target_profile ?: 'Tous profils' }}</td>
-                                <td class="px-3 py-2">{{ $assignment->reading_level ?: 'Non borne' }}</td>
+                                <td class="px-3 py-2">{{ $readingLevelLabel($assignment->reading_level) }}</td>
                                 <td class="px-3 py-2">{{ $assignment->service?->code ?: ($assignment->direction?->code ?: 'Global') }}</td>
                                 <td class="px-3 py-2">{{ $assignment->is_active ? 'Active' : 'Inactive' }}</td>
                                 <td class="px-3 py-2"><form method="POST" action="{{ route('workspace.super-admin.templates.assignments.toggle', $assignment) }}">@csrf<button class="btn btn-secondary !px-3 !py-1.5" type="submit">Basculer</button></form></td>
@@ -95,7 +100,7 @@
                 <div><label for="assign_report_type">Type de rapport</label><input id="assign_report_type" name="report_type" type="text" value="{{ $assignmentDefaults['report_type'] }}"></div>
                 <div><label for="assign_format">Format</label><input id="assign_format" name="format" type="text" value="{{ $assignmentDefaults['format'] }}"></div>
                 <div><label for="assign_target_profile">Profil</label><select id="assign_target_profile" name="target_profile"><option value="">Tous profils</option>@foreach ($profileOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['target_profile'] === $option)>{{ $option }}</option>@endforeach</select></div>
-                <div><label for="assign_reading_level">Niveau</label><select id="assign_reading_level" name="reading_level"><option value="">Non borne</option>@foreach ($readingLevelOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['reading_level'] === $option)>{{ $option }}</option>@endforeach</select></div>
+                <div><label for="assign_reading_level">Niveau</label><select id="assign_reading_level" name="reading_level"><option value="">Non borne</option>@foreach ($readingLevelOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['reading_level'] === $option)>{{ $readingLevelLabels[$option] ?? $option }}</option>@endforeach</select></div>
                 <div><label for="assign_direction_id">Direction</label><select id="assign_direction_id" name="direction_id"><option value="">Globale</option>@foreach ($directionOptions as $direction)<option value="{{ $direction->id }}">{{ $direction->code }} - {{ $direction->libelle }}</option>@endforeach</select></div>
                 <div><label for="assign_service_id">Service</label><select id="assign_service_id" name="service_id"><option value="">Aucun</option>@foreach ($serviceOptions as $service)<option value="{{ $service->id }}">{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>@endforeach</select></div>
                 <div class="flex items-end gap-3"><label class="checkbox-pill !mb-0"><input name="is_default" type="checkbox" value="1">Defaut</label><label class="checkbox-pill !mb-0"><input name="is_active" type="checkbox" value="1" checked>Active</label></div>
@@ -121,7 +126,7 @@
                                 <div class="text-xs text-slate-500">
                                     {{ $version->snapshot['format'] ?? '-' }} /
                                     {{ $version->snapshot['module'] ?? '-' }} /
-                                    {{ $version->snapshot['reading_level'] ?? 'non borne' }}
+                                    {{ $readingLevelLabel($version->snapshot['reading_level'] ?? null) }}
                                 </div>
                             </td>
                             <td class="px-3 py-2">

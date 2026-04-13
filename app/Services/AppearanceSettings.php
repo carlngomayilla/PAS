@@ -243,6 +243,10 @@ class AppearanceSettings
         $border = $this->sanitizeHex($settings['border_color']);
         $cardBackground = $this->sanitizeHex($settings['card_background_color']);
         $inputBackground = $this->sanitizeHex($settings['input_background_color']);
+        $darkText = '#E2E8F0';
+        $darkStrongText = '#F8FAFC';
+        $darkMutedText = '#CBD5E1';
+        $darkSubtleText = '#94A3B8';
 
         return [
             '--app-primary' => $primary,
@@ -254,6 +258,10 @@ class AppearanceSettings
             '--app-danger' => $danger,
             '--app-text-color' => $text,
             '--app-muted-text-color' => $muted,
+            '--app-dark-text-color' => $darkText,
+            '--app-dark-strong-text-color' => $darkStrongText,
+            '--app-dark-muted-text-color' => $darkMutedText,
+            '--app-dark-subtle-text-color' => $darkSubtleText,
             '--app-border-color' => $border,
             '--app-card-background-color' => $cardBackground,
             '--app-input-background-color' => $inputBackground,
@@ -266,6 +274,10 @@ class AppearanceSettings
             '--app-danger-rgb' => $this->hexToRgbTriplet($danger),
             '--app-text-color-rgb' => $this->hexToRgbTriplet($text),
             '--app-muted-text-color-rgb' => $this->hexToRgbTriplet($muted),
+            '--app-dark-text-color-rgb' => $this->hexToRgbTriplet($darkText),
+            '--app-dark-strong-text-color-rgb' => $this->hexToRgbTriplet($darkStrongText),
+            '--app-dark-muted-text-color-rgb' => $this->hexToRgbTriplet($darkMutedText),
+            '--app-dark-subtle-text-color-rgb' => $this->hexToRgbTriplet($darkSubtleText),
             '--app-border-color-rgb' => $this->hexToRgbTriplet($border),
             '--app-card-background-rgb' => $this->hexToRgbTriplet($cardBackground),
             '--app-input-background-rgb' => $this->hexToRgbTriplet($inputBackground),

@@ -23,6 +23,7 @@ use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
 use App\Services\Exports\ExportTemplateResolver;
 use App\Services\Analytics\ReportingAnalyticsService;
+use App\Services\Exports\ReportingCsvExporter;
 use App\Services\Exports\ReportingWorkbookExporter;
 use App\Support\SafeSql;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -46,6 +47,7 @@ class MonitoringWebController extends Controller
         private readonly AlertCenterService $alertCenter,
         private readonly AlertReadService $alertReadService,
         private readonly ReportingWorkbookExporter $reportingWorkbookExporter,
+        private readonly ReportingCsvExporter $reportingCsvExporter,
         private readonly ReportingAnalyticsService $reportingAnalyticsService,
         private readonly ExportTemplateResolver $exportTemplateResolver
     ) {
@@ -154,11 +156,17 @@ class MonitoringWebController extends Controller
                 'direction_id' => $user->direction_id,
                 'service_id' => $user->service_id,
             ],
+            'statisticalPolicy' => [
+                'scope_status' => $this->actionCalculationSettings->statisticalScope(),
+                'scope_label' => $this->actionCalculationSettings->statisticalScopeLabel(),
+                'scope_summary' => $this->actionCalculationSettings->statisticalScopeSummary(),
+                'route_filters' => $this->actionCalculationSettings->statisticalRouteFilters(),
+            ],
             'officialPolicy' => [
-                'threshold_status' => $this->actionCalculationSettings->officialValidationStatus(),
-                'threshold_label' => $this->actionCalculationSettings->officialThresholdLabel(),
-                'scope_summary' => $this->actionCalculationSettings->officialScopeSummary(),
-                'route_filters' => $this->actionCalculationSettings->officialRouteFilters(),
+                'threshold_status' => $this->actionCalculationSettings->statisticalScope(),
+                'threshold_label' => $this->actionCalculationSettings->statisticalScopeLabel(),
+                'scope_summary' => $this->actionCalculationSettings->statisticalScopeSummary(),
+                'route_filters' => $this->actionCalculationSettings->statisticalRouteFilters(),
             ],
             'totals' => $totals,
             'completion' => [
@@ -206,7 +214,7 @@ class MonitoringWebController extends Controller
         $this->denyUnlessPlanningReader($user);
         $this->denyUnlessReportingReader($user);
 
-        $payload = $this->reportingAnalyticsService->buildPayload($user);
+        $payload = $this->reportingAnalyticsService->buildPayload($user, true, false);
         $payload['roleProfile'] = $this->buildMonitoringRoleProfile($user, 'reporting');
         $payload['dgComparison'] = ($payload['roleProfile']['role'] ?? null) === 'dg'
             ? $this->buildDgMonitoringComparison($user)
@@ -244,7 +252,7 @@ class MonitoringWebController extends Controller
         }
         $generatedAt = $payload['generatedAt'];
         $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
-        $filename = $filenamePrefix.'_'.$generatedAt->format('Ymd_His').'.xlsx';
+        $filename = $this->institutionalReportFilename('REPORTING', $payload, 'xlsx', $filenamePrefix);
         $tempPath = $this->reportingWorkbookExporter->create($payload);
 
         return response()->streamDownload(function () use ($tempPath): void {
@@ -273,6 +281,46 @@ class MonitoringWebController extends Controller
         ]);
     }
 
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessReportingReader($user);
+
+        $payload = $this->reportingAnalyticsService->buildPayload($user, true, false);
+        $filename = $this->institutionalReportFilename('REPORTING', $payload, 'zip', 'csv');
+        $tempPath = $this->reportingCsvExporter->create($payload);
+
+        return response()->streamDownload(function () use ($tempPath): void {
+            $stream = fopen($tempPath, 'rb');
+            if (! is_resource($stream)) {
+                @unlink($tempPath);
+
+                return;
+            }
+
+            try {
+                while (! feof($stream)) {
+                    $chunk = fread($stream, 8192);
+                    if ($chunk === false) {
+                        break;
+                    }
+
+                    echo $chunk;
+                }
+            } finally {
+                fclose($stream);
+                @unlink($tempPath);
+            }
+        }, $filename, [
+            'Content-Type' => 'application/zip',
+        ]);
+    }
+
     public function exportPdf(Request $request)
     {
         $user = $request->user();
@@ -290,7 +338,7 @@ class MonitoringWebController extends Controller
         }
         $generatedAt = $payload['generatedAt'];
         $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
-        $filename = $filenamePrefix.'_'.$generatedAt->format('Ymd_His').'.pdf';
+        $filename = $this->institutionalReportFilename('REPORTING', $payload, 'pdf', $filenamePrefix);
 
         return Pdf::loadView('workspace.monitoring.reporting-pdf', $payload)
             ->setPaper($template?->paperSize() ?? 'a4', $template?->orientation() ?? 'landscape')
@@ -315,7 +363,7 @@ class MonitoringWebController extends Controller
 
         $generatedAt = $payload['generatedAt'];
         $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
-        $filename = $filenamePrefix.'_'.$generatedAt->format('Ymd_His').'.doc';
+        $filename = $this->institutionalReportFilename('REPORTING', $payload, 'doc', $filenamePrefix);
 
         return response()
             ->view('workspace.monitoring.reporting-word', $payload)
@@ -326,6 +374,60 @@ class MonitoringWebController extends Controller
     private function resolveReportingExportTemplate(User $user, string $format): ?ExportTemplate
     {
         return $this->exportTemplateResolver->resolve($user, 'reporting', 'consolidated_reporting', $format, 'officiel');
+    }
+
+    private function institutionalReportFilename(string $type, array $payload, string $extension, ?string $prefix = null): string
+    {
+        $generatedAt = $payload['generatedAt'] instanceof Carbon
+            ? $payload['generatedAt']
+            : now();
+        $scope = (array) ($payload['scope'] ?? []);
+        $prefixToken = $this->filenameToken((string) ($prefix ?: ''), '');
+        $directionToken = $this->directionFilenameToken($scope['direction_id'] ?? null);
+        $serviceToken = $this->serviceFilenameToken($scope['service_id'] ?? null);
+
+        $parts = ['RAPPORT'];
+        $parts[] = $this->filenameToken($type, 'REPORTING');
+        $parts[] = $directionToken;
+        $parts[] = $serviceToken;
+        if ($prefixToken !== '' && Str::upper($prefixToken) !== 'RAPPORT' && $prefixToken !== 'reporting_anbg') {
+            $parts[] = $prefixToken;
+        }
+        $parts[] = $generatedAt->format('Ymd_His');
+
+        return implode('_', $parts).'.'.$this->filenameToken($extension, 'dat');
+    }
+
+    private function directionFilenameToken(mixed $directionId): string
+    {
+        if ($directionId === null || $directionId === '') {
+            return 'GLOBAL';
+        }
+
+        $direction = Direction::query()->find((int) $directionId, ['id', 'code', 'libelle']);
+
+        return $this->filenameToken((string) ($direction?->code ?: $direction?->libelle ?: 'DIRECTION_'.$directionId), 'DIRECTION_'.$directionId);
+    }
+
+    private function serviceFilenameToken(mixed $serviceId): string
+    {
+        if ($serviceId === null || $serviceId === '') {
+            return 'GLOBAL';
+        }
+
+        $service = Service::query()->find((int) $serviceId, ['id', 'code', 'libelle']);
+
+        return $this->filenameToken((string) ($service?->code ?: $service?->libelle ?: 'SERVICE_'.$serviceId), 'SERVICE_'.$serviceId);
+    }
+
+    private function filenameToken(string $value, string $fallback): string
+    {
+        $token = (string) Str::of($value)
+            ->ascii()
+            ->replaceMatches('/[^A-Za-z0-9]+/', '_')
+            ->trim('_');
+
+        return $token !== '' ? $token : $fallback;
     }
 
     public function alertes(Request $request): View
@@ -1047,7 +1149,7 @@ class MonitoringWebController extends Controller
                 'service' => [
                     'eyebrow' => 'Reporting service',
                     'title' => 'Diffusion consolidee du service',
-                    'subtitle' => 'Exports et vues consolidees du service avec lecture rapide des niveaux provisoire, valide et officiel.',
+                    'subtitle' => 'Exports et vues consolidees du service avec lecture rapide des validations et de la performance.',
                 ],
                 'direction' => [
                     'eyebrow' => 'Reporting direction',
@@ -1057,7 +1159,7 @@ class MonitoringWebController extends Controller
                 'dg' => [
                     'eyebrow' => 'Reporting DG',
                     'title' => 'Centre d export institutionnel',
-                    'subtitle' => 'Point unique de diffusion des vues consolidees et officielles pour l arbitrage strategique.',
+                    'subtitle' => 'Point unique de diffusion des vues consolidees pour l arbitrage strategique.',
                 ],
                 'cabinet' => [
                     'eyebrow' => 'Reporting cabinet',

@@ -161,6 +161,82 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
     }
 
+    public function test_responsable_cannot_validate_own_action(): void
+    {
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $serviceUser = $fixture['service_user'];
+        $directionUser = $fixture['direction_user'];
+
+        $action->forceFill([
+            'responsable_id' => $serviceUser->id,
+            'contexte_action' => Action::CONTEXT_OPERATIONNEL,
+            'origine_action' => Action::ORIGIN_INTERNE,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+        ])->save();
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.actions.review', $action), [
+                'decision_validation' => 'valider',
+                'evaluation_note' => 90,
+                'evaluation_commentaire' => 'Auto validation interdite',
+                'validation_sans_correction' => 1,
+            ])
+            ->assertForbidden();
+
+        $action->forceFill([
+            'responsable_id' => $directionUser->id,
+            'contexte_action' => Action::CONTEXT_OPERATIONNEL,
+            'origine_action' => Action::ORIGIN_INTERNE,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ])->save();
+
+        $this->actingAs($directionUser)
+            ->post(route('workspace.actions.review-direction', $action), [
+                'decision_validation' => 'valider',
+                'evaluation_note' => 92,
+                'evaluation_commentaire' => 'Auto validation direction interdite',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_non_agent_responsable_can_execute_operational_action(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $directionUser = $fixture['direction_user'];
+        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
+
+        $action->forceFill([
+            'responsable_id' => $directionUser->id,
+            'contexte_action' => Action::CONTEXT_OPERATIONNEL,
+            'origine_action' => Action::ORIGIN_INTERNE,
+        ])->save();
+
+        $this->actingAs($directionUser)
+            ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
+                'quantite_realisee' => 100,
+                'commentaire' => 'Execution propre direction',
+                'difficultes' => 'Aucune',
+                'mesures_correctives' => 'RAS',
+                'justificatif' => UploadedFile::fake()->create('preuve-direction.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->actingAs($directionUser)
+            ->post(route('workspace.actions.close', $action), [
+                'date_fin_reelle' => '2026-01-07',
+                'rapport_final' => 'Action operationnelle direction terminee',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
+        $this->assertSame($directionUser->id, (int) $action->soumise_par);
+    }
+
     public function test_comment_thread_is_persisted_on_action(): void
     {
         $fixture = $this->createActionFixture();

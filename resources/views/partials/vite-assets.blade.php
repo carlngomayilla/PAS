@@ -88,20 +88,20 @@
 
     .dark .admin-theme-scope main > section > h1:first-child,
     .dark .admin-theme-scope main > section > h2:first-child {
-        color: rgb(241, 245, 249);
+        color: var(--app-dark-strong-text-color, rgb(241, 245, 249));
     }
 
     .dark th,
     .dark .admin-theme-scope th {
         border-bottom-color: rgb(var(--app-border-color-rgb) / 0.35);
         background: var(--app-table-head-bg-dark);
-        color: rgb(226 232 240);
+        color: var(--app-dark-text-color, rgb(226 232 240));
     }
 
     .dark td,
     .dark .admin-theme-scope td {
         border-bottom-color: rgb(var(--app-border-color-rgb) / 0.35);
-        color: rgb(226, 232, 240);
+        color: var(--app-dark-text-color, rgb(226, 232, 240));
     }
 
     .dark tbody tr:hover td,
@@ -260,7 +260,7 @@
     }
 
     .dark .form-section-subtitle {
-        color: rgb(203, 213, 225);
+        color: var(--app-dark-muted-text-color, rgb(203, 213, 225));
     }
 
     .dark .form-actions {
@@ -268,13 +268,13 @@
     }
 
     .dark .field-hint {
-        color: rgb(148, 163, 184);
+        color: var(--app-dark-subtle-text-color, rgb(148, 163, 184));
     }
 
     .dark .checkbox-pill {
         border-color: rgb(var(--app-border-color-rgb) / 0.35);
         background: rgb(var(--app-surface-rgb) / 0.9);
-        color: rgb(226, 232, 240);
+        color: var(--app-dark-text-color, rgb(226, 232, 240));
     }
 
     .dark input[type='checkbox'],
@@ -349,7 +349,7 @@
         border-radius: 0.7rem;
         padding: 0.4rem 0.75rem;
         background: rgba(15, 23, 42, 0.9);
-        color: rgb(248, 250, 252);
+        color: var(--app-dark-strong-text-color, rgb(248, 250, 252));
         font-weight: 600;
         cursor: pointer;
     }
@@ -359,8 +359,8 @@
     .dark .admin-theme-scope textarea {
         background: var(--app-input-surface-dark) !important;
         border-color: rgb(var(--app-border-color-rgb) / 0.35) !important;
-        color: rgb(241, 245, 249) !important;
-        caret-color: rgb(248, 250, 252);
+        color: var(--app-dark-strong-text-color, rgb(241, 245, 249)) !important;
+        caret-color: var(--app-dark-strong-text-color, rgb(248, 250, 252));
         box-shadow:
             inset 0 1px 0 rgba(255, 255, 255, 0.03),
             0 10px 24px -24px rgba(57, 150, 211, 0.42) !important;
@@ -383,7 +383,7 @@
 
     .admin-theme-scope input::placeholder,
     .admin-theme-scope textarea::placeholder {
-        color: rgb(148, 163, 184) !important;
+        color: var(--app-dark-subtle-text-color, rgb(148, 163, 184)) !important;
         opacity: 1;
     }
 
@@ -391,7 +391,7 @@
     .dark .admin-theme-scope textarea::placeholder,
     .dark input::placeholder,
     .dark textarea::placeholder {
-        color: rgb(148, 163, 184) !important;
+        color: var(--app-dark-subtle-text-color, rgb(148, 163, 184)) !important;
         opacity: 1;
     }
 
@@ -432,7 +432,7 @@
     .dark select:disabled,
     .dark textarea:disabled {
         background: linear-gradient(135deg, rgba(17, 24, 39, 0.88) 0%, rgba(30, 41, 59, 0.8) 100%) !important;
-        color: rgb(148, 163, 184) !important;
+        color: var(--app-dark-subtle-text-color, rgb(148, 163, 184)) !important;
         border-color: rgba(71, 85, 105, 0.55) !important;
         box-shadow: none !important;
     }
@@ -440,7 +440,7 @@
     .dark .admin-theme-scope input[type='file'] {
         background: linear-gradient(135deg, rgba(10, 20, 46, 0.96) 0%, rgba(18, 35, 72, 0.92) 100%) !important;
         border-color: rgba(255, 255, 255, 0.10) !important;
-        color: rgb(241, 245, 249) !important;
+        color: var(--app-dark-strong-text-color, rgb(241, 245, 249)) !important;
         box-shadow:
             inset 0 1px 0 rgba(255, 255, 255, 0.03),
             0 10px 24px -24px rgba(57, 150, 211, 0.42) !important;
@@ -463,7 +463,7 @@
     .dark select option,
     .dark select optgroup {
         background-color: rgb(15, 23, 42);
-        color: rgb(241, 245, 249);
+        color: var(--app-dark-strong-text-color, rgb(241, 245, 249));
     }
 
     .admin-theme-scope input:-webkit-autofill,
@@ -486,7 +486,7 @@
     .dark input:-webkit-autofill:focus,
     .dark textarea:-webkit-autofill,
     .dark select:-webkit-autofill {
-        -webkit-text-fill-color: rgb(241, 245, 249) !important;
+        -webkit-text-fill-color: var(--app-dark-strong-text-color, rgb(241, 245, 249)) !important;
         -webkit-box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.92) inset !important;
         transition: background-color 5000s ease-in-out 0s;
     }
@@ -567,5 +567,121 @@
     html[data-theme='light'] .admin-theme-scope .dark\:border-slate-800,
     html[data-theme='light'] .admin-theme-scope .dark\:border-slate-700 {
         border-color: rgba(203, 213, 225, 0.9) !important;
+    }
+
+    /*
+     * Dark-mode contrast guard.
+     * The configurable palette keeps one text color for the public theme; in dark mode
+     * we force neutral text tokens back to readable institutional values.
+     */
+    :is(html.dark, html[data-theme='dark']),
+    :is(html.dark, html[data-theme='dark']) body {
+        color: var(--app-dark-text-color, rgb(226, 232, 240)) !important;
+    }
+
+    :is(html.dark, html[data-theme='dark']) h1,
+    :is(html.dark, html[data-theme='dark']) h2,
+    :is(html.dark, html[data-theme='dark']) h3,
+    :is(html.dark, html[data-theme='dark']) h4,
+    :is(html.dark, html[data-theme='dark']) h5,
+    :is(html.dark, html[data-theme='dark']) h6,
+    :is(html.dark, html[data-theme='dark']) .form-section-title,
+    :is(html.dark, html[data-theme='dark']) .showcase-title,
+    :is(html.dark, html[data-theme='dark']) .showcase-panel-title,
+    :is(html.dark, html[data-theme='dark']) .showcase-kpi-number,
+    :is(html.dark, html[data-theme='dark']) .dashboard-summary-value {
+        color: var(--app-dark-strong-text-color, rgb(248, 250, 252)) !important;
+    }
+
+    :is(html.dark, html[data-theme='dark']) .text-slate-950,
+    :is(html.dark, html[data-theme='dark']) .text-slate-900,
+    :is(html.dark, html[data-theme='dark']) .text-slate-800,
+    :is(html.dark, html[data-theme='dark']) .text-slate-700,
+    :is(html.dark, html[data-theme='dark']) .text-gray-950,
+    :is(html.dark, html[data-theme='dark']) .text-gray-900,
+    :is(html.dark, html[data-theme='dark']) .text-gray-800,
+    :is(html.dark, html[data-theme='dark']) .text-gray-700,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-950,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-900,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-800,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-700,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-950,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-900,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-800,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-700 {
+        color: var(--app-dark-strong-text-color, rgb(248, 250, 252)) !important;
+    }
+
+    :is(html.dark, html[data-theme='dark']) .text-slate-600,
+    :is(html.dark, html[data-theme='dark']) .text-slate-500,
+    :is(html.dark, html[data-theme='dark']) .text-slate-400,
+    :is(html.dark, html[data-theme='dark']) .text-slate-300,
+    :is(html.dark, html[data-theme='dark']) .text-slate-200,
+    :is(html.dark, html[data-theme='dark']) .text-slate-100,
+    :is(html.dark, html[data-theme='dark']) .text-gray-600,
+    :is(html.dark, html[data-theme='dark']) .text-gray-500,
+    :is(html.dark, html[data-theme='dark']) .text-gray-400,
+    :is(html.dark, html[data-theme='dark']) .text-gray-300,
+    :is(html.dark, html[data-theme='dark']) .text-gray-200,
+    :is(html.dark, html[data-theme='dark']) .text-gray-100,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-600,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-500,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-400,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-300,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-200,
+    :is(html.dark, html[data-theme='dark']) .text-zinc-100,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-600,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-500,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-400,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-300,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-200,
+    :is(html.dark, html[data-theme='dark']) .text-neutral-100,
+    :is(html.dark, html[data-theme='dark']) .muted,
+    :is(html.dark, html[data-theme='dark']) .field-hint,
+    :is(html.dark, html[data-theme='dark']) .form-section-subtitle,
+    :is(html.dark, html[data-theme='dark']) .showcase-subtitle,
+    :is(html.dark, html[data-theme='dark']) .showcase-kpi-meta,
+    :is(html.dark, html[data-theme='dark']) .showcase-panel-subtitle,
+    :is(html.dark, html[data-theme='dark']) .showcase-data-key,
+    :is(html.dark, html[data-theme='dark']) .dashboard-summary-label,
+    :is(html.dark, html[data-theme='dark']) .dashboard-summary-meta {
+        color: var(--app-dark-muted-text-color, rgb(203, 213, 225)) !important;
+    }
+
+    :is(html.dark, html[data-theme='dark']) label,
+    :is(html.dark, html[data-theme='dark']) table,
+    :is(html.dark, html[data-theme='dark']) td {
+        color: var(--app-dark-text-color, rgb(226, 232, 240)) !important;
+    }
+
+    :is(html.dark, html[data-theme='dark']) th {
+        color: var(--app-dark-strong-text-color, rgb(248, 250, 252)) !important;
+    }
+
+    :is(html.dark, html[data-theme='dark']) input:not([type='checkbox']):not([type='radio']),
+    :is(html.dark, html[data-theme='dark']) select,
+    :is(html.dark, html[data-theme='dark']) textarea {
+        color: var(--app-dark-strong-text-color, rgb(241, 245, 249)) !important;
+        caret-color: var(--app-dark-strong-text-color, rgb(248, 250, 252)) !important;
+    }
+
+    :is(html.dark, html[data-theme='dark']) input::placeholder,
+    :is(html.dark, html[data-theme='dark']) textarea::placeholder {
+        color: var(--app-dark-subtle-text-color, rgb(148, 163, 184)) !important;
+        opacity: 1 !important;
+    }
+
+    :is(html.dark, html[data-theme='dark']) .badge {
+        background: rgb(71 85 105 / 0.34);
+        color: var(--app-dark-text-color, rgb(226, 232, 240));
+    }
+
+    :is(html.dark, html[data-theme='dark']) .btn-ghost {
+        color: var(--app-dark-text-color, rgb(226, 232, 240)) !important;
+    }
+
+    :is(html.dark, html[data-theme='dark']) .btn-ghost:hover {
+        color: var(--app-dark-strong-text-color, rgb(248, 250, 252)) !important;
+        background: rgb(30 41 59 / 0.78) !important;
     }
 </style>

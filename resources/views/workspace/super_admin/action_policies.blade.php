@@ -14,7 +14,7 @@
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.workflow.edit') }}">Workflow</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.calculation.edit') }}">Calcul officiel</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.calculation.edit') }}">Calcul statistique</a>
             </div>
         </div>
     </section>

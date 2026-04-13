@@ -363,7 +363,15 @@ class DashboardController extends Controller
      */
     private function buildDashboardData(User $user, Collection $actions): array
     {
-        $actions = $actions->values();
+        $visibleActions = $actions->values();
+        $personalActions = $visibleActions
+            ->filter(fn (Action $action): bool => (int) ($action->responsable_id ?? 0) === (int) $user->id)
+            ->values();
+        $actions = $user->isAgent()
+            ? $visibleActions
+            : $visibleActions
+                ->reject(fn (Action $action): bool => (int) ($action->responsable_id ?? 0) === (int) $user->id)
+                ->values();
         $validatedActions = $this->validatedActions($actions);
         $dashboardRole = $this->resolveDashboardRole($user);
         $currentYear = (int) now()->year;
@@ -505,7 +513,14 @@ class DashboardController extends Controller
         return [
             'dashboard_role' => $dashboardRole,
             'actions_index_url' => $this->actionIndexRoute(),
-            'official_action_filters' => $this->validatedActionFilters(),
+            'personal_actions_summary' => [
+                'total' => $personalActions->count(),
+                'late' => $personalActions
+                    ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')
+                    ->count(),
+                'url' => $this->actionIndexRoute(['vue' => 'mes_actions']),
+            ],
+            'official_action_filters' => $this->actionCalculationSettings->officialRouteFilters(),
             'unit_mode_label' => (string) $unitMeta['label'],
             'operational_global_scores' => $operationalGlobalScores,
             'global_scores' => $globalScores,
@@ -738,22 +753,22 @@ class DashboardController extends Controller
             [
                 'label' => 'Brouillon',
                 'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_NON_SOUMISE)->count(),
-                'url' => $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE]),
+                'url' => $this->actionIndexRoute(),
             ],
             [
                 'label' => 'Soumises service',
                 'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)->count(),
-                'url' => $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]),
+                'url' => $this->actionIndexRoute(),
             ],
             [
                 'label' => 'Validees service',
                 'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_CHEF)->count(),
-                'url' => $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]),
+                'url' => $this->actionIndexRoute(),
             ],
             [
                 'label' => 'Validees direction',
                 'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)->count(),
-                'url' => $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION]),
+                'url' => $this->actionIndexRoute(),
             ],
         ];
 
@@ -1932,15 +1947,9 @@ class DashboardController extends Controller
      */
     private function validatedActions(Collection $actions): Collection
     {
-        $finalStage = $this->workflowSettings->actionFinalStage();
-
-        return $actions->filter(function (Action $action) use ($finalStage): bool {
-            return match ($finalStage) {
-                'direction' => (string) $action->statut_validation === ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
-                'service' => (string) $action->statut_validation === ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-                default => in_array($this->normalizeStatus((string) ($action->statut_dynamique ?? '')), ['acheve'], true),
-            };
-        })->values();
+        return $actions
+            ->filter(fn (Action $action): bool => in_array($this->normalizeStatus((string) ($action->statut_dynamique ?? '')), ['acheve'], true))
+            ->values();
     }
 
     /**
@@ -1948,13 +1957,7 @@ class DashboardController extends Controller
      */
     private function validatedActionFilters(array $filters = []): array
     {
-        $validationFilter = match ($this->workflowSettings->actionFinalStage()) {
-            'direction' => ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION],
-            'service' => ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF],
-            default => ['statut' => 'achevees'],
-        };
-
-        return array_merge($validationFilter, $filters);
+        return array_merge(['statut' => 'achevees'], $filters);
     }
 
     private function validatedActionIndexRoute(array $filters = []): string

@@ -55,7 +55,7 @@ class ManagedKpiSettings
             [
                 'code' => 'delai',
                 'label' => 'Delai',
-                'description' => 'Respect moyen des echeances officielles.',
+                'description' => 'Respect moyen des echeances sur les actions visibles.',
                 'weight' => 15,
                 'green_threshold' => 85,
                 'orange_threshold' => 65,
@@ -75,7 +75,7 @@ class ManagedKpiSettings
             [
                 'code' => 'performance',
                 'label' => 'Performance',
-                'description' => 'Performance moyenne des actions officielles.',
+                'description' => 'Performance moyenne des actions visibles.',
                 'weight' => 20,
                 'green_threshold' => 85,
                 'orange_threshold' => 65,
@@ -135,7 +135,7 @@ class ManagedKpiSettings
             [
                 'code' => 'risque',
                 'label' => 'Risque',
-                'description' => 'Niveau de maitrise des risques sur les actions officielles.',
+                'description' => 'Niveau de maitrise des risques sur les actions visibles.',
                 'weight' => 10,
                 'green_threshold' => 75,
                 'orange_threshold' => 55,
@@ -155,7 +155,7 @@ class ManagedKpiSettings
             [
                 'code' => 'global',
                 'label' => 'Score global',
-                'description' => 'Synthese composite globale du portefeuille officiel.',
+                'description' => 'Synthese composite globale du portefeuille statistique.',
                 'weight' => 20,
                 'green_threshold' => 85,
                 'orange_threshold' => 65,

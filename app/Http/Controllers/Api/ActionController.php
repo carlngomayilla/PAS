@@ -49,6 +49,30 @@ class ActionController extends Controller
 
         $this->scopeActionQuery($query, $user);
 
+        $viewMode = trim((string) $request->string('vue'));
+        if ($viewMode === 'pilotage') {
+            $query->where('contexte_action', Action::CONTEXT_PILOTAGE);
+
+            if (! $user->isAgent()) {
+                $query->where(function ($q) use ($user): void {
+                    $q->whereNull('responsable_id')
+                        ->orWhere('responsable_id', '!=', (int) $user->id);
+                });
+            }
+        } elseif ($viewMode === 'mes_actions') {
+            $query->where('responsable_id', (int) $user->id);
+        }
+
+        $query->when(
+            $request->filled('contexte_action'),
+            fn ($q) => $q->where('contexte_action', (string) $request->string('contexte_action'))
+        );
+
+        $query->when(
+            $request->filled('origine_action'),
+            fn ($q) => $q->where('origine_action', (string) $request->string('origine_action'))
+        );
+
         $query->when(
             $request->filled('pta_id'),
             fn ($q) => $q->where('pta_id', (int) $request->integer('pta_id'))
@@ -113,6 +137,12 @@ class ActionController extends Controller
 
         $action = DB::transaction(function () use ($validated, $indicatorPayload, $request, $trackingService, $indicatorService, $user, $secureStorage): Action {
             $payload = $validated;
+            $payload['contexte_action'] = $payload['contexte_action'] ?? Action::CONTEXT_PILOTAGE;
+            $payload['origine_action'] = $payload['origine_action'] ?? (
+                $payload['contexte_action'] === Action::CONTEXT_OPERATIONNEL
+                    ? Action::ORIGIN_INTERNE
+                    : Action::ORIGIN_PTA
+            );
             $manualStatus = in_array((string) ($payload['statut'] ?? ''), [
                 ActionTrackingService::STATUS_SUSPENDU,
                 ActionTrackingService::STATUS_ANNULE,
@@ -247,6 +277,12 @@ class ActionController extends Controller
 
         DB::transaction(function () use ($action, $validated, $indicatorPayload, $trackingService, $indicatorService, $dateChanged, $frequencyChanged, $targetTypeChanged, $request, $user, $secureStorage): void {
             $payload = $validated;
+            $payload['contexte_action'] = $payload['contexte_action'] ?? Action::CONTEXT_PILOTAGE;
+            $payload['origine_action'] = $payload['origine_action'] ?? (
+                $payload['contexte_action'] === Action::CONTEXT_OPERATIONNEL
+                    ? Action::ORIGIN_INTERNE
+                    : Action::ORIGIN_PTA
+            );
             $payload['date_echeance'] = $payload['date_fin'];
             $payload['seuil_alerte_progression'] = $payload['seuil_alerte_progression'] ?? 10;
             $payload['frequence_execution'] = $payload['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
@@ -352,6 +388,8 @@ class ActionController extends Controller
         );
 
         $query->where(function ($scopedQuery) use ($user, $delegatedDirectionIds, $delegatedServiceScopes): void {
+            $scopedQuery->orWhere('responsable_id', (int) $user->id);
+
             if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
                 $scopedQuery->orWhereHas('pta', fn ($subQuery) => $subQuery->where('direction_id', (int) $user->direction_id));
             }

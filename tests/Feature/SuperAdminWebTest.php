@@ -219,6 +219,8 @@ class SuperAdminWebTest extends TestCase
             $workbookXml = $zip->getFromName('xl/workbook.xml');
             $sheetOneXml = $zip->getFromName('xl/worksheets/sheet1.xml');
             $sheetTwoXml = $zip->getFromName('xl/worksheets/sheet2.xml');
+            $sheetThreeXml = $zip->getFromName('xl/worksheets/sheet3.xml');
+            $sheetSixXml = $zip->getFromName('xl/worksheets/sheet6.xml');
             $coreXml = $zip->getFromName('docProps/core.xml');
             $zip->close();
         } else {
@@ -226,16 +228,31 @@ class SuperAdminWebTest extends TestCase
             $workbookXml = $entries['xl/workbook.xml'] ?? false;
             $sheetOneXml = $entries['xl/worksheets/sheet1.xml'] ?? false;
             $sheetTwoXml = $entries['xl/worksheets/sheet2.xml'] ?? false;
+            $sheetThreeXml = $entries['xl/worksheets/sheet3.xml'] ?? false;
+            $sheetSixXml = $entries['xl/worksheets/sheet6.xml'] ?? false;
             $coreXml = $entries['docProps/core.xml'] ?? false;
         }
         @unlink($tempFile);
 
         $this->assertNotFalse($workbookXml);
         $this->assertNotFalse($sheetOneXml);
+        $this->assertNotFalse($sheetTwoXml);
+        $this->assertNotFalse($sheetThreeXml);
+        $this->assertNotFalse($sheetSixXml);
         $this->assertNotFalse($coreXml);
-        $this->assertFalse($sheetTwoXml);
         $this->assertStringContainsString('Reporting DG Excel', (string) $sheetOneXml);
         $this->assertStringContainsString('Classeur synthese sans graphiques', (string) $sheetOneXml);
+        $this->assertStringContainsString('STRATEGIE', (string) $workbookXml);
+        $this->assertStringContainsString('PAO', (string) $workbookXml);
+        $this->assertStringContainsString('RMO_PERFORMANCE', (string) $workbookXml);
+        $this->assertStringContainsString('Tableau 2 : Objectifs operationnels &amp; Actions', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Direction', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Service', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Objectif operationnel', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Tableau 3 : Actions detaillees', (string) $sheetThreeXml);
+        $this->assertStringContainsString('Description action', (string) $sheetThreeXml);
+        $this->assertStringContainsString('Tableau 6 : Alertes KPI sous seuil', (string) $sheetSixXml);
+        $this->assertStringContainsString('Action corrective', (string) $sheetSixXml);
         $this->assertStringContainsString('Reporting DG Excel', (string) $coreXml);
         $this->assertStringNotContainsString('Synthese graphique', (string) $workbookXml);
     }

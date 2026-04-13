@@ -40,6 +40,7 @@ class ReportingAnalyticsService
      * @return array{
      *     generatedAt: \Illuminate\Support\Carbon,
      *     scope: array{role: string, direction_id: int|null, service_id: int|null},
+     *     statisticalPolicy: array{scope_status: string, scope_label: string, scope_summary: string},
      *     officialPolicy: array{threshold_status: string, threshold_label: string, scope_summary: string},
      *     global: array<string, int>,
      *     kpiSummary: array<string, float>,
@@ -52,7 +53,8 @@ class ReportingAnalyticsService
      *     details: array{
      *         actions_retard: \Illuminate\Support\Collection<int, \App\Models\Action>,
      *         kpi_sous_seuil: \Illuminate\Support\Collection<int, \App\Models\KpiMesure>,
-     *         structure_rapports: \Illuminate\Support\Collection<int, array<string, string>>
+     *         structure_rapports: \Illuminate\Support\Collection<int, array<string, string>>,
+     *         direction_service_report: \Illuminate\Support\Collection<int, array<string, mixed>>
      *     }
      * }
      */
@@ -107,6 +109,7 @@ class ReportingAnalyticsService
             'actions_retard' => collect(),
             'kpi_sous_seuil' => collect(),
             'structure_rapports' => collect(),
+            'direction_service_report' => collect(),
         ];
 
         if ($withDetails) {
@@ -208,6 +211,8 @@ class ReportingAnalyticsService
                         'risques_potentiels' => (string) ($action->risques ?? ''),
                     ];
                 });
+
+            $details['direction_service_report'] = $this->buildDirectionServiceReport($user);
         }
 
         $kpiSummary = $this->buildKpiSummary($validatedActions);
@@ -219,11 +224,17 @@ class ReportingAnalyticsService
                 'direction_id' => $user->direction_id,
                 'service_id' => $user->service_id,
             ],
+            'statisticalPolicy' => [
+                'scope_status' => $this->actionCalculationSettings->statisticalScope(),
+                'scope_label' => $this->actionCalculationSettings->statisticalScopeLabel(),
+                'scope_summary' => $this->actionCalculationSettings->statisticalScopeSummary(),
+                'route_filters' => $this->actionCalculationSettings->statisticalRouteFilters(),
+            ],
             'officialPolicy' => [
-                'threshold_status' => $this->actionCalculationSettings->officialValidationStatus(),
-                'threshold_label' => $this->actionCalculationSettings->officialThresholdLabel(),
-                'scope_summary' => $this->actionCalculationSettings->officialScopeSummary(),
-                'route_filters' => $this->actionCalculationSettings->officialRouteFilters(),
+                'threshold_status' => $this->actionCalculationSettings->statisticalScope(),
+                'threshold_label' => $this->actionCalculationSettings->statisticalScopeLabel(),
+                'scope_summary' => $this->actionCalculationSettings->statisticalScopeSummary(),
+                'route_filters' => $this->actionCalculationSettings->statisticalRouteFilters(),
             ],
             'global' => [
                 'pas_total' => (clone $pas)->count(),
@@ -259,6 +270,554 @@ class ReportingAnalyticsService
         ];
     }
 
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildDirectionServiceReport(User $user): Collection
+    {
+        $servicesQuery = Service::query()
+            ->where('actif', true)
+            ->with([
+                'users' => function ($query): void {
+                    $query
+                        ->select(['id', 'name', 'role', 'service_id'])
+                        ->where('role', User::ROLE_SERVICE)
+                        ->orderBy('name');
+                },
+            ]);
+
+        $this->scopeReportingServices($servicesQuery, $user);
+
+        $services = $servicesQuery
+            ->orderBy('direction_id')
+            ->orderBy('code')
+            ->get(['id', 'direction_id', 'code', 'libelle', 'actif']);
+
+        if ($services->isEmpty()) {
+            return collect();
+        }
+
+        $directionIds = $services
+            ->pluck('direction_id')
+            ->filter()
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $directions = Direction::query()
+            ->with([
+                'users' => function ($query): void {
+                    $query
+                        ->select(['id', 'name', 'role', 'direction_id'])
+                        ->where('role', User::ROLE_DIRECTION)
+                        ->orderBy('name');
+                },
+            ])
+            ->whereIn('id', $directionIds)
+            ->orderBy('code')
+            ->get(['id', 'code', 'libelle', 'actif'])
+            ->keyBy('id');
+
+        $serviceIds = $services
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
+        $actionsQuery = Action::query()
+            ->with([
+                'pta:id,pao_id,titre,direction_id,service_id',
+                'pta.pao:id,pas_objectif_id,titre,annee,direction_id,service_id,objectif_operationnel,echeance',
+                'pta.pao.pasObjectif:id,pas_axe_id,code,libelle',
+                'pta.pao.pasObjectif.pasAxe:id,code,libelle,periode_fin',
+                'responsable:id,name,email',
+                'kpis:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
+                'kpis.mesures:id,kpi_id,periode,valeur,commentaire',
+                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_qualite,kpi_risque,kpi_conformite',
+                'justificatifs:id,justifiable_type,justifiable_id,categorie,nom_original,description,created_at,ajoute_par',
+                'justificatifs.ajoutePar:id,name',
+            ])
+            ->whereHas('pta', function (Builder $ptaQuery) use ($serviceIds): void {
+                $ptaQuery->whereIn('service_id', $serviceIds);
+            });
+
+        $this->scopeAction($actionsQuery, $user);
+
+        $actionsByService = $actionsQuery
+            ->orderBy('id')
+            ->get()
+            ->groupBy(fn (Action $action): int => (int) ($action->pta?->service_id ?? 0));
+
+        return $services
+            ->groupBy('direction_id')
+            ->map(function (Collection $directionServices, $directionId) use ($directions, $actionsByService): array {
+                $direction = $directions->get((int) $directionId);
+                $serviceRows = $directionServices
+                    ->values()
+                    ->map(function (Service $service) use ($actionsByService): array {
+                        $serviceActions = $actionsByService
+                            ->get((int) $service->id, collect())
+                            ->values();
+
+                        return [
+                            'id' => (int) $service->id,
+                            'code' => (string) ($service->code ?? ''),
+                            'libelle' => (string) ($service->libelle ?? ''),
+                            'responsable' => (string) ($service->users->first()?->name ?? '-'),
+                            'summary' => $this->reportSummary($serviceActions),
+                            'actions' => $serviceActions
+                                ->map(fn (Action $action): array => $this->reportActionRow($action))
+                                ->values()
+                                ->all(),
+                        ];
+                    });
+
+                $directionActions = $serviceRows
+                    ->flatMap(fn (array $service): array => (array) ($service['actions'] ?? []))
+                    ->values();
+
+                return [
+                    'id' => (int) ($direction?->id ?? $directionId),
+                    'code' => (string) ($direction?->code ?? ''),
+                    'libelle' => (string) ($direction?->libelle ?? 'Direction non renseignee'),
+                    'responsable' => (string) ($direction?->users->first()?->name ?? '-'),
+                    'summary' => $this->reportSummaryFromRows($directionActions),
+                    'services' => $serviceRows->all(),
+                ];
+            })
+            ->values();
+    }
+
+    private function scopeReportingServices(Builder $query, User $user): void
+    {
+        if ($this->canReadAllPlanning($user)) {
+            return;
+        }
+
+        $directionIds = array_merge(
+            $user->delegatedDirectionIds('planning_read'),
+            $user->delegatedDirectionIds('planning_write')
+        );
+        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
+            $directionIds[] = (int) $user->direction_id;
+        }
+        $directionIds = array_values(array_unique(array_filter($directionIds, static fn ($id): bool => (int) $id > 0)));
+
+        $serviceScopes = array_merge(
+            $user->delegatedServiceScopes('planning_read'),
+            $user->delegatedServiceScopes('planning_write')
+        );
+        if ($user->hasRole(User::ROLE_SERVICE) && $user->direction_id !== null && $user->service_id !== null) {
+            $serviceScopes[] = [
+                'direction_id' => (int) $user->direction_id,
+                'service_id' => (int) $user->service_id,
+            ];
+        }
+
+        if ($directionIds === [] && $serviceScopes === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where(function (Builder $scopedQuery) use ($directionIds, $serviceScopes): void {
+            foreach ($directionIds as $directionId) {
+                $scopedQuery->orWhere('direction_id', (int) $directionId);
+            }
+
+            foreach ($serviceScopes as $scope) {
+                $scopedQuery->orWhere(function (Builder $serviceQuery) use ($scope): void {
+                    $serviceQuery
+                        ->where('direction_id', (int) $scope['direction_id'])
+                        ->where('id', (int) $scope['service_id']);
+                });
+            }
+        });
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<string, int|float>
+     */
+    private function reportSummary(Collection $actions): array
+    {
+        if ($actions->isEmpty()) {
+            return [
+                'actions_total' => 0,
+                'actions_validees' => 0,
+                'actions_terminees' => 0,
+                'actions_en_cours' => 0,
+                'actions_retard' => 0,
+                'progression_moyenne' => 0.0,
+                'taux_realisation' => 0.0,
+                'taux_retard' => 0.0,
+                'kpi_global' => 0.0,
+                'kpi_conformite' => 0.0,
+            ];
+        }
+
+        $total = $actions->count();
+        $completed = $actions
+            ->filter(fn (Action $action): bool => in_array((string) $action->statut_dynamique, $this->completedActionStatuses(), true))
+            ->count();
+        $delayed = $actions
+            ->filter(fn (Action $action): bool => $this->isReportActionDelayed($action))
+            ->count();
+
+        return [
+            'actions_total' => $total,
+            'actions_validees' => $actions
+                ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
+                    ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                    ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                ], true))
+                ->count(),
+            'actions_terminees' => $completed,
+            'actions_en_cours' => max(0, $total - $completed - $delayed),
+            'actions_retard' => $delayed,
+            'progression_moyenne' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2),
+            'taux_realisation' => $this->completionRate($completed, $total),
+            'taux_retard' => $this->completionRate($delayed, $total),
+            'kpi_global' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
+            'kpi_conformite' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)), 2),
+        ];
+    }
+
+    /**
+     * @param Collection<int, array<string, mixed>> $rows
+     * @return array<string, int|float>
+     */
+    private function reportSummaryFromRows(Collection $rows): array
+    {
+        if ($rows->isEmpty()) {
+            return [
+                'actions_total' => 0,
+                'actions_validees' => 0,
+                'actions_terminees' => 0,
+                'actions_en_cours' => 0,
+                'actions_retard' => 0,
+                'progression_moyenne' => 0.0,
+                'taux_realisation' => 0.0,
+                'taux_retard' => 0.0,
+                'kpi_global' => 0.0,
+                'kpi_conformite' => 0.0,
+            ];
+        }
+
+        $total = $rows->count();
+        $completed = $rows->filter(fn (array $row): bool => (bool) ($row['est_terminee'] ?? false))->count();
+        $delayed = $rows->filter(fn (array $row): bool => (bool) ($row['est_en_retard'] ?? false))->count();
+
+        return [
+            'actions_total' => $total,
+            'actions_validees' => $rows->filter(fn (array $row): bool => (bool) ($row['est_validee'] ?? false))->count(),
+            'actions_terminees' => $completed,
+            'actions_en_cours' => max(0, $total - $completed - $delayed),
+            'actions_retard' => $delayed,
+            'progression_moyenne' => round((float) $rows->avg(fn (array $row): float => (float) ($row['progression_value'] ?? 0)), 2),
+            'taux_realisation' => $this->completionRate($completed, $total),
+            'taux_retard' => $this->completionRate($delayed, $total),
+            'kpi_global' => round((float) $rows->avg(fn (array $row): float => (float) ($row['kpi_global_value'] ?? 0)), 2),
+            'kpi_conformite' => round((float) $rows->avg(fn (array $row): float => (float) ($row['kpi_conformite_value'] ?? 0)), 2),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function reportActionRow(Action $action): array
+    {
+        $progression = (float) ($action->progression_reelle ?? 0);
+        $kpiGlobal = (float) ($action->actionKpi?->kpi_global ?? 0);
+        $kpiConformite = (float) ($action->actionKpi?->kpi_conformite ?? 0);
+        $statut = $this->reportActionStatusLabel($action);
+        $validationStatus = (string) ($action->statut_validation ?? '');
+        $isCompleted = in_array((string) $action->statut_dynamique, $this->completedActionStatuses(), true)
+            || $progression >= 100.0;
+        $isDelayed = $this->isReportActionDelayed($action);
+        $riskText = trim((string) ($action->risques ?? ''));
+        $mitigationText = trim((string) ($action->mesures_preventives ?? ''));
+        $strategicObjective = (string) (
+            $action->pta?->pao?->pasObjectif?->libelle
+            ?? $action->pta?->pao?->titre
+            ?? '-'
+        );
+        $operationalObjective = (string) (
+            $action->pta?->pao?->objectif_operationnel
+            ?? $action->pta?->titre
+            ?? '-'
+        );
+        $pasAxe = $action->pta?->pao?->pasObjectif?->pasAxe;
+        $pasObjectif = $action->pta?->pao?->pasObjectif;
+        $pao = $action->pta?->pao;
+        $justificatifs = $this->reportActionJustificatifs($action);
+
+        return [
+            'axe_id' => (int) ($pasAxe?->id ?? 0),
+            'axe_numero' => (string) ($pasAxe?->code ?? ''),
+            'axe' => (string) ($pasAxe?->libelle ?? '-'),
+            'axe_strategique' => (string) ($pasAxe?->libelle ?? '-'),
+            'objectif_strategique_id' => (int) ($pasObjectif?->id ?? 0),
+            'objectif_strategique_numero' => (string) ($pasObjectif?->code ?? ''),
+            'objectif' => $strategicObjective,
+            'objectif_strategique' => $strategicObjective,
+            'objectif_operationnel' => $operationalObjective,
+            'objectif_operationnel_id' => (int) ($pao?->id ?? 0),
+            'echeance_strategique' => $pao?->echeance?->format('Y-m-d') ?? $pasAxe?->periode_fin?->format('Y-m-d') ?? '',
+            'echeance' => $action->date_echeance?->format('Y-m-d') ?? $action->date_fin?->format('Y-m-d') ?? '',
+            'action' => (string) ($action->libelle ?? '-'),
+            'description_action' => trim((string) ($action->description ?? '')) ?: (string) ($action->libelle ?? '-'),
+            'responsable' => (string) ($action->responsable?->name ?? '-'),
+            'rmo' => (string) ($action->responsable?->name ?? '-'),
+            'cible' => $this->reportActionTargetLabel($action) ?: '-',
+            'kpi' => $this->reportActionKpiLabel($action),
+            'prevu' => $this->reportActionPlannedLabel($action),
+            'realise' => $this->reportActionActualLabel($action),
+            'debut' => $action->date_debut?->format('Y-m-d') ?? '',
+            'fin' => $action->date_fin?->format('Y-m-d') ?? '',
+            'taux' => number_format($progression, 2, '.', '').'%',
+            'statut' => $statut,
+            'statut_validation' => (string) ($action->validation_status_label ?? $validationStatus ?: '-'),
+            'kpi_global' => number_format($kpiGlobal, 2, '.', ''),
+            'kpi_delai' => number_format((float) ($action->actionKpi?->kpi_delai ?? 0), 2, '.', ''),
+            'kpi_performance' => number_format((float) ($action->actionKpi?->kpi_performance ?? 0), 2, '.', ''),
+            'kpi_qualite' => number_format((float) ($action->actionKpi?->kpi_qualite ?? 0), 2, '.', ''),
+            'kpi_risque' => number_format((float) ($action->actionKpi?->kpi_risque ?? 0), 2, '.', ''),
+            'kpi_conformite' => number_format($kpiConformite, 2, '.', ''),
+            'progression_value' => $progression,
+            'kpi_global_value' => $kpiGlobal,
+            'kpi_delai_value' => (float) ($action->actionKpi?->kpi_delai ?? 0),
+            'kpi_performance_value' => (float) ($action->actionKpi?->kpi_performance ?? 0),
+            'kpi_qualite_value' => (float) ($action->actionKpi?->kpi_qualite ?? 0),
+            'kpi_risque_value' => (float) ($action->actionKpi?->kpi_risque ?? 0),
+            'kpi_conformite_value' => $kpiConformite,
+            'risque_identifie' => $riskText,
+            'niveau_risque' => $this->reportRiskLevel($riskText, (float) ($action->actionKpi?->kpi_risque ?? 0)),
+            'mesure_mitigation' => $mitigationText,
+            'ressources_requises' => $this->reportActionResourcesLabel($action),
+            'justificatif' => $this->reportActionJustificatifLabel($justificatifs),
+            'justificatifs' => $justificatifs,
+            'kpi_rows' => $this->reportActionKpiRows($action),
+            'est_validee' => in_array($validationStatus, [
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ], true),
+            'est_terminee' => $isCompleted,
+            'est_en_retard' => $isDelayed,
+        ];
+    }
+
+    private function reportActionKpiLabel(Action $action): string
+    {
+        $labels = $action->kpis
+            ->pluck('libelle')
+            ->filter(fn ($label): bool => trim((string) $label) !== '')
+            ->values()
+            ->implode(' | ');
+
+        if ($labels !== '') {
+            return $labels;
+        }
+
+        return 'Indicateur global: '.number_format((float) ($action->actionKpi?->kpi_global ?? 0), 2, '.', '');
+    }
+
+    private function reportActionPlannedLabel(Action $action): string
+    {
+        $parts = [];
+        $target = $this->reportActionTargetLabel($action);
+        if ($target !== '') {
+            $parts[] = 'Cible: '.$target;
+        }
+
+        $period = trim(($action->date_debut?->format('Y-m-d') ?? '').' - '.($action->date_fin?->format('Y-m-d') ?? ''), ' -');
+        if ($period !== '') {
+            $parts[] = 'Periode: '.$period;
+        }
+
+        return $parts !== [] ? implode(' | ', $parts) : '-';
+    }
+
+    private function reportActionActualLabel(Action $action): string
+    {
+        $parts = ['Progression: '.number_format((float) ($action->progression_reelle ?? 0), 2, '.', '').'%'];
+
+        if ($action->date_fin_reelle !== null) {
+            $parts[] = 'Fin reelle: '.$action->date_fin_reelle->format('Y-m-d');
+        }
+
+        $rapportFinal = trim((string) ($action->rapport_final ?? ''));
+        if ($rapportFinal !== '') {
+            $parts[] = 'Rapport: '.Str::limit($rapportFinal, 80, '');
+        }
+
+        return implode(' | ', $parts);
+    }
+
+    private function reportActionTargetLabel(Action $action): string
+    {
+        if ($action->type_cible === 'quantitative') {
+            $quantite = $action->quantite_cible !== null
+                ? number_format((float) $action->quantite_cible, 2, '.', '')
+                : '';
+            $unite = trim((string) ($action->unite_cible ?? ''));
+
+            return trim($quantite.' '.$unite);
+        }
+
+        return trim((string) ($action->resultat_attendu ?: $action->livrable_attendu ?: ''));
+    }
+
+    private function reportActionStatusLabel(Action $action): string
+    {
+        $progression = (float) ($action->progression_reelle ?? 0);
+        $status = (string) ($action->statut_dynamique ?: $action->statut ?: '');
+
+        if (in_array($status, [
+            ActionTrackingService::STATUS_SUSPENDU,
+            ActionTrackingService::STATUS_ANNULE,
+        ], true)) {
+            return (string) ($action->status_label ?: $status);
+        }
+
+        if ($progression >= 100.0) {
+            return 'Terminee';
+        }
+
+        if ($this->isReportActionDelayed($action)) {
+            return 'En retard';
+        }
+
+        if ($progression <= 0.0) {
+            return 'Non demarree';
+        }
+
+        return 'En cours';
+    }
+
+    private function isReportActionDelayed(Action $action): bool
+    {
+        if ((string) $action->statut_dynamique === ActionTrackingService::STATUS_EN_RETARD) {
+            return true;
+        }
+
+        if ($action->date_fin === null || (float) ($action->progression_reelle ?? 0) >= 100.0) {
+            return false;
+        }
+
+        return $action->date_fin->lt(Carbon::today());
+    }
+
+    private function reportRiskLevel(string $riskText, float $riskScore): string
+    {
+        if ($riskText === '') {
+            return '-';
+        }
+
+        if ($riskScore > 0 && $riskScore < 50) {
+            return 'Eleve';
+        }
+
+        if ($riskScore > 0 && $riskScore < 75) {
+            return 'Modere';
+        }
+
+        return 'Faible';
+    }
+
+    private function reportActionResourcesLabel(Action $action): string
+    {
+        $resources = [];
+        if ((bool) $action->ressource_main_oeuvre) {
+            $resources[] = 'Main d oeuvre';
+        }
+        if ((bool) $action->ressource_equipement) {
+            $resources[] = 'Equipement';
+        }
+        if ((bool) $action->ressource_partenariat) {
+            $resources[] = 'Partenariat';
+        }
+        if ((bool) $action->ressource_autres) {
+            $details = trim((string) ($action->ressource_autres_details ?? ''));
+            $resources[] = $details !== '' ? 'Autres: '.$details : 'Autres';
+        }
+        if ((bool) $action->financement_requis) {
+            $source = trim((string) ($action->source_financement ?? ''));
+            $resources[] = $source !== '' ? 'Financement: '.$source : 'Financement';
+        }
+
+        return $resources !== [] ? implode(' | ', $resources) : '-';
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    private function reportActionJustificatifs(Action $action): array
+    {
+        return $action->justificatifs
+            ->sortByDesc('created_at')
+            ->map(fn ($justificatif): array => [
+                'nom' => (string) ($justificatif->nom_original ?? '-'),
+                'categorie' => (string) ($justificatif->categorie ?? 'justificatif'),
+                'description' => (string) ($justificatif->description ?? ''),
+                'ajoute_par' => (string) ($justificatif->ajoutePar?->name ?? '-'),
+                'date' => $justificatif->created_at?->format('Y-m-d') ?? '',
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, array<string, string>> $justificatifs
+     */
+    private function reportActionJustificatifLabel(array $justificatifs): string
+    {
+        if ($justificatifs === []) {
+            return '-';
+        }
+
+        return collect($justificatifs)
+            ->take(3)
+            ->map(fn (array $justificatif): string => trim(($justificatif['nom'] ?? '-').' '.(($justificatif['date'] ?? '') !== '' ? '('.$justificatif['date'].')' : '')))
+            ->implode(' | ');
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function reportActionKpiRows(Action $action): array
+    {
+        return $action->kpis
+            ->map(function ($kpi) use ($action): array {
+                $measure = $kpi->mesures
+                    ->sortByDesc('id')
+                    ->first();
+                $value = $measure?->valeur !== null ? (float) $measure->valeur : null;
+                $threshold = $kpi->seuil_alerte !== null ? (float) $kpi->seuil_alerte : null;
+
+                return [
+                    'action' => (string) ($action->libelle ?? '-'),
+                    'indicateur' => (string) ($kpi->libelle ?? '-'),
+                    'type' => (string) ($kpi->periodicite ?? ($kpi->est_a_renseigner ? 'A renseigner' : 'Suivi')),
+                    'periode' => (string) ($measure?->periode ?? '-'),
+                    'valeur' => $value,
+                    'seuil' => $threshold,
+                    'statut' => $this->reportKpiStatus($value, $threshold),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function reportKpiStatus(?float $value, ?float $threshold): string
+    {
+        if ($value === null || $threshold === null) {
+            return 'Non renseigne';
+        }
+
+        return $value < $threshold ? 'Alerte' : 'OK';
+    }
+
     private function cacheKey(User $user, bool $withDetails, bool $withCharts): string
     {
         return 'reporting-analytics:'.sha1(json_encode([
@@ -268,7 +827,7 @@ class ReportingAnalyticsService
             'service_id' => $user->service_id !== null ? (int) $user->service_id : null,
             'with_details' => $withDetails,
             'with_charts' => $withCharts,
-            'official_validation_status' => $this->actionCalculationSettings->officialValidationStatus(),
+            'statistical_scope' => $this->actionCalculationSettings->statisticalScope(),
         ], JSON_THROW_ON_ERROR));
     }
 

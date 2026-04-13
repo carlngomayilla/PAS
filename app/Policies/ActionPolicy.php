@@ -29,6 +29,10 @@ class ActionPolicy
      */
     public function view(User $user, Action $action): bool
     {
+        if ($action->isResponsible($user)) {
+            return true;
+        }
+
         if ($user->isAgent()) {
             return (int) $action->responsable_id === (int) $user->id;
         }
@@ -108,8 +112,8 @@ class ActionPolicy
      */
     public function submitWeek(User $user, Action $action): bool
     {
-        return $user->isAgent()
-            && (int) $action->responsable_id === (int) $user->id;
+        return $action->isResponsible($user)
+            && ($user->isAgent() || $action->isOperationalContext());
     }
 
     /**
@@ -117,8 +121,8 @@ class ActionPolicy
      */
     public function submitClosure(User $user, Action $action): bool
     {
-        return $user->hasRole(User::ROLE_AGENT)
-            && (int) $action->responsable_id === (int) $user->id;
+        return $action->isResponsible($user)
+            && ($user->hasRole(User::ROLE_AGENT) || $action->isOperationalContext());
     }
 
     /**
@@ -126,6 +130,10 @@ class ActionPolicy
      */
     public function reviewByChef(User $user, Action $action): bool
     {
+        if ($action->isResponsible($user)) {
+            return false;
+        }
+
         if ($user->hasRole(User::ROLE_SERVICE)
             && $this->canManageAction(
                 $user,
@@ -148,6 +156,10 @@ class ActionPolicy
      */
     public function reviewByDirection(User $user, Action $action): bool
     {
+        if ($action->isResponsible($user)) {
+            return false;
+        }
+
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             return (int) $user->direction_id === (int) $action->pta?->direction_id;
         }

@@ -24,12 +24,14 @@
     $alertRows = $analytics['alert_rows'] ?? [];
     $interannualRows = $analytics['interannual'] ?? [];
     $unitModeLabel = $analytics['unit_mode_label'] ?? 'Unites';
+    $statisticalPolicy = is_array(($reportingAnalytics['statisticalPolicy'] ?? null)) ? $reportingAnalytics['statisticalPolicy'] : [];
     $officialPolicy = is_array(($reportingAnalytics['officialPolicy'] ?? null)) ? $reportingAnalytics['officialPolicy'] : [];
-    $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
+    $basePolicy = $statisticalPolicy !== [] ? $statisticalPolicy : $officialPolicy;
+    $officialBaseLabel = (string) ($basePolicy['scope_label'] ?? $basePolicy['threshold_label'] ?? 'Toutes les actions visibles');
     $officialBaseLower = mb_strtolower($officialBaseLabel);
     $officialBaseText = 'Base statistique : '.$officialBaseLabel;
     $officialAverageText = 'Moyenne sur '.$officialBaseLabel;
-    $officialFilters = (array) ($officialPolicy['route_filters'] ?? []);
+    $officialFilters = (array) ($basePolicy['route_filters'] ?? []);
     $availableDashboardTabs = [
         'overview' => 'Synthese',
         'charts' => 'Graphiques',
@@ -56,6 +58,19 @@
         ['label' => 'Non demarrees', 'value' => collect($statusCards)->firstWhere('label', 'Non demarre')['count'] ?? 0, 'accent' => '#6B7280', 'bg' => '#F1F5F9', 'meta' => 'Aucune progression', 'href' => route('workspace.actions.index', ['statut' => 'non_demarre'])],
         ['label' => 'Taux validation', 'value' => ($metrics['totals']['actions_total'] ?? 0) > 0 ? number_format(((($metrics['totals']['actions_validees'] ?? 0) / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100), 0).'%' : '0%', 'accent' => '#3B82F6', 'bg' => '#EFF6FF', 'meta' => $officialBaseText, 'href' => route('workspace.actions.index', $officialFilters)],
     ];
+    $personalActionsSummary = is_array($analytics['personal_actions_summary'] ?? null) ? $analytics['personal_actions_summary'] : [];
+    if ($dashboardRole !== 'agent' && (int) ($personalActionsSummary['total'] ?? 0) > 0) {
+        array_splice($summaryStrip, 1, 0, [[
+            'label' => 'Mes actions',
+            'value' => (int) $personalActionsSummary['total'],
+            'accent' => '#1E3A8A',
+            'bg' => '#EFF6FF',
+            'meta' => ((int) ($personalActionsSummary['late'] ?? 0)).' en retard, separees du pilotage',
+            'href' => (string) ($personalActionsSummary['url'] ?? route('workspace.actions.index', ['vue' => 'mes_actions'])),
+            'badge' => null,
+            'badge_tone' => 'info',
+        ]]);
+    }
 
     $ganttStart = \Illuminate\Support\Carbon::create(now()->year, 1, 1)->startOfDay();
     $ganttEnd = \Illuminate\Support\Carbon::create(now()->year, 12, 31)->endOfDay();
@@ -125,6 +140,7 @@
             .dashboard-chart-host{width:100%;height:100%}
             .dashboard-canvas .dashboard-chart-host,.dashboard-canvas .dashboard-chart-host canvas,.dashboard-canvas svg{position:absolute;inset:0;width:100%!important;height:100%!important}
             .dashboard-chart-host canvas{display:block}
+            .dashboard-chart-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border:1px dashed rgba(148,163,184,.45);border-radius:1rem;background:rgba(248,250,252,.68);padding:1rem;text-align:center;font-size:.84rem;font-weight:800;color:#475569}
             .dashboard-table{width:100%;border-collapse:collapse;font-size:.84rem}
             .dashboard-table th{padding:.78rem .9rem;text-align:left;font-size:.67rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#1F2937;background:linear-gradient(180deg,rgba(248,251,255,.98)_0%,rgba(239,246,255,.96)_100%);border-bottom:1px solid rgba(191,219,254,.92);white-space:nowrap}
             .dashboard-table td{padding:.85rem .9rem;border-bottom:1px solid rgba(218,226,236,.95);color:rgb(30 41 59);vertical-align:middle}
@@ -200,6 +216,7 @@
             .dashboard-reporting-jump:hover{background:linear-gradient(135deg,rgba(255,255,255,1) 0%,rgba(241,245,249,.96) 100%);transform:translateY(-1px)}
             @keyframes dashboardFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
             .dark .dashboard-tab-inactive{color:rgb(148 163 184)}
+            .dark .dashboard-chart-empty{border-color:rgba(100,116,139,.45);background:rgba(15,23,42,.52);color:#CBD5E1}
             .dark .dashboard-table th{background:linear-gradient(180deg,rgba(28,32,61,.96)_0%,rgba(20,24,47,.98)_100%);border-bottom-color:rgb(51 65 85 / .88);color:rgb(248 250 252)}
             .dark .dashboard-table td{border-bottom-color:rgb(30 41 59 / .8);color:rgb(226 232 240)}
             .dark .dashboard-table tbody tr:nth-child(even) td{background:rgba(18,24,43,.86)}
@@ -310,6 +327,7 @@
         @include('partials.dashboard-role-overview', [
             'roleDashboard' => $roleDashboard,
             'dashboardRole' => $dashboardRole,
+            'statisticalPolicy' => $statisticalPolicy,
             'officialPolicy' => $officialPolicy,
             'displayMode' => 'overview',
         ])
@@ -377,6 +395,7 @@
         @include('partials.dashboard-role-overview', [
             'roleDashboard' => $roleDashboard,
             'dashboardRole' => $dashboardRole,
+            'statisticalPolicy' => $statisticalPolicy,
             'officialPolicy' => $officialPolicy,
             'displayMode' => 'charts',
         ])
@@ -462,6 +481,7 @@
             @include('partials.dashboard-role-overview', [
                 'roleDashboard' => $roleDashboard,
                 'dashboardRole' => $dashboardRole,
+                'statisticalPolicy' => $statisticalPolicy,
                 'officialPolicy' => $officialPolicy,
                 'displayMode' => 'tables',
             ])

@@ -181,7 +181,7 @@ class WebWorkspaceTest extends TestCase
             ->assertOk()
             ->assertSee(route('workspace.actions.index'), false)
             ->assertSee(route('workspace.actions.index', ['statut' => 'en_retard']), false)
-            ->assertSee(route('workspace.actions.index', ['statut_validation' => 'validee_direction']), false);
+            ->assertDontSee('statut_validation=validee_direction', false);
     }
 
     public function test_dashboard_graphs_and_summary_tables_expose_drilldown_metadata(): void
@@ -274,26 +274,26 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/workspace/actions?statut=achevees&sort=kpi_global_desc&without_kpi=1')
             ->assertOk()
-            ->assertSee('Drill-down actif : actions sans indicateur')
+            ->assertSee('Actions sans indicateur')
             ->assertSee('value="achevees" selected', false)
             ->assertSee('value="kpi_global_desc" selected', false);
 
         $this->actingAs($admin)
             ->get('/workspace/pas?statut=valide_ou_verrouille&without_pao=1')
             ->assertOk()
-            ->assertSee('Drill-down actif : PAS sans PAO')
+            ->assertSee('PAS sans PAO')
             ->assertSee('value="valide_ou_verrouille" selected', false);
 
         $this->actingAs($admin)
             ->get('/workspace/pao?statut=valide_ou_verrouille&without_pta=1')
             ->assertOk()
-            ->assertSee('Drill-down actif : PAO sans PTA')
+            ->assertSee('PAO sans PTA')
             ->assertSee('value="valide_ou_verrouille" selected', false);
 
         $this->actingAs($admin)
             ->get('/workspace/pta?statut=valide_ou_verrouille&without_action=1')
             ->assertOk()
-            ->assertSee('Drill-down actif : PTA sans action')
+            ->assertSee('PTA sans action')
             ->assertSee('value="valide_ou_verrouille" selected', false);
 
         $this->actingAs($admin)
@@ -722,7 +722,7 @@ class WebWorkspaceTest extends TestCase
         ]);
     }
 
-    public function test_non_admin_global_profiles_cannot_access_user_role_management(): void
+    public function test_user_role_management_access_follows_role_permissions(): void
     {
         $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
         $planification = User::query()->where('email', 'hilaire.nguebet@anbg.ga')->firstOrFail();
@@ -734,7 +734,7 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($planification)
             ->get('/workspace/referentiel/utilisateurs/create')
-            ->assertForbidden();
+            ->assertOk();
 
         $this->actingAs($cabinet)
             ->get('/workspace/referentiel/utilisateurs')
@@ -927,44 +927,169 @@ class WebWorkspaceTest extends TestCase
             $workbookXml = $zip->getFromName('xl/workbook.xml');
             $sheetOneXml = $zip->getFromName('xl/worksheets/sheet1.xml');
             $sheetTwoXml = $zip->getFromName('xl/worksheets/sheet2.xml');
-            $chartOneXml = $zip->getFromName('xl/charts/chart1.xml');
-            $drawingXml = $zip->getFromName('xl/drawings/drawing1.xml');
+            $sheetThreeXml = $zip->getFromName('xl/worksheets/sheet3.xml');
+            $sheetFourXml = $zip->getFromName('xl/worksheets/sheet4.xml');
+            $sheetFiveXml = $zip->getFromName('xl/worksheets/sheet5.xml');
+            $sheetSixXml = $zip->getFromName('xl/worksheets/sheet6.xml');
+            $sheetSevenXml = $zip->getFromName('xl/worksheets/sheet7.xml');
+            $sheetEightXml = $zip->getFromName('xl/worksheets/sheet8.xml');
+            $sheetNineXml = $zip->getFromName('xl/worksheets/sheet9.xml');
+            $sheetTenXml = $zip->getFromName('xl/worksheets/sheet10.xml');
+            $stylesXml = $zip->getFromName('xl/styles.xml');
             $zip->close();
         } else {
             $entries = app(SimpleZipReader::class)->read($tempFile);
             $workbookXml = $entries['xl/workbook.xml'] ?? false;
             $sheetOneXml = $entries['xl/worksheets/sheet1.xml'] ?? false;
             $sheetTwoXml = $entries['xl/worksheets/sheet2.xml'] ?? false;
-            $chartOneXml = $entries['xl/charts/chart1.xml'] ?? false;
-            $drawingXml = $entries['xl/drawings/drawing1.xml'] ?? false;
+            $sheetThreeXml = $entries['xl/worksheets/sheet3.xml'] ?? false;
+            $sheetFourXml = $entries['xl/worksheets/sheet4.xml'] ?? false;
+            $sheetFiveXml = $entries['xl/worksheets/sheet5.xml'] ?? false;
+            $sheetSixXml = $entries['xl/worksheets/sheet6.xml'] ?? false;
+            $sheetSevenXml = $entries['xl/worksheets/sheet7.xml'] ?? false;
+            $sheetEightXml = $entries['xl/worksheets/sheet8.xml'] ?? false;
+            $sheetNineXml = $entries['xl/worksheets/sheet9.xml'] ?? false;
+            $sheetTenXml = $entries['xl/worksheets/sheet10.xml'] ?? false;
+            $stylesXml = $entries['xl/styles.xml'] ?? false;
         }
         @unlink($tempFile);
 
         $this->assertNotFalse($workbookXml);
         $this->assertNotFalse($sheetOneXml);
         $this->assertNotFalse($sheetTwoXml);
-        $this->assertNotFalse($chartOneXml);
-        $this->assertNotFalse($drawingXml);
-        $this->assertStringContainsString('Synthese graphique', (string) $workbookXml);
-        $this->assertStringContainsString('Repères de lecture', (string) $sheetOneXml);
+        $this->assertNotFalse($sheetThreeXml);
+        $this->assertNotFalse($sheetFourXml);
+        $this->assertNotFalse($sheetFiveXml);
+        $this->assertNotFalse($sheetSixXml);
+        $this->assertNotFalse($sheetSevenXml);
+        $this->assertNotFalse($sheetEightXml);
+        $this->assertNotFalse($sheetNineXml);
+        $this->assertNotFalse($sheetTenXml);
+        $this->assertNotFalse($stylesXml);
+        $this->assertStringContainsString('STRATEGIE', (string) $workbookXml);
+        $this->assertStringContainsString('PAO', (string) $workbookXml);
+        $this->assertStringContainsString('ACTIONS', (string) $workbookXml);
+        $this->assertStringContainsString('KPI', (string) $workbookXml);
+        $this->assertStringContainsString('SYNTH', (string) $workbookXml);
+        $this->assertStringContainsString('ALERTES', (string) $workbookXml);
+        $this->assertStringContainsString('RISQUES', (string) $workbookXml);
+        $this->assertStringContainsString('RMO_PERFORMANCE', (string) $workbookXml);
+        $this->assertStringContainsString('JUSTIFICATIFS', (string) $workbookXml);
+        $this->assertStringNotContainsString('Synthese graphique', (string) $workbookXml);
+        $this->assertStringContainsString('Reporting consolide ANBG', (string) $sheetOneXml);
         $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetOneXml);
-        $this->assertStringContainsString('Synthese des indicateurs', (string) $sheetOneXml);
-        $this->assertStringContainsString('Vue du PAS', (string) $sheetOneXml);
-        $this->assertStringContainsString('Details - indicateurs sous seuil', (string) $sheetOneXml);
-        $this->assertStringContainsString('Indicateur qualite', (string) $sheetOneXml);
-        $this->assertStringContainsString('Indicateur risque', (string) $sheetOneXml);
-        $this->assertStringContainsString('Lecture statistique unifiee', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Funnel de pilotage', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Vue interannuelle', (string) $sheetTwoXml);
-        $this->assertStringContainsString('<c:barChart>', (string) $chartOneXml);
-        $this->assertStringContainsString('rId1', (string) $drawingXml);
+        $this->assertStringContainsString('Tableau 1 : Axes &amp; Objectifs strategiques', (string) $sheetOneXml);
+        $this->assertStringContainsString('Axe strategique', (string) $sheetOneXml);
+        $this->assertStringContainsString('Tableau 2 : Objectifs operationnels &amp; Actions', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Direction', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Service', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Objectif operationnel', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Tableau 3 : Actions detaillees', (string) $sheetThreeXml);
+        $this->assertStringContainsString('Description action', (string) $sheetThreeXml);
+        $this->assertStringContainsString('Tableau 4 : KPI par action', (string) $sheetFourXml);
+        $this->assertStringContainsString('KPI Performance (%)', (string) $sheetFourXml);
+        $this->assertStringContainsString('Tableau 5 : Reporting synthetique', (string) $sheetFiveXml);
+        $this->assertStringContainsString('Performance (%)', (string) $sheetFiveXml);
+        $this->assertStringContainsString('Tableau 6 : Alertes KPI sous seuil', (string) $sheetSixXml);
+        $this->assertStringContainsString('Action corrective', (string) $sheetSixXml);
+        $this->assertStringContainsString('Tableau 7 : Risques', (string) $sheetSevenXml);
+        $this->assertStringContainsString('Solution', (string) $sheetSevenXml);
+        $this->assertStringContainsString('Tableau 8 : Performance par RMO', (string) $sheetEightXml);
+        $this->assertStringContainsString('RMO', (string) $sheetEightXml);
+        $this->assertStringContainsString('Tableau 9 : Suivi des justificatifs', (string) $sheetNineXml);
+        $this->assertStringContainsString('Statut validation', (string) $sheetNineXml);
+        $this->assertStringContainsString('ANBG - RAPPORT PAS PAR DIRECTION ET SERVICE', (string) $sheetTenXml);
+        $this->assertStringContainsString('Service :', (string) $sheetTenXml);
+        $this->assertStringContainsString('FF3B82F6', (string) $stylesXml);
 
         $pdfResponse = $this->actingAs($admin)
             ->get(route('workspace.reporting.export.pdf'));
 
         $pdfResponse->assertOk();
         $pdfResponse->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_admin_can_export_reporting_in_normalized_csv_zip(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $response = $this->actingAs($admin)
+            ->get(route('workspace.reporting.export.csv'));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/zip');
+        $this->assertStringContainsString('.zip', (string) $response->headers->get('content-disposition'));
+
+        $binary = $response->streamedContent();
+        $this->assertStringStartsWith('PK', $binary);
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'csv_reporting_');
+        $this->assertNotFalse($tempFile);
+        file_put_contents($tempFile, $binary);
+
+        if (class_exists(ZipArchive::class)) {
+            $zip = new ZipArchive();
+            $this->assertTrue($zip->open($tempFile) === true);
+            $indexCsv = $zip->getFromName('00_index_direction_service.csv');
+            $strategyCsv = $zip->getFromName('01_strategie.csv');
+            $paoCsv = $zip->getFromName('02_pao.csv');
+            $actionsCsv = $zip->getFromName('03_actions.csv');
+            $kpiCsv = $zip->getFromName('04_kpi.csv');
+            $summaryCsv = $zip->getFromName('05_synthese.csv');
+            $alertsCsv = $zip->getFromName('06_alertes.csv');
+            $risksCsv = $zip->getFromName('07_risques.csv');
+            $rmoCsv = $zip->getFromName('08_rmo_performance.csv');
+            $justificatifsCsv = $zip->getFromName('09_justificatifs.csv');
+            $serviceEntryExists = false;
+            for ($index = 0; $index < $zip->numFiles; $index++) {
+                $entryName = $zip->getNameIndex($index);
+                if (is_string($entryName) && Str::startsWith($entryName, 'services/')) {
+                    $serviceEntryExists = true;
+                    break;
+                }
+            }
+            $zip->close();
+        } else {
+            $entries = app(SimpleZipReader::class)->read($tempFile);
+            $indexCsv = $entries['00_index_direction_service.csv'] ?? false;
+            $strategyCsv = $entries['01_strategie.csv'] ?? false;
+            $paoCsv = $entries['02_pao.csv'] ?? false;
+            $actionsCsv = $entries['03_actions.csv'] ?? false;
+            $kpiCsv = $entries['04_kpi.csv'] ?? false;
+            $summaryCsv = $entries['05_synthese.csv'] ?? false;
+            $alertsCsv = $entries['06_alertes.csv'] ?? false;
+            $risksCsv = $entries['07_risques.csv'] ?? false;
+            $rmoCsv = $entries['08_rmo_performance.csv'] ?? false;
+            $justificatifsCsv = $entries['09_justificatifs.csv'] ?? false;
+            $serviceEntryExists = collect(array_keys($entries))->contains(
+                fn (string $name): bool => Str::startsWith($name, 'services/')
+            );
+        }
+        @unlink($tempFile);
+
+        $this->assertNotFalse($indexCsv);
+        $this->assertNotFalse($strategyCsv);
+        $this->assertNotFalse($paoCsv);
+        $this->assertNotFalse($actionsCsv);
+        $this->assertNotFalse($kpiCsv);
+        $this->assertNotFalse($summaryCsv);
+        $this->assertNotFalse($alertsCsv);
+        $this->assertNotFalse($risksCsv);
+        $this->assertNotFalse($rmoCsv);
+        $this->assertNotFalse($justificatifsCsv);
+        $this->assertTrue($serviceEntryExists);
+        $this->assertStringContainsString('Direction', (string) $indexCsv);
+        $this->assertStringContainsString('Service', (string) $indexCsv);
+        $this->assertStringContainsString('Axe strategique', (string) $strategyCsv);
+        $this->assertStringContainsString('Objectif operationnel', (string) $paoCsv);
+        $this->assertStringContainsString('Service', (string) $paoCsv);
+        $this->assertStringContainsString('Description action', (string) $actionsCsv);
+        $this->assertStringContainsString('KPI Performance (%)', (string) $kpiCsv);
+        $this->assertStringContainsString('Performance (%)', (string) $summaryCsv);
+        $this->assertStringContainsString('Action corrective', (string) $alertsCsv);
+        $this->assertStringContainsString('Risque', (string) $risksCsv);
+        $this->assertStringContainsString('Performance moyenne (%)', (string) $rmoCsv);
+        $this->assertStringContainsString('Statut validation', (string) $justificatifsCsv);
     }
 
     public function test_reporting_pdf_template_includes_quality_and_risk_kpis(): void
@@ -974,9 +1099,12 @@ class WebWorkspaceTest extends TestCase
 
         $html = view('workspace.monitoring.reporting-pdf', $payload)->render();
 
-        $this->assertStringContainsString('Indicateur qualite', $html);
-        $this->assertStringContainsString('Indicateur risque', $html);
-        $this->assertStringContainsString('Indicateur global', $html);
+        $this->assertStringContainsString('KPI Performance (%)', $html);
+        $this->assertStringContainsString('KPI Risque (%)', $html);
+        $this->assertStringContainsString('KPI Global (%)', $html);
+        $this->assertStringContainsString('section-kicker">Direction', $html);
+        $this->assertStringContainsString('section-kicker">Service', $html);
+        $this->assertStringNotContainsString('<th>Direction</th><th>Service</th><th>Axe stratégique</th>', $html);
         $this->assertStringNotContainsString('Provisoire', $html);
         $this->assertStringNotContainsString('Officiel', $html);
         $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
@@ -994,7 +1122,7 @@ class WebWorkspaceTest extends TestCase
         $html = view('workspace.monitoring.reporting-pdf', $payload)->render();
 
         $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
-        $this->assertStringContainsString('Validees', $html);
+        $this->assertStringContainsString('Statut validation', $html);
 
         $xlsxResponse = $this->actingAs($admin)
             ->get(route('workspace.reporting.export.excel'));
@@ -1009,20 +1137,25 @@ class WebWorkspaceTest extends TestCase
             $zip = new ZipArchive();
             $this->assertTrue($zip->open($tempFile) === true);
             $sheetOneXml = $zip->getFromName('xl/worksheets/sheet1.xml');
-            $sheetTwoXml = $zip->getFromName('xl/worksheets/sheet2.xml');
+            $sheetFiveXml = $zip->getFromName('xl/worksheets/sheet5.xml');
+            $sheetSixXml = $zip->getFromName('xl/worksheets/sheet6.xml');
             $zip->close();
         } else {
             $entries = app(SimpleZipReader::class)->read($tempFile);
             $sheetOneXml = $entries['xl/worksheets/sheet1.xml'] ?? false;
-            $sheetTwoXml = $entries['xl/worksheets/sheet2.xml'] ?? false;
+            $sheetFiveXml = $entries['xl/worksheets/sheet5.xml'] ?? false;
+            $sheetSixXml = $entries['xl/worksheets/sheet6.xml'] ?? false;
         }
         @unlink($tempFile);
 
         $this->assertNotFalse($sheetOneXml);
-        $this->assertNotFalse($sheetTwoXml);
+        $this->assertNotFalse($sheetFiveXml);
+        $this->assertNotFalse($sheetSixXml);
         $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetOneXml);
-        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Synthese des indicateurs', (string) $sheetOneXml);
+        $this->assertStringContainsString('Tableau 1 : Axes &amp; Objectifs strategiques', (string) $sheetOneXml);
+        $this->assertStringContainsString('Tableau 5 : Reporting synthetique', (string) $sheetFiveXml);
+        $this->assertStringContainsString('Tableau 6 : Alertes KPI sous seuil', (string) $sheetSixXml);
+        $this->assertStringContainsString('Action corrective', (string) $sheetSixXml);
     }
 
     public function test_reporting_hub_displays_super_admin_official_basis(): void
@@ -1036,7 +1169,7 @@ class WebWorkspaceTest extends TestCase
             ->get('/workspace/reporting')
             ->assertOk()
             ->assertSee('Base statistique : Toutes les actions visibles')
-            ->assertSee('Actions validees')
+            ->assertSee('Actions suivies')
             ->assertDontSee('statut_validation_min=validee_chef', false)
             ->assertDontSee('statut_validation=validee_direction', false)
             ->assertDontSee('Moyenne validee direction')

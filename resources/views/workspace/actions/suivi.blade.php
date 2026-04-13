@@ -5,6 +5,10 @@
         $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
         $actionStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
         $validationStatusLabel = static fn (string $status): string => \App\Support\UiLabel::validationStatus($status);
+        $contextOptions = \App\Models\Action::contextOptions();
+        $originOptions = \App\Models\Action::originOptions();
+        $contextValue = (string) ($action->contexte_action ?: \App\Models\Action::CONTEXT_PILOTAGE);
+        $originValue = (string) ($action->origine_action ?: \App\Models\Action::ORIGIN_PTA);
         $kpi = $action->actionKpi;
         $status = $action->statut_dynamique ?: 'non_demarre';
         $pta = $action->pta;
@@ -128,6 +132,10 @@
                         <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         Periode {{ optional($action->date_debut)->format('d/m/Y') ?: '-' }} -> {{ optional($action->date_fin)->format('d/m/Y') ?: '-' }}
                     </span>
+                    <span class="showcase-chip">
+                        <span class="showcase-chip-dot bg-slate-500"></span>
+                        {{ $contextOptions[$contextValue] ?? ucfirst($contextValue) }} / {{ $originOptions[$originValue] ?? $originValue }}
+                    </span>
                     <span class="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold {{ $statusClass }}">
                         {{ $actionStatusLabel($status) }}
                     </span>
@@ -231,6 +239,8 @@
                 <p class="text-slate-600">Titre: <strong>{{ $action->libelle }}</strong></p>
                 <p class="text-slate-600">Description: <strong>{{ $action->description ?: '-' }}</strong></p>
                 <p class="text-slate-600">Type cible: <strong>{{ $action->type_cible }}</strong></p>
+                <p class="text-slate-600">Contexte: <strong>{{ $contextOptions[$contextValue] ?? ucfirst($contextValue) }}</strong></p>
+                <p class="text-slate-600">Origine: <strong>{{ $originOptions[$originValue] ?? $originValue }}</strong></p>
                 <p class="text-slate-600">Statut metier: <strong>{{ $actionStatusLabel($action->statut ?: '-') }}</strong></p>
                 <p class="text-slate-600">Statut dynamique: <strong>{{ $actionStatusLabel($status) }}</strong></p>
             </article>

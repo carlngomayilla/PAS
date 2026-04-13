@@ -26,12 +26,14 @@
 
     @php
         $roleProfile = $roleProfile ?? ['eyebrow' => 'Pilotage global', 'title' => 'PAS / PAO / PTA', 'subtitle' => 'Vue de pilotage annuelle.', 'role_label' => strtoupper((string) ($scope['role'] ?? 'lecture'))];
+        $statisticalPolicy = is_array($statisticalPolicy ?? null) ? $statisticalPolicy : [];
         $officialPolicy = is_array($officialPolicy ?? null) ? $officialPolicy : [];
-        $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
+        $basePolicy = $statisticalPolicy !== [] ? $statisticalPolicy : $officialPolicy;
+        $officialBaseLabel = (string) ($basePolicy['scope_label'] ?? $basePolicy['threshold_label'] ?? 'Toutes les actions visibles');
         $officialBaseText = 'Base statistique : '.$officialBaseLabel;
         $officialAverageText = 'Moyenne sur '.$officialBaseLabel;
         $officialCompletedText = 'Achevees sur '.$officialBaseLabel;
-        $officialFilters = (array) ($officialPolicy['route_filters'] ?? []);
+        $officialFilters = (array) ($basePolicy['route_filters'] ?? []);
         $totalLinks = [
             'pas_total' => route('workspace.pas.index'),
             'paos_total' => route('workspace.pao.index'),

@@ -285,7 +285,7 @@ class WorkspaceNotificationService
                 $targets,
                 [
                     'title' => 'Action validee par la direction',
-                    'message' => sprintf('L action "%s" est officiellement comptabilisee.', (string) $action->libelle),
+                    'message' => sprintf('L action "%s" est comptabilisee dans les statistiques.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,

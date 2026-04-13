@@ -8,6 +8,6 @@ class SyncOrgUsersSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call(AnbgOrganizationSeeder::class);
+        $this->call(SyncOrgUsersPreservingPasswordsSeeder::class);
     }
 }

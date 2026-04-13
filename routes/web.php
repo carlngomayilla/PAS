@@ -223,6 +223,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.reporting');
         Route::get('/workspace/reporting/export/excel', [MonitoringWebController::class, 'exportExcel'])
             ->name('workspace.reporting.export.excel');
+        Route::get('/workspace/reporting/export/csv', [MonitoringWebController::class, 'exportCsv'])
+            ->name('workspace.reporting.export.csv');
         Route::get('/workspace/reporting/export/word', [MonitoringWebController::class, 'exportWord'])
             ->name('workspace.reporting.export.word');
         Route::get('/workspace/reporting/export/pdf', [MonitoringWebController::class, 'exportPdf'])

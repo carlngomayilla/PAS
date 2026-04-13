@@ -40,7 +40,14 @@
             'label' => 'Execution',
             'route' => 'workspace.actions.index',
             'icon' => 'bolt',
-            'active' => request()->routeIs('workspace.actions.*'),
+            'active' => request()->routeIs('workspace.actions.*') && request('vue') !== 'mes_actions',
+        ],
+        [
+            'label' => 'Mes actions',
+            'route' => 'workspace.actions.index',
+            'route_params' => ['vue' => 'mes_actions'],
+            'icon' => 'user',
+            'active' => request()->routeIs('workspace.actions.*') && request('vue') === 'mes_actions',
         ],
         [
             'label' => 'Pilotage',
@@ -95,7 +102,7 @@
       <div class="mb-6">
         @foreach ($mainItems as $item)
           <a
-            href="{{ route($item['route']) }}"
+            href="{{ route($item['route'], $item['route_params'] ?? []) }}"
             class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 {{ $item['active'] ? 'bg-[linear-gradient(135deg,#8fc043_0%,#f0e509_24%,#f9b13c_52%,#3996d3_78%,#1c203d_100%)] text-white shadow-lg shadow-[#3996d3]/35' : 'text-slate-200 hover:text-white hover:bg-white/8' }}"
           >
             <span class="opacity-90">{!! $svgs[$item['icon']] ?? $svgs['grid'] !!}</span>

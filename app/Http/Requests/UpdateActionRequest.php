@@ -45,6 +45,8 @@ class UpdateActionRequest extends FormRequest
             'frequence_execution' => ['required', Rule::in(ActionTrackingService::executionFrequencyOptions())],
             'date_echeance' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_debut'],
             'responsable_id' => ['required', 'integer', 'exists:users,id'],
+            'contexte_action' => ['nullable', Rule::in(array_keys(Action::contextOptions()))],
+            'origine_action' => ['nullable', Rule::in(array_keys(Action::originOptions()))],
 
             'statut' => ['nullable', Rule::in(['non_demarre', 'en_cours', 'suspendu', 'termine', 'annule'])],
             'statut_dynamique' => ['nullable', Rule::in(ActionTrackingService::dynamicStatusOptions())],
@@ -91,7 +93,19 @@ class UpdateActionRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $contexteAction = $this->input('contexte_action');
+        $contexteAction = $contexteAction === null || $contexteAction === ''
+            ? Action::CONTEXT_PILOTAGE
+            : (string) $contexteAction;
+
+        $origineAction = $this->input('origine_action');
+        $origineAction = $origineAction === null || $origineAction === ''
+            ? ($contexteAction === Action::CONTEXT_OPERATIONNEL ? Action::ORIGIN_INTERNE : Action::ORIGIN_PTA)
+            : (string) $origineAction;
+
         $this->merge([
+            'contexte_action' => $contexteAction,
+            'origine_action' => $origineAction,
             'financement_requis' => $this->boolean('financement_requis'),
             'ressource_main_oeuvre' => $this->boolean('ressource_main_oeuvre'),
             'ressource_equipement' => $this->boolean('ressource_equipement'),
@@ -246,14 +260,22 @@ class UpdateActionRequest extends FormRequest
 
             $pta = Pta::query()->find((int) $this->input('pta_id'));
             $responsableId = $this->input('responsable_id');
+            $contexteAction = (string) $this->input('contexte_action', Action::CONTEXT_PILOTAGE);
 
             if ($pta !== null && $responsableId !== null) {
                 $responsable = User::query()->find((int) $responsableId);
 
-                if ($responsable === null || ! $responsable->hasRole(User::ROLE_AGENT)) {
+                if ($responsable === null || ! (bool) ($responsable->is_active ?? true)) {
                     $validator->errors()->add(
                         'responsable_id',
-                        'Le responsable doit avoir le role agent.'
+                        'Le responsable doit etre un utilisateur actif.'
+                    );
+                } elseif ($contexteAction !== Action::CONTEXT_OPERATIONNEL
+                    && ! $responsable->hasRole(User::ROLE_AGENT)
+                ) {
+                    $validator->errors()->add(
+                        'responsable_id',
+                        'Le responsable doit avoir le role agent pour une action de pilotage.'
                     );
                 } elseif ($responsable->direction_id !== null
                     && (int) $responsable->direction_id !== (int) $pta->direction_id

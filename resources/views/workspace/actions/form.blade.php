@@ -7,6 +7,10 @@
         $targetTypeLabel = $targetTypeOptions[$targetType] ?? ucfirst($targetType);
         $selectedPta = $ptaOptions->firstWhere('id', (int) old('pta_id', $row->pta_id));
         $selectedResponsable = $responsableOptions->firstWhere('id', (int) old('responsable_id', $row->responsable_id));
+        $contextOptions = is_array($contextOptions ?? null) ? $contextOptions : \App\Models\Action::contextOptions();
+        $originOptions = is_array($originOptions ?? null) ? $originOptions : \App\Models\Action::originOptions();
+        $selectedContext = old('contexte_action', $row->contexte_action ?: \App\Models\Action::CONTEXT_PILOTAGE);
+        $selectedOrigin = old('origine_action', $row->origine_action ?: ($selectedContext === \App\Models\Action::CONTEXT_OPERATIONNEL ? \App\Models\Action::ORIGIN_INTERNE : \App\Models\Action::ORIGIN_PTA));
         $primaryKpi = $row->relationLoaded('primaryKpi') ? $row->primaryKpi : null;
         $derivedIndicatorUnit = trim((string) old('unite_cible', $row->unite_cible ?: $primaryKpi?->unite));
         $derivedIndicatorTarget = old('quantite_cible', $row->quantite_cible ?? $primaryKpi?->cible);
@@ -35,9 +39,9 @@
 
     <section class="showcase-summary-grid mb-4">
         <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Mode</p>
-            <p class="showcase-kpi-number">{{ $isEdit ? 'Edit.' : 'Nouv.' }}</p>
-            <p class="showcase-kpi-meta">{{ $isEdit ? 'Mise a jour d une action existante' : 'Creation d une action structurelle' }}</p>
+            <p class="showcase-kpi-label">Contexte</p>
+            <p class="showcase-kpi-number text-[1.35rem]">{{ $contextOptions[$selectedContext] ?? 'Pilotage' }}</p>
+            <p class="showcase-kpi-meta">{{ $selectedContext === \App\Models\Action::CONTEXT_OPERATIONNEL ? 'Action personnelle ou assignee' : 'Action de pilotage du PTA' }}</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">PTA cible</p>
@@ -85,7 +89,7 @@
                         </select>
                     </div>
                     <div>
-                        <label for="responsable_id">Agent responsable (RMO)</label>
+                        <label for="responsable_id">Responsable (RMO)</label>
                         <select id="responsable_id" name="responsable_id" required>
                             <option value="">Selectionner</option>
                             @foreach ($responsableOptions as $user)
@@ -97,15 +101,32 @@
                                     @if (!empty($user->agent_fonction))
                                         - {{ $user->agent_fonction }}
                                     @endif
-                                    ({{ $user->email }})
+                                    ({{ $user->roleLabel() }} - {{ $user->email }})
                                 </option>
                             @endforeach
                         </select>
                         @if ($responsableOptions->isEmpty())
                             <p class="field-hint text-[#f9b13c]">
-                                Aucun agent executant disponible pour votre perimetre.
+                                Aucun utilisateur actif disponible pour votre perimetre.
                             </p>
                         @endif
+                    </div>
+                    <div>
+                        <label for="contexte_action">Contexte fonctionnel</label>
+                        <select id="contexte_action" name="contexte_action" required>
+                            @foreach ($contextOptions as $value => $label)
+                                <option value="{{ $value }}" @selected($selectedContext === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <p class="field-hint">Pilotage = supervision. Operationnel = action propre du responsable.</p>
+                    </div>
+                    <div>
+                        <label for="origine_action">Origine</label>
+                        <select id="origine_action" name="origine_action" required>
+                            @foreach ($originOptions as $value => $label)
+                                <option value="{{ $value }}" @selected($selectedOrigin === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div>
                         <label for="date_debut">Date debut</label>
@@ -396,6 +417,8 @@
             var form = document.querySelector('form[data-is-edit]');
             var isEdit = form && form.getAttribute('data-is-edit') === '1';
             var typeSelect = document.getElementById('type_cible');
+            var contextSelect = document.getElementById('contexte_action');
+            var originSelect = document.getElementById('origine_action');
             var unitInput = document.getElementById('unite_cible');
             var quantityInput = document.getElementById('quantite_cible');
             var quantZone = document.getElementById('zone_quantitative');
@@ -512,8 +535,26 @@
                 setSectionState(autresRessourceBlock, enabled);
             }
 
+            function syncOriginFromContext() {
+                if (!contextSelect || !originSelect) {
+                    return;
+                }
+
+                if (contextSelect.value === 'operationnel' && originSelect.value === 'PTA') {
+                    originSelect.value = 'INTERNE';
+                }
+
+                if (contextSelect.value === 'pilotage' && originSelect.value === 'INTERNE') {
+                    originSelect.value = 'PTA';
+                }
+            }
+
             if (typeSelect) {
                 typeSelect.addEventListener('change', syncTargetZones);
+            }
+
+            if (contextSelect) {
+                contextSelect.addEventListener('change', syncOriginFromContext);
             }
 
             if (unitInput) {
@@ -535,6 +576,7 @@
             syncTargetZones();
             syncFinanceFields();
             syncAutresRessources();
+            syncOriginFromContext();
             syncIndicatorDerivations();
         })();
     </script>

@@ -479,12 +479,16 @@ class ActionTrackingWebController extends Controller
 
     private function canTrackWeekly(User $user, Action $action): bool
     {
-        return $user->isAgent()
-            && (int) $action->responsable_id === (int) $user->id;
+        return $action->isResponsible($user)
+            && ($user->isAgent() || $action->isOperationalContext());
     }
 
     private function canReadAction(User $user, Action $action): bool
     {
+        if ($action->isResponsible($user)) {
+            return true;
+        }
+
         if ($user->isAgent()) {
             return (int) $action->responsable_id === (int) $user->id;
         }
@@ -526,12 +530,16 @@ class ActionTrackingWebController extends Controller
 
     private function canSubmitClosure(User $user, Action $action): bool
     {
-        return $user->hasRole(User::ROLE_AGENT)
-            && (int) $action->responsable_id === (int) $user->id;
+        return $action->isResponsible($user)
+            && ($user->hasRole(User::ROLE_AGENT) || $action->isOperationalContext());
     }
 
     private function canReviewByChef(User $user, Action $action): bool
     {
+        if ($action->isResponsible($user)) {
+            return false;
+        }
+
         if (! $this->workflowSettings()->serviceValidationEnabled()) {
             return false;
         }
@@ -547,6 +555,10 @@ class ActionTrackingWebController extends Controller
 
     private function canReviewByDirection(User $user, Action $action): bool
     {
+        if ($action->isResponsible($user)) {
+            return false;
+        }
+
         if (! $this->workflowSettings()->directionValidationEnabled()) {
             return false;
         }

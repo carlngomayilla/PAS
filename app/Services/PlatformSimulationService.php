@@ -29,13 +29,13 @@ class PlatformSimulationService
             ->with('actionKpi:id,action_id,kpi_global')
             ->get();
 
-        $currentThreshold = $this->actionCalculationSettings->officialValidationStatus();
+        $currentThreshold = $this->actionCalculationSettings->statisticalScope();
         $simulatedThreshold = $currentThreshold;
 
-        $currentOfficial = $this->filterByThreshold($actions, $currentThreshold);
-        $simulatedOfficial = $currentOfficial;
-        $currentSummary = $this->metricSummary($currentOfficial);
-        $simulatedSummary = $this->metricSummary($simulatedOfficial);
+        $currentStatistical = $this->filterByThreshold($actions, $currentThreshold);
+        $simulatedStatistical = $currentStatistical;
+        $currentSummary = $this->metricSummary($currentStatistical);
+        $simulatedSummary = $this->metricSummary($simulatedStatistical);
 
         $currentClosureProgress = $this->actionManagementSettings->minProgressForClosure();
         $simulatedClosureProgress = max(0, min(100, (int) ($payload['actions_min_progress_for_closure'] ?? $currentClosureProgress)));
@@ -66,29 +66,40 @@ class PlatformSimulationService
 
         return [
             'current' => [
+                'statistical_basis_label' => $this->labelForThreshold($currentThreshold),
                 'official_basis_label' => $this->labelForThreshold($currentThreshold),
                 'workflow_chain_label' => $this->chainLabel($currentServiceEnabled, $currentDirectionEnabled),
-                'official_actions_total' => $currentOfficial->count(),
-                'official_completion_rate' => $this->completionRate($currentOfficial),
-                'official_average_score' => $this->averageScore($currentOfficial),
+                'statistical_actions_total' => $currentStatistical->count(),
+                'official_actions_total' => $currentStatistical->count(),
+                'statistical_completion_rate' => $this->completionRate($currentStatistical),
+                'official_completion_rate' => $this->completionRate($currentStatistical),
+                'statistical_average_score' => $this->averageScore($currentStatistical),
+                'official_average_score' => $this->averageScore($currentStatistical),
                 'min_progress_for_closure' => $currentClosureProgress,
                 'auto_complete_when_target_reached' => $currentAutoComplete,
                 'closure_eligible_actions' => $this->countClosureEligible($openActions, $currentClosureProgress),
             ],
             'simulated' => [
+                'statistical_basis_label' => $this->labelForThreshold($simulatedThreshold),
                 'official_basis_label' => $this->labelForThreshold($simulatedThreshold),
                 'workflow_chain_label' => $this->chainLabel($simulatedServiceEnabled, $simulatedDirectionEnabled),
-                'official_actions_total' => $simulatedOfficial->count(),
-                'official_completion_rate' => $this->completionRate($simulatedOfficial),
-                'official_average_score' => $this->averageScore($simulatedOfficial),
+                'statistical_actions_total' => $simulatedStatistical->count(),
+                'official_actions_total' => $simulatedStatistical->count(),
+                'statistical_completion_rate' => $this->completionRate($simulatedStatistical),
+                'official_completion_rate' => $this->completionRate($simulatedStatistical),
+                'statistical_average_score' => $this->averageScore($simulatedStatistical),
+                'official_average_score' => $this->averageScore($simulatedStatistical),
                 'min_progress_for_closure' => $simulatedClosureProgress,
                 'auto_complete_when_target_reached' => $simulatedAutoComplete,
                 'closure_eligible_actions' => $this->countClosureEligible($openActions, $simulatedClosureProgress),
             ],
             'impact' => [
-                'official_actions_delta' => $simulatedOfficial->count() - $currentOfficial->count(),
-                'official_completion_rate_delta' => round($this->completionRate($simulatedOfficial) - $this->completionRate($currentOfficial), 2),
-                'official_average_score_delta' => round($this->averageScore($simulatedOfficial) - $this->averageScore($currentOfficial), 2),
+                'statistical_actions_delta' => $simulatedStatistical->count() - $currentStatistical->count(),
+                'official_actions_delta' => $simulatedStatistical->count() - $currentStatistical->count(),
+                'statistical_completion_rate_delta' => round($this->completionRate($simulatedStatistical) - $this->completionRate($currentStatistical), 2),
+                'official_completion_rate_delta' => round($this->completionRate($simulatedStatistical) - $this->completionRate($currentStatistical), 2),
+                'statistical_average_score_delta' => round($this->averageScore($simulatedStatistical) - $this->averageScore($currentStatistical), 2),
+                'official_average_score_delta' => round($this->averageScore($simulatedStatistical) - $this->averageScore($currentStatistical), 2),
                 'closure_eligible_actions_delta' => $this->countClosureEligible($openActions, $simulatedClosureProgress) - $this->countClosureEligible($openActions, $currentClosureProgress),
                 'auto_complete_candidates' => $autoCompleteCandidates,
             ],
@@ -176,7 +187,7 @@ class PlatformSimulationService
                 return [
                     'format' => strtoupper($format),
                     'name' => (string) ($template?->name ?? 'Template non publie'),
-                    'reading_level' => (string) ($template?->reading_level ?? 'officiel'),
+                    'reading_level' => (string) ($template?->reading_level ?? 'consolide'),
                     'meta' => [
                         'graphs' => (bool) data_get($template?->meta_config, 'show_graphs', true),
                         'watermark' => (bool) data_get($template?->meta_config, 'show_watermark', false),
@@ -271,7 +282,7 @@ class PlatformSimulationService
 
     private function labelForThreshold(string $threshold): string
     {
-        return $this->actionCalculationSettings->officialValidationStatusOptions()[$threshold]
+        return $this->actionCalculationSettings->statisticalScopeOptions()[$threshold]
             ?? 'Toutes les actions visibles';
     }
 

@@ -528,6 +528,10 @@
                 box-shadow: var(--app-card-shadow-dark);
             }
 
+            .appearance-live-preview[data-theme='dark'] {
+                color: var(--app-dark-text-color, rgb(226 232 240));
+            }
+
             .appearance-live-preview-sidebar {
                 display: flex;
                 flex-direction: column;
@@ -583,6 +587,17 @@
                 border-bottom-color: rgb(var(--app-border-color-rgb) / 0.3);
             }
 
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-eyebrow,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-section-label,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-kpi-label,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-kpi-meta,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-chart-bar span,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-login-copy,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-meta-label,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-form-grid label {
+                color: var(--app-dark-muted-text-color, rgb(203 213 225));
+            }
+
             .appearance-live-preview-eyebrow,
             .appearance-live-preview-section-label,
             .appearance-live-preview-kpi-label {
@@ -633,6 +648,13 @@
             .appearance-live-preview[data-theme='dark'] .appearance-live-preview-card {
                 background: var(--app-card-surface-dark);
                 box-shadow: var(--app-card-shadow-dark);
+            }
+
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-title,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-section-head h4,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-kpi strong,
+            .appearance-live-preview[data-theme='dark'] .appearance-live-preview-table td {
+                color: var(--app-dark-strong-text-color, rgb(248 250 252));
             }
 
             .appearance-live-preview-kpi {
@@ -781,6 +803,7 @@
 
             .appearance-live-preview[data-theme='dark'] .appearance-live-preview-table th {
                 background: var(--app-table-head-bg-dark);
+                color: var(--app-dark-strong-text-color, rgb(248 250 252));
             }
 
             .appearance-live-preview-table tbody tr:hover td {

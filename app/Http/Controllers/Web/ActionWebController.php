@@ -58,6 +58,36 @@ class ActionWebController extends Controller
 
         $this->scopeAction($query, $user);
 
+        $viewMode = trim((string) $request->string('vue'));
+        if (! in_array($viewMode, ['', 'pilotage', 'mes_actions'], true)) {
+            $viewMode = '';
+        }
+
+        if ($viewMode === 'pilotage') {
+            $query->where('contexte_action', Action::CONTEXT_PILOTAGE);
+
+            if (! $user->isAgent()) {
+                $query->where(function (Builder $q) use ($user): void {
+                    $q->whereNull('responsable_id')
+                        ->orWhere('responsable_id', '!=', (int) $user->id);
+                });
+            }
+        }
+
+        if ($viewMode === 'mes_actions') {
+            $query->where('responsable_id', (int) $user->id);
+        }
+
+        $contextFilter = trim((string) $request->string('contexte_action'));
+        if ($contextFilter !== '' && in_array($contextFilter, array_keys(Action::contextOptions()), true)) {
+            $query->where('contexte_action', $contextFilter);
+        }
+
+        $originFilter = trim((string) $request->string('origine_action'));
+        if ($originFilter !== '' && in_array($originFilter, array_keys(Action::originOptions()), true)) {
+            $query->where('origine_action', $originFilter);
+        }
+
         $query->when(
             $request->filled('pta_id'),
             fn (Builder $q) => $q->where('pta_id', (int) $request->integer('pta_id'))
@@ -163,6 +193,8 @@ class ActionWebController extends Controller
             });
         });
 
+        $summary = $this->buildActionIndexSummary($query);
+
         $sort = (string) $request->string('sort');
         match ($sort) {
             'progression_desc' => $query->orderByDesc('progression_reelle')->orderByDesc('id'),
@@ -187,14 +219,22 @@ class ActionWebController extends Controller
             default => $query->orderByDesc('id'),
         };
 
+        $perPage = max(15, min(100, (int) $request->integer('per_page', 15)));
+
         return view('workspace.actions.index', [
-            'rows' => $query->paginate(15)->withQueryString(),
+            'rows' => $query->paginate($perPage)->withQueryString(),
+            'summary' => $summary,
             'ptaOptions' => $this->ptaOptions($user),
             'statusOptions' => array_merge(['achevees'], ActionTrackingService::dynamicStatusOptions()),
             'validationOptions' => $this->validationStatusOptions(),
+            'contextOptions' => Action::contextOptions(),
+            'originOptions' => Action::originOptions(),
             'sortOptions' => $this->sortOptions(),
             'canWrite' => $this->canWrite($user),
             'filters' => [
+                'vue' => $viewMode,
+                'contexte_action' => $contextFilter,
+                'origine_action' => $originFilter,
                 'q' => (string) $request->string('q'),
                 'pta_id' => $request->filled('pta_id') ? (int) $request->integer('pta_id') : null,
                 'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
@@ -212,6 +252,7 @@ class ActionWebController extends Controller
                     : null,
                 'without_kpi' => $request->boolean('without_kpi'),
                 'sort' => $sort,
+                'per_page' => $perPage,
             ],
         ]);
     }
@@ -232,6 +273,12 @@ class ActionWebController extends Controller
             'row' => new Action([
                 'type_cible' => 'quantitative',
                 'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
+                'contexte_action' => (string) $request->string('vue') === 'mes_actions'
+                    ? Action::CONTEXT_OPERATIONNEL
+                    : Action::CONTEXT_PILOTAGE,
+                'origine_action' => (string) $request->string('vue') === 'mes_actions'
+                    ? Action::ORIGIN_INTERNE
+                    : Action::ORIGIN_PTA,
                 'statut' => 'non_demarre',
                 'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
                 'financement_requis' => false,
@@ -240,6 +287,8 @@ class ActionWebController extends Controller
             'ptaOptions' => $this->ptaOptions($user),
             'responsableOptions' => $this->responsableOptions($user),
             'statusOptions' => ActionTrackingService::dynamicStatusOptions(),
+            'contextOptions' => Action::contextOptions(),
+            'originOptions' => Action::originOptions(),
             'indicatorPeriodicityOptions' => $this->indicatorPeriodicityOptions(),
             'indicatorModeOptions' => $this->indicatorInputModeOptions(),
             'targetTypeOptions' => $this->actionTargetTypeOptions(),
@@ -358,6 +407,8 @@ class ActionWebController extends Controller
             'ptaOptions' => $this->ptaOptions($user),
             'responsableOptions' => $this->responsableOptions($user),
             'statusOptions' => ActionTrackingService::dynamicStatusOptions(),
+            'contextOptions' => Action::contextOptions(),
+            'originOptions' => Action::originOptions(),
             'indicatorPeriodicityOptions' => $this->indicatorPeriodicityOptions(),
             'indicatorModeOptions' => $this->indicatorInputModeOptions(),
             'targetTypeOptions' => $this->actionTargetTypeOptions(),
@@ -527,6 +578,12 @@ class ActionWebController extends Controller
         $validated['frequence_execution'] = $validated['frequence_execution']
             ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
         $validated['seuil_alerte_progression'] = $validated['seuil_alerte_progression'] ?? 10;
+        $validated['contexte_action'] = (string) ($validated['contexte_action'] ?? Action::CONTEXT_PILOTAGE);
+        $validated['origine_action'] = (string) ($validated['origine_action'] ?? (
+            $validated['contexte_action'] === Action::CONTEXT_OPERATIONNEL
+                ? Action::ORIGIN_INTERNE
+                : Action::ORIGIN_PTA
+        ));
 
         $type = (string) ($validated['type_cible'] ?? '');
         if ($type === 'quantitative') {
@@ -649,7 +706,8 @@ class ActionWebController extends Controller
     private function responsableOptions(User $user)
     {
         $query = User::query()
-            ->where('role', User::ROLE_AGENT)
+            ->where('is_active', true)
+            ->orderBy('role')
             ->orderBy('name');
 
         if (! $user->hasGlobalReadAccess() && $user->direction_id !== null) {
@@ -693,6 +751,8 @@ class ActionWebController extends Controller
         );
 
         $query->where(function (Builder $scopedQuery) use ($user, $delegatedDirectionIds, $delegatedServiceScopes): void {
+            $scopedQuery->orWhere('responsable_id', (int) $user->id);
+
             if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
                 $scopedQuery->orWhereHas('pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
             }
@@ -711,6 +771,37 @@ class ActionWebController extends Controller
                     ->where('service_id', (int) $scope['service_id']));
             }
         });
+    }
+
+    /**
+     * @return array{total:int, avg_progression:float, avg_kpi_global:float, funded_count:int, status_counts:array<string, int>}
+     */
+    private function buildActionIndexSummary(Builder $query): array
+    {
+        $baseQuery = (clone $query)->toBase();
+
+        /** @var array<string, int> $statusCounts */
+        $statusCounts = (clone $baseQuery)
+            ->select('statut_dynamique as status_label')
+            ->selectRaw('COUNT(*) as total')
+            ->groupBy('statut_dynamique')
+            ->pluck('total', 'status_label')
+            ->map(fn ($value): int => (int) $value)
+            ->toArray();
+
+        $actionIdsQuery = (clone $query)->toBase()->select('actions.id');
+        $avgKpiGlobal = DB::query()
+            ->fromSub($actionIdsQuery, 'filtered_actions')
+            ->join('action_kpis', 'action_kpis.action_id', '=', 'filtered_actions.id')
+            ->avg('action_kpis.kpi_global');
+
+        return [
+            'total' => (int) (clone $baseQuery)->count(),
+            'avg_progression' => round((float) ((clone $baseQuery)->avg('progression_reelle') ?? 0), 2),
+            'avg_kpi_global' => round((float) ($avgKpiGlobal ?? 0), 2),
+            'funded_count' => (int) (clone $baseQuery)->where('financement_requis', true)->count(),
+            'status_counts' => $statusCounts,
+        ];
     }
 
     /**

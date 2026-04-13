@@ -12,8 +12,10 @@
     $pasConsolidation = $reporting['pasConsolidation'] ?? [];
     $interannualComparison = $reporting['interannualComparison'] ?? [];
     $reportingDetails = $reporting['details'] ?? ['structure_rapports' => collect()];
+    $statisticalPolicy = is_array(($reporting['statisticalPolicy'] ?? null)) ? $reporting['statisticalPolicy'] : [];
     $officialPolicy = is_array(($reporting['officialPolicy'] ?? null)) ? $reporting['officialPolicy'] : [];
-    $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
+    $basePolicy = $statisticalPolicy !== [] ? $statisticalPolicy : $officialPolicy;
+    $officialBaseLabel = (string) ($basePolicy['scope_label'] ?? $basePolicy['threshold_label'] ?? 'Toutes les actions visibles');
     $officialBaseLower = mb_strtolower($officialBaseLabel);
     $officialBaseText = 'Base statistique : '.$officialBaseLabel;
 

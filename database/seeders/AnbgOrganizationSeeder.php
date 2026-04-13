@@ -93,7 +93,7 @@ class AnbgOrganizationSeeder extends Seeder
     /**
      * @return array<int, array{code:string, libelle:string}>
      */
-    private function directions(): array
+    protected function directions(): array
     {
         return [
             ['code' => 'DG', 'libelle' => 'Direction Generale'],
@@ -109,7 +109,7 @@ class AnbgOrganizationSeeder extends Seeder
     /**
      * @return array<int, array{direction_code:string, code:string, libelle:string}>
      */
-    private function services(): array
+    protected function services(): array
     {
         return [
             ['direction_code' => 'DG', 'code' => 'DIRGEN', 'libelle' => 'Direction Generale'],
@@ -150,7 +150,7 @@ class AnbgOrganizationSeeder extends Seeder
      *     role:string
      * }>
      */
-    private function users(): array
+    protected function users(): array
     {
         return [
             ['name' => 'Super Administrateur PAS', 'email' => 'superadmin@anbg.ga', 'direction_code' => '', 'service_code' => null, 'fonction' => 'Super administration de la plateforme', 'role' => User::ROLE_SUPER_ADMIN],
@@ -244,7 +244,7 @@ class AnbgOrganizationSeeder extends Seeder
         ];
     }
 
-    private function buildMatricule(string $role, int $sequence): string
+    protected function buildMatricule(string $role, int $sequence): string
     {
         $prefix = match ($role) {
             User::ROLE_SUPER_ADMIN => 'SAD',

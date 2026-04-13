@@ -92,7 +92,7 @@ class SuperAdminWebController extends Controller
                 'templates_published' => (clone $templateQuery)->where('status', ExportTemplate::STATUS_PUBLISHED)->count(),
                 'assignments_active' => ExportTemplateAssignment::query()->where('is_active', true)->count(),
                 'system_changes' => JournalAudit::query()->whereIn('module', ['super_admin', 'export_template'])->count(),
-                'official_base' => $this->actionCalculationSettings->officialThresholdLabel(),
+                'official_base' => $this->actionCalculationSettings->statisticalScopeLabel(),
                 'default_theme' => $this->appearanceSettings->get('default_theme', 'dark'),
                 'default_locale' => $this->platformSettings->locale(),
                 'default_timezone' => $this->platformSettings->timezone(),
@@ -1807,7 +1807,7 @@ class SuperAdminWebController extends Controller
                 'actions_auto_complete_when_target_reached' => $this->actionManagementSettings->autoCompleteWhenTargetReached() ? '1' : '0',
                 'actions_min_progress_for_closure' => (string) $this->actionManagementSettings->minProgressForClosure(),
             ],
-            'officialBasisLabel' => $this->actionCalculationSettings->officialThresholdLabel(),
+            'officialBasisLabel' => $this->actionCalculationSettings->statisticalScopeLabel(),
             'simulation' => null,
         ]);
     }
@@ -2191,11 +2191,11 @@ class SuperAdminWebController extends Controller
         return view('workspace.super_admin.calculation', [
             'settings' => $this->actionCalculationSettings->all(),
             'summary' => [
-                'official_threshold_label' => $this->actionCalculationSettings->officialThresholdLabel(),
-                'official_scope_summary' => $this->actionCalculationSettings->officialScopeSummary(),
-                'official_route_filters' => $this->actionCalculationSettings->officialRouteFilters(),
+                'official_threshold_label' => $this->actionCalculationSettings->statisticalScopeLabel(),
+                'official_scope_summary' => $this->actionCalculationSettings->statisticalScopeSummary(),
+                'official_route_filters' => $this->actionCalculationSettings->statisticalRouteFilters(),
             ],
-            'statusOptions' => $this->actionCalculationSettings->officialValidationStatusOptions(),
+            'statusOptions' => $this->actionCalculationSettings->statisticalScopeOptions(),
         ]);
     }
 
@@ -2205,8 +2205,8 @@ class SuperAdminWebController extends Controller
         $this->denyUnlessSuperAdmin($user);
 
         $before = $this->actionCalculationSettings->all();
-        $after = $this->actionCalculationSettings->updateOfficialPolicy([
-            'actions_official_validation_status' => ActionCalculationSettings::OFFICIAL_SCOPE_ALL_VISIBLE,
+        $after = $this->actionCalculationSettings->updateStatisticalPolicy([
+            'actions_statistical_scope' => ActionCalculationSettings::STATISTICAL_SCOPE_ALL_VISIBLE,
         ], $user);
         $auditTarget = PlatformSetting::query()
             ->where('group', 'action_calculation')

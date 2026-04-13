@@ -10,6 +10,7 @@
         $blocks = old('include_cover') !== null ? null : ($template->blocks_config ?? []);
         $style = old('color_primary') !== null ? null : ($template->style_config ?? []);
         $content = old('visible_columns') !== null ? null : ($template->content_config ?? []);
+        $readingLevelLabels = ['interne' => 'Interne', 'provisoire' => 'Travail', 'valide' => 'Valide', 'officiel' => 'Consolide'];
     @endphp
 
     <section class="ui-card mb-3.5">
@@ -40,7 +41,7 @@
                     <div><label for="module">Module</label><select id="module" name="module" required>@foreach ($moduleOptions as $option)<option value="{{ $option }}" @selected(old('module', $template->module) === $option)>{{ $option }}</option>@endforeach</select></div>
                     <div><label for="report_type">Type de rapport</label><input id="report_type" name="report_type" type="text" value="{{ old('report_type', $template->report_type ?: 'consolidated_reporting') }}" required></div>
                     <div><label for="target_profile">Profil cible</label><select id="target_profile" name="target_profile"><option value="">Tous profils</option>@foreach ($profileOptions as $option)<option value="{{ $option }}" @selected(old('target_profile', $template->target_profile) === $option)>{{ $option }}</option>@endforeach</select></div>
-                    <div><label for="reading_level">Niveau</label><select id="reading_level" name="reading_level"><option value="">Non borne</option>@foreach ($readingLevelOptions as $option)<option value="{{ $option }}" @selected(old('reading_level', $template->reading_level) === $option)>{{ $option }}</option>@endforeach</select></div>
+                    <div><label for="reading_level">Niveau</label><select id="reading_level" name="reading_level"><option value="">Non borne</option>@foreach ($readingLevelOptions as $option)<option value="{{ $option }}" @selected(old('reading_level', $template->reading_level) === $option)>{{ $readingLevelLabels[$option] ?? $option }}</option>@endforeach</select></div>
                     <div class="flex items-end gap-3"><label class="checkbox-pill !mb-0"><input name="is_default" type="checkbox" value="1" @checked(old('is_default', $template->is_default))>Template par defaut</label><label class="checkbox-pill !mb-0"><input name="is_active" type="checkbox" value="1" @checked(old('is_active', $template->exists ? (int) $template->is_active : 1))>Actif</label></div>
                     <div class="md:col-span-2 xl:col-span-4"><label for="description">Description</label><textarea id="description" name="description" rows="3">{{ old('description', $template->description) }}</textarea></div>
                 </div>

@@ -314,6 +314,42 @@ function bootDashboardRender() {
     delete chartInstances[id];
   }
 
+  function chartDatasetHasData(dataset) {
+    if (!dataset || typeof dataset !== 'object') {
+      return false;
+    }
+
+    if (Array.isArray(dataset.data) && dataset.data.length > 0) {
+      return true;
+    }
+
+    if (Array.isArray(dataset.tree) && dataset.tree.length > 0) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function chartConfigHasData(config) {
+    const chartData = config?.data || {};
+
+    if (Array.isArray(chartData.datasets) && chartData.datasets.length > 0) {
+      return chartData.datasets.some(chartDatasetHasData);
+    }
+
+    return Array.isArray(chartData.labels) && chartData.labels.length > 0;
+  }
+
+  function mountChartEmptyState(host, message) {
+    host.innerHTML = '';
+    host.dataset.chartState = 'empty';
+
+    const empty = document.createElement('div');
+    empty.className = 'dashboard-chart-empty';
+    empty.textContent = message || host.dataset.emptyMessage || 'Aucune donnee disponible pour ce graphique.';
+    host.appendChild(empty);
+  }
+
   function metricSortKey(label) {
     const normalized = String(label || '').toLowerCase();
 
@@ -426,15 +462,26 @@ function bootDashboardRender() {
   function mountChart(id, config, drilldownResolver = null) {
     const host = document.getElementById(id);
 
-    if (!host || typeof window.Chart === 'undefined') {
+    if (!host) {
       return;
     }
 
     destroyChart(id);
     host.innerHTML = '';
 
+    if (typeof window.Chart === 'undefined') {
+      mountChartEmptyState(host, 'Moteur graphique indisponible.');
+      return;
+    }
+
+    if (!chartConfigHasData(config)) {
+      mountChartEmptyState(host);
+      return;
+    }
+
     const canvas = document.createElement('canvas');
     host.appendChild(canvas);
+    host.dataset.chartState = 'ready';
 
     chartInstances[id] = new window.Chart(canvas, config);
     bindChartDrilldown(chartInstances[id], drilldownResolver);
