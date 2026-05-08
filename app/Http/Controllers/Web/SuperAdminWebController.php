@@ -1374,7 +1374,6 @@ class SuperAdminWebController extends Controller
                 'actions' => 'Actions',
                 'alertes' => 'Alertes',
                 'reporting' => 'Reporting',
-                'pilotage' => 'Pilotage',
             ],
         ]);
     }
@@ -1399,7 +1398,7 @@ class SuperAdminWebController extends Controller
                 $rules['profiles.'.$role.'.cards.'.$code.'.order'] = ['required', 'integer', 'min:1', 'max:999'];
                 $rules['profiles.'.$role.'.cards.'.$code.'.size'] = ['nullable', Rule::in(['sm', 'md', 'lg'])];
                 $rules['profiles.'.$role.'.cards.'.$code.'.tone'] = ['nullable', Rule::in(['auto', 'neutral', 'info', 'success', 'warning', 'danger'])];
-                $rules['profiles.'.$role.'.cards.'.$code.'.target_route'] = ['nullable', Rule::in(['dashboard', 'actions', 'alertes', 'reporting', 'pilotage', ''])];
+                $rules['profiles.'.$role.'.cards.'.$code.'.target_route'] = ['nullable', Rule::in(['dashboard', 'actions', 'alertes', 'reporting', ''])];
                 $rules['profiles.'.$role.'.cards.'.$code.'.target_filters'] = ['nullable', 'string', 'max:255'];
             }
         }
@@ -1772,7 +1771,7 @@ class SuperAdminWebController extends Controller
 
         if ($request->boolean('partial_restore') && $selectedGroups === []) {
             return back()->withErrors([
-                'groups' => 'Selectionnez au moins un groupe a restaurer.',
+                'groups' => 'Sélectionnez au moins un groupe à restaurer.',
             ]);
         }
 
@@ -2927,8 +2926,8 @@ class SuperAdminWebController extends Controller
                 'dynamic_variables' => $dynamicVariables,
             ],
             'style_config' => [
-                'color_primary' => (string) (($validated['color_primary'] ?? null) ?: '#1E3A8A'),
-                'color_secondary' => (string) (($validated['color_secondary'] ?? null) ?: '#3B82F6'),
+                'color_primary' => (string) (($validated['color_primary'] ?? null) ?: '#1C203D'),
+                'color_secondary' => (string) (($validated['color_secondary'] ?? null) ?: '#3996D3'),
                 'font_family' => (string) (($validated['font_family'] ?? null) ?: 'Inter'),
             ],
             'meta_config' => [
@@ -3181,10 +3180,13 @@ class SuperAdminWebController extends Controller
     {
         $permissions = $this->rolePermissionSettings->forRole($role);
         $baseRole = $this->roleRegistry->baseRole($role);
+        $isTechnicalAdmin = in_array($baseRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN], true);
+        $isPlanification = $baseRole === User::ROLE_PLANIFICATION;
+        $isCabinet = $baseRole === User::ROLE_CABINET;
 
         return collect($this->workspaceModuleSettings->configuredModules())
             ->sortBy('order')
-            ->filter(function (array $module) use ($permissions, $baseRole): bool {
+            ->filter(function (array $module) use ($permissions, $baseRole, $isTechnicalAdmin, $isPlanification, $isCabinet): bool {
                 if (! ($module['enabled'] ?? false) && ($module['code'] ?? null) !== 'super_admin') {
                     return false;
                 }
@@ -3194,20 +3196,48 @@ class SuperAdminWebController extends Controller
                     'messagerie' => in_array('messagerie.read', $permissions, true),
                     'pas', 'pao', 'pta' => in_array('planning.read', $permissions, true),
                     'execution' => in_array('planning.read', $permissions, true) || $baseRole === User::ROLE_AGENT,
-                    'alertes' => in_array('planning.read', $permissions, true) && in_array('alerts.read', $permissions, true),
-                    'reporting' => in_array('planning.read', $permissions, true) && in_array('reporting.read', $permissions, true),
-                    'referentiel' => collect(['referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles'])
+                    'referentiel' => ($isTechnicalAdmin || $isPlanification) && collect(['referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles'])
                         ->contains(fn (string $permission): bool => in_array($permission, $permissions, true)),
-                    'audit' => in_array('audit.read', $permissions, true),
-                    'api_docs' => in_array('api_docs.read', $permissions, true),
-                    'retention' => collect(['retention.read', 'retention.manage'])
+                    'audit' => ($isTechnicalAdmin || $isCabinet) && in_array('audit.read', $permissions, true),
+                    'api_docs' => $isTechnicalAdmin && in_array('api_docs.read', $permissions, true),
+                    'retention' => $isTechnicalAdmin && collect(['retention.read', 'retention.manage'])
                         ->contains(fn (string $permission): bool => in_array($permission, $permissions, true)),
-                    'delegations' => in_array('delegations.manage', $permissions, true),
+                    'delegations' => ($isTechnicalAdmin || $isPlanification || in_array($baseRole, [User::ROLE_DIRECTION, User::ROLE_SERVICE], true))
+                        && in_array('delegations.manage', $permissions, true),
                     default => false,
                 };
             })
             ->map(fn (array $module): array => Arr::only($module, ['code', 'label', 'description']))
             ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $matrix
+     * @return array<string, array<int, string>>
+     */
+    private function customRolePermissionSnapshot(array $matrix): array
+    {
+        $customRoleCodes = array_keys($this->roleRegistry->customRoles());
+        if ($customRoleCodes === []) {
+            return [];
+        }
+
+        return collect($matrix)
+            ->only($customRoleCodes)
+            ->map(function ($permissions): array {
+                if (! is_array($permissions)) {
+                    return [];
+                }
+
+                return collect($permissions)
+                    ->map(fn ($permission): string => trim((string) $permission))
+                    ->filter(fn (string $permission): bool => $permission !== '')
+                    ->unique()
+                    ->values()
+                    ->all();
+            })
+            ->sortKeys()
             ->all();
     }
 

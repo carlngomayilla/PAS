@@ -84,7 +84,7 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
                 'name' => $user['name'],
                 'role' => $user['role'],
                 'is_agent' => $user['role'] === User::ROLE_AGENT,
-                'agent_matricule' => $this->buildMatricule($user['role'], $index + 1),
+                'agent_matricule' => $this->resolveMatricule($user, $index + 1),
                 'agent_fonction' => $user['fonction'],
                 'agent_telephone' => null,
                 'direction_id' => $directionId,
@@ -108,7 +108,7 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
                 'password' => $defaultPassword,
                 'role' => $user['role'],
                 'is_agent' => $user['role'] === User::ROLE_AGENT,
-                'agent_matricule' => $this->buildMatricule($user['role'], $index + 1),
+                'agent_matricule' => $this->resolveMatricule($user, $index + 1),
                 'agent_fonction' => $user['fonction'],
                 'agent_telephone' => null,
                 'direction_id' => $directionId,
@@ -119,5 +119,7 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
                 'updated_at' => $now,
             ]);
         }
+
+        $this->deleteLegacyOrganizationEntries($now);
     }
 }

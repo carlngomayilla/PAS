@@ -3,7 +3,7 @@
     'subtitle' => null,
     'hostId' => null,
     'height' => '320px',
-    'empty' => 'Aucune donnee disponible pour ce graphique.',
+    'empty' => 'Aucune donnée disponible pour votre périmètre.',
 ])
 
 <x-ui.section-card :title="$title" :subtitle="$subtitle" {{ $attributes->merge(['class' => 'mb-4']) }}>

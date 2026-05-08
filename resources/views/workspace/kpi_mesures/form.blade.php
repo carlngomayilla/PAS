@@ -4,12 +4,12 @@
     @php
         $isEdit = $mode === 'edit';
     @endphp
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <h1>{{ $isEdit ? 'Modifier mesure indicateur' : 'Nouvelle mesure indicateur' }}</h1>
         <p class="text-slate-600">Saisir une valeur sur un indicateur ouvert a la collecte.</p>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.kpi-mesures.update', $row) : route('workspace.kpi-mesures.store') }}">
             @csrf
             @if ($isEdit)
@@ -23,7 +23,7 @@
                     <div>
                         <label for="kpi_id">Indicateur</label>
                         <select id="kpi_id" name="kpi_id" required>
-                            <option value="">Selectionner</option>
+                            <option value="">Sélectionner</option>
                             @foreach ($kpiOptions as $kpi)
                                 <option
                                     value="{{ $kpi->id }}"
@@ -40,9 +40,8 @@
                         @endif
                     </div>
                     <div id="periode_block" class="conditional-block">
-                        <label for="periode">Periode</label>
+                        <label for="periode">Période</label>
                         <input id="periode" name="periode" type="text" maxlength="20" value="{{ old('periode', $row->periode) }}" required>
-                        <p id="periode_hint" class="field-hint">Format selon periodicite.</p>
                     </div>
                     <div>
                         <label for="valeur">Valeur</label>
@@ -68,7 +67,7 @@
             </div>
 
             <div class="form-actions">
-                <button class="btn btn-primary" id="submit_mesure_button" type="submit" @disabled(! $isEdit && $kpiOptions->isEmpty())>{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <button class="btn btn-primary" id="submit_mesure_button" type="submit" @disabled(! $isEdit && $kpiOptions->isEmpty())>{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.kpi-mesures.index') }}">Retour</a>
             </div>
         </form>
@@ -76,7 +75,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script @cspNonce>
         (function () {
             var kpiSelect = document.getElementById('kpi_id');
             var periodeInput = document.getElementById('periode');
@@ -102,7 +101,7 @@
                 }
             }
 
-            function syncPeriodeField() {
+            function syncPériodeField() {
                 if (!kpiSelect || !periodeInput || !periodeHint || !periodeBlock) {
                     return;
                 }
@@ -147,16 +146,16 @@
                         periodeInput.placeholder = 'AAAA';
                         break;
                     default:
-                        periodeInput.placeholder = 'Periode';
+                        periodeInput.placeholder = 'Période';
                         break;
                 }
             }
 
             if (kpiSelect) {
-                kpiSelect.addEventListener('change', syncPeriodeField);
+                kpiSelect.addEventListener('change', syncPériodeField);
             }
 
-            syncPeriodeField();
+            syncPériodeField();
         })();
     </script>
 @endpush

@@ -15,7 +15,7 @@
                     <div>
                         <label for="delegant_id">Delegant</label>
                         <select id="delegant_id" name="delegant_id" required>
-                            <option value="">Selectionner...</option>
+                            <option value="">Sélectionner...</option>
                             @foreach ($delegantOptions as $option)
                                 <option value="{{ $option->id }}" @selected(old('delegant_id') == $option->id)>
                                     {{ $option->name }} - {{ $option->roleLabel() }}
@@ -26,7 +26,7 @@
                     <div>
                         <label for="delegue_id">Delegue</label>
                         <select id="delegue_id" name="delegue_id" required>
-                            <option value="">Selectionner...</option>
+                            <option value="">Sélectionner...</option>
                             @foreach ($delegateOptions as $option)
                                 <option value="{{ $option->id }}" @selected(old('delegue_id') == $option->id)>
                                     {{ $option->name }} - {{ $option->roleLabel() }}
@@ -44,7 +44,7 @@
                     <div>
                         <label for="direction_id">Direction</label>
                         <select id="direction_id" name="direction_id" required>
-                            <option value="">Selectionner...</option>
+                            <option value="">Sélectionner...</option>
                             @foreach ($directionOptions as $option)
                                 <option value="{{ $option->id }}" @selected(old('direction_id') == $option->id)>
                                     {{ $option->code }} - {{ $option->libelle }}
@@ -55,7 +55,7 @@
                     <div>
                         <label for="service_id">Service</label>
                         <select id="service_id" name="service_id">
-                            <option value="">Selectionner...</option>
+                            <option value="">Sélectionner...</option>
                             @foreach ($serviceOptions as $option)
                                 <option value="{{ $option->id }}" @selected(old('service_id') == $option->id)>
                                     {{ $option->code }} - {{ $option->libelle }}

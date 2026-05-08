@@ -20,7 +20,7 @@ class ReportingAnalyticsServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_consolidation_progression_only_uses_direction_validated_actions(): void
+    public function test_consolidation_progression_uses_all_visible_actions_without_official_split(): void
     {
         [$admin, $pta] = $this->createPlanningFixture();
 
@@ -62,11 +62,11 @@ class ReportingAnalyticsServiceTest extends TestCase
 
         $payload = app(ReportingAnalyticsService::class)->buildPayload($admin, false, false);
 
-        $this->assertSame(1, $payload['global']['actions_validees']);
+        $this->assertSame(2, $payload['global']['actions_validees']);
         $this->assertCount(1, $payload['pasConsolidation']);
-        $this->assertSame(80.0, (float) $payload['pasConsolidation'][0]['progression_moyenne']);
+        $this->assertSame(50.0, (float) $payload['pasConsolidation'][0]['progression_moyenne']);
         $this->assertCount(1, $payload['interannualComparison']);
-        $this->assertSame(80.0, (float) $payload['interannualComparison'][0]['progression_moyenne']);
+        $this->assertSame(50.0, (float) $payload['interannualComparison'][0]['progression_moyenne']);
     }
 
     /**

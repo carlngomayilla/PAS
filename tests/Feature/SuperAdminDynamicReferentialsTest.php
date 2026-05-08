@@ -18,7 +18,7 @@ class SuperAdminDynamicReferentialsTest extends TestCase
         $this->seed();
     }
 
-    public function test_super_admin_can_update_dynamic_referentials_and_the_action_form_reflects_them(): void
+    public function test_super_admin_can_update_dynamic_referentials_while_action_creation_stays_in_pta(): void
     {
         $superAdmin = $this->createSuperAdminUser();
         $admin = $this->createAdminUser();
@@ -75,16 +75,11 @@ class SuperAdminDynamicReferentialsTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('workspace.actions.create'))
-            ->assertOk()
-            ->assertSee('Quantifiee')
-            ->assertSee('Qualifiee')
-            ->assertSee('inspections terrain')
-            ->assertSee('%')
-            ->assertSee('points');
+            ->assertRedirect(route('workspace.pta.index'));
 
         $this->actingAs($admin)
             ->get(route('workspace.kpi.create'))
-            ->assertRedirect(route('workspace.actions.create').'#action-indicator-settings');
+            ->assertRedirect(route('workspace.pta.index'));
     }
 
     public function test_admin_cannot_access_dynamic_referential_settings(): void

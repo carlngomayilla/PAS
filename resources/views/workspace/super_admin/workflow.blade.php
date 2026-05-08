@@ -3,7 +3,7 @@
 @section('title', 'Workflow et validations')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
@@ -59,7 +59,7 @@
         </article>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="POST" action="{{ route('workspace.super-admin.workflow.update') }}" class="form-shell">
             @csrf
             @method('PUT')
@@ -67,7 +67,7 @@
             <div class="form-section">
                 <h2 class="form-section-title">Circuit des actions</h2>
                 <div class="grid gap-4 md:grid-cols-2">
-                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200">
+                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
                         <input
                             class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             type="checkbox"
@@ -76,12 +76,12 @@
                             @checked(($settings['actions_service_validation_enabled'] ?? '1') === '1')
                         >
                         <span>
-                            <strong class="block text-slate-900 dark:text-slate-100">Activer la validation chef de service</strong>
-                            <span class="mt-1 block text-slate-500 dark:text-slate-400">Si desactivee, la soumission agent part directement a la direction ou devient finale selon le reste du circuit.</span>
+                            <strong class="block text-slate-900">Activer la validation chef de service</strong>
+                            <span class="mt-1 block text-slate-500">Si desactivee, la soumission agent part directement a la direction ou devient finale selon le reste du circuit.</span>
                         </span>
                     </label>
 
-                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200">
+                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
                         <input
                             class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             type="checkbox"
@@ -90,12 +90,12 @@
                             @checked(($settings['actions_direction_validation_enabled'] ?? '1') === '1')
                         >
                         <span>
-                            <strong class="block text-slate-900 dark:text-slate-100">Activer la validation direction</strong>
-                            <span class="mt-1 block text-slate-500 dark:text-slate-400">Si desactivee, le chef de service devient l etape finale du circuit lorsqu il est actif.</span>
+                            <strong class="block text-slate-900">Activer la validation direction</strong>
+                            <span class="mt-1 block text-slate-500">Si desactivee, le chef de service devient l'étape finale du circuit lorsqu il est actif.</span>
                         </span>
                     </label>
 
-                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 md:col-span-2">
+                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700 md:col-span-2">
                         <input
                             class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             type="checkbox"
@@ -104,8 +104,8 @@
                             @checked(($settings['actions_rejection_comment_required'] ?? '1') === '1')
                         >
                         <span>
-                            <strong class="block text-slate-900 dark:text-slate-100">Rendre le motif de rejet obligatoire</strong>
-                            <span class="mt-1 block text-slate-500 dark:text-slate-400">Quand cette regle est active, une validation de rejet sans commentaire est refusee en web comme en API.</span>
+                            <strong class="block text-slate-900">Rendre le motif de rejet obligatoire</strong>
+                            <span class="mt-1 block text-slate-500">Quand cette regle est active, une validation de rejet sans commentaire est refusée en web comme en API.</span>
                         </span>
                     </label>
                 </div>
@@ -116,7 +116,7 @@
                 <p class="form-section-subtitle">Chaque module peut conserver le workflow complet, s arreter a la validation, ou autoriser une validation directe sans etape `soumis`.</p>
                 <div class="grid gap-4 md:grid-cols-3">
                     @foreach (['pas' => 'PAS', 'pao' => 'PAO', 'pta' => 'PTA'] as $module => $label)
-                        <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/40">
+                        <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
                             <label for="{{ $module }}_workflow_mode">{{ $label }}</label>
                             <select id="{{ $module }}_workflow_mode" name="{{ $module }}_workflow_mode" class="mt-2">
                                 @foreach ($planningModes as $mode => $modeLabel)

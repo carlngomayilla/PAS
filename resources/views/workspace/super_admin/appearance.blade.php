@@ -25,7 +25,7 @@
             ->implode('; ');
     @endphp
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
@@ -73,7 +73,7 @@
 
                 <div class="form-section">
                     <h2 class="form-section-title">Texte et surfaces</h2>
-                    <p class="form-section-subtitle">Controle des tons de lecture, fonds de cartes et champs de saisie.</p>
+                    <p class="form-section-subtitle">Contrôle des tons de lecture, fonds de cartes et champs de saisie.</p>
                     <div class="form-grid">
                         @foreach ($surfaceFields as $key => $label)
                             <div>
@@ -108,7 +108,7 @@
                             </select>
                         </div>
                         <div>
-                            <label for="default_theme">Theme par defaut</label>
+                            <label for="default_theme">Thème par défaut</label>
                             <select id="default_theme" name="default_theme">
                                 @foreach ($themeOptions as $value => $label)
                                     <option value="{{ $value }}" @selected(old('default_theme', $settings['default_theme']) === $value)>{{ $label }}</option>
@@ -301,7 +301,7 @@
                             <div class="appearance-live-preview-content">
                                 <div class="appearance-live-preview-kpis">
                                     <article class="appearance-live-preview-kpi">
-                                        <span class="appearance-live-preview-kpi-label">Execution</span>
+                                        <span class="appearance-live-preview-kpi-label">Exécution</span>
                                         <strong>82%</strong>
                                         <span class="appearance-live-preview-kpi-meta">Lecture consolidee</span>
                                     </article>
@@ -354,7 +354,7 @@
                         <div class="appearance-live-preview-login-hero">
                             <p class="appearance-live-preview-eyebrow">Acces plateforme</p>
                             <h3 class="appearance-live-preview-title">Page de connexion</h3>
-                            <p class="appearance-live-preview-login-copy">Controle la lecture du hero, des champs et du formulaire public.</p>
+                            <p class="appearance-live-preview-login-copy">Contrôle la lecture du hero, des champs et du formulaire public.</p>
                         </div>
                         <article class="appearance-live-preview-login-card">
                             <div>
@@ -399,7 +399,7 @@
                                 <tbody>
                                     <tr><td>Numerisation des dossiers</td><td>DSIC</td><td>76%</td><td>En cours</td></tr>
                                     <tr><td>Cadre budgetaire</td><td>DAF</td><td>54%</td><td>A risque</td></tr>
-                                    <tr><td>Suivi des bourses</td><td>DS</td><td>91%</td><td>Validee</td></tr>
+                                    <tr><td>Suivi des bourses</td><td>DS</td><td>91%</td><td>Validée</td></tr>
                                 </tbody>
                             </table>
                         </section>
@@ -869,7 +869,7 @@
     @endpush
 
     @push('scripts')
-        <script>
+        <script @cspNonce>
             (function () {
                 var form = document.getElementById('appearance-form');
                 var previewRoot = document.getElementById('appearance-live-preview');

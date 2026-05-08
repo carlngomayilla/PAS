@@ -38,8 +38,8 @@
 @endsection
 
 @push('scripts')
-    <script src="{{ asset('vendor/swagger-ui/swagger-ui-bundle.js') }}"></script>
-    <script>
+    <script @cspNonce src="{{ asset('vendor/swagger-ui/swagger-ui-bundle.js') }}"></script>
+    <script @cspNonce>
         (function () {
             var container = document.getElementById('swagger-ui');
             if (!container || typeof window.SwaggerUIBundle !== 'function') {

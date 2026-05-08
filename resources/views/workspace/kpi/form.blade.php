@@ -4,12 +4,12 @@
     @php
         $isEdit = $mode === 'edit';
     @endphp
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <h1>{{ $isEdit ? 'Modifier indicateur' : 'Nouvel indicateur' }}</h1>
         <p class="text-slate-600">Configurer l indicateur principal de suivi.</p>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.kpi.update', $row) : route('workspace.kpi.store') }}">
             @csrf
             @if ($isEdit)
@@ -23,7 +23,7 @@
                     <div>
                         <label for="action_id">Action</label>
                         <select id="action_id" name="action_id" required>
-                            <option value="">Selectionner</option>
+                            <option value="">Sélectionner</option>
                             @foreach ($actionOptions as $action)
                                 <option value="{{ $action->id }}" @selected((int) old('action_id', $row->action_id) === $action->id)>
                                     #{{ $action->id }} - {{ $action->libelle }}
@@ -72,7 +72,7 @@
             </div>
 
             <div class="form-actions">
-                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.kpi.index') }}">Retour</a>
             </div>
         </form>
@@ -80,7 +80,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script @cspNonce>
         (function () {
             var cibleInput = document.getElementById('cible');
             var seuilInput = document.getElementById('seuil_alerte');

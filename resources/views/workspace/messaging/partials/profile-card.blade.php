@@ -20,10 +20,10 @@
             @endif
             <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                    <p class="truncate text-base font-semibold text-slate-950 dark:text-slate-50">{{ $cardUser->name }}</p>
+                    <p class="truncate text-base font-semibold text-slate-950">{{ $cardUser->name }}</p>
                     <span class="anbg-badge {{ $presence['tone'] === 'success' ? 'anbg-badge-success' : ($presence['tone'] === 'info' ? 'anbg-badge-info' : 'anbg-badge-neutral') }}">{{ $presence['label'] }}</span>
                 </div>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $cardUser->agent_fonction ?: 'Fonction non renseignee' }}</p>
+                <p class="mt-1 text-sm text-slate-500">{{ $cardUser->agent_fonction ?: 'Fonction non renseignee' }}</p>
             </div>
         </div>
 
@@ -58,7 +58,7 @@
             </div>
             <div class="showcase-data-point">
                 <p class="showcase-data-key">Derniere activite</p>
-                <p class="showcase-data-value">{{ $presence['last_activity']?->diffForHumans() ?? 'Aucune session recente' }}</p>
+                <p class="showcase-data-value">{{ $presence['last_activity']?->diffForHumans() ?? 'Aucune session récente' }}</p>
             </div>
         </div>
 
@@ -76,7 +76,7 @@
 
     <div class="mt-5">
         <div class="mb-3 flex items-center justify-between gap-3">
-            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Collaborateurs lies</h3>
+            <h3 class="text-sm font-semibold text-slate-900">Collaborateurs lies</h3>
             <span class="anbg-badge anbg-badge-neutral">{{ $relatedUsers->count() }}</span>
         </div>
         <div class="space-y-2.5">
@@ -86,19 +86,19 @@
                     class="messaging-related-user"
                 >
                     <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{{ $relatedUser->name }}</p>
-                        <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $relatedUser->agent_fonction ?: $relatedUser->roleLabel() }}</p>
+                        <p class="truncate text-sm font-medium text-slate-900">{{ $relatedUser->name }}</p>
+                        <p class="truncate text-xs text-slate-500">{{ $relatedUser->agent_fonction ?: $relatedUser->roleLabel() }}</p>
                     </div>
                     <span class="text-xs text-slate-400">Voir</span>
                 </a>
             @empty
-                <p class="text-sm text-slate-500 dark:text-slate-400">Aucun collaborateur lie dans le meme perimetre.</p>
+                <p class="text-sm text-slate-500">Aucun collaborateur lie dans le meme perimetre.</p>
             @endforelse
         </div>
     </div>
 @else
     <div class="messaging-empty-state">
-        <p class="font-medium text-slate-900 dark:text-slate-100">Aucun collaborateur selectionne.</p>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Selectionnez un contact pour afficher sa fiche detaillee et lancer un echange.</p>
+        <p class="font-medium text-slate-900">Aucun collaborateur selectionne.</p>
+        <p class="mt-1 text-sm text-slate-500">Sélectionnez un contact pour afficher sa fiche détaillée et lancer un échange.</p>
     </div>
 @endif

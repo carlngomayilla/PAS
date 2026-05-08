@@ -1,19 +1,26 @@
 @extends('layouts.workspace')
 
 @section('content')
+    @php
+        $summaryCards = [
+            ['label' => 'Entrees filtrees', 'value' => $summary['total'] ?? 0, 'href' => route('workspace.audit.index', request()->query())],
+            ['label' => 'Utilisateurs distincts', 'value' => $summary['distinct_users'] ?? 0, 'href' => route('workspace.audit.index', request()->query())],
+            ['label' => 'Actions Super Admin', 'value' => $summary['super_admin_actions'] ?? 0, 'href' => route('workspace.audit.index', request()->query())],
+            ['label' => 'Actions sensibles', 'value' => $summary['sensitive_actions'] ?? 0, 'href' => route('workspace.audit.index', request()->query())],
+        ];
+    @endphp
     <div class="app-screen-flow">
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <h1>Journal d'audit</h1>
     </section>
 
-    <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5 app-screen-kpis">
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Entrees filtrees</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Utilisateurs distincts</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['distinct_users'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Actions Super Admin</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['super_admin_actions'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Actions sensibles</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['sensitive_actions'] }}</p></article>
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
+        @foreach ($summaryCards as $card)
+            <x-stat-card-link :href="$card['href']" :label="$card['label']" :value="$card['value']" :meta="null" />
+        @endforeach
     </section>
 
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <h2>Filtres</h2>
         <form method="GET" action="{{ route('workspace.audit.index') }}">
             <div class="form-grid-compact mb-2">
@@ -52,13 +59,13 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.audit.index') }}">Reinitialiser</a>
+                <a class="btn btn-blue" href="{{ route('workspace.audit.index') }}">Réinitialiser</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.audit.export', request()->query()) }}">Exporter CSV</a>
             </div>
         </form>
     </section>
 
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <h2>Historique</h2>
         <div class="overflow-auto">
             <table>

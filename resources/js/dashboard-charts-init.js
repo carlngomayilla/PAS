@@ -2,7 +2,11 @@ async function bootDashboardCharts() {
   const hasDashboardCharts =
     document.querySelector('[data-dashboard-tabs]') ||
     document.getElementById('dashboard-gantt-chart') ||
-    document.getElementById('dashboard-critical-gantt-chart');
+    document.getElementById('dashboard-critical-gantt-chart') ||
+    document.getElementById('pilotage-unit-chart') ||
+    document.getElementById('pilotage-status-chart') ||
+    document.getElementById('pilotage-perf-radar') ||
+    document.getElementById('pilotage-progress-chart');
 
   if (!hasDashboardCharts) {
     return;

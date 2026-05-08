@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -16,7 +17,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     public const ROLE_SUPER_ADMIN = 'super_admin';
     public const ROLE_ADMIN = 'admin';
@@ -68,6 +69,27 @@ class User extends Authenticatable
         'profile_photo_url',
         'profile_initials',
     ];
+
+    /**
+     * Per-request cache for active delegation lookups. Dashboard policies call
+     * these helpers often; keeping the result on the model avoids repeated SQL.
+     *
+     * @var array<string, \Illuminate\Support\Collection<int, \App\Models\Delegation>>
+     */
+    private array $activeDelegationsCache = [];
+
+    /**
+     * Per-request cache for workspace-derived payloads used repeatedly by the
+     * layout, sidebar and dashboard.
+     *
+     * @var array<int, array<string, mixed>>|null
+     */
+    private ?array $workspaceModulesCache = null;
+
+    /**
+     * @var array<string, mixed>|null
+     */
+    private ?array $profileInteractionsCache = null;
 
     /**
      * Get the attributes that should be cast.
@@ -264,34 +286,41 @@ class User extends Authenticatable
     public function profileScopeLabel(): string
     {
         if ($this->isSuperAdmin()) {
-            return 'Portee globale plateforme';
+            return 'Portée globale plateforme';
         }
 
         if ($this->hasGlobalWriteAccess()) {
-            return 'Portee globale (lecture/ecriture)';
+            return 'Portée globale (lecture/écriture)';
         }
 
         if ($this->hasRole(self::ROLE_CABINET)) {
-            return 'Portee globale (lecture seule)';
+            return 'Portée globale (lecture seule)';
         }
 
         if ($this->hasRole(self::ROLE_DIRECTION)) {
-            return 'Portee directionnelle';
+            return 'Portée directionnelle';
         }
 
         if ($this->hasRole(self::ROLE_AGENT)) {
-            return 'Portee direction et service (agent)';
+            return 'Portée direction et service (agent)';
         }
 
         if ($this->hasRole(self::ROLE_SERVICE)) {
-            return 'Portee direction et service (service)';
+            return 'Portée direction et service (service)';
         }
 
-        return 'Portee non definie';
+        return 'Portée non définie';
     }
 
     public function activeDelegations(?string $permission = null)
     {
+        $permissionKey = trim((string) $permission);
+        $cacheKey = $permissionKey !== '' ? $permissionKey : '*';
+
+        if (array_key_exists($cacheKey, $this->activeDelegationsCache)) {
+            return $this->activeDelegationsCache[$cacheKey];
+        }
+
         $now = now();
 
         $query = $this->delegationsReceived()
@@ -300,11 +329,11 @@ class User extends Authenticatable
             ->where('date_debut', '<=', $now)
             ->where('date_fin', '>=', $now);
 
-        if ($permission !== null && $permission !== '') {
-            $query->whereJsonContains('permissions', $permission);
+        if ($permissionKey !== '') {
+            $query->whereJsonContains('permissions', $permissionKey);
         }
 
-        return $query->get()->values();
+        return $this->activeDelegationsCache[$cacheKey] = $query->get()->values();
     }
 
     /**
@@ -371,7 +400,11 @@ class User extends Authenticatable
      */
     public function profileInteractions(): array
     {
-        return app(\App\Services\UserProfileService::class)->interactionsFor($this);
+        if ($this->profileInteractionsCache !== null) {
+            return $this->profileInteractionsCache;
+        }
+
+        return $this->profileInteractionsCache = app(\App\Services\UserProfileService::class)->interactionsFor($this);
     }
 
     /**
@@ -379,6 +412,10 @@ class User extends Authenticatable
      */
     public function workspaceModules(): array
     {
-        return app(\App\Services\UserWorkspaceService::class)->modulesFor($this);
+        if ($this->workspaceModulesCache !== null) {
+            return $this->workspaceModulesCache;
+        }
+
+        return $this->workspaceModulesCache = app(\App\Services\UserWorkspaceService::class)->modulesFor($this);
     }
 }

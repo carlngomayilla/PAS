@@ -68,8 +68,24 @@ class KpiMesureWebController extends Controller
             });
         });
 
+        $summaryBase = clone $query;
+        $belowThresholdQuery = (clone $summaryBase)
+            ->join('kpis', 'kpis.id', '=', 'kpi_mesures.kpi_id')
+            ->whereNotNull('kpis.seuil_alerte')
+            ->whereColumn('kpi_mesures.valeur', '<', 'kpis.seuil_alerte');
+
         return view('workspace.kpi_mesures.index', [
             'rows' => $query->orderByDesc('id')->paginate(15)->withQueryString(),
+            'summary' => [
+                'total' => (clone $summaryBase)->count(),
+                'below_threshold_total' => (clone $belowThresholdQuery)->count(),
+                'kpis_total' => (clone $summaryBase)->whereNotNull('kpi_id')->distinct()->count('kpi_id'),
+                'contributors_total' => (clone $summaryBase)->whereNotNull('saisi_par')->distinct()->count('saisi_par'),
+                'commented_total' => (clone $summaryBase)
+                    ->whereNotNull('commentaire')
+                    ->where('commentaire', '!=', '')
+                    ->count(),
+            ],
             'kpiOptions' => $this->kpiFilterOptions($user),
             'saisiParOptions' => $this->saisiParOptions($user),
             'canWrite' => $this->canWrite($user),

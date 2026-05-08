@@ -5,11 +5,11 @@
         $isEdit = $mode === 'edit';
     @endphp
     <div class="app-screen-flow">
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <h1>{{ $isEdit ? 'Modifier direction' : 'Nouvelle direction' }}</h1>
     </section>
 
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.referentiel.directions.update', $row) : route('workspace.referentiel.directions.store') }}">
             @csrf
             @if ($isEdit)
@@ -38,7 +38,7 @@
             </div>
 
             <div class="form-actions">
-                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.referentiel.directions.index') }}">Retour</a>
             </div>
         </form>

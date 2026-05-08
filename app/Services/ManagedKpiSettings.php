@@ -54,7 +54,7 @@ class ManagedKpiSettings
         return $this->sanitizeDefinitions([
             [
                 'code' => 'delai',
-                'label' => 'Delai',
+                'label' => 'Délai',
                 'description' => 'Respect moyen des echeances sur les actions visibles.',
                 'weight' => 15,
                 'green_threshold' => 85,
@@ -94,8 +94,8 @@ class ManagedKpiSettings
             ],
             [
                 'code' => 'conformite',
-                'label' => 'Conformite',
-                'description' => 'Conformite documentaire et procedurale.',
+                'label' => 'Conformité',
+                'description' => 'Conformité documentaire et procédurale.',
                 'weight' => 15,
                 'green_threshold' => 80,
                 'orange_threshold' => 60,
@@ -114,8 +114,8 @@ class ManagedKpiSettings
             ],
             [
                 'code' => 'qualite',
-                'label' => 'Qualite',
-                'description' => 'Qualite moyenne des livrables et de l execution.',
+                'label' => 'Qualité',
+                'description' => 'Qualité moyenne des livrables et de l’exécution.',
                 'weight' => 15,
                 'green_threshold' => 85,
                 'orange_threshold' => 65,
@@ -312,10 +312,10 @@ class ManagedKpiSettings
     public function sourceMetricOptions(): array
     {
         return [
-            'delai' => 'Delai',
+            'delai' => 'Délai',
             'performance' => 'Performance',
-            'conformite' => 'Conformite',
-            'qualite' => 'Qualite',
+            'conformite' => 'Conformité',
+            'qualite' => 'Qualité',
             'risque' => 'Risque',
             'global' => 'Score global',
             'progression' => 'Progression',
@@ -640,6 +640,5 @@ class ManagedKpiSettings
         }
     }
 }
-
 
 

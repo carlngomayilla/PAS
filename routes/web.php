@@ -5,13 +5,15 @@ use App\Http\Controllers\SessionController;
 use App\Http\Controllers\Web\ActionWebController;
 use App\Http\Controllers\Web\ActionTrackingWebController;
 use App\Http\Controllers\Web\AuditWebController;
+use App\Http\Controllers\Web\DependentSelectController;
+use App\Http\Controllers\Web\GlobalSearchWebController;
 use App\Http\Controllers\Web\GovernanceWebController;
+use App\Http\Controllers\Web\KpiMesureWebController;
+use App\Http\Controllers\Web\KpiWebController;
 use App\Http\Controllers\Web\MonitoringWebController;
 use App\Http\Controllers\Web\MessagingWebController;
 use App\Http\Controllers\Web\NotificationWebController;
 use App\Http\Controllers\Web\PaoWebController;
-use App\Http\Controllers\Web\PasAxeWebController;
-use App\Http\Controllers\Web\PasObjectifWebController;
 use App\Http\Controllers\Web\PasWebController;
 use App\Http\Controllers\Web\ProfileWebController;
 use App\Http\Controllers\Web\PtaWebController;
@@ -54,9 +56,21 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::get('/referentiel', fn () => redirect()->route('workspace.referentiel.directions.index'))->name('referentiel');
         });
 
+        Route::get('/actions/create', static function () {
+            return redirect()
+                ->route('workspace.pta.index')
+                ->with('info', 'Les actions sont desormais creees depuis le PTA. Ce module est reserve au suivi, au controle et a la validation.');
+        });
+        Route::post('/actions', static function () {
+            abort(403, 'Les actions sont desormais creees depuis le PTA. Ce module est reserve au suivi, au controle et a la validation.');
+        });
+
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace.index');
+        Route::get('/workspace/recherche', [GlobalSearchWebController::class, 'index'])->name('workspace.search');
         Route::get('/workspace/messagerie', [MessagingWebController::class, 'index'])
             ->name('workspace.messaging.index');
+        Route::get('/workspace/messagerie/dropdown', [MessagingWebController::class, 'dropdown'])
+            ->name('workspace.messaging.dropdown');
         Route::get('/workspace/messagerie/profil/{target}/card', [MessagingWebController::class, 'profileCard'])
             ->name('workspace.messaging.profile.card');
         Route::post('/workspace/messagerie/direct/{target}', [MessagingWebController::class, 'startDirect'])
@@ -131,6 +145,12 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.delegations.cancel');
 
         Route::prefix('/workspace')->name('workspace.')->group(function (): void {
+            Route::get('ajax/services', [DependentSelectController::class, 'services'])->name('ajax.services');
+            Route::get('ajax/users', [DependentSelectController::class, 'users'])->name('ajax.users');
+            Route::get('ajax/objectifs-operationnels', [DependentSelectController::class, 'objectifsOperationnels'])->name('ajax.objectifs-operationnels');
+            Route::get('ajax/ptas', [DependentSelectController::class, 'ptas'])->name('ajax.ptas');
+            Route::get('ajax/actions', [DependentSelectController::class, 'actions'])->name('ajax.actions');
+
             Route::resource('pas', PasWebController::class)
                 ->except(['show'])
                 ->parameters(['pas' => 'pas']);
@@ -139,14 +159,15 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::post('pas/{pas}/lock', [PasWebController::class, 'lock'])->name('pas.lock');
             Route::post('pas/{pas}/reopen', [PasWebController::class, 'reopen'])->name('pas.reopen');
 
-            // Routes legacy conservees uniquement pour rediriger vers le wizard PAS.
-            Route::resource('pas-axes', PasAxeWebController::class)
-                ->except(['show'])
-                ->parameters(['pas-axes' => 'pasAxe']);
+            // Les anciens sous-CRUD PAS ne sont plus exposes : toute lecture legacy
+            // revient vers le wizard PAS unique.
+            Route::get('pas-axes/{legacy?}', static function () {
+                return redirect()->route('workspace.pas.index');
+            })->where('legacy', '.*')->name('pas-axes.legacy');
 
-            Route::resource('pas-objectifs', PasObjectifWebController::class)
-                ->except(['show'])
-                ->parameters(['pas-objectifs' => 'pasObjectif']);
+            Route::get('pas-objectifs/{legacy?}', static function () {
+                return redirect()->route('workspace.pas.index');
+            })->where('legacy', '.*')->name('pas-objectifs.legacy');
 
             Route::resource('pao', PaoWebController::class)
                 ->except(['show'])
@@ -164,17 +185,30 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::post('pta/{pta}/lock', [PtaWebController::class, 'lock'])->name('pta.lock');
             Route::post('pta/{pta}/reopen', [PtaWebController::class, 'reopen'])->name('pta.reopen');
 
+            Route::get('daf/financements-actions', [ActionWebController::class, 'financingRequests'])
+                ->name('daf.financements.index');
+
+            Route::get('actions/create', static function () {
+                return redirect()
+                    ->route('workspace.pta.index')
+                    ->with('info', 'Les actions sont desormais creees depuis le PTA. Ce module est reserve au suivi, au controle et a la validation.');
+            })->name('actions.create');
+            Route::post('actions', static function () {
+                abort(403, 'Les actions sont desormais creees depuis le PTA. Ce module est reserve au suivi, au controle et a la validation.');
+            })->name('actions.store');
             Route::resource('actions', ActionWebController::class)
-                ->except(['show'])
+                ->except(['show', 'create', 'store'])
                 ->parameters(['actions' => 'action']);
             Route::get('kpi', fn () => redirect()
                 ->route('workspace.actions.index')
                 ->with('info', 'Le parametrage des indicateurs se fait maintenant directement dans les actions.'))
                 ->name('kpi.index');
             Route::get('kpi/create', fn () => redirect()
-                ->to(route('workspace.actions.create').'#action-indicator-settings')
-                ->with('info', 'Le parametrage des indicateurs se fait maintenant directement dans les actions.'))
+                ->route('workspace.pta.index')
+                ->with('info', 'Les indicateurs attendus sont desormais definis lors de la creation des actions dans le PTA.'))
                 ->name('kpi.create');
+            Route::post('kpi', [KpiWebController::class, 'store'])
+                ->name('kpi.store');
             Route::get('kpi/{kpi}/edit', function (Kpi $kpi) {
                 $target = $kpi->action_id !== null
                     ? route('workspace.actions.edit', $kpi->action_id).'#action-indicator-settings'
@@ -184,6 +218,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                     ->to($target)
                     ->with('info', 'Le parametrage des indicateurs se fait maintenant directement dans les actions.');
             })->name('kpi.edit');
+            Route::put('kpi/{kpi}', [KpiWebController::class, 'update'])
+                ->name('kpi.update');
+            Route::delete('kpi/{kpi}', [KpiWebController::class, 'destroy'])
+                ->name('kpi.destroy');
             Route::get('kpi-mesures', fn () => redirect()
                 ->route('workspace.actions.index')
                 ->with('info', 'Le suivi des indicateurs passe desormais par les actions et le reporting.'))
@@ -192,6 +230,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->route('workspace.actions.index')
                 ->with('info', 'Le suivi des indicateurs passe desormais par les actions et le reporting.'))
                 ->name('kpi-mesures.create');
+            Route::post('kpi-mesures', [KpiMesureWebController::class, 'store'])
+                ->name('kpi-mesures.store');
             Route::get('kpi-mesures/{kpiMesure}/edit', function (KpiMesure $kpiMesure) {
                 $actionId = $kpiMesure->kpi?->action_id;
                 $target = $actionId !== null
@@ -202,8 +242,18 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                     ->to($target)
                     ->with('info', 'Le suivi des indicateurs passe desormais par les actions et le reporting.');
             })->name('kpi-mesures.edit');
+            Route::put('kpi-mesures/{kpiMesure}', [KpiMesureWebController::class, 'update'])
+                ->name('kpi-mesures.update');
+            Route::delete('kpi-mesures/{kpiMesure}', [KpiMesureWebController::class, 'destroy'])
+                ->name('kpi-mesures.destroy');
             Route::get('actions/{action}/suivi', [ActionTrackingWebController::class, 'show'])
                 ->name('actions.suivi');
+            Route::post('actions/{action}/sous-actions', [ActionTrackingWebController::class, 'storeSubAction'])
+                ->name('actions.sub-actions.store');
+            Route::put('actions/{action}/sous-actions/{sousAction}', [ActionTrackingWebController::class, 'updateSubAction'])
+                ->name('actions.sub-actions.update');
+            Route::post('actions/{action}/execution', [ActionTrackingWebController::class, 'updateQuantitativeProgress'])
+                ->name('actions.execution.update');
             Route::post('actions/{action}/semaines/{actionWeek}/soumettre', [ActionTrackingWebController::class, 'submitWeek'])
                 ->name('actions.weeks.submit');
             Route::post('actions/{action}/cloturer', [ActionTrackingWebController::class, 'closeAction'])
@@ -212,10 +262,18 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.review');
             Route::post('actions/{action}/review-direction', [ActionTrackingWebController::class, 'reviewClosureByDirection'])
                 ->name('actions.review-direction');
+            Route::post('actions/{action}/financement/daf', [ActionTrackingWebController::class, 'reviewFinancingByDaf'])
+                ->name('actions.financement.daf');
+            Route::post('actions/{action}/financement/daf/statut', [ActionTrackingWebController::class, 'updateFinancingStatusByDaf'])
+                ->name('actions.financement.daf.status');
+            Route::post('actions/{action}/financement/dg', [ActionTrackingWebController::class, 'reviewFinancingByDg'])
+                ->name('actions.financement.dg');
             Route::post('actions/{action}/commentaires', [ActionTrackingWebController::class, 'comment'])
                 ->name('actions.comment');
             Route::get('actions/{action}/justificatifs/{justificatif}/download', [ActionTrackingWebController::class, 'downloadJustificatif'])
                 ->name('actions.justificatifs.download');
+            Route::get('actions/{action}/justificatifs/{justificatif}/preview', [ActionTrackingWebController::class, 'previewJustificatif'])
+                ->name('actions.justificatifs.preview');
 
         });
 
@@ -229,8 +287,13 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.reporting.export.word');
         Route::get('/workspace/reporting/export/pdf', [MonitoringWebController::class, 'exportPdf'])
             ->name('workspace.reporting.export.pdf');
-        Route::get('/workspace/pilotage', [MonitoringWebController::class, 'pilotage'])
-            ->name('workspace.pilotage');
+        Route::post('/workspace/reporting/export/{format}/queue', [MonitoringWebController::class, 'queueExport'])
+            ->whereIn('format', ['excel', 'csv', 'word', 'pdf'])
+            ->name('workspace.reporting.export.queue');
+        Route::get('/workspace/reporting/export-ready', [MonitoringWebController::class, 'downloadQueuedExport'])
+            ->middleware('signed')
+            ->name('workspace.reporting.exports.download');
+        Route::redirect('/workspace/pilotage', '/dashboard');
         Route::get('/workspace/alertes', [MonitoringWebController::class, 'alertes'])
             ->name('workspace.alertes');
         Route::get('/workspace/alertes/dropdown', [MonitoringWebController::class, 'alertesDropdown'])

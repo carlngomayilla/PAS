@@ -80,6 +80,7 @@ class ActionIndicatorService
             $payload['libelle'] = trim((string) $action->libelle);
         }
 
+        $payload['exercice_id'] = $action->exercice_id;
         $indicator->fill($payload);
         $indicator->save();
 

@@ -129,7 +129,7 @@ class NotificationPolicySettings
                 'offset_days' => 7,
                 'level' => 'critical',
                 'target_role' => 'direction',
-                'message_template' => 'J+7 apres echeance pour {action_label}. Escalade direction requise.',
+                'message_template' => 'J+7 après échéance pour {action_label}. Escalade direction requise.',
                 'active' => true,
             ],
         ];
@@ -143,18 +143,21 @@ class NotificationPolicySettings
     public function eventDefinitions(): array
     {
         return [
-            'action_assigned' => ['group' => 'Actions', 'label' => 'Attribution d action', 'description' => 'Notification envoyee a l agent responsable lors de l attribution ou du changement de responsable.'],
-            'action_submitted_to_chef' => ['group' => 'Actions', 'label' => 'Soumission au chef', 'description' => 'Notification envoyee au service lors d une demande de validation.'],
-            'action_submitted_to_direction' => ['group' => 'Actions', 'label' => 'Soumission directe a la direction', 'description' => 'Notification envoyee a la direction quand l etape service est sautee.'],
-            'action_reviewed_by_chef' => ['group' => 'Actions', 'label' => 'Decision chef', 'description' => 'Notification apres validation ou rejet par le chef de service.'],
-            'action_reviewed_by_direction' => ['group' => 'Actions', 'label' => 'Decision direction', 'description' => 'Notification apres validation ou rejet par la direction.'],
-            'action_finalized_by_chef' => ['group' => 'Actions', 'label' => 'Finalisation par le chef', 'description' => 'Notification finale lorsque le chef devient la derniere etape du circuit.'],
-            'action_finalized_without_workflow' => ['group' => 'Actions', 'label' => 'Cloture sans workflow', 'description' => 'Notification finale quand aucune validation supplementaire n est active.'],
-            'action_alert_escalation' => ['group' => 'Alertes', 'label' => 'Escalade d alerte action', 'description' => 'Notification issue des journaux d action en warning, critique ou urgence.'],
+            'action_assigned' => ['group' => 'Actions', 'label' => 'Attribution d’action', 'description' => 'Notification envoyée à l’agent responsable lors de l’attribution ou du changement de responsable.'],
+            'action_submitted_to_chef' => ['group' => 'Actions', 'label' => 'Soumission au chef', 'description' => 'Notification envoyée au service lors d’une demande de validation.'],
+            'action_submitted_to_direction' => ['group' => 'Actions', 'label' => 'Soumission directe à la direction', 'description' => 'Notification envoyée à la direction quand l’étape service est sautée.'],
+            'action_reviewed_by_chef' => ['group' => 'Actions', 'label' => 'Décision chef', 'description' => 'Notification après validation ou rejet par le chef de service.'],
+            'action_reviewed_by_direction' => ['group' => 'Actions', 'label' => 'Décision direction', 'description' => 'Notification après validation ou rejet par la direction.'],
+            'action_finalized_by_chef' => ['group' => 'Actions', 'label' => 'Finalisation par le chef', 'description' => 'Notification finale lorsque le chef devient la dernière étape du circuit.'],
+            'action_finalized_without_workflow' => ['group' => 'Actions', 'label' => 'Clôture sans workflow', 'description' => 'Notification finale quand aucune validation supplémentaire n’est active.'],
+            'action_alert_escalation' => ['group' => 'Alertes', 'label' => 'Escalade d’alerte action', 'description' => 'Notification issue des journaux d’action en warning, critique ou urgence.'],
+            'action_financing_requested' => ['group' => 'Financement', 'label' => 'Besoin de financement', 'description' => 'Notification envoyée à la DAF et aux responsables de suivi lorsqu’une action demande un financement.'],
+            'action_financing_reviewed_by_daf' => ['group' => 'Financement', 'label' => 'Décision DAF', 'description' => 'Notification après validation ou rejet DAF du financement.'],
+            'action_financing_reviewed_by_dg' => ['group' => 'Financement', 'label' => 'Accord DG', 'description' => 'Notification après accord ou refus DG du financement.'],
             'pas_status' => ['group' => 'Planification', 'label' => 'Statuts PAS', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PAS.'],
             'pao_status' => ['group' => 'Planification', 'label' => 'Statuts PAO', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PAO.'],
             'pta_status' => ['group' => 'Planification', 'label' => 'Statuts PTA', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PTA.'],
-            'delegation_created' => ['group' => 'Gouvernance', 'label' => 'Nouvelle delegation', 'description' => 'Notification envoyee au delegue lors de la creation d une delegation.'],
+            'delegation_created' => ['group' => 'Gouvernance', 'label' => 'Nouvelle délégation', 'description' => 'Notification envoyée au délégué lors de la création d’une délégation.'],
         ];
     }
 
@@ -208,7 +211,7 @@ class NotificationPolicySettings
     {
         return [
             'in_app' => 'Notification applicative',
-            'audit' => 'Trace audit supplementaire',
+            'audit' => 'Trace audit supplémentaire',
         ];
     }
 
@@ -474,18 +477,21 @@ class NotificationPolicySettings
     private function eventTemplateDefaults(): array
     {
         return [
-            'action_assigned' => ['title' => 'Nouvelle action attribuee', 'message' => 'L action \"{action_label}\" vous a ete attribuee.', 'channels' => ['in_app']],
-            'action_submitted_to_chef' => ['title' => 'Action soumise pour validation', 'message' => 'L action \"{action_label}\" attend votre evaluation.', 'channels' => ['in_app']],
+            'action_assigned' => ['title' => 'Nouvelle action attribuée', 'message' => 'L’action \"{action_label}\" vous a été attribuée.', 'channels' => ['in_app']],
+            'action_submitted_to_chef' => ['title' => 'Action soumise pour validation', 'message' => 'L’action \"{action_label}\" attend votre évaluation.', 'channels' => ['in_app']],
             'action_submitted_to_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'action_reviewed_by_chef' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'action_reviewed_by_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
-            'action_finalized_by_chef' => ['title' => 'Action validee par le chef', 'message' => 'L action \"{action_label}\" est finalisee sans etape direction supplementaire.', 'channels' => ['in_app']],
-            'action_finalized_without_workflow' => ['title' => 'Action cloturee', 'message' => 'L action \"{action_label}\" a ete cloturee sans circuit de validation supplementaire.', 'channels' => ['in_app']],
+            'action_finalized_by_chef' => ['title' => 'Action validée par le chef', 'message' => 'L’action \"{action_label}\" est finalisée sans étape direction supplémentaire.', 'channels' => ['in_app']],
+            'action_finalized_without_workflow' => ['title' => 'Action clôturée', 'message' => 'L’action \"{action_label}\" a été clôturée sans circuit de validation supplémentaire.', 'channels' => ['in_app']],
             'action_alert_escalation' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit']],
+            'action_financing_requested' => ['title' => 'Financement à traiter', 'message' => 'L’action \"{action_label}\" nécessite un financement estimé à {montant_estime}. Traitement DAF requis.', 'channels' => ['in_app', 'audit']],
+            'action_financing_reviewed_by_daf' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit']],
+            'action_financing_reviewed_by_dg' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit']],
             'pas_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'pao_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'pta_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
-            'delegation_created' => ['title' => 'Nouvelle delegation recue', 'message' => 'Une delegation de {actor_name} vous a ete attribuee sur le perimetre {scope_label}.', 'channels' => ['in_app']],
+            'delegation_created' => ['title' => 'Nouvelle délégation reçue', 'message' => 'Une délégation de {actor_name} vous a été attribuée sur le périmètre {scope_label}.', 'channels' => ['in_app']],
         ];
     }
 
@@ -651,6 +657,4 @@ class NotificationPolicySettings
         }
     }
 }
-
-
 

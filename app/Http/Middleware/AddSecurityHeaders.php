@@ -4,12 +4,15 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 class AddSecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
+        Vite::useCspNonce();
+        $nonce = Vite::cspNonce();
         /** @var Response $response */
         $response = $next($request);
 
@@ -21,7 +24,7 @@ class AddSecurityHeaders
             "object-src 'none'",
             "img-src 'self' data: blob:",
             "media-src 'self' data: blob:",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            "script-src 'self' 'nonce-{$nonce}'",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' data: https://fonts.gstatic.com",
             "connect-src 'self' ws: wss:",

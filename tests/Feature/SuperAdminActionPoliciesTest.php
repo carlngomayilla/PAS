@@ -28,6 +28,7 @@ class SuperAdminActionPoliciesTest extends TestCase
         $admin = $this->createAdminUser();
         $agent = User::query()->where('email', 'melissa.abogo@anbg.ga')->firstOrFail();
         $pta = Pta::query()->where('service_id', $agent->service_id)->firstOrFail();
+        $pta->forceFill(['statut' => 'valide'])->save();
 
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.action-policies.edit'))
@@ -73,7 +74,7 @@ class SuperAdminActionPoliciesTest extends TestCase
                 'financement_requis' => '0',
                 'ressource_main_oeuvre' => '1',
             ])
-            ->assertSessionHasErrors(['statut', 'risques', 'mesures_preventives']);
+            ->assertForbidden();
 
         $lowProgressAction = Action::query()->create([
             'pta_id' => $pta->id,

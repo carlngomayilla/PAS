@@ -10,6 +10,7 @@ use App\Http\Requests\StorePaoRequest;
 use App\Http\Requests\UpdatePaoRequest;
 use App\Models\Direction;
 use App\Models\JournalAudit;
+use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasObjectif;
@@ -18,9 +19,11 @@ use App\Models\User;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
+use App\Services\ExerciceContext;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PaoWebController extends Controller
@@ -45,11 +48,16 @@ class PaoWebController extends Controller
                 'pasObjectif.pasAxe:id,pas_id,code,libelle,ordre',
                 'direction:id,code,libelle',
                 'service:id,direction_id,code,libelle',
+                'objectifsOperationnels:id,pao_id,service_id,libelle,echeance,statut',
                 'validateur:id,name,email',
             ])
-            ->withCount(['ptas']);
+            ->withCount(['ptas', 'objectifsOperationnels']);
 
         $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
+        app(ExerciceContext::class)->applyToPao(
+            $query,
+            $request->filled('annee') ? (int) $request->integer('annee') : null
+        );
 
         $query->when(
             $request->filled('pas_id'),
@@ -68,7 +76,11 @@ class PaoWebController extends Controller
         );
         $query->when(
             $request->filled('service_id'),
-            fn ($q) => $q->where('service_id', (int) $request->integer('service_id'))
+            fn ($q) => $q->where(function ($serviceQuery) use ($request): void {
+                $serviceId = (int) $request->integer('service_id');
+                $serviceQuery->where('service_id', $serviceId)
+                    ->orWhereHas('objectifsOperationnels', fn ($objectiveQuery) => $objectiveQuery->where('service_id', $serviceId));
+            })
         );
         $query->when(
             $request->filled('annee'),
@@ -93,6 +105,10 @@ class PaoWebController extends Controller
                     ->orWhere('objectif_operationnel', 'like', "%{$search}%")
                     ->orWhere('resultats_attendus', 'like', "%{$search}%")
                     ->orWhere('indicateurs_associes', 'like', "%{$search}%")
+                    ->orWhereHas('objectifsOperationnels', fn ($objectiveQuery) => $objectiveQuery
+                        ->where('libelle', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhere('indicateurs', 'like', "%{$search}%"))
                     ->orWhereHas('pasObjectif', fn ($objectifQuery) => $objectifQuery
                         ->where('code', 'like', "%{$search}%")
                         ->orWhere('libelle', 'like', "%{$search}%"))
@@ -102,8 +118,23 @@ class PaoWebController extends Controller
             });
         });
 
+        $statsBase = clone $query;
+        $byStatus = (clone $statsBase)->toBase()
+            ->selectRaw('statut, COUNT(*) as cnt')
+            ->groupBy('statut')
+            ->pluck('cnt', 'statut');
+        $paoStats = [
+            'total'      => (int) $byStatus->sum(),
+            'actifs'     => (int) (($byStatus['valide'] ?? 0) + ($byStatus['verrouille'] ?? 0)),
+            'brouillons' => (int) ($byStatus['brouillon'] ?? 0),
+            'avec_pta'   => (clone $statsBase)->has('ptas')->count(),
+            'sans_pta'   => (clone $statsBase)->doesntHave('ptas')->count(),
+            'directions' => (clone $statsBase)->toBase()->distinct()->count('direction_id'),
+        ];
+
         return view('workspace.pao.index', [
             'rows' => $query->orderByDesc('annee')->orderByDesc('id')->paginate(15)->withQueryString(),
+            'paoStats' => $paoStats,
             'pasOptions' => $this->pasOptions($user),
             'objectifOptions' => $this->objectifOptions($user),
             'directionOptions' => $this->directionOptions($user),
@@ -143,7 +174,7 @@ class PaoWebController extends Controller
         $row->pas_objectif_id = $prefilledObjectifId;
         $row->direction_id = $prefilledDirectionId;
         $row->service_id = $prefilledServiceId;
-        $row->annee = $request->filled('annee') ? (int) $request->integer('annee') : null;
+        $row->annee = $request->filled('annee') ? (int) $request->integer('annee') : app(ExerciceContext::class)->selectedYear();
 
         return view('workspace.pao.form', [
             'mode' => 'create',
@@ -170,46 +201,31 @@ class PaoWebController extends Controller
         }
 
         $validated = $request->validated();
-        $statut = (string) ($validated['statut'] ?? 'brouillon');
-        if (! in_array($statut, $this->statusOptions($user), true)) {
-            return back()->withInput()->withErrors([
-                'statut' => 'Le statut selectionne n est pas autorise pour votre profil.',
-            ]);
-        }
+        $statut = 'brouillon';
 
         $this->denyUnlessManagePao($user, (int) $validated['direction_id']);
 
         $objectif = $this->resolveAccessibleObjectif($user, (int) $validated['pas_objectif_id']);
 
-        $payload = [
-            'pas_id' => (int) $objectif->pasAxe->pas_id,
-            'pas_objectif_id' => (int) $objectif->id,
-            'direction_id' => (int) $validated['direction_id'],
-            'service_id' => (int) $validated['service_id'],
-            'annee' => (int) $validated['annee'],
-            'titre' => (string) $validated['titre'],
-            'echeance' => $validated['echeance'] ?? null,
-            'objectif_operationnel' => $validated['objectif_operationnel'] ?? null,
-            'resultats_attendus' => $validated['resultats_attendus'] ?? null,
-            'indicateurs_associes' => $validated['indicateurs_associes'] ?? null,
-            'statut' => $statut,
-        ];
+        $pao = DB::transaction(function () use ($validated, $objectif, $statut, $user, $request): Pao {
+            $operationalObjectives = $this->validatedOperationalObjectives($validated);
+            $payload = $this->paoPayload($objectif, $validated, $operationalObjectives[0], $statut, $user);
+            $pao = Pao::query()->create($payload);
+            $this->recordAudit($request, 'pao', 'create', $pao, null, $pao->toArray());
 
-        if (in_array($payload['statut'], ['valide', 'verrouille'], true)) {
-            $payload['valide_le'] = now();
-            $payload['valide_par'] = $user->id;
-        } else {
-            $payload['valide_le'] = null;
-            $payload['valide_par'] = null;
-        }
+            foreach ($operationalObjectives as $operationalObjective) {
+                $objective = $pao->objectifsOperationnels()->create(
+                    $this->operationalObjectivePayload($pao, $objectif, $validated, $operationalObjective, $statut)
+                );
+                $this->recordAudit($request, 'objectif_operationnel', 'create', $objective, null, $objective->toArray());
+            }
 
-        $pao = Pao::query()->create($payload);
-
-        $this->recordAudit($request, 'pao', 'create', $pao, null, $pao->toArray());
+            return $pao;
+        });
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', $this->entityCreatedMessage(UiLabel::object('pao')));
+            ->with('success', $this->entityCreatedMessage(UiLabel::object('pao')).' '.count($this->validatedOperationalObjectives($validated)).' objectif(s) operationnel(s) rattache(s).');
     }
 
     public function edit(Request $request, Pao $pao): View
@@ -219,6 +235,7 @@ class PaoWebController extends Controller
             abort(401);
         }
 
+        $pao->loadMissing('objectifsOperationnels');
         $this->denyUnlessManagePao($user, (int) $pao->direction_id);
 
         $pasOptions = $this->pasOptions($user, (int) $pao->pas_id);
@@ -250,53 +267,51 @@ class PaoWebController extends Controller
         }
 
         $validated = $request->validated();
-        $statut = (string) ($validated['statut'] ?? 'brouillon');
-        if (! in_array($statut, $this->statusOptions($user), true)) {
-            return back()->withInput()->withErrors([
-                'statut' => 'Le statut selectionne n est pas autorise pour votre profil.',
-            ]);
-        }
+        $statut = (string) ($pao->statut ?: 'brouillon');
 
         $this->denyUnlessManagePao($user, (int) $pao->direction_id);
         $this->denyUnlessManagePao($user, (int) $validated['direction_id']);
         $objectif = $this->resolveAccessibleObjectif($user, (int) $validated['pas_objectif_id']);
 
-        if ($pao->ptas()->exists() && (int) $pao->service_id !== (int) $validated['service_id']) {
-            return back()->withInput()->withErrors([
-                'service_id' => 'Le service affecte au PAO ne peut plus changer apres creation du PTA.',
-            ]);
-        }
-
-        $payload = [
-            'pas_id' => (int) $objectif->pasAxe->pas_id,
-            'pas_objectif_id' => (int) $objectif->id,
-            'direction_id' => (int) $validated['direction_id'],
-            'service_id' => (int) $validated['service_id'],
-            'annee' => (int) $validated['annee'],
-            'titre' => (string) $validated['titre'],
-            'echeance' => $validated['echeance'] ?? null,
-            'objectif_operationnel' => $validated['objectif_operationnel'] ?? null,
-            'resultats_attendus' => $validated['resultats_attendus'] ?? null,
-            'indicateurs_associes' => $validated['indicateurs_associes'] ?? null,
-            'statut' => $statut,
-        ];
-
-        if (in_array($payload['statut'], ['valide', 'verrouille'], true)) {
-            $payload['valide_le'] = now();
-            $payload['valide_par'] = $user->id;
-        } else {
-            $payload['valide_le'] = null;
-            $payload['valide_par'] = null;
-        }
+        $operationalObjectives = $this->validatedOperationalObjectives($validated);
 
         $before = $pao->toArray();
-        $pao->update($payload);
+        DB::transaction(function () use ($pao, $before, $validated, $objectif, $statut, $user, $request, $operationalObjectives): void {
+            $firstPayload = $this->paoPayload($objectif, $validated, $operationalObjectives[0], $statut, $user);
+            $pao->update($firstPayload);
+            $this->recordAudit($request, 'pao', 'update', $pao, $before, $pao->toArray());
 
-        $this->recordAudit($request, 'pao', 'update', $pao, $before, $pao->toArray());
+            $keptObjectiveIds = [];
+            foreach ($operationalObjectives as $operationalObjective) {
+                $objectiveId = (int) ($operationalObjective['id'] ?? 0);
+                $payload = $this->operationalObjectivePayload($pao, $objectif, $validated, $operationalObjective, $statut);
+
+                if ($objectiveId > 0) {
+                    $objective = $pao->objectifsOperationnels()->whereKey($objectiveId)->first();
+                    if ($objective instanceof ObjectifOperationnel) {
+                        $beforeObjective = $objective->toArray();
+                        $objective->update($payload);
+                        $this->recordAudit($request, 'objectif_operationnel', 'update', $objective, $beforeObjective, $objective->toArray());
+                        $keptObjectiveIds[] = (int) $objective->id;
+                        continue;
+                    }
+                }
+
+                $objective = $pao->objectifsOperationnels()->create($payload);
+                $this->recordAudit($request, 'objectif_operationnel', 'create', $objective, null, $objective->toArray());
+                $keptObjectiveIds[] = (int) $objective->id;
+            }
+
+            $pao->objectifsOperationnels()
+                ->whereNotIn('id', $keptObjectiveIds)
+                ->whereDoesntHave('ptas')
+                ->whereDoesntHave('actions')
+                ->delete();
+        });
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', $this->entityUpdatedMessage(UiLabel::object('pao')));
+            ->with('success', $this->entityUpdatedMessage(UiLabel::object('pao')).' Objectifs operationnels synchronises.');
     }
 
     public function destroy(Request $request, Pao $pao): RedirectResponse
@@ -624,6 +639,7 @@ class PaoWebController extends Controller
             ->with(['directions:id,code,libelle'])
             ->orderByDesc('periode_debut')
             ->orderByDesc('id');
+        app(ExerciceContext::class)->applyToPas($query);
 
         return $query->get(['id', 'titre', 'periode_debut', 'periode_fin']);
     }
@@ -642,6 +658,13 @@ class PaoWebController extends Controller
             ->orderBy('ordre')
             ->orderBy('id');
 
+        $selectedYear = app(ExerciceContext::class)->selectedYear();
+        if ($selectedYear !== null) {
+            $query->whereHas('pasAxe.pas', fn ($pasQuery) => $pasQuery
+                ->where('periode_debut', '<=', $selectedYear)
+                ->where('periode_fin', '>=', $selectedYear));
+        }
+
         return $query->get(['id', 'pas_axe_id', 'code', 'libelle', 'ordre']);
     }
 
@@ -657,6 +680,7 @@ class PaoWebController extends Controller
                     'id' => (int) $objectif->id,
                     'code' => (string) $objectif->code,
                     'libelle' => (string) $objectif->libelle,
+                    'axe_id' => (int) ($objectif->pas_axe_id ?? 0),
                     'axe' => (string) ($objectif->pasAxe?->code ? $objectif->pasAxe->code.' - '.$objectif->pasAxe->libelle : $objectif->pasAxe?->libelle),
                     'pas_id' => (int) ($objectif->pasAxe?->pas_id ?? 0),
                     'pas' => (string) ($objectif->pasAxe?->pas?->titre ?? '-'),
@@ -681,5 +705,85 @@ class PaoWebController extends Controller
     private function planningWorkflowSummary(): array
     {
         return app(WorkflowSettings::class)->planningWorkflowSummary('pao');
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array<int, array{id: int|null, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null}>
+     */
+    private function validatedOperationalObjectives(array $validated): array
+    {
+        return collect($validated['objectifs_operationnels'] ?? [])
+            ->filter(fn ($objective): bool => is_array($objective))
+            ->map(fn (array $objective): array => [
+                'id' => isset($objective['id']) && is_numeric($objective['id']) ? (int) $objective['id'] : null,
+                'libelle' => trim((string) ($objective['libelle'] ?? '')),
+                'service_id' => (int) ($objective['service_id'] ?? 0),
+                'echeance' => isset($objective['echeance']) && $objective['echeance'] !== ''
+                    ? (string) $objective['echeance']
+                    : null,
+                'description' => null,
+                'indicateurs' => null,
+            ])
+            ->filter(fn (array $objective): bool => $objective['libelle'] !== '' && $objective['service_id'] > 0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @param array{id: int|null, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null} $operationalObjective
+     * @return array<string, mixed>
+     */
+    private function paoPayload(PasObjectif $objectif, array $validated, array $operationalObjective, string $statut, User $user): array
+    {
+        $payload = [
+            'pas_id' => (int) $objectif->pasAxe->pas_id,
+            'pas_objectif_id' => (int) $objectif->id,
+            'direction_id' => (int) $validated['direction_id'],
+            'service_id' => (int) $operationalObjective['service_id'],
+            'annee' => (int) $validated['annee'],
+            'titre' => $this->generatedPaoTitle(
+                (int) $validated['direction_id'],
+                (int) $validated['annee']
+            ),
+            'echeance' => $operationalObjective['echeance'],
+            'objectif_operationnel' => $operationalObjective['libelle'],
+            'resultats_attendus' => $operationalObjective['description'],
+            'indicateurs_associes' => $operationalObjective['indicateurs'],
+            'statut' => $statut,
+            'exercice_id' => app(ExerciceContext::class)->idForYear((int) $validated['annee']),
+        ];
+
+        return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @param array{id: int|null, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null} $operationalObjective
+     * @return array<string, mixed>
+     */
+    private function operationalObjectivePayload(Pao $pao, PasObjectif $objectif, array $validated, array $operationalObjective, string $statut): array
+    {
+        return [
+            'pas_id' => (int) $objectif->pasAxe->pas_id,
+            'pas_axe_id' => (int) $objectif->pas_axe_id,
+            'pas_objectif_id' => (int) $objectif->id,
+            'direction_id' => (int) $validated['direction_id'],
+            'service_id' => (int) $operationalObjective['service_id'],
+            'libelle' => (string) $operationalObjective['libelle'],
+            'description' => $operationalObjective['description'],
+            'echeance' => $operationalObjective['echeance'],
+            'indicateurs' => $operationalObjective['indicateurs'],
+            'statut' => $statut,
+        ];
+    }
+
+    private function generatedPaoTitle(int $directionId, int $year): string
+    {
+        $direction = Direction::query()->find($directionId, ['id', 'code', 'libelle']);
+        $directionLabel = trim((string) ($direction?->code ?: $direction?->libelle ?: 'DIR-'.$directionId));
+
+        return 'PAO '.$directionLabel.' '.$year;
     }
 }

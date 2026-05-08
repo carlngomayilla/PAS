@@ -63,7 +63,7 @@ function renderMessage(message) {
                 <span class="text-sm font-semibold">${escapeHtml(message.sender_name)}</span>
                 <span class="text-[11px] opacity-75">${escapeHtml(message.sent_at_label ?? '')}</span>
             </div>
-            ${message.is_mine ? `<span class="text-[11px] font-medium opacity-80" data-message-seen-label>${message.is_seen ? 'Vu' : 'Envoye'}</span>` : ''}
+            ${message.is_mine ? `<span class="text-[11px] font-medium opacity-80" data-message-seen-label>${message.is_seen ? 'Vu' : 'Envoyé'}</span>` : ''}
         </div>
         ${message.body ? `<p class="mt-2 whitespace-pre-line text-sm leading-6">${escapeHtml(message.body)}</p>` : ''}
         ${renderAttachment(message.attachment)}
@@ -151,6 +151,9 @@ function initMessagingRealtime() {
 
             if (messages.length > 0) {
                 lastMessageId = Number.parseInt(String(payload.last_message_id ?? lastMessageId), 10) || lastMessageId;
+                window.dispatchEvent(new CustomEvent('anbg:message-received', {
+                    detail: { count: messages.length },
+                }));
             }
 
             updateSeenLabels(thread, payload.other_last_read_at);
@@ -177,6 +180,11 @@ function initMessagingRealtime() {
             .listen('.message.sent', (payload) => {
                 const distanceToBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight;
                 appendMessage(payload, distanceToBottom < 96);
+                if (Number.parseInt(String(payload.sender_id ?? 0), 10) !== currentUserId) {
+                    window.dispatchEvent(new CustomEvent('anbg:message-received', {
+                        detail: { count: 1 },
+                    }));
+                }
             })
             .listen('.conversation.read', (payload) => {
                 if (Number.parseInt(String(payload.reader_id ?? 0), 10) !== currentUserId) {

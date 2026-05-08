@@ -4,63 +4,66 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" type="image/png" href="{{ $platformSettings->faviconUrl() }}">
-    @php
-        $defaultTheme = $appearanceSettings->get('default_theme', 'dark');
-    @endphp
-    <script>
+    @include('partials.app-icons')
+    <script @cspNonce>
         (function () {
-            var themeKey = 'anbg-theme';
             var root = document.documentElement;
-            var theme = @json($defaultTheme);
-
+            var savedTheme = 'light';
+            try { savedTheme = window.localStorage.getItem('theme') || 'light'; } catch (e) {}
+            if (savedTheme === 'dark') {
+                root.classList.add('dark');
+            } else {
+                root.classList.remove('dark');
+            }
+            root.setAttribute('data-theme', savedTheme);
             try {
-                var savedTheme = localStorage.getItem(themeKey);
-                if (savedTheme === 'light' || savedTheme === 'dark') {
-                    theme = savedTheme;
+                if (window.localStorage.getItem('anbg:sidebar:collapsed') === '1') {
+                    document.addEventListener('DOMContentLoaded', function () {
+                        document.body.classList.add('sidebar-collapsed');
+                    }, { once: true });
                 }
             } catch (error) {
-                theme = @json($defaultTheme);
+                // no-op: sidebar preference is optional
             }
-
-            root.classList.toggle('dark', theme === 'dark');
-            root.setAttribute('data-theme', theme);
         })();
     </script>
     <title>@yield('title', 'Dashboard') - {{ $platformSettings->get('app_short_name', 'ANBG') }}</title>
+    @stack('head')
     @include('partials.vite-assets')
     <style>
-        body.admin-theme-scope {
-            background: var(--app-body-bg-light);
+        :root { --app-sidebar-width: 232px; --app-sidebar-collapsed-width: 72px; }
+
+        /* ── Fond de page ── */
+        .admin-page-root { background: var(--app-bg, #f6fbff); }
+
+        /* ── Shell frame — carte flottante ── */
+        .admin-shell-frame { background: transparent; border-radius: 0; }
+
+        /* ── Header ── */
+        .admin-page-header {
+            background: var(--app-surface, #ffffff);
+            border-bottom: 1px solid var(--app-border, #d8ecf8);
+            backdrop-filter: none;
         }
 
-        html.dark body.admin-theme-scope {
-            background: var(--app-body-bg-dark);
-        }
-
-        #admin-shell-header {
-            background: var(--app-header-bg-light);
-        }
-
-        html.dark #admin-shell-header {
-            background: var(--app-header-bg-dark);
-        }
-
-        #admin-sidebar {
-            background: var(--app-sidebar-bg);
-        }
-
+        /* ── Contenu principal ── */
         .admin-content-shell {
             padding-left: 0;
+            min-height: 100vh;
         }
-
         @media (min-width: 1024px) {
             .admin-content-shell {
                 padding-left: var(--app-sidebar-width);
+                transition: padding-left 220ms ease;
+            }
+
+            body.sidebar-collapsed .admin-content-shell {
+                padding-left: var(--app-sidebar-collapsed-width);
             }
         }
+
+        body.admin-theme-scope::before { display: none !important; }
     </style>
-    @stack('head')
 </head>
 
 @php
@@ -80,6 +83,12 @@
         'info' => 0,
     ];
     $headerAlertUnreadCount = 0;
+    $exerciseContext = app(\App\Services\ExerciceContext::class);
+    $exerciseOptions = $exerciseContext->options();
+    $quarterOptions = $exerciseContext->quarterOptions();
+    $selectedExercise = $exerciseContext->selectedYear();
+    $selectedQuarter = $exerciseContext->selectedQuarter();
+    $exerciseHiddenQuery = collect(request()->query())->except(['exercice', 'trimestre', 'page']);
 
     if ($layoutUser) {
         $headerNotifications = $layoutUser->notifications()
@@ -98,7 +107,7 @@
             ->toArray();
         $headerSidebarBadges = $headerUnreadByModule;
 
-        if (collect($layoutUser->workspaceModules())->pluck('code')->contains('alertes')) {
+        if ($layoutUser->hasPermission('alerts.read')) {
             $alertReadService = app(\App\Services\Alerting\AlertReadService::class);
             $alertCenterService = app(\App\Services\Alerting\AlertCenterService::class);
             $headerAlertSummary = $alertCenterService->summaryForUser(
@@ -121,150 +130,183 @@
     }
 @endphp
 
-<body class="admin-theme-scope h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-    <div class="min-h-screen">
-        <div id="admin-overlay" class="fixed inset-0 z-40 hidden bg-black/40 lg:hidden"></div>
+<body class="admin-theme-scope h-full" data-auto-refresh="20">
+    <div class="admin-page-root app-shell min-h-screen">
+        <div id="admin-overlay" class="fixed inset-0 z-40 hidden bg-white/70 backdrop-blur-sm lg:hidden"></div>
 
         <x-admin.sidebar :notification-counts="$headerSidebarBadges" :unread-total="$headerUnreadCount" />
 
-        <div class="admin-content-shell">
-            <header id="admin-shell-header" class="sticky top-0 z-30 border-b border-[#3996d3]/18 backdrop-blur dark:border-white/10">
-                <div class="flex h-16 items-center gap-3 px-4 sm:px-6">
-                    <button
-                        type="button"
-                        id="admin-sidebar-open"
-                        class="inline-flex items-center justify-center rounded-xl p-2 hover:bg-slate-100 dark:hover:bg-slate-900 lg:hidden"
-                        aria-label="Ouvrir le menu"
-                    >
-                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                        </svg>
-                    </button>
+        <div class="admin-content-shell app-main min-h-screen">
+            <div class="admin-shell-frame flex min-h-screen flex-col overflow-hidden">
+                <header id="admin-shell-header" class="admin-page-header app-navbar sticky top-0 z-30">
+                    <div class="admin-navbar-inner flex min-h-[5rem] items-center gap-3 px-5 py-4 sm:px-6 lg:px-8">
+                        <button
+                            type="button"
+                            id="admin-sidebar-open"
+                            class="admin-navbar-icon-button inline-flex items-center justify-center lg:hidden"
+                            aria-label="Ouvrir le menu"
+                        >
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                            </svg>
+                        </button>
 
-                    <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{{ $platformSettings->get('admin_header_eyebrow', 'Administration') }}</p>
+                        <div class="flex min-w-0 flex-1 items-center gap-3">
+                            <div class="min-w-0 flex-1">
+                                <h1 class="admin-navbar-title truncate text-xl font-bold leading-tight text-[#17324a]">
+                                    @yield('title', 'Dashboard')
+                                </h1>
+                                <p class="starline-greeting">{{ $platformSettings->get('admin_header_eyebrow', 'Pilotage institutionnel ANBG') }}</p>
+                            </div>
                         </div>
-                        <h1 class="truncate text-base font-semibold leading-tight sm:text-lg">
-                            @yield('title', 'Dashboard')
-                        </h1>
-                    </div>
 
-                    <div class="hidden w-[280px] md:block">
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-3 flex items-center text-slate-400">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/>
-                                </svg>
-                            </span>
-                            <input
-                                class="w-full rounded-xl border border-[#3996d3]/18 bg-[linear-gradient(135deg,rgba(255,255,255,0.99)_0%,rgba(245,249,252,0.96)_100%)] px-9 py-2 text-sm outline-none focus:ring-2 focus:ring-[#3996d3]/30 dark:border-white/10 dark:bg-none dark:bg-[linear-gradient(135deg,rgba(10,20,46,0.96)_0%,rgba(18,35,72,0.92)_100%)] dark:text-slate-100 dark:placeholder:text-slate-400"
-                                placeholder="Rechercher..."
-                            />
+<form method="GET" action="{{ url()->current() }}" class="admin-exercise-filter flex shrink-0 items-center gap-1 px-2 py-1.5 text-[11px]">
+                            @foreach ($exerciseHiddenQuery as $queryKey => $queryValue)
+                                @if (is_array($queryValue))
+                                    @foreach ($queryValue as $itemValue)
+                                        <input type="hidden" name="{{ $queryKey }}[]" value="{{ $itemValue }}">
+                                    @endforeach
+                                @elseif (! is_null($queryValue))
+                                    <input type="hidden" name="{{ $queryKey }}" value="{{ $queryValue }}">
+                                @endif
+                            @endforeach
+                            <select
+                                name="exercice"
+                                class="w-[86px] border-0 bg-transparent px-1 py-1 font-semibold text-[#17324a] outline-none ring-0"
+                                onchange="this.form.submit()"
+                                aria-label="Filtrer par exercice"
+                            >
+                                @foreach ($exerciseOptions as $exerciseOption)
+                                    <option value="{{ $exerciseOption['value'] }}" @selected((string) ($selectedExercise ?? 'all') === $exerciseOption['value'])>
+                                        {{ $exerciseOption['value'] === 'all' ? 'Tous' : $exerciseOption['value'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <select
+                                name="trimestre"
+                                class="w-[74px] border-0 bg-transparent px-1 py-1 font-semibold text-[#17324a] outline-none ring-0"
+                                onchange="this.form.submit()"
+                                aria-label="Filtrer par trimestre"
+                            >
+                                @foreach ($quarterOptions as $quarterOption)
+                                    <option value="{{ $quarterOption['value'] }}" @selected((string) ($selectedQuarter ?? 'all') === $quarterOption['value'])>
+                                        {{ $quarterOption['label'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </form>
+
+                        <div class="admin-local-clock hidden lg:inline-flex" id="admin-local-clock" aria-label="Heure locale">
+                            --:--:--
                         </div>
-                    </div>
 
-                    <button
-                        type="button"
-                        id="admin-theme-toggle"
-                        class="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-slate-100"
-                        aria-label="Basculer mode sombre"
-                    >
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a1 1 0 011 1v1a1 1 0 11-2 0V4a1 1 0 011-1zm0 14a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zm8-6a1 1 0 100 2h1a1 1 0 100-2h-1zM2 12a1 1 0 011-1h1a1 1 0 110 2H3a1 1 0 01-1-1zm14.95-6.364a1 1 0 011.414 0l.707.707a1 1 0 11-1.414 1.414l-.707-.707a1 1 0 010-1.414zM5.636 16.95a1 1 0 011.414 0l.707.707a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 010-1.414zm12.728 1.414a1 1 0 01-1.414 0l-.707-.707a1 1 0 111.414-1.414l.707.707a1 1 0 010 1.414zM7.05 7.05a1 1 0 01-1.414 0L4.93 6.343a1 1 0 011.414-1.414l.707.707a1 1 0 010 1.414zM12 7a5 5 0 100 10 5 5 0 000-10z"/>
-                        </svg>
-                    </button>
+                        <button
+                            type="button"
+                            id="admin-theme-toggle"
+                            class="admin-navbar-icon-button inline-flex items-center justify-center"
+                            title="Changer le thème"
+                            aria-label="Changer le thème"
+                        >
+                            <svg class="h-5 w-5 dark:hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21.752 15.002A9.718 9.718 0 0 1 18 15.75 9.75 9.75 0 0 1 8.25 6c0-1.33.266-2.597.748-3.752A9.753 9.753 0 1 0 21.752 15.002Z" />
+                            </svg>
+                            <svg class="hidden h-5 w-5 dark:block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.364-6.364-1.591 1.591M7.227 16.773l-1.591 1.591m12.728 0-1.591-1.591M7.227 7.227 5.636 5.636M12 8.25A3.75 3.75 0 1 1 12 15.75a3.75 3.75 0 0 1 0-7.5Z" />
+                            </svg>
+                        </button>
 
-                    <div class="relative" id="header-messaging">
+                        <div class="relative" id="header-messaging">
                         <button
                             type="button"
                             id="header-messaging-toggle"
-                            class="relative inline-flex items-center justify-center rounded-xl p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+                            class="admin-navbar-icon-button relative inline-flex items-center justify-center"
                             aria-label="Messagerie"
                         >
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8m-8 4h5m-9 5l1.2-3.6A8 8 0 014 12V7a3 3 0 013-3h10a3 3 0 013 3v5a3 3 0 01-3 3H9l-4 4z" />
                             </svg>
-                            @if ($headerMessageUnreadCount > 0)
-                                <span class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#f8e932] px-1 text-[10px] font-semibold leading-none text-[#1c203d]">
-                                    {{ $headerMessageUnreadCount > 99 ? '99+' : $headerMessageUnreadCount }}
-                                </span>
-                            @endif
+                            <span
+                                id="header-messaging-badge"
+                                class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#3996d3] px-1 text-[10px] font-semibold leading-none text-white {{ $headerMessageUnreadCount > 0 ? '' : 'hidden' }}"
+                            >
+                                {{ $headerMessageUnreadCount > 99 ? '99+' : $headerMessageUnreadCount }}
+                            </span>
                         </button>
 
                         <div
                             id="header-messaging-menu"
-                            class="admin-dropdown-panel absolute right-0 z-40 mt-2 hidden w-[360px] overflow-hidden rounded-2xl"
+                            data-messages-endpoint="{{ route('workspace.messaging.dropdown') }}"
+                            class="admin-dropdown-panel admin-navbar-dropdown admin-navbar-messaging-dropdown absolute right-0 z-40 mt-2 hidden w-[360px] overflow-hidden border border-[#d8ecf8] bg-white"
                         >
-                            <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+                            <div class="admin-dropdown-head flex items-center justify-between border-b border-[#d8ecf8] px-3 py-2">
                                 <div>
                                     <p class="text-sm font-semibold">Messagerie</p>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $headerMessageUnreadCount }} message(s) non lus</p>
+                                    <p class="text-xs text-[#667085]">{{ $headerMessageUnreadCount }}</p>
                                 </div>
                                 <a
                                     href="{{ route('workspace.messaging.index') }}"
-                                    class="rounded-lg px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#e8f3fb] dark:text-[#8fc043] dark:hover:bg-slate-900"
+                                    class="admin-dropdown-link border border-[#d8ecf8] px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#eaf6fd]"
                                 >
                                     Ouvrir
                                 </a>
                             </div>
 
-                            <div class="border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+                            <div class="admin-dropdown-shortcuts border-b border-[#d8ecf8] px-3 py-2">
                                 <div class="grid grid-cols-2 gap-2 text-xs">
-                                    <a href="{{ route('workspace.messaging.index') }}" class="rounded-xl border border-slate-200 px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900">
-                                        Messages recents
+                                    <a href="{{ route('workspace.messaging.index') }}" class="admin-dropdown-shortcut border border-[#d8ecf8] px-3 py-2 font-medium text-[#17324a] transition hover:bg-[#eaf6fd]">
+                                        Messages récents
                                     </a>
-                                    <a href="{{ route('workspace.messaging.index') }}#messaging-orgchart" class="rounded-xl border border-slate-200 px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900">
+                                    <a href="{{ route('workspace.messaging.index') }}#messaging-orgchart" class="admin-dropdown-shortcut border border-[#d8ecf8] px-3 py-2 font-medium text-[#17324a] transition hover:bg-[#eaf6fd]">
                                         Organigramme
                                     </a>
                                 </div>
                             </div>
 
-                            <div class="max-h-96 overflow-y-auto">
+                            <div class="admin-dropdown-scroll max-h-96 overflow-y-auto">
                                 @forelse ($headerMessages as $thread)
                                     @php
                                         $threadUser = $thread->getAttribute('other_user');
                                     @endphp
                                     <a
                                         href="{{ route('workspace.messaging.index', ['conversation' => $thread->id]) }}"
-                                        class="block border-b border-slate-100 px-3 py-2 transition last:border-b-0 hover:bg-slate-50 dark:border-slate-900 dark:hover:bg-slate-900/60 {{ (int) $thread->getAttribute('unread_messages_count') > 0 ? 'bg-[#fff8d6]/70 dark:bg-[#f8e932]/10' : '' }}"
+                                        class="admin-dropdown-item admin-message-item block border-b border-[#d8ecf8] px-3 py-2 transition last:border-b-0 hover:bg-[#eaf6fd] {{ (int) $thread->getAttribute('unread_messages_count') > 0 ? 'bg-[#eaf6fd]' : '' }}"
                                     >
                                         <div class="mb-1 flex items-start justify-between gap-2">
                                             <div class="min-w-0">
-                                                <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                <p class="truncate text-sm font-semibold text-[#17324a]">
                                                     {{ $thread->getAttribute('display_name') }}
                                                 </p>
-                                                <p class="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                                                <p class="truncate text-[11px] text-[#667085]">
                                                     {{ $threadUser?->agent_fonction ?: $thread->getAttribute('display_scope') }}
                                                 </p>
                                             </div>
                                             @if ((int) $thread->getAttribute('unread_messages_count') > 0)
-                                                <span class="anbg-badge anbg-badge-warning px-2 py-0.5 text-[10px]">
+                                                <span class="app-badge app-badge-warning px-2 py-0.5 text-[10px]">
                                                     {{ $thread->getAttribute('unread_messages_count') }}
                                                 </span>
                                             @endif
                                         </div>
-                                        <p class="truncate text-xs text-slate-600 dark:text-slate-300">
+                                        <p class="truncate text-xs text-[#667085]">
                                             {{ $thread->latestMessage?->body ?: ($thread->latestMessage?->attachment_original_name ?: 'Conversation ouverte.') }}
                                         </p>
-                                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                        <p class="mt-1 text-[11px] text-[#667085]">
                                             {{ $thread->latestMessage?->sent_at?->diffForHumans() ?? 'Nouveau' }}
                                         </p>
                                     </a>
                                 @empty
-                                    <div class="px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
-                                        Aucune conversation recente.
+                                    <div class="admin-dropdown-empty px-3 py-6 text-center text-sm text-[#667085]">
+                                        Aucune conversation récente.
                                     </div>
                                 @endforelse
                             </div>
                         </div>
                     </div>
 
-                    <div class="relative" id="header-notifications">
+                        <div class="relative" id="header-notifications">
                         <button
                             type="button"
                             id="header-notifications-toggle"
-                            class="relative inline-flex items-center justify-center rounded-xl p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+                            class="admin-navbar-icon-button relative inline-flex items-center justify-center"
                             aria-label="Notifications"
                         >
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -272,7 +314,7 @@
                             </svg>
                             <span
                                 id="header-notifications-badge"
-                                class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#f9b13c] px-1 text-[10px] font-semibold leading-none text-[#1c203d] {{ $headerAlertUnreadCount > 0 ? '' : 'hidden' }}"
+                                class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#3996d3] px-1 text-[10px] font-semibold leading-none text-white {{ $headerAlertUnreadCount > 0 ? '' : 'hidden' }}"
                             >
                                 {{ $headerAlertUnreadCount > 99 ? '99+' : $headerAlertUnreadCount }}
                             </span>
@@ -281,49 +323,49 @@
                         <div
                             id="header-notifications-menu"
                             data-alerts-endpoint="{{ route('workspace.alertes.dropdown') }}"
-                            class="admin-dropdown-panel absolute right-0 z-40 mt-2 hidden w-[340px] overflow-hidden rounded-2xl"
+                            class="admin-dropdown-panel admin-navbar-dropdown admin-navbar-notifications-dropdown absolute right-0 z-40 mt-2 hidden w-[340px] overflow-hidden border border-[#d8ecf8] bg-white"
                         >
-                            <div class="border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+                            <div class="admin-dropdown-head admin-dropdown-alert-head border-b border-[#d8ecf8] px-3 py-2">
                                 <div class="flex items-center justify-between gap-2">
                                     <div>
                                         <p class="text-sm font-semibold">Alertes</p>
-                                        <p id="header-alerts-summary" class="text-xs text-slate-500 dark:text-slate-400">
+                                        <p id="header-alerts-summary" class="text-xs text-[#667085]">
                                             {{ $headerAlertSummary['unread'] ?? 0 }} non lue(s) sur {{ $headerAlertSummary['total'] ?? 0 }} alerte(s).
                                         </p>
                                     </div>
                                     <a
                                         href="{{ route('workspace.alertes') }}"
-                                        class="rounded-lg px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#e8f3fb] dark:text-[#8fc043] dark:hover:bg-slate-900"
+                                        class="admin-dropdown-link border border-[#d8ecf8] px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#eaf6fd]"
                                     >
                                         Centre
                                     </a>
                                 </div>
-                                <div id="header-alerts-kpi-summary" class="mt-2 hidden flex flex-wrap gap-2"></div>
+                                <div id="header-alerts-kpi-summary" class="admin-dropdown-kpi-summary mt-2 hidden flex flex-wrap gap-2"></div>
                             </div>
 
-                            <div id="header-alerts-items" class="border-b border-slate-200 dark:border-slate-800">
-                                <div class="px-3 py-4 text-xs text-slate-500 dark:text-slate-400">
-                                    Les alertes recentes s affichent ici.
+                            <div id="header-alerts-items" class="admin-dropdown-alerts border-b border-[#d8ecf8]">
+                                <div class="admin-dropdown-empty px-3 py-4 text-xs text-[#667085]">
+                                    Les alertes récentes s'affichent ici.
                                 </div>
                             </div>
 
-                            <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+                            <div class="admin-dropdown-head flex items-center justify-between border-b border-[#d8ecf8] px-3 py-2">
                                 <div>
                                     <p class="text-sm font-semibold">Notifications</p>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $headerUnreadCount }} non lue(s)</p>
+                                    <p class="text-xs text-[#667085]">{{ $headerUnreadCount }} non lue(s)</p>
                                 </div>
                                 <form method="POST" action="{{ route('workspace.notifications.read_all') }}">
                                     @csrf
                                     <button
                                         type="submit"
-                                        class="rounded-lg px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#e8f3fb] dark:text-[#8fc043] dark:hover:bg-slate-900"
+                                        class="admin-dropdown-link border border-[#d8ecf8] px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#eaf6fd]"
                                     >
                                         Tout marquer comme lu
                                     </button>
                                 </form>
                             </div>
 
-                            <div class="max-h-96 overflow-y-auto">
+                            <div class="admin-dropdown-scroll max-h-96 overflow-y-auto">
                                 @forelse ($headerNotifications as $notification)
                                     @php
                                         $moduleCode = strtolower((string) ($notification->data['module'] ?? 'autres'));
@@ -341,25 +383,25 @@
                                     @endphp
                                     <a
                                         href="{{ route('workspace.notifications.read', $notification->id) }}"
-                                        class="block border-b border-slate-100 px-3 py-2 transition last:border-b-0 hover:bg-slate-50 dark:border-slate-900 dark:hover:bg-slate-900/60 {{ $isUnread ? 'bg-[#e8f3fb]/70 dark:bg-[#3996d3]/10' : '' }}"
+                                        class="admin-dropdown-item admin-notification-item block border-b border-[#d8ecf8] px-3 py-2 transition last:border-b-0 hover:bg-[#eaf6fd] {{ $isUnread ? 'bg-[#eaf6fd]' : '' }}"
                                     >
                                         <div class="mb-1 flex items-start justify-between gap-2">
-                                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                            <p class="text-sm font-semibold text-[#17324a]">
                                                 {{ $notification->data['title'] ?? 'Notification' }}
                                             </p>
-                                            <span class="anbg-badge anbg-badge-neutral px-2 py-0.5 text-[10px] uppercase tracking-wide leading-none">
+                                            <span class="app-badge px-2 py-0.5 text-[10px] uppercase tracking-wide leading-none">
                                                 {{ $moduleLabel }}
                                             </span>
                                         </div>
-                                        <p class="text-xs text-slate-600 dark:text-slate-300">
+                                        <p class="text-xs text-[#667085]">
                                             {{ $notification->data['message'] ?? '' }}
                                         </p>
-                                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                        <p class="mt-1 text-[11px] text-[#667085]">
                                             {{ $notification->created_at?->diffForHumans() }}
                                         </p>
                                     </a>
                                 @empty
-                                    <div class="px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                                    <div class="admin-dropdown-empty px-3 py-6 text-center text-sm text-[#667085]">
                                         Aucune notification.
                                     </div>
                                 @endforelse
@@ -367,36 +409,44 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-3">
-                        <a href="{{ route('workspace.profile.edit') }}" class="hidden text-right transition-opacity hover:opacity-75 sm:block">
-                            <p class="text-sm font-medium dark:text-slate-100">{{ auth()->user()?->name ?? 'Utilisateur' }}</p>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ auth()->user()?->roleLabel() ?? 'Compte' }}</p>
-                        </a>
-                        <a href="{{ route('workspace.profile.edit') }}" class="inline-flex items-center justify-center rounded-2xl hover:opacity-75 transition-opacity">
-                            @if (auth()->user()?->profile_photo_url)
-                                <img src="{{ auth()->user()->profile_photo_url }}" alt="Avatar" class="h-9 w-9 rounded-2xl object-cover">
-                            @else
-                                <div class="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[#3996d3] to-[#1c203d] text-xs font-bold text-white">
-                                    {{ auth()->user()?->profile_initials ?? 'U' }}
-                                </div>
-                            @endif
-                        </a>
+                        <div class="admin-navbar-user flex items-center gap-3 px-3 py-2">
+                            <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-user-copy hidden text-right transition-opacity hover:opacity-75 sm:block">
+                                <p class="text-sm font-semibold text-[#17324a]">{{ auth()->user()?->name ?? 'Utilisateur' }}</p>
+                                <p class="text-xs text-[#667085]">{{ auth()->user()?->roleLabel() ?? 'Compte' }}</p>
+                            </a>
+                            <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-avatar inline-flex items-center justify-center transition-opacity hover:opacity-75">
+                                @if (auth()->user()?->profile_photo_url)
+                                    <img src="{{ auth()->user()->profile_photo_url }}" alt="Avatar" class="admin-navbar-avatar-media h-10 w-10 rounded-[1rem] object-cover">
+                                @else
+                                    <div class="admin-navbar-avatar-media flex h-10 w-10 items-center justify-center rounded-[1rem] bg-[#3996d3] text-xs font-bold text-white">
+                                        {{ auth()->user()?->profile_initials ?? 'U' }}
+                                    </div>
+                                @endif
+                            </a>
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
 
-            <main class="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
-                @if (session('success'))
-                    <div class="flash-success">{{ session('success') }}</div>
-                @endif
-                @if ($errors->any())
-                    <div class="flash-error">{{ $errors->first() }}</div>
-                @endif
-                @yield('content')
-                <footer class="mt-8 border-t border-slate-200/80 pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                    {{ $platformSettings->get('footer_text', 'ANBG | Systeme institutionnel de pilotage PAS / PAO / PTA') }}
-                </footer>
-            </main>
+                <main id="admin-main-content" data-auto-refresh-region class="app-content min-h-[calc(100vh-5rem)] w-full flex-1">
+                    @if (session('success'))
+                        <div class="flash-success">
+                            {{ session('success') }}
+                            <button type="button" class="flash-dismiss" aria-label="Fermer">x</button>
+                        </div>
+                    @endif
+                    @if ($errors->any())
+                        <div class="flash-error">
+                            {{ $errors->first() }}
+                            <button type="button" class="flash-dismiss" aria-label="Fermer">x</button>
+                        </div>
+                    @endif
+                    @stack('breadcrumb')
+                    @yield('content')
+                    <footer class="mt-8 border-t border-[#d8ecf8] pt-4 text-xs text-[#667085]">
+                        {{ $platformSettings->get('footer_text', 'ANBG | Système institutionnel de pilotage PAS / PAO / PTA') }}
+                    </footer>
+                </main>
+            </div>
         </div>
     </div>
 
@@ -417,7 +467,7 @@
             <div class="anbg-dialog-body">
                 <p id="anbg-dialog-message" class="anbg-dialog-message"></p>
                 <div id="anbg-dialog-input-wrap" class="hidden">
-                    <label id="anbg-dialog-input-label" for="anbg-dialog-input" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Valeur</label>
+                    <label id="anbg-dialog-input-label" for="anbg-dialog-input" class="app-label mb-1 block">Valeur</label>
                     <input id="anbg-dialog-input" type="text" autocomplete="off">
                     <p id="anbg-dialog-error" class="field-error hidden"></p>
                 </div>
@@ -434,7 +484,7 @@
         <div class="analytics-explorer-panel" role="dialog" aria-modal="true" aria-labelledby="analytics-explorer-title">
             <div class="analytics-explorer-header">
                 <div>
-                    <p class="anbg-dialog-eyebrow">Analyse detaillee</p>
+                    <p class="anbg-dialog-eyebrow">Analyse détaillée</p>
                     <h2 id="analytics-explorer-title" class="anbg-dialog-title">Visualisation</h2>
                     <p id="analytics-explorer-subtitle" class="anbg-dialog-message mt-1"></p>
                 </div>
@@ -446,59 +496,190 @@
             </div>
             <div id="analytics-explorer-body" class="analytics-explorer-body"></div>
             <div class="analytics-explorer-actions">
-                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Cliquez sur un graphique ou un tableau pour l ouvrir ici.</span>
+                <span class="text-xs font-medium text-[#667085]">Selection active</span>
                 <div class="flex items-center gap-2">
-                    <button type="button" id="analytics-explorer-download" class="btn btn-primary hidden">Telecharger</button>
-                    <button type="button" class="btn btn-secondary" data-analytics-explorer-dismiss>Fermer</button>
+                    <button type="button" id="analytics-explorer-download" class="app-btn app-btn-primary hidden">Telecharger</button>
+                    <button type="button" class="app-btn app-btn-secondary" data-analytics-explorer-dismiss>Fermer</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
+    <script @cspNonce>
         (function () {
             var root = document.documentElement;
-            var themeKey = 'anbg-theme';
-            var toggleThemeButton = document.getElementById('admin-theme-toggle');
+            var adminHeader = document.getElementById('admin-shell-header');
+            var localClock = document.getElementById('admin-local-clock');
+            var globalSearchInput = document.getElementById('sidebar-search-input');
+            var themeToggle = document.getElementById('admin-theme-toggle');
 
-            function applyTheme(theme) {
-                var isDark = theme === 'dark';
-                root.classList.toggle('dark', isDark);
-                root.setAttribute('data-theme', isDark ? 'dark' : 'light');
-                window.dispatchEvent(new CustomEvent('anbg:theme-changed', {
-                    detail: { theme: isDark ? 'dark' : 'light' }
-                }));
-                return isDark;
+            window.anbgToggleTheme = function () {
+                var isDark = root.classList.contains('dark');
+                if (isDark) {
+                    root.classList.remove('dark');
+                    root.setAttribute('data-theme', 'light');
+                    try { window.localStorage.setItem('theme', 'light'); } catch (e) {}
+                } else {
+                    root.classList.add('dark');
+                    root.setAttribute('data-theme', 'dark');
+                    try { window.localStorage.setItem('theme', 'dark'); } catch (e) {}
+                }
+            };
+
+            if (themeToggle) {
+                themeToggle.addEventListener('click', window.anbgToggleTheme);
             }
 
-            if (toggleThemeButton) {
-                toggleThemeButton.dataset.themeBound = '1';
-                toggleThemeButton.addEventListener('click', function () {
-                    var nextTheme = root.classList.contains('dark') ? 'light' : 'dark';
-                    applyTheme(nextTheme);
-                    try {
-                        localStorage.setItem(themeKey, nextTheme);
-                    } catch (error) {
-                        // no-op: theme still changes in the current session
+            function updateLocalClock() {
+                if (!localClock) {
+                    return;
+                }
+
+                var now = new Date();
+                localClock.textContent = new Intl.DateTimeFormat('fr-FR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }).format(now);
+            }
+
+            updateLocalClock();
+            if (localClock) {
+                window.setInterval(updateLocalClock, 1000);
+            }
+
+            function unlockNotificationSound() {
+                notificationSoundUnlocked = true;
+                try {
+                    var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass && !notificationAudioContext) {
+                        notificationAudioContext = new AudioContextClass();
                     }
-                });
+                    if (notificationAudioContext && notificationAudioContext.state === 'suspended') {
+                        notificationAudioContext.resume().catch(function () {});
+                    }
+                } catch (error) {
+                    notificationAudioContext = null;
+                }
             }
+
+            function playNotificationSound(kind) {
+                if (!notificationSoundUnlocked) {
+                    return;
+                }
+
+                try {
+                    var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioContextClass) {
+                        return;
+                    }
+
+                    notificationAudioContext = notificationAudioContext || new AudioContextClass();
+                    if (notificationAudioContext.state === 'suspended') {
+                        notificationAudioContext.resume().catch(function () {});
+                    }
+
+                    var now = notificationAudioContext.currentTime;
+                    var frequencies = kind === 'message' ? [660, 880] : [520, 740, 980];
+
+                    frequencies.forEach(function (frequency, index) {
+                        var oscillator = notificationAudioContext.createOscillator();
+                        var gainNode = notificationAudioContext.createGain();
+                        var start = now + (index * 0.09);
+                        var end = start + 0.075;
+
+                        oscillator.type = kind === 'message' ? 'sine' : 'triangle';
+                        oscillator.frequency.setValueAtTime(frequency, start);
+                        gainNode.gain.setValueAtTime(0.0001, start);
+                        gainNode.gain.exponentialRampToValueAtTime(kind === 'message' ? 0.045 : 0.055, start + 0.018);
+                        gainNode.gain.exponentialRampToValueAtTime(0.0001, end);
+
+                        oscillator.connect(gainNode);
+                        gainNode.connect(notificationAudioContext.destination);
+                        oscillator.start(start);
+                        oscillator.stop(end + 0.02);
+                    });
+                } catch (error) {
+                    // Les sons restent un enrichissement progressif : l'application continue sans audio.
+                }
+            }
+
+            window.anbgPlayNotificationSound = playNotificationSound;
+            window.addEventListener('pointerdown', unlockNotificationSound, { once: true, passive: true });
+            window.addEventListener('keydown', unlockNotificationSound, { once: true });
+            window.addEventListener('anbg:message-received', function (event) {
+                var count = Number((event.detail || {}).count || 1);
+                if (count > 0) {
+                    updateMessagingBadge(previousMessageUnreadCount + count);
+                    playNotificationSound('message');
+                }
+            });
+            window.addEventListener('anbg:alert-received', function () {
+                playNotificationSound('alert');
+            });
+
+            var lastScrollY = window.scrollY || 0;
+            var headerScrollTicking = false;
+
+            function syncHeaderVisibility() {
+                headerScrollTicking = false;
+
+                if (!adminHeader) {
+                    return;
+                }
+
+                var currentScrollY = window.scrollY || 0;
+                var isScrollingDown = currentScrollY > lastScrollY;
+                var shouldHide = isScrollingDown && currentScrollY > 120;
+
+                adminHeader.classList.toggle('admin-navbar-hidden', shouldHide);
+                lastScrollY = Math.max(currentScrollY, 0);
+            }
+
+            window.addEventListener('scroll', function () {
+                if (headerScrollTicking) {
+                    return;
+                }
+
+                headerScrollTicking = true;
+                window.requestAnimationFrame(syncHeaderVisibility);
+            }, { passive: true });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key !== '/' || !globalSearchInput) {
+                    return;
+                }
+
+                var target = event.target;
+                var isTyping = target instanceof HTMLInputElement
+                    || target instanceof HTMLTextAreaElement
+                    || target instanceof HTMLSelectElement
+                    || (target && target.isContentEditable);
+
+                if (isTyping) {
+                    return;
+                }
+
+                event.preventDefault();
+                if (document.body.classList.contains('sidebar-collapsed')) {
+                    document.body.classList.remove('sidebar-collapsed');
+                    try { window.localStorage.setItem('anbg:sidebar:collapsed', '0'); } catch (e) {}
+                }
+                globalSearchInput.focus();
+                globalSearchInput.select();
+            });
 
             var sidebar = document.getElementById('admin-sidebar');
             var openButton = document.getElementById('admin-sidebar-open');
             var closeButton = document.getElementById('admin-sidebar-close');
             var overlay = document.getElementById('admin-overlay');
-            var sidebarLabelScroll = sidebar ? sidebar.querySelector('[data-gooey-nav-scroll]') : null;
-            var sidebarLabelLayer = sidebar ? sidebar.querySelector('[data-gooey-label-layer]') : null;
-            var sidebarFloatingLabel = sidebar ? sidebar.querySelector('[data-gooey-floating-label]') : null;
-            var sidebarLabelItems = sidebar ? Array.prototype.slice.call(sidebar.querySelectorAll('.gooey-item[data-label]')) : [];
-            var sidebarActiveLabelItem = sidebar ? sidebar.querySelector('.gooey-item[data-active="1"]') : null;
-            var sidebarCurrentLabelItem = null;
-            var sidebarScrollStorageKey = 'anbg:sidebar:scroll:{{ auth()->id() ?? 'guest' }}';
-            var sidebarScrollSaveFrame = null;
             var messagingWrapper = document.getElementById('header-messaging');
             var messagingToggle = document.getElementById('header-messaging-toggle');
             var messagingMenu = document.getElementById('header-messaging-menu');
+            var messagingBadge = document.getElementById('header-messaging-badge');
+            var messagingEndpoint = messagingMenu ? messagingMenu.getAttribute('data-messages-endpoint') : null;
+            var messagingLoadedAt = 0;
+            var messagingPending = null;
             var notificationsWrapper = document.getElementById('header-notifications');
             var notificationsToggle = document.getElementById('header-notifications-toggle');
             var notificationsMenu = document.getElementById('header-notifications-menu');
@@ -509,6 +690,10 @@
             var notificationsAlertsItems = document.getElementById('header-alerts-items');
             var notificationsAlertsLoadedAt = 0;
             var notificationsAlertsPending = null;
+            var previousAlertUnreadCount = Number(@json((int) $headerAlertUnreadCount));
+            var previousMessageUnreadCount = Number(@json((int) $headerMessageUnreadCount));
+            var notificationAudioContext = null;
+            var notificationSoundUnlocked = false;
             var dialogRoot = document.getElementById('anbg-dialog');
             var dialogBackdrop = dialogRoot ? dialogRoot.querySelector('[data-dialog-dismiss]') : null;
             var dialogClose = document.getElementById('anbg-dialog-close');
@@ -551,156 +736,6 @@
                 overlay.addEventListener('click', closeSidebar);
             }
 
-            function sidebarLabelsEnabled() {
-                return !!(sidebar && sidebarLabelLayer && sidebarFloatingLabel) && window.matchMedia('(min-width: 1024px)').matches;
-            }
-
-            function hideSidebarFloatingLabel() {
-                if (!sidebarFloatingLabel) {
-                    return;
-                }
-
-                sidebarFloatingLabel.classList.remove('is-visible');
-                sidebarCurrentLabelItem = null;
-            }
-
-            function showSidebarFloatingLabel(item) {
-                if (!sidebarLabelsEnabled() || !item || !sidebarFloatingLabel || !sidebar) {
-                    hideSidebarFloatingLabel();
-                    return;
-                }
-
-                var trigger = item.querySelector('.gooey-link, .gooey-logout');
-                var label = item.dataset.label;
-
-                if (!trigger || !label) {
-                    hideSidebarFloatingLabel();
-                    return;
-                }
-
-                var sidebarRect = sidebar.getBoundingClientRect();
-                var triggerRect = trigger.getBoundingClientRect();
-                var top = triggerRect.top - sidebarRect.top + (triggerRect.height / 2);
-                var left = triggerRect.right - sidebarRect.left + 10;
-
-                sidebarFloatingLabel.textContent = label;
-                sidebarFloatingLabel.style.top = top + 'px';
-                sidebarFloatingLabel.style.left = left + 'px';
-                sidebarFloatingLabel.classList.add('is-visible');
-                sidebarCurrentLabelItem = item;
-            }
-
-            function restoreSidebarFloatingLabel() {
-                if (!sidebarLabelsEnabled()) {
-                    hideSidebarFloatingLabel();
-                    return;
-                }
-
-                if (sidebarActiveLabelItem) {
-                    showSidebarFloatingLabel(sidebarActiveLabelItem);
-                    return;
-                }
-
-                hideSidebarFloatingLabel();
-            }
-
-            function persistSidebarScrollPosition() {
-                if (!sidebarLabelScroll) {
-                    return;
-                }
-
-                try {
-                    window.localStorage.setItem(sidebarScrollStorageKey, String(sidebarLabelScroll.scrollTop));
-                } catch (error) {
-                    // no-op: sidebar scroll persistence is a progressive enhancement
-                }
-            }
-
-            function queueSidebarScrollPositionSave() {
-                if (!sidebarLabelScroll) {
-                    return;
-                }
-
-                if (sidebarScrollSaveFrame) {
-                    window.cancelAnimationFrame(sidebarScrollSaveFrame);
-                }
-
-                sidebarScrollSaveFrame = window.requestAnimationFrame(function () {
-                    sidebarScrollSaveFrame = null;
-                    persistSidebarScrollPosition();
-                });
-            }
-
-            function restoreSidebarScrollPosition() {
-                if (!sidebarLabelScroll) {
-                    return;
-                }
-
-                var savedScrollTop = null;
-
-                try {
-                    savedScrollTop = window.localStorage.getItem(sidebarScrollStorageKey);
-                } catch (error) {
-                    savedScrollTop = null;
-                }
-
-                window.requestAnimationFrame(function () {
-                    var parsedScrollTop = savedScrollTop === null ? Number.NaN : Number(savedScrollTop);
-
-                    if (Number.isFinite(parsedScrollTop) && parsedScrollTop >= 0) {
-                        sidebarLabelScroll.scrollTop = parsedScrollTop;
-                    } else if (sidebarActiveLabelItem) {
-                        var activeTrigger = sidebarActiveLabelItem.querySelector('.gooey-link, .gooey-logout');
-                        if (activeTrigger && typeof activeTrigger.scrollIntoView === 'function') {
-                            activeTrigger.scrollIntoView({
-                                block: 'center',
-                                inline: 'nearest',
-                            });
-                        }
-                    }
-
-                    persistSidebarScrollPosition();
-                    restoreSidebarFloatingLabel();
-                });
-            }
-
-            sidebarLabelItems.forEach(function (item) {
-                var trigger = item.querySelector('.gooey-link, .gooey-logout');
-                if (!trigger) {
-                    return;
-                }
-
-                item.addEventListener('mouseenter', function () {
-                    showSidebarFloatingLabel(item);
-                });
-
-                item.addEventListener('mouseleave', function () {
-                    restoreSidebarFloatingLabel();
-                });
-
-                trigger.addEventListener('focus', function () {
-                    showSidebarFloatingLabel(item);
-                });
-
-                trigger.addEventListener('blur', function () {
-                    window.requestAnimationFrame(restoreSidebarFloatingLabel);
-                });
-
-                trigger.addEventListener('click', persistSidebarScrollPosition);
-            });
-
-            if (sidebarLabelScroll) {
-                sidebarLabelScroll.addEventListener('scroll', function () {
-                    if (sidebarCurrentLabelItem) {
-                        showSidebarFloatingLabel(sidebarCurrentLabelItem);
-                    }
-
-                    queueSidebarScrollPositionSave();
-                });
-            }
-
-            restoreSidebarScrollPosition();
-
             function escapeHtml(value) {
                 return String(value == null ? '' : value)
                     .replace(/&/g, '&amp;')
@@ -725,6 +760,72 @@
                 return 'anbg-badge anbg-badge-info';
             }
 
+            function updateMessagingBadge(unread) {
+                previousMessageUnreadCount = Math.max(0, Number(unread || 0));
+
+                if (!messagingBadge) {
+                    return;
+                }
+
+                messagingBadge.textContent = previousMessageUnreadCount > 99 ? '99+' : String(previousMessageUnreadCount);
+                messagingBadge.classList.toggle('hidden', previousMessageUnreadCount <= 0);
+            }
+
+            function renderNavbarMessageSummary(payload) {
+                var unread = Number((payload && payload.unread_count) || 0);
+
+                if (unread > previousMessageUnreadCount) {
+                    window.dispatchEvent(new CustomEvent('anbg:message-received', {
+                        detail: { count: unread - previousMessageUnreadCount }
+                    }));
+                    return;
+                }
+
+                updateMessagingBadge(unread);
+            }
+
+            function loadNavbarMessages(forceRefresh) {
+                if (!messagingEndpoint) {
+                    return Promise.resolve();
+                }
+
+                var isFresh = messagingLoadedAt > 0 && (Date.now() - messagingLoadedAt) < 60000;
+                if (!forceRefresh && isFresh) {
+                    return Promise.resolve();
+                }
+
+                if (messagingPending) {
+                    return messagingPending;
+                }
+
+                messagingPending = window.fetch(messagingEndpoint, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('messages_dropdown_failed');
+                        }
+
+                        return response.json();
+                    })
+                    .then(function (payload) {
+                        messagingLoadedAt = Date.now();
+                        renderNavbarMessageSummary(payload);
+                    })
+                    .catch(function () {
+                        // La messagerie reste consultable meme si la synthese temps reel echoue.
+                    })
+                    .finally(function () {
+                        messagingPending = null;
+                    });
+
+                return messagingPending;
+            }
+
             function renderNavbarAlertSummary(payload) {
                 if (!notificationsAlertsSummary) {
                     return;
@@ -735,6 +836,12 @@
 
                 if (notificationsBadge) {
                     var unread = Number(summary.unread || 0);
+                    if (unread > previousAlertUnreadCount) {
+                        window.dispatchEvent(new CustomEvent('anbg:alert-received', {
+                            detail: { unread: unread }
+                        }));
+                    }
+                    previousAlertUnreadCount = unread;
                     notificationsBadge.textContent = unread > 99 ? '99+' : String(unread);
                     notificationsBadge.classList.toggle('hidden', unread <= 0);
                 }
@@ -748,7 +855,7 @@
                 var summary = payload && payload.kpi_summary ? payload.kpi_summary : {};
                 var cards = [
                     ['Global', summary.global],
-                    ['Qualite', summary.qualite],
+                    ['Qualité', summary.qualite],
                     ['Risque', summary.risque],
                     ['Progression', summary.progression],
                 ].filter(function (row) {
@@ -777,7 +884,7 @@
 
                 var items = payload && Array.isArray(payload.items) ? payload.items : [];
                 if (!items.length) {
-                    notificationsAlertsItems.innerHTML = '<div class="px-3 py-4 text-xs text-slate-500 dark:text-slate-400">Aucune alerte recente.</div>';
+                    notificationsAlertsItems.innerHTML = '<div class="admin-dropdown-empty px-3 py-4 text-xs text-[#667085]">Aucune alerte recente.</div>';
                     return;
                 }
 
@@ -785,7 +892,7 @@
                     var metrics = item.metrics || {};
                     var metricChips = [
                         ['Global', metrics.kpi_global],
-                        ['Qualite', metrics.kpi_qualite],
+                        ['Qualité', metrics.kpi_qualite],
                         ['Risque', metrics.kpi_risque],
                     ].filter(function (row) {
                         return typeof row[1] !== 'undefined';
@@ -797,14 +904,14 @@
                         ? '<span class="anbg-badge anbg-badge-info px-2 py-0.5 text-[10px]">Escalade ' + escapeHtml(item.escalation_label) + '</span>'
                         : '';
 
-                    return '<a href="' + escapeHtml(item.read_url || item.target_url || '#') + '" class="block border-b border-slate-100 px-3 py-2 transition last:border-b-0 hover:bg-slate-50 dark:border-slate-900 dark:hover:bg-slate-900/60 ' + (item.is_unread ? 'bg-[#fff8d6]/70 dark:bg-[#f8e932]/10' : '') + '">' +
+                    return '<a href="' + escapeHtml(item.read_url || item.target_url || '#') + '" class="block border-b border-[#d8ecf8] px-3 py-2 transition last:border-b-0 hover:bg-[#eaf6fd] ' + (item.is_unread ? 'bg-[#eaf6fd]' : '') + '">' +
                         '<div class="mb-1 flex items-start justify-between gap-2">' +
-                            '<p class="text-sm font-semibold text-slate-900 dark:text-slate-100">' + escapeHtml(item.titre || 'Alerte') + '</p>' +
+                            '<p class="text-sm font-semibold text-[#17324a]">' + escapeHtml(item.titre || 'Alerte') + '</p>' +
                             '<span class="' + notificationAlertTone(String(item.niveau || 'info')) + ' px-2 py-0.5 text-[10px]">' + escapeHtml(item.niveau_label || item.niveau || 'Info') + '</span>' +
                         '</div>' +
-                        '<p class="text-xs text-slate-600 dark:text-slate-300">' + escapeHtml(item.message || '') + '</p>' +
+                        '<p class="text-xs text-[#667085]">' + escapeHtml(item.message || '') + '</p>' +
                         '<div class="mt-2 flex flex-wrap items-center gap-2">' + metricChips + escalation + '</div>' +
-                        '<p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">' + escapeHtml(item.date_label || '') + '</p>' +
+                        '<p class="mt-1 text-[11px] text-[#667085]">' + escapeHtml(item.date_label || '') + '</p>' +
                     '</a>';
                 }).join('');
             }
@@ -852,7 +959,7 @@
                             notificationsAlertsKpis.innerHTML = '';
                         }
                         if (notificationsAlertsItems) {
-                            notificationsAlertsItems.innerHTML = '<div class="px-3 py-4 text-xs text-slate-500 dark:text-slate-400">Ouvrir le centre d alertes pour consulter le detail.</div>';
+                            notificationsAlertsItems.innerHTML = '<div class="admin-dropdown-empty px-3 py-4 text-xs text-[#667085]">Ouvrir le centre d\'alertes pour consulter le detail.</div>';
                         }
                     })
                     .finally(function () {
@@ -860,6 +967,18 @@
                     });
 
                 return notificationsAlertsPending;
+            }
+
+            if (notificationsAlertsEndpoint) {
+                window.setInterval(function () {
+                    loadNavbarAlerts(true);
+                }, 60000);
+            }
+
+            if (messagingEndpoint) {
+                window.setInterval(function () {
+                    loadNavbarMessages(true);
+                }, 60000);
             }
 
             function openNotificationsMenu() {
@@ -884,6 +1003,7 @@
                 }
                 closeNotificationsMenu();
                 messagingMenu.classList.remove('hidden');
+                loadNavbarMessages(false);
             }
 
             function closeMessagingMenu() {
@@ -946,7 +1066,7 @@
                     dialogEyebrow.textContent = dialogState.eyebrow || 'Confirmation';
                 }
 
-                dialogTitle.textContent = dialogState.title || 'Confirmer l action';
+                dialogTitle.textContent = dialogState.title || 'Confirmer l\'action';
                 dialogMessage.textContent = dialogState.message || '';
                 dialogCancel.textContent = dialogState.cancelLabel || 'Annuler';
                 dialogConfirm.textContent = dialogState.confirmLabel || 'Confirmer';
@@ -991,7 +1111,7 @@
 
                     if (value.length < minLength) {
                         if (dialogError) {
-                            dialogError.textContent = 'Veuillez saisir au moins ' + minLength + ' caracteres.';
+                            dialogError.textContent = 'Veuillez saisir au moins ' + minLength + ' caractères.';
                             dialogError.classList.remove('hidden');
                         }
                         if (dialogInput) {
@@ -1136,7 +1256,7 @@
                 openDialog({
                     mode: 'confirm',
                     eyebrow: form.dataset.confirmTone === 'danger' ? 'Action sensible' : 'Confirmation',
-                    title: form.dataset.confirmTitle || 'Confirmer l action',
+                    title: form.dataset.confirmTitle || 'Confirmer l\'action',
                     message: confirmMessage,
                     tone: form.dataset.confirmTone || 'primary',
                     confirmLabel: form.dataset.confirmLabel || 'Confirmer',
@@ -1181,6 +1301,68 @@
 
             syncSidebarForViewport();
             window.addEventListener('resize', syncSidebarForViewport);
+
+            (function initSidebarSearch() {
+                var searchInput = document.getElementById('sidebar-search-input');
+                var searchWrap = document.querySelector('[data-sidebar-search-wrap]');
+                if (!searchInput || !sidebar) {
+                    return;
+                }
+
+                function filterSidebar(query) {
+                    var q = query.toLowerCase().trim();
+                    sidebar.querySelectorAll('section').forEach(function (section) {
+                        var visibleLinks = 0;
+                        section.querySelectorAll('[data-sidebar-label]').forEach(function (label) {
+                            var link = label.closest('a, button');
+                            if (!link) {
+                                return;
+                            }
+                            var text = (label.textContent || '').toLowerCase();
+                            var matches = q === '' || text.includes(q);
+                            link.style.display = matches ? '' : 'none';
+                            if (matches) {
+                                visibleLinks++;
+                            }
+                        });
+                        var title = section.querySelector('.app-sidebar-section-title');
+                        if (title) {
+                            title.style.display = visibleLinks === 0 ? 'none' : '';
+                        }
+                    });
+                }
+
+                searchInput.addEventListener('input', function () {
+                    filterSidebar(searchInput.value);
+                });
+
+                document.addEventListener('body-class-change', function () {
+                    if (document.body.classList.contains('sidebar-collapsed') && searchWrap) {
+                        searchWrap.style.display = 'none';
+                    } else if (searchWrap) {
+                        searchWrap.style.display = '';
+                    }
+                });
+
+                if (document.body.classList.contains('sidebar-collapsed') && searchWrap) {
+                    searchWrap.style.display = 'none';
+                }
+
+                var collapseToggle = document.querySelector('[data-sidebar-collapse-toggle]');
+                if (collapseToggle) {
+                    collapseToggle.addEventListener('click', function () {
+                        setTimeout(function () {
+                            if (document.body.classList.contains('sidebar-collapsed') && searchWrap) {
+                                searchWrap.style.display = 'none';
+                                searchInput.value = '';
+                                filterSidebar('');
+                            } else if (searchWrap) {
+                                searchWrap.style.display = '';
+                            }
+                        }, 230);
+                    });
+                }
+            })();
 
         })();
     </script>

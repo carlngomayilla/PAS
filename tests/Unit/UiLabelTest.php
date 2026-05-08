@@ -12,17 +12,17 @@ class UiLabelTest extends TestCase
     public function it_maps_action_and_validation_statuses_to_french_labels(): void
     {
         self::assertSame('En cours', UiLabel::actionStatus('en_cours'));
-        self::assertSame('Acheve hors delai', UiLabel::actionStatus('acheve_hors_delai'));
-        self::assertSame('Validee service', UiLabel::validationStatus('validee_chef'));
-        self::assertSame('Validee', UiLabel::validationStatus('validee_direction'));
+        self::assertSame('Achevé hors délai', UiLabel::actionStatus('acheve_hors_delai'));
+        self::assertSame('Validée service', UiLabel::validationStatus('validee_chef'));
+        self::assertSame('Validée', UiLabel::validationStatus('validee_direction'));
     }
 
     #[Test]
     public function it_maps_workflow_and_delegation_statuses_to_secondary_screen_labels(): void
     {
         self::assertSame('Brouillon', UiLabel::workflowStatus('brouillon'));
-        self::assertSame('Valide ou verrouille', UiLabel::workflowStatus('valide_ou_verrouille'));
+        self::assertSame('Validé ou verrouillé', UiLabel::workflowStatus('valide_ou_verrouille'));
         self::assertSame('Active', UiLabel::delegationStatus('active'));
-        self::assertSame('Expiree', UiLabel::delegationStatus('expired'));
+        self::assertSame('Expirée', UiLabel::delegationStatus('expired'));
     }
 }

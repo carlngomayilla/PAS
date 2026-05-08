@@ -165,10 +165,10 @@ php artisan view:cache
 php artisan anbg:health-check
 ```
 
-Regeneration du jeu de demonstration planning sans repartir d'une base vide :
+Reseed production-safe avec organisation, parametrage et PAS institutionnels officiels, sans PAO/PTA/actions de demonstration :
 
 ```bash
-php artisan db:seed --class=RefreshPlanningDemoSeeder --force
+php artisan db:seed --class=ProductionSafeSeeder --force
 ```
 
 Reseed du referentiel ANBG seul :
@@ -287,6 +287,5 @@ Les commandes de seed ci-dessous sont prevues pour la demo locale ou les environ
 
 ```bash
 php artisan migrate:fresh --seed --force
-php artisan db:seed --class=RefreshPlanningDemoSeeder --force
 php artisan db:seed --class=AnbgOrganizationSeeder --force
 ```

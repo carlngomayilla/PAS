@@ -78,8 +78,8 @@ class SuperAdminPlatformConfigurationTest extends TestCase
             ];
         }
 
-        $payload['reporting']['label'] = 'Analyse publiee';
-        $payload['reporting']['enabled'] = '0';
+        $payload['pilotage']['label'] = 'Analyse publiee';
+        $payload['pilotage']['enabled'] = '0';
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.modules.draft'), ['modules' => $payload])
@@ -87,7 +87,7 @@ class SuperAdminPlatformConfigurationTest extends TestCase
 
         $this->assertDatabaseHas('platform_settings', [
             'group' => 'workspace_modules_draft',
-            'key' => 'workspace_module_draft_reporting',
+            'key' => 'workspace_module_draft_pilotage',
         ]);
         $this->assertDatabaseHas('journal_audit', [
             'module' => 'super_admin',
@@ -100,11 +100,11 @@ class SuperAdminPlatformConfigurationTest extends TestCase
 
         $this->assertDatabaseHas('platform_settings', [
             'group' => 'workspace_modules',
-            'key' => 'workspace_module_reporting',
+            'key' => 'workspace_module_pilotage',
         ]);
         $this->assertDatabaseMissing('platform_settings', [
             'group' => 'workspace_modules_draft',
-            'key' => 'workspace_module_draft_reporting',
+            'key' => 'workspace_module_draft_pilotage',
         ]);
         $this->assertDatabaseHas('journal_audit', [
             'module' => 'super_admin',
@@ -112,7 +112,7 @@ class SuperAdminPlatformConfigurationTest extends TestCase
         ]);
 
         $draftAgain = $payload;
-        $draftAgain['alertes']['label'] = 'Alertes laterales';
+        $draftAgain['pilotage']['label'] = 'Pilotage lateral';
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.modules.draft'), ['modules' => $draftAgain])
@@ -124,7 +124,7 @@ class SuperAdminPlatformConfigurationTest extends TestCase
 
         $this->assertDatabaseMissing('platform_settings', [
             'group' => 'workspace_modules_draft',
-            'key' => 'workspace_module_draft_alertes',
+            'key' => 'workspace_module_draft_pilotage',
         ]);
         $this->assertDatabaseHas('journal_audit', [
             'module' => 'super_admin',

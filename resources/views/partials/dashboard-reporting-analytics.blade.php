@@ -24,6 +24,8 @@
     $resourceTreemap = $reportingCharts['resource_treemap'] ?? ['labels' => [], 'values' => [], 'total' => 0];
     $topRisks = $reportingCharts['top_risks'] ?? ['rows' => []];
     $performanceGauge = $reportingCharts['performance_gauge'] ?? ['labels' => [], 'values' => []];
+    $performanceGaugeScopeLabel = (string) ($performanceGauge['scope_label'] ?? 'Directions');
+    $performanceGaugeEmptyLabel = (string) ($performanceGauge['empty_label'] ?? 'Aucune donnee disponible pour les jauges.');
     $structureHighlights = collect($reportingDetails['structure_rapports'] ?? collect())
         ->take(6)
         ->values();
@@ -37,7 +39,7 @@
     $reportingSummaryCards = [
         ['label' => 'PAS scopes', 'value' => $reportingGlobal['pas_total'] ?? 0, 'tone' => 'navy', 'meta' => 'Strategie couverte', 'href' => route('workspace.pas.index'), 'badge' => null, 'badge_tone' => 'info'],
         ['label' => 'Mesures d indicateur', 'value' => $reportingGlobal['kpi_mesures_total'] ?? 0, 'tone' => 'blue', 'meta' => 'Mesures suivies', 'href' => route('workspace.reporting'), 'badge' => null, 'badge_tone' => 'warning'],
-        ['label' => 'Alertes retard', 'value' => $reportingAlerts['actions_en_retard'] ?? 0, 'tone' => 'amber', 'meta' => 'Suivi a traiter', 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => null, 'badge_tone' => 'danger'],
+        ['label' => 'Alertes retard', 'value' => $reportingAlerts['actions_en_retard'] ?? 0, 'tone' => 'amber', 'meta' => 'Suivi à traiter', 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => null, 'badge_tone' => 'danger'],
         ['label' => 'Indicateurs sous seuil', 'value' => $reportingAlerts['mesures_kpi_sous_seuil'] ?? 0, 'tone' => 'green', 'meta' => 'Mesures critiques', 'href' => route('workspace.alertes', ['niveau' => 'warning', 'limit' => 100]), 'badge' => null, 'badge_tone' => 'success'],
     ];
     $statusCards = collect($reportingStatuses)
@@ -190,7 +192,7 @@
             @if (($criticalGantt['items'] ?? []) !== [])
                 <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-critical-gantt-chart" class="dashboard-chart-host"></div></div>
             @else
-                <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune action critique detectee.</div>
+                <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action critique détectée.</div>
             @endif
         </article>
 
@@ -204,10 +206,10 @@
         </article>
     </div>
 
-    <article class="dashboard-advanced-card mt-4">
+        <article class="dashboard-advanced-card mt-4">
         <div class="dashboard-advanced-head">
             <div>
-                <h2 class="showcase-panel-title">Jauges de performance par direction</h2>
+                <h2 class="showcase-panel-title">Jauges de performance par {{ strtolower($performanceGaugeScopeLabel) }}</h2>
             </div>
         </div>
         <div class="dashboard-gauge-grid">
@@ -220,7 +222,7 @@
                     <p>{{ number_format((float) ($performanceGauge['values'][$index] ?? 0), 2) }}%</p>
                 </article>
             @empty
-                <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune direction disponible pour les jauges.</div>
+                <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">{{ $performanceGaugeEmptyLabel }}</div>
             @endforelse
         </div>
     </article>
@@ -239,7 +241,7 @@
                     <thead>
                         <tr>
                             <th>PAS</th>
-                            <th>Periode</th>
+                            <th>Période</th>
                             <th>Axes</th>
                             <th>Objectifs</th>
                             <th>PAO</th>
@@ -282,13 +284,13 @@
                         <div class="flex items-center justify-between gap-3">
                             <div>
                                 <div class="dashboard-status-block-title mb-1">{{ $card['module'] }}</div>
-                                <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $card['total'] }} elements suivis</div>
+                                <div class="text-sm font-semibold text-[#17324a]">{{ $card['total'] }} elements suivis</div>
                             </div>
                             <span class="dashboard-pill">{{ $card['top_total'] }} x {{ $card['top_status'] }}</span>
                         </div>
                     </div>
                 @empty
-                    <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune vue statutaire disponible.</div>
+                    <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune vue statutaire disponible.</div>
                 @endforelse
             </div>
         </article>
@@ -348,29 +350,32 @@
                             <th>Action</th>
                             <th>Score</th>
                             <th>Statut</th>
-                            <th>Echeance</th>
+                            <th>Échéance</th>
                             <th>Responsable</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($topRisks['rows'] as $row)
+                            @php
+                                $riskScore = (float) ($row['score'] ?? 0);
+                            @endphp
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] ?? '' }}">
-                                <td class="font-semibold">{{ $row['action'] }}</td>
+                                <td class="font-semibold">{{ $row['action'] ?? '-' }}</td>
                                 <td>
                                     <div class="dashboard-risk-inline">
-                                        <span>{{ number_format((float) $row['score'], 1) }}</span>
+                                        <span>{{ number_format($riskScore, 1) }}</span>
                                         <span class="dashboard-risk-inline-bar">
-                                            <span style="width: {{ min(100, max(6, (float) $row['score'])) }}%;"></span>
+                                            <span style="width: {{ min(100, max(6, $riskScore)) }}%;"></span>
                                         </span>
                                     </div>
                                 </td>
-                                <td>{{ $row['statut'] }}</td>
-                                <td>{{ $row['echeance'] }}</td>
-                                <td>{{ $row['responsable'] }}</td>
+                                <td>{{ $row['statut'] ?? '-' }}</td>
+                                <td>{{ $row['echeance'] ?? '-' }}</td>
+                                <td>{{ $row['responsable'] ?? '-' }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5">Aucune action a risque detectee.</td>
+                                <td colspan="5">Aucune action à risque détectée.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -386,26 +391,24 @@
             </div>
             <div class="grid gap-3">
                 @forelse ($structureHighlights as $row)
-                    <article class="rounded-[1.05rem] border border-slate-200/85 bg-slate-50/90 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                    <article class="rounded-[1.05rem] border border-slate-200/85 bg-slate-50/90 p-4">
                         <div class="flex flex-wrap items-center justify-between gap-2">
-                            <strong class="text-slate-900 dark:text-slate-100">{{ $row['objectif_operationnel'] ?: '-' }}</strong>
+                            <strong class="text-[#17324a]">{{ $row['objectif_operationnel'] ?: '-' }}</strong>
                             <span class="dashboard-pill">{{ $row['etat_realisation'] ?: 'non renseigne' }}</span>
                         </div>
-                        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ $row['description_actions_detaillees'] ?: 'Aucune description detaillee.' }}</p>
+                        <p class="mt-2 text-sm text-[#667085]">{{ $row['description_actions_detaillees'] ?: 'Aucune description detaillee.' }}</p>
                         <div class="mt-3 grid gap-2 md:grid-cols-2">
-                            <div class="text-xs text-slate-500 dark:text-slate-400"><strong class="text-slate-700 dark:text-slate-200">Ressources:</strong> {{ $row['ressources_requises'] ?: '-' }}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400"><strong class="text-slate-700 dark:text-slate-200">Indicateurs:</strong> {{ $row['indicateurs_performance'] ?: '-' }}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400"><strong class="text-slate-700 dark:text-slate-200">Cible:</strong> {{ $row['cible'] ?: '-' }}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400"><strong class="text-slate-700 dark:text-slate-200">Risques:</strong> {{ $row['risques_potentiels'] ?: '-' }}</div>
+                            <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Ressources:</strong> {{ $row['ressources_requises'] ?: '-' }}</div>
+                            <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Indicateurs:</strong> {{ $row['indicateurs_performance'] ?: '-' }}</div>
+                            <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Cible:</strong> {{ $row['cible'] ?: '-' }}</div>
+                            <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Risques:</strong> {{ $row['risques_potentiels'] ?: '-' }}</div>
                         </div>
                     </article>
                 @empty
-                    <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">Aucune extraction de structure disponible.</div>
+                    <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune extraction de structure disponible.</div>
                 @endforelse
             </div>
         </article>
     </div>
     @endif
 </div>
-
-

@@ -4,33 +4,24 @@
     @php
         $currentUser = auth()->user();
         $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
-        $visibleRows = collect($rows->items());
-        $draftCount = $visibleRows->where('statut', 'brouillon')->count();
-        $validatedCount = $visibleRows->filter(fn ($item) => in_array((string) $item->statut, ['valide', 'verrouille'], true))->count();
-        $actionsTotal = (int) $visibleRows->sum('actions_count');
-        $servicesCovered = $visibleRows->pluck('service_id')->filter()->unique()->count();
+        $ps = is_array($ptaStats ?? null) ? $ptaStats : [];
         $summaryCards = [
-            ['label' => 'Total', 'value' => $rows->total(), 'meta' => 'PTA dans le perimetre courant', 'href' => route('workspace.pta.index'), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Brouillons visibles', 'value' => $draftCount, 'meta' => 'Plans en construction', 'href' => route('workspace.pta.index', ['statut' => 'brouillon']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Valides / verrouilles', 'value' => $validatedCount, 'meta' => 'PTA prets pour l execution', 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Actions / services', 'value' => $actionsTotal.' / '.$servicesCovered, 'meta' => 'Actions visibles et services couverts', 'href' => route('workspace.actions.index'), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Total PTA',            'value' => $ps['total'] ?? $rows->total(),   'meta' => null, 'href' => route('workspace.pta.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Actifs',               'value' => $ps['actifs'] ?? 0,               'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Brouillons',           'value' => $ps['brouillons'] ?? 0,           'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'brouillon']),  'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Actions associées',    'value' => $ps['actions_total'] ?? 0,        'meta' => null, 'href' => route('workspace.actions.index'),                         'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Services couverts',    'value' => $ps['services'] ?? 0,             'meta' => null, 'href' => route('workspace.pta.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Sans action',          'value' => $ps['sans_action'] ?? 0,          'meta' => null, 'href' => route('workspace.pta.index', ['without_action' => 1]),    'badge' => null, 'badge_tone' => ($ps['sans_action'] ?? 0) > 0 ? 'warning' : 'neutral'],
         ];
     @endphp
 
     <div class="app-screen-flow">
-    <section class="showcase-hero mb-4 app-screen-block">
-        <div class="showcase-hero-body">
-            <div>
-                <span class="showcase-eyebrow">Execution par service</span>
-                <h1 class="showcase-title">PTA</h1>
-            </div>
-            <div class="showcase-action-row">
-                @if ($canWrite)
-                    <a class="btn btn-green" href="{{ route('workspace.pta.create') }}">Nouveau PTA</a>
-                @endif
-            </div>
-        </div>
-    </section>
+    <div class="mb-4 flex items-center justify-between gap-3">
+        <h1 class="text-xl font-bold text-[#1a1a1a]">PTA</h1>
+        @if ($canWrite)
+            <a class="btn btn-primary" href="{{ route('workspace.pta.create') }}">Nouveau PTA</a>
+        @endif
+    </div>
 
     <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
@@ -94,10 +85,10 @@
             @endif
             <div class="mt-4 flex flex-wrap gap-2">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.pta.index') }}">Reinitialiser</a>
+                <a class="btn btn-blue" href="{{ route('workspace.pta.index') }}">Réinitialiser</a>
             </div>
             @if ($filters['without_action'])
-                <div class="mt-4 rounded-[1rem] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <div class="mt-4 rounded-[1rem] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-900">
                     PTA sans action
                 </div>
             @endif
@@ -109,7 +100,7 @@
             <div>
                 <h2 class="showcase-panel-title">Liste des PTA</h2>
             </div>
-            <span class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ $rows->count() }} ligne(s)</span>
+            <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
         <div class="overflow-auto">
             <table>
@@ -121,7 +112,7 @@
                         <th>Direction</th>
                         <th>Service</th>
                         <th>Statut</th>
-                        <th>Actions</th>
+                        <th>Nb actions</th>
                         <th>Validateur</th>
                         @if ($canWrite)
                             <th>Operations</th>
@@ -157,7 +148,7 @@
                         <tr>
                             <td>#{{ $row->id }}</td>
                             <td>
-                                <div class="font-semibold text-slate-900 dark:text-slate-100">{{ $row->titre }}</div>
+                                <div class="font-semibold text-slate-900">{{ $row->titre }}</div>
                             </td>
                             <td>{{ $row->pao?->titre ?? '-' }}</td>
                             <td>{{ $row->direction?->code }} {{ $row->direction?->libelle ? '- '.$row->direction->libelle : '' }}</td>
@@ -209,7 +200,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 9 : 8 }}" class="text-slate-500 dark:text-slate-400">Aucun PTA trouve.</td>
+                            <td colspan="{{ $canWrite ? 9 : 8 }}" class="text-slate-500">Aucun PTA trouve.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -219,4 +210,3 @@
     </section>
     </div>
 @endsection
-

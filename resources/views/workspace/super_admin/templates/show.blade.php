@@ -8,7 +8,7 @@
         $readingLevelLabel = static fn (?string $value): string => $value ? ($readingLevelLabels[$value] ?? $value) : 'Non borne';
     @endphp
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Template d export</p>
@@ -40,31 +40,31 @@
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))] mb-3.5">
         <article class="ui-card !mb-0"><h2 class="text-base">Metadonnees</h2><p class="mt-2 text-sm text-slate-600">Code : <code>{{ $template->code }}</code></p><p class="mt-1 text-sm text-slate-600">Type de rapport : <strong>{{ $template->report_type }}</strong></p><p class="mt-1 text-sm text-slate-600">Profil cible : <strong>{{ $template->target_profile ?: 'Tous profils' }}</strong></p><p class="mt-1 text-sm text-slate-600">Titre document : <strong>{{ $template->documentTitle() }}</strong></p><p class="mt-1 text-sm text-slate-600">Prefixe fichier : <strong>{{ $template->filenamePrefix() }}</strong></p></article>
         <article class="ui-card !mb-0"><h2 class="text-base">Mise en page</h2><p class="mt-2 text-sm text-slate-600">Papier : <strong>{{ $template->paperSize() }}</strong></p><p class="mt-1 text-sm text-slate-600">Orientation : <strong>{{ $template->orientation() }}</strong></p><p class="mt-1 text-sm text-slate-600">Filigrane : <strong>{{ $template->layout_config['watermark_text'] ?? 'Aucun' }}</strong></p><p class="mt-1 text-sm text-slate-600">Police : <strong>{{ $template->style_config['font_family'] ?? 'Inter' }}</strong></p></article>
-        <article class="ui-card !mb-0"><h2 class="text-base">Cycle de vie</h2><p class="mt-2 text-sm text-slate-600">Cree par : <strong>{{ $template->creator?->name ?? 'Systeme' }}</strong></p><p class="mt-1 text-sm text-slate-600">Mis a jour par : <strong>{{ $template->updater?->name ?? 'Systeme' }}</strong></p><p class="mt-1 text-sm text-slate-600">Publie le : <strong>{{ $template->published_at?->format('Y-m-d H:i') ?? 'Non publie' }}</strong></p></article>
+        <article class="ui-card !mb-0"><h2 class="text-base">Cycle de vie</h2><p class="mt-2 text-sm text-slate-600">Créé par : <strong>{{ $template->creator?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Mis à jour par : <strong>{{ $template->updater?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Publié le : <strong>{{ $template->published_at?->format('Y-m-d H:i') ?? 'Non publié' }}</strong></p></article>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <h2>Apercu fonctionnel</h2>
         <div class="mt-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             @foreach (($template->blocks_config ?? []) as $block => $enabled)
                 <article class="ui-card !mb-0"><p class="text-sm text-slate-500">{{ $block }}</p><p class="mt-2 text-lg font-semibold">{{ $enabled ? 'Active' : 'Inactive' }}</p></article>
             @endforeach
         </div>
-        <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">Variables dynamiques</p>
+        <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-sm font-semibold text-slate-700">Variables dynamiques</p>
             <div class="mt-2 flex flex-wrap gap-2">@forelse (($template->content_config['dynamic_variables'] ?? []) as $variable)<code>{{ $variable }}</code>@empty<span class="text-sm text-slate-500">Aucune variable declaree.</span>@endforelse</div>
         </div>
-        <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">Options avancees</p>
-            <div class="mt-2 grid gap-2 md:grid-cols-2 text-sm text-slate-600 dark:text-slate-300">
+        <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-sm font-semibold text-slate-700">Options avancees</p>
+            <div class="mt-2 grid gap-2 md:grid-cols-2 text-sm text-slate-600">
                 <div>Excel freeze header : <strong>{{ ($template->layout_config['excel_freeze_header'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
                 <div>Excel auto filter : <strong>{{ ($template->layout_config['excel_auto_filter'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
                 <div>Feuille detail : <strong>{{ $template->layout_config['excel_detail_sheet_name'] ?? 'Reporting' }}</strong></div>
                 <div>Feuille graphique : <strong>{{ $template->layout_config['excel_graph_sheet_name'] ?? 'Synthese graphique' }}</strong></div>
                 <div>PDF legende niveaux : <strong>{{ ($template->layout_config['pdf_show_level_legend'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
-                <div>PDF cartes KPI : <strong>{{ ($template->layout_config['pdf_show_kpi_cards'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
+                <div>PDF cartes Indicateur de performance : <strong>{{ ($template->layout_config['pdf_show_kpi_cards'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
                 <div>Word sommaire : <strong>{{ ($template->layout_config['word_include_toc'] ?? false) ? 'Oui' : 'Non' }}</strong></div>
-                <div>Word saut apres synthese : <strong>{{ ($template->layout_config['word_page_break_after_summary'] ?? false) ? 'Oui' : 'Non' }}</strong></div>
+                <div>Word saut apres synthèse : <strong>{{ ($template->layout_config['word_page_break_after_summary'] ?? false) ? 'Oui' : 'Non' }}</strong></div>
             </div>
         </div>
     </section>
@@ -109,7 +109,7 @@
         </article>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <h2>Versions</h2>
         <div class="mt-4 overflow-x-auto">
             <table class="min-w-full text-sm">
@@ -120,7 +120,7 @@
                             <td class="px-3 py-2">v{{ $version->version_number }}</td>
                             <td class="px-3 py-2">{{ $version->status }}</td>
                             <td class="px-3 py-2">{{ $version->note ?: '-' }}</td>
-                            <td class="px-3 py-2">{{ $version->creator?->name ?? 'Systeme' }}</td>
+                            <td class="px-3 py-2">{{ $version->creator?->name ?? 'Système' }}</td>
                             <td class="px-3 py-2">{{ $version->created_at?->format('Y-m-d H:i') }}</td>
                             <td class="px-3 py-2">
                                 <div class="text-xs text-slate-500">
@@ -137,7 +137,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td class="px-3 py-4 text-slate-500" colspan="7">Aucune version n a encore ete publiee.</td></tr>
+                        <tr><td class="px-3 py-4 text-slate-500" colspan="7">Aucune version n'a encore été publiée.</td></tr>
                     @endforelse
                 </tbody>
             </table>

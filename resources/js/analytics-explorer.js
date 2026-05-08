@@ -216,7 +216,7 @@ function initAnalyticsExplorer() {
     bodyNode.innerHTML = '';
     subtitleNode.textContent = '';
     downloadButton.classList.add('hidden');
-    downloadButton.textContent = 'Telecharger';
+    downloadButton.textContent = 'Télécharger';
     downloadHandler = null;
 
     if (lastFocused && typeof lastFocused.focus === 'function') {
@@ -233,7 +233,7 @@ function initAnalyticsExplorer() {
 
     if (typeof onDownload === 'function') {
       downloadHandler = onDownload;
-      downloadButton.textContent = downloadLabel || 'Telecharger';
+      downloadButton.textContent = downloadLabel || 'Télécharger';
       downloadButton.classList.remove('hidden');
     } else {
       downloadHandler = null;
@@ -260,7 +260,7 @@ function initAnalyticsExplorer() {
         const csv = tableToCsv(table);
         downloadBlob(new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }), `${slugify(title)}.csv`);
       },
-      downloadLabel: 'Telecharger CSV',
+      downloadLabel: 'Télécharger CSV',
     });
   };
 
@@ -284,7 +284,7 @@ function initAnalyticsExplorer() {
         subtitle,
         content: image,
         onDownload: () => downloadDataUrl(canvas.toDataURL('image/png'), `${slugify(title)}.png`),
-        downloadLabel: 'Telecharger PNG',
+        downloadLabel: 'Télécharger PNG',
       });
       return;
     }
@@ -302,7 +302,7 @@ function initAnalyticsExplorer() {
           const dataUrl = await svgToPngDataUrl(svg);
           downloadDataUrl(dataUrl, `${slugify(title)}.png`);
         },
-        downloadLabel: 'Telecharger PNG',
+        downloadLabel: 'Télécharger PNG',
       });
     }
   };

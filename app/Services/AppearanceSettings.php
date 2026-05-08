@@ -191,19 +191,19 @@ class AppearanceSettings
     public function defaults(): array
     {
         return [
-            'primary_color' => '#243B5A',
-            'secondary_color' => '#516B8B',
-            'surface_color' => '#162338',
-            'success_color' => '#607861',
-            'accent_color' => '#A78F63',
-            'warning_color' => '#8E6A38',
-            'danger_color' => '#8B4D4A',
+            'primary_color' => '#3996D3',
+            'secondary_color' => '#1C203D',
+            'surface_color' => '#101A33',
+            'success_color' => '#8FC043',
+            'accent_color' => '#F8E932',
+            'warning_color' => '#F9B13C',
+            'danger_color' => '#B42318',
             'text_color' => '#0F172A',
             'muted_text_color' => '#64748B',
             'border_color' => '#CBD5E1',
             'card_background_color' => '#FFFFFF',
             'input_background_color' => '#FFFFFF',
-            'font_family' => 'Public Sans',
+            'font_family' => 'Manrope',
             'heading_font_family' => 'Source Serif 4',
             'default_theme' => 'dark',
             'sidebar_style' => 'aurora',
@@ -282,12 +282,12 @@ class AppearanceSettings
             '--app-card-background-rgb' => $this->hexToRgbTriplet($cardBackground),
             '--app-input-background-rgb' => $this->hexToRgbTriplet($inputBackground),
             '--anbg-blue-soft' => $this->hexToRgbTriplet($primary),
-            '--anbg-blue' => $this->hexToRgbTriplet($secondary),
-            '--anbg-blue-deep' => $this->hexToRgbTriplet($surface),
+            '--anbg-blue' => $this->hexToRgbTriplet($primary),
+            '--anbg-blue-deep' => $this->hexToRgbTriplet($secondary),
             '--anbg-navy' => $this->hexToRgbTriplet($surface),
             '--anbg-green' => $this->hexToRgbTriplet($success),
             '--anbg-lime' => $this->hexToRgbTriplet($accent),
-            '--anbg-gold' => $this->hexToRgbTriplet($warning),
+            '--anbg-gold' => $this->hexToRgbTriplet('#F0E509'),
             '--anbg-orange' => $this->hexToRgbTriplet($warning),
             '--app-font-family' => $this->fontStack($settings['font_family']),
             '--app-heading-font-family' => $this->headingFontStack($settings['heading_font_family']),
@@ -447,6 +447,10 @@ class AppearanceSettings
     }
     private function hasSettingsTable(): bool
     {
+        if ($this->shouldSkipDatabaseSettings()) {
+            return $this->tableAvailable = false;
+        }
+
         if ($this->tableAvailable !== null) {
             return $this->tableAvailable;
         }
@@ -456,6 +460,34 @@ class AppearanceSettings
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }
+    }
+
+    private function shouldSkipDatabaseSettings(): bool
+    {
+        $databaseSettingsEnabled = filter_var(
+            env('PLATFORM_SETTINGS_DATABASE', true),
+            FILTER_VALIDATE_BOOLEAN,
+            FILTER_NULL_ON_FAILURE
+        );
+
+        if ($databaseSettingsEnabled === false) {
+            return true;
+        }
+
+        if (app()->runningInConsole() && ! app()->runningUnitTests()) {
+            return true;
+        }
+
+        if (! app()->bound('request')) {
+            return false;
+        }
+
+        $request = request();
+        $path = trim((string) $request->getPathInfo(), '/');
+
+        return in_array($path, ['', 'login', 'forgot-password'], true)
+            || str_starts_with($path, 'password/')
+            || str_starts_with($path, 'reset-password/');
     }
 
     /**

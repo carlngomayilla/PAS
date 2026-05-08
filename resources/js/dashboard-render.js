@@ -1,7 +1,7 @@
 let dashboardBooted = false;
 
-function bootDashboardRender() {
-  if (dashboardBooted) {
+function bootDashboardRender(force = false) {
+  if (dashboardBooted && !force) {
     return;
   }
 
@@ -47,15 +47,15 @@ function bootDashboardRender() {
     maximumFractionDigits: 1,
   });
   const ANBG = {
-    primary: '#1E3A8A',
-    secondary: '#3B82F6',
-    light: '#EFF6FF',
+    primary: '#1C203D',
+    secondary: '#3996D3',
+    light: '#E8F3FB',
     white: '#FFFFFF',
-    dark: '#1F2937',
-    muted: '#6B7280',
-    success: '#10B981',
-    warning: '#F59E0B',
-    danger: '#EF4444',
+    dark: '#101A33',
+    muted: '#64748B',
+    success: '#8FC043',
+    warning: '#F9B13C',
+    danger: '#B42318',
   };
   let assetBootstrapPromise = null;
   let renderInFlight = false;
@@ -79,7 +79,7 @@ function bootDashboardRender() {
       ctx.textBaseline = 'middle';
 
       options.lines.forEach((line) => {
-        ctx.font = line.font || '700 14px Inter, ui-sans-serif, system-ui, sans-serif';
+        ctx.font = line.font || '700 14px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif';
         ctx.fillStyle = line.color || '#0f172a';
         ctx.fillText(line.text || '', centerX, centerY + (line.offsetY || 0));
       });
@@ -116,18 +116,19 @@ function bootDashboardRender() {
       return window.getAnbgChartTheme();
     }
 
-    const isDark = document.documentElement.classList.contains('dark');
+    /* Light mode forced — dark mode is disabled */
+    const isDark = false;
 
     return {
       isDark,
-      text: isDark ? '#e2e8f0' : '#334155',
-      muted: isDark ? '#94a3b8' : '#64748b',
-      grid: isDark ? 'rgba(100,116,139,0.28)' : 'rgba(148,163,184,0.22)',
-      tooltipBackground: isDark ? 'rgba(6,12,28,0.96)' : 'rgba(255,255,255,0.98)',
-      tooltipTitle: isDark ? '#f8fafc' : '#0f172a',
-      tooltipBody: isDark ? '#e2e8f0' : '#334155',
-      tooltipBorder: isDark ? 'rgba(57,150,211,0.26)' : 'rgba(148,163,184,0.28)',
-      emphasis: isDark ? '#f8e932' : '#1c203d',
+      text: '#334155',
+      muted: '#64748b',
+      grid: 'rgba(148,163,184,0.22)',
+      tooltipBackground: 'rgba(255,255,255,0.98)',
+      tooltipTitle: '#0f172a',
+      tooltipBody: '#334155',
+      tooltipBorder: 'rgba(148,163,184,0.28)',
+      emphasis: '#1c203d',
     };
   }
 
@@ -155,7 +156,7 @@ function bootDashboardRender() {
 
   function truncateLabel(value, limit = 18) {
     const label = String(value ?? '');
-    return label.length > limit ? `${label.slice(0, limit - 1)}…` : label;
+    return label.length > limit ? `${label.slice(0, limit - 1)}...` : label;
   }
 
   function formatNumber(value, digits = 1) {
@@ -346,7 +347,7 @@ function bootDashboardRender() {
 
     const empty = document.createElement('div');
     empty.className = 'dashboard-chart-empty';
-    empty.textContent = message || host.dataset.emptyMessage || 'Aucune donnee disponible pour ce graphique.';
+    empty.textContent = message || host.dataset.emptyMessage || 'Aucune donnée disponible pour ce graphique.';
     host.appendChild(empty);
   }
 
@@ -773,13 +774,13 @@ function bootDashboardRender() {
               {
                 text: `${Math.round(numeric)}%`,
                 color: gaugeColor(numeric),
-                font: '800 25px Inter, ui-sans-serif, system-ui, sans-serif',
+                font: '800 25px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
                 offsetY: -6,
               },
               {
                 text: label,
                 color: theme.muted,
-                font: '700 11px Inter, ui-sans-serif, system-ui, sans-serif',
+                font: '700 11px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
                 offsetY: 20,
               },
             ],
@@ -932,8 +933,8 @@ function bootDashboardRender() {
     const d3 = window.d3;
     const prepared = rows
       .map((row) => {
-        const start = new Date(meta.startAccessor(row));
-        let end = new Date(meta.endAccessor(row));
+        const start = new Date(meta.startAccèssor(row));
+        let end = new Date(meta.endAccèssor(row));
 
         if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
           return null;
@@ -944,14 +945,14 @@ function bootDashboardRender() {
         }
 
         return {
-          label: meta.labelAccessor(row),
-          subLabel: meta.subLabelAccessor ? meta.subLabelAccessor(row) : '',
+          label: meta.labelAccèssor(row),
+          subLabel: meta.subLabelAccèssor ? meta.subLabelAccèssor(row) : '',
           start,
           end,
-          progress: Math.max(0, Math.min(100, Number(meta.progressAccessor(row) || 0))),
-          color: meta.colorAccessor ? meta.colorAccessor(row) : '#3996D3',
-          rightLabel: meta.rightLabelAccessor ? meta.rightLabelAccessor(row) : '',
-          url: meta.urlAccessor ? meta.urlAccessor(row) : null,
+          progress: Math.max(0, Math.min(100, Number(meta.progressAccèssor(row) || 0))),
+          color: meta.colorAccèssor ? meta.colorAccèssor(row) : '#3996D3',
+          rightLabel: meta.rightLabelAccèssor ? meta.rightLabelAccèssor(row) : '',
+          url: meta.urlAccèssor ? meta.urlAccèssor(row) : null,
         };
       })
       .filter(Boolean);
@@ -1085,17 +1086,17 @@ function bootDashboardRender() {
     });
 
     renderGanttChart('dashboard-gantt-chart', ganttRows, {
-      startAccessor: (row) => row.date_debut,
-      endAccessor: (row) => row.date_fin,
-      labelAccessor: (row) => row.libelle,
-      subLabelAccessor: (row) => `${row.responsable || ''} | ${row.date_debut_label || ''} - ${row.date_fin_label || ''}`,
-      progressAccessor: (row) => row.progression,
-      colorAccessor: (row) => row.color || '#3996D3',
-      rightLabelAccessor: (row) => {
+      startAccèssor: (row) => row.date_debut,
+      endAccèssor: (row) => row.date_fin,
+      labelAccèssor: (row) => row.libelle,
+      subLabelAccèssor: (row) => `${row.responsable || ''} | ${row.date_debut_label || ''} - ${row.date_fin_label || ''}`,
+      progressAccèssor: (row) => row.progression,
+      colorAccèssor: (row) => row.color || '#3996D3',
+      rightLabelAccèssor: (row) => {
         const action = actionById[row.id] || {};
         return String(Math.round(Number(action.kpi_global || 0)));
       },
-      urlAccessor: (row) => row.url,
+      urlAccèssor: (row) => row.url,
       axisTicks: window.d3 ? window.d3.timeMonth.every(1) : null,
       tickFormat: window.d3 ? window.d3.timeFormat('%b') : null,
     });
@@ -1103,14 +1104,14 @@ function bootDashboardRender() {
     const critical = reportingCharts.critical_gantt || { items: [] };
 
     renderGanttChart('dashboard-critical-gantt-chart', critical.items || [], {
-      startAccessor: (row) => row.start,
-      endAccessor: (row) => row.end,
-      labelAccessor: (row) => row.label,
-      subLabelAccessor: (row) => `${row.start} - ${row.end} | ${row.status}`,
-      progressAccessor: (row) => row.progress,
-      colorAccessor: (row) => gaugeColor(Number(row.progress || 0)),
-      rightLabelAccessor: (row) => `S ${Number(row.score || 0).toFixed(1)}`,
-      urlAccessor: (row) => row.url,
+      startAccèssor: (row) => row.start,
+      endAccèssor: (row) => row.end,
+      labelAccèssor: (row) => row.label,
+      subLabelAccèssor: (row) => `${row.start} - ${row.end} | ${row.status}`,
+      progressAccèssor: (row) => row.progress,
+      colorAccèssor: (row) => gaugeColor(Number(row.progress || 0)),
+      rightLabelAccèssor: (row) => `S ${Number(row.score || 0).toFixed(1)}`,
+      urlAccèssor: (row) => row.url,
       axisTicks: window.d3 ? window.d3.timeWeek.every(1) : null,
       tickFormat: window.d3 ? window.d3.timeFormat('%d %b') : null,
     });
@@ -1138,13 +1139,13 @@ function bootDashboardRender() {
               {
                 text: String(total || 0),
                 color: theme.emphasis,
-                font: '800 28px Inter, ui-sans-serif, system-ui, sans-serif',
+                font: '800 28px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
                 offsetY: -8,
               },
               {
                 text: 'Actions',
                 color: theme.muted,
-                font: '700 11px Inter, ui-sans-serif, system-ui, sans-serif',
+                font: '700 11px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
                 offsetY: 16,
               },
             ],
@@ -1160,7 +1161,7 @@ function bootDashboardRender() {
         labels: rows.map((item) => item.label),
         datasets: [
           {
-            label: 'Delai',
+            label: 'Délai',
             data: rows.map((item) => Number(item.delai || 0)),
             borderColor: '#3996D3',
             backgroundColor: (context) => chartGradient(context.chart, '#3996D3'),
@@ -1180,7 +1181,7 @@ function bootDashboardRender() {
             pointHoverRadius: 5,
           },
           {
-            label: 'Conformite',
+            label: 'Conformité',
             data: rows.map((item) => Number(item.conformite || 0)),
             borderColor: '#F0E509',
             backgroundColor: (context) => chartGradient(context.chart, '#F0E509'),
@@ -1190,7 +1191,7 @@ function bootDashboardRender() {
             pointHoverRadius: 5,
           },
           {
-            label: 'Qualite',
+            label: 'Qualité',
             data: rows.map((item) => Number(item.qualite || 0)),
             borderColor: '#F9B13C',
             backgroundColor: (context) => chartGradient(context.chart, '#F9B13C'),
@@ -1242,10 +1243,10 @@ function bootDashboardRender() {
     const actionsIndexUrl = payload.actions_index_url || '/workspace/actions';
     const officialFilters = isObject(payload.official_action_filters) ? payload.official_action_filters : {};
     const definitions = [
-      ['delai', 'Delai'],
+      ['delai', 'Délai'],
       ['performance', 'Performance'],
-      ['conformite', 'Conformite'],
-      ['qualite', 'Qualite'],
+      ['conformite', 'Conformité'],
+      ['qualite', 'Qualité'],
       ['risque', 'Risque'],
     ];
 
@@ -1298,7 +1299,7 @@ function bootDashboardRender() {
         labels: monthly.map((item) => item.label),
         datasets: [
           {
-            label: 'Delai',
+            label: 'Délai',
             data: monthly.map((item) => Number(item.delai || 0)),
             backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
             borderRadius: 8,
@@ -1374,7 +1375,7 @@ function bootDashboardRender() {
           },
           {
             type: 'bar',
-            label: 'Validees',
+            label: 'Validées',
             data: interannual.map((item) => Number(item.actions_validees || 0)),
             backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
             borderRadius: 10,
@@ -1419,7 +1420,7 @@ function bootDashboardRender() {
 
     mountChart('dashboard-radar-chart', baseConfig('radar', {
       data: {
-        labels: ['Delai', 'Performance', 'Conformite', 'Progression'],
+        labels: ['Délai', 'Performance', 'Conformité', 'Progression'],
         datasets: radarDatasets.map((dataset, index) => {
           const color = dataset.borderColor || colorForStatus(dataset.label, index);
 
@@ -1476,7 +1477,7 @@ function bootDashboardRender() {
                 return items[0]?.raw?.title || 'Action';
               },
               label(context) {
-                return `Performance ${context.raw.x}% | Conformite ${context.raw.y}%`;
+                return `Performance ${context.raw.x}% | Conformité ${context.raw.y}%`;
               },
             },
           },
@@ -1490,7 +1491,7 @@ function bootDashboardRender() {
           y: {
             min: 0,
             max: 100,
-            title: { display: true, text: 'Conformite', color: dashboardTheme().muted },
+            title: { display: true, text: 'Conformité', color: dashboardTheme().muted },
           },
         }),
       },
@@ -1644,7 +1645,7 @@ function bootDashboardRender() {
           },
           {
             type: 'bar',
-            label: 'Validees',
+            label: 'Validées',
             data: interannualOverview.actions_validees,
             backgroundColor: (context) => barGradient(context.chart, ANBG.secondary),
             borderRadius: 10,
@@ -2020,8 +2021,13 @@ function bootDashboardRender() {
   if (tabsRoot) {
     tabsRoot.querySelectorAll('[data-dashboard-tab]').forEach((button) => {
       button.addEventListener('click', (event) => {
+        const targetKey = panelAliases[button.getAttribute('data-dashboard-tab')] || button.getAttribute('data-dashboard-tab');
+        if (!document.querySelector(`[data-dashboard-panel="${targetKey}"]`)) {
+          return;
+        }
+
         event.preventDefault();
-        activateTab(button.getAttribute('data-dashboard-tab'), true);
+        activateTab(targetKey, true);
       });
     });
 
@@ -2033,6 +2039,9 @@ function bootDashboardRender() {
 
     activateTab(panelAliases[initialKey] || initialKey || 'overview', false);
   }
+
+  window.__anbgDashboardRenderCurrent = () => render();
+  window.__anbgDashboardResizeCurrent = () => resizeCharts();
 
   if (!tabsRoot) {
     document.addEventListener('anbg:dashboard-assets-ready', () => {
@@ -2047,16 +2056,29 @@ function bootDashboardRender() {
       }).then(() => render());
     }
   }
+}
+
+if (!window.__anbgDashboardGlobalBindings) {
+  window.__anbgDashboardGlobalBindings = true;
 
   window.addEventListener('anbg:theme-changed', () => {
-    void render();
+    if (typeof window.__anbgDashboardRenderCurrent === 'function') {
+      void window.__anbgDashboardRenderCurrent();
+    }
   });
 
   window.addEventListener('resize', () => {
     window.clearTimeout(window.__anbgDashboardResizeTimer);
     window.__anbgDashboardResizeTimer = window.setTimeout(() => {
-      resizeCharts();
+      if (typeof window.__anbgDashboardResizeCurrent === 'function') {
+        window.__anbgDashboardResizeCurrent();
+      }
     }, 90);
+  });
+
+  document.addEventListener('anbg:page-soft-refreshed', () => {
+    dashboardBooted = false;
+    bootDashboardRender(true);
   });
 }
 

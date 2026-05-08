@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ReportingOverviewResource;
 use App\Models\User;
 use App\Services\Analytics\ReportingAnalyticsService;
 use Illuminate\Http\JsonResponse;
@@ -29,13 +30,7 @@ class ReportingController extends Controller
 
         $payload = $this->reportingAnalyticsService->buildPayload($user, false, false);
 
-        return response()->json([
-            'generated_at' => $payload['generatedAt'] ?? now(),
-            'scope' => $payload['scope'] ?? [],
-            'global' => $payload['global'] ?? [],
-            'kpi_summary' => $payload['kpiSummary'] ?? [],
-            'statuts' => $payload['statuts'] ?? [],
-            'alertes' => $payload['alertes'] ?? [],
-        ]);
+        return response()->json((new ReportingOverviewResource($payload))->resolve($request));
+
     }
 }

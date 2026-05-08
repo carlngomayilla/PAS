@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('action_id')->unique()->constrained('actions')->cascadeOnDelete();
             $table->decimal('kpi_delai', 7, 2)->default(0);
             $table->decimal('kpi_performance', 7, 2)->default(0);
-            $table->decimal('kpi_conformite', 7, 2)->default(100);
+            $table->decimal('kpi_conformite', 7, 2)->default(85);
             $table->decimal('kpi_global', 7, 2)->default(0);
             $table->decimal('progression_reelle', 7, 2)->default(0);
             $table->decimal('progression_theorique', 7, 2)->default(0);

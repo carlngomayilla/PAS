@@ -1,39 +1,39 @@
 @extends('layouts.workspace')
 
-@section('title', "Centre d'alertes")
+@section('title', 'Alertes')
 
 @php
     $levelStyles = [
         'urgence' => [
-            'panel' => 'border-red-500/45 bg-red-50/95 dark:border-red-400/40 dark:bg-red-500/10',
+            'panel' => 'border-red-500/45 bg-red-50/95',
             'dot' => 'bg-red-500',
             'iconBadge' => 'bg-red-500 text-white',
             'badge' => 'anbg-badge anbg-badge-danger',
-            'soft' => 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-200',
+            'soft' => 'bg-red-50 text-red-700',
             'icon' => '!',
         ],
         'critical' => [
-            'panel' => 'border-[#f9b13c]/40 bg-[#fff0df]/90 dark:border-[#f9b13c]/35 dark:bg-[#f9b13c]/10',
+            'panel' => 'border-[#f9b13c]/40 bg-[#fff0df]/90',
             'dot' => 'bg-[#f9b13c]',
             'iconBadge' => 'bg-[#f9b13c] text-white',
             'badge' => 'anbg-badge anbg-badge-danger',
-            'soft' => 'bg-[#fff0df] text-[#f9b13c] dark:bg-[#f9b13c]/15 dark:text-[#f8e932]',
+            'soft' => 'bg-[#fff0df] text-[#f9b13c]',
             'icon' => '!',
         ],
         'warning' => [
-            'panel' => 'border-[#f9b13c]/40 bg-[#fff8d6]/90 dark:border-[#f9b13c]/35 dark:bg-[#f9b13c]/10',
+            'panel' => 'border-[#f9b13c]/40 bg-[#fff8d6]/90',
             'dot' => 'bg-[#f0e509]',
             'iconBadge' => 'bg-[#f0e509] text-[#1c203d]',
             'badge' => 'anbg-badge anbg-badge-warning',
-            'soft' => 'bg-[#fff8d6] text-[#f9b13c] dark:bg-[#f9b13c]/15 dark:text-[#f8e932]',
+            'soft' => 'bg-[#fff8d6] text-[#f9b13c]',
             'icon' => '!',
         ],
         'info' => [
-            'panel' => 'border-[#3996d3]/40 bg-[#e8f3fb]/90 dark:border-[#3996d3]/35 dark:bg-[#3996d3]/10',
+            'panel' => 'border-[#3996d3]/40 bg-[#e8f3fb]/90',
             'dot' => 'bg-[#3996d3]',
             'iconBadge' => 'bg-[#3996d3] text-white',
             'badge' => 'anbg-badge anbg-badge-info',
-            'soft' => 'bg-[#e8f3fb] text-[#3996d3] dark:bg-[#3996d3]/15 dark:text-[#8fc043]',
+            'soft' => 'bg-[#e8f3fb] text-[#3996d3]',
             'icon' => 'i',
         ],
     ];
@@ -48,45 +48,45 @@
             [
                 'label' => 'Urgences',
                 'value' => $summary['urgence'] ?? 0,
-                'meta' => 'Escalade DG immediate',
+                'meta' => null,
                 'href' => route('workspace.alertes', ['niveau' => 'urgence', 'limit' => 100]),
-                'valueClass' => 'showcase-kpi-number text-red-600 dark:text-red-300',
+                'valueClass' => 'showcase-kpi-number text-red-600',
                 'badge' => null,
                 'badge_tone' => 'info',
             ],
             [
                 'label' => 'Non lues',
                 'value' => $summary['unread'] ?? 0,
-                'meta' => 'Alertes a traiter',
+                'meta' => null,
                 'href' => route('workspace.alertes', ['etat' => 'unread', 'limit' => 100]),
-                'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
+                'valueClass' => 'showcase-kpi-number text-[#f9b13c]',
                 'badge' => null,
                 'badge_tone' => 'info',
             ],
             [
                 'label' => 'Critiques',
                 'value' => $summary['critical'] ?? 0,
-                'meta' => 'Escalade immediate',
+                'meta' => null,
                 'href' => route('workspace.alertes', ['niveau' => 'critical', 'limit' => 100]),
-                'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
+                'valueClass' => 'showcase-kpi-number text-[#f9b13c]',
                 'badge' => null,
                 'badge_tone' => 'info',
             ],
             [
                 'label' => 'Attention',
                 'value' => $summary['warning'] ?? 0,
-                'meta' => 'Surveillance rapprochee',
+                'meta' => null,
                 'href' => route('workspace.alertes', ['niveau' => 'warning', 'limit' => 100]),
-                'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
+                'valueClass' => 'showcase-kpi-number text-[#f9b13c]',
                 'badge' => null,
                 'badge_tone' => 'info',
             ],
             [
                 'label' => 'Info',
                 'value' => $summary['info'] ?? 0,
-                'meta' => 'Information de contexte',
+                'meta' => null,
                 'href' => route('workspace.alertes', ['niveau' => 'info', 'limit' => 100]),
-                'valueClass' => 'showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]',
+                'valueClass' => 'showcase-kpi-number text-[#3996d3]',
                 'badge' => null,
                 'badge_tone' => 'info',
             ],
@@ -95,36 +95,36 @@
             [
                 'label' => $metricLabel('global'),
                 'value' => number_format((float) ($kpiSummary['global'] ?? 0), 0),
-                'meta' => 'Synthese DG des actions validees direction',
+                'meta' => null,
                 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc']),
-                'valueClass' => 'showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]',
+                'valueClass' => 'showcase-kpi-number text-[#3996d3]',
                 'badge' => null,
                 'badge_tone' => 'success',
             ],
             [
                 'label' => 'Qualite',
                 'value' => number_format((float) ($kpiSummary['qualite'] ?? 0), 0),
-                'meta' => 'Conformite des preuves et du suivi',
+                'meta' => null,
                 'href' => route('workspace.actions.index', ['sort' => 'kpi_qualite_desc']),
-                'valueClass' => 'showcase-kpi-number text-[#8fc043] dark:text-[#f8e932]',
+                'valueClass' => 'showcase-kpi-number text-[#8fc043]',
                 'badge' => null,
                 'badge_tone' => 'success',
             ],
             [
                 'label' => 'Risque',
                 'value' => number_format((float) ($kpiSummary['risque'] ?? 0), 0),
-                'meta' => 'Exposition globale et actions fragiles',
+                'meta' => null,
                 'href' => route('workspace.actions.index', ['sort' => 'kpi_risque_desc']),
-                'valueClass' => 'showcase-kpi-number text-[#f9b13c] dark:text-[#f8e932]',
+                'valueClass' => 'showcase-kpi-number text-[#f9b13c]',
                 'badge' => null,
                 'badge_tone' => 'success',
             ],
             [
                 'label' => 'Progression',
                 'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 0),
-                'meta' => 'Execution moyenne consolidee',
+                'meta' => null,
                 'href' => route('workspace.actions.index', ['sort' => 'progression_desc']),
-                'valueClass' => 'showcase-kpi-number text-[#3996d3] dark:text-[#8fc043]',
+                'valueClass' => 'showcase-kpi-number text-[#3996d3]',
                 'badge' => null,
                 'badge_tone' => 'success',
             ],
@@ -134,17 +134,17 @@
     <section class="showcase-hero mb-4 app-screen-block">
         <div class="showcase-hero-body">
             <div>
-                <span class="showcase-eyebrow">Alertes operationnelles</span>
+                <span class="showcase-eyebrow">Alertes opérationnelles</span>
                 <h1 class="showcase-title">Centre d'alertes</h1>
             </div>
 
             <div class="showcase-action-row">
                 <span class="showcase-chip">
                     <span class="showcase-chip-dot bg-blue-600"></span>
-                    Limite d affichage: {{ $limit }} elements
+                    Limite d'affichage : {{ $limit }} éléments
                 </span>
-                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.pilotage') }}">
-                    Retour pilotage
+                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('dashboard') }}">
+                    Retour dashboard
                 </a>
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting') }}">
                     Ouvrir le reporting
@@ -191,8 +191,8 @@
 
     <section class="showcase-toolbar mb-4 app-screen-block">
         <div class="flex flex-wrap items-center gap-3">
-            <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 dark:border-slate-800 dark:bg-slate-950/50">
-                <button class="{{ $filterButtonBase }} border-slate-300 bg-slate-900 text-white dark:border-slate-700 dark:bg-slate-100 dark:text-slate-900" data-level-filter="all" type="button">
+            <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+                <button class="{{ $filterButtonBase }} border-[#3996d3]/40 bg-[#3996d3] text-white" data-level-filter="all" type="button">
                     Tous
                     <span class="anbg-badge anbg-badge-neutral px-2 py-0.5 text-[10px] leading-none">{{ $summary['total'] ?? 0 }}</span>
                 </button>
@@ -207,17 +207,17 @@
                 @endforeach
             </div>
 
-            <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 dark:border-slate-800 dark:bg-slate-950/50">
-                <button class="{{ $filterButtonBase }} border-slate-300 bg-slate-900 text-white dark:border-slate-700 dark:bg-slate-100 dark:text-slate-900" data-state-filter="all" type="button">
+            <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+                <button class="{{ $filterButtonBase }} border-[#3996d3]/40 bg-[#3996d3] text-white" data-state-filter="all" type="button">
                     Toutes
                 </button>
-                <button class="{{ $filterButtonBase }} border-transparent bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-200" data-state-filter="unread" type="button">
+                <button class="{{ $filterButtonBase }} border-transparent bg-white text-slate-700" data-state-filter="unread" type="button">
                     Non lues
                     @if (($summary['unread'] ?? 0) > 0)
                         <span class="anbg-badge anbg-badge-warning px-2 py-0.5 text-[10px] leading-none">{{ $summary['unread'] }}</span>
                     @endif
                 </button>
-                <button class="{{ $filterButtonBase }} border-transparent bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-200" data-state-filter="read" type="button">
+                <button class="{{ $filterButtonBase }} border-transparent bg-white text-slate-700" data-state-filter="read" type="button">
                     Lues
                 </button>
             </div>
@@ -226,7 +226,7 @@
 
     <div class="mb-4 flex flex-wrap items-end justify-between gap-3 app-screen-block">
         <div>
-            <h2 class="showcase-panel-title">Fil d alertes</h2>
+            <h2 class="showcase-panel-title">Fil d'alertes</h2>
         </div>
     </div>
 
@@ -237,14 +237,14 @@
                 $isUnread = (bool) ($alert['is_unread'] ?? false);
             @endphp
             <a
-                class="alert-card group relative block overflow-hidden rounded-2xl border bg-white/95 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:bg-slate-900/95 {{ $isUnread ? $style['panel'] : 'border-slate-200 dark:border-slate-800' }}"
+                class="alert-card group relative block overflow-hidden rounded-2xl border bg-white/95 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg {{ $isUnread ? $style['panel'] : 'border-slate-200' }}"
                 data-alert-card
                 data-level="{{ $alert['niveau'] }}"
                 data-state="{{ $isUnread ? 'unread' : 'read' }}"
                 href="{{ $alert['read_url'] }}"
             >
                 @if ($isUnread)
-                    <span class="absolute right-4 top-4 inline-flex h-3 w-3 rounded-full {{ $style['dot'] }} ring-4 ring-white/80 dark:ring-slate-900/80"></span>
+                    <span class="absolute right-4 top-4 inline-flex h-3 w-3 rounded-full {{ $style['dot'] }} ring-4 ring-white/80"></span>
                 @endif
 
                 <div class="flex items-start gap-4">
@@ -254,7 +254,7 @@
 
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-base font-semibold text-slate-950 dark:text-slate-50">{{ $alert['titre'] }}</h2>
+                            <h2 class="text-base font-semibold text-slate-950">{{ $alert['titre'] }}</h2>
                             <span class="{{ $style['badge'] }} px-3">
                                 {{ $alert['niveau_label'] }}
                             </span>
@@ -268,9 +268,9 @@
                             @endif
                         </div>
 
-                        <p class="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-200">{{ $alert['message'] }}</p>
+                        <p class="mt-2 text-sm leading-6 text-slate-700">{{ $alert['message'] }}</p>
 
-                        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
                             <span>{{ $alert['direction'] }}</span>
                             <span>{{ $alert['service'] }}</span>
                             <span>{{ $alert['date_label'] }}</span>
@@ -278,7 +278,7 @@
                         </div>
 
                         @if (!empty($alert['action']))
-                            <div class="mt-3 rounded-2xl border border-slate-200/80 bg-slate-50/90 px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-200">
+                            <div class="mt-3 rounded-2xl border border-slate-200/80 bg-slate-50/90 px-3 py-2 text-sm text-slate-700">
                                 <strong>Action:</strong> {{ $alert['action']['libelle'] }}
                                 <span class="mx-2 text-slate-400">|</span>
                                 <strong>PTA:</strong> {{ $alert['action']['pta'] }}
@@ -312,18 +312,18 @@
                         @endif
                     </div>
 
-                    <div class="hidden shrink-0 self-center rounded-xl bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition group-hover:bg-slate-900 group-hover:text-white dark:bg-slate-800 dark:text-slate-200 dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 md:block">
+                    <div class="hidden shrink-0 self-center rounded-xl bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition group-hover:bg-[#3996d3] group-hover:text-white md:block">
                         Voir la cause
                     </div>
                 </div>
             </a>
         @empty
-            <div class="rounded-2xl border border-dashed border-slate-300 bg-white/90 px-6 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-400">
+            <div class="rounded-2xl border border-dashed border-slate-300 bg-white/90 px-6 py-10 text-center text-sm text-slate-500">
                 Aucune alerte sur le perimetre courant.
             </div>
         @endforelse
 
-        <div id="alert-empty-state" class="hidden rounded-2xl border border-dashed border-slate-300 bg-white/90 px-6 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-400">
+        <div id="alert-empty-state" class="hidden rounded-2xl border border-dashed border-slate-300 bg-white/90 px-6 py-10 text-center text-sm text-slate-500">
             Aucune alerte ne correspond aux filtres selectionnes.
         </div>
     </section>
@@ -331,7 +331,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script @cspNonce>
         (function () {
             var cards = Array.prototype.slice.call(document.querySelectorAll('[data-alert-card]'));
             if (!cards.length) {
@@ -347,12 +347,10 @@
             function syncButtons(buttons, activeValue, attribute) {
                 buttons.forEach(function (button) {
                     var isActive = button.getAttribute(attribute) === activeValue;
-                    button.classList.toggle('bg-slate-900', isActive);
+                    button.classList.toggle('bg-[#3996d3]', isActive);
                     button.classList.toggle('text-white', isActive);
-                    button.classList.toggle('dark:bg-slate-100', isActive);
-                    button.classList.toggle('dark:text-slate-900', isActive);
                     if (!isActive) {
-                        button.classList.remove('border-slate-300', 'dark:border-slate-700');
+                        button.classList.remove('border-slate-300');
                     }
                 });
             }
@@ -417,4 +415,3 @@
         })();
     </script>
 @endpush
-

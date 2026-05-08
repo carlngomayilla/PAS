@@ -48,6 +48,7 @@ class JustificatifWebController extends Controller
             ->with(['ajoutePar:id,name,email', 'justifiable']);
 
         $this->applyJustificatifScope($query, $user);
+        $this->applyCategoryVisibilityScope($query, $user, $documentPolicy);
 
         $query->when($request->filled('type'), function (Builder $q) use ($request): void {
             $class = $this->resolveJustifiableClass((string) $request->string('type'));
@@ -68,6 +69,8 @@ class JustificatifWebController extends Controller
             });
         });
 
+        $summaryBase = clone $query;
+
         $justificatifs = $query->orderByDesc('id')->paginate(15)->withQueryString();
         $justificatifs->setCollection(
             $justificatifs->getCollection()->filter(
@@ -85,6 +88,13 @@ class JustificatifWebController extends Controller
 
         return view('workspace.justificatifs.index', [
             'justificatifs' => $justificatifs,
+            'summary' => [
+                'total' => (clone $summaryBase)->count(),
+                'action_total' => (clone $summaryBase)->where('justifiable_type', Action::class)->count(),
+                'kpi_total' => (clone $summaryBase)->where('justifiable_type', Kpi::class)->count(),
+                'kpi_mesure_total' => (clone $summaryBase)->where('justifiable_type', KpiMesure::class)->count(),
+                'authors_total' => (clone $summaryBase)->whereNotNull('ajoute_par')->distinct()->count('ajoute_par'),
+            ],
             'canWrite' => $this->canWrite($user),
             'canWriteByJustificatif' => $canWriteByJustificatif,
             'type' => (string) $request->string('type'),
@@ -377,6 +387,30 @@ class JustificatifWebController extends Controller
         }
 
         $query->whereRaw('1 = 0');
+    }
+
+    private function applyCategoryVisibilityScope(Builder $query, User $user, DocumentPolicySettings $documentPolicy): void
+    {
+        if ($user->isSuperAdmin() || $user->hasRole(User::ROLE_ADMIN)) {
+            return;
+        }
+
+        $restrictedCategories = collect($documentPolicy->categoryVisibility())
+            ->filter(fn (array $roles): bool => ! in_array($user->effectiveRoleCode(), $roles, true))
+            ->keys()
+            ->values()
+            ->all();
+
+        if ($restrictedCategories === []) {
+            return;
+        }
+
+        $query->where(function (Builder $visibilityQuery) use ($restrictedCategories): void {
+            $visibilityQuery
+                ->whereNull('categorie')
+                ->orWhere('categorie', '')
+                ->orWhereNotIn('categorie', $restrictedCategories);
+        });
     }
 
     private function applyScopeForDirection(Builder $query, int $directionId): void

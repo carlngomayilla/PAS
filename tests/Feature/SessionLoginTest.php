@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Database\Seeders\SyncOrgUsersPreservingPasswordsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -23,6 +24,22 @@ class SessionLoginTest extends TestCase
 
         $this->post(route('login'), [
             'email' => $user->email,
+            'password' => 'Pass@12345',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_seeded_anbg_user_can_login_with_default_password(): void
+    {
+        $this->seed(SyncOrgUsersPreservingPasswordsSeeder::class);
+
+        $user = User::query()
+            ->where('email', 'ingrid@anbg.ga')
+            ->firstOrFail();
+
+        $this->post(route('login'), [
+            'email' => 'ingrid@anbg.ga',
             'password' => 'Pass@12345',
         ])->assertRedirect(route('dashboard'));
 

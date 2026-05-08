@@ -15,6 +15,7 @@ use App\Models\Service;
 use App\Models\User;
 use App\Services\ActionCalculationSettings;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\ExerciceContext;
 use App\Services\ManagedKpiSettings;
 use App\Support\SafeSql;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,11 +29,15 @@ class ReportingAnalyticsService
 {
     use AuthorizesPlanningScope;
 
-    private const CACHE_TTL_SECONDS = 60;
+    private const CACHE_TTL_SECONDS = 300;
 
     public function __construct(
         private readonly ActionCalculationSettings $actionCalculationSettings,
-        private readonly ManagedKpiSettings $managedKpiSettings
+        private readonly ManagedKpiSettings $managedKpiSettings,
+        private readonly AnalyticsCacheVersionService $cacheVersionService,
+        private readonly KpiAggregatorService $kpiAggregatorService,
+        private readonly ActionSummaryService $actionSummaryService,
+        private readonly ExerciceContext $exerciceContext
     ) {
     }
 
@@ -223,6 +228,12 @@ class ReportingAnalyticsService
                 'role' => $user->role,
                 'direction_id' => $user->direction_id,
                 'service_id' => $user->service_id,
+            ],
+            'exercise' => [
+                'year' => $this->exerciceContext->selectedYear(),
+                'label' => $this->exerciceContext->activeLabel(),
+                'quarter' => $this->exerciceContext->selectedQuarter(),
+                'quarter_label' => $this->exerciceContext->activeQuarterLabel(),
             ],
             'statisticalPolicy' => [
                 'scope_status' => $this->actionCalculationSettings->statisticalScope(),
@@ -441,46 +452,7 @@ class ReportingAnalyticsService
      */
     private function reportSummary(Collection $actions): array
     {
-        if ($actions->isEmpty()) {
-            return [
-                'actions_total' => 0,
-                'actions_validees' => 0,
-                'actions_terminees' => 0,
-                'actions_en_cours' => 0,
-                'actions_retard' => 0,
-                'progression_moyenne' => 0.0,
-                'taux_realisation' => 0.0,
-                'taux_retard' => 0.0,
-                'kpi_global' => 0.0,
-                'kpi_conformite' => 0.0,
-            ];
-        }
-
-        $total = $actions->count();
-        $completed = $actions
-            ->filter(fn (Action $action): bool => in_array((string) $action->statut_dynamique, $this->completedActionStatuses(), true))
-            ->count();
-        $delayed = $actions
-            ->filter(fn (Action $action): bool => $this->isReportActionDelayed($action))
-            ->count();
-
-        return [
-            'actions_total' => $total,
-            'actions_validees' => $actions
-                ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
-                    ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-                    ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
-                ], true))
-                ->count(),
-            'actions_terminees' => $completed,
-            'actions_en_cours' => max(0, $total - $completed - $delayed),
-            'actions_retard' => $delayed,
-            'progression_moyenne' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2),
-            'taux_realisation' => $this->completionRate($completed, $total),
-            'taux_retard' => $this->completionRate($delayed, $total),
-            'kpi_global' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
-            'kpi_conformite' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)), 2),
-        ];
+        return $this->actionSummaryService->summarize($actions);
     }
 
     /**
@@ -612,6 +584,7 @@ class ReportingAnalyticsService
         $labels = $action->kpis
             ->pluck('libelle')
             ->filter(fn ($label): bool => trim((string) $label) !== '')
+            ->map(fn ($label): string => $this->indicatorLabel((string) $label))
             ->values()
             ->implode(' | ');
 
@@ -797,7 +770,7 @@ class ReportingAnalyticsService
 
                 return [
                     'action' => (string) ($action->libelle ?? '-'),
-                    'indicateur' => (string) ($kpi->libelle ?? '-'),
+                    'indicateur' => $this->indicatorLabel((string) ($kpi->libelle ?? '-')),
                     'type' => (string) ($kpi->periodicite ?? ($kpi->est_a_renseigner ? 'A renseigner' : 'Suivi')),
                     'periode' => (string) ($measure?->periode ?? '-'),
                     'valeur' => $value,
@@ -818,6 +791,13 @@ class ReportingAnalyticsService
         return $value < $threshold ? 'Alerte' : 'OK';
     }
 
+    private function indicatorLabel(string $label): string
+    {
+        $label = trim(str_ireplace('KPI', 'Indicateur', $label));
+
+        return $label !== '' ? $label : '-';
+    }
+
     private function cacheKey(User $user, bool $withDetails, bool $withCharts): string
     {
         return 'reporting-analytics:'.sha1(json_encode([
@@ -828,21 +808,27 @@ class ReportingAnalyticsService
             'with_details' => $withDetails,
             'with_charts' => $withCharts,
             'statistical_scope' => $this->actionCalculationSettings->statisticalScope(),
+            'exercice' => $this->exerciceContext->selectedYear(),
+            'trimestre' => $this->exerciceContext->selectedQuarter(),
         ], JSON_THROW_ON_ERROR));
     }
 
     private function scopePao(Builder|Relation $query, User $user): void
     {
         $this->scopeByUserDirection($query, $user, 'direction_id');
+        $this->exerciceContext->applyToPao($query);
     }
 
     private function scopePta(Builder|Relation $query, User $user): void
     {
         $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
+        $this->exerciceContext->applyToPta($query);
     }
 
     private function scopeAction(Builder|Relation $query, User $user): void
     {
+        $this->exerciceContext->applyToAction($query);
+
         if ($user->hasGlobalReadAccess()) {
             return;
         }
@@ -859,6 +845,8 @@ class ReportingAnalyticsService
 
     private function scopeMesure(Builder|Relation $query, User $user): void
     {
+        $this->exerciceContext->applyToMesure($query);
+
         if ($user->hasGlobalReadAccess()) {
             return;
         }
@@ -895,6 +883,7 @@ class ReportingAnalyticsService
 
     private function scopeJoinedPta(Builder $query, User $user, string $directionColumn, string $serviceColumn): void
     {
+        $this->exerciceContext->applyToJoinedPta($query);
         $this->scopeByUserDirection($query, $user, $directionColumn, $serviceColumn);
     }
 
@@ -902,6 +891,7 @@ class ReportingAnalyticsService
     {
         $query = Pas::query();
         $this->scopePasByUser($query, $user);
+        $this->exerciceContext->applyToPas($query);
 
         return $query;
     }
@@ -1376,7 +1366,14 @@ class ReportingAnalyticsService
         }
 
         $actionCandidates = (clone $actionQuery)
-            ->with(['pta:id,pao_id,titre,direction_id,service_id', 'pta.pao:id,titre', 'responsable:id,name,email'])
+            ->with([
+                'pta:id,pao_id,titre,direction_id,service_id',
+                'pta.pao:id,titre',
+                'pta.direction:id,code,libelle',
+                'pta.service:id,code,libelle',
+                'responsable:id,name,email',
+                'actionKpi:id,action_id,kpi_global',
+            ])
             ->orderByDesc('id')
             ->limit(350)
             ->get();
@@ -1519,48 +1516,20 @@ class ReportingAnalyticsService
         $topRiskLabels = array_map(fn (array $row): string => Str::limit((string) $row['action'], 34), $topRiskRows);
         $topRiskScores = array_map(fn (array $row): float => (float) $row['score'], $topRiskRows);
 
-        $performanceRows = Action::query()
-            ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
-            ->selectRaw('ptas.direction_id as direction_id, AVG(COALESCE(actions.progression_reelle, 0)) as avg_progression, COUNT(*) as total')
-            ->groupBy('ptas.direction_id');
-        $this->scopeActionStatistics($performanceRows, 'actions.statut_validation');
-        $this->scopeJoinedPta($performanceRows, $user, 'ptas.direction_id', 'ptas.service_id');
-
-        $performanceDirectionNames = Direction::query()
-            ->pluck('libelle', 'id')
-            ->mapWithKeys(fn ($label, $id): array => [(int) $id => (string) $label])
-            ->toArray();
-
-        $perfRows = $performanceRows->get()->map(function ($row): array {
-            return [
-                'direction_id' => (int) ($row->direction_id ?? 0),
-                'avg' => round(max(0, min(100, (float) ($row->avg_progression ?? 0))), 2),
-                'total' => (int) ($row->total ?? 0),
-            ];
-        })->sortByDesc('total')->values();
-
-        $performanceLabels = [];
-        $performanceValues = [];
-        $performanceUrls = [];
-        foreach ($perfRows->take(6) as $row) {
-            $directionId = (int) $row['direction_id'];
-            if ($directionId <= 0) {
-                continue;
-            }
-            $performanceLabels[] = $performanceDirectionNames[$directionId] ?? ('#'.$directionId);
-            $performanceValues[] = (float) $row['avg'];
-            $performanceUrls[] = $this->officialActionIndexRoute([
-                'direction_id' => $directionId,
-            ]);
-        }
-
-        if ($performanceLabels === [] && $user->direction_id !== null) {
-            $performanceLabels[] = $performanceDirectionNames[(int) $user->direction_id] ?? ('#'.$user->direction_id);
-            $performanceValues[] = 0.0;
-            $performanceUrls[] = $this->officialActionIndexRoute([
-                'direction_id' => (int) $user->direction_id,
-            ]);
-        }
+        $performanceGaugeMeta = $this->resolvePerformanceGaugeMeta($user);
+        $performanceRows = $this->buildPerformanceGaugeRows($user, $actionCandidates);
+        $performanceLabels = array_map(
+            static fn (array $row): string => (string) ($row['label'] ?? '-'),
+            $performanceRows
+        );
+        $performanceValues = array_map(
+            static fn (array $row): float => (float) ($row['kpi_global'] ?? 0),
+            $performanceRows
+        );
+        $performanceUrls = array_map(
+            static fn (array $row): string => (string) ($row['url'] ?? ''),
+            $performanceRows
+        );
 
         $interannualRows = $this->buildInterannualComparison($user);
 
@@ -1611,6 +1580,8 @@ class ReportingAnalyticsService
                 'rows' => $topRiskRows,
             ],
             'performance_gauge' => [
+                'scope_label' => (string) ($performanceGaugeMeta['label'] ?? 'Directions'),
+                'empty_label' => (string) ($performanceGaugeMeta['empty_label'] ?? 'Aucune donnee disponible pour les jauges.'),
                 'labels' => $performanceLabels,
                 'values' => $performanceValues,
                 'urls' => $performanceUrls,
@@ -1653,23 +1624,8 @@ class ReportingAnalyticsService
      */
     private function buildKpiSummary(Collection $actions): array
     {
-        $average = static function (Collection $items, callable $callback): float {
-            if ($items->isEmpty()) {
-                return 0.0;
-            }
+        return $this->kpiAggregatorService->summarizeActions($actions);
 
-            return round((float) $items->avg($callback), 2);
-        };
-
-        return [
-            'delai' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
-            'performance' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
-            'conformite' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
-            'qualite' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
-            'risque' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)),
-            'global' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
-            'progression' => $average($actions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
-        ];
     }
 
     private function computeActionRiskScore(Action $action, Carbon $today): float
@@ -1744,6 +1700,97 @@ class ReportingAnalyticsService
         }
 
         return round(($done / $total) * 100, 2);
+    }
+
+    /**
+     * @return array{label: string, empty_label: string, mode: string}
+     */
+    private function resolvePerformanceGaugeMeta(User $user): array
+    {
+        return match (true) {
+            $user->hasGlobalReadAccess() => [
+                'label' => 'Directions',
+                'empty_label' => 'Aucune direction disponible pour les jauges.',
+                'mode' => 'direction',
+            ],
+            $user->hasRole(User::ROLE_DIRECTION) => [
+                'label' => 'Services',
+                'empty_label' => 'Aucun service disponible pour les jauges.',
+                'mode' => 'service',
+            ],
+            default => [
+                'label' => 'Actions',
+                'empty_label' => 'Aucune action disponible pour les jauges.',
+                'mode' => 'action',
+            ],
+        };
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildPerformanceGaugeRows(User $user, Collection $actions): array
+    {
+        $meta = $this->resolvePerformanceGaugeMeta($user);
+        $mode = (string) ($meta['mode'] ?? 'direction');
+        $groups = [];
+
+        foreach ($actions as $action) {
+            if (! $action instanceof Action) {
+                continue;
+            }
+
+            if ($mode === 'direction') {
+                $groupId = (int) ($action->pta?->direction?->id ?? 0);
+                if ($groupId <= 0) {
+                    continue;
+                }
+
+                $groupKey = 'direction:'.$groupId;
+                $label = (string) ($action->pta?->direction?->code ?? $action->pta?->direction?->libelle ?? 'Non renseigne');
+                $url = $this->officialActionIndexRoute(['direction_id' => $groupId]);
+            } elseif ($mode === 'service') {
+                $groupId = (int) ($action->pta?->service?->id ?? 0);
+                if ($groupId <= 0) {
+                    continue;
+                }
+
+                $groupKey = 'service:'.$groupId;
+                $label = (string) ($action->pta?->service?->code ?? $action->pta?->service?->libelle ?? 'Non renseigne');
+                $url = $this->officialActionIndexRoute(['service_id' => $groupId]);
+            } else {
+                $groupKey = 'action:'.(int) $action->id;
+                $label = (string) ($action->libelle ?? 'Action');
+                $url = route('workspace.actions.suivi', $action);
+            }
+
+            $groups[$groupKey]['label'] = $label;
+            $groups[$groupKey]['url'] = $url;
+            $groups[$groupKey]['items'][] = $action;
+        }
+
+        return collect($groups)
+            ->map(function (array $group): array {
+                /** @var Collection<int, Action> $items */
+                $items = collect($group['items'] ?? []);
+
+                return [
+                    'label' => (string) ($group['label'] ?? 'Non renseigne'),
+                    'url' => (string) ($group['url'] ?? $this->officialActionIndexRoute()),
+                    'actions_total' => $items->count(),
+                    'kpi_global' => round((float) $items->avg(
+                        fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)
+                    ), 2),
+                ];
+            })
+            ->filter(fn (array $row): bool => (int) ($row['actions_total'] ?? 0) > 0)
+            ->sortByDesc(
+                fn (array $row): float => ((float) ($row['kpi_global'] ?? 0) * 1000) + (float) ($row['actions_total'] ?? 0)
+            )
+            ->take(6)
+            ->values()
+            ->all();
     }
 
     private function actionIndexRoute(array $filters = []): string

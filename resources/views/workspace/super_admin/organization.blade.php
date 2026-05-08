@@ -3,7 +3,7 @@
 @section('title', 'Organisation et utilisateurs')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
@@ -21,19 +21,19 @@
     </section>
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Directions actives</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['directions_active'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Services actifs</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['services_active'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Utilisateurs actifs</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['users_active'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Utilisateurs inactifs</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['users_inactive'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Directions inactives</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['directions_inactive'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Services inactifs</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['services_inactive'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Comptes hors scope</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['users_without_scope'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Sessions actives</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['sessions_active'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Comptes suspendus</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['users_suspended'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Connexions journalisees</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['login_events_total'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Directions actives</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['directions_active'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Services actifs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['services_active'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Utilisateurs actifs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['users_active'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Utilisateurs inactifs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['users_inactive'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Directions inactives</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['directions_inactive'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Services inactifs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['services_inactive'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Comptes hors scope</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['users_without_scope'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Sessions actives</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['sessions_active'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Comptes suspendus</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['users_suspended'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Connexions journalisees</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['login_events_total'] }}</p></article>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <h2>Filtrer les comptes</h2>
         <form method="GET" action="{{ route('workspace.super-admin.organization.index') }}">
             <div class="form-grid-compact mb-2">
@@ -103,7 +103,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.organization.index') }}">Reinitialiser</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.organization.index') }}">Réinitialiser</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.organization.users.export', request()->query()) }}">Exporter CSV</a>
             </div>
         </form>
@@ -124,11 +124,11 @@
         </article>
         <article class="ui-card !mb-0">
             <h2>Actions de masse</h2>
-            <p class="text-slate-600">Selectionne des comptes dans le tableau puis applique un role, un scope ou une action de securite.</p>
+            <p class="text-slate-600">Sélectionne des comptes dans le tableau puis applique un rôle, un scope ou une action de sécurité.</p>
             <div class="mt-4 grid gap-2 text-sm text-slate-600">
                 <div>1. Coche les utilisateurs cibles</div>
                 <div>2. Choisis l action de masse</div>
-                <div>3. Complete le role ou le scope si necessaire</div>
+                <div>3. Complète le rôle ou le scope si nécessaire</div>
             </div>
         </article>
     </section>
@@ -166,7 +166,7 @@
                         <input name="actif" type="checkbox" value="1" @checked(old('actif', $editingDirection?->actif ?? true))>
                         Active
                     </label>
-                    <button class="btn btn-primary" type="submit">{{ $editingDirection ? 'Mettre a jour' : 'Creer direction' }}</button>
+                    <button class="btn btn-primary" type="submit">{{ $editingDirection ? 'Mettre à jour' : 'Créer direction' }}</button>
                 </div>
             </form>
         </article>
@@ -206,7 +206,7 @@
                         <input name="actif" type="checkbox" value="1" @checked(old('actif', $editingService?->actif ?? true))>
                         Actif
                     </label>
-                    <button class="btn btn-primary" type="submit">{{ $editingService ? 'Mettre a jour' : 'Creer service' }}</button>
+                    <button class="btn btn-primary" type="submit">{{ $editingService ? 'Mettre à jour' : 'Créer service' }}</button>
                 </div>
             </form>
         </article>
@@ -295,13 +295,13 @@
                         <input name="is_agent" type="checkbox" value="1" @checked(old('is_agent', $editingUser?->is_agent ?? false))>
                         Marquer comme agent
                     </label>
-                    <button class="btn btn-primary" type="submit">{{ $editingUser ? 'Mettre a jour' : 'Creer utilisateur' }}</button>
+                    <button class="btn btn-primary" type="submit">{{ $editingUser ? 'Mettre à jour' : 'Créer utilisateur' }}</button>
                 </div>
             </form>
         </article>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex items-center justify-between gap-3">
             <div>
                 <h2>Directions</h2>
@@ -315,7 +315,7 @@
                 <tbody>
                     @foreach ($directionRows as $row)
                         <tr>
-                            <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row->code }} - {{ $row->libelle }}</td>
+                            <td class="font-semibold text-slate-900">{{ $row->code }} - {{ $row->libelle }}</td>
                             <td><span class="anbg-badge {{ $row->actif ? 'anbg-badge-success' : 'anbg-badge-danger' }} px-3">{{ $row->actif ? 'Active' : 'Inactive' }}</span></td>
                             <td>{{ $row->services_count }}</td>
                             <td>{{ $row->users_count }}</td>
@@ -335,7 +335,7 @@
         </div>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex items-center justify-between gap-3">
             <div>
                 <h2>Services</h2>
@@ -349,7 +349,7 @@
                 <tbody>
                     @foreach ($serviceRows as $row)
                         <tr>
-                            <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row->direction?->code }} / {{ $row->code }} - {{ $row->libelle }}</td>
+                            <td class="font-semibold text-slate-900">{{ $row->direction?->code }} / {{ $row->code }} - {{ $row->libelle }}</td>
                             <td><span class="anbg-badge {{ $row->actif ? 'anbg-badge-success' : 'anbg-badge-danger' }} px-3">{{ $row->actif ? 'Actif' : 'Inactif' }}</span></td>
                             <td>{{ $row->users_count }}</td>
                             <td>{{ $row->ptas_count }}</td>
@@ -369,7 +369,7 @@
         </div>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex items-center justify-between gap-3">
             <div>
                 <h2>Utilisateurs avances</h2>
@@ -430,13 +430,13 @@
             </div>
         <div class="mt-4 overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th><input type="checkbox" data-check-all-users></th><th>Utilisateur</th><th>Role</th><th>Portee</th><th>Etat</th><th>Suspension</th><th>Sessions</th><th>Derniere activite</th><th>Actions</th></tr></thead>
+                <thead><tr><th><input type="checkbox" data-check-all-users></th><th>Utilisateur</th><th>Role</th><th>Portee</th><th>Etat</th><th>Suspension</th><th>Sessions</th><th>Derniere activite</th><th>Operations</th></tr></thead>
                 <tbody>
                     @forelse ($userRows as $row)
                         <tr>
                             <td><input type="checkbox" name="user_ids[]" value="{{ $row->id }}" data-bulk-user></td>
                             <td>
-                                <div class="font-semibold text-slate-900 dark:text-slate-100">{{ $row->name }}</div>
+                                <div class="font-semibold text-slate-900">{{ $row->name }}</div>
                                 <div class="text-xs text-slate-500">{{ $row->email }}</div>
                                 @if ($row->agent_matricule)
                                     <div class="text-xs text-slate-500">Matricule : {{ $row->agent_matricule }}</div>
@@ -492,11 +492,11 @@
     <section class="ui-card">
         <div class="flex items-center justify-between gap-3">
             <div>
-                <h2>Historique recent des connexions</h2>
-                <p class="text-slate-600">Journal exploitable des connexions et deconnexions recentes des comptes actuellement filtres.</p>
+                <h2>Historique récent des connexions</h2>
+                <p class="text-slate-600">Journal exploitable des connexions et déconnexions récentes des comptes actuellement filtres.</p>
             </div>
             <div class="flex items-center gap-2">
-                <span class="showcase-chip">{{ $loginHistory->count() }} evenements</span>
+                <span class="showcase-chip">{{ $loginHistory->count() }} événements</span>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.organization.login-history.export', request()->query()) }}">Exporter CSV</a>
             </div>
         </div>
@@ -508,7 +508,7 @@
                         <tr>
                             <td>{{ $row->created_at?->format('Y-m-d H:i') ?? '-' }}</td>
                             <td>
-                                <div class="font-semibold text-slate-900 dark:text-slate-100">{{ $row->user?->name ?? 'Utilisateur supprime' }}</div>
+                                <div class="font-semibold text-slate-900">{{ $row->user?->name ?? 'Utilisateur supprime' }}</div>
                                 <div class="text-xs text-slate-500">{{ $row->user?->email ?? '-' }}</div>
                             </td>
                             <td>
@@ -520,7 +520,7 @@
                             <td class="text-xs text-slate-500">{{ \Illuminate\Support\Str::limit((string) $row->user_agent, 70) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="text-slate-500">Aucun evenement de connexion recent sur le filtre courant.</td></tr>
+                        <tr><td colspan="5" class="text-slate-500">Aucun événement de connexion récent sur le filtre courant.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -556,15 +556,15 @@
             </form>
             @if (is_array($mergeSimulation))
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <article class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80"><p class="text-sm text-slate-500">Utilisateurs impactes</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['users_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80"><p class="text-sm text-slate-500">Actions impactees</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['actions_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80"><p class="text-sm text-slate-500">PTA impactes</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80"><p class="text-sm text-slate-500">Justificatifs impactes</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['justificatifs_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactes</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['users_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactees</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['actions_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactes</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Justificatifs impactes</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['justificatifs_total'] ?? 0 }}</p></article>
                 </div>
                 @if (($mergeSimulation['warnings'] ?? []) !== [])
                     <div class="mt-3 space-y-2">
                         @foreach ($mergeSimulation['warnings'] as $warning)
-                            <div class="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">{{ $warning }}</div>
+                            <div class="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $warning }}</div>
                         @endforeach
                     </div>
                 @endif
@@ -599,15 +599,15 @@
             </form>
             @if (is_array($transferSimulation))
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <article class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80"><p class="text-sm text-slate-500">Utilisateurs impactes</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['users_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80"><p class="text-sm text-slate-500">Actions impactees</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['actions_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80"><p class="text-sm text-slate-500">PTA impactes</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80"><p class="text-sm text-slate-500">Direction cible</p><p class="mt-2 text-lg font-semibold">{{ $transferSimulation['target_direction'] ?? '-' }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactes</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['users_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactees</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['actions_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactes</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Direction cible</p><p class="mt-2 text-lg font-semibold">{{ $transferSimulation['target_direction'] ?? '-' }}</p></article>
                 </div>
                 @if (($transferSimulation['warnings'] ?? []) !== [])
                     <div class="mt-3 space-y-2">
                         @foreach ($transferSimulation['warnings'] as $warning)
-                            <div class="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">{{ $warning }}</div>
+                            <div class="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $warning }}</div>
                         @endforeach
                     </div>
                 @endif
@@ -619,7 +619,7 @@
         <div class="flex items-center justify-between gap-3">
             <div>
                 <h2>Historique d organisation</h2>
-                <p class="text-slate-600">Dernieres operations sensibles sur la structure, les comptes et les roles pilotes.</p>
+                <p class="text-slate-600">Dernieres operations sensibles sur la structure, les comptes et les rôles pilotes.</p>
             </div>
             <span class="showcase-chip">{{ count($orgHistory ?? []) }} operations</span>
         </div>
@@ -630,19 +630,19 @@
                     @forelse (($orgHistory ?? []) as $row)
                         <tr>
                             <td>{{ $row->created_at?->format('Y-m-d H:i') ?? '-' }}</td>
-                            <td>{{ $row->user?->email ?? 'Systeme' }}</td>
+                            <td>{{ $row->user?->email ?? 'Système' }}</td>
                             <td>{{ $row->action }}</td>
                             <td>{{ $row->entite_type ?? '-' }} #{{ $row->entite_id ?? '-' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="text-slate-500">Aucune operation recente.</td></tr>
+                        <tr><td colspan="4" class="text-slate-500">Aucune operation récente.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
     </section>
 
-    <script>
+    <script @cspNonce>
         document.addEventListener('DOMContentLoaded', function () {
             var toggle = document.querySelector('[data-check-all-users]');
             if (!toggle) {
@@ -657,4 +657,3 @@
         });
     </script>
 @endsection
-

@@ -10,9 +10,24 @@
             'cancelled' => 'anbg-badge anbg-badge-neutral',
             'expired' => 'anbg-badge anbg-badge-warning',
         ];
+        $summary = is_array($summary ?? null) ? $summary : [];
+        $summaryCards = [
+            ['label' => 'Delegations', 'value' => $summary['total'] ?? $rows->total(), 'href' => route('workspace.delegations.index')],
+            ['label' => 'Actives', 'value' => $summary['active'] ?? 0, 'href' => route('workspace.delegations.index')],
+            ['label' => 'Fin < 7 jours', 'value' => $summary['expires_soon'] ?? 0, 'href' => route('workspace.delegations.index')],
+            ['label' => 'Annulees', 'value' => $summary['cancelled'] ?? 0, 'href' => route('workspace.delegations.index')],
+            ['label' => 'Perimetres direction', 'value' => $summary['direction_scope'] ?? 0, 'href' => route('workspace.delegations.index')],
+            ['label' => 'Perimetres service', 'value' => $summary['service_scope'] ?? 0, 'href' => route('workspace.delegations.index')],
+        ];
     @endphp
     <div class="app-screen-flow">
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
+        @foreach ($summaryCards as $card)
+            <x-stat-card-link :href="$card['href']" :label="$card['label']" :value="$card['value']" :meta="null" />
+        @endforeach
+    </section>
+
+    <section class="showcase-panel mb-4 app-screen-block">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h1>Delegations temporaires</h1>
@@ -33,7 +48,7 @@
                         <th>Permissions</th>
                         <th>Periode</th>
                         <th>Statut</th>
-                        <th>Action</th>
+                        <th>Operations</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -109,7 +109,7 @@ class GovernanceWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        $rows = Delegation::query()
+        $delegations = Delegation::query()
             ->with([
                 'delegant:id,name,role,direction_id,service_id',
                 'delegue:id,name,role,direction_id,service_id',
@@ -117,12 +117,21 @@ class GovernanceWebController extends Controller
                 'service:id,code,libelle',
                 'createdBy:id,name',
                 'cancelledBy:id,name',
-            ])
-            ->latest('id')
-            ->paginate(20);
+            ]);
 
         return view('workspace.governance.delegations.index', [
-            'rows' => $rows,
+            'rows' => $delegations->latest('id')->paginate(20),
+            'summary' => [
+                'total' => (clone $delegations)->count(),
+                'active' => (clone $delegations)->active()->count(),
+                'expires_soon' => (clone $delegations)
+                    ->where('statut', 'active')
+                    ->whereBetween('date_fin', [now(), now()->addDays(7)])
+                    ->count(),
+                'cancelled' => (clone $delegations)->where('statut', 'cancelled')->count(),
+                'direction_scope' => (clone $delegations)->where('role_scope', Delegation::SCOPE_DIRECTION)->count(),
+                'service_scope' => (clone $delegations)->where('role_scope', Delegation::SCOPE_SERVICE)->count(),
+            ],
         ]);
     }
 

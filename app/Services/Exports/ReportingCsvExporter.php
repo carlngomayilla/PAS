@@ -24,27 +24,27 @@ class ReportingCsvExporter
 
         $entries = [
             '00_index_direction_service.csv' => $this->csv(
-                ['Direction', 'Service', 'Total actions', 'Terminees', 'En cours', 'En retard', 'Performance (%)'],
+                ['Direction', 'Service', 'Total actions', 'Terminées', 'En cours', 'En retard', 'Performance (%)'],
                 $this->summaryRows($payload)
             ),
             '01_strategie.csv' => $this->csv(
-                ['N° Axe', 'Axe strategique', 'N° Objectif', 'Objectif strategique', 'Echeance'],
+                ['N° Axe', 'Axe stratégique', 'N° Objectif', 'Objectif stratégique', 'Échéance'],
                 $this->strategyRows($payload)
             ),
             '02_pao.csv' => $this->csv(
-                ['Direction', 'Service', 'Axe strategique', 'Objectif strategique', 'Objectif operationnel', 'Action', 'Responsable', 'Echeance'],
+                ['Direction', 'Service', 'Axe stratégique', 'Objectif stratégique', 'Objectif opérationnel', 'Action', 'Responsable', 'Échéance'],
                 $this->paoRows($payload)
             ),
             '03_actions.csv' => $this->csv(
-                ['Direction', 'Service', 'Description action', 'RMO', 'Cible', 'Debut', 'Fin', 'Statut', 'Ressources', 'Taux (%)', 'Justificatif', 'Risque'],
+                ['Direction', 'Service', 'Description action', 'RMO', 'Cible', 'Début', 'Fin', 'Statut', 'Ressources', 'Taux (%)', 'Justificatif', 'Risque'],
                 $this->actionRowsForCsv($payload)
             ),
-            '04_kpi.csv' => $this->csv(
-                ['Direction', 'Service', 'Action', 'RMO', 'KPI Performance (%)', 'KPI Qualite (%)', 'KPI Delai (%)', 'KPI Risque (%)', 'KPI Conformite (%)', 'KPI Global (%)'],
+            '04_indicateurs.csv' => $this->csv(
+                ['Direction', 'Service', 'Action', 'RMO', 'Indicateur de performance (%)', 'Indicateur qualite (%)', 'Indicateur delai (%)', 'Indicateur risque (%)', 'Indicateur conformite (%)', 'Indicateur global (%)'],
                 $this->kpiRows($payload)
             ),
             '05_synthese.csv' => $this->csv(
-                ['Direction', 'Service', 'Total actions', 'Terminees', 'En cours', 'En retard', 'Performance (%)'],
+                ['Direction', 'Service', 'Total actions', 'Terminées', 'En cours', 'En retard', 'Performance (%)'],
                 $this->summaryRows($payload)
             ),
             '06_alertes.csv' => $this->csv(
@@ -179,7 +179,7 @@ class ReportingCsvExporter
         $kpiRows = collect($payload['details']['kpi_sous_seuil'] ?? [])
             ->map(fn ($mesure): array => [
                 (string) ($mesure->kpi?->action?->libelle ?? '-'),
-                (string) ($mesure->kpi?->libelle ?? '-'),
+                $this->indicatorLabel((string) ($mesure->kpi?->libelle ?? '-')),
                 (float) ($mesure->valeur ?? 0),
                 (float) ($mesure->kpi?->seuil_alerte ?? 0),
                 'Alerte',
@@ -347,7 +347,7 @@ class ReportingCsvExporter
                         (string) ($row['objectif_strategique'] ?? $row['objectif'] ?? '-'),
                         (string) ($row['objectif_operationnel'] ?? '-'),
                         (string) ($row['action'] ?? '-'),
-                        (string) ($row['kpi'] ?? '-'),
+                        $this->indicatorLabel((string) ($row['kpi'] ?? '-')),
                         (string) ($row['prevu'] ?? '-'),
                         (string) ($row['realise'] ?? '-'),
                         (string) ($row['taux'] ?? '-'),
@@ -363,7 +363,7 @@ class ReportingCsvExporter
                     $date
                 );
                 $entries[$filename] = $this->csv(
-                    ['Axe strategique', 'Objectif strategique', 'Objectif operationnel', 'Action', 'KPI', 'Prevu', 'Realise', 'Taux', 'Statut'],
+                    ['Axe stratégique', 'Objectif stratégique', 'Objectif opérationnel', 'Action', 'Indicateurs', 'Prévu', 'Réalisé', 'Taux', 'Statut'],
                     $rows
                 );
             }
@@ -401,6 +401,13 @@ class ReportingCsvExporter
                     ->all();
             })
             ->values();
+    }
+
+    private function indicatorLabel(string $label): string
+    {
+        $label = trim(str_ireplace('KPI', 'Indicateur', $label));
+
+        return $label !== '' ? $label : '-';
     }
 
     private function entityLabel(array $entity, string $fallback): string

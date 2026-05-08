@@ -5,10 +5,10 @@
     'meta' => null,
     'badge' => null,
     'badgeTone' => 'neutral',
-    'cardClass' => 'showcase-kpi-card',
-    'labelClass' => 'showcase-kpi-label',
-    'valueClass' => 'showcase-kpi-number',
-    'metaClass' => 'showcase-kpi-meta',
+    'cardClass' => 'app-card eas-stat-card',
+    'labelClass' => 'eas-stat-card-label',
+    'valueClass' => 'eas-stat-card-value',
+    'metaClass' => 'eas-stat-card-meta',
     'valueStyle' => null,
     'hint' => null,
     'tone' => null,
@@ -18,19 +18,13 @@
     $resolvedTone = $tone ?? ($badge ? $badgeTone : null);
 @endphp
 
-<a href="{{ $href }}" {{ $attributes->class([$cardClass, 'stat-card-link', $resolvedTone ? 'showcase-tone-card showcase-tone-card-'.$resolvedTone : null]) }}>
-    <div class="flex items-start justify-between gap-2">
-        <p class="{{ $labelClass }}">{{ $label }}</p>
+<a href="{{ $href }}" {{ $attributes->class([$cardClass, 'stat-card-link stat-card flex min-w-[150px] max-w-[220px] flex-col items-center justify-center p-3 text-center', $resolvedTone ? 'showcase-tone-card showcase-tone-card-'.$resolvedTone : null]) }}>
+    <div class="flex w-full flex-col items-center justify-center gap-2">
+        <p class="{{ $labelClass }} max-w-full truncate text-center">{{ $label }}</p>
         @if ($badge)
-            <span class="anbg-badge anbg-badge-{{ $badgeTone }} px-2 py-0.5 text-[10px] font-semibold leading-none">{{ $badge }}</span>
+            <span class="app-badge app-badge-{{ $badgeTone }}">{{ $badge }}</span>
         @endif
     </div>
-    <p class="{{ $valueClass }}" @if($valueStyle) style="{{ $valueStyle }}" @endif>{{ $value }}</p>
-    @if ($meta)
-        <p class="{{ $metaClass }}">{{ $meta }}</p>
-    @endif
-    @if ($hint)
-        <p class="stat-card-hint">{{ $hint }}</p>
-    @endif
+    <p class="{{ $valueClass }} mt-1 text-center" @if($valueStyle) style="{{ $valueStyle }}" @endif>{{ $value }}</p>
     {{ $slot }}
 </a>

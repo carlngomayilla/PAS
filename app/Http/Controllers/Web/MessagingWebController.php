@@ -106,6 +106,35 @@ class MessagingWebController extends Controller
         ]);
     }
 
+    public function dropdown(Request $request): JsonResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessMessagingReader($user);
+
+        $items = $this->messagingService
+            ->recentConversations($user, 6)
+            ->map(function (Conversation $conversation): array {
+                $otherUser = $conversation->getAttribute('other_user');
+
+                return [
+                    'id' => (int) $conversation->id,
+                    'title' => (string) $conversation->getAttribute('display_name'),
+                    'scope' => (string) ($otherUser?->agent_fonction ?: $conversation->getAttribute('display_scope')),
+                    'preview' => (string) ($conversation->latestMessage?->body ?: ($conversation->latestMessage?->attachment_original_name ?: 'Conversation ouverte.')),
+                    'date_label' => (string) ($conversation->latestMessage?->sent_at?->diffForHumans() ?? 'Nouveau'),
+                    'unread_count' => (int) $conversation->getAttribute('unread_messages_count'),
+                    'url' => route('workspace.messaging.index', ['conversation' => $conversation->id]),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return response()->json([
+            'unread_count' => $this->messagingService->unreadCount($user),
+            'items' => $items,
+        ]);
+    }
+
     public function profileCard(Request $request, User $target): JsonResponse
     {
         $user = $this->authUser($request);

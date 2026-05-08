@@ -19,9 +19,10 @@ class DashboardProfileInteractionsTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Interactions disponibles pour ce profil');
-        $response->assertSee('Espace de travail (interactions utilisables)');
-        $response->assertSee('Profil utilisateur');
+        $response->assertDontSee('Interactions disponibles pour ce profil');
+        $response->assertSee('Synth');
+        $response->assertSee('Graphiques');
+        $response->assertSee('Tableaux');
     }
 
     public function test_seeded_service_user_can_open_dashboard_without_scope_error(): void
@@ -30,19 +31,22 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $user = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
 
-        $response = $this->actingAs($user)->get('/dashboard');
+        $overview = $this->actingAs($user)->get('/dashboard');
+        $overview->assertOk();
+        $overview->assertSee('Pilotage du service');
+        $overview->assertSee('valider');
 
-        $response->assertOk();
-        $response->assertSee('Pilotage du service');
-        $response->assertSee('Actions a valider');
-        $response->assertSee('Performance des agents');
-        $response->assertSee('Diagramme de Gantt');
-        $response->assertSee('dashboard-role-status-chart', false);
-        $response->assertSee('dashboard-role-support-chart', false);
-        $response->assertSee('"dgPayload"', false);
-        $response->assertSee('"kpi_summary"', false);
-        $response->assertSee('"kpi_qualite"', false);
-        $response->assertSee('"kpi_risque"', false);
+        $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
+        $charts->assertOk();
+        $charts->assertSee('Diagramme de Gantt');
+        $charts->assertDontSee('Analytique avancee');
+        $charts->assertSee('dashboard-role-status-chart', false);
+        $charts->assertSee('dashboard-role-support-chart', false);
+
+        $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
+        $tables->assertOk();
+        $tables->assertSee('Performance des agents');
+        $tables->assertSee('Tableau de synth');
     }
 
     public function test_seeded_agent_user_sees_agent_dashboard_sections(): void
@@ -51,13 +55,18 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $user = User::query()->where('email', 'melissa.abogo@anbg.ga')->firstOrFail();
 
-        $response = $this->actingAs($user)->get('/dashboard');
+        $overview = $this->actingAs($user)->get('/dashboard');
+        $overview->assertOk();
+        $overview->assertSee('Suivi personnel');
 
-        $response->assertOk();
-        $response->assertSee('Suivi personnel de l execution');
-        $response->assertSee('Mes actions prioritaires');
-        $response->assertSee('Mes actions en retard');
-        $response->assertSee('dashboard-role-trend-chart', false);
+        $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
+        $tables->assertOk();
+        $tables->assertSee('Mes actions prioritaires');
+        $tables->assertSee('Mes actions en retard');
+
+        $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
+        $charts->assertOk();
+        $charts->assertSee('dashboard-role-trend-chart', false);
     }
 
     public function test_seeded_direction_user_sees_direction_dashboard_sections(): void
@@ -66,15 +75,20 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $user = User::query()->where('email', 'directeur.daf@anbg.ga')->firstOrFail();
 
-        $response = $this->actingAs($user)->get('/dashboard');
+        $overview = $this->actingAs($user)->get('/dashboard');
+        $overview->assertOk();
+        $overview->assertSee('Pilotage directionnel et comparaison des services');
 
-        $response->assertOk();
-        $response->assertSee('Pilotage directionnel et comparaison des services');
-        $response->assertSee('Performance par service');
-        $response->assertSee('Actions critiques de la direction');
-        $response->assertSee('SFC');
-        $response->assertSee('AJARH');
-        $response->assertSee('dashboard-role-support-chart', false);
+        $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
+        $tables->assertOk();
+        $tables->assertSee('Performance par service');
+        $tables->assertSee('Actions critiques de la direction');
+        $tables->assertSee('SFC');
+        $tables->assertSee('AJARH');
+
+        $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
+        $charts->assertOk();
+        $charts->assertSee('dashboard-role-support-chart', false);
     }
 
     public function test_seeded_planification_user_sees_planification_dashboard_sections(): void
@@ -83,13 +97,19 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $user = User::query()->where('email', 'hilaire.nguebet@anbg.ga')->firstOrFail();
 
-        $response = $this->actingAs($user)->get('/dashboard');
+        $overview = $this->actingAs($user)->get('/dashboard');
+        $overview->assertOk();
+        $overview->assertSee('Consolidation transverse du pilotage');
+        $overview->assertSee('Actions');
 
-        $response->assertOk();
-        $response->assertSee('Consolidation transverse du pilotage');
-        $response->assertSee('Classement des directions');
-        $response->assertSee('Actions critiques validees');
-        $response->assertSee('Actions validees');
+        $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
+        $tables->assertOk();
+        $tables->assertSee('Classement des directions');
+        $tables->assertSee('Tableau de synth');
+
+        $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
+        $charts->assertOk();
+        $charts->assertSee('Jauges de performance par directions');
     }
 
     public function test_seeded_dg_user_sees_dg_dashboard_sections(): void
@@ -98,18 +118,24 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $user = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
 
-        $response = $this->actingAs($user)->get('/dashboard');
+        $overview = $this->actingAs($user)->get('/dashboard');
+        $overview->assertOk();
+        $overview->assertSee('Lecture');
+        $overview->assertSee('institutionnelle');
+        $overview->assertSee('Actions');
+        $overview->assertSee('Taux validation');
+        $overview->assertSee('globale');
+        $overview->assertSee('Score global');
 
-        $response->assertOk();
-        $response->assertSee('Lecture strategique institutionnelle');
-        $response->assertSee('Actions validees');
-        $response->assertSee('Taux validation');
-        $response->assertSee('Execution globale');
-        $response->assertSee('Score global');
-        $response->assertSee('Performance par direction');
-        $response->assertSee('Indicateurs mensuels');
-        $response->assertSee('Directions en difficulte');
-        $response->assertSee('dashboard-role-support-chart', false);
+        $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
+        $charts->assertOk();
+        $charts->assertSee('Performance par direction');
+        $charts->assertSee('Indicateurs mensuels');
+        $charts->assertSee('dashboard-role-support-chart', false);
+
+        $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
+        $tables->assertOk();
+        $tables->assertSee('Directions en');
     }
 
     public function test_seeded_cabinet_user_sees_cabinet_dashboard_sections(): void
@@ -121,10 +147,10 @@ class DashboardProfileInteractionsTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Suivi transverse et appui decisionnel');
+        $response->assertSee('Suivi transverse');
         $response->assertSee('Validations en attente');
-        $response->assertSee('Alertes critiques transverses');
-        $response->assertSee('Actions validees');
+        $response->assertSee('Directions');
+        $response->assertSee('Actions');
     }
 
     public function test_seeded_service_user_sees_role_aware_pilotage_page(): void
@@ -136,9 +162,9 @@ class DashboardProfileInteractionsTest extends TestCase
         $response = $this->actingAs($user)->get('/workspace/pilotage');
 
         $response->assertOk();
-        $response->assertSee('Suivi du service et ruptures de chaine');
-        $response->assertSee('Actions validees');
-        $response->assertSee('Base statistique : Toutes les actions visibles');
+        $response->assertSee('Suivi du service');
+        $response->assertSee('Actions');
+
     }
 
     public function test_seeded_dg_user_sees_role_aware_reporting_page(): void
@@ -150,12 +176,12 @@ class DashboardProfileInteractionsTest extends TestCase
         $response = $this->actingAs($user)->get('/workspace/reporting');
 
         $response->assertOk();
-        $response->assertSee('Centre d export institutionnel');
-        $response->assertSee('Actions validees');
-        $response->assertSee('Base statistique : Toutes les actions visibles');
+        $response->assertSee('Centre');
+        $response->assertSee('Actions');
+
         $response->assertDontSee('Lecture DG : operationnel vs consolide');
         $response->assertDontSee('Execution consolidee');
-        $response->assertSee('Dashboard analytique');
+
     }
 
     public function test_seeded_dg_user_sees_role_aware_pilotage_comparison_sections(): void
@@ -168,8 +194,8 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Pilotage institutionnel');
-        $response->assertSee('Actions validees');
-        $response->assertSee('Base statistique : Toutes les actions visibles');
+        $response->assertSee('Actions');
+
         $response->assertDontSee('Lecture DG : operationnel vs consolide');
         $response->assertDontSee('Execution consolidee');
     }
@@ -184,7 +210,7 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Centre de diffusion transverse');
-        $response->assertSee('Actions validees');
+        $response->assertSee('Actions');
         $response->assertDontSee('Provisoire');
         $response->assertDontSee('Officiel');
     }

@@ -1,4 +1,4 @@
-﻿@php
+@php
     $exportTemplate = $exportTemplate ?? null;
     $templateBlocks = $exportTemplate?->blocks_config ?? [];
     $templateLayout = $exportTemplate?->layout_config ?? [];
@@ -66,7 +66,7 @@
             'valeur' => (float) ($mesure->valeur ?? 0),
             'seuil' => (float) ($mesure->kpi?->seuil_alerte ?? 0),
             'statut' => 'Alerte',
-            'correctif' => 'Verifier la mesure, documenter l ecart et proposer une action corrective.',
+            'correctif' => "Vérifier la mesure, documenter l'écart et proposer une action corrective.",
         ])
         ->merge(collect($details['actions_retard'] ?? [])->map(fn ($action): array => [
             'action' => (string) ($action->libelle ?? '-'),
@@ -123,8 +123,8 @@
         @page { size: A4 landscape; margin: 24px 28px 34px; }
         body{font-family:"Cambria","Georgia",serif;color:#111827;font-size:10pt;line-height:1.38;margin:0;background:#fff}
         h1,h2,h3{color:#173f73;margin:0 0 10px} h1{font-size:25pt;letter-spacing:.02em} h2{font-size:15pt;margin-top:18px} h3{font-size:12pt;margin-top:14px}
-        .logo{width:118px;height:auto;margin-bottom:22px}.cover-band{background:#5b9bd5;color:#173f73;text-align:center;padding:26px 28px;margin:28px 0 34px;font-size:28pt;font-weight:800;line-height:1.08;text-shadow:1px 1px 0 #d9e9f8}.cover-meta{text-align:center;font-size:13pt;color:#111827;margin:8px 0}.meta{font-size:9.5pt;color:#475569;margin-bottom:14px}.blue-band{background:#4f83bd;color:#fff;text-align:center;padding:10px 12px;font-size:16pt;font-weight:800;margin:18px 0 14px}
-        table{width:100%;border-collapse:collapse;margin-top:10px;margin-bottom:16px} th,td{border:1px solid #4f8ed7;padding:5px 6px;vertical-align:top} th{background:#3B82F6;color:#fff;text-align:center;font-weight:700} tbody td{background:#f8fafc}.compact th,.compact td{font-size:8.6pt;padding:4px}.summary-grid td{width:25%;text-align:center;font-size:13pt;font-weight:800}.muted{color:#64748b}.page-break{page-break-after:always}.section-break{page-break-before:always}.signature-box{border:2px solid #4f8ed7;width:52%;padding:18px 12px;margin-top:60px;min-height:78px}.footer-note{font-size:9pt;color:#64748b;margin-top:18px;text-align:right}.nowrap{white-space:nowrap}
+        .logo{width:118px;height:auto;margin-bottom:22px}.cover-band{background:#3996D3;background-image:linear-gradient(135deg,#7FB8E6 0%,#3996D3 45%,#1C203D 100%);color:#fff;text-align:center;padding:28px 30px;margin:28px 0 34px;font-size:28pt;font-weight:800;line-height:1.08;letter-spacing:.02em;text-shadow:0 2px 4px rgba(28,32,61,.42);border:1px solid rgba(28,32,61,.18)}.cover-meta{text-align:center;font-size:13pt;color:#111827;margin:8px 0}.meta{font-size:9.5pt;color:#475569;margin-bottom:14px}.blue-band{background:#3996D3;background-image:linear-gradient(90deg,#3996D3 0%,#1C203D 100%);color:#fff;text-align:center;padding:10px 12px;font-size:16pt;font-weight:800;margin:18px 0 14px}
+        table{width:100%;border-collapse:collapse;margin-top:10px;margin-bottom:16px} th,td{border:1px solid #4f8ed7;padding:5px 6px;vertical-align:top} th{background:#3996D3;color:#fff;text-align:center;font-weight:700} tbody td{background:#f8fafc}.compact th,.compact td{font-size:8.6pt;padding:4px}.summary-grid td{width:25%;text-align:center;font-size:13pt;font-weight:800}.muted{color:#64748b}.page-break{page-break-after:always}.section-break{page-break-before:always}.signature-box{border:2px solid #4f8ed7;width:52%;padding:18px 12px;margin-top:60px;min-height:78px}.footer-note{font-size:9pt;color:#64748b;margin-top:18px;text-align:right}.nowrap{white-space:nowrap}
     </style>
 </head>
 <body>
@@ -144,7 +144,7 @@
 
     @if ($showWordToc)
         <h2>Sommaire</h2>
-        <table><tr><th>Section</th><th>Contenu</th></tr><tr><td>01</td><td>Axes & Objectifs stratégiques</td></tr><tr><td>02</td><td>Objectifs opérationnels & Actions</td></tr><tr><td>03</td><td>Actions détaillées</td></tr><tr><td>04</td><td>KPI par action</td></tr><tr><td>05</td><td>Reporting synthétique, alertes, risques, RMO et justificatifs</td></tr><tr><td>06</td><td>Page de signature et page de fin</td></tr></table>
+        <table><tr><th>Section</th><th>Contenu</th></tr><tr><td>01</td><td>Axes & Objectifs stratégiques</td></tr><tr><td>02</td><td>Objectifs opérationnels & Actions</td></tr><tr><td>03</td><td>Actions détaillées</td></tr><tr><td>04</td><td>Indicateur de performance par action</td></tr><tr><td>05</td><td>Reporting synthétique, alertes, risques, RMO et justificatifs</td></tr><tr><td>06</td><td>Page de signature et page de fin</td></tr></table>
         <div class="page-break"></div>
     @endif
 

@@ -32,7 +32,7 @@ class MessagingDirectoryServiceTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame(['DG', 'DGA', 'SCIQ', 'UCAS', 'DS', 'DSIC', 'DAF'], $directionLabels);
+        $this->assertSame(['DG', 'DIR021', 'DS', 'DSIC', 'DAF'], $directionLabels);
 
         $dafNode = collect($root['children'] ?? [])
             ->first(fn (array $node): bool => ($node['label'] ?? null) === 'DAF');

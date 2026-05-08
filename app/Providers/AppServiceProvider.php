@@ -2,12 +2,15 @@
 
 namespace App\Providers;
 
+use App\Database\Connectors\PostgresConnector;
 use App\Models\Action;
 use App\Models\Pao;
 use App\Models\PaoAxe;
 use App\Models\PaoObjectifOperationnel;
 use App\Models\PaoObjectifStrategique;
 use App\Models\Pas;
+use App\Models\Pta;
+use App\Models\User;
 use App\Services\AppearanceSettings;
 use App\Services\ActionCalculationSettings;
 use App\Services\ActionManagementSettings;
@@ -32,9 +35,12 @@ use App\Policies\PaoAxePolicy;
 use App\Policies\PaoObjectifOperationnelPolicy;
 use App\Policies\PaoObjectifStrategiquePolicy;
 use App\Policies\PasPolicy;
+use App\Observers\ActionObserver;
+use App\Observers\PlanningCacheObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\View;
@@ -48,6 +54,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind('db.connector.pgsql', fn (): PostgresConnector => new PostgresConnector());
+
         $this->app->singleton(AppearanceSettings::class);
         $this->app->singleton(ActionCalculationSettings::class);
         $this->app->singleton(ActionManagementSettings::class);
@@ -78,6 +86,12 @@ class AppServiceProvider extends ServiceProvider
         config(['app.timezone' => $platformSettings->timezone()]);
         date_default_timezone_set($platformSettings->timezone());
         Carbon::setLocale($platformSettings->locale());
+
+        Blade::directive('cspNonce', static fn (): string => '<?php echo "nonce=\"".e(\Illuminate\Support\Facades\Vite::cspNonce())."\""; ?>');
+        Action::observe(ActionObserver::class);
+        Pao::observe(PlanningCacheObserver::class);
+        Pta::observe(PlanningCacheObserver::class);
+        User::observe(PlanningCacheObserver::class);
 
         Gate::policy(Action::class, ActionPolicy::class);
         Gate::policy(Pas::class, PasPolicy::class);

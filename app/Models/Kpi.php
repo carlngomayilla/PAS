@@ -18,6 +18,7 @@ class Kpi extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'exercice_id',
         'action_id',
         'libelle',
         'unite',
@@ -41,6 +42,7 @@ class Kpi extends Model
     {
         return [
             'cible' => 'decimal:4',
+            'exercice_id' => 'integer',
             'seuil_alerte' => 'decimal:4',
             'est_a_renseigner' => 'boolean',
         ];
@@ -49,6 +51,11 @@ class Kpi extends Model
     public function getModeSaisieLabelAttribute(): string
     {
         return UiLabel::indicatorInputMode($this->est_a_renseigner);
+    }
+
+    public function exercice(): BelongsTo
+    {
+        return $this->belongsTo(Exercice::class, 'exercice_id');
     }
 
     public function action(): BelongsTo

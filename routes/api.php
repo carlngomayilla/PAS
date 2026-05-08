@@ -51,7 +51,11 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
         Route::apiResource('kpi-mesures', KpiMesureController::class)
             ->parameters(['kpi-mesures' => 'kpiMesure']);
 
+        Route::post('actions', static function () {
+            abort(403, 'Les actions sont desormais creees depuis le PTA. Le module Actions de l API est reserve au suivi, au controle et a la validation.');
+        })->name('actions.store');
         Route::apiResource('actions', ActionController::class)
+            ->except(['store'])
             ->parameters(['actions' => 'action']);
         Route::get('actions/{action}/weeks', [ActionWeekController::class, 'weeks'])
             ->name('actions.weeks');

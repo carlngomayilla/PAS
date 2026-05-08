@@ -447,7 +447,7 @@ class DashboardProfileSettings
     {
         $value = trim((string) $value);
 
-        return in_array($value, ['dashboard', 'actions', 'alertes', 'reporting', 'pilotage'], true)
+        return in_array($value, ['dashboard', 'actions', 'alertes', 'reporting'], true)
             ? $value
             : '';
     }
@@ -465,7 +465,7 @@ class DashboardProfileSettings
             'actions' => route('workspace.actions.index', $filters),
             'alertes' => route('workspace.alertes', $filters),
             'reporting' => route('workspace.reporting', $filters),
-            'pilotage' => route('workspace.pilotage', $filters),
+            'pilotage' => route('dashboard', $filters),
             default => route('workspace.actions.index', $filters),
         };
     }
@@ -508,6 +508,5 @@ class DashboardProfileSettings
         }
     }
 }
-
 
 

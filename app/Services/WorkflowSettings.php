@@ -114,16 +114,16 @@ class WorkflowSettings
             'status_options_global' => match ($mode) {
                 'approval_only' => ['brouillon', 'soumis', 'valide'],
                 'direct_approval' => ['brouillon', 'valide'],
-                default => ['brouillon', 'soumis', 'valide', 'verrouille'],
+                default => ['brouillon', 'soumis', 'valide', 'verrouille', 'fin'],
             },
             'status_options_writer' => match ($mode) {
                 'direct_approval' => ['brouillon', 'valide'],
-                default => ['brouillon', 'soumis'],
+            default => ['brouillon', 'soumis', 'fin'],
             },
             'chain_label' => match ($mode) {
                 'approval_only' => 'Brouillon -> Soumis -> Valide',
                 'direct_approval' => 'Brouillon -> Valide',
-                default => 'Brouillon -> Soumis -> Valide -> Verrouille',
+                default => 'Brouillon -> Soumis -> Valide -> Verrouille -> Fin',
             },
             'submit_button_label' => match ($mode) {
                 'direct_approval' => 'Valider directement',
@@ -284,6 +284,5 @@ class WorkflowSettings
         }
     }
 }
-
 
 

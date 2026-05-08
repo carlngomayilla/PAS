@@ -5,11 +5,11 @@
         $isEdit = $mode === 'edit';
     @endphp
     <div class="app-screen-flow">
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <h1>{{ $isEdit ? 'Modifier service' : 'Nouveau service' }}</h1>
     </section>
 
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.referentiel.services.update', $row) : route('workspace.referentiel.services.store') }}">
             @csrf
             @if ($isEdit)
@@ -22,7 +22,7 @@
                     <div>
                         <label for="direction_id">Direction</label>
                         <select id="direction_id" name="direction_id" required>
-                            <option value="">Selectionner</option>
+                            <option value="">Sélectionner</option>
                             @foreach ($directionOptions as $direction)
                                 <option value="{{ $direction->id }}" @selected((int) old('direction_id', $row->direction_id) === $direction->id)>
                                     {{ $direction->code }} - {{ $direction->libelle }}
@@ -49,7 +49,7 @@
             </div>
 
             <div class="form-actions">
-                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.referentiel.services.index') }}">Retour</a>
             </div>
         </form>

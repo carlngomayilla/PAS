@@ -72,6 +72,8 @@ class DynamicReferentialSettings
                 'evaluation_chef' => 'Evaluation chef',
                 'evaluation_direction' => 'Evaluation direction',
                 'financement' => 'Piece financement',
+                'financement_daf' => 'Decision DAF financement',
+                'financement_dg' => 'Accord DG financement',
             ]
         );
         $settings['alert_level_labels'] = $this->sanitizeKeyValueLabels(
@@ -105,8 +107,8 @@ class DynamicReferentialSettings
     {
         return [
             'action_target_type_labels' => [
-                'quantitative' => 'Quantitative',
-                'qualitative' => 'Qualitative',
+                'quantitative' => 'Cible quantitative',
+                'qualitative' => 'Cible par sous-action',
             ],
             'action_unit_suggestions' => [
                 'dossiers',
@@ -136,6 +138,8 @@ class DynamicReferentialSettings
                 'evaluation_chef' => 'Evaluation chef',
                 'evaluation_direction' => 'Evaluation direction',
                 'financement' => 'Piece financement',
+                'financement_daf' => 'Decision DAF financement',
+                'financement_dg' => 'Accord DG financement',
             ],
             'alert_level_labels' => [
                 'warning' => 'Attention',
@@ -315,6 +319,8 @@ class DynamicReferentialSettings
                 'evaluation_chef' => Arr::get($payload, 'justificatif_category_label_evaluation_chef'),
                 'evaluation_direction' => Arr::get($payload, 'justificatif_category_label_evaluation_direction'),
                 'financement' => Arr::get($payload, 'justificatif_category_label_financement'),
+                'financement_daf' => Arr::get($payload, 'justificatif_category_label_financement_daf'),
+                'financement_dg' => Arr::get($payload, 'justificatif_category_label_financement_dg'),
             ], $this->defaults()['justificatif_category_labels']),
             'alert_level_labels' => $this->sanitizeKeyValueLabels([
                 'warning' => Arr::get($payload, 'alert_level_label_warning'),
@@ -421,6 +427,5 @@ class DynamicReferentialSettings
         }
     }
 }
-
 
 

@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StorePasRequest extends FormRequest
@@ -19,10 +18,9 @@ class StorePasRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'titre' => ['required', 'string', 'max:255'],
+            'titre' => ['nullable', 'string', 'max:255'],
             'periode_debut' => ['required', 'integer', 'digits:4', 'min:2000'],
             'periode_fin' => ['required', 'integer', 'digits:4', 'gte:periode_debut'],
-            'statut' => ['nullable', Rule::in(['brouillon', 'soumis', 'valide', 'verrouille'])],
             'axes' => ['required', 'array', 'min:1'],
             'axes.*.code' => ['nullable', 'string', 'max:30'],
             'axes.*.libelle' => ['required', 'string', 'max:255'],

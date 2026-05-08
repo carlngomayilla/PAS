@@ -20,6 +20,7 @@ class Pas extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'exercice_id',
         'titre',
         'periode_debut',
         'periode_fin',
@@ -37,9 +38,15 @@ class Pas extends Model
         return [
             'periode_debut' => 'integer',
             'periode_fin' => 'integer',
+            'exercice_id' => 'integer',
             'valide_le' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    public function exercice(): BelongsTo
+    {
+        return $this->belongsTo(Exercice::class, 'exercice_id');
     }
 
     public function axes(): HasMany

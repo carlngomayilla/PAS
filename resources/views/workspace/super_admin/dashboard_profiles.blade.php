@@ -3,12 +3,12 @@
 @section('title', 'Dashboards par profil')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Dashboards par profil</h1>
-                <p class="mt-2 text-slate-600">Pilotage des cartes de synthese et des blocs analytiques par role metier, avec effet direct sur le dashboard.</p>
+                <p class="mt-2 text-slate-600">Pilotage des cartes de synthèse et des blocs analytiques par rôle métier, avec effet direct sur le dashboard.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
@@ -19,12 +19,12 @@
     </section>
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Profils pilotes</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['profiles_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Cartes pilotables</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['cards_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Vues detail actives</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['overviews_enabled'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Profils pilotes</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['profiles_total'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Cartes pilotables</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['cards_total'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Vues detail actives</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['overviews_enabled'] }}</p></article>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="POST" action="{{ route('workspace.super-admin.dashboard-profiles.update') }}" class="space-y-4">
             @csrf
             @method('PUT')
@@ -34,11 +34,11 @@
                     $profile = $profiles[$role] ?? [];
                     $cards = $profile['cards'] ?? [];
                 @endphp
-                <section class="rounded-3xl border border-slate-200/80 p-4 dark:border-slate-700/80">
+                <section class="rounded-3xl border border-slate-200/80 p-4">
                     <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                             <h2>{{ $label }}</h2>
-                            <p class="text-slate-600">Activer ou masquer les blocs analytiques et reordonner les cartes de synthese.</p>
+                            <p class="text-slate-600">Activer ou masquer les blocs analytiques et reordonner les cartes de synthèse.</p>
                         </div>
                         <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
                             <label class="checkbox-pill !mb-0">
@@ -59,7 +59,7 @@
                             </label>
                             <label class="checkbox-pill !mb-0">
                                 <input type="checkbox" name="profiles[{{ $role }}][support_chart_enabled]" value="1" @checked(old("profiles.$role.support_chart_enabled", $profile['support_chart_enabled'] ?? true))>
-                                Lecture metier
+                                Lecture métier
                             </label>
                         </div>
                     </div>
@@ -70,7 +70,7 @@
                             <tbody>
                                 @foreach ($cards as $card)
                                     <tr>
-                                        <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $card['label'] }}</td>
+                                        <td class="font-semibold text-slate-900">{{ $card['label'] }}</td>
                                         <td>
                                             <label class="checkbox-pill !mb-0">
                                                 <input type="checkbox" name="profiles[{{ $role }}][cards][{{ $card['code'] }}][enabled]" value="1" @checked(old("profiles.$role.cards.{$card['code']}.enabled", $card['enabled'] ?? true))>

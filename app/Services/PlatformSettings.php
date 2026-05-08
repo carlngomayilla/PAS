@@ -66,13 +66,13 @@ class PlatformSettings
             'guest_space_label' => 'Espace invite',
             'login_page_title' => 'Connexion - PAS',
             'login_welcome_title' => "Bienvenue dans l'espace ANBG",
-            'login_welcome_text' => 'Tire sur la corde puis connecte-toi a ton espace de pilotage.',
+            'login_welcome_text' => 'Renseignez vos identifiants, puis tirez sur la corde pour vous connecter.',
             'login_form_title' => 'Connexion',
-            'login_form_subtitle' => 'Accede a ton espace.',
+            'login_form_subtitle' => 'Plateforme institutionnelle PAS / PAO / PTA',
             'login_identifier_label' => 'Email ou matricule',
             'login_identifier_placeholder' => 'ex: admin@anbg.ga ou ADM-001',
-            'login_helper_text' => 'Identifiants de demonstration disponibles sur l environnement local.',
-            'footer_text' => 'ANBG | Systeme institutionnel de pilotage PAS / PAO / PTA',
+            'login_helper_text' => 'Accès réservé aux utilisateurs autorisés de l’ANBG.',
+            'footer_text' => 'ANBG | Système institutionnel de pilotage PAS / PAO / PTA',
             'logo_mark_path' => '',
             'logo_wordmark_path' => '',
             'logo_full_path' => '',
@@ -397,6 +397,10 @@ class PlatformSettings
     }
     private function hasSettingsTable(): bool
     {
+        if ($this->shouldSkipDatabaseSettings()) {
+            return $this->tableAvailable = false;
+        }
+
         if ($this->tableAvailable !== null) {
             return $this->tableAvailable;
         }
@@ -408,6 +412,24 @@ class PlatformSettings
         }
     }
 
+    private function shouldSkipDatabaseSettings(): bool
+    {
+        $databaseSettingsEnabled = filter_var(
+            env('PLATFORM_SETTINGS_DATABASE', true),
+            FILTER_VALIDATE_BOOLEAN,
+            FILTER_NULL_ON_FAILURE
+        );
+
+        if ($databaseSettingsEnabled === false) {
+            return true;
+        }
+
+        if (app()->runningInConsole() && ! app()->runningUnitTests()) {
+            return true;
+        }
+
+        return false;
+    }
     private function publicStorageUrl(string $path): string
     {
         $normalizedPath = trim(Str::replace('\\', '/', $path), '/');
@@ -440,6 +462,3 @@ class PlatformSettings
         }
     }
 }
-
-
-

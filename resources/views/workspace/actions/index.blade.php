@@ -5,13 +5,13 @@
         $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
         $actionStatusLabel = static fn (string $status): string => \App\Support\UiLabel::actionStatus($status);
         $validationStatusLabel = static fn (string $status): string => \App\Support\UiLabel::validationStatus($status);
-        $contextOptions = is_array($contextOptions ?? null) ? $contextOptions : \App\Models\Action::contextOptions();
-        $originOptions = is_array($originOptions ?? null) ? $originOptions : \App\Models\Action::originOptions();
+        $financingStatusOptions = is_array($financingStatusOptions ?? null) ? $financingStatusOptions : \App\Models\Action::financingStatusOptions();
         $currentViewMode = (string) ($filters['vue'] ?? '');
+        $showDualActionTabs = (bool) ($showDualActionTabs ?? false);
         $viewModeLabel = match ($currentViewMode) {
-            'pilotage' => 'Mode pilotage',
+            'pilotage' => 'Actions pilotées',
             'mes_actions' => 'Mes actions',
-            default => 'Vue complete',
+            default => 'Vue complète',
         };
         $paginationRange = $rows->total() > 0
             ? $rows->firstItem().' - '.$rows->lastItem()
@@ -25,118 +25,67 @@
         $avgProgression = (float) ($summary['avg_progression'] ?? ($listing->avg(fn ($item) => (float) ($item->progression_reelle ?? 0)) ?? 0));
         $avgKpi = (float) ($summary['avg_kpi_global'] ?? ($listing->avg(fn ($item) => (float) ($item->actionKpi?->kpi_global ?? 0)) ?? 0));
         $fundedCount = (int) ($summary['funded_count'] ?? $listing->where('financement_requis', true)->count());
+        $sc = fn (string $key): int => $hasSummaryStatusCounts
+            ? (int) ($summaryStatusCounts[$key] ?? 0)
+            : $listing->where('statut_dynamique', $key)->count();
         $statusCounts = [
-            'en_retard' => $hasSummaryStatusCounts ? (int) ($summaryStatusCounts['en_retard'] ?? 0) : $listing->where('statut_dynamique', 'en_retard')->count(),
-            'en_cours' => $hasSummaryStatusCounts ? (int) ($summaryStatusCounts['en_cours'] ?? 0) : $listing->where('statut_dynamique', 'en_cours')->count(),
-            'achevees' => $hasSummaryStatusCounts
+            'non_demarre'       => $sc('non_demarre'),
+            'en_cours'          => $sc('en_cours'),
+            'en_retard'         => $sc('en_retard'),
+            'a_risque'          => $sc('a_risque'),
+            'en_avance'         => $sc('en_avance'),
+            'suspendu'          => $sc('suspendu'),
+            'annule'            => $sc('annule'),
+            'a_corriger'        => $sc('a_corriger'),
+            'acheve_dans_delai' => $sc('acheve_dans_delai'),
+            'acheve_hors_delai' => $sc('acheve_hors_delai'),
+            'cloturee'          => $sc('cloturee'),
+            'achevees'          => $hasSummaryStatusCounts
                 ? (int) (($summaryStatusCounts['acheve_dans_delai'] ?? 0) + ($summaryStatusCounts['acheve_hors_delai'] ?? 0))
                 : $listing->filter(fn ($item) => in_array($item->statut_dynamique, ['acheve_dans_delai', 'acheve_hors_delai'], true))->count(),
         ];
         $statusStyles = [
-            'non_demarre' => 'anbg-badge anbg-badge-neutral',
-            'en_cours' => 'anbg-badge anbg-badge-info',
-            'a_risque' => 'anbg-badge anbg-badge-warning',
-            'en_avance' => 'anbg-badge anbg-badge-success',
-            'en_retard' => 'anbg-badge anbg-badge-danger',
-            'suspendu' => 'anbg-badge anbg-badge-danger',
-            'annule' => 'anbg-badge anbg-badge-neutral',
+            'non_demarre'       => 'anbg-badge anbg-badge-neutral',
+            'en_cours'          => 'anbg-badge anbg-badge-info',
+            'a_risque'          => 'anbg-badge anbg-badge-warning',
+            'en_avance'         => 'anbg-badge anbg-badge-success',
+            'en_retard'         => 'anbg-badge anbg-badge-danger',
+            'suspendu'          => 'anbg-badge anbg-badge-danger',
+            'annule'            => 'anbg-badge anbg-badge-neutral',
+            'a_corriger'        => 'anbg-badge anbg-badge-warning',
             'acheve_dans_delai' => 'anbg-badge anbg-badge-success',
             'acheve_hors_delai' => 'anbg-badge anbg-badge-warning',
+            'cloturee'          => 'anbg-badge anbg-badge-success',
         ];
         $summaryCards = [
-            [
-                'label' => 'Actions filtrees',
-                'value' => $summaryTotal,
-                'meta' => 'Total du perimetre courant, pas seulement cette page',
-                'href' => route('workspace.actions.index'),
-                'badge' => null,
-                'badge_tone' => 'neutral',
-            ],
-            [
-                'label' => 'Progression moyenne',
-                'value' => number_format($avgProgression, 1).'%',
-                'meta' => $statusCounts['en_cours'].' actions en cours',
-                'href' => route('workspace.actions.index', ['statut' => 'en_cours']),
-                'badge' => null,
-                'badge_tone' => 'neutral',
-            ],
-            [
-                'label' => $metricLabel('global'),
-                'value' => number_format($avgKpi, 1),
-                'meta' => 'Lecture directe de la performance courante',
-                'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc']),
-                'badge' => null,
-                'badge_tone' => 'neutral',
-            ],
-            [
-                'label' => 'Financement requis',
-                'value' => $fundedCount,
-                'meta' => 'Actions avec besoin financier sur le perimetre courant',
-                'href' => route('workspace.actions.index', ['financement_requis' => 1]),
-                'badge' => null,
-                'badge_tone' => 'neutral',
-            ],
+            ['label' => 'Total',                    'value' => $summaryTotal,                           'meta' => null, 'href' => route('workspace.actions.index'),                              'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'En cours',                 'value' => $statusCounts['en_cours'],               'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_cours']),    'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Non démarrées',            'value' => $statusCounts['non_demarre'],            'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'non_demarre']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'En retard',                'value' => $statusCounts['en_retard'],              'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_retard']),   'badge' => null, 'badge_tone' => $statusCounts['en_retard'] > 0 ? 'danger' : 'neutral'],
+            ['label' => 'À risque',                 'value' => $statusCounts['a_risque'],               'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'a_risque']),    'badge' => null, 'badge_tone' => $statusCounts['a_risque'] > 0 ? 'warning' : 'neutral'],
+            ['label' => 'À corriger',               'value' => $statusCounts['a_corriger'],             'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'a_corriger']),  'badge' => null, 'badge_tone' => $statusCounts['a_corriger'] > 0 ? 'warning' : 'neutral'],
+            ['label' => 'Achevées',                 'value' => $statusCounts['achevees'],               'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'achevees']),    'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Clôturées',                'value' => $statusCounts['cloturee'],               'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'cloturee']),    'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Progression moyenne',      'value' => number_format($avgProgression, 1).'%',  'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'progression_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => $metricLabel('global'),     'value' => number_format($avgKpi, 1),              'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc']),'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Financement requis',       'value' => $fundedCount,                           'meta' => null, 'href' => route('workspace.actions.index', ['financement_requis' => 1]),  'badge' => null, 'badge_tone' => 'neutral'],
         ];
     @endphp
 
-    <section class="showcase-hero mb-4">
-        <div class="showcase-hero-body">
-            <div class="max-w-3xl">
-                <span class="showcase-eyebrow">Execution operationnelle</span>
-                <h1 class="showcase-title">Actions</h1>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
-                        {{ $rows->total() }} actions dans le perimetre courant
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-red-500"></span>
-                        {{ $statusCounts['en_retard'] }} en retard dans le perimetre
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
-                        {{ $statusCounts['achevees'] }} achevees dans le perimetre
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-slate-500"></span>
-                        {{ $viewModeLabel }}
-                    </span>
-                </div>
-            </div>
-            <div class="showcase-action-row">
-                @if ($canWrite)
-                    <a class="btn btn-blue rounded-2xl px-4 py-2.5" href="{{ route('workspace.actions.create', $createRouteParams) }}">
-                        Nouvelle action
-                    </a>
-                @endif
-                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.pilotage') }}">
-                    Voir le pilotage
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <section class="showcase-toolbar mb-4">
+    <div class="app-screen-flow">
+    <section class="showcase-toolbar mb-4 app-screen-block">
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h2 class="showcase-panel-title">Double contexte</h2>
-                <p class="text-sm text-slate-600 dark:text-slate-300">Pilotage = supervision. Mes actions = execution personnelle ou actions assignees.</p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <a class="btn {{ $currentViewMode === 'pilotage' ? 'btn-primary' : 'btn-secondary' }} rounded-2xl px-4 py-2" href="{{ route('workspace.actions.index', ['vue' => 'pilotage']) }}">
-                    Pilotage
-                </a>
-                <a class="btn {{ $currentViewMode === 'mes_actions' ? 'btn-primary' : 'btn-secondary' }} rounded-2xl px-4 py-2" href="{{ route('workspace.actions.index', ['vue' => 'mes_actions']) }}">
-                    Mes actions
-                </a>
-                <a class="btn {{ $currentViewMode === '' ? 'btn-primary' : 'btn-secondary' }} rounded-2xl px-4 py-2" href="{{ route('workspace.actions.index') }}">
-                    Tout
-                </a>
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="showcase-panel-title">Vue des actions</h2>
+                @if ($showDualActionTabs)
+                    <a class="btn btn-sm {{ $currentViewMode === 'pilotage' ? 'btn-primary' : 'btn-secondary' }} rounded-xl px-3 py-1.5" href="{{ route('workspace.actions.index', ['vue' => 'pilotage']) }}">Actions pilotées</a>
+                    <a class="btn btn-sm {{ $currentViewMode === 'mes_actions' ? 'btn-primary' : 'btn-secondary' }} rounded-xl px-3 py-1.5" href="{{ route('workspace.actions.index', ['vue' => 'mes_actions']) }}">Mes actions</a>
+                @endif
             </div>
         </div>
     </section>
 
-    <section class="showcase-summary-grid mb-4">
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
             <x-stat-card-link
                 :href="$card['href']"
@@ -149,13 +98,13 @@
         @endforeach
     </section>
 
-    <section class="showcase-toolbar mb-4">
+    <section class="showcase-toolbar mb-4 app-screen-block">
         <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Filtres de navigation</h2>
             </div>
             <a class="btn btn-secondary rounded-2xl px-4 py-2" href="{{ route('workspace.actions.index') }}">
-                Reinitialiser
+                Réinitialiser
             </a>
         </div>
         <form method="GET" action="{{ route('workspace.actions.index') }}">
@@ -200,29 +149,20 @@
                     </select>
                 </div>
                 <div>
-                    <label for="contexte_action">Contexte</label>
-                    <select id="contexte_action" name="contexte_action">
-                        <option value="">Tous</option>
-                        @foreach ($contextOptions as $value => $label)
-                            <option value="{{ $value }}" @selected($filters['contexte_action'] === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="origine_action">Origine</label>
-                    <select id="origine_action" name="origine_action">
-                        <option value="">Toutes</option>
-                        @foreach ($originOptions as $value => $label)
-                            <option value="{{ $value }}" @selected($filters['origine_action'] === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
                     <label for="financement_requis">Financement requis</label>
                     <select id="financement_requis" name="financement_requis">
                         <option value="">Tous</option>
                         <option value="1" @selected($filters['financement_requis'] === 1)>Oui</option>
                         <option value="0" @selected($filters['financement_requis'] === 0)>Non</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="financement_statut">Statut financement</label>
+                    <select id="financement_statut" name="financement_statut">
+                        <option value="">Tous</option>
+                        @foreach ($financingStatusOptions as $value => $label)
+                            <option value="{{ $value }}" @selected(($filters['financement_statut'] ?? '') === $value)>{{ $label }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <div>
@@ -254,16 +194,11 @@
                 <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
                     Appliquer les filtres
                 </button>
-                @if ($canWrite)
-                    <a class="btn btn-green rounded-2xl px-4 py-2.5" href="{{ route('workspace.actions.create', $createRouteParams) }}">
-                        Creer une action
-                    </a>
-                @endif
             </div>
             @if ($filters['without_kpi'])
                 <div class="mt-4 showcase-chip-row">
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#F59E0B]"></span>
+                        <span class="showcase-chip-dot bg-[#F9B13C]"></span>
                         Actions sans indicateur
                     </span>
                 </div>
@@ -271,16 +206,16 @@
             @if ($filters['direction_id'] || $filters['service_id'] || $filters['pas_objectif_id'] || $filters['annee'] || $filters['mois_demarrage'] || $filters['week_start'] || $filters['risque_label'])
                 <div class="mt-4 showcase-chip-row">
                     @if ($filters['direction_id'])
-                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#3B82F6]"></span>Direction #{{ $filters['direction_id'] }}</span>
+                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#3996D3]"></span>Direction #{{ $filters['direction_id'] }}</span>
                     @endif
                     @if ($filters['service_id'])
-                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#1E3A8A]"></span>Service #{{ $filters['service_id'] }}</span>
+                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#1C203D]"></span>Service #{{ $filters['service_id'] }}</span>
                     @endif
                     @if ($filters['pas_objectif_id'])
-                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#10B981]"></span>Objectif #{{ $filters['pas_objectif_id'] }}</span>
+                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#8FC043]"></span>Objectif #{{ $filters['pas_objectif_id'] }}</span>
                     @endif
                     @if ($filters['annee'])
-                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#F59E0B]"></span>Annee {{ $filters['annee'] }}</span>
+                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#F9B13C]"></span>Année {{ $filters['annee'] }}</span>
                     @endif
                     @if ($filters['mois_demarrage'])
                         <span class="showcase-chip"><span class="showcase-chip-dot bg-[#6B7280]"></span>Demarrage {{ $filters['mois_demarrage'] }}</span>
@@ -289,23 +224,23 @@
                         <span class="showcase-chip"><span class="showcase-chip-dot bg-[#6B7280]"></span>Semaine du {{ $filters['week_start'] }}</span>
                     @endif
                     @if ($filters['risque_label'])
-                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#EF4444]"></span>Risque {{ $filters['risque_label'] }}</span>
+                        <span class="showcase-chip"><span class="showcase-chip-dot bg-[#B42318]"></span>Risque {{ $filters['risque_label'] }}</span>
                     @endif
                 </div>
             @endif
         </form>
     </section>
 
-    <section class="showcase-panel mb-4">
+    <section class="showcase-panel mb-4 app-screen-block">
         <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
                 <h2 class="showcase-panel-title">Liste des actions</h2>
             </div>
-            <span class="showcase-chip">{{ $rows->total() }} lignes au total</span>
+            <span class="showcase-chip">{{ $rows->total() }}</span>
         </div>
 
-        <div class="overflow-auto">
-            <table>
+        <div class="overflow-auto eas-table-shell">
+            <table class="dashboard-table min-w-full">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -313,9 +248,7 @@
                         <th>PTA</th>
                         <th>Responsable</th>
                         <th>Progression</th>
-                        <th>Frequence</th>
-                        <th>Periodes</th>
-                        <th>Contexte</th>
+                        <th>Cible</th>
                         <th>Statut</th>
                         <th>{{ $metricLabel('global') }}</th>
                         <th>Financement</th>
@@ -328,57 +261,68 @@
                             $semainesTotal = (int) ($row->semaines_total ?? 0);
                             $semainesRenseignees = (int) ($row->semaines_renseignees ?? 0);
                             $kpiGlobal = $row->actionKpi?->kpi_global;
+                            $modeEvaluationLabel = $row->mode_evaluation_label ?? 'Par sous-actions';
                             $statusClass = $statusStyles[$row->statut_dynamique ?: 'non_demarre'] ?? $statusStyles['non_demarre'];
                             $progressValue = max(0, min(100, (float) ($row->progression_reelle ?? 0)));
+                            $targetValue = max(0, (float) ($row->quantite_cible ?? 0));
+                            $realizedValue = max(0, (float) ($row->quantite_realisee ?? 0));
+                            $targetRate = $targetValue > 0 ? min(100, ($realizedValue / $targetValue) * 100) : (float) ($row->taux_atteinte_cible ?? 0);
+                            $remainingValue = $targetValue > 0 ? max(0, $targetValue - $realizedValue) : 0;
+                            $overachievementRate = (float) ($row->taux_depassement ?? ($targetValue > 0 && $realizedValue > $targetValue ? (($realizedValue - $targetValue) / $targetValue) * 100 : 0));
                             $progressColor = $progressValue >= 80 ? 'bg-[#8fc043]' : ($progressValue >= 50 ? 'bg-blue-500' : ($progressValue > 0 ? 'bg-[#f0e509]' : 'bg-slate-400'));
-                            $contextValue = (string) ($row->contexte_action ?: \App\Models\Action::CONTEXT_PILOTAGE);
-                            $originValue = (string) ($row->origine_action ?: \App\Models\Action::ORIGIN_PTA);
-                            $contextBadgeClass = $contextValue === \App\Models\Action::CONTEXT_OPERATIONNEL ? 'anbg-badge anbg-badge-info' : 'anbg-badge anbg-badge-neutral';
                             $kpiColor = $kpiGlobal !== null
-                                ? ((float) $kpiGlobal >= 80 ? 'text-[#8fc043] dark:text-[#f8e932]' : ((float) $kpiGlobal >= 60 ? 'text-[#f9b13c] dark:text-[#f8e932]' : 'text-[#f9b13c] dark:text-[#f8e932]'))
-                                : 'text-slate-400 dark:text-slate-500';
+                                ? ((float) $kpiGlobal >= 80 ? 'text-[#8fc043]' : ((float) $kpiGlobal >= 60 ? 'text-[#f9b13c]' : 'text-[#f9b13c]'))
+                                : 'text-slate-400';
                         @endphp
                         <tr>
-                            <td class="font-mono text-xs text-slate-500 dark:text-slate-400">ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }}</td>
+                            <td class="font-mono text-xs text-slate-500">ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }}</td>
                             <td class="min-w-[260px]">
-                                <div class="font-semibold text-slate-900 dark:text-slate-100">{{ $row->libelle }}</div>
-                                <p class="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">{{ $row->description ?: 'Aucune description renseignee.' }}</p>
+                                <div class="font-semibold text-slate-900">{{ $row->libelle }}</div>
+                                @if ($row->description)
+                                    <p class="mt-1 max-w-sm text-sm text-slate-500">{{ $row->description }}</p>
+                                @endif
                                 <div class="mt-2 flex flex-wrap gap-2">
-                                    <span class="anbg-badge anbg-badge-neutral">Type {{ $row->type_cible }}</span>
                                     @if ($row->date_echeance)
                                         <span class="anbg-badge anbg-badge-neutral">
-                                            Echeance {{ \Illuminate\Support\Carbon::parse($row->date_echeance)->format('d/m/Y') }}
+                                            Échéance {{ \Illuminate\Support\Carbon::parse($row->date_echeance)->format('d/m/Y') }}
                                         </span>
                                     @endif
                                 </div>
                             </td>
                             <td class="min-w-[170px]">
-                                <div class="font-medium text-slate-900 dark:text-slate-100">{{ $row->pta?->titre ?? '-' }}</div>
-                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PTA rattache a l'action</p>
+                                <div class="font-medium text-slate-900">{{ $row->pta?->titre ?? '-' }}</div>
                             </td>
                             <td class="min-w-[180px]">
-                                <div class="font-medium text-slate-900 dark:text-slate-100">{{ $row->responsable?->name ?? '-' }}</div>
-                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $row->responsable?->agent_matricule ?? $row->responsable?->email ?? '-' }}</p>
+                                <div class="font-medium text-slate-900">{{ $row->responsable?->name ?? '-' }}</div>
+                                <p class="mt-1 text-xs text-slate-500">{{ $row->responsable?->agent_matricule ?? $row->responsable?->email ?? '-' }}</p>
                             </td>
                             <td class="min-w-[180px]">
                                 <div class="mb-2 flex items-center justify-between gap-2 text-xs">
-                                    <span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($progressValue, 1) }}%</span>
-                                    <span class="text-slate-500 dark:text-slate-400">Theo {{ number_format((float) ($row->progression_theorique ?? 0), 1) }}%</span>
+                                    <span class="font-semibold text-slate-700">{{ number_format($progressValue, 1) }}%</span>
+                                    <span class="text-slate-500">Theo. {{ number_format((float) ($row->progression_theorique ?? 0), 1) }}%</span>
                                 </div>
                                 <div class="showcase-progress-track">
                                     <span class="showcase-progress-bar {{ $progressColor }}" style="width: {{ $progressValue }}%"></span>
                                 </div>
                             </td>
-                            <td class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $row->frequence_execution ?: 'hebdomadaire' }}</td>
-                            <td>
-                                <div class="font-semibold text-slate-900 dark:text-slate-100">{{ $semainesRenseignees }}/{{ $semainesTotal }}</div>
-                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Periodes renseignees</p>
-                            </td>
-                            <td>
-                                <span class="{{ $contextBadgeClass }} px-3">
-                                    {{ $contextOptions[$contextValue] ?? ucfirst($contextValue) }}
-                                </span>
-                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $originOptions[$originValue] ?? $originValue }}</p>
+                            <td class="min-w-[210px] text-sm text-slate-700">
+                                <div class="font-semibold text-slate-900">{{ $modeEvaluationLabel }}</div>
+                                @if ($row->usesQuantitativeProgress())
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Cible : {{ $row->quantite_cible !== null ? number_format((float) $row->quantite_cible, 2) : '0' }} {{ $row->unite_cible ?: '' }}
+                                        | Realise : {{ number_format($realizedValue, 2) }}
+                                        | Reste : {{ number_format($remainingValue, 2) }}
+                                    </p>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Realisation : {{ number_format($targetRate, 1) }}%
+                                        | Technique : {{ number_format((float) ($row->avancement_operationnel ?? 0), 1) }}%
+                                        @if ($overachievementRate > 0)
+                                            | Depassement : +{{ number_format($overachievementRate, 1) }}%
+                                        @endif
+                                    </p>
+                                @else
+                                    <p class="mt-1 text-xs text-slate-500">Sous-actions de suivi : {{ $semainesRenseignees }}/{{ $semainesTotal }}</p>
+                                @endif
                             </td>
                             <td>
                                 <span class="{{ $statusClass }} px-3">
@@ -392,7 +336,7 @@
                             </td>
                             <td>
                                 <span class="{{ $row->financement_requis ? 'anbg-badge anbg-badge-warning' : 'anbg-badge anbg-badge-neutral' }} px-3">
-                                    {{ $row->financement_requis ? 'Oui' : 'Non' }}
+                                    {{ $row->financement_requis ? ($financingStatusOptions[$row->financementStatus()] ?? 'A traiter DAF') : 'Non' }}
                                 </span>
                             </td>
                             <td>
@@ -411,7 +355,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="12" class="py-8 text-center text-slate-500 dark:text-slate-400">Aucune action trouvee pour les filtres courants.</td>
+                            <td colspan="10" class="py-8 text-center text-slate-500">Aucune action trouvée pour les filtres courants.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -420,4 +364,5 @@
 
         <x-ui.pagination :paginator="$rows" label="actions filtrees" />
     </section>
+    </div>
 @endsection

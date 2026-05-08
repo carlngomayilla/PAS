@@ -3,7 +3,7 @@
 @section('title', 'Maintenance')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
@@ -20,17 +20,17 @@
     </section>
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Mode maintenance</p><p class="mt-2 text-2xl font-bold {{ $status['maintenance_active'] ? 'text-amber-600 dark:text-amber-300' : 'text-emerald-600 dark:text-emerald-300' }}">{{ $status['maintenance_active'] ? 'Actif' : 'Inactif' }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Cache configuration</p><p class="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $status['config_cached'] ? 'Present' : 'Absent' }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Cache routes</p><p class="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $status['routes_cached'] ? 'Present' : 'Absent' }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Cache evenements</p><p class="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $status['events_cached'] ? 'Present' : 'Absent' }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Mode maintenance</p><p class="mt-2 text-2xl font-bold {{ $status['maintenance_active'] ? 'text-amber-600' : 'text-emerald-600' }}">{{ $status['maintenance_active'] ? 'Actif' : 'Inactif' }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Cache configuration</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $status['config_cached'] ? 'Present' : 'Absent' }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Cache routes</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $status['routes_cached'] ? 'Present' : 'Absent' }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Cache événements</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $status['events_cached'] ? 'Present' : 'Absent' }}</p></article>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
             @foreach ($actions as $action => $label)
                 <article class="ui-card !mb-0">
-                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $label }}</p>
+                    <p class="text-sm font-semibold text-slate-900">{{ $label }}</p>
                     <p class="mt-2 text-sm text-slate-600">Action journalisee automatiquement dans le module `Super Administration`.</p>
                     <form method="POST" action="{{ route('workspace.super-admin.maintenance.run', $action) }}" class="mt-4">
                         @csrf
@@ -48,7 +48,7 @@
     </section>
 
     <section class="ui-card">
-        <h2>Historique recent</h2>
+        <h2>Historique récent</h2>
         <div class="mt-4 overflow-x-auto">
             <table class="min-w-full text-sm">
                 <thead>
@@ -62,7 +62,7 @@
                     @forelse ($recentAudits as $audit)
                         <tr>
                             <td class="px-3 py-2">{{ $audit->created_at?->format('Y-m-d H:i') }}</td>
-                            <td class="px-3 py-2">{{ $audit->user?->name ?? 'Systeme' }}</td>
+                            <td class="px-3 py-2">{{ $audit->user?->name ?? 'Système' }}</td>
                             <td class="px-3 py-2">{{ $audit->action }}</td>
                         </tr>
                     @empty

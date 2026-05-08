@@ -65,7 +65,7 @@ import { gsap } from 'gsap';
     scale: isOn ? 1 : 0.96,
     y: isOn ? -4 : 18,
     boxShadow: isOn ? '0 30px 90px rgba(0,0,0,.45)' : '0 18px 60px rgba(0,0,0,.35)',
-    borderColor: isOn ? 'rgba(255,214,102,.22)' : 'rgba(255,255,255,.10)',
+    borderColor: isOn ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.10)',
   });
   gsap.set(cardRevealTargets, {
     autoAlpha: isOn ? 1 : 0,
@@ -101,14 +101,14 @@ import { gsap } from 'gsap';
     gsap.to(glow, {
       duration: 0.35,
       ease: 'power2.out',
-      background: `radial-gradient(circle at ${percentX}% ${Math.max(0, percentY - 20)}%, rgba(255, 225, 150, .76), rgba(255, 212, 108, .22) 40%, rgba(255, 212, 108, 0) 70%)`,
+      background: `radial-gradient(circle at ${percentX}% ${Math.max(0, percentY - 20)}%, rgba(255, 255, 255, .48), rgba(226, 232, 240, .16) 40%, rgba(226, 232, 240, 0) 70%)`,
       overwrite: 'auto',
     });
 
     gsap.to(card, {
       duration: 0.35,
       ease: 'power2.out',
-      boxShadow: `${Math.round((percentX - 50) * 0.22)}px 34px 96px rgba(0,0,0,.46), 0 0 0 1px rgba(255,214,102,.08)`,
+      boxShadow: `${Math.round((percentX - 50) * 0.22)}px 34px 96px rgba(0,0,0,.46), 0 0 0 1px rgba(255,255,255,.08)`,
       overwrite: 'auto',
     });
   }
@@ -194,7 +194,7 @@ import { gsap } from 'gsap';
         scale: 1,
         duration: 0.24,
         ease: 'elastic.out(1, 0.45)',
-        boxShadow: '0 12px 34px rgba(255, 214, 102, .28)',
+        boxShadow: '0 12px 34px rgba(255, 255, 255, .18)',
       }, '<')
       .to(scene, { rotate: 0.35, duration: 0.32, ease: 'power2.out' });
   }
@@ -242,14 +242,14 @@ import { gsap } from 'gsap';
       ease: 'power3.out',
       opacity: 1,
       scale: 1.03,
-      background: 'radial-gradient(circle at 50% 0%, rgba(255, 236, 170, .88), rgba(255, 220, 130, .30) 38%, rgba(255, 220, 130, 0) 70%)',
+      background: 'radial-gradient(circle at 50% 0%, rgba(255, 255, 255, .56), rgba(226, 232, 240, .18) 38%, rgba(226, 232, 240, 0) 70%)',
     });
 
     gsap.to(glow, {
       duration: 0.9,
       delay: 0.42,
       ease: 'power2.out',
-      background: 'radial-gradient(circle at 50% 0%, rgba(255, 221, 145, .78), rgba(255, 212, 108, .24) 40%, rgba(255, 212, 108, 0) 70%)',
+      background: 'radial-gradient(circle at 50% 0%, rgba(255, 255, 255, .46), rgba(226, 232, 240, .14) 40%, rgba(226, 232, 240, 0) 70%)',
       overwrite: 'auto',
     });
 
@@ -258,14 +258,14 @@ import { gsap } from 'gsap';
       ease: 'power3.out',
       opacity: 1,
       y: 0,
-      background: 'conic-gradient(from 180deg at 50% 0%, rgba(255, 214, 102, 0) 0deg, rgba(255, 231, 166, .22) 35deg, rgba(255, 236, 182, .44) 55deg, rgba(255, 225, 144, .24) 75deg, rgba(255, 214, 102, 0) 110deg)',
+      background: 'conic-gradient(from 180deg at 50% 0%, rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, .10) 35deg, rgba(255, 255, 255, .22) 55deg, rgba(255, 255, 255, .12) 75deg, rgba(255, 255, 255, 0) 110deg)',
     });
 
     gsap.to(cone, {
       duration: 0.9,
       delay: 0.44,
       ease: 'power2.out',
-      background: 'conic-gradient(from 180deg at 50% 0%, rgba(255, 214, 102, 0) 0deg, rgba(255, 219, 126, .18) 35deg, rgba(255, 215, 116, .34) 55deg, rgba(255, 216, 118, .18) 75deg, rgba(255, 214, 102, 0) 110deg)',
+      background: 'conic-gradient(from 180deg at 50% 0%, rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, .08) 35deg, rgba(255, 255, 255, .16) 55deg, rgba(255, 255, 255, .08) 75deg, rgba(255, 255, 255, 0) 110deg)',
       overwrite: 'auto',
     });
 
@@ -276,7 +276,7 @@ import { gsap } from 'gsap';
       x: 0,
       scale: 1,
       y: -4,
-      borderColor: 'rgba(255,214,102,.22)',
+      borderColor: 'rgba(255,255,255,.22)',
       boxShadow: '0 30px 90px rgba(0,0,0,.45)',
     });
 

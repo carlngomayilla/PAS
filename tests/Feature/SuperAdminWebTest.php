@@ -251,7 +251,7 @@ class SuperAdminWebTest extends TestCase
         $this->assertStringContainsString('Objectif operationnel', (string) $sheetTwoXml);
         $this->assertStringContainsString('Tableau 3 : Actions detaillees', (string) $sheetThreeXml);
         $this->assertStringContainsString('Description action', (string) $sheetThreeXml);
-        $this->assertStringContainsString('Tableau 6 : Alertes KPI sous seuil', (string) $sheetSixXml);
+        $this->assertStringContainsString('Tableau 6 : Alertes indicateurs sous seuil', (string) $sheetSixXml);
         $this->assertStringContainsString('Action corrective', (string) $sheetSixXml);
         $this->assertStringContainsString('Reporting DG Excel', (string) $coreXml);
         $this->assertStringNotContainsString('Synthese graphique', (string) $workbookXml);

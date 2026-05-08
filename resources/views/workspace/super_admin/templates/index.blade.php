@@ -3,7 +3,7 @@
 @section('title', 'Templates d export')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
@@ -18,7 +18,7 @@
         </div>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="GET" class="form-grid">
             <div><label for="q">Recherche</label><input id="q" name="q" type="text" value="{{ $filters['q'] }}" placeholder="Nom, code, type de rapport"></div>
             <div><label for="format">Format</label><select id="format" name="format"><option value="">Tous</option>@foreach ($formatOptions as $option)<option value="{{ $option }}" @selected($filters['format'] === $option)>{{ strtoupper($option) }}</option>@endforeach</select></div>
@@ -29,7 +29,7 @@
         </form>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <h2>Importer un template JSON</h2>
         <form method="POST" action="{{ route('workspace.super-admin.templates.import-json') }}" enctype="multipart/form-data" class="mt-4 form-grid">
             @csrf
@@ -47,7 +47,7 @@
         </form>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
                 <thead><tr><th class="px-3 py-2 text-left">Nom</th><th class="px-3 py-2 text-left">Format</th><th class="px-3 py-2 text-left">Module</th><th class="px-3 py-2 text-left">Profil</th><th class="px-3 py-2 text-left">Niveau</th><th class="px-3 py-2 text-left">Statut</th><th class="px-3 py-2 text-left">Affectations</th><th class="px-3 py-2 text-left">Versions</th><th class="px-3 py-2 text-left">Actions</th></tr></thead>

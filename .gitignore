@@ -3,6 +3,9 @@
 .env
 .env.backup
 .env.production
+.env.*
+!.env.example
+!.env.production.example
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -22,3 +25,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Artefacts temporaires d'analyse / extraction
+/tmp_*
+/diff.txt

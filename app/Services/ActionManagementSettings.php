@@ -55,6 +55,7 @@ class ActionManagementSettings
             'actions_auto_complete_when_target_reached' => '0',
             'actions_min_progress_for_closure' => '0',
             'actions_final_justificatif_required' => '0',
+            'actions_kpi_required' => '1',
         ];
     }
 
@@ -83,6 +84,11 @@ class ActionManagementSettings
         return $this->get('actions_final_justificatif_required', '0') === '1';
     }
 
+    public function kpiRequired(): bool
+    {
+        return $this->get('actions_kpi_required', '1') === '1';
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -94,6 +100,7 @@ class ActionManagementSettings
             'auto_complete_when_target_reached' => $this->autoCompleteWhenTargetReached(),
             'min_progress_for_closure' => $this->minProgressForClosure(),
             'final_justificatif_required' => $this->finalJustificatifRequired(),
+            'kpi_required' => $this->kpiRequired(),
         ];
     }
 

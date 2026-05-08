@@ -17,6 +17,7 @@ use App\Notifications\WorkspaceModuleNotification;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class WorkspaceNotificationService
@@ -34,14 +35,20 @@ class WorkspaceNotificationService
             return;
         }
 
-        if ($action->responsable_id === null) {
+        if ($action->responsable_id === null && ! Schema::hasTable('action_responsables')) {
             return;
         }
 
         /** @var EloquentCollection<int, User> $users */
-        $users = User::query()
-            ->whereKey((int) $action->responsable_id)
-            ->get();
+        $users = Schema::hasTable('action_responsables')
+            ? $action->responsables()->get(['users.id', 'users.name', 'users.email'])
+            : User::query()->whereKey((int) $action->responsable_id)->get();
+
+        if ($users->isEmpty() && $action->responsable_id !== null) {
+            $users = User::query()
+                ->whereKey((int) $action->responsable_id)
+                ->get();
+        }
 
         $this->dispatchEvent(
             'action_assigned',
@@ -485,6 +492,123 @@ class WorkspaceNotificationService
         );
     }
 
+    public function notifyActionFinancingRequested(Action $action, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_financing_requested')) {
+            return;
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id');
+        $directionId = (int) ($action->pta?->direction_id ?? 0);
+        $serviceId = (int) ($action->pta?->service_id ?? 0);
+
+        $targets = $this->mergeRecipients($this->dafDirectionUsers(), $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]));
+        $targets = $this->mergeRecipients($targets, $this->directionUsers($directionId, [User::ROLE_DIRECTION]));
+        $targets = $this->mergeRecipients($targets, $this->globalUsers([User::ROLE_DG, User::ROLE_PLANIFICATION]));
+
+        $this->dispatchEvent(
+            'action_financing_requested',
+            $targets,
+            [
+                'title' => 'Financement a traiter',
+                'message' => sprintf('L action "%s" necessite un financement. Traitement DAF requis.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action).'#action-financement',
+                'icon' => 'banknote',
+                'status' => 'warning',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'montant_estime' => (string) ($action->montant_estime ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyActionFinancingReviewedByDaf(Action $action, bool $approved, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_financing_reviewed_by_daf')) {
+            return;
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id');
+        $directionId = (int) ($action->pta?->direction_id ?? 0);
+        $serviceId = (int) ($action->pta?->service_id ?? 0);
+
+        $targets = $this->mergeRecipients($this->agentRecipient($action), $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]));
+        $targets = $this->mergeRecipients($targets, $this->directionUsers($directionId, [User::ROLE_DIRECTION]));
+        $targets = $this->mergeRecipients($targets, $this->globalUsers($approved ? [User::ROLE_DG, User::ROLE_PLANIFICATION] : [User::ROLE_PLANIFICATION]));
+
+        $this->dispatchEvent(
+            'action_financing_reviewed_by_daf',
+            $targets,
+            [
+                'title' => $approved ? 'Financement valide par la DAF' : 'Financement rejete par la DAF',
+                'message' => $approved
+                    ? sprintf('La DAF a valide le financement de "%s". Accord DG requis.', (string) $action->libelle)
+                    : sprintf('La DAF a rejete le financement de "%s". Consultez le motif.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action).'#action-financement',
+                'icon' => $approved ? 'badge-check' : 'x-circle',
+                'status' => $approved ? 'info' : 'warning',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'decision' => $approved ? 'valide_daf' : 'rejete_daf',
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'montant_valide' => (string) ($action->financement_montant_valide ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyActionFinancingReviewedByDg(Action $action, bool $approved, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_financing_reviewed_by_dg')) {
+            return;
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id');
+        $directionId = (int) ($action->pta?->direction_id ?? 0);
+        $serviceId = (int) ($action->pta?->service_id ?? 0);
+
+        $targets = $this->mergeRecipients($this->dafDirectionUsers(), $this->agentRecipient($action));
+        $targets = $this->mergeRecipients($targets, $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]));
+        $targets = $this->mergeRecipients($targets, $this->directionUsers($directionId, [User::ROLE_DIRECTION]));
+        $targets = $this->mergeRecipients($targets, $this->globalUsers([User::ROLE_PLANIFICATION]));
+
+        $this->dispatchEvent(
+            'action_financing_reviewed_by_dg',
+            $targets,
+            [
+                'title' => $approved ? 'Accord DG sur financement' : 'Refus DG sur financement',
+                'message' => $approved
+                    ? sprintf('La DG a donne son accord de financement pour "%s".', (string) $action->libelle)
+                    : sprintf('La DG a refuse le financement de "%s". Consultez le motif.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action).'#action-financement',
+                'icon' => $approved ? 'badge-check' : 'x-circle',
+                'status' => $approved ? 'success' : 'warning',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'decision' => $approved ? 'accorde_dg' : 'refuse_dg',
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'montant_valide' => (string) ($action->financement_montant_valide ?? ''),
+            ],
+            $actor?->id
+        );
+    }
     public function notifyPasStatus(Pas $pas, string $event, ?User $actor = null): void
     {
         if (! $this->notificationPolicySettings->eventEnabled('pas_status')) {
@@ -720,6 +844,16 @@ class WorkspaceNotificationService
      * @param array<int, string> $roles
      * @return EloquentCollection<int, User>
      */
+    /**
+     * @return EloquentCollection<int, User>
+     */
+    private function dafDirectionUsers(): EloquentCollection
+    {
+        return User::query()
+            ->where('role', User::ROLE_DIRECTION)
+            ->whereHas('direction', fn ($query) => $query->where('code', 'DAF'))
+            ->get();
+    }
     private function globalUsers(array $roles): EloquentCollection
     {
         return User::query()

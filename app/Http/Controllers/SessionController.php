@@ -5,10 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\JournalAudit;
 use App\Models\User;
 use App\Services\Security\PasswordPolicyService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use PDOException;
+use Throwable;
 
 class SessionController extends Controller
 {
@@ -33,29 +37,43 @@ class SessionController extends Controller
         $identifier = trim((string) ($credentials['email'] ?? ''));
         $password = (string) ($credentials['password'] ?? '');
 
-        $authenticated = Auth::attempt([
-            'email' => $identifier,
-            'password' => $password,
-        ], $remember);
+        if (! $this->databaseCanBeReachedForLogin()) {
+            return $this->databaseUnavailableResponse($request);
+        }
 
-        if (! $authenticated) {
-            $normalizedMatricule = strtoupper(str_replace(' ', '', $identifier));
-            $legacyEmailAliases = [
-                strtolower($normalizedMatricule).'@anbg.ga',
-                strtolower($normalizedMatricule).'@anbg.test',
-            ];
+        try {
+            $authenticated = Auth::attempt([
+                'email' => $identifier,
+                'password' => $password,
+            ], $remember);
 
-            $matchedUser = User::query()
-                ->whereRaw("UPPER(REPLACE(agent_matricule, ' ', '')) = ?", [$normalizedMatricule])
-                ->orWhereIn('email', $legacyEmailAliases)
-                ->first();
+            if (! $authenticated) {
+                $normalizedMatricule = strtoupper(str_replace(' ', '', $identifier));
+                $legacyEmailAliases = [
+                    strtolower($normalizedMatricule).'@anbg.ga',
+                    strtolower($normalizedMatricule).'@anbg.test',
+                ];
 
-            if ($matchedUser instanceof User) {
-                $authenticated = Auth::attempt([
-                    'email' => (string) $matchedUser->email,
-                    'password' => $password,
-                ], $remember);
+                $matchedUser = User::query()
+                    ->whereRaw("UPPER(REPLACE(agent_matricule, ' ', '')) = ?", [$normalizedMatricule])
+                    ->orWhereIn('email', $legacyEmailAliases)
+                    ->first();
+
+                if ($matchedUser instanceof User) {
+                    $authenticated = Auth::attempt([
+                        'email' => (string) $matchedUser->email,
+                        'password' => $password,
+                    ], $remember);
+                }
             }
+        } catch (QueryException|PDOException $exception) {
+            Log::warning('Login database unavailable.', [
+                'connection' => config('database.default'),
+                'host' => config('database.connections.'.config('database.default').'.host'),
+                'error' => $exception->getMessage(),
+            ]);
+
+            return $this->databaseUnavailableResponse($request);
         }
 
         if (! $authenticated) {
@@ -132,16 +150,73 @@ class SessionController extends Controller
      */
     private function recordAuthenticationAudit(Request $request, User $user, string $action, array $payload = []): void
     {
-        JournalAudit::query()->create([
-            'user_id' => $user->id,
-            'module' => 'auth',
-            'entite_type' => User::class,
-            'entite_id' => (int) $user->id,
-            'action' => $action,
-            'ancienne_valeur' => null,
-            'nouvelle_valeur' => $payload,
-            'adresse_ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
+        try {
+            JournalAudit::query()->create([
+                'user_id' => $user->id,
+                'module' => 'auth',
+                'entite_type' => User::class,
+                'entite_id' => (int) $user->id,
+                'action' => $action,
+                'ancienne_valeur' => null,
+                'nouvelle_valeur' => $payload,
+                'adresse_ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('Authentication audit could not be recorded.', [
+                'user_id' => $user->id,
+                'action' => $action,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function databaseCanBeReachedForLogin(): bool
+    {
+        $connectionName = (string) config('database.default');
+        $connection = (array) config('database.connections.'.$connectionName, []);
+
+        if (($connection['driver'] ?? null) !== 'pgsql') {
+            return true;
+        }
+
+        if (! (bool) ($connection['login_preflight'] ?? true)) {
+            return true;
+        }
+
+        $host = trim((string) ($connection['host'] ?? ''));
+        $port = (int) ($connection['port'] ?? 5432);
+
+        if ($host === '' || str_starts_with($host, '/')) {
+            return true;
+        }
+
+        $timeout = max(0.2, min((float) ($connection['login_preflight_timeout'] ?? 1.0), 3.0));
+        $socket = @fsockopen($host, $port, $errno, $errstr, $timeout);
+
+        if (is_resource($socket)) {
+            fclose($socket);
+
+            return true;
+        }
+
+        Log::warning('Login database preflight failed.', [
+            'connection' => $connectionName,
+            'host' => $host,
+            'port' => $port,
+            'error_number' => $errno,
+            'error' => $errstr,
         ]);
+
+        return false;
+    }
+
+    private function databaseUnavailableResponse(Request $request): RedirectResponse
+    {
+        return back()
+            ->withErrors([
+                'email' => 'Base de donnees indisponible. Verifiez que PostgreSQL sur la VM est demarre et accessible, puis reessayez.',
+            ])
+            ->onlyInput('email');
     }
 }

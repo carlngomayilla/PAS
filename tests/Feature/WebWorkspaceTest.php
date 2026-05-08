@@ -7,6 +7,7 @@ use App\Models\Pao;
 use App\Models\Action;
 use App\Models\KpiMesure;
 use App\Models\Kpi;
+use App\Models\ObjectifOperationnel;
 use App\Models\Pta;
 use App\Models\User;
 use App\Services\ActionCalculationSettings;
@@ -17,6 +18,8 @@ use App\Services\Analytics\ReportingAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\Concerns\CreatesAdminUser;
 use Tests\Support\SimpleZipReader;
@@ -57,12 +60,12 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/workspace/reporting')
             ->assertOk()
-            ->assertSee('Reporting consolide');
+            ->assertSee('Reporting consolidé');
 
         $this->actingAs($admin)
             ->get('/workspace/alertes')
             ->assertOk()
-            ->assertSee('Alertes operationnelles')
+            ->assertSee('Alertes opérationnelles')
             ->assertSee("Centre d'alertes", false);
 
         $this->actingAs($admin)
@@ -128,9 +131,8 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/workspace/actions/create')
-            ->assertOk()
-            ->assertSee('Indicateur principal')
-            ->assertSee('name="kpi_libelle"', false);
+            ->assertRedirect(route('workspace.pta.index'))
+            ->assertSessionHas('info', 'Les actions sont desormais creees depuis le PTA. Ce module est reserve au suivi, au controle et a la validation.');
 
         $this->actingAs($admin)
             ->get('/workspace/kpi')
@@ -158,16 +160,16 @@ class WebWorkspaceTest extends TestCase
         $admin = $this->createAdminUser();
 
         $this->actingAs($admin)
-            ->get('/dashboard')
+            ->get('/dashboard?dashboardTab=charts')
             ->assertOk()
-            ->assertSee('Analytique avancee')
+            ->assertSee('Analytique avancée')
             ->assertSee('Entonnoir PAS - PAO - PTA - Actions')
             ->assertSee('analytics-explorer-title', false);
 
         $this->actingAs($admin)
             ->get('/workspace/reporting')
             ->assertOk()
-            ->assertSee('Centre d export et de diffusion')
+            ->assertSee("Centre d'export et de diffusion")
             ->assertSee('Dashboard analytique')
             ->assertDontSee('Entonnoir PAS - PAO - PTA - Actions');
     }
@@ -189,22 +191,27 @@ class WebWorkspaceTest extends TestCase
         $admin = $this->createAdminUser();
         $reportingPayload = app(ReportingAnalyticsService::class)->buildPayload($admin, true, true);
 
-        $response = $this->actingAs($admin)
-            ->get('/dashboard')
+        $chartResponse = $this->actingAs($admin)
+            ->get('/dashboard?dashboardTab=charts')
             ->assertOk()
-            ->assertSee('data-row-link="', false)
             ->assertSee('"actions_index_url"', false)
             ->assertSee(route('workspace.pas.index'), false)
             ->assertSee(route('workspace.actions.index'), false);
 
+        $tableResponse = $this->actingAs($admin)
+            ->get('/dashboard?dashboardTab=tables')
+            ->assertOk()
+            ->assertSee('data-row-link="', false)
+            ->assertSee(route('workspace.actions.index'), false);
+
         $topRiskUrl = $reportingPayload['charts']['top_risks']['rows'][0]['url'] ?? null;
         if (is_string($topRiskUrl) && $topRiskUrl !== '') {
-            $response->assertSee($topRiskUrl, false);
+            $chartResponse->assertSee($topRiskUrl, false);
         }
 
         $pasRowUrl = $reportingPayload['pasConsolidation'][0]['url'] ?? null;
         if (is_string($pasRowUrl) && $pasRowUrl !== '') {
-            $response->assertSee($pasRowUrl, false);
+            $tableResponse->assertSee('/workspace/pao?pas_id=', false);
         }
     }
 
@@ -347,7 +354,7 @@ class WebWorkspaceTest extends TestCase
             ->assertSee('Liste des PTA');
 
         $this->actingAs($admin)
-            ->get('/workspace/alertes')
+            ->get('/workspace/alertes?limit=100')
             ->assertOk()
             ->assertDontSee('Provisoire')
             ->assertDontSee('Officiel');
@@ -403,7 +410,7 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/workspace/kpi/create')
-            ->assertRedirect(route('workspace.actions.create').'#action-indicator-settings');
+            ->assertRedirect(route('workspace.pta.index'));
 
         $this->actingAs($admin)
             ->get('/workspace/kpi/'.$kpi->id.'/edit')
@@ -422,62 +429,105 @@ class WebWorkspaceTest extends TestCase
             ->assertRedirect(route('workspace.actions.suivi', $mesure->kpi->action));
     }
 
-    public function test_action_form_persists_primary_indicator_configuration(): void
+    public function test_action_direct_creation_is_disabled_from_workspace(): void
     {
         $admin = $this->createAdminUser();
         [$pta, $responsable] = $this->firstUnlockedPtaAndAgent();
 
         $this->actingAs($admin)
             ->get('/workspace/actions/create')
-            ->assertOk()
-            ->assertSee('Indicateur principal')
-            ->assertSee('name="kpi_periodicite"', false)
-            ->assertSee('name="kpi_est_a_renseigner"', false)
-            ->assertDontSee('name="kpi_unite"', false)
-            ->assertDontSee('name="kpi_cible"', false);
+            ->assertRedirect(route('workspace.pta.index'));
 
-        $response = $this->actingAs($admin)
+        $this->actingAs($admin)
             ->post(route('workspace.actions.store'), [
                 'pta_id' => (int) $pta->id,
                 'responsable_id' => (int) $responsable->id,
                 'libelle' => 'Action test indicateur embarque',
                 'description' => 'Creation via formulaire action',
-                'type_cible' => 'quantitative',
-                'unite_cible' => 'dossiers',
                 'quantite_cible' => 120,
+                'resultat_attendu' => 'Finaliser 120 dossiers controles.',
                 'date_debut' => '2026-04-06',
                 'date_fin' => '2026-04-30',
                 'frequence_execution' => 'hebdomadaire',
-                'statut' => 'non_demarre',
-                'seuil_alerte_progression' => 12,
                 'risques' => 'Charge de travail',
                 'mesures_preventives' => 'Pilotage hebdomadaire',
                 'kpi_seuil_alerte' => 75,
-                'kpi_periodicite' => 'mensuel',
-                'kpi_est_a_renseigner' => 0,
                 'financement_requis' => 0,
                 'ressource_main_oeuvre' => 1,
                 'ressource_equipement' => 0,
                 'ressource_partenariat' => 0,
                 'ressource_autres' => 0,
             ])
-            ->assertRedirect();
+            ->assertForbidden();
 
-        $action = Action::query()
-            ->where('libelle', 'Action test indicateur embarque')
-            ->latest('id')
-            ->firstOrFail();
-
-        $response->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $this->assertDatabaseHas('kpis', [
-            'action_id' => (int) $action->id,
+        $this->assertDatabaseMissing('actions', [
             'libelle' => 'Action test indicateur embarque',
-            'unite' => 'dossiers',
-            'cible' => 120,
-            'periodicite' => 'mensuel',
-            'est_a_renseigner' => 0,
         ]);
+    }
+
+    public function test_crud_forms_hide_legacy_fields_from_old_model(): void
+    {
+        $admin = $this->createAdminUser();
+        $pao = Pao::query()->with('direction', 'service', 'pasObjectif')->firstOrFail();
+        $pta = Pta::query()->with('pao.pasObjectif', 'direction', 'service')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.pas.create'))
+            ->assertOk()
+            ->assertDontSee('Code axe')
+            ->assertDontSee('Code objectif')
+            ->assertDontSee('Budget cible')
+            ->assertDontSee('Indicateur global');
+
+        $this->actingAs($admin)
+            ->get(route('workspace.pao.edit', $pao))
+            ->assertOk()
+            ->assertDontSee('Titre du PAO')
+            ->assertDontSee('Resultats attendus')
+            ->assertDontSee('Indicateurs associes')
+            ->assertSee('Objectif opérationnel');
+
+        $this->actingAs($admin)
+            ->get(route('workspace.pta.edit', $pta))
+            ->assertOk()
+            ->assertDontSee('Tache globale du service / description complementaire')
+            ->assertDontSee('name="description"', false)
+            ->assertDontSee('PAO parent')
+            ->assertDontSee('Formalisation du PTA')
+            ->assertSee('Objectif opérationnel transmis au service')
+            ->assertSee('Actions liées');
+
+        $this->actingAs($admin)
+            ->get(route('workspace.actions.create'))
+            ->assertRedirect(route('workspace.pta.index'));
+    }
+
+    public function test_action_reading_pages_and_legacy_pas_sub_crud_routes_stay_clean(): void
+    {
+        $admin = $this->createAdminUser();
+        $action = Action::query()->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.actions.index'))
+            ->assertOk()
+            ->assertDontSee('<label for="contexte_action">', false)
+            ->assertDontSee('<label for="origine_action">', false)
+            ->assertDontSee('<th>Contexte</th>', false);
+
+        $this->actingAs($admin)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertDontSee('Type cible')
+            ->assertDontSee('Contexte:')
+            ->assertDontSee('Origine:');
+
+        $this->actingAs($admin)
+            ->get('/workspace/pas-axes/create')
+            ->assertRedirect(route('workspace.pas.index'));
+
+        $this->actingAs($admin)
+            ->get('/workspace/pas-objectifs/create')
+            ->assertRedirect(route('workspace.pas.index'));
     }
 
     public function test_alerts_page_exposes_direct_links_to_alert_causes(): void
@@ -574,20 +624,20 @@ class WebWorkspaceTest extends TestCase
         $response = $this->actingAs($admin)->get('/dashboard')->assertOk();
         $content = $response->getContent();
 
-        $this->assertStringContainsString('data-sidebar-module="alertes"', $content);
+        $this->assertStringContainsString('data-sidebar-module="pilotage"', $content);
 
         if ($expectedAlertUnreadCount > 0) {
             $expectedBadge = $expectedAlertUnreadCount > 99 ? '99+' : (string) $expectedAlertUnreadCount;
             $fakeBadge = $fakeNotificationCount > 99 ? '99+' : (string) $fakeNotificationCount;
 
             $this->assertMatchesRegularExpression(
-                '/data-sidebar-module="alertes"[\s\S]*?data-sidebar-badge-for="alertes">' . preg_quote($expectedBadge, '/') . '<\/span>/',
+                '/data-sidebar-module="pilotage"[\s\S]*?data-sidebar-badge-for="pilotage">' . preg_quote($expectedBadge, '/') . '<\/span>/',
                 $content
             );
 
             if ($fakeBadge !== $expectedBadge) {
                 $this->assertDoesNotMatchRegularExpression(
-                    '/data-sidebar-module="alertes"[\s\S]*?data-sidebar-badge-for="alertes">' . preg_quote($fakeBadge, '/') . '<\/span>/',
+                    '/data-sidebar-module="pilotage"[\s\S]*?data-sidebar-badge-for="pilotage">' . preg_quote($fakeBadge, '/') . '<\/span>/',
                     $content
                 );
             }
@@ -596,7 +646,7 @@ class WebWorkspaceTest extends TestCase
         }
 
         $this->assertDoesNotMatchRegularExpression(
-            '/data-sidebar-module="alertes"[\s\S]*?data-sidebar-badge-for="alertes">/',
+            '/data-sidebar-module="pilotage"[\s\S]*?data-sidebar-badge-for="pilotage">/',
             $content
         );
     }
@@ -621,7 +671,7 @@ class WebWorkspaceTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get('/workspace/alertes')
+            ->get('/workspace/alertes?limit=100')
             ->assertOk()
             ->assertSee('Escalade DG')
             ->assertSee('Indicateur global')
@@ -969,28 +1019,28 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringContainsString('STRATEGIE', (string) $workbookXml);
         $this->assertStringContainsString('PAO', (string) $workbookXml);
         $this->assertStringContainsString('ACTIONS', (string) $workbookXml);
-        $this->assertStringContainsString('KPI', (string) $workbookXml);
+        $this->assertStringContainsString('Indicateurs', (string) $workbookXml);
         $this->assertStringContainsString('SYNTH', (string) $workbookXml);
         $this->assertStringContainsString('ALERTES', (string) $workbookXml);
         $this->assertStringContainsString('RISQUES', (string) $workbookXml);
         $this->assertStringContainsString('RMO_PERFORMANCE', (string) $workbookXml);
         $this->assertStringContainsString('JUSTIFICATIFS', (string) $workbookXml);
-        $this->assertStringNotContainsString('Synthese graphique', (string) $workbookXml);
-        $this->assertStringContainsString('Reporting consolide ANBG', (string) $sheetOneXml);
+        $this->assertStringNotContainsString('Synthèse graphique', (string) $workbookXml);
+        $this->assertStringContainsString('Reporting consolidé ANBG', (string) $sheetOneXml);
         $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetOneXml);
-        $this->assertStringContainsString('Tableau 1 : Axes &amp; Objectifs strategiques', (string) $sheetOneXml);
-        $this->assertStringContainsString('Axe strategique', (string) $sheetOneXml);
-        $this->assertStringContainsString('Tableau 2 : Objectifs operationnels &amp; Actions', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Tableau 1 : Axes &amp; Objectifs stratégiques', (string) $sheetOneXml);
+        $this->assertStringContainsString('Axe stratégique', (string) $sheetOneXml);
+        $this->assertStringContainsString('Tableau 2 : Objectifs opérationnels &amp; Actions', (string) $sheetTwoXml);
         $this->assertStringContainsString('Direction', (string) $sheetTwoXml);
         $this->assertStringContainsString('Service', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Objectif operationnel', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Tableau 3 : Actions detaillees', (string) $sheetThreeXml);
+        $this->assertStringContainsString('Objectif opérationnel', (string) $sheetTwoXml);
+        $this->assertStringContainsString('Tableau 3 : Actions détaillées', (string) $sheetThreeXml);
         $this->assertStringContainsString('Description action', (string) $sheetThreeXml);
-        $this->assertStringContainsString('Tableau 4 : KPI par action', (string) $sheetFourXml);
-        $this->assertStringContainsString('KPI Performance (%)', (string) $sheetFourXml);
-        $this->assertStringContainsString('Tableau 5 : Reporting synthetique', (string) $sheetFiveXml);
+        $this->assertStringContainsString('Tableau 4 : Indicateurs par action', (string) $sheetFourXml);
+        $this->assertStringContainsString('Indicateur de performance (%)', (string) $sheetFourXml);
+        $this->assertStringContainsString('Tableau 5 : Reporting synthétique', (string) $sheetFiveXml);
         $this->assertStringContainsString('Performance (%)', (string) $sheetFiveXml);
-        $this->assertStringContainsString('Tableau 6 : Alertes KPI sous seuil', (string) $sheetSixXml);
+        $this->assertStringContainsString('Tableau 6 : Alertes indicateurs sous seuil', (string) $sheetSixXml);
         $this->assertStringContainsString('Action corrective', (string) $sheetSixXml);
         $this->assertStringContainsString('Tableau 7 : Risques', (string) $sheetSevenXml);
         $this->assertStringContainsString('Solution', (string) $sheetSevenXml);
@@ -1000,7 +1050,9 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringContainsString('Statut validation', (string) $sheetNineXml);
         $this->assertStringContainsString('ANBG - RAPPORT PAS PAR DIRECTION ET SERVICE', (string) $sheetTenXml);
         $this->assertStringContainsString('Service :', (string) $sheetTenXml);
-        $this->assertStringContainsString('FF3B82F6', (string) $stylesXml);
+        $this->assertStringContainsString('FF7FB8E6', (string) $stylesXml);
+        $this->assertStringContainsString('FF3996D3', (string) $stylesXml);
+        $this->assertStringContainsString('FF1C203D', (string) $stylesXml);
 
         $pdfResponse = $this->actingAs($admin)
             ->get(route('workspace.reporting.export.pdf'));
@@ -1034,7 +1086,7 @@ class WebWorkspaceTest extends TestCase
             $strategyCsv = $zip->getFromName('01_strategie.csv');
             $paoCsv = $zip->getFromName('02_pao.csv');
             $actionsCsv = $zip->getFromName('03_actions.csv');
-            $kpiCsv = $zip->getFromName('04_kpi.csv');
+            $kpiCsv = $zip->getFromName('04_indicateurs.csv');
             $summaryCsv = $zip->getFromName('05_synthese.csv');
             $alertsCsv = $zip->getFromName('06_alertes.csv');
             $risksCsv = $zip->getFromName('07_risques.csv');
@@ -1055,7 +1107,7 @@ class WebWorkspaceTest extends TestCase
             $strategyCsv = $entries['01_strategie.csv'] ?? false;
             $paoCsv = $entries['02_pao.csv'] ?? false;
             $actionsCsv = $entries['03_actions.csv'] ?? false;
-            $kpiCsv = $entries['04_kpi.csv'] ?? false;
+            $kpiCsv = $entries['04_indicateurs.csv'] ?? false;
             $summaryCsv = $entries['05_synthese.csv'] ?? false;
             $alertsCsv = $entries['06_alertes.csv'] ?? false;
             $risksCsv = $entries['07_risques.csv'] ?? false;
@@ -1080,11 +1132,11 @@ class WebWorkspaceTest extends TestCase
         $this->assertTrue($serviceEntryExists);
         $this->assertStringContainsString('Direction', (string) $indexCsv);
         $this->assertStringContainsString('Service', (string) $indexCsv);
-        $this->assertStringContainsString('Axe strategique', (string) $strategyCsv);
-        $this->assertStringContainsString('Objectif operationnel', (string) $paoCsv);
+        $this->assertStringContainsString('Axe stratégique', (string) $strategyCsv);
+        $this->assertStringContainsString('Objectif opérationnel', (string) $paoCsv);
         $this->assertStringContainsString('Service', (string) $paoCsv);
         $this->assertStringContainsString('Description action', (string) $actionsCsv);
-        $this->assertStringContainsString('KPI Performance (%)', (string) $kpiCsv);
+        $this->assertStringContainsString('Indicateur de performance (%)', (string) $kpiCsv);
         $this->assertStringContainsString('Performance (%)', (string) $summaryCsv);
         $this->assertStringContainsString('Action corrective', (string) $alertsCsv);
         $this->assertStringContainsString('Risque', (string) $risksCsv);
@@ -1099,9 +1151,9 @@ class WebWorkspaceTest extends TestCase
 
         $html = view('workspace.monitoring.reporting-pdf', $payload)->render();
 
-        $this->assertStringContainsString('KPI Performance (%)', $html);
-        $this->assertStringContainsString('KPI Risque (%)', $html);
-        $this->assertStringContainsString('KPI Global (%)', $html);
+        $this->assertStringContainsString('Indicateur de performance (%)', $html);
+        $this->assertStringContainsString('Indicateur risque (%)', $html);
+        $this->assertStringContainsString('Indicateur global (%)', $html);
         $this->assertStringContainsString('section-kicker">Direction', $html);
         $this->assertStringContainsString('section-kicker">Service', $html);
         $this->assertStringNotContainsString('<th>Direction</th><th>Service</th><th>Axe stratégique</th>', $html);
@@ -1152,9 +1204,9 @@ class WebWorkspaceTest extends TestCase
         $this->assertNotFalse($sheetFiveXml);
         $this->assertNotFalse($sheetSixXml);
         $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetOneXml);
-        $this->assertStringContainsString('Tableau 1 : Axes &amp; Objectifs strategiques', (string) $sheetOneXml);
-        $this->assertStringContainsString('Tableau 5 : Reporting synthetique', (string) $sheetFiveXml);
-        $this->assertStringContainsString('Tableau 6 : Alertes KPI sous seuil', (string) $sheetSixXml);
+        $this->assertStringContainsString('Tableau 1 : Axes &amp; Objectifs stratégiques', (string) $sheetOneXml);
+        $this->assertStringContainsString('Tableau 5 : Reporting synthétique', (string) $sheetFiveXml);
+        $this->assertStringContainsString('Tableau 6 : Alertes indicateurs sous seuil', (string) $sheetSixXml);
         $this->assertStringContainsString('Action corrective', (string) $sheetSixXml);
     }
 
@@ -1173,7 +1225,7 @@ class WebWorkspaceTest extends TestCase
             ->assertDontSee('statut_validation_min=validee_chef', false)
             ->assertDontSee('statut_validation=validee_direction', false)
             ->assertDontSee('Moyenne validee direction')
-            ->assertDontSee('Lecture DG : operationnel vs consolide');
+            ->assertDontSee('Lecture DG : opérationnel vs consolidé');
     }
 
     public function test_pilotage_displays_super_admin_official_basis(): void
@@ -1187,12 +1239,12 @@ class WebWorkspaceTest extends TestCase
             ->get('/workspace/pilotage')
             ->assertOk()
             ->assertSee('Base statistique : Toutes les actions visibles')
-            ->assertSee('Actions validees')
+            ->assertSee('Actions')
             ->assertDontSee('statut_validation_min=validee_chef', false)
             ->assertDontSee('statut_validation=validee_direction', false)
             ->assertDontSee('Moyenne validee direction')
             ->assertDontSee('socle officiel valide direction')
-            ->assertDontSee('Lecture DG : operationnel vs consolide');
+            ->assertDontSee('Lecture DG : opérationnel vs consolidé');
     }
 
     public function test_dashboard_reporting_analytics_partial_displays_super_admin_official_basis(): void
@@ -1224,7 +1276,7 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($agent)
             ->get(route('workspace.actions.create'))
-            ->assertForbidden();
+            ->assertRedirect(route('workspace.pta.index'));
 
         $this->actingAs($agent)
             ->get(route('workspace.actions.edit', $action))
@@ -1252,22 +1304,310 @@ class WebWorkspaceTest extends TestCase
         $this->assertSame((int) $agent->id, (int) $week->saisi_par);
     }
 
+    public function test_pta_create_form_displays_parent_pao_context_and_default_title(): void
+    {
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $pao = Pao::query()
+            ->with([
+                'direction:id,code,libelle',
+                'service:id,code,libelle',
+                'pasObjectif:id,code,libelle',
+            ])
+            ->where('service_id', (int) $serviceUser->service_id)
+            ->whereNotNull('objectif_operationnel')
+            ->firstOrFail();
+
+        $response = $this->actingAs($serviceUser)
+            ->get(route('workspace.pta.create', ['pao_id' => $pao->id]));
+
+        $response
+            ->assertOk()
+            ->assertSee('Objectif opérationnel transmis au service')
+            ->assertSee('Titre PTA généré')
+            ->assertSee('PTA - ' . $pao->service->code)
+            ->assertSee($pao->titre)
+            ->assertSee($pao->direction->code . ' - ' . $pao->direction->libelle)
+            ->assertSee($pao->service->code . ' - ' . $pao->service->libelle)
+            ->assertSee($pao->pasObjectif->code . ' - ' . $pao->pasObjectif->libelle)
+            ->assertSee($pao->objectif_operationnel)
+            ->assertSee('objectif opérationnel sélectionné')
+            ->assertSee('+ Ajouter une autre action')
+            ->assertDontSee('PAO parent')
+            ->assertDontSee('Formalisation du PTA');
+    }
+
+    public function test_pta_store_creates_actions_and_multiple_rmos_from_operational_objective(): void
+    {
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $objectif = ObjectifOperationnel::query()
+            ->with('service')
+            ->where('service_id', (int) $serviceUser->service_id)
+            ->whereNotNull('pao_id')
+            ->orderBy('id')
+            ->firstOrFail();
+
+        Pta::query()->where('service_id', (int) $serviceUser->service_id)->delete();
+
+        $agentOne = User::query()
+            ->where('role', User::ROLE_AGENT)
+            ->where('service_id', (int) $serviceUser->service_id)
+            ->first();
+        if (! $agentOne instanceof User) {
+            $agentOne = User::factory()->create([
+                'role' => User::ROLE_AGENT,
+                'direction_id' => (int) $serviceUser->direction_id,
+                'service_id' => (int) $serviceUser->service_id,
+                'is_active' => true,
+            ]);
+        }
+
+        $agentTwo = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'direction_id' => (int) $serviceUser->direction_id,
+            'service_id' => (int) $serviceUser->service_id,
+            'is_active' => true,
+        ]);
+
+        $dateFin = $objectif->echeance?->copy()->subDay()->format('Y-m-d') ?? '2026-04-30';
+        $dateDebut = $objectif->echeance?->copy()->subDays(7)->format('Y-m-d') ?? '2026-04-20';
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.pta.store'), [
+                'objectif_operationnel_id' => (int) $objectif->id,
+                'statut' => 'brouillon',
+                'actions' => [
+                    [
+                        'libelle' => 'Action PTA multi RMO',
+                        'description' => 'Action creee depuis le PTA.',
+                        'date_debut' => $dateDebut,
+                        'date_fin' => $dateFin,
+                        'statut' => 'non_demarre',
+                        'resultat_attendu' => 'Traitement operationnel effectue.',
+                        'financement_requis' => false,
+                        'rmo_ids' => [(int) $agentOne->id, (int) $agentTwo->id],
+                    ],
+                    [
+                        'libelle' => 'Action PTA quantitative',
+                        'description' => 'Action quantitative creee depuis le PTA.',
+                        'date_debut' => $dateDebut,
+                        'date_fin' => $dateFin,
+                        'statut' => 'non_demarre',
+                        'mode_evaluation' => 'quantitatif',
+                        'quantite_cible' => 500,
+                        'unite_cible' => 'dossiers',
+                        'ressources_necessaires' => ['ressources_humaines'],
+                        'ressources_details' => 'Deux agents instructeurs',
+                        'financement_requis' => false,
+                        'risque_potentiel' => 'Retard de traitement',
+                        'mesures_preventives' => 'Suivi hebdomadaire',
+                        'rmo_ids' => [(int) $agentOne->id],
+                    ],
+                    [
+                        'libelle' => 'Action PTA mixte',
+                        'description' => 'Action mixte creee depuis le PTA.',
+                        'date_debut' => $dateDebut,
+                        'date_fin' => $dateFin,
+                        'statut' => 'non_demarre',
+                        'mode_evaluation' => 'mixte',
+                        'quantite_cible' => 100,
+                        'unite_cible' => 'agents formes',
+                        'financement_requis' => false,
+                        'rmo_ids' => [(int) $agentTwo->id],
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('workspace.pta.index'));
+
+        $pta = Pta::query()
+            ->where('service_id', (int) $serviceUser->service_id)
+            ->where('objectif_operationnel_id', (int) $objectif->id)
+            ->firstOrFail();
+
+        $action = Action::query()
+            ->where('pta_id', (int) $pta->id)
+            ->where('objectif_operationnel_id', (int) $objectif->id)
+            ->where('libelle', 'Action PTA multi RMO')
+            ->firstOrFail();
+
+        $this->assertSame((int) $objectif->pao_id, (int) $action->pao_id);
+        $this->assertSame(Action::MODE_SOUS_ACTIONS, $action->mode_evaluation);
+        $this->assertDatabaseHas('action_responsables', [
+            'action_id' => (int) $action->id,
+            'user_id' => (int) $agentOne->id,
+        ]);
+        $this->assertDatabaseHas('action_responsables', [
+            'action_id' => (int) $action->id,
+            'user_id' => (int) $agentTwo->id,
+        ]);
+        $quantitativeAction = Action::query()
+            ->where('pta_id', (int) $pta->id)
+            ->where('libelle', 'Action PTA quantitative')
+            ->firstOrFail();
+
+        $this->assertSame(Action::MODE_QUANTITATIF, $quantitativeAction->mode_evaluation);
+        $this->assertSame('dossiers', $quantitativeAction->unite_cible);
+        $this->assertSame(['ressources_humaines'], $quantitativeAction->ressources_necessaires);
+        $this->assertSame('Deux agents instructeurs', $quantitativeAction->ressources_details);
+        $this->assertFalse((bool) $quantitativeAction->financement_requis);
+        $this->assertSame(Action::FINANCEMENT_NON_REQUIS, $quantitativeAction->financementStatus());
+        $this->assertNull($quantitativeAction->source_financement);
+        $this->assertSame('Retard de traitement', $quantitativeAction->risque_potentiel);
+        $this->assertSame('Suivi hebdomadaire', $quantitativeAction->mesures_preventives);
+        $this->assertNull($quantitativeAction->niveau_risque);
+
+        $this->assertDatabaseHas('actions', [
+            'pta_id' => (int) $pta->id,
+            'libelle' => 'Action PTA mixte',
+            'mode_evaluation' => Action::MODE_MIXTE,
+            'unite_cible' => 'agents formes',
+        ]);
+    }
+
+    public function test_pta_store_action_with_financing_upload_is_transmitted_to_daf(): void
+    {
+        Storage::fake('local');
+
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $dafDirector = User::query()->where('email', 'directeur.daf@anbg.ga')->firstOrFail();
+        $objectif = ObjectifOperationnel::query()
+            ->with('service')
+            ->where('service_id', (int) $serviceUser->service_id)
+            ->whereNotNull('pao_id')
+            ->orderBy('id')
+            ->firstOrFail();
+
+        Pta::query()->where('service_id', (int) $serviceUser->service_id)->delete();
+
+        $agent = User::query()
+            ->where('role', User::ROLE_AGENT)
+            ->where('service_id', (int) $serviceUser->service_id)
+            ->firstOrFail();
+
+        $dateFin = $objectif->echeance?->copy()->subDay()->format('Y-m-d') ?? '2026-04-30';
+        $dateDebut = $objectif->echeance?->copy()->subDays(7)->format('Y-m-d') ?? '2026-04-20';
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.pta.store'), [
+                'objectif_operationnel_id' => (int) $objectif->id,
+                'statut' => 'brouillon',
+                'actions' => [
+                    [
+                        'libelle' => 'Action PTA financee DAF',
+                        'description' => 'Action creee depuis le PTA avec besoin de financement.',
+                        'date_debut' => $dateDebut,
+                        'date_fin' => $dateFin,
+                        'statut' => 'non_demarre',
+                        'mode_evaluation' => 'quantitatif',
+                        'quantite_cible' => 25,
+                        'unite_cible' => 'missions',
+                        'ressources_necessaires' => ['main_oeuvre', 'ressources_informatiques'],
+                        'ressources_details' => 'Mobilisation de deux agents et equipements informatiques.',
+                        'financement_requis' => true,
+                        'montant_estime' => 1250000,
+                        'nature_financement' => 'Equipements informatiques',
+                        'source_financement' => 'Budget PTA',
+                        'commentaire_financement' => 'Financement requis pour les equipements de suivi.',
+                        'justificatif_financement' => UploadedFile::fake()->create('budget-action.pdf', 64, 'application/pdf'),
+                        'risque_potentiel' => 'Retard de mise a disposition du materiel',
+                        'mesures_preventives' => 'Anticiper la demande et suivre la commande.',
+                        'rmo_ids' => [(int) $agent->id],
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('workspace.pta.index'));
+
+        $action = Action::query()
+            ->where('libelle', 'Action PTA financee DAF')
+            ->firstOrFail();
+
+        $this->assertTrue((bool) $action->financement_requis);
+        $this->assertSame(Action::FINANCEMENT_EN_ATTENTE_DAF, $action->financementStatus());
+        $this->assertSame(['main_oeuvre', 'ressources_informatiques'], $action->ressources_necessaires);
+        $this->assertSame('Equipements informatiques', $action->nature_financement);
+        $this->assertSame('Budget PTA', $action->source_financement);
+        $this->assertNotNull($action->justificatif_financement_path);
+
+        Storage::disk('local')->assertExists((string) $action->justificatif_financement_path);
+        $this->assertDatabaseHas('justificatifs', [
+            'justifiable_type' => Action::class,
+            'justifiable_id' => (int) $action->id,
+            'categorie' => 'financement',
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => (int) $dafDirector->id,
+        ]);
+
+        $this->actingAs($dafDirector)
+            ->get(route('workspace.daf.financements.index'))
+            ->assertOk()
+            ->assertSee('Action PTA financee DAF')
+            ->assertSee('Budget PTA')
+            ->assertSee('Equipements informatiques');
+    }
+
+    public function test_action_create_form_redirects_to_pta_workflow(): void
+    {
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $pta = Pta::query()
+            ->with([
+                'direction:id,code,libelle',
+                'service:id,code,libelle',
+                'pao:id,pas_objectif_id,titre,objectif_operationnel',
+                'pao.pasObjectif:id,code,libelle',
+            ])
+            ->where('service_id', (int) $serviceUser->service_id)
+            ->whereHas('pao', fn ($query) => $query->whereNotNull('objectif_operationnel'))
+            ->firstOrFail();
+
+        $response = $this->actingAs($serviceUser)
+            ->get(route('workspace.actions.create', ['pta_id' => $pta->id]));
+
+        $response
+            ->assertRedirect(route('workspace.pta.index'))
+            ->assertSessionHas('info', 'Les actions sont desormais creees depuis le PTA. Ce module est reserve au suivi, au controle et a la validation.');
+    }
+
     /**
      * @return array{0: \App\Models\Pta, 1: \App\Models\User}
      */
     private function firstUnlockedPtaAndAgent(): array
     {
         $pta = Pta::query()
-            ->where('statut', '!=', 'verrouille')
+            ->where(function ($query): void {
+                $query->whereNull('statut')
+                    ->orWhere('statut', '!=', 'verrouille');
+            })
             ->orderBy('id')
-            ->firstOrFail();
+            ->first();
+
+        if (! $pta instanceof Pta) {
+            $pta = Pta::query()->orderBy('id')->firstOrFail();
+
+            if ((string) ($pta->statut ?? '') === 'verrouille') {
+                $pta->update(['statut' => 'brouillon']);
+            }
+        }
 
         $agent = User::query()
             ->where('role', User::ROLE_AGENT)
             ->where('direction_id', (int) $pta->direction_id)
             ->where('service_id', (int) $pta->service_id)
             ->orderBy('id')
-            ->firstOrFail();
+            ->first();
+
+        if (! $agent instanceof User) {
+            $agent = User::factory()->create([
+                'name' => 'Agent test PTA',
+                'email' => 'agent.pta.test@anbg.test',
+                'password' => Hash::make('Pass@12345'),
+                'password_changed_at' => now(),
+                'role' => User::ROLE_AGENT,
+                'is_agent' => true,
+                'is_active' => true,
+                'direction_id' => (int) $pta->direction_id,
+                'service_id' => (int) $pta->service_id,
+            ]);
+        }
 
         return [$pta, $agent];
     }

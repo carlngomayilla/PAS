@@ -8,6 +8,7 @@ use App\Models\Direction;
 use App\Models\Justificatif;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
+use App\Models\ObjectifOperationnel;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
@@ -169,10 +170,12 @@ class PlanningApiTest extends TestCase
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
             ->postJson('/api/v1/paos', [
+                'pas_axe_id' => (int) $axe->id,
                 'pas_objectif_id' => (int) $objectif->id,
                 'direction_id' => $dafDirectionId,
                 'service_id' => $dafServiceId,
                 'annee' => 2027,
+                'echeance' => '2027-12-31',
                 'titre' => 'PAO DAF dans PAS global',
                 'statut' => 'brouillon',
             ]);
@@ -216,10 +219,12 @@ class PlanningApiTest extends TestCase
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
             ->postJson('/api/v1/paos', [
+                'pas_axe_id' => (int) $axe->id,
                 'pas_objectif_id' => (int) $objectif->id,
                 'direction_id' => $directionId,
                 'service_id' => $serviceId,
                 'annee' => 2027,
+                'echeance' => '2027-12-31',
                 'titre' => 'PAO DAF direction autorise',
                 'statut' => 'brouillon',
             ]);
@@ -229,7 +234,7 @@ class PlanningApiTest extends TestCase
             ->assertJsonPath('data.service_id', $serviceId);
     }
 
-    public function test_direction_user_can_create_multiple_paos_for_distinct_objectifs_of_the_same_axe(): void
+    public function test_direction_user_can_decline_multiple_operational_objectives_for_the_same_pao_context(): void
     {
         $loginResponse = $this->postJson('/api/v1/login', [
             'email' => 'directeur.daf@anbg.ga',
@@ -263,41 +268,51 @@ class PlanningApiTest extends TestCase
             'ordre' => 1,
         ]);
 
-        $objectifTwo = PasObjectif::query()->create([
-            'pas_axe_id' => $axe->id,
-            'code' => 'OS-DAF-2',
-            'libelle' => 'Objectif DAF 2',
-            'ordre' => 2,
-        ]);
-
         $this->withHeader('Authorization', "Bearer {$token}")
             ->postJson('/api/v1/paos', [
+                'pas_axe_id' => (int) $axe->id,
                 'pas_objectif_id' => (int) $objectifOne->id,
                 'direction_id' => $directionId,
-                'service_id' => $serviceId,
                 'annee' => 2027,
-                'titre' => 'PAO DAF OS 1',
+                'titre' => 'PAO DAF OS multi',
                 'statut' => 'brouillon',
+                'objectifs_operationnels' => [
+                    [
+                        'libelle' => 'Objectif operationnel DAF 1',
+                        'service_id' => $serviceId,
+                        'echeance' => '2027-09-30',
+                        'description' => 'Premiere declinaison operationnelle.',
+                    ],
+                    [
+                        'libelle' => 'Objectif operationnel DAF 2',
+                        'service_id' => $serviceId,
+                        'echeance' => '2027-12-31',
+                        'description' => 'Deuxieme declinaison operationnelle.',
+                    ],
+                ],
             ])
-            ->assertCreated();
-
-        $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/v1/paos', [
-                'pas_objectif_id' => (int) $objectifTwo->id,
-                'direction_id' => $directionId,
-                'service_id' => $serviceId,
-                'annee' => 2027,
-                'titre' => 'PAO DAF OS 2',
-                'statut' => 'brouillon',
-            ])
-            ->assertCreated();
+            ->assertCreated()
+            ->assertJsonPath('created_count', 2);
 
         $this->assertSame(
-            2,
+            1,
             Pao::query()
                 ->where('direction_id', $directionId)
                 ->where('annee', 2027)
-                ->whereIn('pas_objectif_id', [(int) $objectifOne->id, (int) $objectifTwo->id])
+                ->where('pas_objectif_id', (int) $objectifOne->id)
+                ->count()
+        );
+
+        $paoId = Pao::query()
+            ->where('direction_id', $directionId)
+            ->where('annee', 2027)
+            ->where('pas_objectif_id', (int) $objectifOne->id)
+            ->value('id');
+
+        $this->assertSame(
+            2,
+            ObjectifOperationnel::query()
+                ->where('pao_id', (int) $paoId)
                 ->count()
         );
     }
@@ -312,6 +327,9 @@ class PlanningApiTest extends TestCase
 
         $token = (string) $loginResponse->json('access_token');
         $serviceUser = \App\Models\User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        Pta::query()
+            ->where('service_id', (int) $serviceUser->service_id)
+            ->delete();
 
         $pao = Pao::query()->create([
             'pas_id' => (int) Pas::query()->value('id'),
@@ -332,7 +350,8 @@ class PlanningApiTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.pao_id', (int) $pao->id)
-            ->assertJsonPath('data.service_id', (int) $serviceUser->service_id);
+            ->assertJsonPath('data.service_id', (int) $serviceUser->service_id)
+            ->assertJsonPath('data.titre', 'PTA - ' . $pao->service->code);
     }
 
     public function test_direction_user_cannot_create_pta_directly(): void
@@ -547,7 +566,7 @@ class PlanningApiTest extends TestCase
         $this->assertArrayHasKey('kpi_risque', $payload);
     }
 
-    public function test_action_api_can_store_primary_indicator_configuration_directly(): void
+    public function test_action_api_direct_creation_is_disabled(): void
     {
         $admin = $this->createAdminUser();
 
@@ -586,23 +605,13 @@ class PlanningApiTest extends TestCase
                 'ressource_autres' => false,
             ]);
 
-        $response->assertCreated()
-            ->assertJsonPath('data.primary_kpi.libelle', 'Action API indicateur embarque')
-            ->assertJsonPath('data.primary_kpi.unite', 'dossiers')
-            ->assertJsonPath('data.primary_kpi.cible', '80.0000')
-            ->assertJsonPath('data.primary_kpi.est_a_renseigner', false)
-            ->assertJsonPath('data.primary_kpi.periodicite', 'mensuel');
+        $response->assertForbidden();
 
-        $actionId = (int) $response->json('data.id');
-        $this->assertGreaterThan(0, $actionId);
-
-        $this->assertDatabaseHas('kpis', [
-            'action_id' => $actionId,
+        $this->assertDatabaseMissing('actions', [
             'libelle' => 'Action API indicateur embarque',
-            'unite' => 'dossiers',
-            'cible' => 80,
-            'periodicite' => 'mensuel',
-            'est_a_renseigner' => 0,
+        ]);
+        $this->assertDatabaseMissing('kpis', [
+            'libelle' => 'Action API indicateur embarque',
         ]);
     }
 
@@ -954,4 +963,3 @@ class PlanningApiTest extends TestCase
         return [$pta, $agent];
     }
 }
-

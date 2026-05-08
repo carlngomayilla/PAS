@@ -5,11 +5,11 @@
         $isEdit = $mode === 'edit';
     @endphp
     <div class="app-screen-flow">
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <h1>{{ $isEdit ? 'Modifier utilisateur' : 'Nouvel utilisateur' }}</h1>
     </section>
 
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <form method="POST" enctype="multipart/form-data" class="form-shell" action="{{ $isEdit ? route('workspace.referentiel.utilisateurs.update', $row) : route('workspace.referentiel.utilisateurs.store') }}">
             @csrf
             @if ($isEdit)
@@ -44,7 +44,7 @@
                     <div>
                         <label for="role">Role</label>
                         <select id="role" name="role" required>
-                            <option value="">Selectionner</option>
+                            <option value="">Sélectionner</option>
                             @foreach ($roleOptions as $role)
                                 <option value="{{ $role }}" @selected(old('role', $row->role) === $role)>{{ $role }}</option>
                             @endforeach
@@ -101,7 +101,7 @@
             </div>
 
             <div class="form-section">
-                <h2 class="form-section-title">Securite du compte</h2>
+                <h2 class="form-section-title">Sécurité du compte</h2>
                 <div class="grid gap-4">
                     <div>
                         <label for="password">{{ $isEdit ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe' }}</label>
@@ -115,7 +115,7 @@
             </div>
 
             <div class="form-actions">
-                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre a jour' : 'Creer' }}</button>
+                <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Retour</a>
             </div>
         </form>
@@ -124,13 +124,13 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script @cspNonce>
         (function () {
-            var role = document.getElementById('role');
+            var rôle = document.getElementById('role');
             var fields = document.getElementById('agent-fields');
 
             function syncAgentFields() {
-                if (!role || !fields) {
+                if (!rôle || !fields) {
                     return;
                 }
 

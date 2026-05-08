@@ -30,7 +30,8 @@ class SuperAdminKpiSettingsTest extends TestCase
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.kpis.edit'))
             ->assertOk()
-            ->assertSee('KPI et statistiques');
+            ->assertSee('Indicateur de performance et statistiques')
+            ->assertDontSee('KPI et statistiques');
 
         $payload = ['definitions' => []];
         foreach (app(ManagedKpiSettings::class)->all() as $code => $definition) {

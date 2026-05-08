@@ -4,15 +4,15 @@
     'headerClass' => '',
 ])
 
-<section {{ $attributes->merge(['class' => 'ui-card w-full']) }}>
+<section {{ $attributes->merge(['class' => 'app-card eas-section-card w-full']) }}>
     @if ($title || $subtitle || isset($actions))
-        <div class="mb-4 flex flex-wrap items-start justify-between gap-3 {{ $headerClass }}">
-            <div>
+        <div class="mb-5 flex flex-wrap items-start justify-between gap-3 {{ $headerClass }}">
+            <div class="min-w-0 flex-1">
                 @if ($title)
                     <h2 class="showcase-panel-title">{{ $title }}</h2>
                 @endif
                 @if ($subtitle)
-                    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ $subtitle }}</p>
+                    <p class="mt-1 text-sm text-[var(--app-muted)]">{{ $subtitle }}</p>
                 @endif
             </div>
             @isset($actions)

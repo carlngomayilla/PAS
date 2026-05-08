@@ -205,19 +205,20 @@ class WorkspaceModuleSettings
     private function defaults(): array
     {
         return [
-            'messagerie' => ['code' => 'messagerie', 'label' => 'Messagerie', 'description' => 'Annuaire interactif et echanges internes', 'enabled' => true, 'order' => 10, 'section' => 'communication'],
-            'alertes' => ['code' => 'alertes', 'label' => 'Alertes', 'description' => 'Retards et indicateurs sous seuil', 'enabled' => true, 'order' => 20, 'section' => 'pilotage'],
-            'reporting' => ['code' => 'reporting', 'label' => 'Reporting', 'description' => 'Tableau de bord consolide des indicateurs', 'enabled' => true, 'order' => 30, 'section' => 'pilotage'],
-            'pas' => ['code' => 'pas', 'label' => 'PAS', 'description' => 'Vision strategique pluriannuelle', 'enabled' => true, 'order' => 40, 'section' => 'planification'],
-            'pao' => ['code' => 'pao', 'label' => 'PAO', 'description' => 'Declinaison annuelle par direction', 'enabled' => true, 'order' => 50, 'section' => 'planification'],
-            'pta' => ['code' => 'pta', 'label' => 'PTA', 'description' => 'Planification operationnelle par service', 'enabled' => true, 'order' => 60, 'section' => 'planification'],
-            'execution' => ['code' => 'execution', 'label' => 'Actions', 'description' => 'Execution des taches et suivi de progression', 'enabled' => true, 'order' => 70, 'section' => 'execution'],
-            'referentiel' => ['code' => 'referentiel', 'label' => 'Referentiels', 'description' => 'Directions, services, utilisateurs', 'enabled' => true, 'order' => 80, 'section' => 'gouvernance'],
-            'delegations' => ['code' => 'delegations', 'label' => 'Delegations', 'description' => 'Suppleance temporaire de validation', 'enabled' => true, 'order' => 90, 'section' => 'gouvernance'],
-            'retention' => ['code' => 'retention', 'label' => 'Retention', 'description' => 'Archivage et gouvernance des donnees', 'enabled' => true, 'order' => 100, 'section' => 'gouvernance'],
+            'messagerie' => ['code' => 'messagerie', 'label' => 'Messagerie', 'description' => 'Annuaire interactif et échanges internes', 'enabled' => true, 'order' => 10, 'section' => 'communication'],
+            'pilotage' => ['code' => 'pilotage', 'label' => 'Pilotage', 'description' => 'Tableau de bord et synthèse de pilotage', 'enabled' => true, 'order' => 20, 'section' => 'pilotage'],
+            'pas' => ['code' => 'pas', 'label' => 'PAS', 'description' => 'Vision stratégique pluriannuelle', 'enabled' => true, 'order' => 30, 'section' => 'planification'],
+            'pao' => ['code' => 'pao', 'label' => 'PAO', 'description' => 'Déclinaison annuelle par direction', 'enabled' => true, 'order' => 40, 'section' => 'planification'],
+            'pta' => ['code' => 'pta', 'label' => 'PTA', 'description' => 'Planification opérationnelle par service', 'enabled' => true, 'order' => 50, 'section' => 'planification'],
+            'execution' => ['code' => 'execution', 'label' => 'Actions', 'description' => 'Exécution des tâches et suivi de progression', 'enabled' => true, 'order' => 60, 'section' => 'execution'],
+            'reporting' => ['code' => 'reporting', 'label' => 'Reporting', 'description' => 'Reporting consolidé, exports et diffusion', 'enabled' => true, 'order' => 70, 'section' => 'pilotage'],
+            'alertes' => ['code' => 'alertes', 'label' => 'Alertes', 'description' => 'Centre des alertes et écarts de suivi', 'enabled' => true, 'order' => 75, 'section' => 'pilotage'],
+            'referentiel' => ['code' => 'referentiel', 'label' => 'Référentiels', 'description' => 'Directions, services, utilisateurs', 'enabled' => true, 'order' => 80, 'section' => 'gouvernance'],
+            'delegations' => ['code' => 'delegations', 'label' => 'Délégations', 'description' => 'Suppléance temporaire de validation', 'enabled' => true, 'order' => 90, 'section' => 'gouvernance'],
+            'retention' => ['code' => 'retention', 'label' => 'Rétention', 'description' => 'Archivage et gouvernance des données', 'enabled' => true, 'order' => 100, 'section' => 'gouvernance'],
             'api_docs' => ['code' => 'api_docs', 'label' => 'Documentation API', 'description' => 'Contrats OpenAPI et Swagger UI', 'enabled' => true, 'order' => 110, 'section' => 'gouvernance'],
-            'audit' => ['code' => 'audit', 'label' => 'Journal Audit', 'description' => 'Tracabilite des actions utilisateurs', 'enabled' => true, 'order' => 120, 'section' => 'gouvernance'],
-            'super_admin' => ['code' => 'super_admin', 'label' => 'Super Administration', 'description' => 'Parametrage profond, templates d export et gouvernance de plateforme', 'enabled' => true, 'order' => 130, 'section' => 'plateforme'],
+            'audit' => ['code' => 'audit', 'label' => 'Journal Audit', 'description' => 'Traçabilité des actions utilisateurs', 'enabled' => true, 'order' => 120, 'section' => 'gouvernance'],
+            'super_admin' => ['code' => 'super_admin', 'label' => 'Super Administration', 'description' => 'Paramétrage profond, templates d’export et gouvernance de plateforme', 'enabled' => true, 'order' => 130, 'section' => 'plateforme'],
         ];
     }
 

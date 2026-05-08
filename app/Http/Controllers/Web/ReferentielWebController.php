@@ -62,8 +62,18 @@ class ReferentielWebController extends Controller
             }
         }
 
+        $directionSummaryRows = (clone $query)->get();
+
         return view('workspace.referentiel.directions.index', [
             'rows' => $query->paginate(20)->withQueryString(),
+            'summary' => [
+                'total' => $directionSummaryRows->count(),
+                'actifs' => $directionSummaryRows->where('actif', true)->count(),
+                'services_total' => (int) $directionSummaryRows->sum('services_count'),
+                'users_total' => (int) $directionSummaryRows->sum('users_count'),
+                'paos_total' => (int) $directionSummaryRows->sum('paos_count'),
+                'ptas_total' => (int) $directionSummaryRows->sum('ptas_count'),
+            ],
             'canWrite' => $this->canWrite($user),
             'canManageRoles' => $this->canManageRoles($user),
             'filters' => [
@@ -196,8 +206,17 @@ class ReferentielWebController extends Controller
             $query->whereKey((int) $user->service_id);
         }
 
+        $serviceSummaryRows = (clone $query)->get();
+
         return view('workspace.referentiel.services.index', [
             'rows' => $query->paginate(20)->withQueryString(),
+            'summary' => [
+                'total' => $serviceSummaryRows->count(),
+                'actifs' => $serviceSummaryRows->where('actif', true)->count(),
+                'directions_total' => $serviceSummaryRows->pluck('direction_id')->filter()->unique()->count(),
+                'users_total' => (int) $serviceSummaryRows->sum('users_count'),
+                'ptas_total' => (int) $serviceSummaryRows->sum('ptas_count'),
+            ],
             'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle', 'actif']),
             'canWrite' => $this->canWrite($user),
             'canManageRoles' => $this->canManageRoles($user),
@@ -366,8 +385,26 @@ class ReferentielWebController extends Controller
             });
         });
 
+        $userSummaryBase = clone $query;
+
         return view('workspace.referentiel.utilisateurs.index', [
             'rows' => $query->paginate(20)->withQueryString(),
+            'summary' => [
+                'total' => (clone $userSummaryBase)->count(),
+                'actifs' => (clone $userSummaryBase)->where('is_active', true)->count(),
+                'agents' => (clone $userSummaryBase)->where('is_agent', true)->count(),
+                'encadrement' => (clone $userSummaryBase)
+                    ->whereIn('role', [
+                        User::ROLE_SERVICE,
+                        User::ROLE_DIRECTION,
+                        User::ROLE_PLANIFICATION,
+                        User::ROLE_DG,
+                        User::ROLE_ADMIN,
+                        User::ROLE_SUPER_ADMIN,
+                    ])->count(),
+                'directions_total' => (clone $userSummaryBase)->whereNotNull('direction_id')->distinct()->count('direction_id'),
+                'services_total' => (clone $userSummaryBase)->whereNotNull('service_id')->distinct()->count('service_id'),
+            ],
             'canWrite' => $this->canManageUsers($user),
             'canManageRoles' => $this->canManageRoles($user),
             'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
@@ -525,7 +562,7 @@ class ReferentielWebController extends Controller
 
         if ($usedAsResponsable || $usedAsActionResponsable) {
             return back()->withErrors([
-                'general' => 'Suppression impossible: utilisateur deja responsable d actions ou d objectifs operationnels.',
+                'general' => 'Suppression impossible : l\'utilisateur est déjà responsable d\'actions ou d\'objectifs opérationnels.',
             ]);
         }
 

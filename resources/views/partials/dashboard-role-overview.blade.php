@@ -61,7 +61,7 @@
             <article class="showcase-panel">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <div>
-                        <h2 class="showcase-panel-title">{{ $statusChart['title'] ?? 'Repartition des statuts' }}</h2>
+                        <h2 class="showcase-panel-title">{{ $statusChart['title'] ?? 'Répartition des statuts' }}</h2>
                     </div>
                     <span class="showcase-chip">{{ count($statusChart['labels'] ?? []) }} statuts</span>
                 </div>
@@ -89,7 +89,7 @@
     <article class="showcase-panel">
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">{{ $supportChart['title'] ?? 'Lecture metier' }}</h2>
+                <h2 class="showcase-panel-title">{{ $supportChart['title'] ?? 'Lecture métier' }}</h2>
             </div>
             <span class="showcase-chip">{{ count($supportChart['labels'] ?? []) }} lignes</span>
         </div>
@@ -108,11 +108,11 @@
             </div>
             <div class="overflow-x-auto">
                 <table class="dashboard-table">
-                    <thead><tr><th>Action</th><th>PTA</th><th>Echeance</th><th>Statut</th><th>Progression</th><th>Validation</th></tr></thead>
+                    <thead><tr><th>Action</th><th>PTA</th><th>Échéance</th><th>Statut</th><th>Progression</th><th>Validation</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
-                                <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['libelle'] }}</td>
+                                <td class="font-semibold text-[#17324a]">{{ $row['libelle'] }}</td>
                                 <td>{{ $row['pta'] }}</td>
                                 <td>{{ $row['echeance'] }}</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}">{{ $actionStatusLabel($row['statut']) }}</span></td>
@@ -128,7 +128,7 @@
         @elseif ($dashboardRole === 'service')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Actions a valider</h2>
+                    <h2 class="showcase-panel-title">Actions à valider</h2>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
@@ -138,7 +138,7 @@
                     <tbody>
                         @forelse ($primaryRows as $row)
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
-                                <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['libelle'] }}</td>
+                                <td class="font-semibold text-[#17324a]">{{ $row['libelle'] }}</td>
                                 <td>{{ $row['agent'] }}</td>
                                 <td>{{ $row['soumise_le'] }}</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}">{{ $actionStatusLabel($row['statut']) }}</span></td>
@@ -146,7 +146,7 @@
                                 <td>{{ (int) ($row['retard_jours'] ?? 0) }}j</td>
                             </tr>
                         @empty
-                            <tr><td colspan="6">Aucune action a valider pour le moment.</td></tr>
+                            <tr><td colspan="6">Aucune action à valider pour le moment.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -160,11 +160,11 @@
             </div>
             <div class="overflow-x-auto">
                 <table class="dashboard-table">
-                    <thead><tr><th>Service</th><th>Actions</th><th>Achevees</th><th>Retard</th><th>Validees</th><th>Score</th></tr></thead>
+                    <thead><tr><th>Service</th><th>Actions</th><th>Achevées</th><th>Retard</th><th>Validées</th><th>Score</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
-                                <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['service'] }}</td>
+                                <td class="font-semibold text-[#17324a]">{{ $row['service'] }}</td>
                                 <td>{{ $row['actions_total'] }}</td>
                                 <td>{{ $row['achevees'] }}</td>
                                 <td>{{ $row['retards'] }}</td>
@@ -180,17 +180,17 @@
         @elseif ($dashboardRole === 'dg')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Directions : suivi strategique</h2>
+                    <h2 class="showcase-panel-title">Directions : suivi stratégique</h2>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} directions</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="dashboard-table">
-                    <thead><tr><th>Direction</th><th>Actions</th><th>Validees</th><th>Exec.</th><th>Taux validation</th><th>Retards</th><th>Score</th></tr></thead>
+                    <thead><tr><th>Direction</th><th>Actions</th><th>Validées</th><th>Exéc.</th><th>Taux validation</th><th>Retards</th><th>Score</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
-                                <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['direction'] }}</td>
+                                <td class="font-semibold text-[#17324a]">{{ $row['direction'] }}</td>
                                 <td>{{ $row['actions_total'] }}</td>
                                 <td>{{ $row['validees_direction'] }}</td>
                                 <td>{{ number_format((float) ($row['taux_execution'] ?? 0), 0) }}%</td>
@@ -213,11 +213,11 @@
             </div>
             <div class="overflow-x-auto">
                 <table class="dashboard-table">
-                    <thead><tr><th>Direction</th><th>Actions</th><th>Achevees</th><th>Retard</th><th>Validees</th><th>Score</th></tr></thead>
+                    <thead><tr><th>Direction</th><th>Actions</th><th>Achevées</th><th>Retard</th><th>Validées</th><th>Score</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
-                                <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['direction'] }}</td>
+                                <td class="font-semibold text-[#17324a]">{{ $row['direction'] }}</td>
                                 <td>{{ $row['actions_total'] }}</td>
                                 <td>{{ $row['achevees'] }}</td>
                                 <td>{{ $row['retards'] }}</td>
@@ -243,7 +243,7 @@
                     <tbody>
                         @forelse ($primaryRows as $row)
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
-                                <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['direction'] }}</td>
+                                <td class="font-semibold text-[#17324a]">{{ $row['direction'] }}</td>
                                 <td>{{ $row['service'] }}</td>
                                 <td>{{ $row['libelle'] }}</td>
                                 <td>{{ $row['responsable'] }}</td>
@@ -251,7 +251,7 @@
                                 <td>{{ $row['soumise_le'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="6">Aucune validation en attente sur ce perimetre.</td></tr>
+                            <tr><td colspan="6">Aucune validation en attente sur ce périmètre.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -273,11 +273,11 @@
         </div>
         <div class="overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Action</th><th>Echeance</th><th>Retard</th><th>Progression</th><th>Validation</th><th>Acces</th></tr></thead>
+                <thead><tr><th>Action</th><th>Échéance</th><th>Retard</th><th>Progression</th><th>Validation</th><th>Accès</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr>
-                            <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['libelle'] }}</td>
+                            <td class="font-semibold text-[#17324a]">{{ $row['libelle'] }}</td>
                             <td>{{ $row['echeance'] }}</td>
                             <td>{{ $row['retard_jours'] }}j</td>
                             <td>{{ number_format((float) ($row['progression'] ?? 0), 0) }}%</td>
@@ -285,7 +285,7 @@
                             <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="6">Aucune action en retard sur le perimetre courant.</td></tr>
+                        <tr><td colspan="6">Aucune action en retard sur le périmètre courant.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -299,11 +299,11 @@
         </div>
         <div class="overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Agent</th><th>Actions</th><th>Achevees</th><th>Retard</th><th>Taux execution</th></tr></thead>
+                <thead><tr><th>Agent</th><th>Actions</th><th>Achevées</th><th>Retard</th><th>Taux exécution</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
-                            <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['agent'] }}</td>
+                            <td class="font-semibold text-[#17324a]">{{ $row['agent'] }}</td>
                             <td>{{ $row['actions_total'] }}</td>
                             <td>{{ $row['achevees'] }}</td>
                             <td>{{ $row['retards'] }}</td>
@@ -324,11 +324,11 @@
         </div>
         <div class="overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Action</th><th>Service</th><th>Responsable</th><th>Retard</th><th>Validation</th><th>Risque</th><th>Acces</th></tr></thead>
+                <thead><tr><th>Action</th><th>Service</th><th>Responsable</th><th>Retard</th><th>Validation</th><th>Risque</th><th>Accès</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr>
-                            <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['libelle'] }}</td>
+                            <td class="font-semibold text-[#17324a]">{{ $row['libelle'] }}</td>
                             <td>{{ $row['service'] }}</td>
                             <td>{{ $row['responsable'] }}</td>
                             <td>{{ $row['retard_jours'] }}j</td>
@@ -337,7 +337,7 @@
                             <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="7">Aucune action critique sur le perimetre courant.</td></tr>
+                        <tr><td colspan="7">Aucune action critique sur le périmètre courant.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -345,7 +345,7 @@
     @elseif ($dashboardRole === 'dg')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Directions en difficulte</h2>
+                <h2 class="showcase-panel-title">Directions en difficulté</h2>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -355,14 +355,14 @@
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
-                            <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['direction'] }}</td>
+                            <td class="font-semibold text-[#17324a]">{{ $row['direction'] }}</td>
                             <td>{{ $row['service_critique'] }}</td>
                             <td>{{ $row['retards'] }}</td>
                             <td>{{ number_format((float) ($row['taux_validation'] ?? 0), 0) }}%</td>
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 0) }}</span></td>
                         </tr>
                     @empty
-                        <tr><td colspan="5">Aucune direction en difficulte actuellement.</td></tr>
+                        <tr><td colspan="5">Aucune direction en difficulté actuellement.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -370,7 +370,7 @@
     @elseif ($dashboardRole === 'planification')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Actions critiques validees</h2>
+                <h2 class="showcase-panel-title">Actions critiques validées</h2>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -380,7 +380,7 @@
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
-                            <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['direction'] }}</td>
+                            <td class="font-semibold text-[#17324a]">{{ $row['direction'] }}</td>
                             <td>{{ $row['service'] }}</td>
                             <td>{{ $row['libelle'] }}</td>
                             <td>{{ $row['retard_jours'] }}j</td>
@@ -402,11 +402,11 @@
         </div>
         <div class="overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Risque</th><th>Acces</th></tr></thead>
+                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Risque</th><th>Accès</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr>
-                            <td class="font-semibold text-slate-900 dark:text-slate-100">{{ $row['direction'] }}</td>
+                            <td class="font-semibold text-[#17324a]">{{ $row['direction'] }}</td>
                             <td>{{ $row['service'] }}</td>
                             <td>{{ $row['libelle'] }}</td>
                             <td>{{ $row['retard_jours'] }}j</td>
@@ -423,4 +423,3 @@
     @endif
 </article>
 @endif
-

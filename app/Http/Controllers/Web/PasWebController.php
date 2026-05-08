@@ -11,9 +11,12 @@ use App\Http\Requests\UpdatePasRequest;
 use App\Models\Direction;
 use App\Models\JournalAudit;
 use App\Models\Pas;
+use App\Models\PasAxe;
+use App\Models\PasObjectif;
 use App\Models\User;
 use App\Services\PasStructureService;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\ExerciceContext;
 use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -54,6 +57,7 @@ class PasWebController extends Controller
             ->withCount(['axes', 'paos']);
 
         $this->scopePasByUser($query, $user);
+        app(ExerciceContext::class)->applyToPas($query);
 
         $statusFilter = trim((string) $request->string('statut'));
         if ($statusFilter !== '') {
@@ -73,8 +77,28 @@ class PasWebController extends Controller
             $q->where('titre', 'like', "%{$search}%");
         });
 
+        $statsBase = clone $query;
+        $byStatus = (clone $statsBase)->toBase()
+            ->selectRaw('statut, COUNT(*) as cnt')
+            ->groupBy('statut')
+            ->pluck('cnt', 'statut');
+        $pasIdsSubquery = (clone $statsBase)->toBase()->select('id');
+        $pasStats = [
+            'total'           => (int) $byStatus->sum(),
+            'actifs'          => (int) (($byStatus['valide'] ?? 0) + ($byStatus['verrouille'] ?? 0)),
+            'brouillons'      => (int) ($byStatus['brouillon'] ?? 0),
+            'sans_pao'        => (clone $statsBase)->doesntHave('paos')->count(),
+            'sans_axe'        => (clone $statsBase)->doesntHave('axes')->count(),
+            'axes_total'      => PasAxe::query()->whereIn('pas_id', $pasIdsSubquery)->count(),
+            'objectifs_total' => PasObjectif::query()->whereIn(
+                'pas_axe_id',
+                PasAxe::query()->whereIn('pas_id', $pasIdsSubquery)->select('id')
+            )->count(),
+        ];
+
         return view('workspace.pas.index', [
             'rows' => $query->orderByDesc('periode_debut')->orderByDesc('id')->paginate(15)->withQueryString(),
+            'pasStats' => $pasStats,
             'canWrite' => $this->canWrite($user),
             'statusOptions' => array_merge($this->statusOptions($user), ['valide_ou_verrouille']),
             'filters' => [
@@ -114,28 +138,16 @@ class PasWebController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         $validated = $request->validated();
-        $statut = (string) ($validated['statut'] ?? 'brouillon');
-        if (! in_array($statut, $this->statusOptions($user), true)) {
-            return back()->withInput()->withErrors([
-                'statut' => 'Le statut selectionne n est pas autorise pour votre profil.',
-            ]);
-        }
 
         $payload = [
-            'titre' => (string) $validated['titre'],
+            'titre' => $this->generatedPasTitle($validated),
             'periode_debut' => (int) $validated['periode_debut'],
             'periode_fin' => (int) $validated['periode_fin'],
-            'statut' => $statut,
+            'statut' => 'brouillon',
             'created_by' => $user->id,
+            'valide_le' => null,
+            'valide_par' => null,
         ];
-
-        if (in_array($payload['statut'], ['valide', 'verrouille'], true)) {
-            $payload['valide_le'] = now();
-            $payload['valide_par'] = $user->id;
-        } else {
-            $payload['valide_le'] = null;
-            $payload['valide_par'] = null;
-        }
 
         $pas = DB::transaction(function () use ($validated, $payload, $user): Pas {
             $pas = Pas::query()->create($payload);
@@ -192,34 +204,19 @@ class PasWebController extends Controller
         }
 
         $validated = $request->validated();
-        $statut = (string) ($validated['statut'] ?? 'brouillon');
-        if (! in_array($statut, $this->statusOptions($user), true)) {
-            return back()->withInput()->withErrors([
-                'statut' => 'Le statut selectionne n est pas autorise pour votre profil.',
-            ]);
-        }
 
         $payload = [
-            'titre' => (string) $validated['titre'],
+            'titre' => $this->generatedPasTitle($validated),
             'periode_debut' => (int) $validated['periode_debut'],
             'periode_fin' => (int) $validated['periode_fin'],
-            'statut' => $statut,
         ];
-
-        if (in_array($payload['statut'], ['valide', 'verrouille'], true)) {
-            $payload['valide_le'] = now();
-            $payload['valide_par'] = $user->id;
-        } else {
-            $payload['valide_le'] = null;
-            $payload['valide_par'] = null;
-        }
 
         $before = $pas->load([
             'directions:id,code,libelle',
             'axes' => fn ($query) => $query->with('objectifs')->orderBy('ordre')->orderBy('id'),
         ])->toArray();
 
-        DB::transaction(function () use ($pas, $validated, $payload): void {
+        DB::transaction(function () use ($pas, $validated, $payload, $user): void {
             $pas->update($payload);
             $this->pasStructureService->sync(
                 $pas,
@@ -535,6 +532,25 @@ class PasWebController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     */
+    private function generatedPasTitle(array $validated): string
+    {
+        $start = (int) ($validated['periode_debut'] ?? 0);
+        $end = (int) ($validated['periode_fin'] ?? 0);
+
+        if ($start > 0 && $end > 0 && $start !== $end) {
+            return 'PAS '.$start.'-'.$end;
+        }
+
+        if ($start > 0) {
+            return 'PAS '.$start;
+        }
+
+        return 'PAS';
     }
 
     /**

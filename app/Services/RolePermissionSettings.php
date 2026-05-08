@@ -27,25 +27,25 @@ class RolePermissionSettings
     public function permissions(): array
     {
         return [
-            'scope.global.read' => ['group' => 'Portee', 'label' => 'Lecture globale', 'description' => 'Lecture transverse du portefeuille.', 'sensitive' => true],
-            'scope.global.write' => ['group' => 'Portee', 'label' => 'Ecriture globale', 'description' => 'Ecriture transverse sur le portefeuille.', 'sensitive' => true],
+            'scope.global.read' => ['group' => 'Portée', 'label' => 'Lecture globale', 'description' => 'Lecture transverse du portefeuille.', 'sensitive' => true],
+            'scope.global.write' => ['group' => 'Portée', 'label' => 'Écriture globale', 'description' => 'Écriture transverse sur le portefeuille.', 'sensitive' => true],
             'planning.read' => ['group' => 'Planification', 'label' => 'Lire la planification', 'description' => 'Voir PAS, PAO, PTA, reporting et alertes.', 'sensitive' => false],
-            'planning.write.global' => ['group' => 'Planification', 'label' => 'Ecrire globalement', 'description' => 'Modifier la planification sans limite directionnelle.', 'sensitive' => true],
-            'planning.write.direction' => ['group' => 'Planification', 'label' => 'Ecrire en direction', 'description' => 'Modifier la planification de sa direction.', 'sensitive' => false],
-            'planning.write.service' => ['group' => 'Planification', 'label' => 'Ecrire en service', 'description' => 'Modifier la planification de son service.', 'sensitive' => false],
-            'planning.strategic.manage' => ['group' => 'Planification', 'label' => 'Piloter le strategique', 'description' => 'Gerer les elements strategiques et validations avancees.', 'sensitive' => true],
-            'reporting.read' => ['group' => 'Pilotage', 'label' => 'Voir le reporting', 'description' => 'Acceder au hub reporting et aux exports.', 'sensitive' => false],
-            'alerts.read' => ['group' => 'Pilotage', 'label' => 'Voir les alertes', 'description' => 'Acceder au centre d alertes.', 'sensitive' => false],
-            'referentiel.read' => ['group' => 'Referentiel', 'label' => 'Lire le referentiel', 'description' => 'Consulter directions, services et utilisateurs.', 'sensitive' => false],
-            'referentiel.write' => ['group' => 'Referentiel', 'label' => 'Modifier le referentiel', 'description' => 'Creer ou modifier directions et services.', 'sensitive' => true],
-            'users.manage' => ['group' => 'Referentiel', 'label' => 'Administrer les utilisateurs', 'description' => 'Creer, modifier ou supprimer des comptes.', 'sensitive' => true],
-            'users.manage_roles' => ['group' => 'Referentiel', 'label' => 'Administrer les roles', 'description' => 'Affecter et changer les roles utilisateur.', 'sensitive' => true],
-            'delegations.manage' => ['group' => 'Gouvernance', 'label' => 'Gerer les delegations', 'description' => 'Creer et annuler des delegations.', 'sensitive' => true],
-            'retention.read' => ['group' => 'Gouvernance', 'label' => 'Voir la retention', 'description' => 'Consulter les vues de retention et archivage.', 'sensitive' => false],
-            'retention.manage' => ['group' => 'Gouvernance', 'label' => 'Piloter la retention', 'description' => 'Executer les actions de retention.', 'sensitive' => true],
-            'api_docs.read' => ['group' => 'Gouvernance', 'label' => 'Voir l API', 'description' => 'Acceder a la documentation API.', 'sensitive' => false],
-            'audit.read' => ['group' => 'Audit', 'label' => 'Voir l audit', 'description' => 'Consulter les journaux d audit.', 'sensitive' => true],
-            'messagerie.read' => ['group' => 'Communication', 'label' => 'Utiliser la messagerie', 'description' => 'Acceder a la messagerie et a l organigramme.', 'sensitive' => false],
+            'planning.write.global' => ['group' => 'Planification', 'label' => 'Écrire globalement', 'description' => 'Modifier la planification sans limite directionnelle.', 'sensitive' => true],
+            'planning.write.direction' => ['group' => 'Planification', 'label' => 'Écrire en direction', 'description' => 'Modifier la planification de sa direction.', 'sensitive' => false],
+            'planning.write.service' => ['group' => 'Planification', 'label' => 'Écrire en service', 'description' => 'Modifier la planification de son service.', 'sensitive' => false],
+            'planning.strategic.manage' => ['group' => 'Planification', 'label' => 'Piloter le stratégique', 'description' => 'Gérer les elements stratégiques et validations avancees.', 'sensitive' => true],
+            'reporting.read' => ['group' => 'Pilotage', 'label' => 'Voir le reporting', 'description' => 'Accéder au hub reporting et aux exports.', 'sensitive' => false],
+            'alerts.read' => ['group' => 'Pilotage', 'label' => 'Voir les alertes', 'description' => 'Accéder au centre d’alertes.', 'sensitive' => false],
+            'referentiel.read' => ['group' => 'Référentiel', 'label' => 'Lire le référentiel', 'description' => 'Consulter directions, services et utilisateurs.', 'sensitive' => false],
+            'referentiel.write' => ['group' => 'Référentiel', 'label' => 'Modifier le référentiel', 'description' => 'Créer ou modifier directions et services.', 'sensitive' => true],
+            'users.manage' => ['group' => 'Référentiel', 'label' => 'Administrer les utilisateurs', 'description' => 'Créer, modifier ou supprimer des comptes.', 'sensitive' => true],
+            'users.manage_roles' => ['group' => 'Référentiel', 'label' => 'Administrer les roles', 'description' => 'Affecter et changer les roles utilisateur.', 'sensitive' => true],
+            'delegations.manage' => ['group' => 'Gouvernance', 'label' => 'Gérer les délégations', 'description' => 'Créer et annuler des délégations.', 'sensitive' => true],
+            'retention.read' => ['group' => 'Gouvernance', 'label' => 'Voir la rétention', 'description' => 'Consulter les vues de rétention et archivage.', 'sensitive' => false],
+            'retention.manage' => ['group' => 'Gouvernance', 'label' => 'Piloter la rétention', 'description' => 'Exécuter les actions de rétention.', 'sensitive' => true],
+            'api_docs.read' => ['group' => 'Gouvernance', 'label' => 'Voir l’API', 'description' => 'Accéder à la documentation API.', 'sensitive' => false],
+            'audit.read' => ['group' => 'Audit', 'label' => 'Voir l’audit', 'description' => 'Consulter les journaux d’audit.', 'sensitive' => true],
+            'messagerie.read' => ['group' => 'Communication', 'label' => 'Utiliser la messagerie', 'description' => 'Accéder à la messagerie et à l’organigramme.', 'sensitive' => false],
         ];
     }
 
@@ -310,6 +310,3 @@ class RolePermissionSettings
         }
     }
 }
-
-
-

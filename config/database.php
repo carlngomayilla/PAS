@@ -96,6 +96,9 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'connect_timeout' => (int) env('DB_CONNECT_TIMEOUT', 3),
+            'login_preflight' => env('DB_LOGIN_PREFLIGHT', true),
+            'login_preflight_timeout' => (float) env('DB_LOGIN_PREFLIGHT_TIMEOUT', 1.0),
         ],
 
         'sqlsrv' => [

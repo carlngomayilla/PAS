@@ -23,7 +23,7 @@ class SuperAdminSeeder extends Seeder
                 'module' => 'reporting',
                 'report_type' => 'consolidated_reporting',
                 'reading_level' => 'officiel',
-                'meta_config' => ['document_title' => 'Reporting consolide ANBG', 'document_subtitle' => 'Version institutionnelle officielle', 'filename_prefix' => 'reporting_anbg'],
+                'meta_config' => ['document_title' => 'Reporting consolidé ANBG', 'document_subtitle' => 'Version institutionnelle', 'filename_prefix' => 'reporting_anbg'],
                 'layout_config' => ['paper_size' => 'a4', 'orientation' => 'landscape', 'header_text' => 'ANBG - Reporting institutionnel', 'footer_text' => 'Document officiel', 'watermark_text' => 'OFFICIEL'],
             ],
             [
@@ -34,8 +34,8 @@ class SuperAdminSeeder extends Seeder
                 'module' => 'reporting',
                 'report_type' => 'consolidated_reporting',
                 'reading_level' => 'officiel',
-                'meta_config' => ['document_title' => 'Reporting consolide ANBG', 'document_subtitle' => 'Classeur de diffusion institutionnelle', 'filename_prefix' => 'reporting_anbg'],
-                'layout_config' => ['paper_size' => 'a4', 'orientation' => 'landscape', 'header_text' => 'ANBG - Reporting consolide', 'footer_text' => 'Synthese multi-feuilles', 'watermark_text' => ''],
+                'meta_config' => ['document_title' => 'Reporting consolidé ANBG', 'document_subtitle' => 'Classeur de diffusion institutionnelle', 'filename_prefix' => 'reporting_anbg'],
+                'layout_config' => ['paper_size' => 'a4', 'orientation' => 'landscape', 'header_text' => 'ANBG - Reporting consolidé', 'footer_text' => 'Synthèse multi-feuilles', 'watermark_text' => ''],
             ],
         ];
 

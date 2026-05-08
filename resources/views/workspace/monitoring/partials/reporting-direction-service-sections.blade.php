@@ -313,7 +313,7 @@
                     'directionResponsable' => $directionResponsable,
                     'serviceLabel' => $serviceLabel,
                     'serviceResponsable' => $serviceResponsable,
-                    'tableTitle' => 'KPI par action',
+                    'tableTitle' => 'Indicateur de performance par action',
                     'periodLabel' => $servicePeriodLabel,
                     'generatedAtLabel' => $generatedAtLabel,
                 ])
@@ -323,12 +323,12 @@
                         <tr>
                             <th>Action</th>
                             <th>RMO</th>
-                            <th>KPI Performance (%)</th>
-                            <th>KPI Qualité (%)</th>
-                            <th>KPI Délai (%)</th>
-                            <th>KPI Risque (%)</th>
-                            <th>KPI Conformité (%)</th>
-                            <th>KPI Global (%)</th>
+                            <th>Indicateur de performance (%)</th>
+                            <th>Indicateur qualite (%)</th>
+                            <th>Indicateur delai (%)</th>
+                            <th>Indicateur risque (%)</th>
+                            <th>Indicateur conformite (%)</th>
+                            <th>Indicateur global (%)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -344,7 +344,7 @@
                                 <td>{{ $row['kpi_global'] ?? '0.00' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="muted">Aucun KPI disponible pour ce service.</td></tr>
+                            <tr><td colspan="8" class="muted">Aucun Indicateur de performance disponible pour ce service.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -391,7 +391,7 @@
                     'directionResponsable' => $directionResponsable,
                     'serviceLabel' => $serviceLabel,
                     'serviceResponsable' => $serviceResponsable,
-                    'tableTitle' => 'Performance KPI par RMO',
+                    'tableTitle' => 'Performance par RMO',
                     'periodLabel' => $servicePeriodLabel,
                     'generatedAtLabel' => $generatedAtLabel,
                 ])
@@ -477,15 +477,15 @@
 @if (($templateBlocks['include_alerts'] ?? true) === true)
     <div class="{{ $sectionClass }}">
         @if ($isPdf)
-            <span class="section-kicker">Tableau 6</span><h2>Alertes KPI sous seuil</h2>
+            <span class="section-kicker">Tableau 6</span><h2>Alertes indicateurs sous seuil</h2>
         @else
-            <div class="blue-band">Tableau 6 : Alertes KPI sous seuil</div>
+            <div class="blue-band">Tableau 6 : Alertes indicateurs sous seuil</div>
         @endif
 
         @include('workspace.monitoring.partials.reporting-table-header', [
             'scopeLabel' => 'Périmètre',
             'scopeValue' => 'Consolidé ANBG',
-            'tableTitle' => 'Alertes KPI sous seuil',
+            'tableTitle' => 'Alertes indicateurs sous seuil',
             'periodLabel' => $defaultPeriodLabel,
             'generatedAtLabel' => $generatedAtLabel,
         ])

@@ -16,7 +16,7 @@ class MessagingDirectoryService
     /**
      * @var list<string>
      */
-    private const DIRECTION_ORDER = ['DG', 'DGA', 'SCIQ', 'UCAS', 'DS', 'DSIC', 'DAF'];
+    private const DIRECTION_ORDER = ['DG', 'DIR021', 'DS', 'DSIC', 'DAF'];
 
     /**
      * @var array<string, list<string>>

@@ -18,6 +18,7 @@ class Justificatif extends Model
         'justifiable_type',
         'justifiable_id',
         'action_week_id',
+        'sous_action_id',
         'categorie',
         'nom_original',
         'chemin_stockage',
@@ -52,5 +53,10 @@ class Justificatif extends Model
     public function actionWeek(): BelongsTo
     {
         return $this->belongsTo(ActionWeek::class, 'action_week_id');
+    }
+
+    public function sousAction(): BelongsTo
+    {
+        return $this->belongsTo(SousAction::class, 'sous_action_id');
     }
 }

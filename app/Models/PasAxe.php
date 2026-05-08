@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use DateTimeInterface;
 
 class PasAxe extends Model
 {
@@ -43,6 +44,10 @@ class PasAxe extends Model
         ];
     }
 
+    protected function serializeDate(DateTimeInterface $date): string
+    {
+        return $date->format('Y-m-d\T00:00:00.000000\Z');
+    }
     protected static function booted(): void
     {
         static::deleting(function (PasAxe $axe): void {

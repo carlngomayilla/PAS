@@ -99,6 +99,6 @@ class GovernanceWebTest extends TestCase
 
         $this->assertNotNull($notification);
         $this->assertSame('delegations', $notification->data['module'] ?? null);
-        $this->assertSame('Nouvelle delegation recue', $notification->data['title'] ?? null);
+        $this->assertSame('Nouvelle délégation reçue', $notification->data['title'] ?? null);
     }
 }

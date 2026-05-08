@@ -8,12 +8,12 @@
         $editableVisibleCount = $modules->where('enabled', true)->count();
     @endphp
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Modules et navigation</h1>
-                <p class="mt-2 text-slate-600">Pilotage global des libelles, de l ordre et de la visibilite des modules dans le workspace. Les droits metier par role restent appliques a part.</p>
+                <p class="mt-2 text-slate-600">Pilotage global des libellés, de l ordre et de la visibilité des modules dans le workspace. Les droits métier par rôle restent appliqués a part.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
@@ -43,7 +43,7 @@
             </div>
             <div class="mt-4 space-y-2">
                 @foreach ($publishedModules as $module)
-                    <div class="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/80">
+                    <div class="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 text-sm">
                         <div>
                             <p class="font-semibold">{{ $module['label'] }}</p>
                             <p class="text-slate-500">{{ $module['description'] }}</p>
@@ -75,7 +75,7 @@
                             || (int) $published['order'] !== (int) $module['order']
                             || (bool) $published['enabled'] !== (bool) $module['enabled'];
                     @endphp
-                    <div class="flex items-center justify-between rounded-2xl border px-4 py-3 text-sm {{ $changed ? 'border-blue-300/80 bg-blue-50/60 dark:border-blue-700/60 dark:bg-blue-950/20' : 'border-slate-200/80 bg-white/90 dark:border-slate-700 dark:bg-slate-900/80' }}">
+                    <div class="flex items-center justify-between rounded-2xl border px-4 py-3 text-sm {{ $changed ? 'border-blue-300/80 bg-blue-50/60' : 'border-slate-200/80 bg-white/90' }}">
                         <div>
                             <p class="font-semibold">{{ $module['label'] }}</p>
                             <p class="text-slate-500">{{ $module['description'] }}</p>
@@ -90,7 +90,7 @@
         </x-slot:editable>
     </x-super-admin.compare-panels>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="POST" action="{{ route('workspace.super-admin.modules.update') }}" class="form-shell" id="modules-settings-form">
             @csrf
             <input id="modules-settings-method-spoof" name="_method" type="hidden" value="PUT">
@@ -114,7 +114,7 @@
                             @foreach ($modules as $module)
                                 @php($code = (string) $module['code'])
                                 <tr>
-                                    <td class="px-3 py-3 font-semibold text-slate-900 dark:text-slate-100">{{ $code }}</td>
+                                    <td class="px-3 py-3 font-semibold text-slate-900">{{ $code }}</td>
                                     <td class="px-3 py-3">
                                         <input
                                             type="text"
@@ -174,7 +174,7 @@
     </section>
 
     @push('scripts')
-        <script>
+        <script @cspNonce>
             (function () {
                 var form = document.getElementById('modules-settings-form');
                 var methodInput = document.getElementById('modules-settings-method-spoof');

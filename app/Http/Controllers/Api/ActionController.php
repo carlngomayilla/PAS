@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\EnsuresPtaIsUnlocked;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ActionResource;
 use App\Http\Requests\StoreActionRequest;
 use App\Http\Requests\UpdateActionRequest;
 use App\Models\Action;
@@ -13,10 +14,12 @@ use App\Models\Pta;
 use App\Models\User;
 use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\ExerciceContext;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ActionController extends Controller
 {
@@ -48,6 +51,7 @@ class ActionController extends Controller
             ]);
 
         $this->scopeActionQuery($query, $user);
+        app(ExerciceContext::class)->applyToAction($query);
 
         $viewMode = trim((string) $request->string('vue'));
         if ($viewMode === 'pilotage') {
@@ -109,7 +113,7 @@ class ActionController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        return response()->json($result);
+        return ActionResource::collection($result)->response();
     }
 
     public function store(
@@ -124,7 +128,9 @@ class ActionController extends Controller
         }
 
         $validated = $request->validated();
+        $rmoIds = $this->extractRmoIds($validated);
         $indicatorPayload = $indicatorService->pullPrimaryIndicatorPayload($validated);
+        unset($validated['rmo_ids']);
         $pta = Pta::query()->findOrFail((int) $validated['pta_id']);
 
         if ($locked = $this->assertPtaNotLocked($pta)) {
@@ -135,7 +141,7 @@ class ActionController extends Controller
         $dummyAction->setRelation('pta', $pta);
         $this->authorize('create', $dummyAction);
 
-        $action = DB::transaction(function () use ($validated, $indicatorPayload, $request, $trackingService, $indicatorService, $user, $secureStorage): Action {
+        $action = DB::transaction(function () use ($validated, $indicatorPayload, $request, $trackingService, $indicatorService, $user, $secureStorage, $pta, $rmoIds): Action {
             $payload = $validated;
             $payload['contexte_action'] = $payload['contexte_action'] ?? Action::CONTEXT_PILOTAGE;
             $payload['origine_action'] = $payload['origine_action'] ?? (
@@ -160,8 +166,10 @@ class ActionController extends Controller
             $payload['frequence_execution'] = $payload['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
             $payload['seuil_alerte_progression'] = $payload['seuil_alerte_progression'] ?? 10;
             $payload['date_echeance'] = $payload['date_fin'];
+            $payload['exercice_id'] = $pta->exercice_id;
 
             $action = Action::query()->create($payload);
+            $this->syncActionRmos($action, $rmoIds);
             $trackingService->initializeActionTracking($action, $user);
             $indicatorService->syncPrimaryIndicator($action, $indicatorPayload);
 
@@ -190,13 +198,7 @@ class ActionController extends Controller
 
         return response()->json([
             'message' => 'Action creee avec succes.',
-            'data' => $action->load([
-                'pta:id,pao_id,direction_id,service_id,titre,statut',
-                'responsable:id,name,email',
-                'weeks:id,action_id,numero_semaine,date_debut,date_fin,est_renseignee',
-                'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque',
-            ]),
+            'data' => $action->load($this->actionResponseRelations()),
         ], 201);
     }
 
@@ -219,6 +221,8 @@ class ActionController extends Controller
                 'pta.service:id,code,libelle',
                 'pta.pao:id,pas_id,annee,titre,statut',
                 'pta.pao.pas:id,titre,periode_debut,periode_fin,statut',
+                'pao:id,pas_id,annee,titre,statut,objectif_operationnel,echeance',
+                'pao.pas:id,titre,periode_debut,periode_fin,statut',
                 'responsable:id,name,email,agent_matricule,agent_fonction,agent_telephone',
                 'soumisPar:id,name,email',
                 'evaluePar:id,name,email',
@@ -254,7 +258,9 @@ class ActionController extends Controller
         $this->authorize('update', $action);
 
         $validated = $request->validated();
+        $rmoIds = $this->extractRmoIds($validated);
         $indicatorPayload = $indicatorService->pullPrimaryIndicatorPayload($validated);
+        unset($validated['rmo_ids']);
         $targetPta = Pta::query()->findOrFail((int) $validated['pta_id']);
 
         if ($locked = $this->assertPtaNotLocked($targetPta)) {
@@ -273,9 +279,11 @@ class ActionController extends Controller
             ], 422);
         }
 
+        $validated['exercice_id'] = $targetPta->exercice_id;
+
         $before = $action->toArray();
 
-        DB::transaction(function () use ($action, $validated, $indicatorPayload, $trackingService, $indicatorService, $dateChanged, $frequencyChanged, $targetTypeChanged, $request, $user, $secureStorage): void {
+        DB::transaction(function () use ($action, $validated, $indicatorPayload, $trackingService, $indicatorService, $dateChanged, $frequencyChanged, $targetTypeChanged, $request, $user, $secureStorage, $rmoIds): void {
             $payload = $validated;
             $payload['contexte_action'] = $payload['contexte_action'] ?? Action::CONTEXT_PILOTAGE;
             $payload['origine_action'] = $payload['origine_action'] ?? (
@@ -289,6 +297,7 @@ class ActionController extends Controller
 
             $action->fill($payload);
             $action->save();
+            $this->syncActionRmos($action, $rmoIds);
             $indicatorService->syncPrimaryIndicator($action, $indicatorPayload);
 
             if ($dateChanged || $frequencyChanged || $targetTypeChanged) {
@@ -321,13 +330,7 @@ class ActionController extends Controller
 
         return response()->json([
             'message' => 'Action mise a jour avec succes.',
-            'data' => $action->load([
-                'pta:id,pao_id,direction_id,service_id,titre,statut',
-                'responsable:id,name,email',
-                'weeks:id,action_id,numero_semaine,date_debut,date_fin,est_renseignee',
-                'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque',
-            ]),
+            'data' => $action->load($this->actionResponseRelations()),
         ]);
     }
 
@@ -366,6 +369,72 @@ class ActionController extends Controller
         return response()->json([], 204);
     }
 
+    /**
+     * @return list<string>
+     */
+    private function actionResponseRelations(): array
+    {
+        $relations = [
+            'pta:id,pao_id,direction_id,service_id,titre,statut',
+            'pao:id,pas_id,annee,titre,statut,objectif_operationnel,echeance',
+            'responsable:id,name,email',
+            'weeks:id,action_id,numero_semaine,date_debut,date_fin,est_renseignee',
+            'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
+            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque',
+        ];
+
+        if (Schema::hasTable('action_responsables')) {
+            $relations[] = 'responsables:id,name,email';
+        }
+
+        return $relations;
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return list<int>
+     */
+    private function extractRmoIds(array $validated): array
+    {
+        $rmoIds = collect($validated['rmo_ids'] ?? [])
+            ->filter(fn ($id): bool => is_numeric($id))
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($rmoIds === [] && isset($validated['responsable_id']) && is_numeric($validated['responsable_id'])) {
+            $rmoIds = [(int) $validated['responsable_id']];
+        }
+
+        return $rmoIds;
+    }
+
+    /**
+     * @param list<int> $rmoIds
+     */
+    private function syncActionRmos(Action $action, array $rmoIds): void
+    {
+        if (! Schema::hasTable('action_responsables')) {
+            return;
+        }
+
+        $primaryId = (int) ($action->responsable_id ?: ($rmoIds[0] ?? 0));
+        $ids = collect($rmoIds)
+            ->push($primaryId)
+            ->filter(fn ($id): bool => (int) $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        $action->responsables()->sync(
+            $ids->mapWithKeys(fn (int $id): array => [
+                $id => ['is_primary' => $id === $primaryId],
+            ])->all()
+        );
+    }
+
     private function scopeActionQuery(mixed $query, User $user): void
     {
         if ($user->hasGlobalReadAccess()) {
@@ -373,7 +442,13 @@ class ActionController extends Controller
         }
 
         if ($user->isAgent()) {
-            $query->where('responsable_id', (int) $user->id);
+            $query->where(function ($agentQuery) use ($user): void {
+                $agentQuery->where('responsable_id', (int) $user->id);
+
+                if (Schema::hasTable('action_responsables')) {
+                    $agentQuery->orWhereHas('responsables', fn ($responsableQuery) => $responsableQuery->whereKey((int) $user->id));
+                }
+            });
 
             return;
         }
@@ -389,6 +464,10 @@ class ActionController extends Controller
 
         $query->where(function ($scopedQuery) use ($user, $delegatedDirectionIds, $delegatedServiceScopes): void {
             $scopedQuery->orWhere('responsable_id', (int) $user->id);
+
+            if (Schema::hasTable('action_responsables')) {
+                $scopedQuery->orWhereHas('responsables', fn ($responsableQuery) => $responsableQuery->whereKey((int) $user->id));
+            }
 
             if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
                 $scopedQuery->orWhereHas('pta', fn ($subQuery) => $subQuery->where('direction_id', (int) $user->direction_id));

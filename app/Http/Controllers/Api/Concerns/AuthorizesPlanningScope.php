@@ -111,27 +111,36 @@ trait AuthorizesPlanningScope
             return;
         }
 
-        $query->where(function (Builder $scopedQuery) use ($directionIds, $serviceScopes, $directionColumn, $serviceColumn, $query): void {
-            foreach ($directionIds as $directionId) {
-                $scopedQuery->orWhere($directionColumn, (int) $directionId);
+        $uniqueServiceScopes = collect($serviceScopes)
+            ->unique(fn (array $s): string => $s['direction_id'].'-'.$s['service_id'])
+            ->values()
+            ->all();
+
+        $query->where(function (Builder $scopedQuery) use ($directionIds, $uniqueServiceScopes, $directionColumn, $serviceColumn, $query): void {
+            if (! empty($directionIds)) {
+                $scopedQuery->orWhereIn($directionColumn, $directionIds);
             }
 
-            foreach ($serviceScopes as $scope) {
+            if (! empty($uniqueServiceScopes)) {
                 if ($serviceColumn !== null) {
-                    $scopedQuery->orWhere(function (Builder $subQuery) use ($directionColumn, $serviceColumn, $scope): void {
-                        $subQuery
-                            ->where($directionColumn, (int) $scope['direction_id'])
-                            ->where($serviceColumn, (int) $scope['service_id']);
+                    $scopedQuery->orWhere(function (Builder $inner) use ($uniqueServiceScopes, $directionColumn, $serviceColumn): void {
+                        foreach ($uniqueServiceScopes as $scope) {
+                            $inner->orWhere(function (Builder $pair) use ($scope, $directionColumn, $serviceColumn): void {
+                                $pair->where($directionColumn, (int) $scope['direction_id'])
+                                    ->where($serviceColumn, (int) $scope['service_id']);
+                            });
+                        }
                     });
-
-                    continue;
-                }
-
-                if (method_exists($query->getModel(), 'ptas')) {
-                    $scopedQuery->orWhereHas('ptas', function (Builder $ptaQuery) use ($scope): void {
-                        $ptaQuery
-                            ->where('direction_id', (int) $scope['direction_id'])
-                            ->where('service_id', (int) $scope['service_id']);
+                } elseif (method_exists($query->getModel(), 'ptas')) {
+                    $scopedQuery->orWhereHas('ptas', function (Builder $ptaQuery) use ($uniqueServiceScopes): void {
+                        $ptaQuery->where(function (Builder $inner) use ($uniqueServiceScopes): void {
+                            foreach ($uniqueServiceScopes as $scope) {
+                                $inner->orWhere(function (Builder $pair) use ($scope): void {
+                                    $pair->where('direction_id', (int) $scope['direction_id'])
+                                        ->where('service_id', (int) $scope['service_id']);
+                                });
+                            }
+                        });
                     });
                 }
             }
@@ -225,7 +234,7 @@ trait AuthorizesPlanningScope
 
     protected function canManagePao(User $user, ?int $directionId): bool
     {
-        if ($this->canWriteAllPlanning($user) || $this->canWriteStrategicPlanning($user)) {
+        if ($this->canWriteAllPlanning($user)) {
             return true;
         }
 

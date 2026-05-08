@@ -24,7 +24,7 @@
   opacity: 0;
   transform: translateX(-50%);
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 247, 200, .98) 0%, rgba(255, 221, 137, .88) 28%, rgba(255, 214, 102, .34) 56%, rgba(255, 214, 102, 0) 78%);
+  background: radial-gradient(circle, rgba(255, 255, 255, .86) 0%, rgba(226, 232, 240, .34) 42%, rgba(226, 232, 240, 0) 76%);
   filter: blur(10px);
   pointer-events: none;
 }
@@ -65,7 +65,7 @@
   border: 1px solid rgba(255, 255, 255, .10);
 }
 
-/* Glow chaud (ON) */
+/* Glow neutre (ON) */
 .lamp-glow {
   position: absolute;
   top: 92px;
@@ -76,15 +76,15 @@
   border-radius: 999px;
   opacity: 0;
   background: radial-gradient(circle at 50% 0%,
-    rgba(214, 190, 144, .62),
-    rgba(214, 190, 144, .18) 40%,
-    rgba(214, 190, 144, 0) 70%
+    rgba(255, 255, 255, .42),
+    rgba(226, 232, 240, .12) 42%,
+    rgba(226, 232, 240, 0) 72%
   );
   filter: blur(2px);
   pointer-events: none;
 }
 
-/* Cone de lumiere */
+/* Cône de lumière */
 .lamp-cone {
   position: absolute;
   top: 115px;
@@ -95,11 +95,11 @@
   opacity: 0;
   background: conic-gradient(
     from 180deg at 50% 0%,
-    rgba(214, 190, 144, 0) 0deg,
-    rgba(214, 190, 144, .16) 35deg,
-    rgba(214, 190, 144, .26) 55deg,
-    rgba(214, 190, 144, .16) 75deg,
-    rgba(214, 190, 144, 0) 110deg
+    rgba(255, 255, 255, 0) 0deg,
+    rgba(255, 255, 255, .10) 36deg,
+    rgba(255, 255, 255, .18) 55deg,
+    rgba(255, 255, 255, .10) 76deg,
+    rgba(255, 255, 255, 0) 112deg
   );
   filter: blur(10px);
   border-radius: 0 0 999px 999px;
@@ -142,12 +142,12 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 248, 214, .95) 0%, rgba(255, 214, 102, .68) 46%, rgba(161, 111, 34, .82) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .055));
   border: 1px solid rgba(255, 255, 255, .22);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
 }
 
-/* Carte (OFF par defaut) */
+/* Carte (OFF par défaut) */
 .lamp-card {
   transform: translateY(0);
   border-color: rgba(255, 255, 255, .10);
@@ -282,4 +282,3 @@
     height: 14px;
   }
 }
-

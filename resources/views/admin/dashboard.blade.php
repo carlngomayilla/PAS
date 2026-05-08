@@ -1,7 +1,9 @@
 @extends('layouts.admin')
 
-@section('title', 'Overview')
+@section('title', 'Dashboard')
 
 @section('content')
-    @include('partials.dashboard-analytics')
+    <div class="dealdeck-dashboard app-screen-flow">
+        @include('partials.dashboard-analytics')
+    </div>
 @endsection

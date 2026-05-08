@@ -22,14 +22,14 @@ class UserProfileService
                 ],
                 [
                     'module'     => 'Gouvernance systeme',
-                    'operations' => ['Gerer modules', 'Ajuster navigation', 'Maintenir coherence des parametres'],
+                    'operations' => ['Gérer modules', 'Ajuster navigation', 'Maintenir coherence des parametres'],
                     'portee'     => 'Globale',
                 ],
             ],
             User::ROLE_ADMIN => [
                 [
                     'module'     => 'Gouvernance PAS/PAO/PTA',
-                    'operations' => ['Creer', 'Modifier', 'Supprimer', 'Valider', 'Verrouiller', 'Consulter'],
+                    'operations' => ['Créer', 'Modifier', 'Supprimer', 'Valider', 'Verrouiller', 'Consulter'],
                     'portee'     => 'Toutes les directions et services',
                 ],
                 [
@@ -39,7 +39,7 @@ class UserProfileService
                 ],
                 [
                     'module'     => 'Administration',
-                    'operations' => ['Gerer utilisateurs', 'Consulter journal audit'],
+                    'operations' => ['Gérer utilisateurs', 'Consulter journal audit'],
                     'portee'     => 'Globale',
                 ],
             ],
@@ -63,11 +63,11 @@ class UserProfileService
             User::ROLE_PLANIFICATION => [
                 [
                     'module'     => 'Structuration PAS/PAO/PTA',
-                    'operations' => ['Creer', 'Modifier', 'Soumettre', 'Consulter'],
+                    'operations' => ['Créer', 'Modifier', 'Soumettre', 'Consulter'],
                     'portee'     => 'Globale',
                 ],
                 [
-                    'module'     => 'Objectifs strategiques',
+                    'module'     => 'Objectifs stratégiques',
                     'operations' => ['Definir axes/objectifs', 'Configurer indicateurs de suivi'],
                     'portee'     => 'Globale',
                 ],
@@ -80,7 +80,7 @@ class UserProfileService
             User::ROLE_DIRECTION => [
                 [
                     'module'     => 'PAO de la direction',
-                    'operations' => ['Creer', 'Modifier', 'Suivre', 'Soumettre'],
+                    'operations' => ['Créer', 'Modifier', 'Suivre', 'Soumettre'],
                     'portee'     => 'Direction rattachee',
                 ],
                 [
@@ -92,19 +92,19 @@ class UserProfileService
             User::ROLE_SERVICE => [
                 [
                     'module'     => 'PTA du service',
-                    'operations' => ['Executer taches', 'Mettre a jour statuts'],
+                    'operations' => ['Exécuter taches', 'Mettre à jour statuts'],
                     'portee'     => 'Direction et service rattaches',
                 ],
                 [
                     'module'     => 'Actions',
-                    'operations' => ['Renseigner execution', 'Saisir suivi hebdomadaire', 'Televerser justificatifs', 'Signaler risques'],
+                    'operations' => ['Renseigner execution', 'Saisir suivi hebdomadaire', 'Téléverser justificatifs', 'Signaler risques'],
                     'portee'     => 'Direction et service rattaches',
                 ],
             ],
             User::ROLE_AGENT => [
                 [
                     'module'     => 'Suivi hebdomadaire des actions',
-                    'operations' => ['Renseigner suivi hebdomadaire', 'Mettre a jour progression', 'Signaler difficultes', 'Televerser justificatifs hebdomadaires'],
+                    'operations' => ['Renseigner suivi hebdomadaire', 'Mettre à jour progression', 'Signaler difficultés', 'Téléverser justificatifs hebdomadaires'],
                     'portee'     => 'Direction et service rattaches',
                 ],
             ],

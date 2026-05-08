@@ -87,7 +87,7 @@
                         </select>
                     </div>
                     <div>
-                        <label for="conversation_role">Role</label>
+                        <label for="conversation_role">Rôle</label>
                         <select id="conversation_role" name="conversation_role">
                             <option value="">Tous</option>
                             @foreach ($filterOptions['roles'] as $role)
@@ -108,14 +108,14 @@
                 </div>
                 <div class="form-actions">
                     <button class="btn btn-primary" type="submit">Appliquer</button>
-                    <a class="btn btn-secondary" href="{{ route('workspace.messaging.index') }}">Reinitialiser</a>
+                    <a class="btn btn-secondary" href="{{ route('workspace.messaging.index') }}">Réinitialiser</a>
                 </div>
             </form>
 
             <div class="mt-5">
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Conversations</h3>
+                        <h3 class="text-sm font-semibold text-slate-900">Conversations</h3>
                     </div>
                     <span class="anbg-badge anbg-badge-info">{{ $conversations->count() }}</span>
                 </div>
@@ -136,16 +136,16 @@
                                 @endif
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center justify-between gap-2">
-                                        <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $conversation->getAttribute('display_name') }}</p>
+                                        <p class="truncate text-sm font-semibold text-slate-900">{{ $conversation->getAttribute('display_name') }}</p>
                                         @if ((int) $conversation->getAttribute('unread_messages_count') > 0)
                                             <span class="messaging-unread-badge">{{ $conversation->getAttribute('unread_messages_count') }}</span>
                                         @endif
                                     </div>
-                                    <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $conversation->getAttribute('display_scope') }}</p>
-                                    <p class="mt-1 truncate text-xs text-slate-600 dark:text-slate-300">
+                                    <p class="truncate text-xs text-slate-500">{{ $conversation->getAttribute('display_scope') }}</p>
+                                    <p class="mt-1 truncate text-xs text-slate-600">
                                         {{ $latestMessage?->body ?: ($latestMessage?->attachment_original_name ?: 'Aucun message pour le moment.') }}
                                     </p>
-                                    <div class="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                    <div class="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-500">
                                         <span>{{ $latestMessage?->sent_at?->diffForHumans() ?? 'Nouveau' }}</span>
                                         @if ($conversation->getAttribute('is_favorite'))
                                             <span class="anbg-badge anbg-badge-warning px-2 py-0.5 text-[10px]">Favori</span>
@@ -156,8 +156,8 @@
                         </a>
                     @empty
                         <div class="messaging-empty-state">
-                            <p class="font-medium text-slate-900 dark:text-slate-100">Aucune conversation pour l instant.</p>
-                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Choisissez un collaborateur dans l annuaire pour demarrer un echange.</p>
+                            <p class="font-medium text-slate-900">Aucune conversation pour l’instant.</p>
+                            <p class="mt-1 text-sm text-slate-500">Choisissez un collaborateur dans l’annuaire pour démarrer un échange.</p>
                         </div>
                     @endforelse
                 </div>
@@ -166,7 +166,7 @@
             <div class="mt-5">
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Collaborateurs accessibles</h3>
+                        <h3 class="text-sm font-semibold text-slate-900">Collaborateurs accessibles</h3>
                     </div>
                     <span class="anbg-badge anbg-badge-success">{{ $directoryUsers->count() }}</span>
                 </div>
@@ -175,26 +175,26 @@
                         <div class="messaging-contact-card">
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
-                                    <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $directoryUser->name }}</p>
+                                    <p class="truncate text-sm font-semibold text-slate-900">{{ $directoryUser->name }}</p>
                                     @php
                                         $presence = $directoryUser->presence_meta;
                                     @endphp
                                     <span class="anbg-badge {{ $presence['tone'] === 'success' ? 'anbg-badge-success' : ($presence['tone'] === 'info' ? 'anbg-badge-info' : 'anbg-badge-neutral') }} px-2 py-0.5 text-[10px]">{{ $presence['label'] }}</span>
                                 </div>
-                                <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $directoryUser->agent_fonction ?: $directoryUser->roleLabel() }}</p>
-                                <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $directoryUser->direction?->libelle ?? 'Sans direction' }} / {{ $directoryUser->service?->libelle ?? 'Sans service' }}</p>
+                                <p class="truncate text-xs text-slate-500">{{ $directoryUser->agent_fonction ?: $directoryUser->roleLabel() }}</p>
+                                <p class="truncate text-xs text-slate-500">{{ $directoryUser->direction?->libelle ?? 'Sans direction' }} / {{ $directoryUser->service?->libelle ?? 'Sans service' }}</p>
                             </div>
                             <div class="flex items-center gap-2">
                                 <a href="{{ route('workspace.messaging.index', ['contact' => $directoryUser->id]) }}#messaging-profile-card" class="btn btn-secondary !px-3 !py-2">Voir</a>
                                 <form method="POST" action="{{ route('workspace.messaging.direct', $directoryUser) }}">
                                     @csrf
-                                    <button class="btn btn-primary !px-3 !py-2" type="submit">Ecrire</button>
+                                    <button class="btn btn-primary !px-3 !py-2" type="submit">Écrire</button>
                                 </form>
                             </div>
                         </div>
                     @empty
                         <div class="messaging-empty-state">
-                            <p class="font-medium text-slate-900 dark:text-slate-100">Aucun collaborateur ne correspond aux filtres.</p>
+                            <p class="font-medium text-slate-900">Aucun collaborateur ne correspond aux filtres.</p>
                         </div>
                     @endforelse
                 </div>
@@ -209,15 +209,15 @@
                     /** @var ConversationParticipant|null $otherParticipantState */
                     $otherParticipantState = $activeConversation->participantStates->firstWhere('user_id', $activeOtherUser?->id);
                 @endphp
-                <div class="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2">
-                            <h2 class="truncate text-lg font-semibold text-slate-950 dark:text-slate-50">{{ $activeConversation->getAttribute('display_name') }}</h2>
+                            <h2 class="truncate text-lg font-semibold text-slate-950">{{ $activeConversation->getAttribute('display_name') }}</h2>
                             @if ($activeConversation->getAttribute('unread_messages_count') > 0)
                                 <span class="anbg-badge anbg-badge-info">{{ $activeConversation->getAttribute('unread_messages_count') }} non lus</span>
                             @endif
                         </div>
-                        <p class="text-sm text-slate-500 dark:text-slate-400">{{ $activeConversation->getAttribute('display_scope') }}</p>
+                        <p class="text-sm text-slate-500">{{ $activeConversation->getAttribute('display_scope') }}</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <form method="POST" action="{{ route('workspace.messaging.favorite', $activeConversation) }}">
@@ -257,7 +257,7 @@
                                     <span class="text-[11px] opacity-75">{{ $message->sent_at?->format('d/m/Y H:i') }}</span>
                                 </div>
                                 @if ($isMine)
-                                    <span class="text-[11px] font-medium opacity-80" data-message-seen-label>{{ $isSeen ? 'Vu' : 'Envoye' }}</span>
+                                    <span class="text-[11px] font-medium opacity-80" data-message-seen-label>{{ $isSeen ? 'Vu' : 'Envoyé' }}</span>
                                 @endif
                             </div>
                             @if (filled($message->body))
@@ -274,8 +274,8 @@
                         </article>
                     @empty
                         <div class="messaging-empty-state">
-                            <p class="font-medium text-slate-900 dark:text-slate-100">La conversation est ouverte.</p>
-                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Envoyez le premier message pour lancer l echange.</p>
+                            <p class="font-medium text-slate-900">La conversation est ouverte.</p>
+                            <p class="mt-1 text-sm text-slate-500">Envoyez le premier message pour lancer l’échange.</p>
                         </div>
                     @endforelse
                 </div>
@@ -288,7 +288,7 @@
                             <textarea id="body" name="body" rows="5" placeholder="Saisissez votre message, votre relance ou votre demande de coordination...">{{ old('body') }}</textarea>
                         </div>
                         <div>
-                            <label for="attachment">Piece jointe</label>
+                            <label for="attachment">Pièce jointe</label>
                             <input id="attachment" name="attachment" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv">
                         </div>
                     </div>
@@ -298,8 +298,8 @@
                 </form>
             @else
                 <div class="messaging-empty-state !h-full">
-                    <p class="text-lg font-semibold text-slate-900 dark:text-slate-100">Selectionnez une conversation ou un collaborateur</p>
-                    <p class="mt-2 max-w-xl text-sm text-slate-500 dark:text-slate-400">L annuaire a gauche et l organigramme ci-dessous permettent d ouvrir rapidement un echange direct avec un interlocuteur du PAS.</p>
+                    <p class="text-lg font-semibold text-slate-900">Sélectionnez une conversation ou un collaborateur</p>
+                    <p class="mt-2 max-w-xl text-sm text-slate-500">L’annuaire à gauche et l’organigramme ci-dessous permettent d’ouvrir rapidement un échange direct avec un interlocuteur du PAS.</p>
                 </div>
             @endif
         </section>
@@ -354,7 +354,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="org_role">Role</label>
+                        <label for="org_role">Rôle</label>
                     <select id="org_role" name="org_role">
                         <option value="">Tous</option>
                         @foreach ($filterOptions['roles'] as $role)
@@ -365,7 +365,7 @@
             </div>
             <div class="form-actions">
                 <button class="btn btn-primary" type="submit">Filtrer</button>
-                <a class="btn btn-secondary" href="{{ route('workspace.messaging.index') }}#messaging-orgchart">Reinitialiser</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.messaging.index') }}#messaging-orgchart">Réinitialiser</a>
             </div>
         </form>
 
@@ -378,15 +378,15 @@
                 <span class="anbg-badge anbg-badge-info">Liste arborescente</span>
                 <span class="anbg-badge anbg-badge-neutral">Cliquez sur une branche pour la replier</span>
                 <span class="anbg-badge anbg-badge-success">Cliquez sur une personne pour ouvrir sa fiche</span>
-                <span class="anbg-badge anbg-badge-warning">{{ $orgUserCount }} profil(s) charges</span>
+                <span class="anbg-badge anbg-badge-warning">{{ $orgUserCount }} profil(s) chargé(s)</span>
             </div>
 
             <div class="messaging-org-tree-toolbar">
                 <div class="messaging-org-tree-toolbar-group">
-                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-expand-all>Tout deplier</button>
+                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-expand-all>Tout déplier</button>
                     <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-collapse-all>Tout replier</button>
-                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-reset-state>Reinitialiser l arbre</button>
-                    <button type="button" class="btn btn-primary !px-3 !py-2" data-org-recenter>Recentrer la selection</button>
+                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-reset-state>Réinitialiser l’arbre</button>
+                    <button type="button" class="btn btn-primary !px-3 !py-2" data-org-recenter>Recentrer la sélection</button>
                 </div>
                 <div class="messaging-org-tree-toolbar-group messaging-org-tree-toolbar-search">
                     <label for="org_quick_search" class="sr-only">Recherche rapide dans la liste</label>
@@ -419,8 +419,8 @@
                 </div>
             @else
                 <div class="messaging-empty-state">
-                    <p class="font-medium text-slate-900 dark:text-slate-100">Aucun bloc organisationnel visible.</p>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Elargissez les filtres pour retrouver les collaborateurs attendus.</p>
+                    <p class="font-medium text-slate-900">Aucun bloc organisationnel visible.</p>
+                    <p class="mt-1 text-sm text-slate-500">Élargissez les filtres pour retrouver les collaborateurs attendus.</p>
                 </div>
             @endif
         </div>

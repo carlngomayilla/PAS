@@ -66,8 +66,21 @@ class KpiWebController extends Controller
             });
         });
 
+        $summaryBase = clone $query;
+
         return view('workspace.kpi.index', [
             'rows' => $query->orderByDesc('id')->paginate(15)->withQueryString(),
+            'summary' => [
+                'total' => (clone $summaryBase)->count(),
+                'manual_total' => (clone $summaryBase)->where('est_a_renseigner', true)->count(),
+                'automatic_total' => (clone $summaryBase)->where('est_a_renseigner', false)->count(),
+                'with_threshold_total' => (clone $summaryBase)->whereNotNull('seuil_alerte')->count(),
+                'without_measure_total' => (clone $summaryBase)
+                    ->where('est_a_renseigner', true)
+                    ->doesntHave('mesures')
+                    ->count(),
+                'actions_total' => (clone $summaryBase)->whereNotNull('action_id')->distinct()->count('action_id'),
+            ],
             'actionOptions' => $this->actionOptions($user),
             'periodiciteOptions' => $this->periodiciteOptions(),
             'modeSaisieOptions' => $this->modeSaisieOptions(),

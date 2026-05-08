@@ -3,7 +3,7 @@
 @section('title', 'Documents et justificatifs')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
@@ -19,13 +19,13 @@
     </section>
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Extensions autorisees</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['extensions_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Roles upload</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['upload_roles_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Roles consultation</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['view_roles_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Retention</p><p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ $summary['retention_days'] }} j</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Extensions autorisees</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['extensions_total'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Roles upload</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['upload_roles_total'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Roles consultation</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['view_roles_total'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Retention</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['retention_days'] }} j</p></article>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="POST" action="{{ route('workspace.super-admin.documents.update') }}" class="form-shell">
             @csrf
             @method('PUT')
@@ -47,7 +47,7 @@
                         <input id="retention_days" name="retention_days" type="number" min="30" max="3650" value="{{ old('retention_days', $settings['retention_days'] ?? 365) }}" required>
                     </div>
                     <div>
-                        <label for="accept_preview">Accept HTML genere</label>
+                        <label for="accept_preview">Aperçu HTML généré</label>
                         <input id="accept_preview" type="text" value=".{{ implode(',.', $settings['allowed_extensions'] ?? []) }}" disabled>
                     </div>
                 </div>
@@ -57,7 +57,7 @@
                 <h2 class="form-section-title">Roles autorises</h2>
                 <div class="grid gap-4 md:grid-cols-2">
                     <div>
-                        <span class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Televersement</span>
+                        <span class="mb-2 block text-sm font-medium text-slate-700">Televersement</span>
                         <div class="grid gap-2 sm:grid-cols-2">
                             @foreach ($roleLabels as $roleCode => $roleLabel)
                                 <label class="checkbox-pill">
@@ -68,7 +68,7 @@
                         </div>
                     </div>
                     <div>
-                        <span class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Consultation</span>
+                        <span class="mb-2 block text-sm font-medium text-slate-700">Consultation</span>
                         <div class="grid gap-2 sm:grid-cols-2">
                             @foreach ($roleLabels as $roleCode => $roleLabel)
                                 <label class="checkbox-pill">
@@ -85,8 +85,8 @@
                 <h2 class="form-section-title">Visibilite par categorie</h2>
                 <div class="space-y-4">
                     @foreach ($categoryLabels as $category => $label)
-                        <div class="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80">
-                            <h3 class="font-semibold text-slate-900 dark:text-slate-100">{{ $label }}</h3>
+                        <div class="rounded-2xl border border-slate-200/80 p-4">
+                            <h3 class="font-semibold text-slate-900">{{ $label }}</h3>
                             <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                                 @foreach ($roleLabels as $roleCode => $roleLabel)
                                     <label class="checkbox-pill">

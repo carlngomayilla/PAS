@@ -3,12 +3,12 @@
 @section('title', 'Roles et permissions')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Roles et permissions</h1>
-                <p class="mt-2 text-slate-600">Matrice des droits systeme. Les roles natifs restent verrouilles; seul le registre de permissions est modulable.</p>
+                <p class="mt-2 text-slate-600">Matrice des droits systeme. Les rôles natifs restent verrouilles; seul le registre de permissions est modulable.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
@@ -22,23 +22,23 @@
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))] mb-3.5">
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Roles systeme</p>
-            <p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ count($roles) }}</p>
-            <p class="mt-2 text-sm text-slate-600">Les roles natifs restent verrouilles. Cette matrice pilote uniquement leurs droits effectifs.</p>
+            <p class="mt-2 text-3xl font-bold text-slate-900">{{ count($roles) }}</p>
+            <p class="mt-2 text-sm text-slate-600">Les rôles natifs restent verrouilles. Cette matrice pilote uniquement leurs droits effectifs.</p>
         </article>
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Role simule</p>
-            <p class="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $selectedRoleLabel }}</p>
+            <p class="mt-2 text-2xl font-bold text-slate-900">{{ $selectedRoleLabel }}</p>
             <p class="mt-2 text-sm text-slate-600">{{ count($selectedPermissions) }} permissions actives et {{ count($selectedModules) }} modules visibles.</p>
         </article>
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Permissions sensibles</p>
-            <p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ collect($permissionGroups)->sum(fn ($group) => collect($group['permissions'])->where('sensitive', true)->count()) }}</p>
-            <p class="mt-2 text-sm text-slate-600">Les modifications sont journalisees et le role `super_admin` reste force a l ensemble des permissions.</p>
+            <p class="mt-2 text-3xl font-bold text-slate-900">{{ collect($permissionGroups)->sum(fn ($group) => collect($group['permissions'])->where('sensitive', true)->count()) }}</p>
+            <p class="mt-2 text-sm text-slate-600">Les modifications sont journalisees et le rôle `super_admin` reste force a l ensemble des permissions.</p>
         </article>
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Roles personnalises</p>
-            <p class="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{{ count($customRoles) }}</p>
-            <p class="mt-2 text-sm text-slate-600">Chaque role personnalise herite d un role de base pour conserver le scope natif.</p>
+            <p class="mt-2 text-3xl font-bold text-slate-900">{{ count($customRoles) }}</p>
+            <p class="mt-2 text-sm text-slate-600">Chaque rôle personnalise herite d'un rôle de base pour conserver le scope natif.</p>
         </article>
     </section>
 
@@ -63,7 +63,7 @@
         }
     @endphp
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="POST" action="{{ route('workspace.super-admin.roles.registry.update') }}" class="form-shell">
             @csrf
             @method('PUT')
@@ -71,15 +71,15 @@
             <div class="form-section">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <h2 class="form-section-title">Registre des roles personnalises</h2>
-                        <p class="form-section-subtitle">Le code du role personnalise devient le profil effectif du compte. Le role de base conserve la logique de perimetre existante.</p>
+                        <h2 class="form-section-title">Registre des rôles personnalises</h2>
+                        <p class="form-section-subtitle">Le code du rôle personnalise devient le profil effectif du compte. Le rôle de base conserve la logique de perimetre existante.</p>
                     </div>
-                    <button class="btn btn-primary" type="submit">Enregistrer les roles personnalises</button>
+                    <button class="btn btn-primary" type="submit">Enregistrer les rôles personnalises</button>
                 </div>
 
                 <div class="mt-4 space-y-4">
                     @foreach ($customRoleRows as $index => $row)
-                        <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/40">
+                        <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
                             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                                 <div>
                                     <label for="custom_role_code_{{ $index }}">Code</label>
@@ -115,7 +115,7 @@
         </form>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="POST" action="{{ route('workspace.super-admin.roles.update', ['simulate_role' => $selectedRole]) }}" class="form-shell">
             @csrf
             @method('PUT')
@@ -124,7 +124,7 @@
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <h2 class="form-section-title">Matrice de permissions</h2>
-                        <p class="form-section-subtitle">Un role sans permission ne voit plus le module correspondant et perd l acces direct a ses routes principales.</p>
+                        <p class="form-section-subtitle">Un rôle sans permission ne voit plus le module correspondant et perd l acces direct a ses routes principales.</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <a class="btn btn-secondary" href="{{ route('workspace.super-admin.roles.edit', ['simulate_role' => $selectedRole]) }}">Recharger</a>
@@ -145,18 +145,18 @@
                         <tbody>
                             @foreach ($permissionGroups as $group)
                                 <tr>
-                                    <td class="px-3 py-3 font-semibold text-slate-900 dark:text-slate-100" colspan="{{ count($roles) + 1 }}">
+                                    <td class="px-3 py-3 font-semibold text-slate-900" colspan="{{ count($roles) + 1 }}">
                                         {{ $group['group'] }}
                                     </td>
                                 </tr>
                                 @foreach ($group['permissions'] as $permission)
                                     <tr>
                                         <td class="px-3 py-3 align-top">
-                                            <div class="font-medium text-slate-900 dark:text-slate-100">{{ $permission['label'] }}</div>
+                                            <div class="font-medium text-slate-900">{{ $permission['label'] }}</div>
                                             <div class="mt-1 text-xs text-slate-500">{{ $permission['code'] }}</div>
                                             <div class="mt-1 text-sm text-slate-600">{{ $permission['description'] }}</div>
                                             @if ($permission['sensitive'])
-                                                <div class="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">Sensible</div>
+                                                <div class="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Sensible</div>
                                             @endif
                                         </td>
                                         @foreach ($roles as $roleCode => $roleLabel)
@@ -212,7 +212,7 @@
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Permissions actives</h3>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @forelse ($selectedPermissions as $permissionCode)
-                            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $permissionCode }}</span>
+                            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{{ $permissionCode }}</span>
                         @empty
                             <p class="text-sm text-slate-500">Aucune permission active.</p>
                         @endforelse
@@ -222,12 +222,12 @@
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Modules visibles</h3>
                     <div class="mt-3 space-y-3">
                         @forelse ($selectedModules as $module)
-                            <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/40">
-                                <div class="font-medium text-slate-900 dark:text-slate-100">{{ $module['label'] }}</div>
+                            <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-3">
+                                <div class="font-medium text-slate-900">{{ $module['label'] }}</div>
                                 <div class="mt-1 text-sm text-slate-600">{{ $module['description'] }}</div>
                             </div>
                         @empty
-                            <p class="text-sm text-slate-500">Aucun module visible pour ce role avec la configuration actuelle.</p>
+                            <p class="text-sm text-slate-500">Aucun module visible pour ce rôle avec la configuration actuelle.</p>
                         @endforelse
                     </div>
                 </div>
@@ -273,7 +273,7 @@
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Communes</h3>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @forelse ($roleComparison['shared'] as $permissionCode)
-                            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200">{{ $permissionCode }}</span>
+                            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{{ $permissionCode }}</span>
                         @empty
                             <p class="text-sm text-slate-500">Aucune permission commune.</p>
                         @endforelse
@@ -283,7 +283,7 @@
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ $roles[$compareLeftRole] ?? $compareLeftRole }} uniquement</h3>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @forelse ($roleComparison['left_only'] as $permissionCode)
-                            <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-200">{{ $permissionCode }}</span>
+                            <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $permissionCode }}</span>
                         @empty
                             <p class="text-sm text-slate-500">Aucun ecart cote reference.</p>
                         @endforelse
@@ -293,7 +293,7 @@
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ $roles[$compareRightRole] ?? $compareRightRole }} uniquement</h3>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @forelse ($roleComparison['right_only'] as $permissionCode)
-                            <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">{{ $permissionCode }}</span>
+                            <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{{ $permissionCode }}</span>
                         @empty
                             <p class="text-sm text-slate-500">Aucun ecart cote compare.</p>
                         @endforelse
@@ -306,7 +306,7 @@
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Modules visibles : {{ $roles[$compareLeftRole] ?? $compareLeftRole }}</h3>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @forelse ($roleComparison['left_modules'] as $moduleLabel)
-                            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $moduleLabel }}</span>
+                            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{{ $moduleLabel }}</span>
                         @empty
                             <p class="text-sm text-slate-500">Aucun module visible.</p>
                         @endforelse
@@ -316,7 +316,7 @@
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Modules visibles : {{ $roles[$compareRightRole] ?? $compareRightRole }}</h3>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @forelse ($roleComparison['right_modules'] as $moduleLabel)
-                            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $moduleLabel }}</span>
+                            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{{ $moduleLabel }}</span>
                         @empty
                             <p class="text-sm text-slate-500">Aucun module visible.</p>
                         @endforelse

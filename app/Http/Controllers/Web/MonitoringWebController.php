@@ -4,15 +4,20 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateReportJob;
 use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\ActionWeek;
 use App\Models\Direction;
 use App\Models\ExportTemplate;
+use App\Models\ActionKpi;
+use App\Models\Justificatif;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
 use App\Models\Pao;
+use App\Models\PasAxe;
 use App\Models\PaoObjectifOperationnel;
+use App\Models\PaoObjectifStrategique;
 use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\Service;
@@ -22,6 +27,7 @@ use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
 use App\Services\Exports\ExportTemplateResolver;
+use App\Services\ExerciceContext;
 use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Exports\ReportingCsvExporter;
 use App\Services\Exports\ReportingWorkbookExporter;
@@ -34,6 +40,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -64,6 +72,10 @@ class MonitoringWebController extends Controller
         $this->denyUnlessReportingReader($user);
         $roleProfile = $this->buildMonitoringRoleProfile($user, 'pilotage');
 
+        $filterDirectionId = $user->hasGlobalReadAccess() ? ((int) $request->integer('direction_id') ?: null) : null;
+        $filterServiceId = (int) $request->integer('service_id') ?: null;
+        $filterPasId = (int) $request->integer('pas_id') ?: null;
+
         $today = Carbon::today()->toDateString();
 
         $pas = $this->buildPasScopedQuery($user);
@@ -73,6 +85,7 @@ class MonitoringWebController extends Controller
         $kpis = Kpi::query();
         $mesures = KpiMesure::query();
         $objectifsOperationnels = PaoObjectifOperationnel::query();
+        $objectifsStrategiques = PaoObjectifStrategique::query();
 
         $this->scopePao($paos, $user);
         $this->scopePta($ptas, $user);
@@ -80,6 +93,23 @@ class MonitoringWebController extends Controller
         $this->scopeKpi($kpis, $user);
         $this->scopeMesure($mesures, $user);
         $this->scopeObjectifOperationnel($objectifsOperationnels, $user);
+        $this->scopeObjectifStrategique($objectifsStrategiques, $user);
+
+        if ($filterDirectionId !== null) {
+            $paos->where('direction_id', $filterDirectionId);
+            $ptas->where('direction_id', $filterDirectionId);
+            $actions->whereHas('pta', fn (Builder $q) => $q->where('direction_id', $filterDirectionId));
+        }
+        if ($filterServiceId !== null) {
+            $ptas->where('service_id', $filterServiceId);
+            $actions->whereHas('pta', fn (Builder $q) => $q->where('service_id', $filterServiceId));
+        }
+        if ($filterPasId !== null) {
+            $paos->where('pas_id', $filterPasId);
+            $ptas->whereHas('pao', fn (Builder $q) => $q->where('pas_id', $filterPasId));
+            $actions->whereHas('pta.pao', fn (Builder $q) => $q->where('pas_id', $filterPasId));
+        }
+
         $actionsStatistics = (clone $actions);
         $this->scopeActionStatistics($actionsStatistics);
 
@@ -87,11 +117,12 @@ class MonitoringWebController extends Controller
             'pas_total' => (clone $pas)->count(),
             'paos_total' => (clone $paos)->count(),
             'ptas_total' => (clone $ptas)->count(),
+            'objectifs_strategiques_total' => (clone $objectifsStrategiques)->count(),
+            'objectifs_operationnels_total' => (clone $objectifsOperationnels)->count(),
             'actions_total' => (clone $actions)->count(),
             'actions_validees' => (clone $actionsStatistics)->count(),
             'kpis_total' => (clone $kpis)->count(),
             'kpi_mesures_total' => (clone $mesures)->count(),
-            'objectifs_operationnels_total' => (clone $objectifsOperationnels)->count(),
         ];
 
         $paosValides = (clone $paos)->whereIn('statut', ['valide', 'verrouille'])->count();
@@ -148,6 +179,139 @@ class MonitoringWebController extends Controller
             ? $this->buildDgMonitoringComparison($user)
             : null;
 
+        // --- Métriques enrichies ---
+        $axesTotal = PasAxe::query()
+            ->whereHas('pas', fn (Builder $q) => $this->buildPasScopedSubQuery($q, $user))
+            ->count();
+
+        $actionsEnCours = (clone $actions)->where('statut_dynamique', 'en_cours')->count();
+        $actionsACorriger = (clone $actions)->where('statut_dynamique', 'a_corriger')->count();
+        $actionsRejetees = (clone $actions)->whereIn('statut_validation', ['rejetee_chef', 'rejetee_direction'])->count();
+        $actionsCloturees = (clone $actions)->where('statut_dynamique', 'cloturee')->count();
+        $actionsAcheveDansDelai = (clone $actions)->where('statut_dynamique', 'acheve_dans_delai')->count();
+        $actionsAcheveHorsDelai = (clone $actions)->where('statut_dynamique', 'acheve_hors_delai')->count();
+
+        $validationsEnAttente = (clone $actions)
+            ->whereIn('statut_validation', ['soumise_chef', 'validee_chef'])
+            ->count();
+
+        $justificatifsManquants = (clone $actions)
+            ->whereNotIn('statut_dynamique', $this->completedActionStatuses())
+            ->whereDoesntHave('justificatifs')
+            ->where(function (Builder $q): void {
+                $q->whereDate('date_echeance', '<=', now()->addDays(14)->toDateString())
+                    ->orWhere('statut_validation', 'soumise_chef');
+            })
+            ->count();
+
+        $tauxKpis = ActionKpi::query()
+            ->join('actions', 'actions.id', '=', 'action_kpis.action_id')
+            ->join('ptas', 'ptas.id', '=', 'actions.pta_id');
+        $this->scopeJoinedPta($tauxKpis, $user, 'ptas.direction_id', 'ptas.service_id');
+        $tauxMoyens = $tauxKpis->selectRaw('
+            AVG(action_kpis.kpi_performance) as avg_performance,
+            AVG(action_kpis.kpi_conformite) as avg_conformite,
+            AVG(action_kpis.kpi_delai) as avg_delai,
+            AVG(action_kpis.kpi_global) as avg_global
+        ')->first();
+
+        $actionsRetardDetails = (clone $actions)
+            ->with(['pta:id,titre,direction_id,service_id', 'pta.direction:id,code,libelle', 'pta.service:id,code,libelle', 'responsable:id,name'])
+            ->where(function (Builder $q) use ($today): void {
+                $q->where('statut_dynamique', 'en_retard')
+                    ->orWhere(function (Builder $sq) use ($today): void {
+                        $sq->whereNotNull('date_echeance')
+                            ->whereDate('date_echeance', '<', $today)
+                            ->whereNotIn('statut_dynamique', $this->completedActionStatuses());
+                    });
+            })
+            ->orderBy('date_echeance')
+            ->limit(20)
+            ->get();
+
+        $validationsDetails = (clone $actions)
+            ->with(['pta:id,titre,direction_id,service_id', 'pta.direction:id,code,libelle', 'responsable:id,name', 'soumisPar:id,name'])
+            ->whereIn('statut_validation', ['soumise_chef', 'validee_chef'])
+            ->orderBy('soumise_le')
+            ->limit(20)
+            ->get();
+
+        $ruptures = [
+            ['type' => 'PAO sans PTA', 'count' => $paoSansPta, 'niveau' => 'PAO', 'lien' => route('workspace.pao.index', ['without_pta' => 1])],
+            ['type' => 'PTA sans action', 'count' => $ptaSansAction, 'niveau' => 'PTA', 'lien' => route('workspace.pta.index', ['without_action' => 1])],
+            ['type' => 'Action sans indicateur', 'count' => $actionSansKpi, 'niveau' => 'Action', 'lien' => route('workspace.actions.index', ['without_kpi' => 1])],
+            ['type' => 'Indicateur sans mesure', 'count' => $kpiSansMesure, 'niveau' => 'Indicateur', 'lien' => route('workspace.reporting')],
+        ];
+
+        $decisionPoints = $this->buildDecisionPoints(
+            $actionsRetard, $actionsACorriger, $actionsRejetees,
+            (int) round((float) ($tauxMoyens?->avg_global ?? 0)),
+            $kpiSousSeuilQuery->count(), $validationsEnAttente
+        );
+
+        $chaineSummary = (clone $pas)
+            ->select(['pas.id', 'pas.titre', 'pas.statut', 'pas.periode_debut', 'pas.periode_fin'])
+            ->selectRaw('(SELECT COUNT(*) FROM paos WHERE paos.pas_id = pas.id) as pao_count')
+            ->selectRaw('(SELECT COUNT(*) FROM ptas t JOIN paos p ON p.id = t.pao_id WHERE p.pas_id = pas.id) as pta_count')
+            ->selectRaw('(SELECT COUNT(*) FROM actions a JOIN ptas t ON t.id = a.pta_id JOIN paos p ON p.id = t.pao_id WHERE p.pas_id = pas.id) as action_count')
+            ->selectRaw('ROUND(COALESCE((SELECT AVG(a.taux_realisation_global) FROM actions a JOIN ptas t ON t.id = a.pta_id JOIN paos p ON p.id = t.pao_id WHERE p.pas_id = pas.id), 0), 1) as taux_moyen')
+            ->orderByDesc('periode_debut')
+            ->limit(10)
+            ->get();
+
+        $kpiSousSeuilDetailsQuery = KpiMesure::query()
+            ->join('kpis', 'kpis.id', '=', 'kpi_mesures.kpi_id')
+            ->join('actions', 'actions.id', '=', 'kpis.action_id')
+            ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
+            ->whereNotNull('kpis.seuil_alerte')
+            ->whereColumn('kpi_mesures.valeur', '<', 'kpis.seuil_alerte')
+            ->select([
+                'kpi_mesures.id',
+                'kpis.libelle as kpi_libelle',
+                'kpis.unite as kpi_unite',
+                'kpis.seuil_alerte',
+                'kpi_mesures.valeur as valeur_realisee',
+                'kpi_mesures.periode',
+                'actions.id as action_id',
+                'actions.libelle as action_libelle',
+                'actions.statut_dynamique',
+            ])
+            ->selectRaw('(kpis.seuil_alerte - kpi_mesures.valeur) as ecart');
+        $this->scopeJoinedPta($kpiSousSeuilDetailsQuery, $user, 'ptas.direction_id', 'ptas.service_id');
+        if ($filterDirectionId !== null) {
+            $kpiSousSeuilDetailsQuery->where('ptas.direction_id', $filterDirectionId);
+        }
+        if ($filterServiceId !== null) {
+            $kpiSousSeuilDetailsQuery->where('ptas.service_id', $filterServiceId);
+        }
+        $kpiSousSeuilDetails = $kpiSousSeuilDetailsQuery
+            ->orderByRaw('(kpis.seuil_alerte - kpi_mesures.valeur) DESC')
+            ->limit(20)
+            ->get();
+
+        $justificatifsManquantsDetails = (clone $actions)
+            ->with(['pta:id,titre,direction_id,service_id', 'pta.direction:id,code,libelle', 'responsable:id,name'])
+            ->whereNotIn('statut_dynamique', $this->completedActionStatuses())
+            ->whereDoesntHave('justificatifs')
+            ->where(function (Builder $q): void {
+                $q->whereDate('date_echeance', '<=', now()->addDays(14)->toDateString())
+                    ->orWhere('statut_validation', 'soumise_chef');
+            })
+            ->orderBy('date_echeance')
+            ->limit(20)
+            ->get();
+
+        $directionOptions = Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']);
+        $pasOptions = (clone $pas)->orderByDesc('periode_debut')->get(['id', 'titre']);
+        $pilotageFilters = [
+            'direction_id' => $filterDirectionId,
+            'service_id'   => $filterServiceId,
+            'pas_id'       => $filterPasId,
+        ];
+
+        $chartsPayload = $this->reportingAnalyticsService
+            ->buildPayload($user, false, true)['charts'] ?? [];
+
         return view('workspace.monitoring.pilotage', [
             'generatedAt' => now(),
             'roleProfile' => $roleProfile,
@@ -201,6 +365,35 @@ class MonitoringWebController extends Controller
             'interannualComparison' => $this->buildInterannualComparison($user),
             'actionsProches' => $actionsProches,
             'dgComparison' => $dgComparison,
+            'axesTotal' => $axesTotal,
+            'actionsStatutDetails' => [
+                'en_cours' => $actionsEnCours,
+                'acheve_dans_delai' => $actionsAcheveDansDelai,
+                'acheve_hors_delai' => $actionsAcheveHorsDelai,
+                'en_retard' => $actionsRetard,
+                'a_corriger' => $actionsACorriger,
+                'rejetees' => $actionsRejetees,
+                'cloturees' => $actionsCloturees,
+            ],
+            'tauxMoyens' => [
+                'performance' => round((float) ($tauxMoyens?->avg_performance ?? 0), 1),
+                'conformite' => round((float) ($tauxMoyens?->avg_conformite ?? 0), 1),
+                'delai' => round((float) ($tauxMoyens?->avg_delai ?? 0), 1),
+                'global' => round((float) ($tauxMoyens?->avg_global ?? 0), 1),
+            ],
+            'validationsEnAttente' => $validationsEnAttente,
+            'justificatifsManquants' => $justificatifsManquants,
+            'actionsRetardDetails' => $actionsRetardDetails,
+            'validationsDetails' => $validationsDetails,
+            'rupturesDetail' => $ruptures,
+            'decisionPoints' => $decisionPoints,
+            'chartsPayload' => $chartsPayload,
+            'chaineSummary' => $chaineSummary,
+            'kpiSousSeuilDetails' => $kpiSousSeuilDetails,
+            'justificatifsManquantsDetails' => $justificatifsManquantsDetails,
+            'directionOptions' => $directionOptions,
+            'pasOptions' => $pasOptions,
+            'pilotageFilters' => $pilotageFilters,
         ]);
     }
 
@@ -340,6 +533,8 @@ class MonitoringWebController extends Controller
         $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
         $filename = $this->institutionalReportFilename('REPORTING', $payload, 'pdf', $filenamePrefix);
 
+        @ini_set('memory_limit', '512M');
+
         return Pdf::loadView('workspace.monitoring.reporting-pdf', $payload)
             ->setPaper($template?->paperSize() ?? 'a4', $template?->orientation() ?? 'landscape')
             ->download($filename);
@@ -371,6 +566,40 @@ class MonitoringWebController extends Controller
             ->header('Content-Disposition', 'attachment; filename="'.$filename.'"');
     }
 
+    public function queueExport(Request $request, string $format): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $format = strtolower($format);
+        if (! in_array($format, ['excel', 'csv', 'word', 'pdf'], true)) {
+            abort(404);
+        }
+
+        $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessReportingReader($user);
+
+        GenerateReportJob::dispatch((int) $user->id, $format);
+
+        return back()->with('success', 'Export '.$format.' lance. Une notification contiendra le lien de telechargement.');
+    }
+
+    public function downloadQueuedExport(Request $request): StreamedResponse
+    {
+        $path = Crypt::decryptString((string) $request->query('path'));
+        $filename = trim((string) $request->query('name')) ?: basename($path);
+        $contentType = trim((string) $request->query('content_type')) ?: 'application/octet-stream';
+
+        if (! Storage::disk('local')->exists($path)) {
+            abort(404);
+        }
+
+        return Storage::disk('local')->download($path, $filename, [
+            'Content-Type' => $contentType,
+        ]);
+    }
     private function resolveReportingExportTemplate(User $user, string $format): ?ExportTemplate
     {
         return $this->exportTemplateResolver->resolve($user, 'reporting', 'consolidated_reporting', $format, 'officiel');
@@ -583,16 +812,20 @@ class MonitoringWebController extends Controller
 
     private function scopePao(Builder|Relation $query, User $user): void
     {
+        app(ExerciceContext::class)->applyToPao($query);
         $this->scopeByUserDirection($query, $user, 'direction_id');
     }
 
     private function scopePta(Builder|Relation $query, User $user): void
     {
+        app(ExerciceContext::class)->applyToPta($query);
         $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
     }
 
     private function scopeAction(Builder|Relation $query, User $user): void
     {
+        app(ExerciceContext::class)->applyToAction($query);
+
         if ($user->hasGlobalReadAccess()) {
             return;
         }
@@ -838,6 +1071,8 @@ class MonitoringWebController extends Controller
 
     private function scopeKpi(Builder $query, User $user): void
     {
+        app(ExerciceContext::class)->applyToKpi($query);
+
         if ($user->hasGlobalReadAccess()) {
             return;
         }
@@ -857,6 +1092,8 @@ class MonitoringWebController extends Controller
 
     private function scopeMesure(Builder $query, User $user): void
     {
+        app(ExerciceContext::class)->applyToMesure($query);
+
         if ($user->hasGlobalReadAccess()) {
             return;
         }
@@ -897,12 +1134,110 @@ class MonitoringWebController extends Controller
         $query->whereRaw('1 = 0');
     }
 
+    private function buildPasScopedSubQuery(Builder $query, User $user): void
+    {
+        if ($user->hasGlobalReadAccess()) {
+            return;
+        }
+        if ($user->direction_id !== null) {
+            $query->whereHas('directions', function (Builder $q) use ($user): void {
+                $q->where('directions.id', (int) $user->direction_id);
+            });
+        } else {
+            $query->whereRaw('1 = 0');
+        }
+    }
+
+    /**
+     * @return list<array{titre: string, impact: string, responsable: string, urgence: string}>
+     */
+    private function buildDecisionPoints(
+        int $retard, int $aCorriger, int $rejetes,
+        int $tauxGlobal, int $kpiSousSeuil, int $validationsEnAttente
+    ): array {
+        $points = [];
+
+        if ($retard > 0) {
+            $points[] = [
+                'titre' => $retard.' action(s) en retard',
+                'impact' => 'Risque de non-atteinte des objectifs opérationnels',
+                'responsable' => 'Directeurs / Chefs de service',
+                'decision' => 'Mobiliser les responsables et redéfinir les priorités',
+                'urgence' => 'haute',
+            ];
+        }
+        if ($kpiSousSeuil > 0) {
+            $points[] = [
+                'titre' => $kpiSousSeuil.' indicateur(s) sous-seuil',
+                'impact' => 'Performance insuffisante sur les objectifs mesurés',
+                'responsable' => 'Responsables d\'action',
+                'decision' => 'Analyser les écarts et corriger les plans d\'exécution',
+                'urgence' => 'haute',
+            ];
+        }
+        if ($validationsEnAttente > 0) {
+            $points[] = [
+                'titre' => $validationsEnAttente.' validation(s) en attente',
+                'impact' => 'Actions bloquées dans le circuit de validation',
+                'responsable' => 'Chefs de service / Directeurs',
+                'decision' => 'Traiter les dossiers en attente de validation',
+                'urgence' => 'moyenne',
+            ];
+        }
+        if ($aCorriger > 0) {
+            $points[] = [
+                'titre' => $aCorriger.' action(s) à corriger',
+                'impact' => 'Actions rejetées nécessitant une révision',
+                'responsable' => 'Agents responsables',
+                'decision' => 'Corriger et resoumettre les actions rejetées',
+                'urgence' => 'moyenne',
+            ];
+        }
+        if ($tauxGlobal < 50 && $tauxGlobal > 0) {
+            $points[] = [
+                'titre' => 'Taux global d\'avancement faible ('.$tauxGlobal.'%)',
+                'impact' => 'Risque de non-réalisation des objectifs du plan',
+                'responsable' => 'Direction Générale',
+                'decision' => 'Revue urgente du plan d\'exécution',
+                'urgence' => 'haute',
+            ];
+        }
+
+        return $points;
+    }
+
+    private function scopeObjectifStrategique(Builder $query, User $user): void
+    {
+        if ($user->hasGlobalReadAccess()) {
+            return;
+        }
+
+        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
+            $query->whereHas('paoAxe.pao', function (Builder $subQuery) use ($user): void {
+                $subQuery->where('direction_id', (int) $user->direction_id);
+            });
+            return;
+        }
+
+        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
+            $query->whereHas('paoAxe.pao.ptas', function (Builder $subQuery) use ($user): void {
+                $subQuery->where('service_id', (int) $user->service_id);
+            });
+            return;
+        }
+
+        $query->whereRaw('1 = 0');
+    }
+
     private function scopeJoinedPta(
         Builder $query,
         User $user,
         string $directionColumn,
         string $serviceColumn
     ): void {
+        $ptaTable = str_contains($directionColumn, '.') ? Str::before($directionColumn, '.') : 'ptas';
+        app(ExerciceContext::class)->applyToJoinedPta($query, null, $ptaTable);
+
         if ($user->hasGlobalReadAccess()) {
             return;
         }
@@ -924,6 +1259,7 @@ class MonitoringWebController extends Controller
     {
         $query = Pas::query();
 
+        app(ExerciceContext::class)->applyToPas($query);
         $this->scopePasByUser($query, $user);
 
         return $query;
@@ -1117,11 +1453,11 @@ class MonitoringWebController extends Controller
                 'default' => [
                     'eyebrow' => 'Pilotage global',
                     'title' => 'Pilotage global et consolidation transverse',
-                    'subtitle' => 'Vue consolidee des volumes, ruptures de chaine, retards et realisation par annee.',
+                    'subtitle' => 'Vue consolidée des volumes, ruptures de chaîne, retards et réalisation par année.',
                 ],
                 'service' => [
                     'eyebrow' => 'Pilotage service',
-                    'title' => 'Suivi du service et ruptures de chaine',
+                    'title' => 'Suivi du service',
                     'subtitle' => 'Lecture metier du service sur les plans, les ruptures, les retards et la couverture d execution.',
                 ],
                 'direction' => [
@@ -1132,7 +1468,7 @@ class MonitoringWebController extends Controller
                 'dg' => [
                     'eyebrow' => 'Pilotage DG',
                     'title' => 'Pilotage institutionnel',
-                    'subtitle' => 'Vue strategique haute des plans, des ruptures et des tensions majeures du portefeuille.',
+                    'subtitle' => 'Vue stratégique haute des plans, des ruptures et des tensions majeures du portefeuille.',
                 ],
                 'cabinet' => [
                     'eyebrow' => 'Pilotage cabinet',
@@ -1142,29 +1478,29 @@ class MonitoringWebController extends Controller
             ],
             'reporting' => [
                 'default' => [
-                    'eyebrow' => 'Reporting consolide',
-                    'title' => 'Centre d export et de diffusion',
-                    'subtitle' => 'Les graphes et les tableaux de reporting ont ete centralises dans le dashboard analytique et servent ici a l export et a la diffusion.',
+                    'eyebrow' => 'Reporting consolidé',
+                    'title' => "Centre d'export et de diffusion",
+                    'subtitle' => "Les graphes et les tableaux de reporting ont été centralisés dans le dashboard analytique et servent ici à l'export et à la diffusion.",
                 ],
                 'service' => [
                     'eyebrow' => 'Reporting service',
-                    'title' => 'Diffusion consolidee du service',
-                    'subtitle' => 'Exports et vues consolidees du service avec lecture rapide des validations et de la performance.',
+                    'title' => 'Diffusion consolidée du service',
+                    'subtitle' => 'Exports et vues consolidées du service avec lecture rapide des validations et de la performance.',
                 ],
                 'direction' => [
                     'eyebrow' => 'Reporting direction',
                     'title' => 'Centre de diffusion directionnel',
-                    'subtitle' => 'Exports et lectures consolidees de la direction sans filtre statistique sur la validation.',
+                    'subtitle' => 'Exports et lectures consolidées de la direction sans filtre statistique sur la validation.',
                 ],
                 'dg' => [
                     'eyebrow' => 'Reporting DG',
-                    'title' => 'Centre d export institutionnel',
-                    'subtitle' => 'Point unique de diffusion des vues consolidees pour l arbitrage strategique.',
+                    'title' => "Centre d'export institutionnel",
+                    'subtitle' => "Point unique de diffusion des vues consolidées pour l'arbitrage stratégique.",
                 ],
                 'cabinet' => [
                     'eyebrow' => 'Reporting cabinet',
                     'title' => 'Centre de diffusion transverse',
-                    'subtitle' => 'Exports consolides et vue rapide des familles analytiques utiles a l accompagnement DG.',
+                    'subtitle' => "Exports consolidés et vue rapide des familles analytiques utiles à l'accompagnement DG.",
                 ],
             ],
         ];
@@ -1172,8 +1508,8 @@ class MonitoringWebController extends Controller
         $pageProfiles = $profiles[$page] ?? [];
         $profile = $pageProfiles[$role] ?? ($pageProfiles['default'] ?? [
             'eyebrow' => $user->roleLabel(),
-            'title' => 'Lecture consolidee',
-            'subtitle' => 'Vue filtree selon le perimetre courant.',
+            'title' => 'Lecture consolidée',
+            'subtitle' => 'Vue filtrée selon le périmètre courant.',
         ]);
 
         return $profile + [
@@ -1777,6 +2113,7 @@ class MonitoringWebController extends Controller
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
             ActionTrackingService::STATUS_SUSPENDU,
             ActionTrackingService::STATUS_ANNULE,
+            ActionTrackingService::STATUS_CLOTUREE,
         ];
     }
 

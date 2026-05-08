@@ -13,13 +13,15 @@ use App\Services\NotificationPolicySettings;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\WorkflowSettings;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class ActionTrackingService
 {
     public function __construct(
         private readonly WorkflowSettings $workflowSettings,
         private readonly ActionManagementSettings $actionManagementSettings,
-        private readonly NotificationPolicySettings $notificationPolicySettings
+        private readonly NotificationPolicySettings $notificationPolicySettings,
+        private readonly ActionProgressService $actionProgressService
     ) {
     }
 
@@ -38,6 +40,8 @@ class ActionTrackingService
     public const STATUS_ANNULE = 'annule';
     public const STATUS_ACHEVE_DANS_DELAI = 'acheve_dans_delai';
     public const STATUS_ACHEVE_HORS_DELAI = 'acheve_hors_delai';
+    public const STATUS_A_CORRIGER = 'a_corriger';
+    public const STATUS_CLOTUREE = 'cloturee';
 
     public const RISK_ALERT_THRESHOLD_DAYS = 3;
 
@@ -47,6 +51,11 @@ class ActionTrackingService
     public const VALIDATION_VALIDEE_CHEF = 'validee_chef';
     public const VALIDATION_REJETEE_DIRECTION = 'rejetee_direction';
     public const VALIDATION_VALIDEE_DIRECTION = 'validee_direction';
+
+    public const FINANCEMENT_DECISION_VALIDER = 'valider';
+    public const FINANCEMENT_DECISION_REJETER = 'rejeter';
+    public const FINANCEMENT_DECISION_ACCORDER = 'accorder';
+    public const FINANCEMENT_DECISION_REFUSER = 'refuser';
 
     /**
      * @return array<int, string>
@@ -63,6 +72,8 @@ class ActionTrackingService
             self::STATUS_ANNULE,
             self::STATUS_ACHEVE_DANS_DELAI,
             self::STATUS_ACHEVE_HORS_DELAI,
+            self::STATUS_A_CORRIGER,
+            self::STATUS_CLOTUREE,
         ];
     }
 
@@ -97,19 +108,24 @@ class ActionTrackingService
 
     public function initializeActionTracking(Action $action, ?User $actor = null): void
     {
-        $this->regenerateWeeks($action);
-        $this->refreshActionMetrics($action);
+        if ($action->usesStructuredProgressTracking()) {
+            $action->weeks()->delete();
+            $this->refreshActionMetrics($action);
+        } else {
+            $this->regenerateWeeks($action);
+            $this->refreshActionMetrics($action);
+        }
 
         $this->createLogIfMissingToday(
             $action,
             'action_initialisee',
             'info',
-            'Action initialisee avec suivi periodique automatique.',
+            $action->usesStructuredProgressTracking() ? 'Action initialisee avec suivi structure.' : 'Action initialisee avec suivi periodique automatique.',
             [
                 'type_cible' => $action->type_cible,
+                'mode_evaluation' => $action->resolvedEvaluationMode(),
                 'date_debut' => optional($action->date_debut)->toDateString(),
                 'date_fin' => optional($action->date_fin)->toDateString(),
-                'frequence_execution' => (string) ($action->frequence_execution ?? self::FREQUENCE_HEBDOMADAIRE),
             ],
             'responsable',
             $actor?->id
@@ -118,6 +134,10 @@ class ActionTrackingService
 
     public function canRegenerateWeeks(Action $action): bool
     {
+        if ($action->usesStructuredProgressTracking()) {
+            return true;
+        }
+
         return ! $action->weeks()
             ->where('est_renseignee', true)
             ->exists();
@@ -126,6 +146,12 @@ class ActionTrackingService
     public function regenerateWeeks(Action $action): void
     {
         $action->refresh();
+
+        if ($action->usesStructuredProgressTracking()) {
+            $action->weeks()->delete();
+            return;
+        }
+
         $start = $action->date_debut !== null ? Carbon::parse($action->date_debut)->startOfDay() : null;
         $end = $action->date_fin !== null ? Carbon::parse($action->date_fin)->startOfDay() : null;
         $frequence = (string) ($action->frequence_execution ?? self::FREQUENCE_HEBDOMADAIRE);
@@ -249,7 +275,7 @@ class ActionTrackingService
             default => 'Action soumise au chef de service pour evaluation.',
         };
 
-        $action->fill([
+        $closureData = [
             'date_fin_reelle' => $payload['date_fin_reelle'] ?? $action->date_fin_reelle,
             'rapport_final' => $payload['rapport_final'] ?? $action->rapport_final,
             'validation_hierarchique' => $submissionTarget === 'final',
@@ -265,7 +291,21 @@ class ActionTrackingService
             'direction_valide_le' => null,
             'direction_evaluation_note' => null,
             'direction_evaluation_commentaire' => null,
-        ]);
+        ];
+
+        foreach (['resultat_cloture', 'difficultes_rencontrees', 'mesures_correctives', 'justification_cloture'] as $field) {
+            if (array_key_exists($field, $payload)) {
+                $closureData[$field] = $payload[$field];
+            }
+        }
+
+        if ($submissionTarget === 'final') {
+            $closureData['statut_dynamique'] = self::STATUS_CLOTUREE;
+            $closureData['cloture_par'] = $actor?->id;
+            $closureData['cloture_le'] = now();
+        }
+
+        $action->fill($closureData);
         $action->save();
 
         $this->createLogIfMissingToday(
@@ -428,10 +468,177 @@ class ActionTrackingService
         return $this->submitClosureForReview($action, $payload, $actor);
     }
 
+    public function syncFinancingRequest(Action $action, ?User $actor = null): Action
+    {
+        if (! (bool) $action->financement_requis) {
+            $action->fill([
+                'financement_statut' => Action::FINANCEMENT_NON_REQUIS,
+            ]);
+            $action->save();
+
+            return $action->fresh();
+        }
+
+        $status = $action->financementStatus();
+        if (in_array($status, [
+            Action::FINANCEMENT_NON_REQUIS,
+            Action::FINANCEMENT_REJETE_DAF,
+            Action::FINANCEMENT_REFUSE_DG,
+        ], true)) {
+            $action->financement_statut = Action::FINANCEMENT_A_TRAITER_DAF;
+        }
+
+        if ($action->financement_soumis_le === null) {
+            $action->financement_soumis_le = now();
+        }
+
+        $action->save();
+
+        $this->createLogIfMissingToday(
+            $action,
+            'financement_demande',
+            'info',
+            'Besoin de financement transmis au circuit DAF.',
+            [
+                'montant_estime' => $action->montant_estime,
+                'source_financement' => $action->source_financement,
+                'statut_financement' => $action->financementStatus(),
+            ],
+            'daf',
+            $actor?->id
+        );
+
+        return $action->fresh();
+    }
+
+    public function markFinancingNotificationSent(Action $action): Action
+    {
+        $action->forceFill(['financement_notifie_le' => now()])->save();
+
+        return $action->fresh();
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function reviewFinancingByDaf(Action $action, array $payload, User $actor): Action
+    {
+        $decision = (string) ($payload['decision_financement'] ?? self::FINANCEMENT_DECISION_REJETER);
+        $approved = $decision === self::FINANCEMENT_DECISION_VALIDER;
+
+        $action->fill([
+            'financement_statut' => $approved ? Action::FINANCEMENT_VALIDE_DAF : Action::FINANCEMENT_REJETE_DAF,
+            'financement_daf_par' => $actor->id,
+            'financement_daf_le' => now(),
+            'financement_daf_decision' => $decision,
+            'financement_daf_commentaire' => $payload['commentaire_financement'] ?? null,
+            'financement_montant_valide' => $approved
+                ? ($payload['montant_valide'] ?? $action->montant_estime)
+                : null,
+            'financement_reference' => $approved
+                ? ($payload['reference_financement'] ?? $action->financement_reference)
+                : null,
+            'financement_dg_par' => null,
+            'financement_dg_le' => null,
+            'financement_dg_decision' => null,
+            'financement_dg_commentaire' => null,
+        ]);
+        $action->save();
+
+        $this->createLogIfMissingToday(
+            $action,
+            $approved ? 'financement_valide_daf' : 'financement_rejete_daf',
+            $approved ? 'info' : 'warning',
+            $approved
+                ? 'Financement valide par la DAF. Accord DG requis.'
+                : 'Financement rejete par la DAF.',
+            [
+                'decision' => $decision,
+                'montant_valide' => $action->financement_montant_valide,
+                'reference' => $action->financement_reference,
+                'commentaire' => $action->financement_daf_commentaire,
+            ],
+            $approved ? 'dg' : 'direction',
+            $actor->id
+        );
+
+        $this->addDiscussionEntry(
+            $action,
+            (string) ($payload['commentaire_financement'] ?? ($approved
+                ? 'Validation DAF du besoin de financement. Accord DG attendu.'
+                : 'Rejet DAF du besoin de financement.')),
+            $approved ? 'financement_valide_daf' : 'financement_rejete_daf',
+            $approved ? 'info' : 'warning',
+            [
+                'decision' => $decision,
+                'montant_valide' => $action->financement_montant_valide,
+                'reference' => $action->financement_reference,
+            ],
+            $actor
+        );
+
+        return $action->fresh();
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function reviewFinancingByDg(Action $action, array $payload, User $actor): Action
+    {
+        $decision = (string) ($payload['decision_financement'] ?? self::FINANCEMENT_DECISION_REFUSER);
+        $approved = $decision === self::FINANCEMENT_DECISION_ACCORDER;
+
+        $action->fill([
+            'financement_statut' => $approved ? Action::FINANCEMENT_ACCORDE_DG : Action::FINANCEMENT_REFUSE_DG,
+            'financement_dg_par' => $actor->id,
+            'financement_dg_le' => now(),
+            'financement_dg_decision' => $decision,
+            'financement_dg_commentaire' => $payload['commentaire_financement'] ?? null,
+        ]);
+        $action->save();
+
+        $this->createLogIfMissingToday(
+            $action,
+            $approved ? 'financement_accord_dg' : 'financement_refus_dg',
+            $approved ? 'info' : 'warning',
+            $approved
+                ? 'Accord DG donne pour le financement.'
+                : 'Accord DG refuse pour le financement.',
+            [
+                'decision' => $decision,
+                'commentaire' => $action->financement_dg_commentaire,
+                'montant_valide' => $action->financement_montant_valide,
+                'reference' => $action->financement_reference,
+            ],
+            'daf',
+            $actor->id
+        );
+
+        $this->addDiscussionEntry(
+            $action,
+            (string) ($payload['commentaire_financement'] ?? ($approved
+                ? 'Accord DG donne pour le financement.'
+                : 'Accord DG refuse pour le financement.')),
+            $approved ? 'financement_accord_dg' : 'financement_refus_dg',
+            $approved ? 'info' : 'warning',
+            [
+                'decision' => $decision,
+                'montant_valide' => $action->financement_montant_valide,
+                'reference' => $action->financement_reference,
+            ],
+            $actor
+        );
+
+        return $action->fresh();
+    }
     public function refreshActionMetrics(Action $action, ?Carbon $referenceDate = null): Action
     {
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
-        $action->loadMissing('weeks', 'actionKpi');
+        $action->loadMissing('weeks', 'sousActions.justificatifs', 'actionKpi');
+
+        if ($action->usesStructuredProgressTracking()) {
+            return $this->refreshStructuredActionMetrics($action, $referenceDate);
+        }
 
         $weeks = $action->weeks()
             ->orderBy('numero_semaine')
@@ -477,6 +684,18 @@ class ActionTrackingService
             ? ($targetQuantity > 0 ? min(100.0, round(($cumulativeQuantity / $targetQuantity) * 100, 2)) : 0.0)
             : min(100.0, max(0.0, $latestQualitativeProgress));
 
+        $sousActions = $action->sousActions;
+        if ($sousActions->isNotEmpty()) {
+            $completedSousActions = $sousActions->filter(function ($sousAction): bool {
+                return (bool) $sousAction->est_effectuee
+                    && trim((string) ($sousAction->commentaire ?? '')) !== ''
+                    && $sousAction->justificatifs->isNotEmpty();
+            })->count();
+
+            $realProgress = min(100.0, round(($completedSousActions / max(1, $sousActions->count())) * 100, 2));
+            $cumulativeQuantity = $completedSousActions;
+        }
+
         if ($this->actionManagementSettings->autoCompleteWhenTargetReached()
             && $action->date_fin_reelle === null
             && $realProgress >= 100.0
@@ -498,18 +717,9 @@ class ActionTrackingService
         ]);
         $action->save();
 
-        $existingKpi = $action->actionKpi;
         if ($status === self::STATUS_SUSPENDU) {
-            $kpis = $existingKpi instanceof ActionKpi
-                ? [
-                    'kpi_delai' => (float) $existingKpi->kpi_delai,
-                    'kpi_performance' => (float) $existingKpi->kpi_performance,
-                    'kpi_conformite' => (float) $existingKpi->kpi_conformite,
-                    'kpi_qualite' => (float) $existingKpi->kpi_qualite,
-                    'kpi_risque' => (float) $existingKpi->kpi_risque,
-                    'kpi_global' => (float) $existingKpi->kpi_global,
-                ]
-                : $this->calculateActionKpis(
+            $kpis = $this->frozenActionKpis($action)
+                ?? $this->calculateActionKpis(
                     $action,
                     $realProgress,
                     $theoreticalProgress,
@@ -547,6 +757,20 @@ class ActionTrackingService
                 ]
             )
         );
+
+        $tauxRealisation = round(
+            (0.40 * ($kpis['kpi_performance'] ?? 0))
+            + (0.30 * ($kpis['kpi_conformite'] ?? 0))
+            + (0.30 * ($kpis['kpi_delai'] ?? 0)),
+            2
+        );
+        $action->fill([
+            'taux_performance' => $kpis['kpi_performance'] ?? null,
+            'taux_conformite' => $kpis['kpi_conformite'] ?? null,
+            'taux_delai' => $kpis['kpi_delai'] ?? null,
+            'taux_realisation_global' => $tauxRealisation,
+        ]);
+        $action->save();
 
         if ($beforeStatus !== '' && $beforeStatus !== $status) {
             $this->createLogIfMissingToday(
@@ -590,9 +814,156 @@ class ActionTrackingService
             $this->generateAutomaticAlerts($action, $weeks, $realProgress, $theoreticalProgress, $kpis, $referenceDate);
         }
 
-        return $action->fresh(['actionKpi', 'weeks']);
+        return $action->fresh(['actionKpi', 'weeks', 'sousActions.justificatifs']);
     }
 
+    private function refreshStructuredActionMetrics(Action $action, Carbon $referenceDate): Action
+    {
+        $metrics = $this->actionProgressService->compute($action, $referenceDate);
+        $realProgress = (float) ($metrics['progression_reelle'] ?? 0);
+        $theoreticalProgress = (float) ($metrics['progression_theorique'] ?? 0);
+        $beforeStatus = (string) $action->statut_dynamique;
+
+        if (
+            $this->actionManagementSettings->autoCompleteWhenTargetReached()
+            && $action->date_fin_reelle === null
+            && $realProgress >= 100.0
+            && ! in_array((string) ($action->statut ?? ''), [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)
+        ) {
+            $action->date_fin_reelle = $referenceDate->copy()->toDateString();
+        }
+
+        $status = $this->determineDynamicStatus($action, $realProgress, $theoreticalProgress, $referenceDate);
+        $legacyStatus = $this->mapLegacyStatus($status);
+
+        $updates = [
+            'date_echeance' => $action->date_echeance ?? $action->date_fin,
+            'quantite_realisee' => (float) ($metrics['quantite_realisee'] ?? $action->quantite_realisee ?? 0),
+            'progression_reelle' => $realProgress,
+            'progression_theorique' => $theoreticalProgress,
+            'avancement_operationnel' => (float) ($metrics['avancement_operationnel'] ?? 0),
+            'taux_atteinte_cible' => (float) ($metrics['taux_atteinte_cible'] ?? 0),
+            'taux_global' => (float) ($metrics['taux_global'] ?? $realProgress),
+            'statut_dynamique' => $status,
+            'statut' => $legacyStatus,
+        ];
+
+        $optionalMetrics = [
+            'reste_a_realiser' => (float) ($metrics['reste_a_realiser'] ?? 0),
+            'taux_depassement' => (float) ($metrics['taux_depassement'] ?? 0),
+            'statut_performance' => $action->resolvePerformanceStatus(
+                (float) ($metrics['taux_atteinte_cible'] ?? 0),
+                (float) ($metrics['taux_depassement'] ?? 0)
+            ),
+            'statut_execution_quantitative' => $action->resolveQuantitativeExecutionStatus(
+                (float) ($metrics['cible_mesurable_attendue'] ?? 0) > 0
+                    ? (((float) ($metrics['quantite_realisee'] ?? 0) / (float) $metrics['cible_mesurable_attendue']) * 100)
+                    : 0.0
+            ),
+        ];
+
+        foreach ($optionalMetrics as $column => $value) {
+            if (Schema::hasColumn($action->getTable(), $column)) {
+                $updates[$column] = $value;
+            }
+        }
+
+        $action->fill($updates);
+        $action->save();
+
+        $quantitativeBase = $action->usesQuantitativeProgress()
+            ? (float) ($metrics['quantite_realisee'] ?? 0)
+            : (float) ($metrics['sous_actions_realisees'] ?? 0);
+
+        $kpis = match ($status) {
+            self::STATUS_SUSPENDU => $this->frozenActionKpis($action)
+                ?? $this->calculateActionKpis($action, $realProgress, $theoreticalProgress, $quantitativeBase, $referenceDate),
+            self::STATUS_ANNULE => [
+                'kpi_delai' => 0.0,
+                'kpi_performance' => 0.0,
+                'kpi_conformite' => 0.0,
+                'kpi_qualite' => 0.0,
+                'kpi_risque' => 0.0,
+                'kpi_global' => 0.0,
+            ],
+            default => $this->calculateActionKpis($action, $realProgress, $theoreticalProgress, $quantitativeBase, $referenceDate),
+        };
+
+        ActionKpi::query()->updateOrCreate(
+            ['action_id' => $action->id],
+            array_merge(
+                $kpis,
+                [
+                    'progression_reelle' => $realProgress,
+                    'progression_theorique' => $theoreticalProgress,
+                    'statut_calcule' => $status,
+                    'derniere_evaluation_at' => now(),
+                ]
+            )
+        );
+
+        $tauxRealisation = round(
+            (0.40 * ($kpis['kpi_performance'] ?? 0))
+            + (0.30 * ($kpis['kpi_conformite'] ?? 0))
+            + (0.30 * ($kpis['kpi_delai'] ?? 0)),
+            2
+        );
+
+        $action->fill([
+            'taux_performance' => $kpis['kpi_performance'] ?? null,
+            'taux_conformite' => $kpis['kpi_conformite'] ?? null,
+            'taux_delai' => $kpis['kpi_delai'] ?? null,
+            'taux_realisation_global' => $tauxRealisation,
+        ]);
+        $action->save();
+
+        if ($beforeStatus !== '' && $beforeStatus !== $status) {
+            $this->createLogIfMissingToday(
+                $action,
+                'changement_statut',
+                'info',
+                sprintf('Statut dynamique mis a jour: %s -> %s', $beforeStatus, $status),
+                ['from' => $beforeStatus, 'to' => $status],
+                'chef_service'
+            );
+
+            if ($status === self::STATUS_SUSPENDU) {
+                $this->createLogIfMissingToday(
+                    $action,
+                    'action_suspendue',
+                    'warning',
+                    'Action suspendue. Les indicateurs sont geles jusqu a reactivation.',
+                    [
+                        'statut_dynamique' => $status,
+                        'progression_reelle' => $realProgress,
+                    ],
+                    'direction'
+                );
+            }
+
+            if ($status === self::STATUS_ANNULE) {
+                $this->createLogIfMissingToday(
+                    $action,
+                    'action_annulee',
+                    'info',
+                    'Action annulee. Les alertes automatiques sont desactivees.',
+                    [
+                        'statut_dynamique' => $status,
+                    ],
+                    'direction'
+                );
+            }
+        }
+
+        if (! in_array($status, [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)) {
+            $weeks = $action->weeks()
+                ->orderBy('numero_semaine')
+                ->get();
+            $this->generateAutomaticAlerts($action, $weeks, $realProgress, $theoreticalProgress, $kpis, $referenceDate);
+        }
+
+        return $action->fresh(['actionKpi', 'sousActions.justificatifs']);
+    }
     public function addActionJustificatif(
         Action $action,
         ?ActionWeek $week,
@@ -690,6 +1061,29 @@ class ActionTrackingService
         }
 
         return self::STATUS_EN_COURS;
+    }
+
+    /**
+     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_risque: float, kpi_global: float}|null
+     */
+    private function frozenActionKpis(Action $action): ?array
+    {
+        $existingKpi = ActionKpi::query()
+            ->where('action_id', $action->id)
+            ->first();
+
+        if (! $existingKpi instanceof ActionKpi) {
+            return null;
+        }
+
+        return [
+            'kpi_delai' => (float) $existingKpi->kpi_delai,
+            'kpi_performance' => (float) $existingKpi->kpi_performance,
+            'kpi_conformite' => (float) $existingKpi->kpi_conformite,
+            'kpi_qualite' => (float) $existingKpi->kpi_qualite,
+            'kpi_risque' => (float) $existingKpi->kpi_risque,
+            'kpi_global' => (float) $existingKpi->kpi_global,
+        ];
     }
 
     /**
@@ -883,10 +1277,11 @@ class ActionTrackingService
         }
 
         $hasExecutionJustificatif = $action->justificatifs()
-            ->whereIn('categorie', ['hebdomadaire', 'final'])
+            ->whereIn('categorie', ['hebdomadaire', 'final', 'execution_quantitative', 'execution_mixte'])
             ->exists();
+        $hasSousActionJustificatif = $action->sousActions()->whereHas('justificatifs')->exists();
 
-        if (($overdueWeeks->isNotEmpty() || $action->date_fin_reelle !== null) && ! $hasExecutionJustificatif) {
+        if (($overdueWeeks->isNotEmpty() || $action->date_fin_reelle !== null || $action->usesStructuredProgressTracking()) && ! $hasExecutionJustificatif && ! $hasSousActionJustificatif) {
             $this->createLogIfMissingToday(
                 $action,
                 'justificatif_absent',
@@ -1007,10 +1402,11 @@ class ActionTrackingService
         }
 
         $hasExecutionJustificatif = $action->justificatifs()
-            ->whereIn('categorie', ['hebdomadaire', 'final'])
+            ->whereIn('categorie', ['hebdomadaire', 'final', 'execution_quantitative', 'execution_mixte'])
             ->exists();
+        $hasSousActionJustificatif = $action->sousActions()->whereHas('justificatifs')->exists();
 
-        if (! $hasExecutionJustificatif) {
+        if (! $hasExecutionJustificatif && ! $hasSousActionJustificatif) {
             $score -= 20.0;
         }
 

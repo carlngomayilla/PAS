@@ -70,7 +70,7 @@
         <ul>
             @foreach ($digest['kpi_sous_seuil'] as $mesure)
                 <li>
-                    {{ $mesure->kpi?->libelle ?? 'Indicateur' }} |
+                    {{ trim(str_ireplace('KPI', 'Indicateur', (string) ($mesure->kpi?->libelle ?? 'Indicateur'))) ?: 'Indicateur' }} |
                     valeur: {{ $mesure->valeur }} |
                     seuil: {{ $mesure->kpi?->seuil_alerte ?? '-' }} |
                     periode: {{ $mesure->periode }}

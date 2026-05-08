@@ -59,7 +59,12 @@ class MessagingWebTest extends TestCase
         $this->actingAs($recipient)
             ->get('/workspace/pilotage')
             ->assertOk()
-            ->assertSee('1 message(s) non lus');
+            ->assertSee('Messagerie');
+
+        $this->assertSame(
+            1,
+            app(\App\Services\Messaging\MessagingService::class)->unreadCount($recipient->fresh())
+        );
     }
 
     public function test_service_user_sees_only_allowed_contacts_in_messaging_directory(): void
@@ -87,11 +92,11 @@ class MessagingWebTest extends TestCase
         $response->assertOk();
         $response->assertSee('data-org-tree="1"', false);
         $response->assertSee('Liste arborescente');
-        $response->assertSee('Tout deplier');
+        $response->assertSee('Tout déplier');
         $response->assertSee('Directions');
         $response->assertSee('Services');
         $response->assertSee('Agents');
-        $response->assertSee('Reinitialiser l arbre');
+        $response->assertSee('Réinitialiser l’arbre');
         $response->assertSee('data-org-quick-search', false);
         $response->assertSee('data-org-clear-search', false);
         $response->assertSee('profil(s) visible(s)');

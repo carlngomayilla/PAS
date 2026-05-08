@@ -3,7 +3,7 @@
 @section('title', 'Retention')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h1>Retention et archivage</h1>
@@ -28,11 +28,11 @@
         </div>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <h2>Politiques actives</h2>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             @foreach ($summary['policies'] as $label => $value)
-                <article class="rounded-xl border border-slate-200/85 p-4 dark:border-slate-800">
+                <article class="rounded-xl border border-slate-200/85 p-4">
                     <strong>{{ str_replace('_', ' ', ucfirst($label)) }}</strong>
                     <p class="mt-2 text-2xl font-semibold">{{ $value }}</p>
                 </article>
@@ -40,11 +40,11 @@
         </div>
     </section>
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <h2>Eligibilite actuelle</h2>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             @foreach ($summary['counts'] as $label => $value)
-                <article class="rounded-xl border border-slate-200/85 p-4 dark:border-slate-800">
+                <article class="rounded-xl border border-slate-200/85 p-4">
                     <strong>{{ str_replace('_', ' ', ucfirst($label)) }}</strong>
                     <p class="mt-2 text-2xl font-semibold">{{ $value }}</p>
                 </article>

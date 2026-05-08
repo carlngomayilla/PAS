@@ -1,28 +1,44 @@
 @extends('layouts.workspace')
 
 @section('content')
+    @php
+        $summary = is_array($summary ?? null) ? $summary : [];
+        $summaryCards = [
+            ['label' => 'Directions', 'value' => $summary['total'] ?? $rows->total(), 'href' => route('workspace.referentiel.directions.index')],
+            ['label' => 'Actives', 'value' => $summary['actifs'] ?? 0, 'href' => route('workspace.referentiel.directions.index', ['actif' => 1])],
+            ['label' => 'Services', 'value' => $summary['services_total'] ?? 0, 'href' => route('workspace.referentiel.services.index')],
+        ];
+        if ($canManageRoles) {
+            $summaryCards[] = ['label' => 'Utilisateurs', 'value' => $summary['users_total'] ?? 0, 'href' => route('workspace.referentiel.utilisateurs.index')];
+        }
+        $summaryCards[] = ['label' => 'PAO', 'value' => $summary['paos_total'] ?? 0, 'href' => route('workspace.pao.index')];
+        $summaryCards[] = ['label' => 'PTA', 'value' => $summary['ptas_total'] ?? 0, 'href' => route('workspace.pta.index')];
+    @endphp
     <div class="app-screen-flow">
-    <section class="ui-card mb-3.5 app-screen-block">
-        <h1>Referentiel - Directions</h1>
-        @if ($canWrite)
-            <p class="mt-2.5">
-                <a class="btn btn-green" href="{{ route('workspace.referentiel.directions.create') }}">Nouvelle direction</a>
-            </p>
-        @endif
+    <section class="showcase-panel mb-4 app-screen-block">
+        <h1 class="showcase-panel-title">Referentiel - Directions</h1>
+    </section>
+    <section class="showcase-summary-grid mb-4 app-screen-kpis">
+        @foreach ($summaryCards as $card)
+            <x-stat-card-link :href="$card['href']" :label="$card['label']" :value="$card['value']" :meta="null" />
+        @endforeach
     </section>
 
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <h2>Navigation</h2>
         <div class="flex flex-wrap gap-1.5">
-            <a class="btn btn-primary" href="{{ route('workspace.referentiel.directions.index') }}">Directions</a>
-            <a class="btn btn-blue" href="{{ route('workspace.referentiel.services.index') }}">Services</a>
+            @if ($canWrite)
+                <a class="btn btn-primary" href="{{ route('workspace.referentiel.directions.create') }}">Nouvelle direction</a>
+            @endif
+            <a class="btn btn-secondary" href="{{ route('workspace.referentiel.directions.index') }}">Directions</a>
+            <a class="btn btn-secondary" href="{{ route('workspace.referentiel.services.index') }}">Services</a>
             @if ($canManageRoles)
-                <a class="btn btn-blue" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Utilisateurs</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Utilisateurs</a>
             @endif
         </div>
     </section>
 
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <h2>Filtres</h2>
         <form method="GET" action="{{ route('workspace.referentiel.directions.index') }}">
             <div class="form-grid-compact mb-2">
@@ -41,12 +57,12 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.referentiel.directions.index') }}">Reinitialiser</a>
+                <a class="btn btn-blue" href="{{ route('workspace.referentiel.directions.index') }}">Réinitialiser</a>
             </div>
         </form>
     </section>
 
-    <section class="ui-card mb-3.5 app-screen-block">
+    <section class="showcase-panel mb-4 app-screen-block">
         <h2>Liste des directions</h2>
         <div class="overflow-auto">
             <table>
@@ -91,7 +107,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 9 : 8 }}" class="text-slate-600">Aucune direction trouvee.</td>
+                            <td colspan="{{ $canWrite ? 9 : 8 }}" class="text-slate-600">Aucune direction trouvée.</td>
                         </tr>
                     @endforelse
                 </tbody>

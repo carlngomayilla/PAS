@@ -72,9 +72,9 @@ class ActionPolicyTest extends TestCase
         $this->assertFalse($this->policy->reviewByChef($otherServiceUser, $action));
 
         $this->assertTrue($this->policy->view($directionUser, $action));
-        $this->assertTrue($this->policy->create($directionUser, $action));
-        $this->assertTrue($this->policy->update($directionUser, $action));
-        $this->assertTrue($this->policy->delete($directionUser, $action));
+        $this->assertFalse($this->policy->create($directionUser, $action));
+        $this->assertFalse($this->policy->update($directionUser, $action));
+        $this->assertFalse($this->policy->delete($directionUser, $action));
         $this->assertTrue($this->policy->reviewByDirection($directionUser, $action));
         $this->assertFalse($this->policy->reviewByChef($directionUser, $action));
 

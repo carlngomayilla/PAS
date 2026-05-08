@@ -4,33 +4,24 @@
     @php
         $currentUser = auth()->user();
         $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
-        $visibleRows = collect($rows->items());
-        $draftCount = $visibleRows->where('statut', 'brouillon')->count();
-        $validatedCount = $visibleRows->filter(fn ($item) => in_array((string) $item->statut, ['valide', 'verrouille'], true))->count();
-        $ptaTotal = (int) $visibleRows->sum('ptas_count');
-        $directionsCovered = $visibleRows->pluck('direction_id')->filter()->unique()->count();
+        $ps = is_array($paoStats ?? null) ? $paoStats : [];
         $summaryCards = [
-            ['label' => 'Total', 'value' => $rows->total(), 'meta' => 'PAO dans le perimetre courant', 'href' => route('workspace.pao.index'), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Brouillons visibles', 'value' => $draftCount, 'meta' => 'Elements encore en construction', 'href' => route('workspace.pao.index', ['statut' => 'brouillon']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Valides / verrouilles', 'value' => $validatedCount, 'meta' => 'PAO prets a alimenter les services', 'href' => route('workspace.pao.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'PTA / directions', 'value' => $ptaTotal.' / '.$directionsCovered, 'meta' => 'PTA visibles et directions impliquees', 'href' => route('workspace.pta.index'), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Total PAO',            'value' => $ps['total'] ?? $rows->total(), 'meta' => null, 'href' => route('workspace.pao.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Actifs',               'value' => $ps['actifs'] ?? 0,             'meta' => null, 'href' => route('workspace.pao.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Brouillons',           'value' => $ps['brouillons'] ?? 0,         'meta' => null, 'href' => route('workspace.pao.index', ['statut' => 'brouillon']),  'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Avec PTA',             'value' => $ps['avec_pta'] ?? 0,           'meta' => null, 'href' => route('workspace.pta.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Sans PTA',             'value' => $ps['sans_pta'] ?? 0,           'meta' => null, 'href' => route('workspace.pao.index', ['without_pta' => 1]),       'badge' => null, 'badge_tone' => ($ps['sans_pta'] ?? 0) > 0 ? 'warning' : 'neutral'],
+            ['label' => 'Directions couvertes', 'value' => $ps['directions'] ?? 0,         'meta' => null, 'href' => route('workspace.pao.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
         ];
     @endphp
 
     <div class="app-screen-flow">
-    <section class="showcase-hero mb-4 app-screen-block">
-        <div class="showcase-hero-body">
-            <div>
-                <span class="showcase-eyebrow">Declinaison annuelle</span>
-                <h1 class="showcase-title">PAO</h1>
-            </div>
-            <div class="showcase-action-row">
-                @if ($canWrite)
-                    <a class="btn btn-green" href="{{ route('workspace.pao.create') }}">Nouveau PAO</a>
-                @endif
-            </div>
-        </div>
-    </section>
+    <div class="mb-4 flex items-center justify-between gap-3">
+        <h1 class="text-xl font-bold text-[#1a1a1a]">PAO</h1>
+        @if ($canWrite)
+            <a class="btn btn-primary" href="{{ route('workspace.pao.create') }}">Nouveau PAO</a>
+        @endif
+    </div>
 
     <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
@@ -65,7 +56,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="pas_objectif_id">Objectif strategique</label>
+                    <label for="pas_objectif_id">Objectif stratégique</label>
                     <select id="pas_objectif_id" name="pas_objectif_id">
                         <option value="">Tous</option>
                         @foreach ($objectifOptions as $objectif)
@@ -87,7 +78,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="annee">Annee</label>
+                    <label for="annee">Année</label>
                     <input id="annee" name="annee" type="number" value="{{ $filters['annee'] }}" min="2000">
                 </div>
                 <div>
@@ -105,10 +96,10 @@
             @endif
             <div class="mt-4 flex flex-wrap gap-2">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.pao.index') }}">Reinitialiser</a>
+                <a class="btn btn-blue" href="{{ route('workspace.pao.index') }}">Réinitialiser</a>
             </div>
             @if ($filters['without_pta'])
-                <div class="mt-4 rounded-[1rem] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <div class="mt-4 rounded-[1rem] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-900">
                     PAO sans PTA
                 </div>
             @endif
@@ -120,7 +111,7 @@
             <div>
                 <h2 class="showcase-panel-title">Liste des PAO</h2>
             </div>
-            <span class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ $rows->count() }} ligne(s)</span>
+            <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
         <div class="overflow-auto">
             <table>
@@ -129,15 +120,14 @@
                         <th>ID</th>
                         <th>PAO</th>
                         <th>PAS</th>
-                        <th>Axe</th>
-                        <th>OS</th>
+                        <th>Objectif stratégique</th>
                         <th>Direction</th>
-                        <th>Annee</th>
+                        <th>Année</th>
                         <th>Statut</th>
                         <th>PTA</th>
                         <th>Validateur</th>
                         @if ($canWrite)
-                            <th>Actions</th>
+                            <th>Operations</th>
                         @endif
                     </tr>
                 </thead>
@@ -171,12 +161,22 @@
                         <tr>
                             <td>#{{ $row->id }}</td>
                             <td>
-                                <div class="font-semibold text-slate-900 dark:text-slate-100">{{ $row->titre }}</div>
-                                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $row->echeance ?? '-' }}</div>
+                                <div class="font-semibold text-slate-900">{{ $row->titre }}</div>
+                                <div class="mt-1 text-xs text-slate-500">{{ $row->echeance ?? '-' }}</div>
                             </td>
                             <td>{{ $row->pas?->titre ?? '-' }}</td>
-                            <td>{{ $row->pasObjectif?->pasAxe?->code ? $row->pasObjectif->pasAxe->code.' - '.$row->pasObjectif->pasAxe->libelle : '-' }}</td>
-                            <td>{{ $row->pasObjectif?->code ? $row->pasObjectif->code.' - '.$row->pasObjectif->libelle : '-' }}</td>
+                            <td class="min-w-[240px]">
+                                @if ($row->pasObjectif)
+                                    <div class="font-medium text-slate-900">
+                                        {{ $row->pasObjectif->code }} - {{ $row->pasObjectif->libelle }}
+                                    </div>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        {{ $row->pasObjectif->pasAxe?->code ? $row->pasObjectif->pasAxe->code.' - '.$row->pasObjectif->pasAxe->libelle : 'Axe non defini' }}
+                                    </p>
+                                @else
+                                    -
+                                @endif
+                            </td>
                             <td>{{ $row->direction?->code }} {{ $row->direction?->libelle ? '- '.$row->direction->libelle : '' }}</td>
                             <td>{{ $row->annee }}</td>
                             <td>
@@ -226,7 +226,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 11 : 10 }}" class="text-slate-500 dark:text-slate-400">Aucun PAO trouve.</td>
+                            <td colspan="{{ $canWrite ? 10 : 9 }}" class="text-slate-500">Aucun PAO trouve.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -236,4 +236,3 @@
     </section>
     </div>
 @endsection
-

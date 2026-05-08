@@ -3,7 +3,7 @@
 @section('title', 'Parametres generaux')
 
 @section('content')
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
@@ -21,12 +21,12 @@
     <x-super-admin.draft-banner
         :has-draft="$hasDraft"
         :draft-updated-at="$draftUpdatedAt"
-        message="Les libelles publics n ont pas encore ete publies"
+        message="Les libellés publics n'ont pas encore été publiés"
         :publish-route="route('workspace.super-admin.settings.publish-draft')"
         :discard-route="route('workspace.super-admin.settings.discard-draft')"
     />
 
-    <section class="ui-card mb-3.5">
+    <section class="showcase-panel mb-4">
         <form method="POST" action="{{ route('workspace.super-admin.settings.update') }}" class="form-shell" enctype="multipart/form-data" id="general-settings-form">
             @csrf
             <input id="general-settings-method-spoof" name="_method" type="hidden" value="PUT">
@@ -60,7 +60,7 @@
                 <h2 class="form-section-title">Langue et formats globaux</h2>
                 <div class="form-grid">
                     <div>
-                        <label for="default_locale">Langue par defaut</label>
+                        <label for="default_locale">Langue par défaut</label>
                         <select id="default_locale" name="default_locale" required>
                             @foreach ($localeOptions as $localeCode => $localeLabel)
                                 <option value="{{ $localeCode }}" @selected(old('default_locale', $settings['default_locale']) === $localeCode)>{{ $localeLabel }}</option>
@@ -144,38 +144,38 @@
     <x-super-admin.compare-panels :editable-title="$hasDraft ? 'Brouillon / edition' : 'Version en edition'">
         <x-slot:published>
             <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                <article class="rounded-3xl border border-slate-200/80 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-900/80"><p class="text-sm text-slate-500">Titre public</p><p class="mt-2 text-xl font-semibold">{{ $publishedSettings['app_name'] }}</p><p class="mt-2 text-sm text-slate-600">{{ $publishedSettings['institution_label'] }}</p></article>
-                <article class="rounded-3xl border border-slate-200/80 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-900/80"><p class="text-sm text-slate-500">Connexion</p><p class="mt-2 text-xl font-semibold">{{ $publishedSettings['login_form_title'] }}</p><p class="mt-2 text-sm text-slate-600">{{ $publishedSettings['login_form_subtitle'] }}</p></article>
-                <article class="rounded-3xl border border-slate-200/80 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-900/80"><p class="text-sm text-slate-500">Footer</p><p class="mt-2 text-sm text-slate-700 dark:text-slate-200">{{ $publishedSettings['footer_text'] }}</p></article>
-                <article class="rounded-3xl border border-slate-200/80 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-900/80">
+                <article class="rounded-3xl border border-slate-200/80 bg-white/90 p-4"><p class="text-sm text-slate-500">Titre public</p><p class="mt-2 text-xl font-semibold">{{ $publishedSettings['app_name'] }}</p><p class="mt-2 text-sm text-slate-600">{{ $publishedSettings['institution_label'] }}</p></article>
+                <article class="rounded-3xl border border-slate-200/80 bg-white/90 p-4"><p class="text-sm text-slate-500">Connexion</p><p class="mt-2 text-xl font-semibold">{{ $publishedSettings['login_form_title'] }}</p><p class="mt-2 text-sm text-slate-600">{{ $publishedSettings['login_form_subtitle'] }}</p></article>
+                <article class="rounded-3xl border border-slate-200/80 bg-white/90 p-4"><p class="text-sm text-slate-500">Footer</p><p class="mt-2 text-sm text-slate-700">{{ $publishedSettings['footer_text'] }}</p></article>
+                <article class="rounded-3xl border border-slate-200/80 bg-white/90 p-4">
                     <p class="text-sm text-slate-500">Formats actifs</p>
-                    <p class="mt-2 text-sm text-slate-700 dark:text-slate-200">Langue : {{ strtoupper($publishedSettings['default_locale']) }}</p>
-                    <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">Fuseau : {{ $publishedSettings['default_timezone'] }}</p>
-                    <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">Date : {{ $dateFormatOptions[$publishedSettings['date_format']] ?? $publishedSettings['date_format'] }}</p>
-                    <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">Heure : {{ $dateTimeFormatOptions[$publishedSettings['datetime_format']] ?? $publishedSettings['datetime_format'] }}</p>
+                    <p class="mt-2 text-sm text-slate-700">Langue : {{ strtoupper($publishedSettings['default_locale']) }}</p>
+                    <p class="mt-1 text-sm text-slate-700">Fuseau : {{ $publishedSettings['default_timezone'] }}</p>
+                    <p class="mt-1 text-sm text-slate-700">Date : {{ $dateFormatOptions[$publishedSettings['date_format']] ?? $publishedSettings['date_format'] }}</p>
+                    <p class="mt-1 text-sm text-slate-700">Heure : {{ $dateTimeFormatOptions[$publishedSettings['datetime_format']] ?? $publishedSettings['datetime_format'] }}</p>
                 </article>
             </div>
         </x-slot:published>
 
         <x-slot:editable>
             <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4 dark:border-blue-700/60 dark:bg-blue-950/20"><p class="text-sm text-slate-500">Titre edite</p><p class="mt-2 text-xl font-semibold">{{ $settings['app_name'] }}</p><p class="mt-2 text-sm text-slate-600">{{ $settings['institution_label'] }}</p></article>
-                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4 dark:border-blue-700/60 dark:bg-blue-950/20"><p class="text-sm text-slate-500">Connexion</p><p class="mt-2 text-xl font-semibold">{{ $settings['login_form_title'] }}</p><p class="mt-2 text-sm text-slate-600">{{ $settings['login_form_subtitle'] }}</p></article>
-                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4 dark:border-blue-700/60 dark:bg-blue-950/20"><p class="text-sm text-slate-500">Footer</p><p class="mt-2 text-sm text-slate-700 dark:text-slate-200">{{ $settings['footer_text'] }}</p></article>
-                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4 dark:border-blue-700/60 dark:bg-blue-950/20">
+                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4"><p class="text-sm text-slate-500">Titre edite</p><p class="mt-2 text-xl font-semibold">{{ $settings['app_name'] }}</p><p class="mt-2 text-sm text-slate-600">{{ $settings['institution_label'] }}</p></article>
+                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4"><p class="text-sm text-slate-500">Connexion</p><p class="mt-2 text-xl font-semibold">{{ $settings['login_form_title'] }}</p><p class="mt-2 text-sm text-slate-600">{{ $settings['login_form_subtitle'] }}</p></article>
+                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4"><p class="text-sm text-slate-500">Footer</p><p class="mt-2 text-sm text-slate-700">{{ $settings['footer_text'] }}</p></article>
+                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4">
                     <p class="text-sm text-slate-500">Formats edites</p>
-                    <p class="mt-2 text-sm text-slate-700 dark:text-slate-200">Langue : {{ strtoupper($settings['default_locale']) }}</p>
-                    <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">Fuseau : {{ $settings['default_timezone'] }}</p>
-                    <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">Date : {{ $dateFormatOptions[$settings['date_format']] ?? $settings['date_format'] }}</p>
-                    <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">Heure : {{ $dateTimeFormatOptions[$settings['datetime_format']] ?? $settings['datetime_format'] }}</p>
+                    <p class="mt-2 text-sm text-slate-700">Langue : {{ strtoupper($settings['default_locale']) }}</p>
+                    <p class="mt-1 text-sm text-slate-700">Fuseau : {{ $settings['default_timezone'] }}</p>
+                    <p class="mt-1 text-sm text-slate-700">Date : {{ $dateFormatOptions[$settings['date_format']] ?? $settings['date_format'] }}</p>
+                    <p class="mt-1 text-sm text-slate-700">Heure : {{ $dateTimeFormatOptions[$settings['datetime_format']] ?? $settings['datetime_format'] }}</p>
                 </article>
-                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4 dark:border-blue-700/60 dark:bg-blue-950/20">
+                <article class="rounded-3xl border border-blue-200/80 bg-blue-50/70 p-4">
                     <p class="text-sm text-slate-500">Identite visuelle</p>
                     <div class="mt-3 flex flex-wrap items-center gap-3">
-                        <div class="rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
+                        <div class="rounded-2xl border border-slate-200 bg-white p-2">
                             <x-brand.logo variant="mark" class="h-10 w-auto" />
                         </div>
-                        <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                        <div class="rounded-2xl border border-slate-200 bg-white p-3">
                             <x-brand.logo variant="wordmark" class="h-8 w-auto" />
                         </div>
                     </div>
@@ -185,7 +185,7 @@
     </x-super-admin.compare-panels>
 
     @push('scripts')
-        <script>
+        <script @cspNonce>
             (function () {
                 var form = document.getElementById('general-settings-form');
                 var methodInput = document.getElementById('general-settings-method-spoof');

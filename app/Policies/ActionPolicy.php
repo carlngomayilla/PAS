@@ -59,7 +59,7 @@ class ActionPolicy
             return true;
         }
 
-        return $this->canWriteService(
+        return $this->canReadService(
             $user,
             (int) $action->pta?->direction_id,
             (int) $action->pta?->service_id

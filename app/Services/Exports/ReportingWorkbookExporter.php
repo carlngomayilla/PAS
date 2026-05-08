@@ -35,7 +35,7 @@ class ReportingWorkbookExporter
             'docProps/app.xml' => $this->appPropertiesXml($sheetNames),
             'docProps/core.xml' => $this->corePropertiesXml(
                 $payload['generatedAt'] ?? null,
-                (string) (($payload['export_template']['title'] ?? 'Reporting consolide ANBG'))
+                (string) (($payload['export_template']['title'] ?? 'Reporting consolidé ANBG'))
             ),
             'xl/workbook.xml' => $this->workbookXml($sheetNames),
             'xl/_rels/workbook.xml.rels' => $this->workbookRelationshipsXml(count($sheets)),
@@ -113,7 +113,7 @@ class ReportingWorkbookExporter
         $merges = [];
         $rowIndex = 1;
         $exportTemplate = (array) ($payload['export_template'] ?? []);
-        $title = (string) ($exportTemplate['title'] ?? 'Reporting consolide ANBG');
+        $title = (string) ($exportTemplate['title'] ?? 'Reporting consolidé ANBG');
         $subtitle = trim((string) ($exportTemplate['subtitle'] ?? ''));
         $officialPolicy = (array) ($payload['officialPolicy'] ?? []);
         $officialBaseLabel = (string) ($officialPolicy['threshold_label'] ?? 'Toutes les actions visibles');
@@ -136,7 +136,7 @@ class ReportingWorkbookExporter
             : (string) ($payload['generatedAt'] ?? '');
         $scope = $payload['scope'] ?? [];
         $meta = sprintf(
-            'Genere le %s | Role: %s | Direction: %s | Service: %s',
+            'Généré le %s | Role: %s | Direction: %s | Service: %s',
             $generatedAt,
             (string) ($scope['role'] ?? '-'),
             (string) ($scope['direction_id'] ?? '-'),
@@ -203,14 +203,14 @@ class ReportingWorkbookExporter
         $officialBaseText = 'Base statistique : '.$officialBaseLabel;
         $layout = (array) (($payload['export_template']['layout'] ?? []));
 
-        $rows[] = $this->makeMergedRow($rowIndex, (string) ($layout['excel_graph_sheet_name'] ?? 'Synthese graphique'), $maxColumns, 1);
+        $rows[] = $this->makeMergedRow($rowIndex, (string) ($layout['excel_graph_sheet_name'] ?? 'Synthèse graphique'), $maxColumns, 1);
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex++;
 
         $rows[] = $this->makeMergedRow(
             $rowIndex,
             sprintf(
-                'Genere le %s | Role: %s | Direction: %s | Service: %s',
+                'Généré le %s | Role: %s | Direction: %s | Service: %s',
                 $generatedAt,
                 (string) ($scope['role'] ?? '-'),
                 (string) ($scope['direction_id'] ?? '-'),
@@ -222,7 +222,7 @@ class ReportingWorkbookExporter
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex++;
 
-        $rows[] = $this->makeMergedRow($rowIndex, 'Lecture statistique unifiee', $maxColumns, 2);
+        $rows[] = $this->makeMergedRow($rowIndex, 'Lecture statistique unifiée', $maxColumns, 2);
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex++;
 
@@ -235,7 +235,7 @@ class ReportingWorkbookExporter
         $cardsGroups = [
             [
                 ['Actions', (int) ($payload['global']['actions_total'] ?? 0), 13, 14],
-                ['Validees', (int) ($payload['global']['actions_validees'] ?? 0), 15, 16],
+                ['Validées', (int) ($payload['global']['actions_validees'] ?? 0), 15, 16],
                 ['Mesures d indicateur', (int) ($payload['global']['kpi_mesures_total'] ?? 0), 17, 18],
                 ['Obj. op.', (int) ($payload['global']['objectifs_operationnels_total'] ?? 0), 19, 20],
             ],
@@ -353,7 +353,7 @@ class ReportingWorkbookExporter
             $rowIndex++;
         }
         if ($performanceLabels === []) {
-            $rows[] = $this->makeDataRow($rowIndex, ['Aucune donnee', 0, ''], ['string', 'percent', 'string'], true);
+            $rows[] = $this->makeDataRow($rowIndex, ['Aucune donnée', 0, ''], ['string', 'percent', 'string'], true);
             $rowIndex++;
         }
         $performanceEndRow = max($performanceStartRow, $rowIndex - 1);
@@ -361,7 +361,7 @@ class ReportingWorkbookExporter
         $rows[] = $this->makeMergedRow($rowIndex, 'Vue interannuelle', $maxColumns, 3);
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex++;
-        $rows[] = $this->makeStandardRow($rowIndex, ['Annee', 'Actions', 'Validees', 'Progression', 'Validation'], ['string', 'string', 'string', 'string', 'string'], 4);
+        $rows[] = $this->makeStandardRow($rowIndex, ['Année', 'Actions', 'Validées', 'Progression', 'Validation'], ['string', 'string', 'string', 'string', 'string'], 4);
         $rowIndex++;
         $interannualStartRow = $rowIndex;
         foreach (array_values((array) ($payload['interannualComparison'] ?? [])) as $index => $comparisonRow) {
@@ -392,7 +392,7 @@ class ReportingWorkbookExporter
         $rows[] = $this->makeMergedRow($rowIndex, 'Top risques', $maxColumns, 3);
         $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
         $rowIndex++;
-        $rows[] = $this->makeStandardRow($rowIndex, ['Action', 'Score', 'Statut', 'Echeance', 'Intensite'], ['string', 'string', 'string', 'string', 'string'], 4);
+        $rows[] = $this->makeStandardRow($rowIndex, ['Action', 'Score', 'Statut', 'Échéance', 'Intensite'], ['string', 'string', 'string', 'string', 'string'], 4);
         $rowIndex++;
         foreach ($topRiskRows as $index => $riskRow) {
             $score = (float) ($riskRow['score'] ?? 0.0);
@@ -408,11 +408,11 @@ class ReportingWorkbookExporter
             $rows[] = $this->makeDataRow($rowIndex, ['Aucun risque', 0, '', '', ''], ['string', 'decimal', 'string', 'string', 'string'], true);
         }
 
-        $sheetName = (string) ($layout['excel_graph_sheet_name'] ?? 'Synthese graphique');
+        $sheetName = (string) ($layout['excel_graph_sheet_name'] ?? 'Synthèse graphique');
         $chartsMeta[] = [
             'title' => 'Funnel de pilotage',
             'type' => 'column',
-            'color' => '1E3A8A',
+            'color' => '1C203D',
             'anchor' => ['from_col' => 9, 'from_row' => 1, 'to_col' => 16, 'to_row' => 16],
             'categories' => [
                 'formula' => $this->rangeFormula($sheetName, 1, $funnelStartRow, $funnelEndRow),
@@ -426,7 +426,7 @@ class ReportingWorkbookExporter
         $chartsMeta[] = [
             'title' => 'Alertes de synthese',
             'type' => 'bar',
-            'color' => 'EF4444',
+            'color' => 'B42318',
             'anchor' => ['from_col' => 9, 'from_row' => 18, 'to_col' => 16, 'to_row' => 33],
             'categories' => [
                 'formula' => $this->rangeFormula($sheetName, 1, $alertsStartRow, $alertsEndRow),
@@ -440,11 +440,11 @@ class ReportingWorkbookExporter
         $chartsMeta[] = [
             'title' => 'Performance moyenne',
             'type' => 'bar',
-            'color' => '10B981',
+            'color' => '8FC043',
             'anchor' => ['from_col' => 17, 'from_row' => 1, 'to_col' => 24, 'to_row' => 16],
             'categories' => [
                 'formula' => $this->rangeFormula($sheetName, 1, $performanceStartRow, $performanceEndRow),
-                'cache' => $performanceLabels !== [] ? $performanceLabels : ['Aucune donnee'],
+                'cache' => $performanceLabels !== [] ? $performanceLabels : ['Aucune donnée'],
             ],
             'values' => [
                 'formula' => $this->rangeFormula($sheetName, 2, $performanceStartRow, $performanceEndRow),
@@ -454,7 +454,7 @@ class ReportingWorkbookExporter
         $chartsMeta[] = [
             'title' => 'Validation interannuelle',
             'type' => 'line',
-            'color' => '3B82F6',
+            'color' => '3996D3',
             'anchor' => ['from_col' => 17, 'from_row' => 18, 'to_col' => 24, 'to_row' => 33],
             'categories' => [
                 'formula' => $this->rangeFormula($sheetName, 1, $interannualStartRow, $interannualEndRow),
@@ -483,8 +483,8 @@ class ReportingWorkbookExporter
         return $this->buildTableSheet(
             'STRATEGIE',
             'STRATEGIE',
-            $this->standardReportMetaRows($payload, 'Tableau 1 : Axes & Objectifs strategiques'),
-            ['N° Axe', 'Axe strategique', 'N° Objectif', 'Objectif strategique', 'Echeance'],
+            $this->standardReportMetaRows($payload, 'Tableau 1 : Axes & Objectifs stratégiques'),
+            ['N° Axe', 'Axe stratégique', 'N° Objectif', 'Objectif stratégique', 'Échéance'],
             ['string', 'string', 'string', 'string', 'string'],
             $this->strategySheetRows($payload),
             [1 => 16, 2 => 42, 3 => 22, 4 => 48, 5 => 18]
@@ -496,11 +496,15 @@ class ReportingWorkbookExporter
         return $this->buildTableSheet(
             'PAO',
             'PAO',
-            $this->standardReportMetaRows($payload, 'Tableau 2 : Objectifs operationnels & Actions'),
-            ['Direction', 'Service', 'Axe strategique', 'Objectif strategique', 'Objectif operationnel', 'Action', 'Responsable', 'Echeance'],
+            $this->standardReportMetaRows($payload, 'Tableau 2 : Objectifs opérationnels & Actions'),
+            ['Direction', 'Service', 'Axe stratégique', 'Objectif stratégique', 'Objectif opérationnel', 'Action', 'Responsable', 'Échéance'],
             ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string'],
             $this->paoSheetRows($payload),
-            [1 => 36, 2 => 36, 3 => 34, 4 => 38, 5 => 42, 6 => 42, 7 => 28, 8 => 18]
+            [1 => 36, 2 => 36, 3 => 34, 4 => 38, 5 => 42, 6 => 42, 7 => 28, 8 => 18],
+            [
+                'Tableau 2 : Objectifs operationnels & Actions',
+                'Objectif operationnel',
+            ]
         );
     }
 
@@ -509,21 +513,24 @@ class ReportingWorkbookExporter
         return $this->buildTableSheet(
             'ACTIONS',
             'ACTIONS',
-            $this->standardReportMetaRows($payload, 'Tableau 3 : Actions detaillees'),
-            ['Direction', 'Service', 'Description action', 'RMO', 'Cible', 'Debut', 'Fin', 'Statut', 'Ressources', 'Taux (%)', 'Justificatif', 'Risque'],
+            $this->standardReportMetaRows($payload, 'Tableau 3 : Actions détaillées'),
+            ['Direction', 'Service', 'Description action', 'RMO', 'Cible', 'Début', 'Fin', 'Statut', 'Ressources', 'Taux (%)', 'Justificatif', 'Risque'],
             ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'percent', 'string', 'string'],
             $this->actionFinalSheetRows($payload),
-            [1 => 36, 2 => 36, 3 => 48, 4 => 26, 5 => 36, 6 => 16, 7 => 16, 8 => 18, 9 => 34, 10 => 18, 11 => 42, 12 => 42]
+            [1 => 36, 2 => 36, 3 => 48, 4 => 26, 5 => 36, 6 => 16, 7 => 16, 8 => 18, 9 => 34, 10 => 18, 11 => 42, 12 => 42],
+            [
+                'Tableau 3 : Actions detaillees',
+            ]
         );
     }
 
     private function buildKpiFinalSheet(array $payload): array
     {
         return $this->buildTableSheet(
-            'KPI',
-            'KPI',
-            $this->standardReportMetaRows($payload, 'Tableau 4 : KPI par action'),
-            ['Direction', 'Service', 'Action', 'RMO', 'KPI Performance (%)', 'KPI Qualite (%)', 'KPI Delai (%)', 'KPI Risque (%)', 'KPI Conformite (%)', 'KPI Global (%)'],
+            'Indicateurs',
+            'Indicateurs',
+            $this->standardReportMetaRows($payload, 'Tableau 4 : Indicateurs par action'),
+            ['Direction', 'Service', 'Action', 'RMO', 'Indicateur de performance (%)', 'Indicateur qualite (%)', 'Indicateur delai (%)', 'Indicateur risque (%)', 'Indicateur conformite (%)', 'Indicateur global (%)'],
             ['string', 'string', 'string', 'string', 'percent', 'percent', 'percent', 'percent', 'percent', 'percent'],
             $this->kpiFinalSheetRows($payload),
             [1 => 36, 2 => 36, 3 => 42, 4 => 26, 5 => 20, 6 => 18, 7 => 18, 8 => 18, 9 => 20, 10 => 18]
@@ -535,8 +542,8 @@ class ReportingWorkbookExporter
         return $this->buildTableSheet(
             'SYNTHÈSE',
             'SYNTHÈSE',
-            $this->standardReportMetaRows($payload, 'Tableau 5 : Reporting synthetique'),
-            ['Direction', 'Service', 'Total actions', 'Terminees', 'En cours', 'En retard', 'Performance (%)'],
+            $this->standardReportMetaRows($payload, 'Tableau 5 : Reporting synthétique'),
+            ['Direction', 'Service', 'Total actions', 'Terminées', 'En cours', 'En retard', 'Performance (%)'],
             ['string', 'string', 'integer', 'integer', 'integer', 'integer', 'percent'],
             $this->syntheticReportingRows($payload),
             [1 => 36, 2 => 36, 3 => 18, 4 => 18, 5 => 18, 6 => 18, 7 => 20]
@@ -548,7 +555,7 @@ class ReportingWorkbookExporter
         return $this->buildTableSheet(
             'ALERTES',
             'ALERTES',
-            $this->standardReportMetaRows($payload, 'Tableau 6 : Alertes KPI sous seuil'),
+            $this->standardReportMetaRows($payload, 'Tableau 6 : Alertes indicateurs sous seuil'),
             ['Action', 'Indicateur', 'Valeur', 'Seuil', 'Statut', 'Action corrective'],
             ['string', 'string', 'decimal', 'decimal', 'string', 'string'],
             $this->alertFinalSheetRows($payload),
@@ -624,7 +631,7 @@ class ReportingWorkbookExporter
         return $this->buildTableSheet(
             'Alertes',
             'Alertes',
-            ['RAPPORT DE REPORTING', 'Alertes KPI et retards operationnels'],
+            ['RAPPORT DE REPORTING', 'Alertes indicateurs et retards operationnels'],
             ['Action', 'Indicateur', 'Periode', 'Valeur', 'Seuil', 'Statut', 'Mesure corrective recommandee'],
             ['string', 'string', 'string', 'decimal', 'decimal', 'string', 'string'],
             $this->alertSheetRows($payload),
@@ -635,10 +642,10 @@ class ReportingWorkbookExporter
     private function buildInstitutionalActionsSheet(array $payload): array
     {
         return $this->buildTableSheet(
-            'Actions detaillees',
-            'Actions detaillees',
+            'Actions détaillées',
+            'Actions détaillées',
             ['RAPPORT DE REPORTING', 'Hierarchie PAS -> Objectif -> Action'],
-            ['Axe strategique', 'Objectif strategique', 'Objectif operationnel', 'Action', 'Responsable', 'Debut', 'Fin', 'Statut', 'Progression'],
+            ['Axe stratégique', 'Objectif stratégique', 'Objectif opérationnel', 'Action', 'Responsable', 'Début', 'Fin', 'Statut', 'Progression'],
             ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'percent'],
             $this->actionDetailSheetRows($payload),
             [1 => 34, 2 => 34, 3 => 34, 4 => 36, 5 => 24, 6 => 14, 7 => 14, 8 => 18, 9 => 14]
@@ -648,8 +655,8 @@ class ReportingWorkbookExporter
     private function buildInstitutionalKpiSheet(array $payload): array
     {
         return $this->buildTableSheet(
-            'KPI',
-            'KPI',
+            'Indicateurs',
+            'Indicateurs',
             ['RAPPORT DE REPORTING', 'Indicateurs de performance'],
             ['Action', 'Indicateur', 'Type', 'Valeur', 'Seuil', 'Statut'],
             ['string', 'string', 'string', 'decimal', 'decimal', 'string'],
@@ -695,7 +702,8 @@ class ReportingWorkbookExporter
         array $headers,
         array $types,
         array $dataRows,
-        array $widths
+        array $widths,
+        array $hiddenMetaRows = []
     ): array {
         $maxColumns = max(1, count($headers));
         $rows = [];
@@ -712,6 +720,12 @@ class ReportingWorkbookExporter
             $rowIndex++;
         }
 
+        foreach ($hiddenMetaRows as $meta) {
+            $rows[] = $this->makeHiddenMergedRow($rowIndex, (string) $meta, $maxColumns, 2);
+            $merges[] = 'A'.$rowIndex.':'.$this->columnName($maxColumns).$rowIndex;
+            $rowIndex++;
+        }
+
         $rowIndex++;
         $headerRow = $rowIndex;
         $rows[] = $this->makeStandardRow($rowIndex, $headers, array_fill(0, count($headers), 'string'), 4);
@@ -723,7 +737,7 @@ class ReportingWorkbookExporter
         }
 
         if ($dataRows === []) {
-            $rows[] = $this->makeDataRow($rowIndex, array_pad(['Aucune donnee'], $maxColumns, ''), array_fill(0, $maxColumns, 'string'), true);
+            $rows[] = $this->makeDataRow($rowIndex, array_pad(['Aucune donnée'], $maxColumns, ''), array_fill(0, $maxColumns, 'string'), true);
             $rowIndex++;
         }
 
@@ -862,7 +876,7 @@ class ReportingWorkbookExporter
         $rows = collect($payload['details']['kpi_sous_seuil'] ?? [])
             ->map(fn ($mesure): array => [
                 (string) ($mesure->kpi?->action?->libelle ?? '-'),
-                (string) ($mesure->kpi?->libelle ?? '-'),
+                $this->indicatorLabel((string) ($mesure->kpi?->libelle ?? '-')),
                 (float) ($mesure->valeur ?? 0),
                 (float) ($mesure->kpi?->seuil_alerte ?? 0),
                 'Alerte',
@@ -1003,7 +1017,7 @@ class ReportingWorkbookExporter
         $rows = collect($payload['details']['kpi_sous_seuil'] ?? [])
             ->map(fn ($mesure): array => [
                 (string) ($mesure->kpi?->action?->libelle ?? '-'),
-                (string) ($mesure->kpi?->libelle ?? '-'),
+                $this->indicatorLabel((string) ($mesure->kpi?->libelle ?? '-')),
                 (string) ($mesure->periode ?? '-'),
                 (float) ($mesure->valeur ?? 0),
                 (float) ($mesure->kpi?->seuil_alerte ?? 0),
@@ -1056,7 +1070,7 @@ class ReportingWorkbookExporter
                 return collect($row['kpi_rows'] ?? [])
                     ->map(fn (array $kpiRow): array => [
                         (string) ($kpiRow['action'] ?? $row['action'] ?? '-'),
-                        (string) ($kpiRow['indicateur'] ?? '-'),
+                        $this->indicatorLabel((string) ($kpiRow['indicateur'] ?? '-')),
                         (string) ($kpiRow['type'] ?? '-'),
                         ($kpiRow['valeur'] ?? null) !== null ? (float) $kpiRow['valeur'] : 0.0,
                         ($kpiRow['seuil'] ?? null) !== null ? (float) $kpiRow['seuil'] : 0.0,
@@ -1172,11 +1186,11 @@ class ReportingWorkbookExporter
                 $merges[] = 'A'.$rowIndex.':'.$this->columnName($maxColumns).$rowIndex;
                 $rowIndex++;
 
-                $rows[] = $this->makeMergedRow($rowIndex, 'Genere le '.$generatedAt, $maxColumns, 2);
+                $rows[] = $this->makeMergedRow($rowIndex, 'Généré le '.$generatedAt, $maxColumns, 2);
                 $merges[] = 'A'.$rowIndex.':'.$this->columnName($maxColumns).$rowIndex;
                 $rowIndex += 2;
 
-                $rows[] = $this->makeStandardRow($rowIndex, ['Actions', 'Validees', 'Retards', 'Progression', 'Indicateur global', 'Conformite'], ['string', 'string', 'string', 'string', 'string', 'string'], 4);
+                $rows[] = $this->makeStandardRow($rowIndex, ['Actions', 'Validées', 'Retards', 'Progression', 'Indicateur global', 'Conformité'], ['string', 'string', 'string', 'string', 'string', 'string'], 4);
                 $rowIndex++;
                 $rows[] = $this->makeDataRow($rowIndex, [
                     (int) ($summary['actions_total'] ?? 0),
@@ -1189,7 +1203,7 @@ class ReportingWorkbookExporter
                 $rowIndex += 2;
 
                 $headerRow = $rowIndex;
-                $rows[] = $this->makeStandardRow($rowIndex, ['Axe strategique', 'Objectif strategique', 'Objectif operationnel', 'Action', 'KPI', 'Prevu', 'Realise', 'Taux', 'Statut'], ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string'], 4);
+                $rows[] = $this->makeStandardRow($rowIndex, ['Axe stratégique', 'Objectif stratégique', 'Objectif opérationnel', 'Action', 'Indicateurs', 'Prévu', 'Réalisé', 'Taux', 'Statut'], ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string'], 4);
                 $rowIndex++;
 
                 foreach ($actions as $index => $action) {
@@ -1199,7 +1213,7 @@ class ReportingWorkbookExporter
                         (string) ($action['objectif_strategique'] ?? $action['objectif'] ?? '-'),
                         (string) ($action['objectif_operationnel'] ?? '-'),
                         (string) ($action['action'] ?? '-'),
-                        (string) ($action['kpi'] ?? '-'),
+                        (string) ($action['Indicateurs'] ?? '-'),
                         (string) ($action['prevu'] ?? '-'),
                         (string) ($action['realise'] ?? '-'),
                         (float) ($action['progression_value'] ?? 0),
@@ -1240,15 +1254,15 @@ class ReportingWorkbookExporter
             'headers' => ['Bloc', 'Usage'],
             'types' => ['string', 'string'],
             'rows' => [
-                ['Indicateurs globaux', 'Volumes et perimetre courant'],
-                ['Statuts', 'Lecture operationnelle des modules'],
+                ['Indicateurs globaux', 'Volumes et périmètre courant'],
+                ['Statuts', 'Lecture opérationnelle des modules'],
                 ['Alertes de synthese', 'Ecarts et urgences en cours'],
                 ['Synthese des indicateurs', 'Base statistique : '.$officialBaseLabel],
-                ['Vue du PAS', 'Transformation strategique consolidee'],
+                ['Vue du PAS', 'Transformation stratégique consolidée'],
                 ['Comparaison interannuelle', 'Comparaison des exercices'],
                 ['Details - Actions en retard', 'Actions a traiter immediatement'],
                 ['Details - indicateurs sous seuil', 'Mesures en ecart avec suivi metier'],
-                ['Rapports par direction/service', 'Index hierarchique des feuilles detaillees'],
+                ['Rapports par direction/service', 'Index hiérarchique des feuilles détaillées'],
             ],
         ];
 
@@ -1296,20 +1310,20 @@ class ReportingWorkbookExporter
 
         $sections[] = [
             'title' => 'Vue du PAS',
-            'headers' => ['PAS', 'Periode', 'Axes', 'Objectifs', 'PAO', 'PTA', 'Actions', 'Validees', 'Progression moyenne', 'Taux realisation'],
+            'headers' => ['PAS', 'Periode', 'Axes', 'Objectifs', 'PAO', 'PTA', 'Actions', 'Validées', 'Progression moyenne', 'Taux realisation'],
             'types' => ['string', 'string', 'integer', 'integer', 'integer', 'integer', 'integer', 'integer', 'percent', 'percent'],
             'rows' => collect($payload['pasConsolidation'] ?? [])->map(fn (array $row): array => [(string) ($row['titre'] ?? ''), (string) ($row['periode'] ?? ''), (int) ($row['axes_total'] ?? 0), (int) ($row['objectifs_total'] ?? 0), (int) ($row['paos_total'] ?? 0), (int) ($row['ptas_total'] ?? 0), (int) ($row['actions_total'] ?? 0), (int) ($row['actions_validees'] ?? 0), (float) ($row['progression_moyenne'] ?? 0), (float) ($row['taux_realisation'] ?? 0)])->all(),
         ];
 
         $sections[] = [
             'title' => 'Comparaison interannuelle',
-            'headers' => ['Annee', 'PAO', 'PTA', 'Actions', 'Actions validees', 'Actions en retard', 'Progression moyenne', 'Taux validation'],
+            'headers' => ['Année', 'PAO', 'PTA', 'Actions', 'Actions validées', 'Actions en retard', 'Progression moyenne', 'Taux validation'],
             'types' => ['integer', 'integer', 'integer', 'integer', 'integer', 'integer', 'percent', 'percent'],
             'rows' => collect($payload['interannualComparison'] ?? [])->map(fn (array $row): array => [(int) ($row['annee'] ?? 0), (int) ($row['paos_total'] ?? 0), (int) ($row['ptas_total'] ?? 0), (int) ($row['actions_total'] ?? 0), (int) ($row['actions_validees'] ?? 0), (int) ($row['actions_retard'] ?? 0), (float) ($row['progression_moyenne'] ?? 0), (float) ($row['taux_validation'] ?? 0)])->all(),
         ];
         $sections[] = [
             'title' => 'Details - Actions en retard',
-            'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable', 'Indicateur global', 'Indicateur qualite', 'Indicateur risque'],
+            'headers' => ['ID', 'Libelle', 'Échéance', 'Statut', 'PTA', 'Responsable', 'Indicateur global', 'Indicateur qualite', 'Indicateur risque'],
             'types' => ['integer', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal', 'decimal'],
             'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_global ?? 0), (float) ($action->actionKpi?->kpi_qualite ?? 0), (float) ($action->actionKpi?->kpi_risque ?? 0)])->all(),
         ];
@@ -1318,12 +1332,12 @@ class ReportingWorkbookExporter
             'title' => 'Details - indicateurs sous seuil',
             'headers' => ['Mesure ID', 'Indicateur', 'Periode', 'Valeur', 'Seuil', 'Action'],
             'types' => ['integer', 'string', 'string', 'decimal', 'decimal', 'string'],
-            'rows' => collect($payload['details']['kpi_sous_seuil'] ?? [])->map(fn ($mesure): array => [(int) $mesure->id, (string) ($mesure->kpi?->libelle ?? ''), (string) $mesure->periode, (float) ($mesure->valeur ?? 0), (float) ($mesure->kpi?->seuil_alerte ?? 0), (string) ($mesure->kpi?->action?->libelle ?? '')])->all(),
+            'rows' => collect($payload['details']['kpi_sous_seuil'] ?? [])->map(fn ($mesure): array => [(int) $mesure->id, $this->indicatorLabel((string) ($mesure->kpi?->libelle ?? '')), (string) $mesure->periode, (float) ($mesure->valeur ?? 0), (float) ($mesure->kpi?->seuil_alerte ?? 0), (string) ($mesure->kpi?->action?->libelle ?? '')])->all(),
         ];
 
         $sections[] = [
             'title' => 'Rapports par direction/service',
-            'headers' => ['Direction', 'Responsable direction', 'Service', 'Responsable service', 'Actions', 'Validees', 'Retards', 'Progression', 'Indicateur global', 'Conformite'],
+            'headers' => ['Direction', 'Responsable direction', 'Service', 'Responsable service', 'Actions', 'Validées', 'Retards', 'Progression', 'Indicateur global', 'Conformité'],
             'types' => ['string', 'string', 'string', 'string', 'integer', 'integer', 'integer', 'percent', 'decimal', 'decimal'],
             'rows' => collect($payload['details']['direction_service_report'] ?? [])
                 ->flatMap(function (array $direction): array {
@@ -1378,6 +1392,15 @@ class ReportingWorkbookExporter
                 'style' => $style,
             ]],
         ];
+    }
+
+    private function makeHiddenMergedRow(int $rowIndex, string $value, int $maxColumns, int $style): array
+    {
+        $row = $this->makeMergedRow($rowIndex, $value, $maxColumns, $style);
+        $row['height'] = 0;
+        $row['hidden'] = true;
+
+        return $row;
     }
 
     private function makeStandardRow(int $rowIndex, array $values, array $types, int $style): array
@@ -1440,7 +1463,8 @@ class ReportingWorkbookExporter
                 $cells .= $this->cellXml($cell);
             }
             $height = isset($row['height']) ? ' ht="'.$row['height'].'" customHeight="1"' : '';
-            $sheetRows .= '<row r="'.$row['index'].'"'.$height.'>'.$cells.'</row>';
+            $hidden = ! empty($row['hidden']) ? ' hidden="1"' : '';
+            $sheetRows .= '<row r="'.$row['index'].'"'.$height.$hidden.'>'.$cells.'</row>';
         }
 
         $columns = '';
@@ -1668,7 +1692,7 @@ class ReportingWorkbookExporter
     {
         $type = (string) ($chart['type'] ?? 'column');
         $title = (string) ($chart['title'] ?? 'Graphique');
-        $color = strtoupper((string) ($chart['color'] ?? '1E3A8A'));
+        $color = strtoupper((string) ($chart['color'] ?? '1C203D'));
         $categoryFormula = (string) ($chart['categories']['formula'] ?? '');
         $valueFormula = (string) ($chart['values']['formula'] ?? '');
         $categoryCache = array_values((array) ($chart['categories']['cache'] ?? []));
@@ -1781,15 +1805,15 @@ class ReportingWorkbookExporter
             .'</fonts>'
             .'<fills count="11">'
             .'<fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FF1E3A8A"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FF3B82F6"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><gradientFill degree="45"><stop position="0"><color rgb="FF7FB8E6"/></stop><stop position="0.45"><color rgb="FF3996D3"/></stop><stop position="1"><color rgb="FF1C203D"/></stop></gradientFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFE8F3FB"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF3996D3"/><bgColor indexed="64"/></patternFill></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFF8FBFF"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FF10B981"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FFECFDF5"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FFF59E0B"/><bgColor indexed="64"/></patternFill></fill>'
-            .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFFBEB"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF8FC043"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFF2F8E8"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFF9B13C"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFF8D6"/><bgColor indexed="64"/></patternFill></fill>'
             .'</fills>'
             .'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFDBFE"/></left><right style="thin"><color rgb="FFBFDBFE"/></right><top style="thin"><color rgb="FFBFDBFE"/></top><bottom style="thin"><color rgb="FFBFDBFE"/></bottom><diagonal/></border></borders>'
             .'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
@@ -1890,6 +1914,13 @@ class ReportingWorkbookExporter
         return Str::headline(str_replace(['_', '-'], ' ', $value));
     }
 
+    private function indicatorLabel(string $label): string
+    {
+        $label = trim(str_ireplace('KPI', 'Indicateur', $label));
+
+        return $label !== '' ? $label : '-';
+    }
+
     private function asciiBar(float $value, float $max, int $segments = 20): string
     {
         if ($segments <= 0) {
@@ -1913,4 +1944,3 @@ class ReportingWorkbookExporter
         return $name;
     }
 }
-

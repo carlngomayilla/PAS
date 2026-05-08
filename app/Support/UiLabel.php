@@ -7,24 +7,24 @@ final class UiLabel
     public static function object(string $key): string
     {
         return match ($key) {
-            'entity' => 'Entite',
-            'associated_entity' => 'Entite associee',
-            'justifiable_entity' => 'Entite justifiable',
+            'entity' => 'Entité',
+            'associated_entity' => 'Entité associée',
+            'justifiable_entity' => 'Entité justifiable',
             'action' => 'Action',
             'objectif' => 'Objectif',
-            'kpi' => 'Indicateur',
+            'kpi' => 'Indicateur de performance',
             'kpi_mesure' => 'Mesure indicateur',
             'justificatif' => 'Justificatif',
             'budget' => 'Budget',
             'alerte' => 'Alerte',
             'reporting' => 'Reporting',
             'pas' => 'PAS',
-            'pas_axe' => 'Axe strategique PAS',
-            'pas_objectif' => 'Objectif strategique PAS',
+            'pas_axe' => 'Axe stratégique PAS',
+            'pas_objectif' => 'Objectif stratégique PAS',
             'pao' => 'PAO',
-            'pao_axe' => 'Axe strategique PAO',
-            'pao_objectif_strategique' => 'Objectif strategique PAO',
-            'pao_objectif_operationnel' => 'Objectif operationnel',
+            'pao_axe' => 'Axe stratégique PAO',
+            'pao_objectif_strategique' => 'Objectif stratégique PAO',
+            'pao_objectif_operationnel' => 'Objectif opérationnel',
             'pta' => 'PTA',
             default => ucfirst(str_replace('_', ' ', trim($key))),
         };
@@ -33,12 +33,12 @@ final class UiLabel
     public static function metric(string $key): string
     {
         return match ($key) {
-            'delai' => 'Indicateur delai',
+            'delai' => 'Indicateur délai',
             'performance' => 'Indicateur performance',
-            'conformite' => 'Indicateur conformite',
-            'qualite' => 'Indicateur qualite',
+            'conformite' => 'Indicateur conformité',
+            'qualite' => 'Indicateur qualité',
             'risque' => 'Indicateur risque',
-            'global' => 'Indicateur global',
+            'global' => 'Indicateur de performance',
             'moyen' => 'Indicateur moyen',
             default => trim(self::object('kpi') . ' ' . str_replace('_', ' ', $key)),
         };
@@ -47,30 +47,32 @@ final class UiLabel
     public static function indicatorInputMode(bool|int|string|null $requiresInput): string
     {
         if ($requiresInput === null || $requiresInput === '') {
-            return 'A renseigner';
+            return 'À renseigner';
         }
 
         $normalized = filter_var($requiresInput, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
         $isManual = $normalized ?? (bool) $requiresInput;
 
-        return $isManual ? 'A renseigner' : 'Sans saisie';
+        return $isManual ? 'À renseigner' : 'Sans saisie';
     }
 
     public static function actionStatus(string|null $status): string
     {
         return match ((string) $status) {
-            'non_demarre' => 'Non demarre',
+            'non_demarre' => 'Non démarré',
             'en_cours' => 'En cours',
-            'a_risque' => 'A risque',
+            'a_risque' => 'À risque',
             'en_retard' => 'En retard',
-            'bloque' => 'Bloque',
-            'termine' => 'Acheve',
-            'acheve' => 'Acheve',
-            'acheve_dans_delai' => 'Acheve',
-            'acheve_hors_delai' => 'Acheve hors delai',
+            'bloque' => 'Bloqué',
+            'termine' => 'Achevé',
+            'acheve' => 'Achevé',
+            'acheve_dans_delai' => 'Achevé',
+            'acheve_hors_delai' => 'Achevé hors délai',
             'suspendu' => 'Suspendu',
-            'annule' => 'Annule',
+            'annule' => 'Annulé',
             'en_avance' => 'En avance',
+            'a_corriger' => 'À corriger',
+            'cloturee' => 'Clôturée',
             default => ucfirst(str_replace('_', ' ', (string) $status)),
         };
     }
@@ -80,10 +82,10 @@ final class UiLabel
         return match ((string) $status) {
             'non_soumise' => 'Non soumise',
             'soumise_chef' => 'Soumise service',
-            'rejetee_chef' => 'Rejetee service',
-            'validee_chef' => 'Validee service',
-            'rejetee_direction' => 'Rejetee direction',
-            'validee_direction' => 'Validee',
+            'rejetee_chef' => 'Rejetée service',
+            'validee_chef' => 'Validée service',
+            'rejetee_direction' => 'Rejetée direction',
+            'validee_direction' => 'Validée',
             default => ucfirst(str_replace('_', ' ', (string) $status)),
         };
     }
@@ -93,9 +95,10 @@ final class UiLabel
         return match ((string) $status) {
             'brouillon' => 'Brouillon',
             'soumis' => 'Soumis',
-            'valide' => 'Valide',
-            'verrouille' => 'Verrouille',
-            'valide_ou_verrouille' => 'Valide ou verrouille',
+            'valide' => 'Validé',
+            'verrouille' => 'Verrouillé',
+            'fin' => 'Fin',
+            'valide_ou_verrouille' => 'Validé ou verrouillé',
             default => ucfirst(str_replace('_', ' ', (string) $status)),
         };
     }
@@ -104,8 +107,8 @@ final class UiLabel
     {
         return match ((string) $status) {
             'active' => 'Active',
-            'cancelled' => 'Annulee',
-            'expired' => 'Expiree',
+            'cancelled' => 'Annulée',
+            'expired' => 'Expirée',
             default => ucfirst(str_replace('_', ' ', (string) $status)),
         };
     }

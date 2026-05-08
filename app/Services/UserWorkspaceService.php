@@ -12,7 +12,7 @@ class UserWorkspaceService
     }
 
     /**
-     * Retourne la liste des modules accessibles pour l'utilisateur donne.
+     * Retourne la liste des modules accessibles pour l'utilisateur donné.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -33,8 +33,6 @@ class UserWorkspaceService
         $isAgent = $user->isAgent();
         $canWriteOperational = $canWriteGlobal || $canWriteDirection || $canWriteService;
         $canManageActions = $canWriteOperational && ! $isAgent;
-        $canReadReporting = $canReadPlanning && $user->hasPermission('reporting.read');
-        $canReadAlerts = $canReadPlanning && $user->hasPermission('alerts.read');
         $canReadReferentiel = $user->hasAnyPermission('referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles');
         $canWriteReferentiel = $user->hasPermission('referentiel.write');
         $canManageUsers = $user->hasAnyPermission('users.manage', 'users.manage_roles');
@@ -43,18 +41,30 @@ class UserWorkspaceService
         $canReadRetention = $user->hasAnyPermission('retention.read', 'retention.manage');
         $canManageRetention = $user->hasPermission('retention.manage');
         $canManageDelegations = $user->hasPermission('delegations.manage');
+        $canReadReporting = $canReadPlanning && $user->hasPermission('reporting.read');
+        $canReadAlerts = $canReadPlanning && $user->hasPermission('alerts.read');
         $canUseMessaging = $user->hasPermission('messagerie.read');
+        $isTechnicalAdmin = $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN);
+        $isPlanification = $user->hasRole(User::ROLE_PLANIFICATION);
+        $isCabinet = $user->hasRole(User::ROLE_CABINET);
 
-        $modules = [];
+        $modules = [[
+            'code' => 'pilotage',
+            'label' => 'Pilotage',
+            'description' => 'Tableau de bord et synthèse de pilotage',
+            'endpoint' => '/dashboard',
+            'can_write' => false,
+            'actions' => ['Consulter'],
+        ]];
 
         if ($canUseMessaging) {
             $modules[] = [
                 'code' => 'messagerie',
                 'label' => 'Messagerie',
-                'description' => 'Annuaire interactif et echanges internes',
+                'description' => 'Annuaire interactif et échanges internes',
                 'endpoint' => '/workspace/messagerie',
                 'can_write' => true,
-                'actions' => ['Consulter', 'Ecrire', 'Suivre non lus'],
+                'actions' => ['Consulter', 'Écrire', 'Suivre non lus'],
             ];
         }
 
@@ -62,33 +72,33 @@ class UserWorkspaceService
             $modules[] = [
                 'code' => 'pas',
                 'label' => 'PAS',
-                'description' => 'Vision strategique pluriannuelle',
+                'description' => 'Vision stratégique pluriannuelle',
                 'endpoint' => '/api/v1/pas',
                 'can_write' => $canWriteGlobal,
                 'actions' => $canWriteGlobal
-                    ? ['Consulter', 'Creer', 'Modifier', 'Valider', 'Verrouiller']
+                    ? ['Consulter', 'Créer', 'Modifier', 'Valider', 'Verrouiller']
                     : ['Consulter'],
             ];
 
             $modules[] = [
                 'code' => 'pao',
                 'label' => 'PAO',
-                'description' => 'Declinaison annuelle par direction',
+                'description' => 'Déclinaison annuelle par direction',
                 'endpoint' => '/api/v1/paos',
                 'can_write' => $canWriteGlobal || $canWriteDirection,
                 'actions' => ($canWriteGlobal || $canWriteDirection)
-                    ? ['Consulter', 'Creer', 'Modifier', 'Suivre']
+                    ? ['Consulter', 'Créer', 'Modifier', 'Suivre']
                     : ['Consulter'],
             ];
 
             $modules[] = [
                 'code' => 'pta',
                 'label' => 'PTA',
-                'description' => 'Planification operationnelle par service',
+                'description' => 'Planification opérationnelle par service',
                 'endpoint' => '/api/v1/ptas',
                 'can_write' => $canWriteGlobal || $canWriteService,
                 'actions' => ($canWriteGlobal || $canWriteService)
-                    ? ['Consulter', 'Creer', 'Modifier', 'Executer']
+                    ? ['Consulter', 'Créer', 'Modifier', 'Exécuter']
                     : ['Consulter'],
             ];
         }
@@ -97,27 +107,16 @@ class UserWorkspaceService
             $modules[] = [
                 'code' => 'execution',
                 'label' => 'Actions',
-                'description' => 'Execution des taches et suivi de progression',
+                'description' => 'Exécution des tâches et suivi de progression',
                 'endpoint' => '/api/v1/actions',
                 'can_write' => $canWriteOperational || $isAgent || $hasDelegatedActionReview,
                 'actions' => $isAgent
-                    ? ['Consulter', 'Renseigner suivi hebdomadaire', 'Televerser justificatifs hebdomadaires']
+                    ? ['Consulter', 'Renseigner suivi hebdomadaire', 'Téléverser justificatifs hebdomadaires']
                     : ($canManageActions
-                        ? ['Consulter', 'Creer', 'Modifier', 'Parametrer indicateur', 'Supprimer', 'Cloturer', 'Suivi hebdomadaire']
+                        ? ['Consulter', 'Créer', 'Modifier', 'Paramétrer indicateur', 'Supprimer', 'Clôturer', 'Suivi hebdomadaire']
                         : ($hasDelegatedActionReview
-                            ? ['Consulter', 'Evaluer', 'Valider ou rejeter']
+                            ? ['Consulter', 'Évaluer', 'Valider ou rejeter']
                             : ['Consulter'])),
-            ];
-        }
-
-        if ($canReadAlerts) {
-            $modules[] = [
-                'code' => 'alertes',
-                'label' => 'Alertes',
-                'description' => 'Retards et indicateurs sous seuil',
-                'endpoint' => '/api/v1/alertes',
-                'can_write' => false,
-                'actions' => ['Consulter'],
             ];
         }
 
@@ -125,10 +124,21 @@ class UserWorkspaceService
             $modules[] = [
                 'code' => 'reporting',
                 'label' => 'Reporting',
-                'description' => 'Tableau de bord consolide des indicateurs',
-                'endpoint' => '/api/v1/reporting/overview',
+                'description' => 'Reporting consolidé, exports et diffusion',
+                'endpoint' => '/workspace/reporting',
                 'can_write' => false,
-                'actions' => ['Consulter'],
+                'actions' => ['Consulter', 'Exporter'],
+            ];
+        }
+
+        if ($canReadAlerts) {
+            $modules[] = [
+                'code' => 'alertes',
+                'label' => 'Alertes',
+                'description' => 'Centre des alertes et écarts de suivi',
+                'endpoint' => '/workspace/alertes',
+                'can_write' => false,
+                'actions' => ['Consulter', 'Marquer comme lu'],
             ];
         }
 
@@ -136,17 +146,17 @@ class UserWorkspaceService
             $modules[] = [
                 'code' => 'super_admin',
                 'label' => 'Super Administration',
-                'description' => 'Parametrage profond, templates d export et gouvernance de plateforme',
+                'description' => "Paramétrage profond, templates d'export et gouvernance de plateforme",
                 'endpoint' => '/workspace/super-admin',
                 'can_write' => true,
                 'actions' => ['Consulter', 'Configurer', 'Publier', 'Auditer'],
             ];
         }
 
-        if ($canReadReferentiel) {
+        if ($canReadReferentiel && ($isTechnicalAdmin || $isPlanification)) {
             $modules[] = [
                 'code' => 'referentiel',
-                'label' => 'Referentiels',
+                'label' => 'Référentiels',
                 'description' => 'Directions, services, utilisateurs',
                 'endpoint' => '/api/v1/referentiel/utilisateurs',
                 'can_write' => $canWriteReferentiel || $canManageUsers,
@@ -156,18 +166,18 @@ class UserWorkspaceService
             ];
         }
 
-        if ($canReadAudit) {
+        if ($canReadAudit && ($isTechnicalAdmin || $isCabinet)) {
             $modules[] = [
                 'code' => 'audit',
                 'label' => 'Journal Audit',
-                'description' => 'Tracabilite des actions utilisateurs',
+                'description' => 'Traçabilité des actions utilisateurs',
                 'endpoint' => '/api/v1/journal-audit',
                 'can_write' => false,
                 'actions' => ['Consulter'],
             ];
         }
 
-        if ($canReadApiDocs) {
+        if ($canReadApiDocs && $isTechnicalAdmin) {
             $modules[] = [
                 'code' => 'api_docs',
                 'label' => 'Documentation API',
@@ -178,25 +188,25 @@ class UserWorkspaceService
             ];
         }
 
-        if ($canReadRetention) {
+        if ($canReadRetention && $isTechnicalAdmin) {
             $modules[] = [
                 'code' => 'retention',
-                'label' => 'Retention',
-                'description' => 'Archivage et gouvernance des donnees',
+                'label' => 'Rétention',
+                'description' => 'Archivage et gouvernance des données',
                 'endpoint' => '/workspace/retention',
                 'can_write' => $canManageRetention,
                 'actions' => $canManageRetention ? ['Consulter', 'Piloter'] : ['Consulter'],
             ];
         }
 
-        if ($canManageDelegations) {
+        if ($canManageDelegations && ($isTechnicalAdmin || $isPlanification || $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE))) {
             $modules[] = [
                 'code' => 'delegations',
-                'label' => 'Delegations',
-                'description' => 'Suppleance temporaire de validation',
+                'label' => 'Délégations',
+                'description' => 'Suppléance temporaire de validation',
                 'endpoint' => '/workspace/referentiel/delegations',
                 'can_write' => true,
-                'actions' => ['Consulter', 'Creer', 'Annuler'],
+                'actions' => ['Consulter', 'Créer', 'Annuler'],
             ];
         }
 

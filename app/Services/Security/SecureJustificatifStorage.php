@@ -108,4 +108,65 @@ class SecureJustificatifStorage
             ])
         );
     }
+
+    public function preview(Justificatif $justificatif): StreamedResponse
+    {
+        $path = (string) $justificatif->chemin_stockage;
+        if (! Storage::disk('local')->exists($path)) {
+            abort(404, 'Fichier introuvable.');
+        }
+
+        if (! $justificatif->est_chiffre) {
+            $stream = Storage::disk('local')->readStream($path);
+            if ($stream === false) {
+                abort(500, 'Le justificatif ne peut pas etre ouvert.');
+            }
+
+            return Response::stream(
+                static function () use ($stream): void {
+                    fpassthru($stream);
+                    if (is_resource($stream)) {
+                        fclose($stream);
+                    }
+                },
+                200,
+                $this->previewHeaders($justificatif)
+            );
+        }
+
+        try {
+            $encryptedContent = Storage::disk('local')->get($path);
+            $payload = Crypt::decryptString($encryptedContent);
+            $binary = base64_decode($payload, true);
+        } catch (DecryptException) {
+            abort(500, 'Le justificatif chiffre ne peut pas etre dechiffre.');
+        }
+
+        if ($binary === false) {
+            abort(500, 'Le justificatif chiffre est corrompu.');
+        }
+
+        return Response::stream(
+            static function () use ($binary): void {
+                echo $binary;
+            },
+            200,
+            $this->previewHeaders($justificatif)
+        );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function previewHeaders(Justificatif $justificatif): array
+    {
+        $fileName = str_replace(['"', "\r", "\n"], '', (string) $justificatif->nom_original);
+
+        return array_filter([
+            'Content-Type' => (string) ($justificatif->mime_type ?: 'application/octet-stream'),
+            'Content-Length' => (string) $justificatif->taille_octets,
+            'Content-Disposition' => 'inline; filename="'.$fileName.'"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
 }

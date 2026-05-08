@@ -88,17 +88,17 @@ class SuperAdminGeneralSettingsTest extends TestCase
             ->assertOk()
             ->assertSee('lang="en"', false)
             ->assertSee('Connexion institutionnelle')
-            ->assertSee('Bienvenue sur PAS Institutionnel')
             ->assertSee('Authentification')
-            ->assertSee('Acces public')
             ->assertSee('PASI | Diffusion interne ANBG')
+            ->assertDontSee('Bienvenue sur PAS Institutionnel')
+            ->assertDontSee('Acces public')
             ->assertSee('/storage/branding/', false);
 
         $this->actingAs($superAdmin)
             ->get('/dashboard')
             ->assertOk()
             ->assertSee('Plateforme centrale')
-            ->assertSee('STRATEGIE')
+            ->assertDontSee('STRATEGIE')
             ->assertSee('PASI | Diffusion interne ANBG');
     }
 
