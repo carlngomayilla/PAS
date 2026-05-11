@@ -1,4 +1,5 @@
 import './bootstrap';
+import './admin-shell';
 import './dashboard-charts-init';
 import './dashboard-render';
 import './analytics-explorer';

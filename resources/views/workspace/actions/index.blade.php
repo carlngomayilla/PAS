@@ -60,6 +60,14 @@
             'acheve_hors_delai' => 'anbg-badge anbg-badge-warning',
             'cloturee'          => 'anbg-badge anbg-badge-success',
         ];
+        $validationStyles = [
+            'non_soumise'        => 'anbg-badge anbg-badge-neutral',
+            'soumise_chef'       => 'anbg-badge anbg-badge-warning',
+            'rejetee_chef'       => 'anbg-badge anbg-badge-danger',
+            'validee_chef'       => 'anbg-badge anbg-badge-info',
+            'rejetee_direction'  => 'anbg-badge anbg-badge-danger',
+            'validee_direction'  => 'anbg-badge anbg-badge-success',
+        ];
         $summaryCards = [
             ['label' => 'Actions non démarrées', 'value' => $statusCounts['non_demarre'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'non_demarre']), 'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Actions en cours', 'value' => $statusCounts['en_cours'] + $statusCounts['a_risque'] + $statusCounts['en_avance'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_cours']), 'badge' => null, 'badge_tone' => 'neutral'],
@@ -628,7 +636,7 @@
                             $overachievementRate = (float) ($row->taux_depassement ?? ($targetValue > 0 && $realizedValue > $targetValue ? (($realizedValue - $targetValue) / $targetValue) * 100 : 0));
                             $progressColor = $progressValue >= 80 ? 'bg-[#8fc043]' : ($progressValue >= 50 ? 'bg-blue-500' : ($progressValue > 0 ? 'bg-[#f0e509]' : 'bg-slate-400'));
                             $kpiColor = $kpiPerformance !== null
-                                ? ((float) $kpiPerformance >= 80 ? 'text-[#8fc043]' : ((float) $kpiPerformance >= 60 ? 'text-[#f9b13c]' : 'text-[#f9b13c]'))
+                                ? ((float) $kpiPerformance >= 80 ? 'text-[#8fc043]' : ((float) $kpiPerformance >= 60 ? 'text-[#f9b13c]' : 'text-red-500'))
                                 : 'text-slate-400';
                         @endphp
                         <tr>
@@ -698,12 +706,13 @@
                             </td>
                             <td>
                                 <span class="{{ $justificatifsTotal > 0 ? 'anbg-badge anbg-badge-success' : 'anbg-badge anbg-badge-neutral' }} px-3">
-                                    {{ $justificatifsTotal > 0 ? $justificatifsTotal.' piece(s)' : 'Aucun' }}
+                                    {{ $justificatifsTotal > 0 ? $justificatifsTotal.' pièce(s)' : 'Aucun' }}
                                 </span>
                             </td>
                             <td>
-                                <span class="anbg-badge anbg-badge-neutral px-3">
-                                    {{ $validationStatusLabel($row->statut_validation ?: 'non_soumise') }}
+                                @php $rowValidationStatus = $row->statut_validation ?: 'non_soumise'; @endphp
+                                <span class="{{ $validationStyles[$rowValidationStatus] ?? 'anbg-badge anbg-badge-neutral' }} px-3">
+                                    {{ $validationStatusLabel($rowValidationStatus) }}
                                 </span>
                             </td>
                             <td>
