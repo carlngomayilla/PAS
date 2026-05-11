@@ -33,7 +33,7 @@ class SuperAdminActionPoliciesTest extends TestCase
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.action-policies.edit'))
             ->assertOk()
-            ->assertSee('Parametres metier des actions');
+            ->assertSee('Parametres métier des actions');
 
         $this->actingAs($superAdmin)
             ->put(route('workspace.super-admin.action-policies.update'), [
