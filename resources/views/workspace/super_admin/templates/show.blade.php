@@ -22,7 +22,7 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-primary" href="{{ route('workspace.super-admin.templates.edit', $template) }}">Modifier</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.templates.preview', $template) }}">Previsualiser</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.templates.export-json', $template) }}">Exporter JSON</a>
@@ -38,7 +38,7 @@
     </section>
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))] mb-3.5">
-        <article class="ui-card !mb-0"><h2 class="text-base">Metadonnees</h2><p class="mt-2 text-sm text-slate-600">Code : <code>{{ $template->code }}</code></p><p class="mt-1 text-sm text-slate-600">Type de rapport : <strong>{{ $template->report_type }}</strong></p><p class="mt-1 text-sm text-slate-600">Profil cible : <strong>{{ $template->target_profile ?: 'Tous profils' }}</strong></p><p class="mt-1 text-sm text-slate-600">Titre document : <strong>{{ $template->documentTitle() }}</strong></p><p class="mt-1 text-sm text-slate-600">Prefixe fichier : <strong>{{ $template->filenamePrefix() }}</strong></p></article>
+        <article class="ui-card !mb-0"><h2 class="text-base">Métadonnées</h2><p class="mt-2 text-sm text-slate-600">Code : <code>{{ $template->code }}</code></p><p class="mt-1 text-sm text-slate-600">Type de rapport : <strong>{{ $template->report_type }}</strong></p><p class="mt-1 text-sm text-slate-600">Profil cible : <strong>{{ $template->target_profile ?: 'Tous profils' }}</strong></p><p class="mt-1 text-sm text-slate-600">Titre document : <strong>{{ $template->documentTitle() }}</strong></p><p class="mt-1 text-sm text-slate-600">Préfixe fichier : <strong>{{ $template->filenamePrefix() }}</strong></p></article>
         <article class="ui-card !mb-0"><h2 class="text-base">Mise en page</h2><p class="mt-2 text-sm text-slate-600">Papier : <strong>{{ $template->paperSize() }}</strong></p><p class="mt-1 text-sm text-slate-600">Orientation : <strong>{{ $template->orientation() }}</strong></p><p class="mt-1 text-sm text-slate-600">Filigrane : <strong>{{ $template->layout_config['watermark_text'] ?? 'Aucun' }}</strong></p><p class="mt-1 text-sm text-slate-600">Police : <strong>{{ $template->style_config['font_family'] ?? 'Inter' }}</strong></p></article>
         <article class="ui-card !mb-0"><h2 class="text-base">Cycle de vie</h2><p class="mt-2 text-sm text-slate-600">Créé par : <strong>{{ $template->creator?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Mis à jour par : <strong>{{ $template->updater?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Publié le : <strong>{{ $template->published_at?->format('Y-m-d H:i') ?? 'Non publié' }}</strong></p></article>
     </section>
@@ -74,7 +74,7 @@
             <div class="flex items-center justify-between gap-3"><h2>Affectations</h2><span class="text-sm text-slate-500">{{ $template->assignments->count() }} affectation(s)</span></div>
             <div class="mt-4 overflow-x-auto">
                 <table class="min-w-full text-sm">
-                    <thead><tr><th class="px-3 py-2 text-left">Profil</th><th class="px-3 py-2 text-left">Niveau</th><th class="px-3 py-2 text-left">Scope</th><th class="px-3 py-2 text-left">Etat</th><th class="px-3 py-2 text-left">Action</th></tr></thead>
+                    <thead><tr><th class="px-3 py-2 text-left">Profil</th><th class="px-3 py-2 text-left">Niveau</th><th class="px-3 py-2 text-left">Périmètre</th><th class="px-3 py-2 text-left">État</th><th class="px-3 py-2 text-left">Action</th></tr></thead>
                     <tbody>
                         @forelse ($template->assignments as $assignment)
                             <tr>
@@ -144,4 +144,3 @@
         </div>
     </section>
 @endsection
-

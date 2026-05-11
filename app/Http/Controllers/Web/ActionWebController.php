@@ -52,7 +52,7 @@ class ActionWebController extends Controller
         $actionRelations = [
             'pta:id,pao_id,direction_id,service_id,titre,statut',
             'responsable:id,name,email',
-            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque',
+            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite',
         ];
         if (Schema::hasTable('action_responsables')) {
             $actionRelations[] = 'responsables:id,name,email';
@@ -62,177 +62,12 @@ class ActionWebController extends Controller
             ->with($actionRelations)
             ->withCount([
                 'kpis',
+                'justificatifs as justificatifs_total',
                 'weeks as semaines_total',
                 'weeks as semaines_renseignees' => fn (Builder $q) => $q->where('est_renseignee', true),
             ]);
 
-        $this->scopeAction($query, $user);
-        app(ExerciceContext::class)->applyToAction(
-            $query,
-            $request->filled('annee') ? (int) $request->integer('annee') : null
-        );
-
-        $showDualActionTabs = $this->shouldUseDualActionTabs($user);
-        $viewMode = trim((string) $request->string('vue'));
-        if (! in_array($viewMode, ['', 'pilotage', 'mes_actions'], true)) {
-            $viewMode = $showDualActionTabs ? 'pilotage' : '';
-        }
-
-        if ($showDualActionTabs && $viewMode === '') {
-            $viewMode = 'pilotage';
-        }
-
-        if ($viewMode === 'pilotage') {
-            $query->where('contexte_action', Action::CONTEXT_PILOTAGE);
-
-            if (! $user->isAgent()) {
-                $query->where(function (Builder $q) use ($user): void {
-                    $q->whereNull('responsable_id')
-                        ->orWhere('responsable_id', '!=', (int) $user->id);
-
-                    if (Schema::hasTable('action_responsables')) {
-                        $q->whereDoesntHave('responsables', fn (Builder $responsableQuery) => $responsableQuery->whereKey((int) $user->id));
-                    }
-                });
-            }
-        }
-
-        if ($viewMode === 'mes_actions') {
-            $query->where(function (Builder $q) use ($user): void {
-                $q->where('responsable_id', (int) $user->id);
-
-                if (Schema::hasTable('action_responsables')) {
-                    $q->orWhereHas('responsables', fn (Builder $responsableQuery) => $responsableQuery->whereKey((int) $user->id));
-                }
-            });
-        }
-
-        $contextFilter = trim((string) $request->string('contexte_action'));
-        if ($contextFilter !== '' && in_array($contextFilter, array_keys(Action::contextOptions()), true)) {
-            $query->where('contexte_action', $contextFilter);
-        }
-
-        $originFilter = trim((string) $request->string('origine_action'));
-        if ($originFilter !== '' && in_array($originFilter, array_keys(Action::originOptions()), true)) {
-            $query->where('origine_action', $originFilter);
-        }
-
-        $query->when(
-            $request->filled('pta_id'),
-            fn (Builder $q) => $q->where('pta_id', (int) $request->integer('pta_id'))
-        );
-        $query->when(
-            $request->filled('direction_id'),
-            fn (Builder $q) => $q->whereHas(
-                'pta',
-                fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', (int) $request->integer('direction_id'))
-            )
-        );
-        $query->when(
-            $request->filled('service_id'),
-            fn (Builder $q) => $q->whereHas(
-                'pta',
-                fn (Builder $ptaQuery) => $ptaQuery->where('service_id', (int) $request->integer('service_id'))
-            )
-        );
-        $query->when(
-            $request->filled('pas_objectif_id'),
-            fn (Builder $q) => $q->whereHas(
-                'pta.pao',
-                fn (Builder $paoQuery) => $paoQuery->where('pas_objectif_id', (int) $request->integer('pas_objectif_id'))
-            )
-        );
-        $query->when(
-            $request->filled('annee'),
-            fn (Builder $q) => $q->whereHas(
-                'pta.pao',
-                fn (Builder $paoQuery) => $paoQuery->where('annee', (int) $request->integer('annee'))
-            )
-        );
-        $query->when($request->filled('mois_demarrage'), function (Builder $q) use ($request): void {
-            $month = trim((string) $request->string('mois_demarrage'));
-            if (preg_match('/^\d{4}-\d{2}$/', $month) !== 1) {
-                return;
-            }
-
-            [$year, $monthValue] = explode('-', $month, 2);
-            $q->whereYear('date_debut', (int) $year)
-                ->whereMonth('date_debut', (int) $monthValue);
-        });
-        $query->when($request->filled('week_start'), function (Builder $q) use ($request): void {
-            $weekStart = trim((string) $request->string('week_start'));
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $weekStart) !== 1) {
-                return;
-            }
-
-            $start = Carbon::parse($weekStart)->startOfDay();
-            $end = $start->copy()->endOfWeek(Carbon::SUNDAY);
-
-            $q->whereHas('weeks', fn (Builder $weeksQuery) => $weeksQuery
-                ->whereBetween('date_debut', [$start->toDateString(), $end->toDateString()]));
-        });
-        $query->when($request->filled('risque_label'), function (Builder $q) use ($request): void {
-            $risk = trim((string) $request->string('risque_label'));
-            if ($risk === '') {
-                return;
-            }
-
-            $q->whereRaw('LOWER(risques) like ?', ['%'.mb_strtolower($risk).'%']);
-        });
-
-        $statusFilter = trim((string) $request->string('statut'));
-        if ($statusFilter !== '') {
-            if ($statusFilter === 'achevees') {
-                $query->whereIn('statut_dynamique', $this->completedActionStatuses());
-            } else {
-                $query->where('statut_dynamique', $statusFilter);
-            }
-        }
-
-        $query->when(
-            $request->filled('statut_validation'),
-            fn (Builder $q) => $q->where('statut_validation', (string) $request->string('statut_validation'))
-        );
-        $query->when($request->filled('statut_validation_min'), function (Builder $q) use ($request): void {
-            $threshold = trim((string) $request->string('statut_validation_min'));
-            $settings = app(ActionCalculationSettings::class);
-            $statuses = $settings->validationStatusesFrom($threshold);
-
-            $q->whereIn('statut_validation', $statuses);
-        });
-
-        $query->when(
-            $request->filled('financement_requis'),
-            fn (Builder $q) => $q->where('financement_requis', (bool) $request->boolean('financement_requis'))
-        );
-
-        $financingStatusFilter = trim((string) $request->string('financement_statut'));
-        if ($financingStatusFilter !== '' && array_key_exists($financingStatusFilter, Action::financingStatusOptions())) {
-            $statuses = [$financingStatusFilter];
-            foreach (Action::legacyFinancingStatusMap() as $legacy => $current) {
-                if ($current === $financingStatusFilter) {
-                    $statuses[] = $legacy;
-                }
-            }
-
-            $query->whereIn('financement_statut', array_unique($statuses));
-        }
-
-        $query->when(
-            $request->boolean('without_kpi'),
-            fn (Builder $q) => $q->doesntHave('kpis')
-        );
-
-        $query->when($request->filled('q'), function (Builder $q) use ($request): void {
-            $search = trim((string) $request->string('q'));
-            $q->where(function (Builder $subQuery) use ($search): void {
-                $subQuery->where('libelle', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhere('resultat_attendu', 'like', "%{$search}%")
-                    ->orWhere('description_financement', 'like', "%{$search}%")
-                    ->orWhere('source_financement', 'like', "%{$search}%");
-            });
-        });
+        $viewMode = $this->applyActionFilters($query, $request, $user);
 
         $summary = $this->buildActionIndexSummary($query);
 
@@ -254,9 +89,6 @@ class ActionWebController extends Controller
             'kpi_qualite_desc' => $query->orderByDesc(
                 ActionKpi::query()->select('kpi_qualite')->whereColumn('action_id', 'actions.id')->limit(1)
             )->orderByDesc('id'),
-            'kpi_risque_desc' => $query->orderByDesc(
-                ActionKpi::query()->select('kpi_risque')->whereColumn('action_id', 'actions.id')->limit(1)
-            )->orderByDesc('id'),
             default => $query->orderByDesc('id'),
         };
 
@@ -273,11 +105,11 @@ class ActionWebController extends Controller
             'financingStatusOptions' => Action::financingStatusOptions(),
             'sortOptions' => $this->sortOptions(),
             'canWrite' => $this->canWrite($user),
-            'showDualActionTabs' => $showDualActionTabs,
+            'showDualActionTabs' => $this->shouldUseDualActionTabs($user),
             'filters' => [
                 'vue' => $viewMode,
-                'contexte_action' => $contextFilter,
-                'origine_action' => $originFilter,
+                'contexte_action' => trim((string) $request->string('contexte_action')),
+                'origine_action' => trim((string) $request->string('origine_action')),
                 'q' => (string) $request->string('q'),
                 'pta_id' => $request->filled('pta_id') ? (int) $request->integer('pta_id') : null,
                 'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
@@ -286,19 +118,39 @@ class ActionWebController extends Controller
                 'annee' => $request->filled('annee') ? (int) $request->integer('annee') : null,
                 'mois_demarrage' => $request->filled('mois_demarrage') ? trim((string) $request->string('mois_demarrage')) : '',
                 'week_start' => $request->filled('week_start') ? trim((string) $request->string('week_start')) : '',
-                'risque_label' => $request->filled('risque_label') ? trim((string) $request->string('risque_label')) : '',
-                'statut' => $statusFilter,
-                'statut_validation' => (string) $request->string('statut_validation'),
-                'statut_validation_min' => (string) $request->string('statut_validation_min'),
-                'financement_requis' => $request->filled('financement_requis')
-                    ? (int) $request->integer('financement_requis')
-                    : null,
-                'financement_statut' => $financingStatusFilter,
+                'statut' => trim((string) $request->string('statut')),
+                'statut_validation' => $request->filled('statut_validation') ? trim((string) $request->string('statut_validation')) : '',
+                'statut_validation_min' => $request->filled('statut_validation_min') ? trim((string) $request->string('statut_validation_min')) : '',
+                'financement_requis' => $request->filled('financement_requis') ? (int) $request->boolean('financement_requis') : null,
+                'financement_statut' => $request->filled('financement_statut') ? trim((string) $request->string('financement_statut')) : '',
                 'without_kpi' => $request->boolean('without_kpi'),
-                'sort' => $sort,
                 'per_page' => $perPage,
+                'sort' => $sort,
             ],
         ]);
+    }
+
+    public function quickStatus(Request $request, Action $action): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut');
+        $this->denyUnlessActionManager($user, (int) $action->pta?->direction_id, (int) $action->pta?->service_id);
+
+        $statut = $request->string('statut')->toString();
+        if (! in_array($statut, [ActionTrackingService::STATUS_SUSPENDU, ActionTrackingService::STATUS_ANNULE], true)) {
+            return response()->json(['error' => 'Statut non autorisé via glisser-déposer.'], 422);
+        }
+
+        $action->forceFill([
+            'statut' => $statut,
+            'statut_dynamique' => $statut,
+        ])->save();
+
+        return response()->json(['statut' => $statut, 'id' => $action->id]);
     }
 
     public function financingRequests(Request $request): View
@@ -325,7 +177,7 @@ class ActionWebController extends Controller
                 'justificatifs' => fn ($q) => $q
                     ->whereIn('categorie', ['financement', 'financement_daf'])
                     ->with('ajoutePar:id,name,email')
-                ->latest(),
+                    ->latest(),
             ]);
         $exerciseContext = app(ExerciceContext::class);
         if (
@@ -1149,6 +1001,171 @@ class ActionWebController extends Controller
         return $this->canManageActions($user);
     }
 
+    private function applyActionFilters(Builder $query, Request $request, User $user): string
+    {
+        $this->scopeAction($query, $user);
+        app(ExerciceContext::class)->applyToAction(
+            $query,
+            $request->filled('annee') ? (int) $request->integer('annee') : null
+        );
+
+        $showDualActionTabs = $this->shouldUseDualActionTabs($user);
+        $viewMode = trim((string) $request->string('vue'));
+        if (! in_array($viewMode, ['', 'pilotage', 'mes_actions'], true)) {
+            $viewMode = $showDualActionTabs ? 'pilotage' : '';
+        }
+
+        if ($showDualActionTabs && $viewMode === '') {
+            $viewMode = 'pilotage';
+        }
+
+        if ($viewMode === 'pilotage') {
+            $query->where('contexte_action', Action::CONTEXT_PILOTAGE);
+
+            if (! $user->isAgent()) {
+                $query->where(function (Builder $q) use ($user): void {
+                    $q->whereNull('responsable_id')
+                        ->orWhere('responsable_id', '!=', (int) $user->id);
+
+                    if (Schema::hasTable('action_responsables')) {
+                        $q->whereDoesntHave('responsables', fn (Builder $r) => $r->whereKey((int) $user->id));
+                    }
+                });
+            }
+        }
+
+        if ($viewMode === 'mes_actions') {
+            $query->where(function (Builder $q) use ($user): void {
+                $q->where('responsable_id', (int) $user->id);
+
+                if (Schema::hasTable('action_responsables')) {
+                    $q->orWhereHas('responsables', fn (Builder $r) => $r->whereKey((int) $user->id));
+                }
+            });
+        }
+
+        $contextFilter = trim((string) $request->string('contexte_action'));
+        if ($contextFilter !== '' && in_array($contextFilter, array_keys(Action::contextOptions()), true)) {
+            $query->where('contexte_action', $contextFilter);
+        }
+
+        $originFilter = trim((string) $request->string('origine_action'));
+        if ($originFilter !== '' && in_array($originFilter, array_keys(Action::originOptions()), true)) {
+            $query->where('origine_action', $originFilter);
+        }
+
+        $query->when(
+            $request->filled('pta_id'),
+            fn (Builder $q) => $q->where('pta_id', (int) $request->integer('pta_id'))
+        );
+        $query->when(
+            $request->filled('direction_id'),
+            fn (Builder $q) => $q->whereHas(
+                'pta',
+                fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', (int) $request->integer('direction_id'))
+            )
+        );
+        $query->when(
+            $request->filled('service_id'),
+            fn (Builder $q) => $q->whereHas(
+                'pta',
+                fn (Builder $ptaQuery) => $ptaQuery->where('service_id', (int) $request->integer('service_id'))
+            )
+        );
+        $query->when(
+            $request->filled('pas_objectif_id'),
+            fn (Builder $q) => $q->whereHas(
+                'pta.pao',
+                fn (Builder $paoQuery) => $paoQuery->where('pas_objectif_id', (int) $request->integer('pas_objectif_id'))
+            )
+        );
+        $query->when(
+            $request->filled('annee'),
+            fn (Builder $q) => $q->whereHas(
+                'pta.pao',
+                fn (Builder $paoQuery) => $paoQuery->where('annee', (int) $request->integer('annee'))
+            )
+        );
+        $query->when($request->filled('mois_demarrage'), function (Builder $q) use ($request): void {
+            $month = trim((string) $request->string('mois_demarrage'));
+            if (preg_match('/^\d{4}-\d{2}$/', $month) !== 1) {
+                return;
+            }
+
+            [$year, $monthValue] = explode('-', $month, 2);
+            $q->whereYear('date_debut', (int) $year)
+                ->whereMonth('date_debut', (int) $monthValue);
+        });
+        $query->when($request->filled('week_start'), function (Builder $q) use ($request): void {
+            $weekStart = trim((string) $request->string('week_start'));
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $weekStart) !== 1) {
+                return;
+            }
+
+            $start = Carbon::parse($weekStart)->startOfDay();
+            $end = $start->copy()->endOfWeek(Carbon::SUNDAY);
+
+            $q->whereHas('weeks', fn (Builder $weeksQuery) => $weeksQuery
+                ->whereBetween('date_debut', [$start->toDateString(), $end->toDateString()]));
+        });
+
+        $statusFilter = trim((string) $request->string('statut'));
+        if ($statusFilter !== '') {
+            if ($statusFilter === 'achevees') {
+                $query->whereIn('statut_dynamique', $this->completedActionStatuses());
+            } else {
+                $query->where('statut_dynamique', $statusFilter);
+            }
+        }
+
+        $query->when(
+            $request->filled('statut_validation'),
+            fn (Builder $q) => $q->where('statut_validation', (string) $request->string('statut_validation'))
+        );
+        $query->when($request->filled('statut_validation_min'), function (Builder $q) use ($request): void {
+            $threshold = trim((string) $request->string('statut_validation_min'));
+            $settings = app(ActionCalculationSettings::class);
+            $statuses = $settings->validationStatusesFrom($threshold);
+
+            $q->whereIn('statut_validation', $statuses);
+        });
+
+        $query->when(
+            $request->filled('financement_requis'),
+            fn (Builder $q) => $q->where('financement_requis', (bool) $request->boolean('financement_requis'))
+        );
+
+        $financingStatusFilter = trim((string) $request->string('financement_statut'));
+        if ($financingStatusFilter !== '' && array_key_exists($financingStatusFilter, Action::financingStatusOptions())) {
+            $statuses = [$financingStatusFilter];
+            foreach (Action::legacyFinancingStatusMap() as $legacy => $current) {
+                if ($current === $financingStatusFilter) {
+                    $statuses[] = $legacy;
+                }
+            }
+
+            $query->whereIn('financement_statut', array_unique($statuses));
+        }
+
+        $query->when(
+            $request->boolean('without_kpi'),
+            fn (Builder $q) => $q->doesntHave('kpis')
+        );
+
+        $query->when($request->filled('q'), function (Builder $q) use ($request): void {
+            $search = trim((string) $request->string('q'));
+            $q->where(function (Builder $subQuery) use ($search): void {
+                $subQuery->where('libelle', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('resultat_attendu', 'like', "%{$search}%")
+                    ->orWhere('description_financement', 'like', "%{$search}%")
+                    ->orWhere('source_financement', 'like', "%{$search}%");
+            });
+        });
+
+        return $viewMode;
+    }
+
     private function canReadActions(User $user): bool
     {
         return $user->hasGlobalReadAccess()
@@ -1429,7 +1446,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @return array{total:int, avg_progression:float, avg_kpi_global:float, funded_count:int, status_counts:array<string, int>}
+     * @return array{total:int, avg_progression:float, avg_kpi_global:float, avg_quality:float, funded_count:int, validated_count:int, pending_validation_count:int, pending_justificatif_count:int, status_counts:array<string, int>}
      */
     private function buildActionIndexSummary(Builder $query): array
     {
@@ -1450,18 +1467,43 @@ class ActionWebController extends Controller
             ->map(fn ($value): int => (int) $value)
             ->toArray();
 
-        // kpi_global requires a separate join — cannot be merged into the aggregate query above
+        $pendingValidationStatuses = [
+            ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ];
+        $validatedStatuses = [
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ];
+
+        $pendingValidationCount = (int) (clone $baseQuery)
+            ->whereIn('statut_validation', $pendingValidationStatuses)
+            ->count();
+        $validatedCount = (int) (clone $baseQuery)
+            ->whereIn('statut_validation', $validatedStatuses)
+            ->count();
+        $pendingJustificatifCount = (int) (clone $baseQuery)
+            ->where('statut_dynamique', ActionTrackingService::STATUS_NON_DEMARRE)
+            ->count();
+
+        // Execution performance is aggregated from the dedicated action KPI table.
         $actionIdsQuery = (clone $query)->toBase()->select('actions.id');
-        $avgKpiGlobal = DB::query()
+        $kpiBase = DB::query()
             ->fromSub($actionIdsQuery, 'filtered_actions')
-            ->join('action_kpis', 'action_kpis.action_id', '=', 'filtered_actions.id')
-            ->avg('action_kpis.kpi_global');
+            ->join('action_kpis', 'action_kpis.action_id', '=', 'filtered_actions.id');
+
+        $avgKpiGlobal = (clone $kpiBase)->avg('action_kpis.kpi_performance');
+        $avgQuality = (clone $kpiBase)->avg('action_kpis.kpi_qualite');
 
         return [
             'total' => (int) ($stats?->total ?? 0),
             'avg_progression' => round((float) ($stats?->avg_progression ?? 0), 2),
             'avg_kpi_global' => round((float) ($avgKpiGlobal ?? 0), 2),
+            'avg_quality' => round((float) ($avgQuality ?? 0), 2),
             'funded_count' => (int) ($stats?->funded_count ?? 0),
+            'validated_count' => $validatedCount,
+            'pending_validation_count' => $pendingValidationCount,
+            'pending_justificatif_count' => $pendingJustificatifCount,
             'status_counts' => $statusCounts,
         ];
     }
@@ -1494,7 +1536,6 @@ class ActionWebController extends Controller
             'kpi_conformite_desc' => UiLabel::metric('conformite').' le plus eleve',
             'kpi_global_desc' => UiLabel::metric('global').' le plus eleve',
             'kpi_qualite_desc' => 'Qualite la plus forte',
-            'kpi_risque_desc' => 'Risque le plus eleve',
         ];
     }
 

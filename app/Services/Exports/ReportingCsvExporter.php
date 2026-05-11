@@ -36,11 +36,11 @@ class ReportingCsvExporter
                 $this->paoRows($payload)
             ),
             '03_actions.csv' => $this->csv(
-                ['Direction', 'Service', 'Description action', 'RMO', 'Cible', 'Début', 'Fin', 'Statut', 'Ressources', 'Taux (%)', 'Justificatif', 'Risque'],
+                ['Direction', 'Service', 'Description action', 'RMO', 'Cible', 'Debut', 'Fin', 'Statut', 'Ressources', 'Avancement reel (%)', 'Justificatif'],
                 $this->actionRowsForCsv($payload)
             ),
             '04_indicateurs.csv' => $this->csv(
-                ['Direction', 'Service', 'Action', 'RMO', 'Indicateur de performance (%)', 'Indicateur qualite (%)', 'Indicateur delai (%)', 'Indicateur risque (%)', 'Indicateur conformite (%)', 'Indicateur global (%)'],
+                ['Direction', 'Service', 'Action', 'RMO', 'Performance d execution (%)', 'Qualite / conformite (%)', 'Delai (%)', 'Avancement reel (%)'],
                 $this->kpiRows($payload)
             ),
             '05_synthese.csv' => $this->csv(
@@ -51,15 +51,11 @@ class ReportingCsvExporter
                 ['Action', 'Indicateur', 'Valeur', 'Seuil', 'Statut', 'Action corrective'],
                 $this->alertRows($payload)
             ),
-            '07_risques.csv' => $this->csv(
-                ['Direction', 'Service', 'Action', 'Risque', 'Niveau', 'Impact', 'Solution', 'Responsable'],
-                $this->riskRows($payload)
-            ),
-            '08_rmo_performance.csv' => $this->csv(
+            '07_rmo_performance.csv' => $this->csv(
                 ['Direction', 'Service', 'RMO', 'Nombre d actions', 'Performance moyenne (%)'],
                 $this->rmoPerformanceRows($payload)
             ),
-            '09_justificatifs.csv' => $this->csv(
+            '08_justificatifs.csv' => $this->csv(
                 ['Direction', 'Service', 'Action', 'RMO', 'Justificatif', 'Statut validation', 'Date'],
                 $this->justificatifRows($payload)
             ),
@@ -217,7 +213,6 @@ class ReportingCsvExporter
                 (string) ($row['ressources_requises'] ?? '-'),
                 (float) ($row['progression_value'] ?? 0),
                 (string) ($row['justificatif'] ?? '-'),
-                (string) ($row['risque_identifie'] ?? '-'),
             ])
             ->values()
             ->all();
@@ -237,9 +232,7 @@ class ReportingCsvExporter
                 (float) ($row['kpi_performance_value'] ?? 0),
                 (float) ($row['kpi_qualite_value'] ?? 0),
                 (float) ($row['kpi_delai_value'] ?? 0),
-                (float) ($row['kpi_risque_value'] ?? 0),
-                (float) ($row['kpi_conformite_value'] ?? 0),
-                (float) ($row['kpi_global_value'] ?? 0),
+                (float) ($row['progression_value'] ?? 0),
             ])
             ->values()
             ->all();
@@ -247,28 +240,6 @@ class ReportingCsvExporter
 
     /**
      * @return array<int, array<int, mixed>>
-     */
-    private function riskRows(array $payload): array
-    {
-        return $this->actionRows($payload)
-            ->filter(fn (array $row): bool => trim((string) ($row['risque_identifie'] ?? '')) !== '')
-            ->map(fn (array $row): array => [
-                (string) ($row['direction_label'] ?? '-'),
-                (string) ($row['service_label'] ?? '-'),
-                (string) ($row['action'] ?? '-'),
-                (string) ($row['risque_identifie'] ?? '-'),
-                (string) ($row['niveau_risque'] ?? '-'),
-                (float) ($row['kpi_risque_value'] ?? 0),
-                (string) ($row['mesure_mitigation'] ?? '-'),
-                (string) ($row['rmo'] ?? $row['responsable'] ?? '-'),
-            ])
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return array<int, array<int, mixed>>
-     */
     private function rmoPerformanceRows(array $payload): array
     {
         return $this->actionRows($payload)

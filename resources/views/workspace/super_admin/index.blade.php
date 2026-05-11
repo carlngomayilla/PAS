@@ -9,7 +9,7 @@
                 <h1 class="mt-2">Pilotage de la plateforme</h1>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
             </div>
         </div>
     </section>
@@ -27,7 +27,7 @@
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Base statistique actions</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $summary['official_base'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Groupes de permissions</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['permission_groups'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Dashboards pilotables</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['dashboard_profiles'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Referentiels dynamiques</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['dynamic_referentials'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Référentiels dynamiques</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['dynamic_referentials'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Indicateur de performance pilotes visibles</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['managed_kpis'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Events notification actifs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['notification_events_enabled'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Règles temporelles</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['timeline_rules_enabled'] }}</p></article>
@@ -40,17 +40,17 @@
     <section class="showcase-panel mb-4">
         <div class="flex items-center justify-between gap-3">
             <div>
-                <h2>Acces rapides</h2>
+                <h2>Accès rapides</h2>
             </div>
             <a class="btn btn-primary" href="{{ route('workspace.super-admin.templates.create') }}">Nouveau template</a>
         </div>
         <div class="mt-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             <article class="ui-card !mb-0"><strong>Parametres generaux</strong></article>
             <article class="ui-card !mb-0"><strong>Modules et navigation</strong></article>
-            <article class="ui-card !mb-0"><strong>Roles et permissions</strong></article>
+            <article class="ui-card !mb-0"><strong>Rôles et permissions</strong></article>
             <article class="ui-card !mb-0"><strong>Organisation et utilisateurs</strong></article>
             <article class="ui-card !mb-0"><strong>Dashboards par profil</strong></article>
-            <article class="ui-card !mb-0"><strong>Referentiels dynamiques</strong></article>
+            <article class="ui-card !mb-0"><strong>Référentiels dynamiques</strong></article>
             <article class="ui-card !mb-0"><strong>Documents et justificatifs</strong></article>
             <article class="ui-card !mb-0"><strong>Indicateur de performance et statistiques</strong></article>
             <article class="ui-card !mb-0"><strong>Apparence</strong></article>

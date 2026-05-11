@@ -16,12 +16,16 @@
     @endphp
 
     <div class="app-screen-flow">
-    <div class="mb-4 flex items-center justify-between gap-3">
-        <h1 class="text-xl font-bold text-[#1a1a1a]">PTA</h1>
-        @if ($canWrite)
-            <a class="btn btn-primary" href="{{ route('workspace.pta.create') }}">Nouveau PTA</a>
-        @endif
-    </div>
+    <x-ui.page-title
+        title="Plan de travail annuel"
+        subtitle="Suivi des plans de travail par service, avec rattachement aux objectifs opérationnels."
+    >
+        <x-slot:actions>
+            @if ($canWrite)
+                <a class="btn btn-primary" href="{{ route('workspace.pta.create') }}">Nouveau PTA</a>
+            @endif
+        </x-slot:actions>
+    </x-ui.page-title>
 
     <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
@@ -56,7 +60,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="direction_id">Direction ID</label>
+                    <label for="direction_id">Direction</label>
                     <input id="direction_id" name="direction_id" type="number" value="{{ $filters['direction_id'] }}" placeholder="ID direction">
                 </div>
                 <div>
@@ -115,7 +119,7 @@
                         <th>Nb actions</th>
                         <th>Validateur</th>
                         @if ($canWrite)
-                            <th>Operations</th>
+                            <th>Opérations</th>
                         @endif
                     </tr>
                 </thead>
@@ -200,7 +204,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 9 : 8 }}" class="text-slate-500">Aucun PTA trouve.</td>
+                            <td colspan="{{ $canWrite ? 9 : 8 }}" class="text-slate-500">Aucun PTA trouvé.</td>
                         </tr>
                     @endforelse
                 </tbody>

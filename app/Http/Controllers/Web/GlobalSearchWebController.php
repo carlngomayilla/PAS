@@ -23,7 +23,7 @@ class GlobalSearchWebController extends Controller
 {
     use AuthorizesPlanningScope;
 
-    public function index(Request $request, ExerciceContext $exerciceContext): View
+    public function index(Request $request, ExerciceContext $exerciceContext): mixed
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -45,11 +45,17 @@ class GlobalSearchWebController extends Controller
             ];
         }
 
+        $total = collect($groups)->sum(fn (array $group): int => count($group['items'] ?? []));
+
+        if ($request->expectsJson() || $request->query('format') === 'json') {
+            return response()->json(['query' => $query, 'total' => $total, 'groups' => $groups]);
+        }
+
         return view('workspace.search.index', [
             'title' => 'Recherche globale',
             'query' => $query,
             'groups' => $groups,
-            'total' => collect($groups)->sum(fn (array $group): int => count($group['items'] ?? [])),
+            'total' => $total,
         ]);
     }
 

@@ -16,7 +16,7 @@
                 <p class="mt-2 text-slate-600">Pilotage global des libellés, de l ordre et de la visibilité des modules dans le workspace. Les droits métier par rôle restent appliqués a part.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.appearance.edit') }}">Apparence</a>
                 <a class="btn btn-primary" href="{{ route('workspace.super-admin.templates.index') }}">Templates d export</a>
@@ -107,7 +107,7 @@
                                 <th class="px-3 py-2 text-left">Description</th>
                                 <th class="px-3 py-2 text-left">Ordre</th>
                                 <th class="px-3 py-2 text-left">Section</th>
-                                <th class="px-3 py-2 text-left">Etat</th>
+                                <th class="px-3 py-2 text-left">État</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -215,4 +215,3 @@
         </script>
     @endpush
 @endsection
-

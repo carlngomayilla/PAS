@@ -11,10 +11,9 @@ class PlanningWorkflowRulesService
      * @var array<string, int>
      */
     public const GLOBAL_WEIGHTS = [
-        'performance' => 40,
+        'performance' => 70,
         'delay' => 20,
-        'quality' => 30,
-        'risk' => 10,
+        'quality' => 10,
     ];
 
     /**
@@ -167,7 +166,7 @@ class PlanningWorkflowRulesService
         float|int $performance,
         float|int $delay,
         float|int|null $quality,
-        float|int $risk,
+        float|int|null $ignoredLegacyValue = null,
         array $weights = self::GLOBAL_WEIGHTS
     ): float {
         $qualityValue = $quality === null ? 0.0 : (float) $quality;
@@ -175,8 +174,7 @@ class PlanningWorkflowRulesService
 
         $score = ((float) $performance * ($weights['performance'] ?? 40))
             + ((float) $delay * ($weights['delay'] ?? 20))
-            + ($qualityValue * ($weights['quality'] ?? 30))
-            + ((float) $risk * ($weights['risk'] ?? 10));
+            + ($qualityValue * ($weights['quality'] ?? 10));
 
         return round($score / $totalWeight, 2);
     }

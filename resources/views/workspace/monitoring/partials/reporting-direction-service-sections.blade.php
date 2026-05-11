@@ -144,8 +144,6 @@
                 $serviceSummary = (array) ($service['summary'] ?? []);
                 $serviceActions = collect($service['actions'] ?? [])->values();
                 $servicePeriodLabel = $tablePeriodLabel($serviceActions, $defaultPeriodLabel);
-                $serviceRiskRows = $serviceActions
-                    ->filter(fn (array $row): bool => trim((string) ($row['risque_identifie'] ?? '')) !== '')
                     ->values();
                 $serviceRmoRows = $serviceActions
                     ->groupBy(fn (array $row): string => (string) ($row['rmo'] ?? $row['responsable'] ?? 'Non renseigné'))
@@ -285,7 +283,6 @@
                             <th>Ressources</th>
                             <th>Taux (%)</th>
                             <th>Justificatif</th>
-                            <th>Risque</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -300,10 +297,9 @@
                                 <td>{{ $row['ressources_requises'] ?? '-' }}</td>
                                 <td>{{ $row['taux'] ?? '-' }}</td>
                                 <td>{{ $row['justificatif'] ?? '-' }}</td>
-                                <td>{{ $row['risque_identifie'] ?? '-' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="10" class="muted">Aucune action détaillée disponible pour ce service.</td></tr>
+                            <tr><td colspan="9" class="muted">Aucune action detaillee disponible pour ce service.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -313,7 +309,7 @@
                     'directionResponsable' => $directionResponsable,
                     'serviceLabel' => $serviceLabel,
                     'serviceResponsable' => $serviceResponsable,
-                    'tableTitle' => 'Indicateur de performance par action',
+                    'tableTitle' => 'Indicateurs d\'exécution par action',
                     'periodLabel' => $servicePeriodLabel,
                     'generatedAtLabel' => $generatedAtLabel,
                 ])
@@ -323,12 +319,10 @@
                         <tr>
                             <th>Action</th>
                             <th>RMO</th>
-                            <th>Indicateur de performance (%)</th>
-                            <th>Indicateur qualite (%)</th>
-                            <th>Indicateur delai (%)</th>
-                            <th>Indicateur risque (%)</th>
-                            <th>Indicateur conformite (%)</th>
-                            <th>Indicateur global (%)</th>
+                            <th>Performance d'exécution (%)</th>
+                            <th>Qualité / conformité (%)</th>
+                            <th>Indicateur délai (%)</th>
+                            <th>Avancement réel (%)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -339,12 +333,10 @@
                                 <td>{{ $row['kpi_performance'] ?? '0.00' }}</td>
                                 <td>{{ $row['kpi_qualite'] ?? '0.00' }}</td>
                                 <td>{{ $row['kpi_delai'] ?? '0.00' }}</td>
-                                <td>{{ $row['kpi_risque'] ?? '0.00' }}</td>
-                                <td>{{ $row['kpi_conformite'] ?? '0.00' }}</td>
-                                <td>{{ $row['kpi_global'] ?? '0.00' }}</td>
+                                <td>{{ $row['progression_reelle'] ?? $row['taux'] ?? '0.00' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="muted">Aucun Indicateur de performance disponible pour ce service.</td></tr>
+                            <tr><td colspan="6" class="muted">Aucun Indicateur de performance disponible pour ce service.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -354,7 +346,6 @@
                     'directionResponsable' => $directionResponsable,
                     'serviceLabel' => $serviceLabel,
                     'serviceResponsable' => $serviceResponsable,
-                    'tableTitle' => 'Risques du service',
                     'periodLabel' => $servicePeriodLabel,
                     'generatedAtLabel' => $generatedAtLabel,
                 ])
@@ -363,25 +354,15 @@
                     <thead>
                         <tr>
                             <th>Action</th>
-                            <th>Risque</th>
-                            <th>Niveau</th>
-                            <th>Impact</th>
-                            <th>Solution</th>
                             <th>Responsable</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($serviceRiskRows as $row)
                             <tr>
                                 <td>{{ $row['action'] ?? '-' }}</td>
-                                <td>{{ $row['risque_identifie'] ?? '-' }}</td>
-                                <td>{{ $row['niveau_risque'] ?? '-' }}</td>
-                                <td>{{ $row['kpi_risque'] ?? '0.00' }}</td>
-                                <td>{{ $row['mesure_mitigation'] ?? '-' }}</td>
                                 <td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="muted">Aucun risque identifié pour ce service.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

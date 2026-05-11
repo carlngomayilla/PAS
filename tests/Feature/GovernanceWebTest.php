@@ -28,7 +28,7 @@ class GovernanceWebTest extends TestCase
         $this->actingAs($admin)
             ->get(route('workspace.retention.index'))
             ->assertOk()
-            ->assertSee('Retention et archivage');
+            ->assertSee('Rétention et archivage');
     }
 
     public function test_agent_cannot_access_governance_pages(): void

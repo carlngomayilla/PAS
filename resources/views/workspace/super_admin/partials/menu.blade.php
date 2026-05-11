@@ -1,21 +1,21 @@
 @php
-    $buttonLabel = $buttonLabel ?? 'Acces';
+    $buttonLabel = $buttonLabel ?? 'Accès';
     $sections = [
         [
             'title' => 'Plateforme',
-            'description' => 'Identite, navigation, maintenance.',
+            'description' => 'Identité, navigation, maintenance.',
             'links' => [
-                ['label' => 'Generaux', 'description' => 'Textes, logos, formats.', 'route' => route('workspace.super-admin.settings.edit'), 'active' => request()->routeIs('workspace.super-admin.settings.*')],
-                ['label' => 'Apparence', 'description' => 'Palette, densite, lecture.', 'route' => route('workspace.super-admin.appearance.edit'), 'active' => request()->routeIs('workspace.super-admin.appearance.*')],
+                ['label' => 'Généraux', 'description' => 'Textes, logos, formats.', 'route' => route('workspace.super-admin.settings.edit'), 'active' => request()->routeIs('workspace.super-admin.settings.*')],
+                ['label' => 'Apparence', 'description' => 'Palette, densité, lecture.', 'route' => route('workspace.super-admin.appearance.edit'), 'active' => request()->routeIs('workspace.super-admin.appearance.*')],
                 ['label' => 'Modules', 'description' => 'Ordre et visibilité.', 'route' => route('workspace.super-admin.modules.edit'), 'active' => request()->routeIs('workspace.super-admin.modules.*')],
                 ['label' => 'Maintenance', 'description' => 'Caches et actions techniques.', 'route' => route('workspace.super-admin.maintenance.index'), 'active' => request()->routeIs('workspace.super-admin.maintenance.*')],
             ],
         ],
         [
             'title' => 'Gouvernance',
-            'description' => 'Acces, organisation, audit.',
+            'description' => 'Accès, organisation, audit.',
             'links' => [
-                ['label' => 'Roles', 'description' => 'Matrice, registre, comparaison.', 'route' => route('workspace.super-admin.roles.edit'), 'active' => request()->routeIs('workspace.super-admin.roles.*')],
+                ['label' => 'Rôles', 'description' => 'Matrice, registre, comparaison.', 'route' => route('workspace.super-admin.roles.edit'), 'active' => request()->routeIs('workspace.super-admin.roles.*')],
                 ['label' => 'Organisation', 'description' => 'Directions, services, comptes.', 'route' => route('workspace.super-admin.organization.index'), 'active' => request()->routeIs('workspace.super-admin.organization.*')],
                 ['label' => 'Dashboards', 'description' => 'Cartes et visibilité.', 'route' => route('workspace.super-admin.dashboard-profiles.edit'), 'active' => request()->routeIs('workspace.super-admin.dashboard-profiles.*')],
                 ['label' => 'Diagnostic', 'description' => 'Contrôle plateforme et incidents.', 'route' => route('workspace.super-admin.audit-diagnostic.index'), 'active' => request()->routeIs('workspace.super-admin.audit-diagnostic.*')],
@@ -24,19 +24,19 @@
         ],
         [
             'title' => 'Pilotage',
-            'description' => 'Workflow, Indicateur de performance, referentiels.',
+            'description' => 'Workflow, Indicateur de performance, référentiels.',
             'links' => [
                 ['label' => 'Workflow', 'description' => 'Circuits Actions, PAS, PAO, PTA.', 'route' => route('workspace.super-admin.workflow.edit'), 'active' => request()->routeIs('workspace.super-admin.workflow.*')],
                 ['label' => 'Calcul', 'description' => 'Base statistique et règles.', 'route' => route('workspace.super-admin.calculation.edit'), 'active' => request()->routeIs('workspace.super-admin.calculation.*')],
-                ['label' => 'Actions', 'description' => 'Cloture, risque, suspension.', 'route' => route('workspace.super-admin.action-policies.edit'), 'active' => request()->routeIs('workspace.super-admin.action-policies.*')],
-                ['label' => 'Referentiels', 'description' => 'Libelles, unites, priorites.', 'route' => route('workspace.super-admin.referentials.edit'), 'active' => request()->routeIs('workspace.super-admin.referentials.*')],
-                ['label' => 'Documents', 'description' => 'Formats, retention, droits.', 'route' => route('workspace.super-admin.documents.edit'), 'active' => request()->routeIs('workspace.super-admin.documents.*')],
+                ['label' => 'Actions', 'description' => 'Clôture et suspension.', 'route' => route('workspace.super-admin.action-policies.edit'), 'active' => request()->routeIs('workspace.super-admin.action-policies.*')],
+                ['label' => 'Référentiels', 'description' => 'Libellés, unités, priorités.', 'route' => route('workspace.super-admin.referentials.edit'), 'active' => request()->routeIs('workspace.super-admin.referentials.*')],
+                ['label' => 'Documents', 'description' => 'Formats, rétention, droits.', 'route' => route('workspace.super-admin.documents.edit'), 'active' => request()->routeIs('workspace.super-admin.documents.*')],
                 ['label' => 'Indicateur de performance', 'description' => 'Registre et moteur no-code.', 'route' => route('workspace.super-admin.kpis.edit'), 'active' => request()->routeIs('workspace.super-admin.kpis.*')],
-                ['label' => 'Notifications', 'description' => 'Evenements, escalades, delais.', 'route' => route('workspace.super-admin.notifications.edit'), 'active' => request()->routeIs('workspace.super-admin.notifications.*')],
+                ['label' => 'Notifications', 'description' => 'Événements, escalades, délais.', 'route' => route('workspace.super-admin.notifications.edit'), 'active' => request()->routeIs('workspace.super-admin.notifications.*')],
             ],
         ],
         [
-            'title' => 'Avance',
+            'title' => 'Avancé',
             'description' => 'Snapshots, simulation, exports.',
             'links' => [
                 ['label' => 'Snapshots', 'description' => 'Comparaison et restauration.', 'route' => route('workspace.super-admin.snapshots.index'), 'active' => request()->routeIs('workspace.super-admin.snapshots.*')],

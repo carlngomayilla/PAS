@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">Parametrage du circuit de validation des actions sans casser les statuts historiques utilises par le reporting.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.settings.edit') }}">Parametres generaux</a>
             </div>
@@ -174,4 +174,3 @@
         </div>
     </section>
 @endsection
-

@@ -1,11 +1,11 @@
 @extends('layouts.workspace')
 
-@section('title', 'Nouvelle delegation')
+@section('title', 'Nouvelle délégation')
 
 @section('content')
     <div class="app-screen-flow">
     <section class="ui-card app-screen-block">
-        <h1>Nouvelle delegation</h1>
+        <h1>Nouvelle délégation</h1>
 
         <form method="POST" action="{{ route('workspace.delegations.store') }}" class="form-shell mt-4">
             @csrf
@@ -13,7 +13,7 @@
             <div class="form-section">
                 <div class="form-grid">
                     <div>
-                        <label for="delegant_id">Delegant</label>
+                        <label for="delegant_id">Délégant</label>
                         <select id="delegant_id" name="delegant_id" required>
                             <option value="">Sélectionner...</option>
                             @foreach ($delegantOptions as $option)
@@ -24,7 +24,7 @@
                         </select>
                     </div>
                     <div>
-                        <label for="delegue_id">Delegue</label>
+                        <label for="delegue_id">Délégué</label>
                         <select id="delegue_id" name="delegue_id" required>
                             <option value="">Sélectionner...</option>
                             @foreach ($delegateOptions as $option)
@@ -35,7 +35,7 @@
                         </select>
                     </div>
                     <div>
-                        <label for="role_scope">Portee</label>
+                        <label for="role_scope">Portée</label>
                         <select id="role_scope" name="role_scope" required>
                             <option value="service" @selected(old('role_scope', $delegation->role_scope) === 'service')>Service</option>
                             <option value="direction" @selected(old('role_scope', $delegation->role_scope) === 'direction')>Direction</option>
@@ -64,7 +64,7 @@
                         </select>
                     </div>
                     <div>
-                        <label for="date_debut">Date debut</label>
+                        <label for="date_debut">Date début</label>
                         <input id="date_debut" name="date_debut" type="datetime-local" value="{{ old('date_debut', $delegation->date_debut) }}" required>
                     </div>
                     <div>
@@ -78,7 +78,7 @@
                 <h2 class="form-section-title">Permissions</h2>
                 <div class="flex flex-wrap gap-3">
                     @php($oldPermissions = old('permissions', $delegation->permissions ?? []))
-                    @foreach (['planning_read' => 'Lecture planning', 'planning_write' => 'Ecriture planning', 'action_review' => 'Validation actions'] as $value => $label)
+                    @foreach (['planning_read' => 'Lecture planning', 'planning_write' => 'Écriture planning', 'action_review' => 'Validation actions'] as $value => $label)
                         <label class="checkbox-pill">
                             <input type="checkbox" name="permissions[]" value="{{ $value }}" @checked(in_array($value, $oldPermissions, true))>
                             <span>{{ $label }}</span>

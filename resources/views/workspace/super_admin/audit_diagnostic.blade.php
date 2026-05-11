@@ -8,10 +8,10 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Audit et diagnostic</h1>
-                <p class="mt-2 text-slate-600">Vue renforcee des changements sensibles et contrôles de coherence sur les donnees de pilotage et de suivi.</p>
+                <p class="mt-2 text-slate-600">Vue renforcée des changements sensibles et contrôles de cohérence sur les données de pilotage et de suivi.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.audit.index') }}">Journal complet</a>
             </div>
@@ -28,7 +28,7 @@
     </section>
 
     <section class="showcase-panel mb-4">
-        <h2>Contrôle de coherence</h2>
+        <h2>Contrôle de cohérence</h2>
         <div class="mt-4 overflow-x-auto">
             <table class="min-w-full text-sm">
                 <thead>
@@ -85,4 +85,3 @@
         </div>
     </section>
 @endsection
-

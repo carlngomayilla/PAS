@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">Bibliotheque centrale des modeles PDF, Excel, Word et CSV.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-primary" href="{{ route('workspace.super-admin.templates.create') }}">Nouveau template</a>
             </div>
@@ -78,4 +78,3 @@
         <div class="mt-4">{{ $rows->links() }}</div>
     </section>
 @endsection
-

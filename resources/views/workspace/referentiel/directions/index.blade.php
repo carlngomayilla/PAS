@@ -77,7 +77,7 @@
                         <th>PAO</th>
                         <th>PTA</th>
                         @if ($canWrite)
-                            <th>Operations</th>
+                            <th>Opérations</th>
                         @endif
                     </tr>
                 </thead>

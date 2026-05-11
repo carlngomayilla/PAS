@@ -1,6 +1,6 @@
 @extends('layouts.workspace')
 
-@section('title', 'Delegations')
+@section('title', 'Délégations')
 
 @section('content')
     @php
@@ -12,12 +12,12 @@
         ];
         $summary = is_array($summary ?? null) ? $summary : [];
         $summaryCards = [
-            ['label' => 'Delegations', 'value' => $summary['total'] ?? $rows->total(), 'href' => route('workspace.delegations.index')],
+            ['label' => 'Délégations', 'value' => $summary['total'] ?? $rows->total(), 'href' => route('workspace.delegations.index')],
             ['label' => 'Actives', 'value' => $summary['active'] ?? 0, 'href' => route('workspace.delegations.index')],
             ['label' => 'Fin < 7 jours', 'value' => $summary['expires_soon'] ?? 0, 'href' => route('workspace.delegations.index')],
-            ['label' => 'Annulees', 'value' => $summary['cancelled'] ?? 0, 'href' => route('workspace.delegations.index')],
-            ['label' => 'Perimetres direction', 'value' => $summary['direction_scope'] ?? 0, 'href' => route('workspace.delegations.index')],
-            ['label' => 'Perimetres service', 'value' => $summary['service_scope'] ?? 0, 'href' => route('workspace.delegations.index')],
+            ['label' => 'Annulées', 'value' => $summary['cancelled'] ?? 0, 'href' => route('workspace.delegations.index')],
+            ['label' => 'Périmètres direction', 'value' => $summary['direction_scope'] ?? 0, 'href' => route('workspace.delegations.index')],
+            ['label' => 'Périmètres service', 'value' => $summary['service_scope'] ?? 0, 'href' => route('workspace.delegations.index')],
         ];
     @endphp
     <div class="app-screen-flow">
@@ -30,9 +30,9 @@
     <section class="showcase-panel mb-4 app-screen-block">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <h1>Delegations temporaires</h1>
+                <h1>Délégations temporaires</h1>
             </div>
-            <a class="btn btn-blue" href="{{ route('workspace.delegations.create') }}">Nouvelle delegation</a>
+            <a class="btn btn-blue" href="{{ route('workspace.delegations.create') }}">Nouvelle délégation</a>
         </div>
     </section>
 
@@ -42,13 +42,13 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Delegant</th>
-                        <th>Delegue</th>
-                        <th>Portee</th>
+                        <th>Délégant</th>
+                        <th>Délégué</th>
+                        <th>Portée</th>
                         <th>Permissions</th>
-                        <th>Periode</th>
+                        <th>Période</th>
                         <th>Statut</th>
-                        <th>Operations</th>
+                        <th>Opérations</th>
                     </tr>
                 </thead>
                 <tbody>

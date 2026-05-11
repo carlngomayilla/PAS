@@ -9,6 +9,7 @@ use App\Models\ActionWeek;
 use App\Models\Justificatif;
 use App\Models\User;
 use App\Services\ActionManagementSettings;
+use App\Services\ActionPerformanceService;
 use App\Services\NotificationPolicySettings;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\WorkflowSettings;
@@ -21,7 +22,8 @@ class ActionTrackingService
         private readonly WorkflowSettings $workflowSettings,
         private readonly ActionManagementSettings $actionManagementSettings,
         private readonly NotificationPolicySettings $notificationPolicySettings,
-        private readonly ActionProgressService $actionProgressService
+        private readonly ActionProgressService $actionProgressService,
+        private readonly ActionPerformanceService $actionPerformanceService
     ) {
     }
 
@@ -75,6 +77,35 @@ class ActionTrackingService
             self::STATUS_A_CORRIGER,
             self::STATUS_CLOTUREE,
         ];
+    }
+
+    public function computeActionDelayPriorityScore(Action $action, Carbon $today): float
+    {
+        $lateDays = 0;
+        if (
+            $action->date_echeance instanceof Carbon
+            && ! in_array((string) $action->statut_dynamique, [
+                self::STATUS_ACHEVE_DANS_DELAI,
+                self::STATUS_ACHEVE_HORS_DELAI,
+                self::STATUS_CLOTUREE,
+                self::STATUS_ANNULE,
+            ], true)
+            && $action->date_echeance->lt($today)
+        ) {
+            $lateDays = $action->date_echeance->diffInDays($today);
+        }
+
+        $gap = max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
+        $score = ($lateDays * 2.0) + $gap;
+
+        if ((string) ($action->statut_dynamique ?? '') === self::STATUS_EN_RETARD) {
+            $score += 25.0;
+        }
+        if ((bool) $action->financement_requis) {
+            $score += 4.0;
+        }
+
+        return max(0.0, $score);
     }
 
     /**
@@ -263,6 +294,10 @@ class ActionTrackingService
      */
     public function submitClosureForReview(Action $action, array $payload, ?User $actor = null): Action
     {
+        if ($action->statut_dynamique === self::STATUS_NON_DEMARRE) {
+            throw new \InvalidArgumentException('Une action non démarrée ne peut pas être soumise à validation.');
+        }
+
         $submissionTarget = $this->workflowSettings->actionSubmissionTarget();
         $status = match ($submissionTarget) {
             'direction' => self::VALIDATION_VALIDEE_CHEF,
@@ -646,7 +681,6 @@ class ActionTrackingService
 
         $targetQuantity = (float) ($action->quantite_cible ?? 0);
         $cumulativeQuantity = 0.0;
-        $latestQualitativeProgress = 0.0;
 
         foreach ($weeks as $week) {
             if ($action->type_cible === 'quantitative') {
@@ -659,10 +693,6 @@ class ActionTrackingService
                 $weeklyRealProgress = $week->est_renseignee
                     ? min(100.0, max(0.0, (float) ($week->avancement_estime ?? 0)))
                     : 0.0;
-
-                if ($week->est_renseignee) {
-                    $latestQualitativeProgress = $weeklyRealProgress;
-                }
             }
 
             $weeklyTheoreticalProgress = $this->calculateTheoreticalProgress(
@@ -680,21 +710,8 @@ class ActionTrackingService
             $week->save();
         }
 
-        $realProgress = $action->type_cible === 'quantitative'
-            ? ($targetQuantity > 0 ? min(100.0, round(($cumulativeQuantity / $targetQuantity) * 100, 2)) : 0.0)
-            : min(100.0, max(0.0, $latestQualitativeProgress));
-
-        $sousActions = $action->sousActions;
-        if ($sousActions->isNotEmpty()) {
-            $completedSousActions = $sousActions->filter(function ($sousAction): bool {
-                return (bool) $sousAction->est_effectuee
-                    && trim((string) ($sousAction->commentaire ?? '')) !== ''
-                    && $sousAction->justificatifs->isNotEmpty();
-            })->count();
-
-            $realProgress = min(100.0, round(($completedSousActions / max(1, $sousActions->count())) * 100, 2));
-            $cumulativeQuantity = $completedSousActions;
-        }
+        $realProgress = $this->actionPerformanceService->calculateRealProgress($action);
+        $cumulativeQuantity = $this->actionPerformanceService->realizedQuantity($action);
 
         if ($this->actionManagementSettings->autoCompleteWhenTargetReached()
             && $action->date_fin_reelle === null
@@ -732,7 +749,6 @@ class ActionTrackingService
                 'kpi_performance' => 0.0,
                 'kpi_conformite' => 0.0,
                 'kpi_qualite' => 0.0,
-                'kpi_risque' => 0.0,
                 'kpi_global' => 0.0,
             ];
         } else {
@@ -758,12 +774,7 @@ class ActionTrackingService
             )
         );
 
-        $tauxRealisation = round(
-            (0.40 * ($kpis['kpi_performance'] ?? 0))
-            + (0.30 * ($kpis['kpi_conformite'] ?? 0))
-            + (0.30 * ($kpis['kpi_delai'] ?? 0)),
-            2
-        );
+        $tauxRealisation = round(max(0.0, min(100.0, (float) ($kpis['kpi_performance'] ?? 0))), 2);
         $action->fill([
             'taux_performance' => $kpis['kpi_performance'] ?? null,
             'taux_conformite' => $kpis['kpi_conformite'] ?? null,
@@ -883,7 +894,6 @@ class ActionTrackingService
                 'kpi_performance' => 0.0,
                 'kpi_conformite' => 0.0,
                 'kpi_qualite' => 0.0,
-                'kpi_risque' => 0.0,
                 'kpi_global' => 0.0,
             ],
             default => $this->calculateActionKpis($action, $realProgress, $theoreticalProgress, $quantitativeBase, $referenceDate),
@@ -902,12 +912,7 @@ class ActionTrackingService
             )
         );
 
-        $tauxRealisation = round(
-            (0.40 * ($kpis['kpi_performance'] ?? 0))
-            + (0.30 * ($kpis['kpi_conformite'] ?? 0))
-            + (0.30 * ($kpis['kpi_delai'] ?? 0)),
-            2
-        );
+        $tauxRealisation = round(max(0.0, min(100.0, (float) ($kpis['kpi_performance'] ?? 0))), 2);
 
         $action->fill([
             'taux_performance' => $kpis['kpi_performance'] ?? null,
@@ -1064,7 +1069,7 @@ class ActionTrackingService
     }
 
     /**
-     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_risque: float, kpi_global: float}|null
+     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_global: float}|null
      */
     private function frozenActionKpis(Action $action): ?array
     {
@@ -1081,13 +1086,12 @@ class ActionTrackingService
             'kpi_performance' => (float) $existingKpi->kpi_performance,
             'kpi_conformite' => (float) $existingKpi->kpi_conformite,
             'kpi_qualite' => (float) $existingKpi->kpi_qualite,
-            'kpi_risque' => (float) $existingKpi->kpi_risque,
-            'kpi_global' => (float) $existingKpi->kpi_global,
+            'kpi_global' => round(max(0.0, min(100.0, (float) $existingKpi->kpi_performance)), 2),
         ];
     }
 
     /**
-     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_risque: float, kpi_global: float}
+     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_global: float}
      */
     private function calculateActionKpis(
         Action $action,
@@ -1096,78 +1100,25 @@ class ActionTrackingService
         float $cumulativeQuantity,
         Carbon $referenceDate
     ): array {
-        $delayKpi = 0.0;
-        $plannedEnd = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
-        $plannedStart = $action->date_debut !== null ? Carbon::parse($action->date_debut)->startOfDay() : null;
-
-        if ($realProgress >= 100.0 && $plannedEnd !== null) {
-            $actualEnd = $action->date_fin_reelle !== null
-                ? Carbon::parse($action->date_fin_reelle)->endOfDay()
-                : $referenceDate->copy()->endOfDay();
-
-            if ($actualEnd->lte($plannedEnd)) {
-                $delayKpi = 100.0;
-            } else {
-                $plannedDuration = $plannedStart !== null ? max(1, $plannedStart->diffInDays($plannedEnd) + 1) : 1;
-                $actualDuration = $plannedStart !== null ? max(1, $plannedStart->diffInDays($actualEnd) + 1) : 1;
-                $delayKpi = round(min(100.0, ($plannedDuration / $actualDuration) * 100), 2);
-            }
-        } else {
-            $delayKpi = round(max(0.0, min(100.0, 100.0 - max(0.0, $theoreticalProgress - $realProgress))), 2);
-        }
-
-        if ($action->type_cible === 'quantitative') {
-            $target = (float) ($action->quantite_cible ?? 0);
-            $performanceKpi = $target > 0
-                ? round(min(100.0, max(0.0, ($cumulativeQuantity / $target) * 100)), 2)
-                : 0.0;
-        } else {
-            $performanceKpi = round(min(100.0, max(0.0, $realProgress)), 2);
-        }
-
-        $conformiteKpi = $action->direction_evaluation_note !== null
-            ? round(min(100.0, max(0.0, (float) $action->direction_evaluation_note)), 2)
-            : ($action->evaluation_note !== null
-                ? round(min(100.0, max(0.0, (float) $action->evaluation_note)), 2)
-                : match ($action->validation_sans_correction) {
-                true => 100.0,
-                false => 70.0,
-                default => 85.0,
-            });
-
-        $dueWeeks = $action->weeks()
-            ->whereDate('date_fin', '<=', $referenceDate->toDateString())
-            ->get();
-        $missingDueWeeks = $dueWeeks->filter(fn (ActionWeek $week): bool => ! $week->est_renseignee)->count();
-        if ($missingDueWeeks > 0) {
-            $conformiteKpi = round(max(0.0, $conformiteKpi - min(45.0, 20.0 + (($missingDueWeeks - 1) * 10.0))), 2);
-        }
-
-        $qualityKpi = $this->calculateQualityKpi($action, $referenceDate);
-        $riskKpi = $this->calculateRiskKpi($action, $realProgress, $theoreticalProgress, $referenceDate);
-
-        $globalKpi = round(
-            (0.25 * $delayKpi)
-            + (0.30 * $performanceKpi)
-            + (0.15 * $conformiteKpi)
-            + (0.15 * $qualityKpi)
-            + (0.15 * $riskKpi),
-            2
-        );
+        $realProgress = $this->actionPerformanceService->calculateRealProgress($action);
+        $delayKpi = $this->actionPerformanceService->calculateDelayScore($action, $referenceDate);
+        $qualityKpi = $this->actionPerformanceService->calculateQualityScore($action);
+        $performanceKpi = $this->actionPerformanceService->calculateExecutionPerformance($action, $referenceDate);
+        $conformiteKpi = $qualityKpi;
+        $globalKpi = $performanceKpi;
 
         return [
             'kpi_delai' => $delayKpi,
             'kpi_performance' => $performanceKpi,
             'kpi_conformite' => $conformiteKpi,
             'kpi_qualite' => $qualityKpi,
-            'kpi_risque' => $riskKpi,
             'kpi_global' => $globalKpi,
         ];
     }
 
     /**
      * @param \Illuminate\Support\Collection<int, ActionWeek> $weeks
-     * @param array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_risque: float, kpi_global: float} $kpis
+     * @param array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_global: float} $kpis
      */
     private function generateAutomaticAlerts(
         Action $action,
@@ -1240,7 +1191,7 @@ class ActionTrackingService
             if ($daysLeft >= 0 && $daysLeft <= self::RISK_ALERT_THRESHOLD_DAYS && $action->date_fin_reelle === null) {
                 $this->createLogIfMissingToday(
                     $action,
-                    'action_a_risque',
+                    'action_a_surveiller',
                     'warning',
                     'Action proche de l echeance et necessitant une vigilance immediate.',
                     [
@@ -1412,43 +1363,6 @@ class ActionTrackingService
 
         if ($action->date_fin_reelle !== null && trim((string) ($action->rapport_final ?? '')) === '') {
             $score -= 10.0;
-        }
-
-        return round(max(0.0, min(100.0, $score)), 2);
-    }
-
-    private function calculateRiskKpi(
-        Action $action,
-        float $realProgress,
-        float $theoreticalProgress,
-        Carbon $referenceDate
-    ): float {
-        $score = 100.0;
-        $gap = max(0.0, $theoreticalProgress - $realProgress);
-
-        if ($gap > 0) {
-            $score -= min(30.0, round($gap, 2));
-        }
-
-        $deadline = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
-        if ($deadline !== null && $action->date_fin_reelle === null) {
-            if ($referenceDate->copy()->endOfDay()->gt($deadline)) {
-                $daysLate = $deadline->diffInDays($referenceDate->copy()->endOfDay());
-                $score -= min(45.0, 20.0 + ($daysLate * 5.0));
-            } else {
-                $daysLeft = $referenceDate->copy()->startOfDay()->diffInDays($deadline->copy()->startOfDay(), false);
-                if ($daysLeft >= 0 && $daysLeft <= self::RISK_ALERT_THRESHOLD_DAYS) {
-                    $score -= 20.0;
-                }
-            }
-        }
-
-        $risks = trim((string) ($action->risques ?? ''));
-        $preventiveMeasures = trim((string) ($action->mesures_preventives ?? ''));
-        if ($risks !== '' && $preventiveMeasures === '') {
-            $score -= 15.0;
-        } elseif ($risks !== '') {
-            $score -= 5.0;
         }
 
         return round(max(0.0, min(100.0, $score)), 2);

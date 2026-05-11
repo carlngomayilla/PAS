@@ -35,7 +35,7 @@
 
     $menuItems = [[
         'code' => 'dashboard',
-        'label' => $moduleLabel('pilotage', 'Dashboard'),
+        'label' => 'Dashboard',
         'route' => 'dashboard',
         'icon' => 'dashboard',
         'patterns' => ['dashboard', 'admin.dashboard'],
@@ -106,7 +106,7 @@
             ];
         }
 
-        $sections[] = ['title' => 'Execution', 'items' => $sortItems($executionItems)];
+        $sections[] = ['title' => 'Exécution', 'items' => $sortItems($executionItems)];
     }
 
     $pilotageItems = [];
@@ -132,14 +132,14 @@
         ];
     }
     if ($pilotageItems !== []) {
-        $sections[] = ['title' => 'Pilotage', 'items' => $sortItems($pilotageItems)];
+        $sections[] = ['title' => 'Dashboard', 'items' => $sortItems($pilotageItems)];
     }
 
     $toolItems = [];
     if ($canSeeModule('referentiel')) {
         $toolItems[] = [
             'code' => 'referentiel',
-            'label' => $moduleLabel('referentiel', 'Referentiels'),
+            'label' => $moduleLabel('referentiel', 'Référentiels'),
             'route' => 'workspace.referentiel.directions.index',
             'icon' => 'referentiel',
             'patterns' => ['workspace.referentiel.*'],
@@ -149,7 +149,7 @@
     if ($canSeeModule('delegations')) {
         $toolItems[] = [
             'code' => 'delegations',
-            'label' => $moduleLabel('delegations', 'Delegations'),
+            'label' => $moduleLabel('delegations', 'Délégations'),
             'route' => 'workspace.delegations.index',
             'icon' => 'delegations',
             'patterns' => ['workspace.delegations.*'],
@@ -159,7 +159,7 @@
     if ($canSeeModule('retention')) {
         $toolItems[] = [
             'code' => 'retention',
-            'label' => $moduleLabel('retention', 'Retention'),
+            'label' => $moduleLabel('retention', 'Rétention'),
             'route' => 'workspace.retention.index',
             'icon' => 'retention',
             'patterns' => ['workspace.retention.*'],
@@ -242,7 +242,7 @@
                         type="button"
                         class="app-sidebar-collapse-toggle"
                         data-sidebar-collapse-toggle
-                        aria-label="Reduire ou agrandir le menu"
+                        aria-label="Réduire ou agrandir le menu"
                     >
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />

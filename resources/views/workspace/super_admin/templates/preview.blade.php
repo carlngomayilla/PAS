@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">{{ $preview['label'] ?? 'Apercu' }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.templates.show', $template) }}">Retour template</a>
                 <a class="btn btn-primary" href="{{ route('workspace.super-admin.templates.edit', $template) }}">Modifier</a>
             </div>
@@ -38,7 +38,7 @@
                 </div>
             </article>
             <article class="ui-card !mb-0">
-                <h2>Metadonnees exportees</h2>
+                <h2>Métadonnées exportées</h2>
                 <div class="mt-4 space-y-3 text-sm text-slate-700">
                     <p><strong>Titre :</strong> {{ $preview['summary']['title'] ?? '-' }}</p>
                     <p><strong>Sous-titre :</strong> {{ $preview['summary']['subtitle'] ?? '-' }}</p>
@@ -55,7 +55,7 @@
                     <p>
                         <strong>{{ $key }}</strong> :
                         @if (is_array($value))
-                            {{ implode(', ', array_keys(array_filter($value))) ?: 'Aucune donnee' }}
+                            {{ implode(', ', array_keys(array_filter($value))) ?: 'Aucune donnée' }}
                         @else
                             {{ $value }}
                         @endif
@@ -65,4 +65,3 @@
         </section>
     @endif
 @endsection
-

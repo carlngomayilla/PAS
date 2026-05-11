@@ -93,17 +93,17 @@
         ];
         $kpiCards = [
             [
-                'label' => $metricLabel('global'),
-                'value' => number_format((float) ($kpiSummary['global'] ?? 0), 0),
+                'label' => $metricLabel('performance'),
+                'value' => number_format((float) ($kpiSummary['performance'] ?? 0), 1, ',', ' '),
                 'meta' => null,
-                'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc']),
+                'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']),
                 'valueClass' => 'showcase-kpi-number text-[#3996d3]',
                 'badge' => null,
                 'badge_tone' => 'success',
             ],
             [
-                'label' => 'Qualite',
-                'value' => number_format((float) ($kpiSummary['qualite'] ?? 0), 0),
+                'label' => 'Qualité',
+                'value' => number_format((float) ($kpiSummary['qualite'] ?? 0), 1, ',', ' '),
                 'meta' => null,
                 'href' => route('workspace.actions.index', ['sort' => 'kpi_qualite_desc']),
                 'valueClass' => 'showcase-kpi-number text-[#8fc043]',
@@ -111,17 +111,8 @@
                 'badge_tone' => 'success',
             ],
             [
-                'label' => 'Risque',
-                'value' => number_format((float) ($kpiSummary['risque'] ?? 0), 0),
-                'meta' => null,
-                'href' => route('workspace.actions.index', ['sort' => 'kpi_risque_desc']),
-                'valueClass' => 'showcase-kpi-number text-[#f9b13c]',
-                'badge' => null,
-                'badge_tone' => 'success',
-            ],
-            [
                 'label' => 'Progression',
-                'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 0),
+                'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 1, ',', ' '),
                 'meta' => null,
                 'href' => route('workspace.actions.index', ['sort' => 'progression_desc']),
                 'valueClass' => 'showcase-kpi-number text-[#3996d3]',
@@ -144,7 +135,7 @@
                     Limite d'affichage : {{ $limit }} éléments
                 </span>
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('dashboard') }}">
-                    Retour dashboard
+                    Retour au tableau de bord
                 </a>
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting') }}">
                     Ouvrir le reporting
@@ -288,9 +279,8 @@
                         @if (!empty($alert['metrics']) || !empty($alert['escalation_label']))
                             <div class="mt-3 flex flex-wrap items-center gap-2">
                                 @foreach ([
-                                    'kpi_global' => 'Indicateur global',
-                                    'kpi_qualite' => 'Qualite',
-                                    'kpi_risque' => 'Risque',
+                                    'kpi_performance' => "Performance d'exécution",
+                                    'kpi_qualite' => 'Qualité',
                                 ] as $metricKey => $metricLabel)
                                     @php
                                         $metricValue = (float) ($alert['metrics'][$metricKey] ?? 0);
@@ -298,7 +288,7 @@
                                     @endphp
                                     @if (array_key_exists($metricKey, (array) ($alert['metrics'] ?? [])))
                                         <span class="anbg-badge anbg-badge-{{ $metricTone }} px-3 py-1 text-[11px]">
-                                            {{ $metricLabel }} {{ number_format($metricValue, 0) }}
+                                            {{ $metricLabel }} {{ number_format($metricValue, 1, ',', ' ') }}
                                         </span>
                                     @endif
                                 @endforeach
@@ -319,12 +309,12 @@
             </a>
         @empty
             <div class="rounded-2xl border border-dashed border-slate-300 bg-white/90 px-6 py-10 text-center text-sm text-slate-500">
-                Aucune alerte sur le perimetre courant.
+                Aucune alerte sur le périmètre courant.
             </div>
         @endforelse
 
         <div id="alert-empty-state" class="hidden rounded-2xl border border-dashed border-slate-300 bg-white/90 px-6 py-10 text-center text-sm text-slate-500">
-            Aucune alerte ne correspond aux filtres selectionnes.
+            Aucune alerte ne correspond aux filtres sélectionnés.
         </div>
     </section>
     </div>

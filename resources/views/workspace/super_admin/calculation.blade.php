@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">Les validations chef et direction restent dans le workflow, mais elles ne declenchent plus les Indicateur de performance ni les statistiques. Le calcul consolide porte maintenant sur tout le portefeuille visible.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.workflow.edit') }}">Workflow et validations</a>
             </div>
@@ -71,7 +71,7 @@
                 <tbody>
                     <tr>
                         <td class="px-3 py-2">Provisoire</td>
-                        <td class="px-3 py-2">Toutes les actions visibles dans le perimetre</td>
+                        <td class="px-3 py-2">Toutes les actions visibles dans le périmètre</td>
                         <td class="px-3 py-2">Suivi terrain, retards, charge et progression courante</td>
                     </tr>
                     <tr>
@@ -84,4 +84,3 @@
         </div>
     </section>
 @endsection
-

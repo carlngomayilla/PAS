@@ -37,7 +37,8 @@ class ReportingAnalyticsService
         private readonly AnalyticsCacheVersionService $cacheVersionService,
         private readonly KpiAggregatorService $kpiAggregatorService,
         private readonly ActionSummaryService $actionSummaryService,
-        private readonly ExerciceContext $exerciceContext
+        private readonly ExerciceContext $exerciceContext,
+        private readonly \App\Services\Actions\ActionTrackingService $actionTrackingService
     ) {
     }
 
@@ -92,7 +93,7 @@ class ReportingAnalyticsService
         $this->scopeActionStatistics($actionsStatistics);
         $validatedActions = (clone $actionsStatistics)
             ->with([
-                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque,kpi_global',
+                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_global',
             ])
             ->get();
 
@@ -122,7 +123,7 @@ class ReportingAnalyticsService
                 ->with([
                     'pta:id,titre,direction_id,service_id',
                     'responsable:id,name,email',
-                    'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
+                    'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
                 ])
                 ->whereNotNull('date_echeance')
                 ->whereDate('date_echeance', '<', $today)
@@ -155,7 +156,7 @@ class ReportingAnalyticsService
                     'pta.pao:id,titre',
                     'responsable:id,name,email',
                     'kpis:id,action_id,libelle',
-                    'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
+                    'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
                 ])
                 ->orderByDesc('id')
                 ->limit(300)
@@ -210,10 +211,8 @@ class ReportingAnalyticsService
                         'progression' => number_format((float) ($action->progression_reelle ?? 0), 2, '.', '').'%',
                         'kpi_global' => round((float) ($action->actionKpi?->kpi_global ?? 0), 2),
                         'kpi_qualite' => round((float) ($action->actionKpi?->kpi_qualite ?? 0), 2),
-                        'kpi_risque' => round((float) ($action->actionKpi?->kpi_risque ?? 0), 2),
                         'ressources_requises' => implode(' | ', $ressources),
                         'indicateurs_performance' => (string) $indicateurs,
-                        'risques_potentiels' => (string) ($action->risques ?? ''),
                     ];
                 });
 
@@ -344,7 +343,7 @@ class ReportingAnalyticsService
                 'responsable:id,name,email',
                 'kpis:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'kpis.mesures:id,kpi_id,periode,valeur,commentaire',
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_qualite,kpi_risque,kpi_conformite',
+                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_qualite,kpi_conformite',
                 'justificatifs:id,justifiable_type,justifiable_id,categorie,nom_original,description,created_at,ajoute_par',
                 'justificatifs.ajoutePar:id,name',
             ])
@@ -507,8 +506,6 @@ class ReportingAnalyticsService
         $isCompleted = in_array((string) $action->statut_dynamique, $this->completedActionStatuses(), true)
             || $progression >= 100.0;
         $isDelayed = $this->isReportActionDelayed($action);
-        $riskText = trim((string) ($action->risques ?? ''));
-        $mitigationText = trim((string) ($action->mesures_preventives ?? ''));
         $strategicObjective = (string) (
             $action->pta?->pao?->pasObjectif?->libelle
             ?? $action->pta?->pao?->titre
@@ -554,18 +551,13 @@ class ReportingAnalyticsService
             'kpi_delai' => number_format((float) ($action->actionKpi?->kpi_delai ?? 0), 2, '.', ''),
             'kpi_performance' => number_format((float) ($action->actionKpi?->kpi_performance ?? 0), 2, '.', ''),
             'kpi_qualite' => number_format((float) ($action->actionKpi?->kpi_qualite ?? 0), 2, '.', ''),
-            'kpi_risque' => number_format((float) ($action->actionKpi?->kpi_risque ?? 0), 2, '.', ''),
             'kpi_conformite' => number_format($kpiConformite, 2, '.', ''),
             'progression_value' => $progression,
             'kpi_global_value' => $kpiGlobal,
             'kpi_delai_value' => (float) ($action->actionKpi?->kpi_delai ?? 0),
             'kpi_performance_value' => (float) ($action->actionKpi?->kpi_performance ?? 0),
             'kpi_qualite_value' => (float) ($action->actionKpi?->kpi_qualite ?? 0),
-            'kpi_risque_value' => (float) ($action->actionKpi?->kpi_risque ?? 0),
             'kpi_conformite_value' => $kpiConformite,
-            'risque_identifie' => $riskText,
-            'niveau_risque' => $this->reportRiskLevel($riskText, (float) ($action->actionKpi?->kpi_risque ?? 0)),
-            'mesure_mitigation' => $mitigationText,
             'ressources_requises' => $this->reportActionResourcesLabel($action),
             'justificatif' => $this->reportActionJustificatifLabel($justificatifs),
             'justificatifs' => $justificatifs,
@@ -679,23 +671,6 @@ class ReportingAnalyticsService
         }
 
         return $action->date_fin->lt(Carbon::today());
-    }
-
-    private function reportRiskLevel(string $riskText, float $riskScore): string
-    {
-        if ($riskText === '') {
-            return '-';
-        }
-
-        if ($riskScore > 0 && $riskScore < 50) {
-            return 'Eleve';
-        }
-
-        if ($riskScore > 0 && $riskScore < 75) {
-            return 'Modere';
-        }
-
-        return 'Faible';
     }
 
     private function reportActionResourcesLabel(Action $action): string
@@ -1397,7 +1372,7 @@ class ReportingAnalyticsService
                     'end' => $end,
                     'progress' => round(max(0, min(100, (float) ($action->progression_reelle ?? 0))), 2),
                     'status' => (string) ($action->statut_dynamique ?? 'non_demarre'),
-                    'score' => round($this->computeActionRiskScore($action, $today), 2),
+                    'score' => round($this->actionTrackingService->computeActionDelayPriorityScore($action, $today), 2),
                 ];
             })
             ->sortByDesc('score')
@@ -1465,57 +1440,6 @@ class ReportingAnalyticsService
         $resourceValues = array_map(fn (array $row): float => round((float) $row['weight'], 2), array_values($resourceGroups));
         $resourceUrls = array_map(fn (array $row): string => (string) $row['url'], array_values($resourceGroups));
 
-        $riskCounts = [];
-        foreach ($actionCandidates as $action) {
-            $riskText = (string) ($action->risques ?? '');
-            if (trim($riskText) === '') {
-                continue;
-            }
-            $parts = preg_split('/[;,|\\/\\r\\n]+/', $riskText) ?: [];
-            foreach ($parts as $part) {
-                $normalized = $this->normalizeRiskLabel((string) $part);
-                if ($normalized === null) {
-                    continue;
-                }
-                $riskCounts[$normalized] = (int) (($riskCounts[$normalized] ?? 0) + 1);
-            }
-        }
-        arsort($riskCounts);
-        $riskCounts = array_slice($riskCounts, 0, 8, true);
-
-        $paretoLabels = array_keys($riskCounts);
-        $paretoValues = array_values($riskCounts);
-        $paretoUrls = array_map(
-            fn (string $label): string => $this->actionIndexRoute(['risque_label' => $label]),
-            $paretoLabels
-        );
-        $paretoCumulative = [];
-        $runningTotal = 0;
-        $allTotal = array_sum($paretoValues);
-        foreach ($paretoValues as $value) {
-            $runningTotal += (int) $value;
-            $paretoCumulative[] = $allTotal > 0 ? round(($runningTotal / $allTotal) * 100, 2) : 0.0;
-        }
-
-        $topRiskRows = $scoredActions
-            ->take(10)
-            ->map(function (array $item): array {
-                $action = $item['action'];
-
-                return [
-                    'action' => (string) $item['label'],
-                    'score' => (float) $item['score'],
-                    'statut' => (string) $item['status'],
-                    'echeance' => $action->date_echeance instanceof Carbon ? $action->date_echeance->toDateString() : '-',
-                    'responsable' => (string) ($action->responsable?->name ?? '-'),
-                    'url' => route('workspace.actions.suivi', $action),
-                ];
-            })
-            ->all();
-
-        $topRiskLabels = array_map(fn (array $row): string => Str::limit((string) $row['action'], 34), $topRiskRows);
-        $topRiskScores = array_map(fn (array $row): float => (float) $row['score'], $topRiskRows);
-
         $performanceGaugeMeta = $this->resolvePerformanceGaugeMeta($user);
         $performanceRows = $this->buildPerformanceGaugeRows($user, $actionCandidates);
         $performanceLabels = array_map(
@@ -1568,17 +1492,6 @@ class ReportingAnalyticsService
                 'urls' => $resourceUrls,
                 'total' => round((float) array_sum($resourceValues), 2),
             ],
-            'risk_pareto' => [
-                'labels' => array_map(fn ($label): string => Str::limit(Str::title((string) $label), 42), $paretoLabels),
-                'counts' => $paretoValues,
-                'urls' => $paretoUrls,
-                'cumulative_pct' => $paretoCumulative,
-            ],
-            'top_risks' => [
-                'labels' => $topRiskLabels,
-                'scores' => $topRiskScores,
-                'rows' => $topRiskRows,
-            ],
             'performance_gauge' => [
                 'scope_label' => (string) ($performanceGaugeMeta['label'] ?? 'Directions'),
                 'empty_label' => (string) ($performanceGaugeMeta['empty_label'] ?? 'Aucune donnee disponible pour les jauges.'),
@@ -1626,51 +1539,6 @@ class ReportingAnalyticsService
     {
         return $this->kpiAggregatorService->summarizeActions($actions);
 
-    }
-
-    private function computeActionRiskScore(Action $action, Carbon $today): float
-    {
-        $lateDays = 0;
-        if ($action->date_echeance instanceof Carbon && ! in_array((string) $action->statut_dynamique, $this->completedActionStatuses(), true) && $action->date_echeance->lt($today)) {
-            $lateDays = $action->date_echeance->diffInDays($today);
-        }
-
-        $gap = max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
-        $hasRisk = trim((string) ($action->risques ?? '')) !== '';
-        $isDelayed = (string) ($action->statut_dynamique ?? '') === ActionTrackingService::STATUS_EN_RETARD;
-
-        $score = ($lateDays * 2.0) + $gap;
-        if ($isDelayed) {
-            $score += 25.0;
-        }
-        if ($hasRisk) {
-            $score += 10.0;
-        }
-        if ((bool) $action->financement_requis) {
-            $score += 4.0;
-        }
-
-        return max(0.0, $score);
-    }
-
-    private function normalizeRiskLabel(string $value): ?string
-    {
-        $normalized = Str::of($value)
-            ->lower()
-            ->replaceMatches('/\\s+/', ' ')
-            ->trim(" \t\n\r\0\x0B-._");
-
-        $label = (string) $normalized;
-        if ($label === '' || Str::length($label) < 4) {
-            return null;
-        }
-
-        $ignored = ['ras', 'aucun', 'aucune', 'neant', 'n/a', 'na', 'none', 'ok'];
-        if (in_array($label, $ignored, true)) {
-            return null;
-        }
-
-        return $label;
     }
 
     /**

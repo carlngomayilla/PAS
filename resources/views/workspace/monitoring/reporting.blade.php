@@ -44,7 +44,6 @@
             'Cockpit indicateurs et tendances',
             'Entonnoir PAS / PAO / PTA / Actions',
             'Heatmap des retards',
-            'Pareto des risques',
             'Gantt critique et jauges de performance',
             'Tables de consolidation PAS et comparaisons interannuelles',
         ];
@@ -61,7 +60,7 @@
                 </div>
             </div>
             <div class="showcase-action-row">
-                <a class="btn btn-blue rounded-2xl px-4 py-2.5" href="{{ $dashboardAnalyticsUrl }}">Dashboard analytique</a>
+                <a class="btn btn-blue rounded-2xl px-4 py-2.5" href="{{ $dashboardAnalyticsUrl }}">Tableau de bord analytique</a>
                 <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.excel') }}">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h11l5 5v11H4V4zm11 0v5h5M8 13h8M8 17h8M8 9h3" />
@@ -99,7 +98,7 @@
         <section class="showcase-panel mb-4">
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Indicateur de performance pilotes actifs</h2>
+                    <h2 class="showcase-panel-title">Performances d'exécution pilotes actives</h2>
                 </div>
             </div>
             <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
@@ -137,7 +136,7 @@
             </div>
 
             <div class="mt-4 flex flex-wrap gap-3">
-                <a href="{{ $dashboardAnalyticsUrl }}" class="btn btn-primary rounded-2xl px-4 py-2.5">Dashboard analytique</a>
+                <a href="{{ $dashboardAnalyticsUrl }}" class="btn btn-primary rounded-2xl px-4 py-2.5">Tableau de bord analytique</a>
                 <a href="{{ route('workspace.alertes') }}" class="btn btn-secondary rounded-2xl px-4 py-2.5">Alertes</a>
             </div>
         </article>
@@ -145,7 +144,7 @@
         <article class="showcase-panel">
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Direction -> service</h2>
+                    <h2 class="showcase-panel-title">Direction / service</h2>
                 </div>
                 <span class="anbg-badge anbg-badge-info px-3 py-1">{{ $directionServiceReport->count() }} directions</span>
             </div>
@@ -165,7 +164,7 @@
                             </div>
                             <div class="flex flex-wrap gap-2 text-xs">
                                 <span class="anbg-badge anbg-badge-neutral px-3">{{ $directionSummary['actions_total'] ?? 0 }} actions</span>
-                                <span class="anbg-badge anbg-badge-success px-3">{{ number_format((float) ($directionSummary['taux_realisation'] ?? 0), 1) }}% realisation</span>
+                                <span class="anbg-badge anbg-badge-success px-3">{{ number_format((float) ($directionSummary['taux_realisation'] ?? 0), 1) }}% réalisation</span>
                                 <span class="anbg-badge anbg-badge-warning px-3">{{ number_format((float) ($directionSummary['taux_retard'] ?? 0), 1) }}% retard</span>
                             </div>
                         </div>
@@ -185,7 +184,7 @@
                                         <div class="flex flex-wrap gap-2 text-xs">
                                             <span class="anbg-badge anbg-badge-neutral px-3">{{ $serviceSummary['actions_total'] ?? 0 }} actions</span>
                                             <span class="anbg-badge anbg-badge-success px-3">{{ number_format((float) ($serviceSummary['taux_realisation'] ?? 0), 1) }}%</span>
-                                            <span class="anbg-badge anbg-badge-info px-3">Indicateur de performance {{ number_format((float) ($serviceSummary['kpi_global'] ?? 0), 1) }}</span>
+                                            <span class="anbg-badge anbg-badge-info px-3">Performance d'exécution {{ number_format((float) ($serviceSummary['kpi_global'] ?? 0), 1) }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -195,7 +194,7 @@
                         </div>
                     </section>
                 @empty
-                    <div class="rounded-[1.15rem] border border-dashed border-slate-300/80 px-4 py-8 text-center text-sm text-slate-500">Aucune donnée direction -> service disponible pour le périmètre courant.</div>
+                    <div class="rounded-[1.15rem] border border-dashed border-slate-300/80 px-4 py-8 text-center text-sm text-slate-500">Aucune donnée direction / service disponible pour le périmètre courant.</div>
                 @endforelse
             </div>
         </article>

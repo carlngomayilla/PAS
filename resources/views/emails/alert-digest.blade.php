@@ -8,7 +8,7 @@
     <h2 style="margin-bottom: 8px;">Alerte automatique ANBG</h2>
     <p style="margin-top: 0;">
         Bonjour {{ $user->name }},<br>
-        voici le point des alertes de votre perimetre au {{ $digest['generated_at']->format('Y-m-d H:i') }}.
+        voici le point des alertes de votre périmètre au {{ $digest['generated_at']->format('Y-m-d H:i') }}.
     </p>
 
     <table cellpadding="6" cellspacing="0" border="1" style="border-collapse: collapse; margin: 12px 0;">
@@ -80,7 +80,7 @@
     @endif
 
     <p>
-        Acces direct: <a href="{{ url('/workspace/alertes') }}">{{ url('/workspace/alertes') }}</a>
+        Accès direct : <a href="{{ url('/workspace/alertes') }}">{{ url('/workspace/alertes') }}</a>
     </p>
     <p style="color: #6b7280; font-size: 12px;">
         Message automatique ANBG - PAS/PAO/PTA.

@@ -519,7 +519,7 @@ class PlanningApiTest extends TestCase
         Storage::disk('local')->assertExists($storedPath);
     }
 
-    public function test_action_api_exposes_quality_and_risk_kpis(): void
+    public function test_action_api_exposes_execution_quality_and_progress_kpis_without_risk(): void
     {
         $admin = $this->createAdminUser();
         $action = Action::query()->firstOrFail();
@@ -531,7 +531,6 @@ class PlanningApiTest extends TestCase
                 'kpi_performance' => 82,
                 'kpi_conformite' => 91,
                 'kpi_qualite' => 88,
-                'kpi_risque' => 63,
                 'kpi_global' => 80,
                 'progression_reelle' => 64,
                 'progression_theorique' => 70,
@@ -554,8 +553,10 @@ class PlanningApiTest extends TestCase
             ->assertJsonStructure([
                 'data' => [
                     'action_kpi' => [
+                        'kpi_performance',
                         'kpi_qualite',
-                        'kpi_risque',
+                        'kpi_delai',
+                        'progression_reelle',
                     ],
                 ],
             ]);
@@ -563,7 +564,8 @@ class PlanningApiTest extends TestCase
         $payload = $response->json('data.action_kpi');
         $this->assertIsArray($payload);
         $this->assertArrayHasKey('kpi_qualite', $payload);
-        $this->assertArrayHasKey('kpi_risque', $payload);
+        $this->assertArrayHasKey('kpi_performance', $payload);
+        $this->assertArrayNotHasKey('kpi_risque', $payload);
     }
 
     public function test_action_api_direct_creation_is_disabled(): void
@@ -695,7 +697,6 @@ class PlanningApiTest extends TestCase
                     'performance',
                     'conformite',
                     'qualite',
-                    'risque',
                     'global',
                     'progression',
                 ],
@@ -707,7 +708,6 @@ class PlanningApiTest extends TestCase
         $this->assertIsArray($items);
         $this->assertNotEmpty($items);
         $this->assertIsNumeric($response->json('kpi_summary.qualite'));
-        $this->assertIsNumeric($response->json('kpi_summary.risque'));
         $this->assertArrayHasKey('source_type', $items[0]);
         $this->assertArrayHasKey('is_unread', $items[0]);
         $this->assertArrayHasKey('target_url', $items[0]);
@@ -812,7 +812,6 @@ class PlanningApiTest extends TestCase
                     'performance',
                     'conformite',
                     'qualite',
-                    'risque',
                     'global',
                     'progression',
                 ],
@@ -821,7 +820,6 @@ class PlanningApiTest extends TestCase
             ]);
 
         $reportingResponse->assertJsonPath('kpi_summary.qualite', fn ($value) => is_numeric($value));
-        $reportingResponse->assertJsonPath('kpi_summary.risque', fn ($value) => is_numeric($value));
 
         $auditResponse = $this->withHeader('Authorization', "Bearer {$token}")
             ->getJson('/api/v1/journal-audit');

@@ -135,7 +135,7 @@ class AlertCenterService
                 'pta.direction:id,code,libelle',
                 'pta.service:id,code,libelle',
                 'responsable:id,name',
-                'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
+                'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
             ])
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', $today)
@@ -186,7 +186,7 @@ class AlertCenterService
             ->with([
                 'kpi:id,action_id,libelle,seuil_alerte,periodicite',
                 'kpi.action:id,pta_id,libelle,responsable_id',
-                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
+                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'kpi.action.pta.direction:id,code,libelle',
                 'kpi.action.pta.service:id,code,libelle',
@@ -205,7 +205,7 @@ class AlertCenterService
         $query = ActionLog::query()
             ->with([
                 'action:id,pta_id,libelle,statut_dynamique',
-                'action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
+                'action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
                 'action.pta:id,direction_id,service_id,titre',
                 'action.pta.direction:id,code,libelle',
                 'action.pta.service:id,code,libelle',
@@ -364,7 +364,7 @@ class AlertCenterService
                 'pta.direction:id,code,libelle',
                 'pta.service:id,code,libelle',
                 'responsable:id,name',
-                'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
+                'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
             ])
             ->whereKey($id)
             ->whereNotNull('date_echeance')
@@ -407,7 +407,7 @@ class AlertCenterService
             ->with([
                 'kpi:id,action_id,libelle,seuil_alerte,periodicite',
                 'kpi.action:id,pta_id,libelle,responsable_id',
-                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
+                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'kpi.action.pta.direction:id,code,libelle',
                 'kpi.action.pta.service:id,code,libelle',
@@ -425,7 +425,7 @@ class AlertCenterService
         $query = ActionLog::query()
             ->with([
                 'action:id,pta_id,libelle,statut_dynamique',
-                'action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_risque',
+                'action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
                 'action.pta:id,direction_id,service_id,titre',
                 'action.pta.direction:id,code,libelle',
                 'action.pta.service:id,code,libelle',
@@ -581,7 +581,7 @@ class AlertCenterService
         $isCritical = $threshold > 0 && $value <= ($threshold * 0.8);
         $level = $isCritical ? 'critical' : 'warning';
         $isGlobal = str_contains(mb_strtolower((string) ($mesure->kpi?->libelle ?? '')), 'global');
-        $title = $isGlobal ? 'Indicateur global critique' : 'Indicateur sous seuil';
+        $title = $isGlobal ? 'Performance d execution critique' : 'Indicateur sous seuil';
         $message = sprintf(
             '%s est a %.2f pour la periode %s, sous le seuil de %.2f.',
             (string) ($mesure->kpi?->libelle ?? 'L indicateur'),
@@ -828,14 +828,14 @@ class AlertCenterService
     {
         return match ($type) {
             'retard' => 'Retard',
-            'action_a_risque' => 'A risque',
+            'action_a_surveiller' => 'A surveiller',
             'action_non_demarre' => 'Non demarree',
             'alerte_combinee_critique' => 'Escalade DG',
             'retard_kpi_critique' => 'Escalade DG',
             'conformite_incomplete' => 'Conformite',
             'justificatif_absent' => 'Justificatif',
             'pao_manquant' => 'PAO manquant',
-            'kpi_global' => 'Indicateur global',
+            'kpi_global' => 'Performance d execution',
             'kpi_sous_seuil' => 'Indicateur sous seuil',
             'periode_manquante' => 'Periode manquante',
             'ecart_progression' => 'Ecart progression',
@@ -862,7 +862,7 @@ class AlertCenterService
         return [
             'kpi_global' => round((float) ($action->actionKpi?->kpi_global ?? 0), 2),
             'kpi_qualite' => round((float) ($action->actionKpi?->kpi_qualite ?? 0), 2),
-            'kpi_risque' => round((float) ($action->actionKpi?->kpi_risque ?? 0), 2),
+            'kpi_performance' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
         ];
     }
 
@@ -882,7 +882,7 @@ class AlertCenterService
     private function logTitle(ActionLog $log): string
     {
         return match ((string) $log->type_evenement) {
-            'action_a_risque' => 'Action a risque',
+            'action_a_surveiller' => 'Action a surveiller',
             'alerte_combinee_critique' => 'Retard et indicateur critique',
             'retard_kpi_critique' => 'Retard et indicateur critique',
             'periode_manquante' => 'Periode non renseignee',

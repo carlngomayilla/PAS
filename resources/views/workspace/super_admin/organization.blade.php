@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">Pilotage direct des directions, des services, des comptes, des sessions actives et des reinitialisations controlees.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.referentiel.directions.index') }}">Referentiel directions</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.referentiel.services.index') }}">Referentiel services</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Referentiel utilisateurs</a>
@@ -42,7 +42,7 @@
                     <input id="q" name="q" type="text" value="{{ $filters['q'] }}" placeholder="Nom, email ou matricule">
                 </div>
                 <div>
-                    <label for="role">Role</label>
+                    <label for="role">Rôle</label>
                     <select id="role" name="role">
                         <option value="">Tous</option>
                         @foreach ($roleOptions as $role)
@@ -69,7 +69,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="is_active">Etat</label>
+                    <label for="is_active">État</label>
                     <select id="is_active" name="is_active">
                         <option value="">Tous</option>
                         <option value="1" @selected($filters['is_active'] === '1')>Actifs</option>
@@ -215,7 +215,7 @@
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <h2>{{ $editingUser ? 'Modifier utilisateur' : 'Nouvel utilisateur' }}</h2>
-                    <p class="text-slate-600">CRUD direct des comptes avec role, perimetre et mot de passe pilote.</p>
+                    <p class="text-slate-600">Gestion directe des comptes avec rôle, périmètre et mot de passe pilote.</p>
                 </div>
                 @if ($editingUser)
                     <a class="btn btn-secondary btn-sm rounded-xl" href="{{ route('workspace.super-admin.organization.index') }}">Annuler</a>
@@ -233,7 +233,7 @@
                     <input id="managed_email" name="email" type="email" value="{{ old('email', $editingUser?->email) }}" required>
                 </div>
                 <div>
-                    <label for="managed_role">Role</label>
+                    <label for="managed_role">Rôle</label>
                     <select id="managed_role" name="role" required>
                         @foreach ($roleOptions as $role)
                             <option value="{{ $role }}" @selected(old('role', $editingUser?->effectiveRoleCode()) === $role)>{{ $roleLabels[$role] ?? $role }}</option>
@@ -311,7 +311,7 @@
         </div>
         <div class="mt-4 overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Direction</th><th>Etat</th><th>Services</th><th>Utilisateurs</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Direction</th><th>État</th><th>Services</th><th>Utilisateurs</th><th>Actions</th></tr></thead>
                 <tbody>
                     @foreach ($directionRows as $row)
                         <tr>
@@ -345,7 +345,7 @@
         </div>
         <div class="mt-4 overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Service</th><th>Etat</th><th>Utilisateurs</th><th>PTA</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Service</th><th>État</th><th>Utilisateurs</th><th>PTA</th><th>Actions</th></tr></thead>
                 <tbody>
                     @foreach ($serviceRows as $row)
                         <tr>
@@ -390,7 +390,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="bulk_role">Role cible</label>
+                    <label for="bulk_role">Rôle cible</label>
                     <select id="bulk_role" name="bulk_role">
                         <option value="">Aucun</option>
                         @foreach ($roleOptions as $role)
@@ -430,7 +430,7 @@
             </div>
         <div class="mt-4 overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th><input type="checkbox" data-check-all-users></th><th>Utilisateur</th><th>Role</th><th>Portee</th><th>Etat</th><th>Suspension</th><th>Sessions</th><th>Derniere activite</th><th>Operations</th></tr></thead>
+                <thead><tr><th><input type="checkbox" data-check-all-users></th><th>Utilisateur</th><th>Rôle</th><th>Portée</th><th>État</th><th>Suspension</th><th>Sessions</th><th>Dernière activité</th><th>Opérations</th></tr></thead>
                 <tbody>
                     @forelse ($userRows as $row)
                         <tr>

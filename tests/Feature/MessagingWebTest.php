@@ -57,7 +57,7 @@ class MessagingWebTest extends TestCase
         ]);
 
         $this->actingAs($recipient)
-            ->get('/workspace/pilotage')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('Messagerie');
 

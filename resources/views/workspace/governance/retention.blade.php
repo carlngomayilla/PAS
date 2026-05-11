@@ -1,14 +1,14 @@
 @extends('layouts.workspace')
 
-@section('title', 'Retention')
+@section('title', 'Rétention')
 
 @section('content')
     <section class="showcase-panel mb-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <h1>Retention et archivage</h1>
+                <h1>Rétention et archivage</h1>
                 <p class="text-slate-600">
-                    Cette vue pilote les archives non destructives. Les snapshots sont stockes dans <code>data_archives</code>.
+                    Cette vue pilote les archives non destructives. Les snapshots sont stockés dans <code>data_archives</code>.
                 </p>
             </div>
             @if ($canRun)
@@ -18,10 +18,10 @@
                         <input type="hidden" name="mode" value="dry-run">
                         <button class="btn btn-blue" type="submit">Lancer dry-run</button>
                     </form>
-                    <form method="POST" action="{{ route('workspace.retention.run') }}" data-confirm-message="Executer l'archivage non destructif maintenant ?" data-confirm-tone="warning" data-confirm-label="Executer">
+                    <form method="POST" action="{{ route('workspace.retention.run') }}" data-confirm-message="Exécuter l'archivage non destructif maintenant ?" data-confirm-tone="warning" data-confirm-label="Exécuter">
                         @csrf
                         <input type="hidden" name="mode" value="execute">
-                        <button class="btn btn-primary" type="submit">Executer l'archivage</button>
+                        <button class="btn btn-primary" type="submit">Exécuter l'archivage</button>
                     </form>
                 </div>
             @endif
@@ -41,7 +41,7 @@
     </section>
 
     <section class="showcase-panel mb-4">
-        <h2>Eligibilite actuelle</h2>
+        <h2>Éligibilité actuelle</h2>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             @foreach ($summary['counts'] as $label => $value)
                 <article class="rounded-xl border border-slate-200/85 p-4">

@@ -269,7 +269,7 @@ class PtaWebController extends Controller
         $pta->loadMissing([
             'actions.responsables:id,name,email',
             'actions.sousActions:id,action_id,agent_id,libelle,description,resultat_attendu,cible_prevue,unite,commentaire,date_debut,date_fin,statut,est_effectuee',
-            'actions:id,pta_id,pao_id,objectif_operationnel_id,mode_evaluation,libelle,description,date_debut,date_fin,statut,priorite,intitule_cible,unite_cible,quantite_cible,seuil_minimum,seuil_mode,seuil_t1,seuil_t2,seuil_t3,seuil_t4,methode_calcul,justificatif_obligatoire,echeance_cible,resultat_attendu,observations,montant_estime,nature_financement,source_financement,commentaire_financement,justificatif_financement_path,ressources_necessaires,ressources_details,ressource_main_oeuvre,ressource_equipement,ressource_partenariat,ressource_autres,ressource_autres_details,risque_potentiel,mesures_preventives,financement_requis,financement_statut,financement_soumis_le,financement_notifie_le,responsable_id',
+            'actions:id,pta_id,pao_id,objectif_operationnel_id,mode_evaluation,libelle,description,date_debut,date_fin,statut,priorite,intitule_cible,unite_cible,quantite_cible,seuil_minimum,seuil_mode,seuil_t1,seuil_t2,seuil_t3,seuil_t4,methode_calcul,justificatif_obligatoire,echeance_cible,resultat_attendu,observations,montant_estime,nature_financement,source_financement,commentaire_financement,justificatif_financement_path,ressources_necessaires,ressources_details,ressource_main_oeuvre,ressource_equipement,ressource_partenariat,ressource_autres,ressource_autres_details,financement_requis,financement_statut,financement_soumis_le,financement_notifie_le,responsable_id',
         ]);
 
         return view('workspace.pta.form', [
@@ -864,10 +864,6 @@ class PtaWebController extends Controller
             'description_financement' => $financementRequis ? $natureFinancement : null,
             'source_financement' => $financementRequis ? $sourceFinancement : null,
             'commentaire_financement' => $financementRequis ? $commentaireFinancement : null,
-            'risque_potentiel' => $actionPayload['risque_potentiel'] ?? null,
-            'mesures_preventives' => ($value = trim((string) ($actionPayload['mesures_preventives'] ?? ''))) !== ''
-                ? $value
-                : ($isNewAction ? null : $existingAction?->mesures_preventives),
         ];
 
         if (! $financementRequis) {
@@ -1151,3 +1147,4 @@ class PtaWebController extends Controller
         return app(WorkflowSettings::class)->planningWorkflowSummary('pta');
     }
 }
+

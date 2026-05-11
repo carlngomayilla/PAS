@@ -16,12 +16,16 @@
     @endphp
 
     <div class="app-screen-flow">
-    <div class="mb-4 flex items-center justify-between gap-3">
-        <h1 class="text-xl font-bold text-[#1a1a1a]">PAO</h1>
-        @if ($canWrite)
-            <a class="btn btn-primary" href="{{ route('workspace.pao.create') }}">Nouveau PAO</a>
-        @endif
-    </div>
+    <x-ui.page-title
+        title="Plan d'actions opérationnel"
+        subtitle="Organisation annuelle des objectifs stratégiques par direction."
+    >
+        <x-slot:actions>
+            @if ($canWrite)
+                <a class="btn btn-primary" href="{{ route('workspace.pao.create') }}">Nouveau PAO</a>
+            @endif
+        </x-slot:actions>
+    </x-ui.page-title>
 
     <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
@@ -127,7 +131,7 @@
                         <th>PTA</th>
                         <th>Validateur</th>
                         @if ($canWrite)
-                            <th>Operations</th>
+                            <th>Opérations</th>
                         @endif
                     </tr>
                 </thead>
@@ -226,7 +230,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 10 : 9 }}" class="text-slate-500">Aucun PAO trouve.</td>
+                            <td colspan="{{ $canWrite ? 10 : 9 }}" class="text-slate-500">Aucun PAO trouvé.</td>
                         </tr>
                     @endforelse
                 </tbody>

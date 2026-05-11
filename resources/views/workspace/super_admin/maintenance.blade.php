@@ -8,10 +8,10 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Maintenance legere</h1>
-                <p class="mt-2 text-slate-600">Operations techniques encadrees : caches, vues compilees et mode maintenance. Aucun acces shell ni parametre critique n est expose.</p>
+                <p class="mt-2 text-slate-600">Opérations techniques encadrées : caches, vues compilées et mode maintenance. Aucun accès shell ni paramètre critique n'est exposé.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.appearance.edit') }}">Apparence</a>
                 <a class="btn btn-primary" href="{{ route('workspace.audit.index') }}">Audit</a>
@@ -73,4 +73,3 @@
         </div>
     </section>
 @endsection
-

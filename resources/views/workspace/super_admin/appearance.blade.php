@@ -33,7 +33,7 @@
                 <p class="mt-2 text-slate-600">Pilotage fin des couleurs, composants, largeurs, densites et styles globaux avec apercu temps reel avant enregistrement.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.modules.edit') }}">Modules</a>
                 <a class="btn btn-primary" href="{{ route('workspace.super-admin.maintenance.index') }}">Maintenance</a>
@@ -331,12 +331,12 @@
                                     <div class="appearance-live-preview-section-head">
                                         <div>
                                             <p class="appearance-live-preview-section-label">Tableau</p>
-                                            <h4>Lecture des donnees</h4>
+                                            <h4>Lecture des données</h4>
                                         </div>
                                     </div>
                                     <table class="appearance-live-preview-table">
                                         <thead>
-                                            <tr><th>Direction</th><th>Valeur</th><th>Etat</th></tr>
+                                            <tr><th>Direction</th><th>Valeur</th><th>État</th></tr>
                                         </thead>
                                         <tbody>
                                             <tr><td>DAF</td><td>32</td><td>Stable</td></tr>
@@ -352,7 +352,7 @@
                 <section class="appearance-live-preview-scene" data-appearance-scene="login">
                     <div class="appearance-live-preview-login-shell">
                         <div class="appearance-live-preview-login-hero">
-                            <p class="appearance-live-preview-eyebrow">Acces plateforme</p>
+                            <p class="appearance-live-preview-eyebrow">Accès plateforme</p>
                             <h3 class="appearance-live-preview-title">Page de connexion</h3>
                             <p class="appearance-live-preview-login-copy">Contrôle la lecture du hero, des champs et du formulaire public.</p>
                         </div>
@@ -398,7 +398,7 @@
                                 </thead>
                                 <tbody>
                                     <tr><td>Numerisation des dossiers</td><td>DSIC</td><td>76%</td><td>En cours</td></tr>
-                                    <tr><td>Cadre budgetaire</td><td>DAF</td><td>54%</td><td>A risque</td></tr>
+                                    <tr><td>Cadre budgetaire</td><td>DAF</td><td>54%</td><td>A surveiller</td></tr>
                                     <tr><td>Suivi des bourses</td><td>DS</td><td>91%</td><td>Validée</td></tr>
                                 </tbody>
                             </table>
@@ -1029,4 +1029,3 @@
         </script>
     @endpush
 @endsection
-

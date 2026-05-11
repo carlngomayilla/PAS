@@ -53,7 +53,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="periodicite">Periodicite</label>
+                    <label for="periodicite">Périodicité</label>
                     <select id="periodicite" name="periodicite">
                         <option value="">Toutes</option>
                         @foreach ($periodiciteOptions as $periodicite)
@@ -89,13 +89,13 @@
                         <th>ID</th>
                         <th>Indicateur</th>
                         <th>Action</th>
-                        <th>Periodicite</th>
+                        <th>Périodicité</th>
                         <th>Mode saisie</th>
                         <th>Cible</th>
                         <th>Seuil alerte</th>
                         <th>Mesures</th>
                         @if ($canWrite)
-                            <th>Operations</th>
+                            <th>Opérations</th>
                         @endif
                     </tr>
                 </thead>

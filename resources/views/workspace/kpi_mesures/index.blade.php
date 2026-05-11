@@ -89,7 +89,7 @@
                         <th>Saisi par</th>
                         <th>Commentaire</th>
                         @if ($canWrite)
-                            <th>Operations</th>
+                            <th>Opérations</th>
                         @endif
                     </tr>
                 </thead>

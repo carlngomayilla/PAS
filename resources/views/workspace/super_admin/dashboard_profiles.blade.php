@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">Pilotage des cartes de synthèse et des blocs analytiques par rôle métier, avec effet direct sur le dashboard.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('dashboard') }}">Voir le dashboard</a>
                 <a class="btn btn-primary" href="{{ route('workspace.super-admin.index') }}">Retour super admin</a>
             </div>
@@ -130,4 +130,3 @@
         </form>
     </section>
 @endsection
-

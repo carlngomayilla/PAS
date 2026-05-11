@@ -74,8 +74,8 @@ class ManagedKpiSettings
             ],
             [
                 'code' => 'performance',
-                'label' => 'Performance',
-                'description' => 'Performance moyenne des actions visibles.',
+                'label' => 'Performance d execution',
+                'description' => 'Performance d execution moyenne des actions visibles.',
                 'weight' => 20,
                 'green_threshold' => 85,
                 'orange_threshold' => 65,
@@ -133,29 +133,9 @@ class ManagedKpiSettings
                 'target_service_ids' => [],
             ],
             [
-                'code' => 'risque',
-                'label' => 'Risque',
-                'description' => 'Niveau de maitrise des risques sur les actions visibles.',
-                'weight' => 10,
-                'green_threshold' => 75,
-                'orange_threshold' => 55,
-                'visible' => true,
-                'source_metric' => 'risque',
-                'formula_mode' => 'inverse',
-                'secondary_metric' => null,
-                'tertiary_metric' => null,
-                'secondary_weight' => 0,
-                'tertiary_weight' => 0,
-                'target_value' => null,
-                'adjustment' => 0,
-                'target_profiles' => [],
-                'target_direction_ids' => [],
-                'target_service_ids' => [],
-            ],
-            [
                 'code' => 'global',
-                'label' => 'Score global',
-                'description' => 'Synthese composite globale du portefeuille statistique.',
+                'label' => 'Score de suivi',
+                'description' => 'Synthese composite du portefeuille statistique.',
                 'weight' => 20,
                 'green_threshold' => 85,
                 'orange_threshold' => 65,
@@ -313,11 +293,10 @@ class ManagedKpiSettings
     {
         return [
             'delai' => 'Délai',
-            'performance' => 'Performance',
+            'performance' => 'Performance d execution',
             'conformite' => 'Conformité',
             'qualite' => 'Qualité',
-            'risque' => 'Risque',
-            'global' => 'Score global',
+            'global' => 'Score de suivi',
             'progression' => 'Progression',
         ];
     }
@@ -393,7 +372,7 @@ class ManagedKpiSettings
      */
     private function sanitizeDefinitions(iterable $rows): array
     {
-        $allowedCodes = ['delai', 'performance', 'conformite', 'qualite', 'risque', 'global', 'progression'];
+        $allowedCodes = ['delai', 'performance', 'conformite', 'qualite', 'global', 'progression'];
         $allowedProfiles = array_values(array_filter([
             User::ROLE_AGENT,
             User::ROLE_SERVICE,
@@ -640,5 +619,3 @@ class ManagedKpiSettings
         }
     }
 }
-
-

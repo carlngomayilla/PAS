@@ -116,7 +116,7 @@
                                 <td>{{ $row['pta'] }}</td>
                                 <td>{{ $row['echeance'] }}</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}">{{ $actionStatusLabel($row['statut']) }}</span></td>
-                                <td>{{ number_format((float) ($row['progression'] ?? 0), 0) }}%</td>
+                                <td>{{ number_format((float) ($row['progression'] ?? 0), 1) }}%</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($validationTone($row['validation_status'])) }}">{{ $validationStatusLabel($row['validation_status']) }}</span></td>
                             </tr>
                         @empty
@@ -142,7 +142,7 @@
                                 <td>{{ $row['agent'] }}</td>
                                 <td>{{ $row['soumise_le'] }}</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}">{{ $actionStatusLabel($row['statut']) }}</span></td>
-                                <td>{{ number_format((float) ($row['progression'] ?? 0), 0) }}%</td>
+                                <td>{{ number_format((float) ($row['progression'] ?? 0), 1) }}%</td>
                                 <td>{{ (int) ($row['retard_jours'] ?? 0) }}j</td>
                             </tr>
                         @empty
@@ -169,7 +169,7 @@
                                 <td>{{ $row['achevees'] }}</td>
                                 <td>{{ $row['retards'] }}</td>
                                 <td>{{ $row['validees_direction'] }}</td>
-                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 0) }}</span></td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 1) }}</span></td>
                             </tr>
                         @empty
                             <tr><td colspan="6">Aucun service disponible pour cette direction.</td></tr>
@@ -193,10 +193,10 @@
                                 <td class="font-semibold text-[#17324a]">{{ $row['direction'] }}</td>
                                 <td>{{ $row['actions_total'] }}</td>
                                 <td>{{ $row['validees_direction'] }}</td>
-                                <td>{{ number_format((float) ($row['taux_execution'] ?? 0), 0) }}%</td>
-                                <td>{{ number_format((float) ($row['taux_validation'] ?? 0), 0) }}%</td>
+                                <td>{{ number_format((float) ($row['taux_execution'] ?? 0), 1) }}%</td>
+                                <td>{{ number_format((float) ($row['taux_validation'] ?? 0), 1) }}%</td>
                                 <td>{{ $row['retards'] }}</td>
-                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 0) }}</span></td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 1) }}</span></td>
                             </tr>
                         @empty
                             <tr><td colspan="7">Aucune direction disponible.</td></tr>
@@ -222,7 +222,7 @@
                                 <td>{{ $row['achevees'] }}</td>
                                 <td>{{ $row['retards'] }}</td>
                                 <td>{{ $row['validees_direction'] }}</td>
-                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 0) }}</span></td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 1) }}</span></td>
                             </tr>
                         @empty
                             <tr><td colspan="6">Aucune direction disponible.</td></tr>
@@ -280,7 +280,7 @@
                             <td class="font-semibold text-[#17324a]">{{ $row['libelle'] }}</td>
                             <td>{{ $row['echeance'] }}</td>
                             <td>{{ $row['retard_jours'] }}j</td>
-                            <td>{{ number_format((float) ($row['progression'] ?? 0), 0) }}%</td>
+                            <td>{{ number_format((float) ($row['progression'] ?? 0), 1) }}%</td>
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($validationTone($row['validation_status'])) }}">{{ $validationStatusLabel($row['validation_status']) }}</span></td>
                             <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
                         </tr>
@@ -307,7 +307,7 @@
                             <td>{{ $row['actions_total'] }}</td>
                             <td>{{ $row['achevees'] }}</td>
                             <td>{{ $row['retards'] }}</td>
-                            <td>{{ number_format((float) ($row['taux_execution'] ?? 0), 0) }}%</td>
+                            <td>{{ number_format((float) ($row['taux_execution'] ?? 0), 1) }}%</td>
                         </tr>
                     @empty
                         <tr><td colspan="5">Aucune performance agent disponible.</td></tr>
@@ -324,7 +324,7 @@
         </div>
         <div class="overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Action</th><th>Service</th><th>Responsable</th><th>Retard</th><th>Validation</th><th>Risque</th><th>Accès</th></tr></thead>
+                <thead><tr><th>Action</th><th>Service</th><th>Responsable</th><th>Retard</th><th>Validation</th><th>Performance d'exécution</th><th>Accès</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr>
@@ -333,7 +333,7 @@
                             <td>{{ $row['responsable'] }}</td>
                             <td>{{ $row['retard_jours'] }}j</td>
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($validationTone($row['validation_status'])) }}">{{ $validationStatusLabel($row['validation_status']) }}</span></td>
-                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['niveau_risque'] ?? 0))) }}">{{ number_format((float) ($row['niveau_risque'] ?? 0), 0) }}</span></td>
+                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['performance_execution'] ?? 0))) }}">{{ number_format((float) ($row['performance_execution'] ?? 0), 1) }}</span></td>
                             <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
                         </tr>
                     @empty
@@ -358,8 +358,8 @@
                             <td class="font-semibold text-[#17324a]">{{ $row['direction'] }}</td>
                             <td>{{ $row['service_critique'] }}</td>
                             <td>{{ $row['retards'] }}</td>
-                            <td>{{ number_format((float) ($row['taux_validation'] ?? 0), 0) }}%</td>
-                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 0) }}</span></td>
+                            <td>{{ number_format((float) ($row['taux_validation'] ?? 0), 1) }}%</td>
+                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 1) }}</span></td>
                         </tr>
                     @empty
                         <tr><td colspan="5">Aucune direction en difficulté actuellement.</td></tr>
@@ -376,7 +376,7 @@
         </div>
         <div class="overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Risque</th></tr></thead>
+                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Performance d'exécution</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
@@ -385,7 +385,7 @@
                             <td>{{ $row['libelle'] }}</td>
                             <td>{{ $row['retard_jours'] }}j</td>
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($validationTone($row['validation_status'])) }}">{{ $validationStatusLabel($row['validation_status']) }}</span></td>
-                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['niveau_risque'] ?? 0))) }}">{{ number_format((float) ($row['niveau_risque'] ?? 0), 0) }}</span></td>
+                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['performance_execution'] ?? 0))) }}">{{ number_format((float) ($row['performance_execution'] ?? 0), 1) }}</span></td>
                         </tr>
                     @empty
                         <tr><td colspan="6">Aucune action critique validee.</td></tr>
@@ -402,7 +402,7 @@
         </div>
         <div class="overflow-x-auto">
             <table class="dashboard-table">
-                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Risque</th><th>Accès</th></tr></thead>
+                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Performance d'exécution</th><th>Accès</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
                         <tr>
@@ -411,7 +411,7 @@
                             <td>{{ $row['libelle'] }}</td>
                             <td>{{ $row['retard_jours'] }}j</td>
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($validationTone($row['validation_status'])) }}">{{ $validationStatusLabel($row['validation_status']) }}</span></td>
-                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['niveau_risque'] ?? 0))) }}">{{ number_format((float) ($row['niveau_risque'] ?? 0), 0) }}</span></td>
+                            <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['performance_execution'] ?? 0))) }}">{{ number_format((float) ($row['performance_execution'] ?? 0), 1) }}</span></td>
                             <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
                         </tr>
                     @empty

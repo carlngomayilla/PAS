@@ -67,8 +67,6 @@
                         'autres_ressources' => (bool) $action->ressource_autres,
                     ])),
                     'ressources_details' => $action->ressources_details ?: $action->ressource_autres_details,
-                    'risque_potentiel' => $action->risque_potentiel,
-                    'mesures_preventives' => $action->mesures_preventives,
                     'rmo_ids' => $action->relationLoaded('responsables')
                         ? $action->responsables->pluck('id')->map(fn ($id) => (int) $id)->values()->all()
                         : array_filter([(int) $action->responsable_id]),
@@ -103,8 +101,6 @@
                 'observations' => '',
                 'ressources_necessaires' => [],
                 'ressources_details' => '',
-                'risque_potentiel' => '',
-                'mesures_preventives' => '',
                 'rmo_ids' => [],
             ]]);
         }
@@ -245,7 +241,7 @@
                     </div>
 
                     @if ($responsableOptions->isEmpty())
-                        <p class="field-hint mt-3 text-[#f9b13c]">Aucun utilisateur actif disponible pour votre perimetre.</p>
+                        <p class="field-hint mt-3 text-[#f9b13c]">Aucun utilisateur actif disponible pour votre périmètre.</p>
                     @endif
                 </div>
 
@@ -328,8 +324,6 @@
                 'observations' => '',
                 'ressources_necessaires' => [],
                 'ressources_details' => '',
-                'risque_potentiel' => '',
-                'mesures_preventives' => '',
             ],
             'selectedRmos' => collect([null]),
             'responsableOptions' => $responsableOptions,

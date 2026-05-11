@@ -48,7 +48,7 @@
         $usesQuantitativeProgress = $action->usesQuantitativeProgress();
         $usesStructuredProgress = $action->usesStructuredProgressTracking();
         $usesHistoricalProgress = ! $usesStructuredProgress;
-        $showSubActionsPanel = $usesStructuredProgress || $usesHistoricalProgress;
+        $showSubActionsPanel = $usesSubTasksProgress && ! $usesQuantitativeProgress && ($usesStructuredProgress || $usesHistoricalProgress);
         $workflow = $workflowConfig ?? [
             'service_enabled' => true,
             'direction_enabled' => true,
@@ -119,7 +119,7 @@
             'action-validation' => 'Validation',
             'action-fiche' => 'Fiche',
             'action-financement' => 'Financement',
-            'action-status' => 'Indicateur',
+            'action-status' => 'Avancement',
             'action-discussion' => 'Discussion',
             'action-justificatifs' => 'Justificatifs',
             'action-logs' => 'Journal',
@@ -195,14 +195,18 @@
                 @if ($canManageAction)
                     <a class="btn btn-amber rounded-2xl px-4 py-2.5" href="{{ route('workspace.actions.edit', $action) }}">Modifier action</a>
                 @endif
-                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.actions.index') }}">Retour liste</a>
+                <button type="button" onclick="window.print()" class="btn btn-secondary rounded-2xl px-4 py-2.5 flex items-center gap-2 no-print" title="Imprimer la fiche action">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    Imprimer
+                </button>
+                <a class="btn btn-secondary rounded-2xl px-4 py-2.5 no-print" href="{{ route('workspace.actions.index') }}">Retour liste</a>
             </div>
         </div>
     </section>
 
     <section class="showcase-summary-grid mb-4">
         <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">Progression réelle</p>
+            <p class="showcase-kpi-label">Avancement réel</p>
             <p class="showcase-kpi-number">{{ number_format($progressionReelle, 1) }}%</p>
             <div class="mt-3 showcase-progress-track">
                 <span class="showcase-progress-bar {{ $progressionReelle >= 80 ? 'bg-[#8fc043]' : ($progressionReelle >= 50 ? 'bg-blue-500' : 'bg-[#f0e509]') }}" style="width: {{ $progressionReelle }}%"></span>
@@ -216,9 +220,9 @@
             </div>
         </article>
         <article class="showcase-kpi-card">
-            <p class="showcase-kpi-label">{{ $metricLabel('global') }}</p>
-            <p class="showcase-kpi-number">{{ number_format((float) ($kpi?->kpi_global ?? 0), 1) }}%</p>
-            <p class="showcase-kpi-meta">Délai {{ number_format((float) ($kpi?->kpi_delai ?? 0), 1) }} | Performance {{ number_format((float) ($kpi?->kpi_performance ?? 0), 1) }} | Qualité {{ number_format((float) ($kpi?->kpi_qualite ?? 0), 1) }} | Risque {{ number_format((float) ($kpi?->kpi_risque ?? 0), 1) }}</p>
+            <p class="showcase-kpi-label">Performance d'exécution</p>
+            <p class="showcase-kpi-number">{{ number_format((float) ($kpi?->kpi_performance ?? 0), 1) }}%</p>
+            <p class="showcase-kpi-meta">Délai {{ number_format((float) ($kpi?->kpi_delai ?? 0), 1) }} | Qualité / conformité {{ number_format((float) ($kpi?->kpi_qualite ?? 0), 1) }}</p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Sous-actions suivies</p>
@@ -232,7 +236,13 @@
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
             <article class="showcase-inline-stat action-detail-card">
                 <strong>Étape 1 — Soumission agent</strong>
-                <p class="mt-2 text-slate-600">Statut : <strong>{{ in_array($validationStatus, ['non_soumise', 'rejetee_chef', 'rejetee_direction'], true) ? 'À faire / à corriger' : 'Effectuée' }}</strong></p>
+                <p class="mt-2 text-slate-600 flex flex-wrap items-center gap-2">Statut :
+                    @if (in_array($validationStatus, ['non_soumise', 'rejetee_chef', 'rejetee_direction'], true))
+                        <span class="anbg-badge anbg-badge-warning px-3">À corriger</span>
+                    @else
+                        <span class="anbg-badge anbg-badge-success px-3">Effectuée</span>
+                    @endif
+                </p>
                 <p class="text-slate-600">Soumis par : <strong>{{ $action->soumisPar?->name ?? '-' }}</strong></p>
                 <p class="text-slate-600">Date de soumission : <strong>{{ optional($action->soumise_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
             </article>
@@ -241,7 +251,7 @@
                     <strong>Étape 2 — Évaluation chef de service</strong>
                     <p class="mt-2 text-slate-600">Statut : <strong>{{ in_array($validationStatus, ['validee_chef', 'rejetee_direction', 'validee_direction'], true) ? 'Effectuée' : ($isAwaitingChef ? 'En attente' : '-') }}</strong></p>
                     <p class="text-slate-600">Évaluateur : <strong>{{ $action->evaluePar?->name ?? '-' }}</strong></p>
-                    <p class="text-slate-600">Note : <strong>{{ $action->evaluation_note !== null ? number_format((float) $action->evaluation_note, 2) . '/100' : '-' }}</strong></p>
+                    <p class="text-slate-600">Note : <strong>{{ $action->evaluation_note !== null ? number_format((float) $action->evaluation_note, 1, ',', ' ') . '/100' : '-' }}</strong></p>
                     <p class="text-slate-600">Date : <strong>{{ optional($action->evalue_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                 </article>
             @endif
@@ -250,7 +260,7 @@
                     <strong>Étape {{ $workflow['service_enabled'] ? '3' : '2' }} — Validation direction</strong>
                     <p class="mt-2 text-slate-600">Statut : <strong>{{ $isValidatedDirection ? 'Validée' : ($isAwaitingDirection ? 'En attente' : '-') }}</strong></p>
                     <p class="text-slate-600">Évaluateur : <strong>{{ $action->directionValidePar?->name ?? '-' }}</strong></p>
-                    <p class="text-slate-600">Note : <strong>{{ $action->direction_evaluation_note !== null ? number_format((float) $action->direction_evaluation_note, 2) . '/100' : '-' }}</strong></p>
+                    <p class="text-slate-600">Note : <strong>{{ $action->direction_evaluation_note !== null ? number_format((float) $action->direction_evaluation_note, 1, ',', ' ') . '/100' : '-' }}</strong></p>
                     <p class="text-slate-600">Date : <strong>{{ optional($action->direction_valide_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                 </article>
             @endif
@@ -265,95 +275,121 @@
     <section id="action-fiche" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Fiche complète de l'action</h2>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+
+            {{-- Planification --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Contexte de planification</strong>
-                <p class="mt-2 text-slate-600">PAS : <strong>{{ $pas?->titre ?? '-' }}</strong></p>
-                <p class="text-slate-600">Période PAS : <strong>{{ $pas?->periode_debut ?? '-' }} – {{ $pas?->periode_fin ?? '-' }}</strong></p>
-                <p class="text-slate-600">PAO : <strong>{{ $pao?->titre ?? '-' }}</strong> ({{ $pao?->annee ?? '-' }})</p>
-                <p class="text-slate-600">Objectif opérationnel : <strong>{{ $objectifOperationnel?->description ?: ($objectifOperationnel?->libelle ?? '-') }}</strong></p>
-                <p class="text-slate-600">PTA : <strong>{{ $pta?->titre ?? '-' }}</strong></p>
-                <p class="text-slate-600">Direction : <strong>{{ $pta?->direction?->code ?? '-' }} – {{ $pta?->direction?->libelle ?? '-' }}</strong></p>
-                <p class="text-slate-600">Service : <strong>{{ $pta?->service?->code ?? '-' }} – {{ $pta?->service?->libelle ?? '-' }}</strong></p>
+                <strong>Planification</strong>
+                <dl class="action-fiche-dl mt-2">
+                    <dt>PAS</dt><dd>{{ $pas?->titre ?? '-' }}</dd>
+                    <dt>Période PAS</dt><dd>{{ $pas?->periode_debut ?? '-' }} – {{ $pas?->periode_fin ?? '-' }}</dd>
+                    <dt>PAO</dt><dd>{{ $pao?->titre ?? '-' }}{{ $pao?->annee ? ' ('.$pao->annee.')' : '' }}</dd>
+                    <dt>Objectif</dt><dd>{{ $objectifOperationnel?->description ?: ($objectifOperationnel?->libelle ?? '-') }}</dd>
+                    <dt>PTA</dt><dd>{{ $pta?->titre ?? '-' }}</dd>
+                    <dt>Direction</dt><dd>{{ $pta?->direction?->code ?? '-' }} – {{ $pta?->direction?->libelle ?? '-' }}</dd>
+                    <dt>Service</dt><dd>{{ $pta?->service?->code ?? '-' }} – {{ $pta?->service?->libelle ?? '-' }}</dd>
+                </dl>
             </article>
 
+            {{-- Identification --}}
             <article class="showcase-inline-stat action-detail-card">
                 <strong>Identification</strong>
-                <p class="mt-2 text-slate-600">ID action : <strong>#{{ $action->id }}</strong></p>
-                <p class="text-slate-600">Libellé : <strong>{{ $action->libelle }}</strong></p>
-                <p class="text-slate-600">Description : <strong>{{ $action->description ?: '-' }}</strong></p>
-                <p class="text-slate-600">Statut métier : <strong>{{ $actionStatusLabel($action->statut ?: '-') }}</strong></p>
-                <p class="text-slate-600">Statut dynamique : <strong>{{ $actionStatusLabel($status) }}</strong></p>
+                <dl class="action-fiche-dl mt-2">
+                    <dt>ID</dt><dd>#{{ $action->id }}</dd>
+                    <dt>Libellé</dt><dd>{{ $action->libelle }}</dd>
+                    <dt>Description</dt><dd>{{ $action->description ?: '-' }}</dd>
+                    <dt>Statut métier</dt><dd>{{ $actionStatusLabel($action->statut ?: '-') }}</dd>
+                    <dt>Statut</dt>
+                    <dd class="dd-badges">
+                        <span class="{{ $statusStyles[$action->statut_dynamique ?: 'non_demarre'] ?? 'anbg-badge anbg-badge-neutral' }}">{{ $actionStatusLabel($status) }}</span>
+                    </dd>
+                    <dt>Validation</dt>
+                    <dd class="dd-badges">
+                        <span class="{{ $validationStyles[$action->statut_validation ?: 'non_soumise'] ?? 'anbg-badge anbg-badge-neutral' }}">{{ $validationStatusLabel($action->statut_validation ?: 'non_soumise') }}</span>
+                    </dd>
+                </dl>
             </article>
 
+            {{-- Responsable & échéances --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Responsable et échéances</strong>
-                <p class="mt-2 text-slate-600">RMO : <strong>{{ $rmoNames !== [] ? implode(', ', $rmoNames) : ($action->responsable?->name ?? '-') }}</strong></p>
-                <p class="text-slate-600">Responsable principal : <strong>{{ $action->responsable?->name ?? '-' }}</strong></p>
-                <p class="text-slate-600">E-mail : <strong>{{ $action->responsable?->email ?? '-' }}</strong></p>
-                <p class="text-slate-600">Matricule : <strong>{{ $action->responsable?->agent_matricule ?? '-' }}</strong></p>
-                <p class="text-slate-600">Fonction : <strong>{{ $action->responsable?->agent_fonction ?? '-' }}</strong></p>
-                <p class="text-slate-600">Téléphone : <strong>{{ $action->responsable?->agent_telephone ?? '-' }}</strong></p>
-                <p class="text-slate-600">Date de début : <strong>{{ optional($action->date_debut)->format('d/m/Y') ?: '-' }}</strong></p>
-                <p class="text-slate-600">Date de fin prévue : <strong>{{ optional($action->date_fin)->format('d/m/Y') ?: '-' }}</strong></p>
-                <p class="text-slate-600">Date d'échéance : <strong>{{ optional($action->date_echeance)->format('d/m/Y') ?: '-' }}</strong></p>
-                <p class="text-slate-600">Date de fin réelle : <strong>{{ optional($action->date_fin_reelle)->format('d/m/Y') ?: '-' }}</strong></p>
-                <p class="text-slate-600">Fréquence d'exécution : <strong>{{ $frequenceLabel }}</strong></p>
+                <strong>Responsable & échéances</strong>
+                <dl class="action-fiche-dl mt-2">
+                    <dt>Responsable</dt><dd>{{ $action->responsable?->name ?? '-' }}</dd>
+                    <dt>RMO</dt><dd>{{ $rmoNames !== [] ? implode(', ', $rmoNames) : '-' }}</dd>
+                    <dt>E-mail</dt><dd>{{ $action->responsable?->email ?? '-' }}</dd>
+                    <dt>Matricule</dt><dd>{{ $action->responsable?->agent_matricule ?? '-' }}</dd>
+                    <dt>Fonction</dt><dd>{{ $action->responsable?->agent_fonction ?? '-' }}</dd>
+                    <dt>Téléphone</dt><dd>{{ $action->responsable?->agent_telephone ?? '-' }}</dd>
+                    <dt>Début</dt><dd>{{ optional($action->date_debut)->format('d/m/Y') ?: '-' }}</dd>
+                    <dt>Fin prévue</dt><dd>{{ optional($action->date_fin)->format('d/m/Y') ?: '-' }}</dd>
+                    <dt>Échéance</dt><dd>{{ optional($action->date_echeance)->format('d/m/Y') ?: '-' }}</dd>
+                    <dt>Fin réelle</dt><dd>{{ optional($action->date_fin_reelle)->format('d/m/Y') ?: '-' }}</dd>
+                    <dt>Fréquence</dt><dd>{{ $frequenceLabel }}</dd>
+                </dl>
             </article>
 
+            {{-- Progression --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Cible et performance</strong>
-                <p class="mt-2 text-slate-600">Cible : <strong>{{ $modeEvaluationLabel }}</strong></p>
-                @if ($usesQuantitativeProgress)
-                    <p class="text-slate-600">Cible attendue : <strong>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 4) : '-' }} {{ $action->unite_cible ?: '' }}</strong></p>
-                    <p class="text-slate-600">Unité de mesure : <strong>{{ $action->unite_cible ?: '-' }}</strong></p>
-                    <p class="text-slate-600">Quantité réalisée : <strong>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 4) : '0.0000' }} {{ $action->unite_cible ?: '' }}</strong></p>
-                    <p class="text-slate-600">Reste à réaliser : <strong>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 4) }} {{ $action->unite_cible ?: '' }}</strong></p>
-                    <p class="text-slate-600">Taux d'atteinte de la cible : <strong>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 2) }}%</strong></p>
-                    <p class="text-slate-600">Dépassement : <strong>{{ $overachievementRate > 0 ? '+'.number_format($overachievementRate, 2).'%' : '-' }}</strong></p>
-                    <p class="text-slate-600">Seuil minimum : <strong>{{ number_format((float) ($action->seuil_minimum ?? 80), 2) }}%</strong></p>
-                    <p class="text-slate-600">Performance : <strong>{{ $performanceLabels[$action->statut_performance ?? 'non_evaluee'] ?? ($action->statut_performance ?: '-') }}</strong></p>
-                    <p class="text-slate-600">Statut cible : <strong>{{ $quantitativeStatusLabels[$action->statut_execution_quantitative ?? 'non_demarre'] ?? ($action->statut_execution_quantitative ?: '-') }}</strong></p>
-                @else
-                    <p class="text-slate-600">Résultat attendu : <strong>{{ $action->resultat_attendu ?: '-' }}</strong></p>
-                    <p class="text-slate-600">Critères de validation : <strong>{{ $action->criteres_validation ?: '-' }}</strong></p>
-                    <p class="text-slate-600">Livrable attendu : <strong>{{ $action->livrable_attendu ?: '-' }}</strong></p>
-                    <p class="text-slate-600">Avancement par sous-actions : <strong>{{ number_format((float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0), 2) }}%</strong></p>
-                @endif
-                <p class="text-slate-600">Seuil d'alerte progression : <strong>{{ number_format((float) ($action->seuil_alerte_progression ?? 0), 2) }}%</strong></p>
-                <p class="text-slate-600">Progression réelle : <strong>{{ number_format((float) ($action->progression_reelle ?? 0), 2) }}%</strong></p>
-                <p class="text-slate-600">Progression théorique : <strong>{{ number_format((float) ($action->progression_theorique ?? 0), 2) }}%</strong></p>
+                <strong>Progression</strong>
+                <dl class="action-fiche-dl mt-2">
+                    <dt>Mode évaluation</dt><dd>{{ $modeEvaluationLabel }}</dd>
+                    @if ($usesQuantitativeProgress)
+                        <dt>Cible attendue</dt><dd>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 1, ',', ' ') : '-' }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Unité</dt><dd>{{ $action->unite_cible ?: '-' }}</dd>
+                        <dt>Réalisé</dt><dd>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 1, ',', ' ') : '0,0' }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Reste</dt><dd>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 1, ',', ' ') }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Taux cible</dt><dd>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 1, ',', ' ') }}%</dd>
+                        <dt>Dépassement</dt><dd>{{ $overachievementRate > 0 ? '+'.number_format($overachievementRate, 1, ',', ' ').'%' : '-' }}</dd>
+                        <dt>Seuil minimum</dt><dd>{{ number_format((float) ($action->seuil_minimum ?? 80), 1, ',', ' ') }}%</dd>
+                        <dt>Statut perf.</dt><dd>{{ $performanceLabels[$action->statut_performance ?? 'non_evaluee'] ?? ($action->statut_performance ?: '-') }}</dd>
+                    @else
+                        <dt>Résultat attendu</dt><dd>{{ $action->resultat_attendu ?: '-' }}</dd>
+                        <dt>Critères</dt><dd>{{ $action->criteres_validation ?: '-' }}</dd>
+                        <dt>Livrable</dt><dd>{{ $action->livrable_attendu ?: '-' }}</dd>
+                        <dt>Avancement sous-act.</dt><dd>{{ number_format((float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0), 1, ',', ' ') }}%</dd>
+                    @endif
+                    <dt>Seuil alerte</dt><dd>{{ number_format((float) ($action->seuil_alerte_progression ?? 0), 1, ',', ' ') }}%</dd>
+                    <dt>Avancement réel</dt><dd>{{ number_format((float) ($action->progression_reelle ?? 0), 1, ',', ' ') }}%</dd>
+                    <dt>Progression théor.</dt><dd>{{ number_format((float) ($action->progression_theorique ?? 0), 1, ',', ' ') }}%</dd>
+                </dl>
             </article>
 
+            {{-- Ressources --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Ressources mobilisées</strong>
-                <p class="mt-2 text-slate-600">Ressources nécessaires : <strong>{{ $ressources !== [] ? implode(', ', $ressources) : '-' }}</strong></p>
-                <p class="text-slate-600">Détails complémentaires : <strong>{{ $action->ressources_details ?: '-' }}</strong></p>
+                <strong>Ressources</strong>
+                <dl class="action-fiche-dl mt-2">
+                    <dt>Mobilisées</dt><dd>{{ $ressources !== [] ? implode(', ', $ressources) : '-' }}</dd>
+                    <dt>Détails</dt><dd>{{ $action->ressources_details ?: '-' }}</dd>
+                </dl>
             </article>
 
+            {{-- Financement sommaire --}}
             <article class="showcase-inline-stat action-detail-card">
                 <strong>Financement</strong>
-                <p class="mt-2 text-slate-600">Financement requis : <strong>{{ $action->financement_requis ? 'Oui' : 'Non' }}</strong></p>
-                <p class="text-slate-600">Montant estimé : <strong>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 2) : '-' }}</strong></p>
-                <p class="text-slate-600">Nature : <strong>{{ $action->nature_financement ?: $action->description_financement ?: '-' }}</strong></p>
-                <p class="text-slate-600">Source de financement : <strong>{{ $action->source_financement ?: '-' }}</strong></p>
-                <p class="text-slate-600">Statut financement : <strong>{{ $financingLabel }}</strong></p>
-                <p class="text-slate-600">Commentaire DAF : <strong>{{ $action->financement_daf_commentaire ?: '-' }}</strong></p>
-                <p class="text-slate-600">Montant validé DAF : <strong>{{ $action->financement_montant_valide !== null ? number_format((float) $action->financement_montant_valide, 2) : '-' }}</strong></p>
+                <dl class="action-fiche-dl mt-2">
+                    <dt>Requis</dt><dd>{{ $action->financement_requis ? 'Oui' : 'Non' }}</dd>
+                    <dt>Montant estimé</dt><dd>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 2, ',', ' ') : '-' }}</dd>
+                    <dt>Nature</dt><dd>{{ $action->nature_financement ?: $action->description_financement ?: '-' }}</dd>
+                    <dt>Source</dt><dd>{{ $action->source_financement ?: '-' }}</dd>
+                    <dt>Statut</dt>
+                    <dd class="dd-badges">
+                        <span class="{{ $financingStyles[$financingStatus] ?? 'anbg-badge anbg-badge-neutral' }}">{{ $financingLabel }}</span>
+                    </dd>
+                    <dt>Commentaire DAF</dt><dd>{{ $action->financement_daf_commentaire ?: '-' }}</dd>
+                    <dt>Montant validé DAF</dt><dd>{{ $action->financement_montant_valide !== null ? number_format((float) $action->financement_montant_valide, 2, ',', ' ') : '-' }}</dd>
+                </dl>
             </article>
 
-            <article class="showcase-inline-stat action-detail-card">
-                <strong>Risques et mesures</strong>
-                <p class="mt-2 text-slate-600">Risque potentiel : <strong>{{ $action->risque_potentiel ?: ($action->risques ?: '-') }}</strong></p>
-                <p class="text-slate-600">Mesures préventives : <strong>{{ $action->mesures_preventives ?: '-' }}</strong></p>
-            </article>
-
+            {{-- Clôture --}}
             <article class="showcase-inline-stat action-detail-card">
                 <strong>Clôture et évaluation</strong>
-                <p class="mt-2 text-slate-600">Rapport final : <strong>{{ $action->rapport_final ?: '-' }}</strong></p>
-                <p class="text-slate-600">Commentaire chef : <strong>{{ $action->evaluation_commentaire ?: '-' }}</strong></p>
-                <p class="text-slate-600">Commentaire direction : <strong>{{ $action->direction_evaluation_commentaire ?: '-' }}</strong></p>
-                <p class="text-slate-600">Validation hiérarchique finale : <strong>{{ $action->validation_hierarchique ? 'Oui' : 'Non' }}</strong></p>
+                <dl class="action-fiche-dl mt-2">
+                    <dt>Rapport final</dt><dd>{{ $action->rapport_final ?: '-' }}</dd>
+                    <dt>Commentaire chef</dt><dd>{{ $action->evaluation_commentaire ?: '-' }}</dd>
+                    <dt>Commentaire direction</dt><dd>{{ $action->direction_evaluation_commentaire ?: '-' }}</dd>
+                    <dt>Validation hiérarchique</dt><dd>{{ $action->validation_hierarchique ? 'Oui' : 'Non' }}</dd>
+                </dl>
             </article>
+
         </div>
     </section>
 
@@ -461,36 +497,32 @@
         <h2 class="showcase-panel-title">État d'avancement</h2>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             <article class="showcase-inline-stat">
-                <strong>Progression réelle</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($action->progression_reelle ?? 0), 2) }}%</p>
+                <strong>Avancement réel</strong>
+                <p class="mt-1 text-lg">{{ number_format((float) ($action->progression_reelle ?? 0), 1, ',', ' ') }}%</p>
             </article>
             <article class="showcase-inline-stat">
                 <strong>Progression théorique</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($action->progression_theorique ?? 0), 2) }}%</p>
+                <p class="mt-1 text-lg">{{ number_format((float) ($action->progression_theorique ?? 0), 1, ',', ' ') }}%</p>
             </article>
             <article class="showcase-inline-stat">
                 <strong>{{ $metricLabel('delai') }}</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_delai ?? 0), 2) }}%</p>
+                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_delai ?? 0), 1, ',', ' ') }}%</p>
             </article>
             <article class="showcase-inline-stat">
                 <strong>{{ $metricLabel('performance') }}</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_performance ?? 0), 2) }}%</p>
-            </article>
-            <article class="showcase-inline-stat">
-                <strong>{{ $metricLabel('conformite') }}</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_conformite ?? 0), 2) }}%</p>
+                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_performance ?? 0), 1, ',', ' ') }}%</p>
             </article>
             <article class="showcase-inline-stat">
                 <strong>{{ $metricLabel('qualite') }}</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_qualite ?? 0), 2) }}%</p>
+                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_conformite ?? 0), 1, ',', ' ') }}%</p>
             </article>
             <article class="showcase-inline-stat">
-                <strong>{{ $metricLabel('risque') }}</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_risque ?? 0), 2) }}%</p>
+                <strong>Validation</strong>
+                <p class="mt-1 text-lg">{{ $validationStatusLabel($validationStatus) }}</p>
             </article>
             <article class="showcase-inline-stat">
-                <strong>{{ $metricLabel('global') }}</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_global ?? 0), 2) }}%</p>
+                <strong>Justificatif</strong>
+                <p class="mt-1 text-lg">{{ $action->justificatifs->count() }} piece(s)</p>
             </article>
         </div>
         @if ($usesStructuredProgress && $usesQuantitativeProgress && $canTrackWeekly)
@@ -502,7 +534,7 @@
                         <p class="text-sm text-slate-600">Mode : {{ $modeEvaluationLabel }}. La cible est définie dans le PTA.</p>
                     </div>
                     <span class="rounded-full bg-[#3996d3]/10 px-3 py-1 text-xs font-semibold text-[#3996d3]">
-                        Cible {{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 4) : '-' }} {{ $action->unite_cible }}
+                        Cible {{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 1, ',', ' ') : '-' }} {{ $action->unite_cible }}
                     </span>
                 </div>
                 <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
@@ -608,10 +640,10 @@
                             <span class="ml-2 rounded-full bg-[#3996d3]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3996d3]">Sous-action agent</span>
                             <p class="text-slate-600">{{ optional($sousAction->date_debut)->format('d/m/Y') }} → {{ optional($sousAction->date_fin)->format('d/m/Y') }}</p>
                             <p class="text-slate-600">Agent : <strong>{{ $sousAction->agent?->name ?? '-' }}</strong></p>
-                            <p class="text-slate-600">Statut : <strong>{{ $sousAction->est_effectuee ? 'Effectuée' : 'À faire' }}</strong> | Exécution : <strong>{{ number_format((float) ($sousAction->taux_execution ?? 0), 2) }}%</strong></p>
+                            <p class="text-slate-600">Statut : <strong>{{ $sousAction->est_effectuee ? 'Effectuée' : 'À faire' }}</strong> | Exécution : <strong>{{ number_format((float) ($sousAction->taux_execution ?? 0), 1, ',', ' ') }}%</strong></p>
                             @if ($usesQuantitativeProgress)
-                                <p class="text-slate-600">Cible prévue : <strong>{{ $sousAction->cible_prevue !== null ? number_format((float) $sousAction->cible_prevue, 4) : '-' }} {{ $sousAction->unite ?: $action->unite_cible }}</strong></p>
-                                <p class="text-slate-600">Quantité réalisée : <strong>{{ number_format((float) ($sousAction->quantite_realisee ?? 0), 4) }} {{ $sousAction->unite ?: $action->unite_cible }}</strong> | Taux : <strong>{{ number_format((float) ($sousAction->taux_realisation ?? 0), 2) }}%</strong></p>
+                                <p class="text-slate-600">Cible prévue : <strong>{{ $sousAction->cible_prevue !== null ? number_format((float) $sousAction->cible_prevue, 1, ',', ' ') : '-' }} {{ $sousAction->unite ?: $action->unite_cible }}</strong></p>
+                                <p class="text-slate-600">Quantité réalisée : <strong>{{ number_format((float) ($sousAction->quantite_realisee ?? 0), 1, ',', ' ') }} {{ $sousAction->unite ?: $action->unite_cible }}</strong> | Taux : <strong>{{ number_format((float) ($sousAction->taux_realisation ?? 0), 1, ',', ' ') }}%</strong></p>
                                 @if ($sousAction->resultat_obtenu)
                                     <p class="text-slate-600">Résultat obtenu : <strong>{{ $sousAction->resultat_obtenu }}</strong></p>
                                 @endif
@@ -720,8 +752,8 @@
                         @endif
                         <p class="text-slate-600">
                             État : <strong>{{ $week->est_renseignee ? 'Renseignée' : 'Non renseignée' }}</strong> |
-                            Réelle : <strong>{{ number_format((float) ($week->progression_reelle ?? 0), 2) }}%</strong> |
-                            Théo : <strong>{{ number_format((float) ($week->progression_theorique ?? 0), 2) }}%</strong>
+                            Réelle : <strong>{{ number_format((float) ($week->progression_reelle ?? 0), 1, ',', ' ') }}%</strong> |
+                            Théo : <strong>{{ number_format((float) ($week->progression_theorique ?? 0), 1, ',', ' ') }}%</strong>
                         </p>
                     </div>
                     @if ($week->saisiPar)
@@ -888,72 +920,191 @@
     @endif
 
     <section id="action-discussion" class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">Discussion et retours de validation</h2>
-        <form method="POST" action="{{ route('workspace.actions.comment', $action) }}" class="mb-4">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 class="showcase-panel-title">Discussion et retours de validation</h2>
+            <span class="discussion-live-badge" title="Les nouveaux commentaires s'affichent automatiquement">
+                <span class="discussion-live-dot" aria-hidden="true"></span>
+                En direct
+            </span>
+        </div>
+        <form id="discussion-form" method="POST" action="{{ route('workspace.actions.comment', $action) }}" class="mb-5">
             @csrf
             <label for="discussion_message">Ajouter un commentaire</label>
-            <textarea id="discussion_message" name="message" required>{{ old('message') }}</textarea>
-            <button class="btn btn-primary mt-2.5" type="submit">
-                Publier
-            </button>
+            <textarea id="discussion_message" name="message" rows="3" placeholder="Votre commentaire ou retour…" required>{{ old('message') }}</textarea>
+            <div class="mt-2.5 flex items-center gap-3">
+                <button id="discussion-submit" class="btn btn-primary" type="submit">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    Publier
+                </button>
+                <span id="discussion-sending" class="text-xs text-slate-400" style="display:none;">Envoi en cours…</span>
+            </div>
         </form>
 
-        <div class="space-y-3">
+        <div id="discussion-feed" class="space-y-3">
             @forelse ($discussionEntries as $entry)
-                <article class="showcase-thread-item">
+                <article class="showcase-thread-item" data-log-id="{{ $entry->id }}">
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <div>
                             <p class="font-semibold">{{ $entry->utilisateur?->name ?? 'Système' }}</p>
-                            <p class="text-xs text-slate-500">{{ optional($entry->created_at)->format('Y-m-d H:i') ?: '-' }}</p>
+                            <p class="text-xs text-slate-500">{{ optional($entry->created_at)->format('d/m/Y H:i') ?: '-' }}</p>
                         </div>
                         <span class="anbg-badge anbg-badge-neutral px-3">{{ str_replace('_', ' ', $entry->type_evenement) }}</span>
                     </div>
                     <p class="mt-3 whitespace-pre-line text-slate-700">{{ $entry->message }}</p>
                 </article>
             @empty
-                <p class="text-slate-600">Aucun commentaire ou retour de validation pour le moment.</p>
+                <p id="discussion-empty" class="text-slate-600">Aucun commentaire ou retour de validation pour le moment.</p>
             @endforelse
         </div>
     </section>
+    <script>
+    (function () {
+        var actionId = {{ $action->id }};
+        var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        var form = document.getElementById('discussion-form');
+        var feed = document.getElementById('discussion-feed');
+        var textarea = document.getElementById('discussion_message');
+        var submitBtn = document.getElementById('discussion-submit');
+        var sendingLabel = document.getElementById('discussion-sending');
+        var lastLogId = {{ $discussionEntries->last()?->id ?? 0 }};
+        var validTypes = ['commentaire','action_soumise_validation','action_validee_chef','action_rejetee_chef',
+                          'action_validee_direction','action_rejetee_direction','financement_demande',
+                          'financement_valide_daf','financement_rejete_daf','financement_accord_dg','financement_refus_dg'];
+
+        function renderEntry(entry) {
+            var badge = (entry.type_evenement || '').replace(/_/g, ' ');
+            var author = (entry.utilisateur && entry.utilisateur.name) ? entry.utilisateur.name : 'Système';
+            var date = entry.created_at ? new Date(entry.created_at).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+            var el = document.createElement('article');
+            el.className = 'showcase-thread-item discussion-new-entry';
+            el.setAttribute('data-log-id', entry.id);
+            el.innerHTML = '<div class="flex flex-wrap items-start justify-between gap-2">'
+                + '<div><p class="font-semibold">' + author + '</p>'
+                + '<p class="text-xs text-slate-500">' + date + '</p></div>'
+                + '<span class="anbg-badge anbg-badge-neutral px-3">' + badge + '</span>'
+                + '</div><p class="mt-3 whitespace-pre-line text-slate-700">' + (entry.message || '') + '</p>';
+            return el;
+        }
+
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var message = textarea.value.trim();
+                if (!message) return;
+                submitBtn.disabled = true;
+                sendingLabel.style.display = 'inline';
+                fetch('/api/actions/' + actionId + '/comments', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json'},
+                    body: JSON.stringify({message: message}),
+                }).then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                }).then(function (json) {
+                    var empty = document.getElementById('discussion-empty');
+                    if (empty) empty.remove();
+                    var el = renderEntry(json.data);
+                    feed.appendChild(el);
+                    lastLogId = Math.max(lastLogId, json.data.id || 0);
+                    textarea.value = '';
+                    if (window.anbgToast) window.anbgToast('Commentaire publié.', 'success', 3000);
+                }).catch(function () {
+                    if (window.anbgToast) window.anbgToast("Erreur lors de l'envoi. Réessayez.", 'error', 5000);
+                }).finally(function () {
+                    submitBtn.disabled = false;
+                    sendingLabel.style.display = 'none';
+                });
+            });
+        }
+
+        function pollDiscussion() {
+            fetch('/api/actions/' + actionId + '/logs?per_page=100', {
+                headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken},
+            }).then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (json) {
+                if (!json) return;
+                var entries = (json.data && json.data.data ? json.data.data : [])
+                    .filter(function (e) { return validTypes.indexOf(e.type_evenement) !== -1 && e.id > lastLogId; })
+                    .sort(function (a, b) { return a.id - b.id; });
+                if (!entries.length) return;
+                var empty = document.getElementById('discussion-empty');
+                if (empty) empty.remove();
+                entries.forEach(function (entry) {
+                    if (!feed.querySelector('[data-log-id="' + entry.id + '"]')) {
+                        feed.appendChild(renderEntry(entry));
+                        lastLogId = Math.max(lastLogId, entry.id);
+                        var author = (entry.utilisateur && entry.utilisateur.name) ? entry.utilisateur.name : 'Système';
+                        if (window.anbgNotify) window.anbgNotify(
+                            'Nouveau commentaire — ' + author,
+                            entry.message ? entry.message.slice(0, 120) : '',
+                            'discussion-' + entry.id,
+                            null
+                        );
+                    }
+                });
+            }).catch(function () {});
+        }
+        setInterval(pollDiscussion, 30000);
+    })();
+    </script>
 
     <section id="action-justificatifs" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Justificatifs action</h2>
-        <div class="overflow-auto">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Categorie</th>
-                        <th>Sous-action</th>
-                        <th>Fichier</th>
-                        <th>Auteur</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($action->justificatifs as $doc)
-                        <tr>
-                            <td>{{ optional($doc->created_at)->format('Y-m-d H:i') }}</td>
-                            <td>{{ $justificatifCategoryLabels[$doc->categorie] ?? $doc->categorie }}</td>
-                            <td>{{ $doc->sousAction?->libelle ?: ($doc->actionWeek?->libelle_sous_action ?: ($doc->actionWeek ? 'Periode '.$doc->actionWeek->numero_semaine : '-')) }}</td>
-                            <td>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span class="font-semibold text-[#17324a]">{{ $doc->nom_original }}</span>
-                                    <a class="btn btn-primary btn-sm rounded-xl" target="_blank" rel="noopener" href="{{ route('workspace.actions.justificatifs.preview', [$action, $doc]) }}">
-                                        Visualiser
-                                    </a>
-                                    <a class="rounded-xl border border-[#3996d3]/30 px-3 py-1.5 text-xs font-bold text-[#3996d3] hover:bg-[#e8f3fb]" href="{{ route('workspace.actions.justificatifs.download', [$action, $doc]) }}">
-                                        Telecharger
-                                    </a>
-                                </div>
-                            </td>
-                            <td>{{ $doc->ajoutePar?->name ?? '-' }}</td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="5" class="text-slate-600">Aucun justificatif.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        @php
+            $fileTypeIcon = static function (string $name): string {
+                $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                return match (true) {
+                    in_array($ext, ['pdf'], true)                          => '📄',
+                    in_array($ext, ['doc', 'docx'], true)                 => '📝',
+                    in_array($ext, ['xls', 'xlsx', 'csv'], true)          => '📊',
+                    in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true) => '🖼️',
+                    in_array($ext, ['zip', 'rar', '7z'], true)            => '🗜️',
+                    default                                                => '📎',
+                };
+            };
+            $isImage = static fn (string $name): bool => in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['png', 'jpg', 'jpeg', 'gif', 'webp'], true);
+        @endphp
+        @forelse ($action->justificatifs as $doc)
+            @php
+                $docContext = $doc->sousAction?->libelle
+                    ?: ($doc->actionWeek?->libelle_sous_action
+                        ?: ($doc->actionWeek ? 'Période ' . $doc->actionWeek->numero_semaine : null));
+                $docCategory = $justificatifCategoryLabels[$doc->categorie] ?? $doc->categorie;
+                $previewUrl   = route('workspace.actions.justificatifs.preview', [$action, $doc]);
+                $downloadUrl  = route('workspace.actions.justificatifs.download', [$action, $doc]);
+            @endphp
+            <div class="justificatif-card">
+                <div class="justificatif-card-icon">
+                    <span aria-hidden="true">{{ $fileTypeIcon($doc->nom_original ?? '') }}</span>
+                </div>
+                <div class="justificatif-card-body">
+                    <p class="justificatif-card-name">{{ $doc->nom_original }}</p>
+                    <p class="justificatif-card-meta">
+                        <span class="anbg-badge anbg-badge-info px-2 py-0.5 text-[10px]">{{ $docCategory }}</span>
+                        @if ($docContext)
+                            <span class="text-[#667085]">{{ $docContext }}</span>
+                        @endif
+                    </p>
+                    <p class="justificatif-card-author">
+                        {{ $doc->ajoutePar?->name ?? '—' }}
+                        <span class="text-[#667085]">·</span>
+                        {{ optional($doc->created_at)->format('d/m/Y H:i') }}
+                    </p>
+                </div>
+                <div class="justificatif-card-actions">
+                    <a class="btn btn-primary btn-sm rounded-xl" target="_blank" rel="noopener" href="{{ $previewUrl }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        Visualiser
+                    </a>
+                    <a class="rounded-xl border border-[#3996d3]/30 px-3 py-1.5 text-xs font-bold text-[#3996d3] hover:bg-[#e8f3fb] flex items-center gap-1" href="{{ $downloadUrl }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Télécharger
+                    </a>
+                </div>
+            </div>
+        @empty
+            <div class="py-6 text-center text-sm text-[#667085]">Aucun justificatif importé.</div>
+        @endforelse
     </section>
 
     <section id="action-logs" class="showcase-panel mb-4">

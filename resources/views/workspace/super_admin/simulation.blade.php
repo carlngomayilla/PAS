@@ -15,7 +15,7 @@
                 <p class="mt-2 text-slate-600">Comparer l'impact d'un changement de workflow action et de règles de clôture avant application réelle. La base statistique reste fixe sur toutes les actions visibles.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.calculation.edit') }}">Politique de calcul</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.workflow.edit') }}">Workflow</a>
@@ -150,4 +150,3 @@
         </section>
     @endif
 @endsection
-

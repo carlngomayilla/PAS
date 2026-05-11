@@ -77,7 +77,6 @@
             'correctif' => 'Replanifier, lever les blocages et mettre a jour la progression.',
         ]))
         ->values();
-    $riskRows = $actionRows->filter(fn (array $row): bool => trim((string) ($row['risque_identifie'] ?? '')) !== '')->values();
     $rmoRows = $actionRows
         ->groupBy(fn (array $row): string => implode('|', [(string) ($row['direction_label'] ?? '-'), (string) ($row['service_label'] ?? '-'), (string) ($row['rmo'] ?? $row['responsable'] ?? 'Non renseigne')]))
         ->map(function ($rows, string $key): array {
@@ -144,7 +143,7 @@
 
     @if ($showWordToc)
         <h2>Sommaire</h2>
-        <table><tr><th>Section</th><th>Contenu</th></tr><tr><td>01</td><td>Axes & Objectifs stratégiques</td></tr><tr><td>02</td><td>Objectifs opérationnels & Actions</td></tr><tr><td>03</td><td>Actions détaillées</td></tr><tr><td>04</td><td>Indicateur de performance par action</td></tr><tr><td>05</td><td>Reporting synthétique, alertes, risques, RMO et justificatifs</td></tr><tr><td>06</td><td>Page de signature et page de fin</td></tr></table>
+        <table><tr><th>Section</th><th>Contenu</th></tr><tr><td>01</td><td>Axes & Objectifs stratégiques</td></tr><tr><td>02</td><td>Objectifs opérationnels & Actions</td></tr><tr><td>03</td><td>Actions détaillées</td></tr><tr><td>04</td><td>Indicateurs d execution par action</td></tr><tr><td>05</td><td>Reporting synthetique, alertes, RMO et justificatifs</td></tr><tr><td>06</td><td>Page de signature et page de fin</td></tr></table>
         <div class="page-break"></div>
     @endif
 

@@ -116,19 +116,18 @@ function bootDashboardRender(force = false) {
       return window.getAnbgChartTheme();
     }
 
-    /* Light mode forced — dark mode is disabled */
-    const isDark = false;
+    const isDark = document.documentElement.classList.contains('dark');
 
     return {
       isDark,
-      text: '#334155',
-      muted: '#64748b',
-      grid: 'rgba(148,163,184,0.22)',
-      tooltipBackground: 'rgba(255,255,255,0.98)',
-      tooltipTitle: '#0f172a',
-      tooltipBody: '#334155',
-      tooltipBorder: 'rgba(148,163,184,0.28)',
-      emphasis: '#1c203d',
+      text: isDark ? '#cbd5e1' : '#334155',
+      muted: isDark ? '#94a3b8' : '#64748b',
+      grid: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(148,163,184,0.22)',
+      tooltipBackground: isDark ? 'rgba(15,23,42,0.97)' : 'rgba(255,255,255,0.98)',
+      tooltipTitle: isDark ? '#f1f5f9' : '#0f172a',
+      tooltipBody: isDark ? '#cbd5e1' : '#334155',
+      tooltipBorder: isDark ? 'rgba(148,163,184,0.16)' : 'rgba(148,163,184,0.28)',
+      emphasis: isDark ? '#e2e8f0' : '#1c203d',
     };
   }
 
@@ -196,10 +195,6 @@ function bootDashboardRender(force = false) {
 
   function colorForStatus(label, index) {
     const status = String(label || '').toLowerCase();
-
-    if (status.includes('risque')) {
-      return ANBG.warning;
-    }
 
     if (status.includes('retard')) {
       return ANBG.danger;
@@ -273,12 +268,14 @@ function bootDashboardRender(force = false) {
     const { ctx, chartArea } = chart;
 
     if (!chartArea) {
-      return alphaColor(color, 0.18);
+      return alphaColor(color, 0.22);
     }
 
     const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-    gradient.addColorStop(0, alphaColor(color, 0.34));
-    gradient.addColorStop(1, alphaColor(color, 0.04));
+    gradient.addColorStop(0, alphaColor(color, 0.58));
+    gradient.addColorStop(0.4, alphaColor(color, 0.26));
+    gradient.addColorStop(0.75, alphaColor(color, 0.08));
+    gradient.addColorStop(1, alphaColor(color, 0.01));
 
     return gradient;
   }
@@ -287,12 +284,13 @@ function bootDashboardRender(force = false) {
     const { ctx, chartArea } = chart;
 
     if (!chartArea) {
-      return alphaColor(color, 0.88);
+      return alphaColor(color, 0.92);
     }
 
-    const gradient = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
-    gradient.addColorStop(0, alphaColor(color, 0.82));
-    gradient.addColorStop(1, alphaColor(color, 1));
+    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    gradient.addColorStop(0, alphaColor(color, 1));
+    gradient.addColorStop(0.5, alphaColor(color, 0.88));
+    gradient.addColorStop(1, alphaColor(color, 0.7));
 
     return gradient;
   }
@@ -305,6 +303,55 @@ function bootDashboardRender(force = false) {
     ) {
       window.Chart.register(centerTextPlugin);
     }
+  }
+
+  function kpiAnnotations() {
+    if (typeof window.ChartAnnotation === 'undefined') {
+      return {};
+    }
+
+    return {
+      annotation: {
+        annotations: {
+          seuil60: {
+            type: 'line',
+            yMin: 60,
+            yMax: 60,
+            borderColor: alphaColor(ANBG.warning, 0.65),
+            borderWidth: 1.5,
+            borderDash: [5, 4],
+          },
+          seuil80: {
+            type: 'line',
+            yMin: 80,
+            yMax: 80,
+            borderColor: alphaColor(ANBG.success, 0.65),
+            borderWidth: 1.5,
+            borderDash: [5, 4],
+          },
+        },
+      },
+    };
+  }
+
+  function barDataLabels(formatFn) {
+    if (typeof window.ChartDataLabels === 'undefined') {
+      return false;
+    }
+
+    const theme = dashboardTheme();
+
+    return {
+      display(context) {
+        return Number(context.dataset.data[context.dataIndex] || 0) >= 4;
+      },
+      anchor: 'end',
+      align: 'top',
+      offset: 1,
+      color: theme.muted,
+      font: { size: 9, weight: '700' },
+      formatter: formatFn || ((value) => (value > 0 ? Math.round(value) : '')),
+    };
   }
 
   function destroyChart(id) {
@@ -368,10 +415,6 @@ function bootDashboardRender(force = false) {
 
     if (normalized.includes('qualite') || normalized.includes('qual')) {
       return 'kpi_qualite_desc';
-    }
-
-    if (normalized.includes('risque')) {
-      return 'kpi_risque_desc';
     }
 
     if (normalized.includes('global')) {
@@ -486,6 +529,35 @@ function bootDashboardRender(force = false) {
 
     chartInstances[id] = new window.Chart(canvas, config);
     bindChartDrilldown(chartInstances[id], drilldownResolver);
+
+    // Inject export button into the closest showcase-panel header
+    const panel = host.closest('.showcase-panel, .dashboard-card, article');
+    if (panel && !panel.querySelector('.chart-export-btn')) {
+      const headerRow = panel.querySelector('.mb-4.flex, .mb-3.flex, [class*="justify-between"]');
+      if (headerRow) {
+        const exportBtn = document.createElement('button');
+        exportBtn.type = 'button';
+        exportBtn.className = 'chart-export-btn';
+        exportBtn.setAttribute('aria-label', 'Télécharger le graphique');
+        exportBtn.title = 'Télécharger en PNG';
+        exportBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+        exportBtn.addEventListener('click', () => {
+          const chart = chartInstances[id];
+          if (!chart) return;
+          const url = chart.toBase64Image('image/png', 1);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = (id || 'graphique') + '.png';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          if (window.anbgToast) {
+            window.anbgToast({ tone: 'success', message: 'Graphique téléchargé.', duration: 2500 });
+          }
+        });
+        headerRow.appendChild(exportBtn);
+      }
+    }
   }
 
   async function ensureDashboardAssets({ needD3 = false } = {}) {
@@ -509,11 +581,15 @@ function bootDashboardRender(force = false) {
               import('chartjs-chart-matrix'),
               import('chartjs-chart-treemap'),
               import('d3'),
+              import('chartjs-plugin-datalabels'),
+              import('chartjs-plugin-annotation'),
             ]);
 
             const matrixModule = optionalModules[0].status === 'fulfilled' ? optionalModules[0].value : null;
             const treemapModule = optionalModules[1].status === 'fulfilled' ? optionalModules[1].value : null;
             const d3Module = optionalModules[2].status === 'fulfilled' ? optionalModules[2].value : null;
+            const datalabelsModule = optionalModules[3].status === 'fulfilled' ? optionalModules[3].value : null;
+            const annotationModule = optionalModules[4].status === 'fulfilled' ? optionalModules[4].value : null;
 
             Chart.register(...registerables);
 
@@ -523,6 +599,16 @@ function bootDashboardRender(force = false) {
 
             if (treemapModule?.TreemapController && treemapModule?.TreemapElement) {
               Chart.register(treemapModule.TreemapController, treemapModule.TreemapElement);
+            }
+
+            if (datalabelsModule?.default) {
+              Chart.register(datalabelsModule.default);
+              window.ChartDataLabels = datalabelsModule.default;
+            }
+
+            if (annotationModule?.default) {
+              Chart.register(annotationModule.default);
+              window.ChartAnnotation = annotationModule.default;
             }
 
             chartTheme.applyAnbgChartDefaults(Chart);
@@ -628,8 +714,14 @@ function bootDashboardRender(force = false) {
           },
         },
         animation: {
-          duration: 360,
-          easing: 'easeOutQuart',
+          duration: 600,
+          easing: 'easeOutCubic',
+          delay(context) {
+            if (context.type !== 'data' || context.mode !== 'default') {
+              return 0;
+            }
+            return context.dataIndex * 22;
+          },
         },
         interaction: {
           mode: 'index',
@@ -678,10 +770,11 @@ function bootDashboardRender(force = false) {
             callbacks: {
               label(context) {
                 const raw = context.parsed?.y ?? context.parsed?.x ?? context.raw ?? 0;
-                return `${context.dataset.label || 'Valeur'}: ${formatNumber(raw)}`;
+                return ` ${context.dataset.label || 'Valeur'}: ${formatNumber(raw)}`;
               },
             },
           },
+          datalabels: false,
         },
       },
     };
@@ -722,7 +815,7 @@ function bootDashboardRender(force = false) {
         beginAtZero: true,
         grid: {
           color: theme.grid,
-          drawBorder: false,
+          borderDash: [4, 4],
           drawTicks: false,
         },
         ticks: {
@@ -747,6 +840,7 @@ function bootDashboardRender(force = false) {
   function mountGauge(id, label, value, href = '') {
     const theme = dashboardTheme();
     const numeric = Math.max(0, Math.min(100, finiteNumber(value, 0)));
+    const color = gaugeColor(numeric);
 
     mountChart(id, baseConfig('doughnut', {
       data: {
@@ -754,17 +848,18 @@ function bootDashboardRender(force = false) {
         datasets: [{
           data: [numeric, Math.max(0, 100 - numeric)],
           backgroundColor: [
-            gaugeColor(numeric),
-            theme.isDark ? 'rgba(51,65,85,0.86)' : 'rgba(226,232,240,0.96)',
+            color,
+            theme.isDark ? 'rgba(30,41,59,0.92)' : 'rgba(241,245,249,0.98)',
           ],
           borderWidth: 0,
-          hoverOffset: 0,
+          hoverOffset: 4,
+          borderRadius: 6,
         }],
       },
       options: {
         rotation: 270,
         circumference: 180,
-        cutout: '76%',
+        cutout: '78%',
         plugins: {
           legend: { display: false },
           tooltip: { enabled: false },
@@ -773,15 +868,15 @@ function bootDashboardRender(force = false) {
             lines: [
               {
                 text: `${Math.round(numeric)}%`,
-                color: gaugeColor(numeric),
-                font: '800 25px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
-                offsetY: -6,
+                color,
+                font: '800 26px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
+                offsetY: -4,
               },
               {
                 text: label,
                 color: theme.muted,
-                font: '700 11px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
-                offsetY: 20,
+                font: '600 11px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
+                offsetY: 18,
               },
             ],
           },
@@ -804,50 +899,57 @@ function bootDashboardRender(force = false) {
       mountChart('dashboard-role-comparison-chart', baseConfig(chartType, {
         data: {
           labels: comparison.labels,
-          datasets: (comparison.datasets || []).map((dataset, index) => ({
-            label: dataset.label || `Serie ${index + 1}`,
-            data: (dataset.data || []).map((value) => finiteNumber(value, 0)),
-            borderColor: dataset.color || toneForIndex(index),
-            backgroundColor: chartType === 'line'
-              ? alphaColor(dataset.color || toneForIndex(index), 0.16)
-              : alphaColor(dataset.color || toneForIndex(index), 0.84),
-            hoverBackgroundColor: dataset.color || toneForIndex(index),
-            hoverBorderColor: dataset.color || toneForIndex(index),
-            borderWidth: chartType === 'line' ? 3 : 1,
-            borderRadius: chartType === 'bar' ? 14 : 0,
-            maxBarThickness: 34,
-            tension: 0.3,
-            fill: chartType === 'line',
-          })),
+          datasets: (comparison.datasets || []).map((dataset, index) => {
+            const color = dataset.color || toneForIndex(index);
+            return {
+              label: dataset.label || `Serie ${index + 1}`,
+              data: (dataset.data || []).map((value) => finiteNumber(value, 0)),
+              borderColor: color,
+              backgroundColor: chartType === 'line'
+                ? (context) => chartGradient(context.chart, color)
+                : (context) => barGradient(context.chart, color),
+              hoverBackgroundColor: color,
+              hoverBorderColor: color,
+              borderWidth: chartType === 'line' ? 2.5 : 1,
+              borderRadius: chartType === 'bar' ? 14 : 0,
+              maxBarThickness: 34,
+              tension: 0.38,
+              fill: chartType === 'line',
+              pointRadius: chartType === 'line' ? 4 : 0,
+              pointHoverRadius: chartType === 'line' ? 7 : 0,
+              pointBackgroundColor: color,
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2,
+            };
+          }),
         },
         options: {
           indexAxis,
           scales: cartesianScales({
-            x: {
-              stacked,
-            },
-            y: {
-              stacked,
-            },
+            x: { stacked },
+            y: { stacked },
           }),
         },
       }), ({ element }) => (comparison.urls || [])[element?.index] || '');
     }
 
     if (Array.isArray(status.labels) && status.labels.length > 0) {
+      const theme = dashboardTheme();
+
       mountChart('dashboard-role-status-chart', baseConfig('doughnut', {
         data: {
           labels: status.labels,
           datasets: [{
             data: (status.values || []).map((value) => finiteNumber(value, 0)),
-            backgroundColor: (status.labels || []).map((label, index) => alphaColor(colorForStatus(label, index), 0.84)),
-            borderColor: (status.labels || []).map((label, index) => colorForStatus(label, index)),
-            borderWidth: 1.5,
-            hoverOffset: 8,
+            backgroundColor: (status.labels || []).map((label, index) => alphaColor(colorForStatus(label, index), 0.92)),
+            borderColor: theme.isDark ? '#0f172a' : '#ffffff',
+            borderWidth: 3,
+            hoverOffset: 12,
+            borderRadius: 4,
           }],
         },
         options: {
-          cutout: '68%',
+          cutout: '74%',
         },
       }), ({ element }) => (status.urls || [])[element?.index] || '');
     }
@@ -856,23 +958,27 @@ function bootDashboardRender(force = false) {
       mountChart('dashboard-role-trend-chart', baseConfig('line', {
         data: {
           labels: trend.labels,
-          datasets: (trend.datasets || []).map((dataset, index) => ({
-            label: dataset.label || `Serie ${index + 1}`,
-            data: (dataset.data || []).map((value) => finiteNumber(value, 0)),
-            borderColor: dataset.color || toneForIndex(index),
-            backgroundColor: alphaColor(dataset.color || toneForIndex(index), 0.12),
-            pointBackgroundColor: dataset.color || toneForIndex(index),
-            pointBorderColor: '#FFFFFF',
-            pointBorderWidth: 2,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-            tension: 0.34,
-            fill: false,
-            borderWidth: 3,
-          })),
+          datasets: (trend.datasets || []).map((dataset, index) => {
+            const color = dataset.color || toneForIndex(index);
+            return {
+              label: dataset.label || `Serie ${index + 1}`,
+              data: (dataset.data || []).map((value) => finiteNumber(value, 0)),
+              borderColor: color,
+              backgroundColor: (context) => chartGradient(context.chart, color),
+              pointBackgroundColor: color,
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 7,
+              tension: 0.38,
+              fill: true,
+              borderWidth: 2.5,
+            };
+          }),
         },
         options: {
           scales: cartesianScales(),
+          plugins: { ...kpiAnnotations() },
         },
       }), ({ element }) => (trend.urls || [])[element?.index] || '');
     }
@@ -885,32 +991,35 @@ function bootDashboardRender(force = false) {
       mountChart('dashboard-role-support-chart', baseConfig(chartType, {
         data: {
           labels: support.labels,
-          datasets: (support.datasets || []).map((dataset, index) => ({
-            label: dataset.label || `Serie ${index + 1}`,
-            data: (dataset.data || []).map((value) => finiteNumber(value, 0)),
-            borderColor: dataset.color || toneForIndex(index),
-            backgroundColor: chartType === 'line'
-              ? alphaColor(dataset.color || toneForIndex(index), 0.16)
-              : alphaColor(dataset.color || toneForIndex(index), 0.84),
-            hoverBackgroundColor: dataset.color || toneForIndex(index),
-            hoverBorderColor: dataset.color || toneForIndex(index),
-            borderWidth: chartType === 'line' ? 3 : 1,
-            borderRadius: chartType === 'bar' ? 14 : 0,
-            maxBarThickness: 32,
-            tension: 0.3,
-            fill: chartType === 'line',
-          })),
+          datasets: (support.datasets || []).map((dataset, index) => {
+            const color = dataset.color || toneForIndex(index);
+            return {
+              label: dataset.label || `Serie ${index + 1}`,
+              data: (dataset.data || []).map((value) => finiteNumber(value, 0)),
+              borderColor: color,
+              backgroundColor: chartType === 'line'
+                ? (context) => chartGradient(context.chart, color)
+                : (context) => barGradient(context.chart, color),
+              hoverBackgroundColor: color,
+              hoverBorderColor: color,
+              borderWidth: chartType === 'line' ? 2.5 : 1,
+              borderRadius: chartType === 'bar' ? 14 : 0,
+              maxBarThickness: 32,
+              tension: 0.38,
+              fill: chartType === 'line',
+              pointRadius: chartType === 'line' ? 4 : 0,
+              pointHoverRadius: chartType === 'line' ? 7 : 0,
+              pointBackgroundColor: color,
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2,
+            };
+          }),
         },
         options: {
           indexAxis,
           scales: cartesianScales({
-            x: {
-              stacked,
-              max: indexAxis === 'y' ? undefined : undefined,
-            },
-            y: {
-              stacked,
-            },
+            x: { stacked },
+            y: { stacked },
           }),
         },
       }), ({ element }) => (support.urls || [])[element?.index] || '');
@@ -1125,14 +1234,15 @@ function bootDashboardRender(force = false) {
         labels: cards.map((item) => item.label),
         datasets: [{
           data: cards.map((item) => Number(item.count || 0)),
-          backgroundColor: cards.map((item, index) => item.color || colorForStatus(item.label, index)),
+          backgroundColor: cards.map((item, index) => alphaColor(item.color || colorForStatus(item.label, index), 0.9)),
           borderColor: theme.isDark ? '#0f172a' : '#ffffff',
-          borderWidth: 3,
-          hoverOffset: 6,
+          borderWidth: 4,
+          hoverOffset: 10,
+          hoverBorderColor: theme.isDark ? '#0f172a' : '#ffffff',
         }],
       },
       options: {
-        cutout: '72%',
+        cutout: '74%',
         plugins: {
           anbgCenterText: {
             lines: [
@@ -1156,76 +1266,37 @@ function bootDashboardRender(force = false) {
   }
 
   function mountMonthlyKpiLine(hostId = 'dashboard-kpi-line-chart', rows = monthly) {
+    const kpiDatasets = [
+      { label: 'Délai',       key: 'delai',       color: '#3996D3' },
+      { label: 'Performance', key: 'performance', color: '#16A34A' },
+      { label: 'Conformité',  key: 'conformite',  color: '#D97706' },
+      { label: 'Qualité',     key: 'qualite',     color: '#F97316' },
+      { label: 'Global',      key: 'global',      color: '#7C3AED' },
+    ];
+
     mountChart(hostId, baseConfig('line', {
       data: {
         labels: rows.map((item) => item.label),
-        datasets: [
-          {
-            label: 'Délai',
-            data: rows.map((item) => Number(item.delai || 0)),
-            borderColor: '#3996D3',
-            backgroundColor: (context) => chartGradient(context.chart, '#3996D3'),
-            fill: true,
-            tension: 0.36,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-          },
-          {
-            label: 'Performance',
-            data: rows.map((item) => Number(item.performance || 0)),
-            borderColor: '#8FC043',
-            backgroundColor: (context) => chartGradient(context.chart, '#8FC043'),
-            fill: true,
-            tension: 0.36,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-          },
-          {
-            label: 'Conformité',
-            data: rows.map((item) => Number(item.conformite || 0)),
-            borderColor: '#F0E509',
-            backgroundColor: (context) => chartGradient(context.chart, '#F0E509'),
-            fill: true,
-            tension: 0.36,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-          },
-          {
-            label: 'Qualité',
-            data: rows.map((item) => Number(item.qualite || 0)),
-            borderColor: '#F9B13C',
-            backgroundColor: (context) => chartGradient(context.chart, '#F9B13C'),
-            fill: true,
-            tension: 0.36,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-          },
-          {
-            label: 'Risque',
-            data: rows.map((item) => Number(item.risque || 0)),
-            borderColor: '#64748B',
-            backgroundColor: (context) => chartGradient(context.chart, '#64748B'),
-            fill: true,
-            tension: 0.36,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-          },
-          {
-            label: 'Global',
-            data: rows.map((item) => Number(item.global || 0)),
-            borderColor: '#1C203D',
-            backgroundColor: (context) => chartGradient(context.chart, '#1C203D'),
-            fill: true,
-            tension: 0.36,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-          },
-        ],
+        datasets: kpiDatasets.map(({ label, key, color }) => ({
+          label,
+          data: rows.map((item) => Number(item[key] || 0)),
+          borderColor: color,
+          backgroundColor: (context) => chartGradient(context.chart, color),
+          fill: true,
+          tension: 0.42,
+          pointRadius: 4,
+          pointHoverRadius: 8,
+          pointBackgroundColor: color,
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2.5,
+          borderWidth: 3,
+        })),
       },
       options: {
         scales: cartesianScales({
           y: { max: 100 },
         }),
+        plugins: { ...kpiAnnotations() },
       },
     }), ({ element, chart }) => {
       const row = rows[element?.index];
@@ -1247,7 +1318,6 @@ function bootDashboardRender(force = false) {
       ['performance', 'Performance'],
       ['conformite', 'Conformité'],
       ['qualite', 'Qualité'],
-      ['risque', 'Risque'],
     ];
 
     definitions.forEach(([key, label]) => {
@@ -1265,6 +1335,8 @@ function bootDashboardRender(force = false) {
   }
 
   function mountUnitSummary() {
+    const percentLabel = (v) => (v > 0 ? `${Math.round(v)}%` : '');
+
     mountChart('dashboard-unit-summary-chart', baseConfig('bar', {
       data: {
         labels: unitRows.map((item) => item.label),
@@ -1289,63 +1361,44 @@ function bootDashboardRender(force = false) {
         scales: cartesianScales({
           y: { max: 100 },
         }),
+        plugins: {
+          datalabels: barDataLabels(percentLabel),
+          ...kpiAnnotations(),
+        },
       },
     }), ({ element }) => unitRows[element?.index]?.url || '');
   }
 
   function mountMonthlyKpiGrouped() {
+    const kpiSeries = [
+      { label: 'Délai', key: 'delai',       color: '#3996D3', maxBar: 22 },
+      { label: 'Perf.', key: 'performance', color: '#16A34A', maxBar: 22 },
+      { label: 'Conf.', key: 'conformite',  color: '#D97706', maxBar: 18 },
+      { label: 'Qual.', key: 'qualite',     color: '#F97316', maxBar: 18 },
+      { label: 'Global', key: 'global',     color: '#7C3AED', maxBar: 18 },
+    ];
+
+    const percentLabel = (v) => (v > 0 ? `${Math.round(v)}%` : '');
+
     mountChart('dashboard-kpi-grouped-chart', baseConfig('bar', {
       data: {
         labels: monthly.map((item) => item.label),
-        datasets: [
-          {
-            label: 'Délai',
-            data: monthly.map((item) => Number(item.delai || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
-            borderRadius: 8,
-            maxBarThickness: 24,
-          },
-          {
-            label: 'Perf.',
-            data: monthly.map((item) => Number(item.performance || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
-            borderRadius: 8,
-            maxBarThickness: 24,
-          },
-          {
-            label: 'Conf.',
-            data: monthly.map((item) => Number(item.conformite || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#F0E509'),
-            borderRadius: 8,
-            maxBarThickness: 18,
-          },
-          {
-            label: 'Qual.',
-            data: monthly.map((item) => Number(item.qualite || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#F9B13C'),
-            borderRadius: 8,
-            maxBarThickness: 18,
-          },
-          {
-            label: 'Risque',
-            data: monthly.map((item) => Number(item.risque || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#64748B'),
-            borderRadius: 8,
-            maxBarThickness: 18,
-          },
-          {
-            label: 'Global',
-            data: monthly.map((item) => Number(item.global || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#1C203D'),
-            borderRadius: 8,
-            maxBarThickness: 18,
-          },
-        ],
+        datasets: kpiSeries.map(({ label, key, color, maxBar }) => ({
+          label,
+          data: monthly.map((item) => Number(item[key] || 0)),
+          backgroundColor: (context) => barGradient(context.chart, color),
+          borderRadius: 8,
+          maxBarThickness: maxBar,
+        })),
       },
       options: {
         scales: cartesianScales({
           y: { max: 100 },
         }),
+        plugins: {
+          datalabels: barDataLabels(percentLabel),
+          ...kpiAnnotations(),
+        },
       },
     }), ({ element, chart }) => {
       const row = monthly[element?.index];
@@ -1422,17 +1475,19 @@ function bootDashboardRender(force = false) {
       data: {
         labels: ['Délai', 'Performance', 'Conformité', 'Progression'],
         datasets: radarDatasets.map((dataset, index) => {
-          const color = dataset.borderColor || colorForStatus(dataset.label, index);
+          const color = dataset.borderColor || toneForIndex(index);
 
           return {
             label: dataset.label,
             data: dataset.data,
             borderColor: color,
-            backgroundColor: alphaColor(color, 0.18),
+            backgroundColor: alphaColor(color, 0.14),
             pointBackgroundColor: color,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-            borderWidth: 2,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 8,
+            borderWidth: 2.5,
           };
         }),
       },
@@ -1442,8 +1497,8 @@ function bootDashboardRender(force = false) {
             min: 0,
             max: 100,
             angleLines: { color: theme.grid },
-            grid: { color: theme.grid },
-            pointLabels: { color: theme.text, font: { size: 11, weight: '700' } },
+            grid: { color: theme.grid, borderDash: [4, 4] },
+            pointLabels: { color: theme.text, font: { size: 12, weight: '700' } },
             ticks: { display: false },
           },
         },
@@ -1459,13 +1514,14 @@ function bootDashboardRender(force = false) {
           data: scatterPoints.map((point) => ({
             x: Number(point.x || 0),
             y: Number(point.y || 0),
-            r: Number(point.r || 6),
+            r: Math.max(6, Number(point.r || 6)),
             title: point.title,
             color: point.color || '#3996D3',
           })),
-          backgroundColor: (context) => alphaColor(context.raw?.color || '#3996D3', 0.68),
+          backgroundColor: (context) => alphaColor(context.raw?.color || '#3996D3', 0.55),
           borderColor: (context) => context.raw?.color || '#3996D3',
-          borderWidth: 1.5,
+          borderWidth: 2,
+          hoverBorderWidth: 3,
         }],
       },
       options: {
@@ -1552,23 +1608,33 @@ function bootDashboardRender(force = false) {
         labels: progressWeekly.labels,
         datasets: [
           {
-            label: 'Reel',
+            label: 'Réel',
             data: progressWeekly.reel,
             borderColor: ANBG.secondary,
             backgroundColor: (context) => chartGradient(context.chart, ANBG.secondary),
             fill: true,
-            tension: 0.34,
-            pointRadius: 3,
+            tension: 0.38,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: ANBG.secondary,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            borderWidth: 2.5,
           },
           {
-            label: 'Theorique',
+            label: 'Théorique',
             data: progressWeekly.theorique,
             borderColor: ANBG.primary,
             backgroundColor: (context) => chartGradient(context.chart, ANBG.primary),
             fill: true,
-            tension: 0.34,
-            borderDash: [8, 6],
-            pointRadius: 3,
+            tension: 0.38,
+            borderDash: [8, 5],
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: ANBG.primary,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            borderWidth: 2,
           },
         ],
       },
@@ -1576,6 +1642,7 @@ function bootDashboardRender(force = false) {
         scales: cartesianScales({
           y: { max: 100 },
         }),
+        plugins: { ...kpiAnnotations() },
       },
     }), ({ element }) => (progressWeekly.urls || [])[element?.index] || '');
 
@@ -1598,21 +1665,28 @@ function bootDashboardRender(force = false) {
             label: 'Cible',
             data: kpiTrend.cibles,
             borderColor: ANBG.success,
-            backgroundColor: alphaColor(ANBG.success, 0.18),
-            borderWidth: 3,
-            tension: 0.3,
-            pointRadius: 3,
+            backgroundColor: (context) => chartGradient(context.chart, ANBG.success),
+            borderWidth: 2.5,
+            tension: 0.38,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: ANBG.success,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            fill: false,
           },
           {
             type: 'line',
             label: 'Seuil',
             data: kpiTrend.seuils,
             borderColor: ANBG.warning,
-            backgroundColor: alphaColor(ANBG.warning, 0.18),
-            borderWidth: 3,
-            borderDash: [8, 6],
-            tension: 0.3,
+            backgroundColor: (context) => chartGradient(context.chart, ANBG.warning),
+            borderWidth: 2,
+            borderDash: [7, 5],
+            tension: 0.38,
             pointRadius: 3,
+            pointHoverRadius: 6,
+            fill: false,
           },
         ],
       },
@@ -1620,6 +1694,7 @@ function bootDashboardRender(force = false) {
         scales: cartesianScales({
           y: { max: 100 },
         }),
+        plugins: { ...kpiAnnotations() },
       },
     }), ({ element }) => (kpiTrend.urls || [])[element?.index] || '');
 
@@ -1682,70 +1757,6 @@ function bootDashboardRender(force = false) {
         }),
       },
     }), ({ element }) => (interannualOverview.urls || [])[element?.index] || '');
-
-    const pareto = reportingCharts.risk_pareto || { labels: [], counts: [], cumulative_pct: [] };
-
-    mountChart('dashboard-report-risk-pareto-chart', baseConfig('bar', {
-      data: {
-        labels: pareto.labels,
-        datasets: [
-          {
-            type: 'bar',
-            label: 'Occurrences',
-            data: pareto.counts,
-            backgroundColor: (context) => barGradient(context.chart, ANBG.warning),
-            borderRadius: 10,
-            maxBarThickness: 28,
-            yAxisID: 'y',
-          },
-          {
-            type: 'line',
-            label: 'Cumul %',
-            data: pareto.cumulative_pct,
-            borderColor: ANBG.primary,
-            backgroundColor: alphaColor(ANBG.primary, 0.18),
-            tension: 0.3,
-            borderWidth: 3,
-            pointRadius: 3,
-            yAxisID: 'y1',
-          },
-        ],
-      },
-      options: {
-        scales: cartesianScales({
-          y: { title: { display: true, text: 'Occurrences', color: dashboardTheme().muted } },
-          y1: {
-            position: 'right',
-            beginAtZero: true,
-            max: 100,
-            grid: { drawOnChartArea: false },
-            ticks: { color: dashboardTheme().muted, font: { size: 11, weight: '600' } },
-            border: { display: false },
-            title: { display: true, text: 'Cumul %', color: dashboardTheme().muted },
-          },
-        }),
-      },
-    }), ({ element }) => (pareto.urls || [])[element?.index] || '');
-
-    const topRisks = reportingCharts.top_risks || { labels: [], scores: [] };
-
-    mountChart('dashboard-report-top-risks-chart', baseConfig('bar', {
-      data: {
-        labels: topRisks.labels,
-        datasets: [{
-          label: 'Score de risque',
-          data: topRisks.scores,
-          backgroundColor: (context) => barGradient(context.chart, ANBG.danger),
-          borderRadius: 10,
-          maxBarThickness: 26,
-        }],
-      },
-      options: {
-        indexAxis: 'y',
-        plugins: { legend: { display: false } },
-        scales: cartesianScales(),
-      },
-    }), ({ element }) => (topRisks.rows || [])[element?.index]?.url || '');
 
     const heatmap = reportingCharts.retard_heatmap || { weeks: [], units: [], matrix: [], max: 0 };
     const heatmapData = [];

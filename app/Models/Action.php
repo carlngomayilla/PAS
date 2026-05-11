@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ActionPerformanceService;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -101,12 +102,7 @@ class Action extends Model
         'progression_reelle',
         'progression_theorique',
         'seuil_alerte_progression',
-        'risques',
-        'risque_potentiel',
-        'niveau_risque',
-        'impact_estime',
-        'probabilite',
-        'mesures_preventives',
+        'risque_lie',
         'financement_requis',
         'ressource_main_oeuvre',
         'ressources_humaines',
@@ -319,32 +315,27 @@ class Action extends Model
     {
         $this->loadMissing('sousActions');
 
+        $performanceService = app(ActionPerformanceService::class);
         $target = max(0.0, (float) ($this->quantite_cible ?? 0));
         $subActions = $this->sousActions;
-        $realizedFromSubActions = $subActions->sum(fn (SousAction $subAction): float => max(0.0, (float) ($subAction->quantite_realisee ?? 0)));
-        $realized = $subActions->isNotEmpty()
-            ? $realizedFromSubActions
-            : max(0.0, (float) ($this->quantite_realisee ?? 0));
+        $realized = $performanceService->realizedQuantity($this);
 
         $rawRealizationRate = $target > 0.0 ? ($realized / $target) * 100 : 0.0;
-        $realizationRate = round(min(100.0, $rawRealizationRate), 2);
+        $realizationRate = round(min(100.0, max(0.0, $rawRealizationRate)), 2);
         $overachievementRate = $target > 0.0 && $realized > $target
             ? round((($realized - $target) / $target) * 100, 2)
             : 0.0;
         $remainingValue = round(max($target - $realized, 0.0), 4);
 
         $totalSubActions = $subActions->count();
-        $completedSubActions = $subActions->where('est_effectuee', true)->count();
+        $completedSubActions = $subActions
+            ->filter(fn (SousAction $subAction): bool => $performanceService->isCompletedSubAction($subAction))
+            ->count();
         $technicalProgressRate = $totalSubActions > 0
             ? round(($completedSubActions / $totalSubActions) * 100, 2)
             : 0.0;
 
-        $mode = $this->resolvedEvaluationMode();
-        $progression = match ($mode) {
-            self::MODE_QUANTITATIF => $realizationRate,
-            self::MODE_MIXTE => round(($technicalProgressRate + $realizationRate) / 2, 2),
-            default => $technicalProgressRate,
-        };
+        $progression = $performanceService->calculateRealProgress($this);
 
         $updates = [
             'quantite_realisee' => round($realized, 4),
@@ -487,13 +478,9 @@ class Action extends Model
         return $this->belongsTo(User::class, 'cloture_par');
     }
 
-    public function computeTauxRealisation(float $weightPerf = 0.4, float $weightConformite = 0.3, float $weightDelai = 0.3): float
+    public function computeTauxRealisation(): float
     {
-        $perf = (float) ($this->taux_performance ?? $this->progression_reelle ?? 0);
-        $conformite = (float) ($this->taux_conformite ?? 0);
-        $delai = (float) ($this->taux_delai ?? 100);
-
-        return round(($perf * $weightPerf) + ($conformite * $weightConformite) + ($delai * $weightDelai), 2);
+        return app(ActionPerformanceService::class)->calculateExecutionPerformance($this);
     }
 
     public function isCloturee(): bool

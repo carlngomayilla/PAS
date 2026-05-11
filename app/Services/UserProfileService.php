@@ -97,7 +97,7 @@ class UserProfileService
                 ],
                 [
                     'module'     => 'Actions',
-                    'operations' => ['Renseigner execution', 'Saisir suivi hebdomadaire', 'Téléverser justificatifs', 'Signaler risques'],
+                    'operations' => ['Renseigner execution', 'Saisir suivi hebdomadaire', 'Téléverser justificatifs', 'Signaler alertes'],
                     'portee'     => 'Direction et service rattaches',
                 ],
             ],

@@ -8,21 +8,21 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Documents et justificatifs</h1>
-                <p class="mt-2 text-slate-600">Pilotage des formats autorises, des tailles, de la retention et des droits de consultation ou televersement des justificatifs.</p>
+                <p class="mt-2 text-slate-600">Pilotage des formats autorisés, des tailles, de la rétention et des droits de consultation ou téléversement des justificatifs.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
-                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.referentials.edit') }}">Referentiels dynamiques</a>
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
+                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.referentials.edit') }}">Référentiels dynamiques</a>
                 <a class="btn btn-primary" href="{{ route('workspace.super-admin.index') }}">Retour super admin</a>
             </div>
         </div>
     </section>
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Extensions autorisees</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['extensions_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Roles upload</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['upload_roles_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Roles consultation</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['view_roles_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Retention</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['retention_days'] }} j</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Extensions autorisées</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['extensions_total'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Rôles upload</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['upload_roles_total'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Rôles consultation</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['view_roles_total'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Rétention</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['retention_days'] }} j</p></article>
     </section>
 
     <section class="showcase-panel mb-4">
@@ -34,7 +34,7 @@
                 <h2 class="form-section-title">Politique documentaire</h2>
                 <div class="grid gap-4 md:grid-cols-3">
                     <div class="md:col-span-3">
-                        <label for="allowed_extensions">Extensions autorisees</label>
+                        <label for="allowed_extensions">Extensions autorisées</label>
                         <textarea id="allowed_extensions" name="allowed_extensions" rows="3" required>{{ old('allowed_extensions', implode(PHP_EOL, $settings['allowed_extensions'] ?? [])) }}</textarea>
                         <p class="mt-1 text-xs text-slate-500">Une extension par ligne. Exemples: pdf, docx, xlsx, png.</p>
                     </div>
@@ -43,7 +43,7 @@
                         <input id="max_upload_mb" name="max_upload_mb" type="number" min="1" max="50" value="{{ old('max_upload_mb', $settings['max_upload_mb'] ?? 10) }}" required>
                     </div>
                     <div>
-                        <label for="retention_days">Retention (jours)</label>
+                        <label for="retention_days">Rétention (jours)</label>
                         <input id="retention_days" name="retention_days" type="number" min="30" max="3650" value="{{ old('retention_days', $settings['retention_days'] ?? 365) }}" required>
                     </div>
                     <div>
@@ -54,10 +54,10 @@
             </div>
 
             <div class="form-section">
-                <h2 class="form-section-title">Roles autorises</h2>
+                <h2 class="form-section-title">Rôles autorisés</h2>
                 <div class="grid gap-4 md:grid-cols-2">
                     <div>
-                        <span class="mb-2 block text-sm font-medium text-slate-700">Televersement</span>
+                        <span class="mb-2 block text-sm font-medium text-slate-700">Téléversement</span>
                         <div class="grid gap-2 sm:grid-cols-2">
                             @foreach ($roleLabels as $roleCode => $roleLabel)
                                 <label class="checkbox-pill">
@@ -107,4 +107,3 @@
         </form>
     </section>
 @endsection
-

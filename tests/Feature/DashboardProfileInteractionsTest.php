@@ -125,7 +125,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $overview->assertSee('Actions');
         $overview->assertSee('Taux validation');
         $overview->assertSee('globale');
-        $overview->assertSee('Score global');
+        $overview->assertSee('Avancement reel');
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
@@ -159,12 +159,12 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $user = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
 
-        $response = $this->actingAs($user)->get('/workspace/pilotage');
+        $this->actingAs($user)->get('/workspace/pilotage')->assertRedirect('/dashboard');
 
+        $response = $this->actingAs($user)->get('/dashboard');
         $response->assertOk();
-        $response->assertSee('Suivi du service');
+        $response->assertSee('Pilotage du service');
         $response->assertSee('Actions');
-
     }
 
     public function test_seeded_dg_user_sees_role_aware_reporting_page(): void
@@ -190,10 +190,11 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $user = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
 
-        $response = $this->actingAs($user)->get('/workspace/pilotage');
+        $this->actingAs($user)->get('/workspace/pilotage')->assertRedirect('/dashboard');
 
+        $response = $this->actingAs($user)->get('/dashboard');
         $response->assertOk();
-        $response->assertSee('Pilotage institutionnel');
+        $response->assertSee('institutionnelle');
         $response->assertSee('Actions');
 
         $response->assertDontSee('Lecture DG : operationnel vs consolide');

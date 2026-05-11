@@ -40,7 +40,6 @@ class SuperAdminKpiSettingsTest extends TestCase
                 'conformite' => 'gap_to_target',
                 'qualite' => 'minimum',
                 'progression' => 'maximum',
-                'risque' => 'inverse',
                 default => 'direct',
             };
 
@@ -57,7 +56,6 @@ class SuperAdminKpiSettingsTest extends TestCase
                     'conformite' => 'conformite',
                     'qualite' => 'qualite',
                     'progression' => 'progression',
-                    'risque' => 'risque',
                     default => 'performance',
                 },
                 'formula_mode' => $formulaMode,
@@ -104,7 +102,6 @@ class SuperAdminKpiSettingsTest extends TestCase
             'performance' => 88,
             'conformite' => 92,
             'qualite' => 81,
-            'risque' => 18,
             'global' => 84,
             'progression' => 66,
         ], [
@@ -118,7 +115,6 @@ class SuperAdminKpiSettingsTest extends TestCase
         $this->assertSame(97.0, collect($runtimeMetrics)->firstWhere('code', 'conformite')['value']);
         $this->assertSame(66.0, collect($runtimeMetrics)->firstWhere('code', 'qualite')['value']);
         $this->assertSame(84.0, collect($runtimeMetrics)->firstWhere('code', 'progression')['value']);
-        $this->assertSame(82.0, collect($runtimeMetrics)->firstWhere('code', 'risque')['value']);
         $this->assertSame('Cible 95', collect($runtimeMetrics)->firstWhere('code', 'conformite')['formula_summary']);
     }
 }

@@ -142,7 +142,6 @@ class PlatformSimulationService
             'performance' => $average('kpi_performance'),
             'conformite' => $average('kpi_conformite'),
             'qualite' => $average('kpi_qualite'),
-            'risque' => $average('kpi_risque'),
             'global' => $average('kpi_global'),
             'progression' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2),
         ];

@@ -57,7 +57,8 @@ class MonitoringWebController extends Controller
         private readonly ReportingWorkbookExporter $reportingWorkbookExporter,
         private readonly ReportingCsvExporter $reportingCsvExporter,
         private readonly ReportingAnalyticsService $reportingAnalyticsService,
-        private readonly ExportTemplateResolver $exportTemplateResolver
+        private readonly ExportTemplateResolver $exportTemplateResolver,
+        private readonly ActionTrackingService $actionTrackingService
     ) {
     }
 
@@ -1567,18 +1568,6 @@ class MonitoringWebController extends Controller
      *         }>
      *     },
      *     resource_treemap: array{labels: list<string>, values: list<float>, total: float},
-     *     risk_pareto: array{labels: list<string>, counts: list<int>, cumulative_pct: list<float>},
-     *     top_risks: array{
-     *         labels: list<string>,
-     *         scores: list<float>,
-     *         rows: list<array{
-     *             action: string,
-     *             score: float,
-     *             statut: string,
-     *             echeance: string,
-     *             responsable: string
-     *         }>
-     *     },
      *     performance_gauge: array{labels: list<string>, values: list<float>}
      * }
      */
@@ -1894,7 +1883,7 @@ class MonitoringWebController extends Controller
                     $end = $start->copy()->addDay();
                 }
                 $progress = round(max(0, min(100, (float) ($action->progression_reelle ?? 0))), 2);
-                $score = round($this->computeActionRiskScore($action, $today), 2);
+                $score = round($this->actionTrackingService->computeActionDelayPriorityScore($action, $today), 2);
 
                 return [
                     'action' => $action,
@@ -1959,56 +1948,6 @@ class MonitoringWebController extends Controller
         $resourceTotals = array_slice($resourceTotals, 0, 12, true);
         $resourceLabels = array_keys($resourceTotals);
         $resourceValues = array_map(fn ($value): float => round((float) $value, 2), array_values($resourceTotals));
-
-        $riskCounts = [];
-        foreach ($actionCandidates as $action) {
-            $riskText = (string) ($action->risques ?? '');
-            if (trim($riskText) === '') {
-                continue;
-            }
-            $parts = preg_split('/[;,|\/\r\n]+/', $riskText) ?: [];
-            foreach ($parts as $part) {
-                $normalized = $this->normalizeRiskLabel((string) $part);
-                if ($normalized === null) {
-                    continue;
-                }
-                $riskCounts[$normalized] = (int) (($riskCounts[$normalized] ?? 0) + 1);
-            }
-        }
-        arsort($riskCounts);
-        $riskCounts = array_slice($riskCounts, 0, 8, true);
-
-        $paretoLabels = array_keys($riskCounts);
-        $paretoValues = array_values($riskCounts);
-        $paretoCumulative = [];
-        $runningTotal = 0;
-        $allTotal = array_sum($paretoValues);
-        foreach ($paretoValues as $value) {
-            $runningTotal += (int) $value;
-            $paretoCumulative[] = $allTotal > 0 ? round(($runningTotal / $allTotal) * 100, 2) : 0.0;
-        }
-
-        $topRiskRows = $scoredActions
-            ->take(10)
-            ->map(function (array $item): array {
-                /** @var Action $action */
-                $action = $item['action'];
-
-                return [
-                    'action' => (string) $item['label'],
-                    'score' => (float) $item['score'],
-                    'statut' => (string) $item['status'],
-                    'echeance' => $action->date_echeance instanceof Carbon ? $action->date_echeance->toDateString() : '-',
-                    'responsable' => (string) ($action->responsable?->name ?? '-'),
-                ];
-            })
-            ->all();
-
-        $topRiskLabels = array_map(
-            fn (array $row): string => Str::limit((string) $row['action'], 34),
-            $topRiskRows
-        );
-        $topRiskScores = array_map(fn (array $row): float => (float) $row['score'], $topRiskRows);
 
         $performanceRows = Action::query()
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
@@ -2077,19 +2016,6 @@ class MonitoringWebController extends Controller
                 'values' => $resourceValues,
                 'total' => round((float) array_sum($resourceValues), 2),
             ],
-            'risk_pareto' => [
-                'labels' => array_map(
-                    fn ($label): string => Str::limit(Str::title((string) $label), 42),
-                    $paretoLabels
-                ),
-                'counts' => $paretoValues,
-                'cumulative_pct' => $paretoCumulative,
-            ],
-            'top_risks' => [
-                'labels' => $topRiskLabels,
-                'scores' => $topRiskScores,
-                'rows' => $topRiskRows,
-            ],
             'performance_gauge' => [
                 'labels' => $performanceLabels,
                 'values' => $performanceValues,
@@ -2115,55 +2041,6 @@ class MonitoringWebController extends Controller
             ActionTrackingService::STATUS_ANNULE,
             ActionTrackingService::STATUS_CLOTUREE,
         ];
-    }
-
-    private function computeActionRiskScore(Action $action, Carbon $today): float
-    {
-        $lateDays = 0;
-        if (
-            $action->date_echeance instanceof Carbon
-            && ! in_array((string) $action->statut_dynamique, $this->completedActionStatuses(), true)
-            && $action->date_echeance->lt($today)
-        ) {
-            $lateDays = $action->date_echeance->diffInDays($today);
-        }
-
-        $gap = max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
-        $hasRisk = trim((string) ($action->risques ?? '')) !== '';
-        $isDelayed = (string) ($action->statut_dynamique ?? '') === 'en_retard';
-
-        $score = ($lateDays * 2.0) + $gap;
-        if ($isDelayed) {
-            $score += 25.0;
-        }
-        if ($hasRisk) {
-            $score += 10.0;
-        }
-        if ((bool) $action->financement_requis) {
-            $score += 4.0;
-        }
-
-        return max(0.0, $score);
-    }
-
-    private function normalizeRiskLabel(string $value): ?string
-    {
-        $normalized = Str::of($value)
-            ->lower()
-            ->replaceMatches('/\s+/', ' ')
-            ->trim(" \t\n\r\0\x0B-._");
-
-        $label = (string) $normalized;
-        if ($label === '' || Str::length($label) < 4) {
-            return null;
-        }
-
-        $ignored = ['ras', 'aucun', 'aucune', 'neant', 'n/a', 'na', 'none', 'ok'];
-        if (in_array($label, $ignored, true)) {
-            return null;
-        }
-
-        return $label;
     }
 
     /**
@@ -2308,7 +2185,6 @@ class MonitoringWebController extends Controller
                         'progression' => number_format((float) ($action->progression_reelle ?? 0), 2, '.', '').'%',
                         'ressources_requises' => implode(' | ', $ressources),
                         'indicateurs_performance' => (string) $indicateurs,
-                        'risques_potentiels' => (string) ($action->risques ?? ''),
                     ];
                 });
         }
@@ -2375,3 +2251,4 @@ class MonitoringWebController extends Controller
         abort(403, 'Acces non autorise.');
     }
 }
+

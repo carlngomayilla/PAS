@@ -73,13 +73,10 @@
             ? $row->sousActions->map(fn ($subAction) => [
                 'id' => $subAction->id,
                 'libelle' => $subAction->libelle,
-                'description' => $subAction->description,
-                'resultat_attendu' => $subAction->resultat_attendu,
                 'date_debut' => optional($subAction->date_debut)->format('Y-m-d'),
                 'date_fin' => optional($subAction->date_fin)->format('Y-m-d'),
                 'cible_prevue' => $subAction->cible_prevue,
                 'unite' => $subAction->unite,
-                'commentaire' => $subAction->commentaire,
             ])->all()
             : [];
         $oldSubActions = old('sous_actions');
@@ -311,7 +308,7 @@
                         {{-- Cible --}}
                         <div>
                             <label for="type_cible">Cible</label>
-                            <select id="type_cible" name="type_cible" class="mb-3" required>
+                            <select id="type_cible" name="type_cible" class="mb-3">
                                 <option value="quantitative" @selected($selectedTargetType === 'quantitative')>Cible quantitative</option>
                                 <option value="qualitative" @selected($selectedTargetType === 'qualitative')>Cible par sous-action</option>
                             </select>
@@ -360,18 +357,27 @@
 
                         {{-- Date début --}}
                         <div>
-                            <label for="date_debut">Date de début <span class="text-red-500">*</span></label>
+                            <label for="date_debut">Date de début</label>
                             <input id="date_debut" name="date_debut" type="date"
-                                value="{{ old('date_debut', optional($row->date_debut)->format('Y-m-d')) }}" required>
+                                value="{{ old('date_debut', optional($row->date_debut)->format('Y-m-d')) }}">
                             @error('date_debut') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
 
                         {{-- Date fin --}}
                         <div>
-                            <label for="date_fin">Date de fin prévue <span class="text-red-500">*</span></label>
+                            <label for="date_fin">Date de fin prévue</label>
                             <input id="date_fin" name="date_fin" type="date"
-                                value="{{ old('date_fin', optional($row->date_fin)->format('Y-m-d')) }}" required>
+                                value="{{ old('date_fin', optional($row->date_fin)->format('Y-m-d')) }}">
                             @error('date_fin') <p class="field-error">{{ $message }}</p> @enderror
+                        </div>
+
+                        {{-- Risque lié à l'action --}}
+                        <div class="md:col-span-2">
+                            <label for="risque_lie">Risque lié à l'action</label>
+                            <input id="risque_lie" name="risque_lie" type="text"
+                                placeholder="Ex : retard fournisseur, budget insuffisant, dépendance externe…"
+                                value="{{ old('risque_lie', $row->risque_lie) }}">
+                            @error('risque_lie') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
@@ -409,18 +415,6 @@
                                             <label>Unité</label>
                                             <input name="sous_actions[{{ $subIndex }}][unite]" type="text" value="{{ $subAction['unite'] ?? old('unite_cible', $row->unite_cible) }}">
                                         </div>
-                                        <div class="md:col-span-2">
-                                            <label>Description</label>
-                                            <textarea name="sous_actions[{{ $subIndex }}][description]">{{ $subAction['description'] ?? '' }}</textarea>
-                                        </div>
-                                        <div class="md:col-span-2">
-                                            <label>Résultat attendu</label>
-                                            <textarea name="sous_actions[{{ $subIndex }}][resultat_attendu]">{{ $subAction['resultat_attendu'] ?? '' }}</textarea>
-                                        </div>
-                                        <div class="md:col-span-2">
-                                            <label>Commentaire</label>
-                                            <textarea name="sous_actions[{{ $subIndex }}][commentaire]">{{ $subAction['commentaire'] ?? '' }}</textarea>
-                                        </div>
                                     </div>
                                 </div>
                             @endforeach
@@ -432,7 +426,7 @@
                      ÉTAPE 3 — Ressources et financement
                      ============================================================ --}}
                 <div id="resources_section" class="form-section {{ $selectedPta ? '' : 'hidden' }}">
-                    <h2 class="form-section-title">3) Ressources</h2>
+                    <h2 class="form-section-title">3) Échéances et ressources</h2>
 
                     <div class="form-grid-compact">
                         <label class="hidden">
@@ -503,27 +497,10 @@
                     </div>
                 </div>
 
-                {{-- ============================================================
-                     ÉTAPE 4 — Risques
-                     ============================================================ --}}
-                <div id="risks_section" class="form-section {{ $selectedPta ? '' : 'hidden' }}">
-                    <h2 class="form-section-title">4) Risques</h2>
-                    <div class="form-grid">
-                        <div>
-                            <label for="risques">Risques identifiés</label>
-                            <textarea id="risques" name="risques">{{ old('risques', $row->risques) }}</textarea>
-                        </div>
-                        <div>
-                            <label for="mesures_preventives">Mesures préventives</label>
-                            <textarea id="mesures_preventives" name="mesures_preventives">{{ old('mesures_preventives', $row->mesures_preventives) }}</textarea>
-                        </div>
-                    </div>
-                </div>
-
                 @if ($isEdit)
                     <p class="mt-2.5 text-sm text-slate-600">
                         Statut dynamique : <strong>{{ $row->statut_dynamique ?: 'non_demarre' }}</strong> |
-                        Progression : <strong>{{ number_format((float) ($row->progression_reelle ?? 0), 2) }}%</strong>
+                        Progression : <strong>{{ number_format((float) ($row->progression_reelle ?? 0), 1, ',', ' ') }}%</strong>
                     </p>
                 @endif
 
@@ -583,18 +560,6 @@
                     <label>Unité</label>
                     <input name="sous_actions[__INDEX__][unite]" type="text" value="">
                 </div>
-                <div class="md:col-span-2">
-                    <label>Description</label>
-                    <textarea name="sous_actions[__INDEX__][description]"></textarea>
-                </div>
-                <div class="md:col-span-2">
-                    <label>Résultat attendu</label>
-                    <textarea name="sous_actions[__INDEX__][resultat_attendu]"></textarea>
-                </div>
-                <div class="md:col-span-2">
-                    <label>Commentaire</label>
-                    <textarea name="sous_actions[__INDEX__][commentaire]"></textarea>
-                </div>
             </div>
         </div>
     </template>
@@ -607,7 +572,6 @@
     var ptaSection          = document.getElementById('pta_section');
     var actionSection       = document.getElementById('action_section');
     var resourcesSection    = document.getElementById('resources_section');
-    var risksSection        = document.getElementById('risks_section');
     var formActions         = document.getElementById('form_actions');
 
     var ptaSelect           = document.getElementById('pta_id');
@@ -803,7 +767,6 @@
             hide(ptaSection);
             hide(actionSection);
             hide(resourcesSection);
-            hide(risksSection);
             hide(formActions);
             setVal(ptaSelect, '');
             return;
@@ -851,16 +814,13 @@
         if (hasPta) {
             show(actionSection);
             show(resourcesSection);
-            show(risksSection);
             show(formActions);
             disableFields(actionSection,    false);
             disableFields(resourcesSection, false);
-            disableFields(risksSection,     false);
             filterRmosForScope();
         } else {
             hide(actionSection);
             hide(resourcesSection);
-            hide(risksSection);
             hide(formActions);
         }
     }

@@ -17,12 +17,16 @@
     @endphp
 
     <div class="app-screen-flow">
-    <div class="mb-4 flex items-center justify-between gap-3">
-        <h1 class="text-xl font-bold text-[#1a1a1a]">PAS</h1>
-        @if ($canWrite)
-            <a class="btn btn-primary" href="{{ route('workspace.pas.create') }}">Nouveau PAS</a>
-        @endif
-    </div>
+    <x-ui.page-title
+        title="Pilotage stratégique"
+        subtitle="Suivi des plans stratégiques, des axes et des objectifs institutionnels."
+    >
+        <x-slot:actions>
+            @if ($canWrite)
+                <a class="btn btn-primary" href="{{ route('workspace.pas.create') }}">Nouveau PAS</a>
+            @endif
+        </x-slot:actions>
+    </x-ui.page-title>
 
     <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
@@ -89,7 +93,7 @@
                         <th>PAO</th>
                         <th>Validateur</th>
                         @if ($canWrite)
-                            <th>Operations</th>
+                            <th>Opérations</th>
                         @endif
                     </tr>
                 </thead>
@@ -186,7 +190,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 8 : 7 }}" class="text-slate-500">Aucun PAS trouve.</td>
+                            <td colspan="{{ $canWrite ? 8 : 7 }}" class="text-slate-500">Aucun PAS trouvé.</td>
                         </tr>
                     @endforelse
                 </tbody>

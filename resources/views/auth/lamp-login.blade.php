@@ -3,7 +3,7 @@
 @push('head')
     <style>
         .guest-footer { display: none !important; }
-        body { background: #1c203d !important; padding: 0 !important; margin: 0 !important; }
+        body { padding: 0 !important; margin: 0 !important; }
     </style>
 @endpush
 
@@ -12,21 +12,29 @@
     $decode = static fn (string $value): string => html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     $identifierLabel       = $platformSettings->get('login_identifier_label', 'Email ou matricule');
     $identifierPlaceholder = $platformSettings->get('login_identifier_placeholder', 'Email ou matricule');
-    $formTitle             = $decode($platformSettings->get('login_form_title', 'Se connecter'));
+    $formTitle             = $decode($platformSettings->get('login_form_title', 'Connexion'));
     $footerText            = $platformSettings->get('footer_text', 'ANBG · Agence Nationale des Bourses du Gabon');
 @endphp
 
+<div class="login-page">
 <div class="login-root">
 
     {{-- ══════════════════════════════════════════════════
-         PANNEAU GAUCHE — Identité bleue + sphères
+         PANNEAU GAUCHE — Bleu ANBG + sphères 3D
     ══════════════════════════════════════════════════ --}}
     <aside class="login-left">
 
-        {{-- Sphères décoratives 3D --}}
-        <div class="login-brand">
-            <x-brand.logo variant="full" class="login-brand-logo" />
+        {{-- Sphères 3D --}}
+        <div class="login-sphere login-sphere--lg"></div>
+        <div class="login-sphere login-sphere--md"></div>
+        <div class="login-sphere login-sphere--sm"></div>
 
+        {{-- Contenu centré --}}
+        <div class="login-brand">
+            <div class="login-brand-logo-wrap">
+                <x-brand.logo variant="full" class="login-brand-logo" />
+            </div>
+            <p class="login-brand-appname">e-Pilotage PAS</p>
         </div>
     </aside>
 
@@ -44,6 +52,7 @@
             {{-- En-tête --}}
             <div class="login-heading">
                 <h1 class="login-title">{{ $formTitle }}</h1>
+                <p class="login-subtitle">Connectez-vous pour accéder à votre espace de travail</p>
             </div>
 
             {{-- Erreur --}}
@@ -92,6 +101,11 @@
                         class="login-input"
                         required
                     >
+                    <button type="button" class="login-pwd-show" onclick="
+                        var f=document.getElementById('loginPwd');
+                        f.type=f.type==='password'?'text':'password';
+                        this.textContent=f.type==='password'?'VOIR':'CACHER';
+                    ">VOIR</button>
                 </div>
 
                 {{-- Options --}}
@@ -110,15 +124,12 @@
                     Se connecter
                 </button>
 
-                {{-- Séparateur --}}
-                <div class="login-divider">
-                    <span>Accès sécurisé</span>
-                </div>
-
                 {{-- Note bas --}}
                 <p class="login-note">{{ $footerText }}</p>
+
             </form>
         </div>
     </main>
+</div>
 </div>
 @endsection

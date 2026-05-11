@@ -37,7 +37,7 @@ class StoreActionRequest extends FormRequest
             'libelle' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
 
-            'type_cible' => ['required', Rule::in(['quantitative', 'qualitative'])],
+            'type_cible' => ['nullable', Rule::in(['quantitative', 'qualitative'])],
             'unite_cible' => ['nullable', 'string', 'max:100'],
             'quantite_cible' => ['nullable', 'numeric', 'min:0.0001'],
             'seuil_mode' => ['nullable', Rule::in(['unique', 'trimestriel'])],
@@ -60,8 +60,8 @@ class StoreActionRequest extends FormRequest
             'criteres_validation' => ['nullable', 'string'],
             'livrable_attendu' => ['nullable', 'string'],
 
-            'date_debut' => ['required', 'date', 'date_format:Y-m-d'],
-            'date_fin' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:date_debut'],
+            'date_debut' => ['nullable', 'date', 'date_format:Y-m-d'],
+            'date_fin' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_debut'],
             'frequence_execution' => ['required', Rule::in(ActionTrackingService::executionFrequencyOptions())],
             'date_echeance' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_debut'],
             'responsable_id' => ['required', 'integer', 'exists:users,id'],
@@ -71,9 +71,6 @@ class StoreActionRequest extends FormRequest
             'origine_action' => ['nullable', Rule::in(array_keys(Action::originOptions()))],
 
             'seuil_alerte_progression' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'risques' => ['nullable', 'string'],
-            'mesures_preventives' => ['nullable', 'string'],
-
             'kpi_libelle' => ['nullable', 'string', 'max:255'],
             'kpi_unite' => ['nullable', 'string', 'max:30'],
             'kpi_cible' => ['nullable', 'numeric', 'min:0'],
@@ -235,22 +232,6 @@ class StoreActionRequest extends FormRequest
                     $validator->errors()->add(
                         'kpi_libelle',
                         'Un indicateur de performance est obligatoire pour créer une action.'
-                    );
-                }
-            }
-
-            if ($actionManagementSettings->riskPlanRequired()) {
-                if (trim((string) $this->input('risques')) === '') {
-                    $validator->errors()->add(
-                        'risques',
-                        'Les risques doivent etre renseignes lorsque le plan de risque est obligatoire.'
-                    );
-                }
-
-                if (trim((string) $this->input('mesures_preventives')) === '') {
-                    $validator->errors()->add(
-                        'mesures_preventives',
-                        'Les mesures preventives doivent etre renseignees lorsque le plan de risque est obligatoire.'
                     );
                 }
             }

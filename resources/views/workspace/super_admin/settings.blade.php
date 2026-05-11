@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">Pilotage des textes, intitulés et libellés globaux réellement visibles dans l application.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-primary" href="{{ route('workspace.super-admin.templates.index') }}">Templates d export</a>
             </div>
@@ -226,4 +226,3 @@
         </script>
     @endpush
 @endsection
-

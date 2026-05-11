@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">Règles fonctionnelles qui encadrent la création, la suspension, la clôture et l'auto-achievement des actions.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.workflow.edit') }}">Workflow</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.calculation.edit') }}">Calcul statistique</a>
@@ -20,7 +20,6 @@
     </section>
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Plan de risque</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $summary['risk_plan_required'] ? 'Obligatoire' : 'Optionnel' }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Suspension manuelle</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $summary['manual_suspend_enabled'] ? 'Activée' : 'Désactivée' }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Auto-clôture</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $summary['auto_complete_when_target_reached'] ? 'Activée' : 'Inactive' }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Seuil minimal de clôture</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $summary['min_progress_for_closure'] }}%</p></article>
@@ -35,14 +34,6 @@
             <div class="form-section">
                 <h2 class="form-section-title">Règles de creation et d edition</h2>
                 <div class="grid gap-4 md:grid-cols-2">
-                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
-                        <input class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" name="actions_risk_plan_required" value="1" @checked(($settings['actions_risk_plan_required'] ?? '0') === '1')>
-                        <span>
-                            <strong class="block text-slate-900">Rendre le plan de risque obligatoire</strong>
-                            <span class="mt-1 block text-slate-500">Les champs `risques` et `mesures preventives` deviennent requis a la création et a la mise a jour.</span>
-                        </span>
-                    </label>
-
                     <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
                         <input class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" name="actions_manual_suspend_enabled" value="1" @checked(($settings['actions_manual_suspend_enabled'] ?? '1') === '1')>
                         <span>
@@ -89,4 +80,3 @@
         </form>
     </section>
 @endsection
-

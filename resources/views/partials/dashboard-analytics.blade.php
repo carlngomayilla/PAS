@@ -1,4 +1,4 @@
-@section('title', 'Dashboard')
+@section('title', 'Tableau de bord')
 
 @php
     $metricLabel = static fn (string $metric): string => \App\Support\UiLabel::metric($metric);
@@ -20,8 +20,8 @@
     $profileServiceLabel = $currentDashboardUser?->service
         ? trim((string) ($currentDashboardUser->service->code ?: '').' - '.(string) $currentDashboardUser->service->libelle, ' -')
         : 'Tous les services visibles';
-    $operationalGlobalScores = $analytics['operational_global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'risque' => 0, 'global' => 0, 'progression' => 0];
-    $globalScores = $analytics['global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'risque' => 0, 'global' => 0, 'progression' => 0];
+    $operationalGlobalScores = $analytics['operational_global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'global' => 0, 'progression' => 0];
+    $globalScores = $analytics['global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'global' => 0, 'progression' => 0];
     $operationalStatusCards = $analytics['operational_status_cards'] ?? [];
     $officialStatusCards = $analytics['official_status_cards'] ?? [];
     $operationalMonthly = $analytics['operational_monthly'] ?? [];
@@ -98,10 +98,9 @@
 
     $summaryStrip = ($roleDashboard['summary_cards'] ?? []) !== [] ? $roleDashboard['summary_cards'] : [
         ['label' => 'Actions totales', 'value' => $metrics['totals']['actions_total'] ?? 0, 'accent' => '#1F2937', 'bg' => '#F8FBFF', 'meta' => null, 'href' => route('workspace.actions.index')],
-        ['label' => $metricLabel('global'), 'value' => number_format((float) ($globalScores['global'] ?? 0), 0), 'accent' => '#8FC043', 'bg' => '#F2F8E8', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc'])],
+        ['label' => $metricLabel('global'), 'value' => number_format((float) ($globalScores['global'] ?? 0), 1, ',', ' '), 'accent' => '#8FC043', 'bg' => '#F2F8E8', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc'])],
         ['label' => 'En retard', 'value' => $metrics['alerts']['actions_en_retard'] ?? 0, 'accent' => '#B42318', 'bg' => '#FFF1EF', 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_retard'])],
-        ['label' => 'Non demarrees', 'value' => collect($statusCards)->firstWhere('label', 'Non demarre')['count'] ?? 0, 'accent' => '#6B7280', 'bg' => '#F1F5F9', 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'non_demarre'])],
-        ['label' => 'Taux validation', 'value' => ($metrics['totals']['actions_total'] ?? 0) > 0 ? number_format(((($metrics['totals']['actions_validees'] ?? 0) / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100), 0).'%' : '0%', 'accent' => '#3996D3', 'bg' => '#E8F3FB', 'meta' => null, 'href' => route('workspace.actions.index', $officialFilters)],
+        ['label' => 'Non démarrées', 'value' => collect($statusCards)->firstWhere('label', 'Non demarre')['count'] ?? 0, 'accent' => '#6B7280', 'bg' => '#F1F5F9', 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'non_demarre'])],
     ];
     $personalActionsSummary = is_array($analytics['personal_actions_summary'] ?? null) ? $analytics['personal_actions_summary'] : [];
     if ($dashboardRole !== 'agent' && (int) ($personalActionsSummary['total'] ?? 0) > 0) {
@@ -177,7 +176,7 @@
     };
 
     $fmtCount = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ');
-    $fmtPct = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ').'%';
+    $fmtPct = static fn ($value): string => number_format((float) ($value ?? 0), 1, ',', ' ').'%';
     $shortText = static fn ($value, int $limit = 42): string => \Illuminate\Support\Str::limit((string) ($value ?: '-'), $limit);
     $actionStatusCounts = (array) ($metrics['status_breakdown']['actions'] ?? []);
     $actionValidationCounts = (array) ($metrics['status_breakdown']['actions_validation'] ?? []);
@@ -194,7 +193,7 @@
         ->all();
     if ($validationRows === []) {
         $validationRows = [[
-            'cells' => ['Validees', $fmtCount($metrics['totals']['actions_validees'] ?? 0), $fmtPct(($metrics['totals']['actions_total'] ?? 0) > 0 ? (((int) ($metrics['totals']['actions_validees'] ?? 0) / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100) : 0)],
+            'cells' => ['Validées', $fmtCount($metrics['totals']['actions_validees'] ?? 0), $fmtPct(($metrics['totals']['actions_total'] ?? 0) > 0 ? (((int) ($metrics['totals']['actions_validees'] ?? 0) / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100) : 0)],
         ]];
     }
 
@@ -260,12 +259,12 @@
             'empty' => 'Aucun retard.',
         ],
         [
-            'title' => 'Finies',
+            'title' => 'Réalisées',
             'chip' => $fmtCount($statusCount('acheve')),
-            'headers' => ['El.', 'Nb', 'Taux'],
+            'headers' => ['Élément', 'Nb', 'Taux'],
             'rows' => [
-                ['cells' => ['Achevees', $fmtCount($statusCount('acheve')), $fmtPct(($metrics['totals']['actions_total'] ?? 0) > 0 ? (($statusCount('acheve') / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100) : 0)]],
-                ['cells' => ['Validees', $fmtCount($metrics['totals']['actions_validees'] ?? 0), $fmtPct(($metrics['totals']['actions_total'] ?? 0) > 0 ? (((int) ($metrics['totals']['actions_validees'] ?? 0) / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100) : 0)]],
+                ['cells' => ['Achevées', $fmtCount($statusCount('acheve')), $fmtPct(($metrics['totals']['actions_total'] ?? 0) > 0 ? (($statusCount('acheve') / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100) : 0)]],
+                ['cells' => ['Validées', $fmtCount($metrics['totals']['actions_validees'] ?? 0), $fmtPct(($metrics['totals']['actions_total'] ?? 0) > 0 ? (((int) ($metrics['totals']['actions_validees'] ?? 0) / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100) : 0)]],
             ],
         ],
         [
@@ -274,8 +273,8 @@
             'headers' => ['Statut', 'Nb', 'Note'],
             'rows' => [
                 ['cells' => ['Cours', $fmtCount($statusCount('en_cours')), 'Actives']],
-                ['cells' => ['Risque', $fmtCount($statusCount('a_risque')), 'A suivre']],
-                ['cells' => ['Non dem.', $fmtCount($statusCount('non_demarre')), 'A lancer']],
+                ['cells' => ['À surveiller', $fmtCount($statusCount('a_risque')), 'Échéance']],
+                ['cells' => ['Non dém.', $fmtCount($statusCount('non_demarre')), 'À lancer']],
             ],
         ],
         [
@@ -295,13 +294,13 @@
         [
             'title' => 'Valid.',
             'chip' => $fmtCount($metrics['totals']['actions_validees'] ?? 0),
-            'headers' => ['Etat', 'Nb', 'Part'],
+            'headers' => ['État', 'Nb', 'Part'],
             'rows' => $validationRows,
         ],
         [
             'title' => 'Alertes',
             'chip' => count($alertRows),
-            'headers' => ['Alerte', 'Niv.', 'Detail'],
+            'headers' => ['Alerte', 'Niv.', 'Détail'],
             'rows' => collect($alertRows)->take(6)->map(fn (array $row): array => ['cells' => [$shortText($row['titre'] ?? '-', 30), $shortText($row['niveau'] ?? '-', 14), $shortText($row['details'] ?? '-', 18)]])->all(),
             'empty' => 'Aucune alerte.',
         ],
@@ -310,10 +309,9 @@
             'chip' => $fmtPct($globalScores['global'] ?? 0),
             'headers' => ['KPI', 'Score', 'Note'],
             'rows' => [
-                ['cells' => ['Delai', $fmtPct($globalScores['delai'] ?? 0), 'Temps']],
-                ['cells' => ['Perf.', $fmtPct($globalScores['performance'] ?? 0), 'Exec.']],
-                ['cells' => ['Qual.', $fmtPct($globalScores['qualite'] ?? 0), 'Qualite']],
-                ['cells' => ['Risque', $fmtPct($globalScores['risque'] ?? 0), 'Risque']],
+                ['cells' => ['Délai', $fmtPct($globalScores['delai'] ?? 0), 'Temps']],
+                ['cells' => ['Perf.', $fmtPct($globalScores['performance'] ?? 0), 'Exéc.']],
+                ['cells' => ['Qual.', $fmtPct($globalScores['qualite'] ?? 0), 'Qualité']],
             ],
         ],
         [
@@ -431,9 +429,9 @@
 
     $directionSynthesisTables = [
         [
-            'title' => 'Chaine PAS PAO PTA Actions',
+            'title' => 'Chaîne PAS PAO PTA Actions',
             'chip' => $fmtPct($decisionCounts['taux_alignement'] ?? 0),
-            'headers' => ['PAS', 'Objectif strategique', 'PAO', 'Objectif operationnel', 'PTA', 'Actions', 'Etat'],
+            'headers' => ['PAS', 'Objectif stratégique', 'PAO', 'Objectif opérationnel', 'PTA', 'Actions', 'État'],
             'rows' => collect($decisionChainRows)->take(10)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['pas'] ?? 'PAS', 22),
                 $shortText($row['objectif_strategique'] ?? '-', 34),
@@ -443,12 +441,12 @@
                 $fmtCount($row['actions'] ?? 0),
                 $row['etat'] ?? '-',
             ]])->all(),
-            'empty' => 'Aucune chaine PAS PAO PTA Actions sur ce perimetre.',
+            'empty' => 'Aucune chaîne PAS PAO PTA Actions sur ce périmètre.',
         ],
         [
             'title' => 'Performance par service',
             'chip' => count($decisionServiceRows).' services',
-            'headers' => ['Service', 'PTA', 'Actions', 'Terminees', 'En cours', 'Retard', 'Taux', 'Score'],
+            'headers' => ['Service', 'PTA', 'Actions', 'Terminées', 'En cours', 'Retard', 'Taux', 'Score'],
             'rows' => collect($decisionServiceRows)->take(10)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['service'] ?? '-', 32),
                 $fmtCount($row['pta'] ?? 0),
@@ -494,7 +492,7 @@
         [
             'title' => 'Performance des agents',
             'chip' => count($decisionAgentRows).' agents',
-            'headers' => ['Agent', 'Service', 'Actions affectees', 'Terminees', 'En retard', 'Sous-actions', 'Score'],
+            'headers' => ['Agent', 'Service', 'Actions affectées', 'Terminées', 'En retard', 'Sous-actions', 'Score'],
             'rows' => collect($decisionAgentRows)->take(10)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['agent'] ?? '-', 30),
                 $shortText($row['service'] ?? '-', 22),
@@ -509,7 +507,7 @@
         [
             'title' => 'Validations en attente',
             'chip' => count($decisionPendingValidationRows).' attente',
-            'headers' => ['Element', 'Service', 'Responsable', 'Niveau', 'Statut', 'Depuis', 'Action'],
+            'headers' => ['Élément', 'Service', 'Responsable', 'Niveau', 'Statut', 'Depuis', 'Action'],
             'rows' => collect($decisionPendingValidationRows)->take(10)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['element'] ?? '-', 34),
                 $shortText($row['service'] ?? '-', 22),
@@ -517,7 +515,7 @@
                 $row['niveau'] ?? '-',
                 $shortText($row['statut'] ?? '-', 20),
                 $row['depuis'] ?? '-',
-                $row['action'] ?? 'Verifier',
+                $row['action'] ?? 'Vérifier',
             ]])->all(),
             'empty' => 'Aucune validation en attente.',
         ],
@@ -538,7 +536,7 @@
         [
             'title' => 'Alertes et anomalies',
             'chip' => count($decisionAnomalyRows).' points',
-            'headers' => ['Type', 'Element', 'Service', 'Gravite', 'Detail', 'Action corrective'],
+            'headers' => ['Type', 'Élément', 'Service', 'Gravité', 'Détail', 'Action corrective'],
             'rows' => collect($decisionAnomalyRows)->take(10)->map(fn (array $row): array => ['cells' => [
                 $row['type'] ?? '-',
                 $shortText($row['element'] ?? '-', 30),
@@ -550,9 +548,9 @@
             'empty' => 'Aucune anomalie active.',
         ],
         [
-            'title' => 'Evolution trimestrielle',
+            'title' => 'Évolution trimestrielle',
             'chip' => $exerciseFilter['quarter_label'] ?? 'Tous les trimestres',
-            'headers' => ['Trimestre', 'Actions prevues', 'Terminees', 'Retard', 'Taux execution', 'Score'],
+            'headers' => ['Trimestre', 'Actions prévues', 'Terminées', 'Retard', 'Taux d\'exécution', 'Score'],
             'rows' => collect($decisionQuarterRows)->map(fn (array $row): array => ['cells' => [
                 $row['trimestre'] ?? '-',
                 $fmtCount($row['actions_prevues'] ?? 0),
@@ -568,7 +566,7 @@
         [
             'title' => 'Performance des directions',
             'chip' => count($directionPerformanceRows).' directions',
-            'headers' => ['Direction', 'PAO cree', 'Objectifs operationnels', 'Services', 'PTA crees', 'Actions', 'Non demarrees', 'En cours', 'Realisees', 'Validees', 'Retards', 'Hors delai', 'Taux execution', 'Taux realisation', 'Performance', 'Statut', 'Derniere activite'],
+            'headers' => ['Direction', 'PAO créé', 'Objectifs opérationnels', 'Services', 'PTA créés', 'Actions', 'Non démarrées', 'En cours', 'Réalisées', 'Validées', 'Retards', 'Hors délai', 'Taux d\'exécution', 'Taux de réalisation', 'Performance', 'Statut', 'Dernière activité'],
             'rows' => collect($directionPerformanceRows)->take(12)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['direction'] ?? '-', 28),
                 $row['pao_cree'] ?? '-',
@@ -591,9 +589,9 @@
             'empty' => 'Aucune direction disponible.',
         ],
         [
-            'title' => 'Declinaison du PAS par direction',
+            'title' => 'Déclinaison du PAS par direction',
             'chip' => count($pasDirectionRows).' lignes',
-            'headers' => ['Direction', 'Axes concernes', 'Objectifs strategiques', 'PAO cree', 'Objectifs operationnels', 'Taux declinaison', 'Statut', 'Derniere mise a jour'],
+            'headers' => ['Direction', 'Axes concernés', 'Objectifs stratégiques', 'PAO créé', 'Objectifs opérationnels', 'Taux de déclinaison', 'Statut', 'Dernière mise à jour'],
             'rows' => collect($pasDirectionRows)->take(12)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['direction'] ?? '-', 28),
                 $fmtCount($row['axes'] ?? 0),
@@ -604,12 +602,12 @@
                 $row['statut'] ?? '-',
                 $row['derniere_maj'] ?? '-',
             ]])->all(),
-            'empty' => 'Aucune declinaison PAS disponible.',
+            'empty' => 'Aucune déclinaison PAS disponible.',
         ],
         [
             'title' => 'PAO par direction',
             'chip' => count($paoDirectionRows).' objectifs',
-            'headers' => ['Direction', 'Objectif strategique', 'Objectif operationnel', 'Service', 'Echeance', 'PTA cree', 'Actions creees', 'Actions affectees', 'En cours', 'Realisees', 'Retards', 'Taux execution', 'Statut'],
+            'headers' => ['Direction', 'Objectif stratégique', 'Objectif opérationnel', 'Service', 'Échéance', 'PTA créé', 'Actions créées', 'Actions affectées', 'En cours', 'Réalisées', 'Retards', 'Taux d\'exécution', 'Statut'],
             'rows' => collect($paoDirectionRows)->take(15)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['direction'] ?? '-', 20),
                 $shortText($row['objectif_strategique'] ?? '-', 34),
@@ -630,7 +628,7 @@
         [
             'title' => 'Services de la direction',
             'chip' => count($decisionServiceRows).' services',
-            'headers' => ['Service', 'PTA', 'Actions', 'Terminees', 'En cours', 'Retard', 'Taux execution', 'Score'],
+            'headers' => ['Service', 'PTA', 'Actions', 'Terminées', 'En cours', 'Retard', 'Taux d\'exécution', 'Score'],
             'rows' => collect($decisionServiceRows)->take(12)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['service'] ?? '-', 32),
                 $fmtCount($row['pta'] ?? 0),
@@ -646,7 +644,7 @@
         [
             'title' => 'PTA par service',
             'chip' => count($ptaServiceActionRows).' actions',
-            'headers' => ['Service', 'Objectif operationnel', 'Action', 'Responsable', 'Debut', 'Echeance', 'Cible', 'Realise', 'Reste', 'Taux realisation', 'Progression technique', 'Statut evolution', 'Statut delai', 'Justificatifs', 'Performance'],
+            'headers' => ['Service', 'Objectif opérationnel', 'Action', 'Responsable', 'Début', 'Échéance', 'Cible', 'Réalisé', 'Reste', 'Taux de réalisation', 'Progression technique', 'Statut d\'évolution', 'Statut délai', 'Justificatifs', 'Performance'],
             'rows' => collect($ptaServiceActionRows)->take(15)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['service'] ?? '-', 24),
                 $shortText($row['objectif_operationnel'] ?? '-', 34),
@@ -669,7 +667,7 @@
         [
             'title' => 'Agents par service',
             'chip' => count($decisionAgentRows).' agents',
-            'headers' => ['Agent', 'Service', 'Actions affectees', 'Terminees', 'En retard', 'Sous-actions', 'Score'],
+            'headers' => ['Agent', 'Service', 'Actions affectées', 'Terminées', 'En retard', 'Sous-actions', 'Score'],
             'rows' => collect($decisionAgentRows)->take(12)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['agent'] ?? '-', 30),
                 $shortText($row['service'] ?? '-', 22),
@@ -684,7 +682,7 @@
         [
             'title' => 'Actions des agents',
             'chip' => count($agentActionRows).' lignes',
-            'headers' => ['Agent', 'Action', 'Objectif operationnel', 'PTA', 'Direction', 'Service', 'Echeance', 'Cible', 'Realise', 'Reste', 'Sous-actions', 'Progression', 'Taux realisation', 'Statut', 'Delai', 'Performance', 'Justificatifs', 'Commentaires', 'Derniere activite'],
+            'headers' => ['Agent', 'Action', 'Objectif opérationnel', 'PTA', 'Direction', 'Service', 'Échéance', 'Cible', 'Réalisé', 'Reste', 'Sous-actions', 'Progression', 'Taux de réalisation', 'Statut', 'Délai', 'Performance', 'Justificatifs', 'Commentaires', 'Dernière activité'],
             'rows' => collect($agentActionRows)->take(18)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['agent'] ?? '-', 24),
                 $shortText($row['action'] ?? '-', 32),
@@ -706,12 +704,12 @@
                 $fmtCount($row['commentaires'] ?? 0),
                 $row['derniere_activite'] ?? '-',
             ]])->all(),
-            'empty' => 'Aucune action affectee disponible.',
+            'empty' => 'Aucune action affectée disponible.',
         ],
         [
             'title' => 'Sous-actions et preuves',
             'chip' => count($subActionRows).' sous-actions',
-            'headers' => ['Action', 'Sous-action', 'Description', 'Cible prevue', 'Quantite realisee', 'Unite', 'Taux', 'Resultat obtenu', 'Effectuee', 'Date realisation', 'Justificatif', 'Commentaire agent', 'Controle superieur', 'Statut'],
+            'headers' => ['Action', 'Sous-action', 'Description', 'Cible prévue', 'Quantité réalisée', 'Unité', 'Taux', 'Résultat obtenu', 'Effectuée', 'Date de réalisation', 'Justificatif', 'Commentaire agent', 'Contrôle supérieur', 'Statut'],
             'rows' => collect($subActionRows)->take(18)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 28),
                 $shortText($row['sous_action'] ?? '-', 28),
@@ -731,9 +729,9 @@
             'empty' => 'Aucune sous-action disponible.',
         ],
         [
-            'title' => 'Chaine PAS PAO PTA Actions',
+            'title' => 'Chaîne PAS PAO PTA Actions',
             'chip' => $fmtPct($decisionCounts['taux_alignement'] ?? 0),
-            'headers' => ['PAS', 'Objectif strategique', 'PAO', 'Objectif operationnel', 'PTA', 'Actions', 'Etat'],
+            'headers' => ['PAS', 'Objectif stratégique', 'PAO', 'Objectif opérationnel', 'PTA', 'Actions', 'État'],
             'rows' => collect($decisionChainRows)->take(12)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['pas'] ?? 'PAS', 22),
                 $shortText($row['objectif_strategique'] ?? '-', 34),
@@ -743,7 +741,7 @@
                 $fmtCount($row['actions'] ?? 0),
                 $row['etat'] ?? '-',
             ]])->all(),
-            'empty' => 'Aucune chaine disponible.',
+            'empty' => 'Aucune chaîne disponible.',
         ],
         [
             'title' => 'Actions prioritaires',
@@ -778,7 +776,7 @@
         [
             'title' => 'Validations en attente',
             'chip' => count($decisionPendingValidationRows).' attente',
-            'headers' => ['Element', 'Service', 'Responsable', 'Niveau', 'Statut', 'Depuis', 'Action'],
+            'headers' => ['Élément', 'Service', 'Responsable', 'Niveau', 'Statut', 'Depuis', 'Action'],
             'rows' => collect($decisionPendingValidationRows)->take(10)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['element'] ?? '-', 34),
                 $shortText($row['service'] ?? '-', 22),
@@ -807,7 +805,7 @@
         [
             'title' => 'Alertes et anomalies',
             'chip' => count($decisionAnomalyRows).' points',
-            'headers' => ['Type', 'Element', 'Service', 'Gravite', 'Detail', 'Action corrective'],
+            'headers' => ['Type', 'Élément', 'Service', 'Gravité', 'Détail', 'Action corrective'],
             'rows' => collect($decisionAnomalyRows)->take(10)->map(fn (array $row): array => ['cells' => [
                 $row['type'] ?? '-',
                 $shortText($row['element'] ?? '-', 30),
@@ -819,9 +817,9 @@
             'empty' => 'Aucune anomalie active.',
         ],
         [
-            'title' => 'Evolution trimestrielle',
+            'title' => 'Évolution trimestrielle',
             'chip' => $exerciseFilter['quarter_label'] ?? 'Tous les trimestres',
-            'headers' => ['Trimestre', 'Actions prevues', 'Terminees', 'Retard', 'Taux execution', 'Score'],
+            'headers' => ['Trimestre', 'Actions prévues', 'Terminées', 'Retard', 'Taux d\'exécution', 'Score'],
             'rows' => collect($decisionQuarterRows)->map(fn (array $row): array => ['cells' => [
                 $row['trimestre'] ?? '-',
                 $fmtCount($row['actions_prevues'] ?? 0),
@@ -886,7 +884,7 @@
             'rows' => collect($decisionQuarterRows)->map(fn (array $row): array => [
                 'label' => $row['trimestre'] ?? '-',
                 'value' => (float) ($row['taux_execution'] ?? 0),
-                'meta' => $fmtCount($row['terminees'] ?? 0).' terminees / '.$fmtCount($row['actions_prevues'] ?? 0).' prevues',
+                'meta' => $fmtCount($row['terminees'] ?? 0).' terminées / '.$fmtCount($row['actions_prevues'] ?? 0).' prévues',
                 'color' => '#F9B13C',
             ])->all(),
         ],
@@ -988,33 +986,97 @@
 
 @if ($currentDashboardTab === 'overview')
 <section class="dashboard-tab-panel active" data-dashboard-panel="overview">
-    @if (false)
-    <div class="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
-        @foreach ($summaryStrip as $card)
+    {{-- ── KPI STAT CARDS ──────────────────────────────────────────────── --}}
+    @php
+        $kpiStatCards = [
+            [
+                'label'   => 'Actions totales',
+                'value'   => $metrics['totals']['actions_total'] ?? 0,
+                'accent'  => '#1c203d',
+                'icon'    => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+                'trend'   => null,
+                'href'    => route('workspace.actions.index'),
+            ],
+            [
+                'label'   => 'KPI global',
+                'value'   => number_format((float) ($globalScores['global'] ?? 0), 1, ',', ' ') . '%',
+                'accent'  => '#178f5f',
+                'icon'    => '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+                'trend'   => (float) ($globalScores['global'] ?? 0) >= 80 ? 'up' : ((float) ($globalScores['global'] ?? 0) >= 60 ? 'neutral' : 'down'),
+                'trendLabel' => (float) ($globalScores['global'] ?? 0) >= 80 ? 'Bon' : ((float) ($globalScores['global'] ?? 0) >= 60 ? 'À surveiller' : 'Critique'),
+                'href'    => route('workspace.actions.index', ['sort' => 'kpi_global_desc']),
+            ],
+            [
+                'label'   => 'En retard',
+                'value'   => $metrics['alerts']['actions_en_retard'] ?? 0,
+                'accent'  => '#b42318',
+                'icon'    => '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+                'trend'   => ((int)($metrics['alerts']['actions_en_retard'] ?? 0)) > 0 ? 'down' : 'up',
+                'trendLabel' => ((int)($metrics['alerts']['actions_en_retard'] ?? 0)) > 0 ? 'Alerte' : 'OK',
+                'href'    => route('workspace.actions.index', ['statut' => 'en_retard']),
+            ],
+            [
+                'label'   => 'Non démarrées',
+                'value'   => collect($statusCards)->firstWhere('key', 'non_demarre')['count'] ?? (collect($statusCards)->firstWhere('label', 'Non demarre')['count'] ?? 0),
+                'accent'  => '#64748b',
+                'icon'    => '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+                'trend'   => 'neutral',
+                'trendLabel' => 'À lancer',
+                'href'    => route('workspace.actions.index', ['statut' => 'non_demarre']),
+            ],
+            [
+                'label'   => 'Achevées',
+                'value'   => $statusCount('acheve'),
+                'accent'  => '#3996d3',
+                'icon'    => '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+                'trend'   => 'up',
+                'trendLabel' => 'Terminées',
+                'href'    => route('workspace.actions.index', ['statut' => 'achevees']),
+            ],
+        ];
+        if ($dashboardRole === 'agent' && (int) ($personalActionsSummary['total'] ?? 0) > 0) {
+            array_unshift($kpiStatCards, [
+                'label'  => 'Mes actions',
+                'value'  => (int) $personalActionsSummary['total'],
+                'accent' => '#1c203d',
+                'icon'   => '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+                'trend'  => null,
+                'href'   => (string) ($personalActionsSummary['url'] ?? route('workspace.actions.index', ['vue' => 'mes_actions'])),
+            ]);
+        }
+    @endphp
+    <div class="mb-5 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,175px),1fr))]">
+        @foreach ($kpiStatCards as $ksc)
             @php
-                $dashboardSizeClass = match ($card['dashboard_size'] ?? 'md') {
-                    'lg' => 'sm:col-span-2 xl:col-span-2',
-                    'sm' => 'max-w-none',
-                    default => '',
-                };
+                $trendUp   = ($ksc['trend'] ?? null) === 'up';
+                $trendDown = ($ksc['trend'] ?? null) === 'down';
+                $trendNeutral = ($ksc['trend'] ?? null) === 'neutral';
             @endphp
-            <x-stat-card-link
-                :href="$card['href']"
-                :label="$card['label']"
-                :value="$card['value']"
-                :meta="$card['meta']"
-                :badge="$card['badge'] ?? null"
-                :badge-tone="$card['badge_tone'] ?? 'neutral'"
-                :tone="$card['tone'] ?? null"
-                card-class="dashboard-summary-card dashboard-summary-card-{{ $loop->index % 5 }} {{ $dashboardSizeClass }} rounded-[1.2rem] border p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.45)]"
-                label-class="dashboard-summary-label"
-                value-class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none"
-                meta-class="dashboard-summary-meta mt-2 text-xs"
-                :value-style="'color: '.$card['accent'].';'"
-            />
+            <a href="{{ $ksc['href'] }}" class="anbg-kpi-stat-card group">
+                <div class="anbg-kpi-stat-icon" style="color:{{ $ksc['accent'] }};">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round" aria-hidden="true">{!! $ksc['icon'] !!}</svg>
+                </div>
+                <div class="anbg-kpi-stat-body">
+                    <p class="anbg-kpi-stat-label">{{ $ksc['label'] }}</p>
+                    <p class="anbg-kpi-stat-value" style="color:{{ $ksc['accent'] }};">{{ $ksc['value'] }}</p>
+                    @if (!is_null($ksc['trend'] ?? null))
+                        <div class="anbg-kpi-stat-trend @if($trendUp) anbg-trend-up @elseif($trendDown) anbg-trend-down @else anbg-trend-neutral @endif">
+                            @if ($trendUp)
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
+                            @elseif ($trendDown)
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                            @else
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            @endif
+                            <span>{{ $ksc['trendLabel'] ?? '' }}</span>
+                        </div>
+                    @endif
+                </div>
+            </a>
         @endforeach
     </div>
-    @endif
 
     @if (!in_array($dashboardRole, ['agent'], true))
     <div class="mb-4 space-y-3">
@@ -1056,16 +1118,16 @@
                     'group' => 'PAS',
                     'cards' => [
                         ['label' => 'PAS actif', 'value' => $metrics['totals']['pas_actifs'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pas.index', ['statut' => 'valide_ou_verrouille'])],
-                        ['label' => 'Axes concernes', 'value' => $decisionCounts['axes_concernes'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pas.index')],
-                        ['label' => 'Objectifs strategiques concernes', 'value' => $decisionCounts['objectifs_strategiques_concernes'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pas.index')],
-                        ['label' => 'Taux alignement strategique', 'value' => $fmtPct($decisionCounts['taux_alignement'] ?? 0), 'accent' => '#178f5f', 'href' => route('workspace.actions.index')],
+                        ['label' => 'Axes concernés', 'value' => $decisionCounts['axes_concernes'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pas.index')],
+                        ['label' => 'Objectifs stratégiques concernés', 'value' => $decisionCounts['objectifs_strategiques_concernes'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pas.index')],
+                        ['label' => 'Taux d\'alignement stratégique', 'value' => $fmtPct($decisionCounts['taux_alignement'] ?? 0), 'accent' => '#178f5f', 'href' => route('workspace.actions.index')],
                     ],
                 ],
                 [
                     'group' => 'PAO',
                     'cards' => [
                         ['label' => 'PAO de la direction', 'value' => $metrics['totals']['paos_total'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pao.index')],
-                        ['label' => 'Objectifs operationnels', 'value' => $decisionCounts['objectifs_operationnels'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pao.index')],
+                        ['label' => 'Objectifs opérationnels', 'value' => $decisionCounts['objectifs_operationnels'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pao.index')],
                         ['label' => 'Objectifs transmis aux services', 'value' => $decisionCounts['objectifs_transmis_services'] ?? 0, 'accent' => '#178f5f', 'href' => route('workspace.pao.index')],
                         ['label' => 'Objectifs non repris dans les PTA', 'value' => max(0, (int) ($decisionCounts['objectifs_operationnels'] ?? 0) - (int) ($decisionCounts['ptas_lies'] ?? 0)), 'accent' => '#B42318', 'href' => route('workspace.pao.index')],
                     ],
@@ -1074,7 +1136,7 @@
                     'group' => 'PTA',
                     'cards' => [
                         ['label' => 'PTA des services', 'value' => $metrics['totals']['ptas_total'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pta.index')],
-                        ['label' => 'PTA valides', 'value' => $metrics['totals']['ptas_actifs'] ?? 0, 'accent' => '#178f5f', 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille'])],
+                        ['label' => 'PTA validés', 'value' => $metrics['totals']['ptas_actifs'] ?? 0, 'accent' => '#178f5f', 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille'])],
                         ['label' => 'PTA sans actions', 'value' => max(0, (int) ($metrics['totals']['ptas_total'] ?? 0) - (int) ($decisionCounts['ptas_avec_actions'] ?? 0)), 'accent' => '#B42318', 'href' => route('workspace.pta.index')],
                         ['label' => 'Services couverts', 'value' => $decisionCounts['services_couverts'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pta.index')],
                     ],
@@ -1083,14 +1145,63 @@
                     'group' => 'ACTIONS',
                     'cards' => [
                         ['label' => 'Actions totales', 'value' => $decisionCounts['actions_total'] ?? ($metrics['totals']['actions_total'] ?? 0), 'accent' => '#17324a', 'href' => route('workspace.actions.index')],
-                        ['label' => 'Actions terminees', 'value' => $decisionCounts['actions_terminees'] ?? 0, 'accent' => '#178f5f', 'href' => route('workspace.actions.index', ['statut' => 'achevees'])],
+                        ['label' => 'Actions terminées', 'value' => $decisionCounts['actions_terminees'] ?? 0, 'accent' => '#178f5f', 'href' => route('workspace.actions.index', ['statut' => 'achevees'])],
                         ['label' => 'Actions en cours', 'value' => $decisionCounts['actions_en_cours'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.actions.index', ['statut' => 'en_cours'])],
                         ['label' => 'Actions en retard', 'value' => $decisionCounts['actions_en_retard'] ?? 0, 'accent' => '#B42318', 'href' => route('workspace.actions.index', ['statut' => 'en_retard'])],
-                        ['label' => 'Taux execution', 'value' => $fmtPct($decisionCounts['taux_execution'] ?? 0), 'accent' => '#178f5f', 'href' => route('workspace.actions.index')],
+                        ['label' => 'Taux d\'exécution', 'value' => $fmtPct($decisionCounts['taux_execution'] ?? 0), 'accent' => '#178f5f', 'href' => route('workspace.actions.index')],
                         ['label' => 'Taux validation', 'value' => $fmtPct($decisionCounts['taux_validation'] ?? 0), 'accent' => '#3996D3', 'href' => route('workspace.actions.index')],
                     ],
                 ],
             ];
+            $moduleProgressCards = [
+                [
+                    'group' => 'PAS',
+                    'label' => 'Statut global',
+                    'progress' => ($metrics['totals']['pas_total'] ?? 0) > 0 ? (($metrics['totals']['pas_actifs'] ?? 0) / max(1, (int) ($metrics['totals']['pas_total'] ?? 0))) * 100 : 0,
+                    'status' => ($metrics['totals']['pas_total'] ?? 0) > 0 ? 'En evolution' : 'A initialiser',
+                    'href' => route('workspace.pas.index'),
+                    'accent' => '#3996D3',
+                ],
+                [
+                    'group' => 'PAO',
+                    'label' => 'Declinaison operationnelle',
+                    'progress' => ($metrics['totals']['paos_total'] ?? 0) > 0 ? (($metrics['totals']['paos_actifs'] ?? 0) / max(1, (int) ($metrics['totals']['paos_total'] ?? 0))) * 100 : 0,
+                    'status' => ($metrics['totals']['paos_total'] ?? 0) > 0 ? 'En cours' : 'A initialiser',
+                    'href' => route('workspace.pao.index'),
+                    'accent' => '#8FC043',
+                ],
+                [
+                    'group' => 'PTA',
+                    'label' => 'Execution annuelle',
+                    'progress' => (float) collect($synthesisPtaRows)->avg(fn (array $row): float => (float) ($row['progression'] ?? 0)),
+                    'status' => ($metrics['totals']['ptas_total'] ?? 0) > 0 ? 'Suivi actif' : 'A initialiser',
+                    'href' => route('workspace.pta.index'),
+                    'accent' => '#F9B13C',
+                ],
+                [
+                    'group' => 'ACTION',
+                    'label' => 'Avancement reel',
+                    'progress' => (float) ($globalScores['progression'] ?? 0),
+                    'status' => $statusCount('non_demarre') > 0 ? $fmtCount($statusCount('non_demarre')).' non demarree(s)' : 'Suivi operationnel',
+                    'href' => route('workspace.actions.index'),
+                    'accent' => '#1C203D',
+                ],
+            ];
+            $planningHierarchyRows = collect($moduleProgressCards)->map(function (array $module) use ($fmtPct): array {
+                $progress = max(0, min(100, (float) ($module['progress'] ?? 0)));
+
+                return [
+                    'group' => $module['group'],
+                    'cards' => [[
+                        'label' => $module['label'],
+                        'value' => $fmtPct($progress),
+                        'meta' => $module['status'],
+                        'progress' => $progress,
+                        'accent' => $module['accent'],
+                        'href' => $module['href'],
+                    ]],
+                ];
+            })->all();
         @endphp
         @foreach ($planningHierarchyRows as $row)
             <div class="grid gap-2 md:grid-cols-[92px_minmax(0,1fr)]">
@@ -1099,18 +1210,15 @@
                 </div>
                 <div class="flex gap-3 overflow-x-auto pb-1">
                     @foreach ($row['cards'] as $card)
-                        <x-stat-card-link
-                            :href="$card['href']"
-                            :label="$card['label']"
-                            :value="$card['value']"
-                            :meta="null"
-                            :badge="null"
-                            badge-tone="neutral"
-                            card-class="min-w-[170px] flex-1 rounded-[1rem] border p-3 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.28)]"
-                            label-class="text-[0.66rem] font-semibold uppercase tracking-wide text-[#667085]"
-                            value-class="mt-1.5 text-[1.45rem] font-black leading-none"
-                            :value-style="'color: '.$card['accent'].';'"
-                        />
+                        @php $progress = max(0, min(100, (float) ($card['progress'] ?? 0))); @endphp
+                        <a href="{{ $card['href'] }}" class="dashboard-module-progress-card min-w-[220px] flex-1 rounded-[1rem] border p-3 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.28)]">
+                            <span class="text-[0.66rem] font-semibold uppercase text-[#667085]">{{ $card['label'] }}</span>
+                            <strong class="mt-1.5 block text-[1.45rem] font-black leading-none" style="color: {{ $card['accent'] }};">{{ $card['value'] }}</strong>
+                            <span class="mt-1 block text-xs font-semibold text-[#667085]">{{ $card['meta'] ?? '' }}</span>
+                            <span class="mt-3 block h-2 overflow-hidden rounded-full bg-slate-200/80">
+                                <span class="block h-full rounded-full" style="width: {{ $progress }}%; background: {{ $card['accent'] }};"></span>
+                            </span>
+                        </a>
                     @endforeach
                 </div>
             </div>
@@ -1140,7 +1248,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-[#17324a]">
                                         <span class="truncate">{{ $row['label'] }}</span>
-                                        <span class="whitespace-nowrap">{{ number_format($barValue, 0, ',', ' ') }}%</span>
+                                        <span class="whitespace-nowrap">{{ number_format($barValue, 1, ',', ' ') }}%</span>
                                     </div>
                                     <div class="h-2.5 overflow-hidden rounded-full bg-slate-200/80">
                                         <div class="h-full rounded-full" style="width: {{ $barValue }}%; background: {{ $barColor }};"></div>
@@ -1215,7 +1323,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="{{ count($synthesisTable['headers']) + 1 }}">{{ $synthesisTable['empty'] ?? 'Aucune donnee.' }}</td>
+                                            <td colspan="{{ count($synthesisTable['headers']) + 1 }}">{{ $synthesisTable['empty'] ?? 'Aucune donnée.' }}</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -1230,8 +1338,8 @@
             <div class="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
                 <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3996d3]">Detail de ligne</p>
-                        <h3 id="dashboard-row-detail-title" class="mt-1 text-lg font-black text-[#17324a]">Detail</h3>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3996d3]">Détail de ligne</p>
+                        <h3 id="dashboard-row-detail-title" class="mt-1 text-lg font-black text-[#17324a]">Détail</h3>
                     </div>
                     <button type="button" class="btn btn-primary btn-sm rounded-xl" data-dashboard-row-detail-close>Fermer</button>
                 </div>
@@ -1243,7 +1351,7 @@
         </div>
     @endif
 
-    @if ($showRoleOverview && ! $showDirectionSynthesisSelector)
+    @if ($showRoleOverview)
         @include('partials.dashboard-role-overview', [
             'roleDashboard' => $roleDashboard,
             'dashboardRole' => $dashboardRole,
@@ -1258,7 +1366,7 @@
 
 @if ($currentDashboardTab === 'charts')
 <section class="dashboard-tab-panel active" data-dashboard-panel="charts">
-    @if ($showRoleOverview && ! $showDirectionSynthesisSelector)
+    @if ($showRoleOverview)
         @include('partials.dashboard-role-overview', [
             'roleDashboard' => $roleDashboard,
             'dashboardRole' => $dashboardRole,
@@ -1289,7 +1397,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-[#17324a]">
                                         <span class="truncate">{{ $row['label'] }}</span>
-                                        <span class="whitespace-nowrap">{{ number_format($barValue, 0, ',', ' ') }}%</span>
+                                        <span class="whitespace-nowrap">{{ number_format($barValue, 1, ',', ' ') }}%</span>
                                     </div>
                                     <div class="h-2.5 overflow-hidden rounded-full bg-slate-200/80">
                                         <div class="h-full rounded-full" style="width: {{ $barValue }}%; background: {{ $barColor }};"></div>
@@ -1298,7 +1406,7 @@
                                 </div>
                             @empty
                                 <div class="rounded-[1rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-8 text-center text-sm text-[#667085]">
-                                    Aucune donnee disponible.
+                                    Aucune donnée disponible.
                                 </div>
                             @endforelse
                         </div>
@@ -1352,7 +1460,7 @@
                     </svg>
                 </div>
                 <div class="mt-2 flex flex-wrap gap-3 text-xs font-semibold text-[#667085]">
-                    <span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[#3996D3]"></i>Taux execution</span>
+                    <span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[#3996D3]"></i>Taux d'exécution</span>
                     <span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[#8FC043]"></i>Score</span>
                 </div>
             </article>
@@ -1362,10 +1470,10 @@
     <article class="showcase-panel mb-4">
         <div class="mb-4 flex items-center justify-between gap-3">
                     <div><h2 class="showcase-panel-title">Jauges des indicateurs de performance</h2></div>
-            <span class="showcase-chip">5 mesures</span>
+            <span class="showcase-chip">4 mesures</span>
         </div>
         <div class="dashboard-gauge-grid">
-            @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')],['key' => 'conformite', 'label' => $metricLabel('conformite')],['key' => 'qualite', 'label' => $metricLabel('qualite')],['key' => 'risque', 'label' => $metricLabel('risque')]] as $gauge)
+            @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')],['key' => 'conformite', 'label' => $metricLabel('conformite')],['key' => 'qualite', 'label' => $metricLabel('qualite')]] as $gauge)
                 <article class="dashboard-gauge-card">
                     <strong>{{ $gauge['label'] }}</strong>
                     <div class="dashboard-gauge-canvas">
@@ -1404,18 +1512,18 @@
 
     <div class="mt-4 space-y-4">
         <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Indicateurs par mois</h2></div><span class="showcase-chip">12 mois</span></div><div class="dashboard-canvas"><div id="dashboard-kpi-grouped-chart" class="dashboard-chart-host"></div></div></article>
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">{{ $metricLabel('global') }}</h2></div><span class="showcase-chip">Seuil 60</span></div><div class="rounded-[1.4rem] border border-slate-200/85 p-5 text-white" style="background: #3996d3;"><p class="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/75">Score actuel</p><p class="mt-3 text-5xl font-black leading-none">{{ number_format((float) ($globalScores['global'] ?? 0), 0) }}</p><p class="mt-3 text-sm text-white/80">Progression moyenne: {{ number_format((float) ($globalScores['progression'] ?? 0), 0) }}%</p><div class="mt-4 h-2 rounded-full bg-white/20"><div class="h-2 rounded-full bg-white" style="width: {{ min(100, max(0, (float) ($globalScores['global'] ?? 0))) }}%;"></div></div></div><div class="mt-4 grid gap-2">@foreach ($statusCards as $card)<div class="rounded-2xl border border-slate-200/80 bg-slate-50/90 px-4 py-3"><div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: {{ $card['color'] }};"></span><span class="text-sm font-semibold text-[#17324a]">{{ $card['label'] }}</span></div><span class="text-sm font-black" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span></div></div>@endforeach</div></article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">{{ $metricLabel('global') }}</h2></div><span class="showcase-chip">Seuil 60</span></div><div class="rounded-[1.4rem] border border-slate-200/85 p-5 text-white" style="background: #3996d3;"><p class="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/75">Score actuel</p><p class="mt-3 text-5xl font-black leading-none">{{ number_format((float) ($globalScores['global'] ?? 0), 1, ',', ' ') }}</p><p class="mt-3 text-sm text-white/80">Progression moyenne: {{ number_format((float) ($globalScores['progression'] ?? 0), 1, ',', ' ') }}%</p><div class="mt-4 h-2 rounded-full bg-white/20"><div class="h-2 rounded-full bg-white" style="width: {{ min(100, max(0, (float) ($globalScores['global'] ?? 0))) }}%;"></div></div></div><div class="mt-4 grid gap-2">@foreach ($statusCards as $card)<div class="rounded-2xl border border-slate-200/80 bg-slate-50/90 px-4 py-3"><div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: {{ $card['color'] }};"></span><span class="text-sm font-semibold text-[#17324a]">{{ $card['label'] }}</span></div><span class="text-sm font-black" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span></div></div>@endforeach</div></article>
     </div>
 
     <div class="mt-4 space-y-4">
         @if ($showDashboardMacroCharts)
             <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Comparaison interannuelle</h2></div><span class="showcase-chip">{{ count($interannualRows) }} année(s)</span></div><div class="dashboard-canvas"><div id="dashboard-interannual-chart" class="dashboard-chart-host"></div></div></article>
         @endif
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Cible vs réalisé</h2></div><span class="showcase-chip">Cible 80</span></div>@if ($bulletRows !== [])<div class="grid gap-3">@foreach ($bulletRows as $row)@php $real = (float) ($row['real'] ?? 0); $bulletColor = $real >= 80 ? '#178f5f' : ($real >= 60 ? '#3996D3' : '#b7791f'); @endphp<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#E8F3FB]/70"><span class="truncate text-xs font-semibold text-[#667085]">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-threshold"></span><span class="dashboard-bullet-target"></span><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, $real)) }}%; background: {{ $bulletColor }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $bulletColor }};">{{ number_format($real, 0) }}</span></a>@endforeach</div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action avec indicateur disponible pour cette lecture.</div>@endif</article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Cible vs réalisé</h2></div><span class="showcase-chip">Cible 80</span></div>@if ($bulletRows !== [])<div class="grid gap-3">@foreach ($bulletRows as $row)@php $real = (float) ($row['real'] ?? 0); $bulletColor = $real >= 80 ? '#178f5f' : ($real >= 60 ? '#3996D3' : '#b7791f'); @endphp<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#E8F3FB]/70"><span class="truncate text-xs font-semibold text-[#667085]">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-threshold"></span><span class="dashboard-bullet-target"></span><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, $real)) }}%; background: {{ $bulletColor }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $bulletColor }};">{{ number_format($real, 1, ',', ' ') }}</span></a>@endforeach</div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action avec indicateur disponible pour cette lecture.</div>@endif</article>
     </div>
 
     <div class="mt-4 space-y-4">
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Classement des actions par indicateur</h2></div><span class="showcase-chip">Top 6</span></div>@if ($analytics['top_action_bars'] ?? false)<div class="grid gap-3">@foreach ($analytics['top_action_bars'] as $row)<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#E8F3FB]/70"><span class="truncate text-xs font-semibold text-[#667085]">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, (float) $row['value'])) }}%; background: {{ $row['color'] }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 0) }}</span></a>@endforeach</div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action classée pour le moment.</div>@endif</article>
+        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Classement des actions par indicateur</h2></div><span class="showcase-chip">Top 6</span></div>@if ($analytics['top_action_bars'] ?? false)<div class="grid gap-3">@foreach ($analytics['top_action_bars'] as $row)<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#E8F3FB]/70"><span class="truncate text-xs font-semibold text-[#667085]">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, (float) $row['value'])) }}%; background: {{ $row['color'] }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 1, ',', ' ') }}</span></a>@endforeach</div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action classée pour le moment.</div>@endif</article>
         @if ($showDashboardMacroCharts)
             <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Radar de comparaison</h2></div><span class="showcase-chip">{{ min(3, count($unitRows)) }} jeux</span></div><div class="dashboard-canvas"><div id="dashboard-radar-chart" class="dashboard-chart-host"></div></div></article>
         @endif
@@ -1473,10 +1581,10 @@
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] ?? '' }}">
                                 <td class="font-semibold text-[#17324a]">{{ $row['label'] }}</td>
                                 <td>{{ $row['actions_total'] }}</td>
-                                <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 0) }}%</span></div></td>
-                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpi)) }}">{{ number_format($kpi, 0) }}</span></td>
+                                <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 1) }}%</span></div></td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpi)) }}">{{ number_format($kpi, 1) }}</span></td>
                                 <td>@if (($row['alertes'] ?? 0) > 0)<span class="dashboard-pill" style="{{ $dashboardPillVars('danger') }}">{{ $row['alertes'] }}</span>@else<span class="dashboard-pill" style="{{ $dashboardPillVars('success') }}">0</span>@endif</td>
-                                <td>{{ number_format((float) ($row['validation_pct'] ?? 0), 0) }}%</td>
+                                <td>{{ number_format((float) ($row['validation_pct'] ?? 0), 1) }}%</td>
                             </tr>
                         @empty
                             <tr><td colspan="6">Aucune donnée disponible.</td></tr>
@@ -1490,7 +1598,7 @@
             <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Actions prioritaires</h2></div><span class="showcase-chip">{{ count($priorityActionRows) }} lignes</span></div>
             <div class="overflow-x-auto">
                 <table class="dashboard-table">
-                    <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Progression</th><th>Indicateur</th><th>Délai</th><th>Perf.</th><th>Conf.</th><th>Qual.</th><th>Risque</th></tr></thead>
+                    <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Délai</th><th>Conf.</th><th>Qual.</th></tr></thead>
                     <tbody>
                         @forelse ($priorityActionRows as $row)
                             @php
@@ -1502,21 +1610,50 @@
                                 <td><a href="{{ $row['url'] }}" class="font-semibold text-[#17324a] hover:text-[#3996D3]">{{ $row['libelle'] }}</a><div class="mt-1 text-[11px] text-[#667085]">{{ $row['responsable'] }} | {{ $row['service'] }}</div></td>
                                 <td>{{ $row['direction'] }}</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}"><span class="h-2 w-2 rounded-full" style="background: {{ $statusColor }};"></span>{{ $actionStatusLabel($row['statut']) }}</span></td>
-                                <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 0) }}%</span></div></td>
-                                @foreach (['kpi_global', 'kpi_delai', 'kpi_performance', 'kpi_conformite', 'kpi_qualite', 'kpi_risque'] as $metricKey)
+                                <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 1) }}%</span></div></td>
+                                @foreach (['kpi_performance', 'kpi_delai', 'kpi_conformite', 'kpi_qualite'] as $metricKey)
                                     @php $metricValue = (float) ($row[$metricKey] ?? 0); @endphp
-                                    <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($metricValue)) }}">{{ number_format($metricValue, 0) }}</span></td>
+                                    <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($metricValue)) }}">{{ number_format($metricValue, 1) }}</span></td>
                                 @endforeach
                             </tr>
                         @empty
-                            <tr><td colspan="10">Aucune action disponible sur ce périmètre.</td></tr>
+                            <tr><td colspan="8">Aucune action disponible sur ce périmètre.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </article>
 
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Alertes actives</h2></div><span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span></div><div class="overflow-x-auto"><table class="dashboard-table"><thead><tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Détail</th><th>{{ $metricLabel('global') }}</th><th>Qual.</th><th>Risque</th><th>Accès</th></tr></thead><tbody>@forelse ($alertRows as $row)<tr><td class="font-semibold text-[#17324a]">{{ $row['titre'] }}</td><td>{{ $row['direction'] }}</td><td>{{ $row['action'] }}</td><td><span class="dashboard-pill" style="{{ $dashboardPillVars(in_array($row['niveau'], ['Critique', 'Urgence'], true) ? 'danger' : 'warning') }}">{{ $row['niveau'] }}</span></td><td>{{ $row['details'] }}</td>@php $kpiValue = (float) ($row['kpi'] ?? 0); $qualityValue = (float) ($row['kpi_qualite'] ?? 0); $riskValue = (float) ($row['kpi_risque'] ?? 0); @endphp<td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpiValue)) }}">{{ number_format($kpiValue, 0) }}</span></td><td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($qualityValue)) }}">{{ number_format($qualityValue, 0) }}</span></td><td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($riskValue)) }}">{{ number_format($riskValue, 0) }}</span></td><td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td></tr>@empty<tr><td colspan="9">Aucune alerte active sur ce périmètre.</td></tr>@endforelse</tbody></table></div></article>
+        <article class="showcase-panel">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <div><h2 class="showcase-panel-title">Alertes actives</h2></div>
+                <span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="dashboard-table">
+                    <thead>
+                        <tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Détail</th><th>{{ $metricLabel('global') }}</th><th>Qual.</th><th>Accès</th></tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($alertRows as $row)
+                            <tr>
+                                <td class="font-semibold text-[#17324a]">{{ $row['titre'] }}</td>
+                                <td>{{ $row['direction'] }}</td>
+                                <td>{{ $row['action'] }}</td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars(in_array($row['niveau'], ['Critique', 'Urgence'], true) ? 'danger' : 'warning') }}">{{ $row['niveau'] }}</span></td>
+                                <td>{{ $row['details'] }}</td>
+                                @php $kpiValue = (float) ($row['kpi'] ?? 0); $qualityValue = (float) ($row['kpi_qualite'] ?? 0); @endphp
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpiValue)) }}">{{ number_format($kpiValue, 1) }}</span></td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($qualityValue)) }}">{{ number_format($qualityValue, 1) }}</span></td>
+                                <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="8">Aucune alerte active sur ce périmètre.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </article>
 
         @if ($showDashboardAnalyticalTables)
             <section>
@@ -1569,7 +1706,7 @@
                         }
 
                         const payload = decodePayload(button.dataset.dashboardRowDetail || '');
-                        modalTitle.textContent = payload.title || 'Detail';
+                        modalTitle.textContent = payload.title || 'Détail';
                         modalBody.innerHTML = '';
 
                         (payload.headers || []).forEach((header, index) => {

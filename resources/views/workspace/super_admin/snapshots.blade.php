@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">Snapshots complets des configurations stockees dans `platform_settings`, avec restauration tracee et reversible.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.audit.index') }}">Audit</a>
             </div>

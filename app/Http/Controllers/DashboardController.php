@@ -28,6 +28,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Cache;
+use Throwable;
 
 class DashboardController extends Controller
 {
@@ -64,11 +65,7 @@ class DashboardController extends Controller
         ]);
 
         $view = $request->routeIs('admin.*') ? 'admin.dashboard' : 'dashboard';
-        $payload = Cache::remember(
-            $this->dashboardCacheKey($user, 'page'),
-            now()->addMinutes(5),
-            fn (): array => $this->buildDashboardPagePayload($user)
-        );
+        $payload = $this->dashboardPagePayload($user);
 
         return view($view, [
             'user' => $user,
@@ -82,6 +79,36 @@ class DashboardController extends Controller
             'dgPayload' => $payload['dgPayload'],
             'chartPayload' => $payload['chartPayload'],
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function dashboardPagePayload(User $user): array
+    {
+        $key = null;
+
+        try {
+            $key = $this->dashboardCacheKey($user, 'page');
+            $cached = Cache::get($key);
+            if (is_array($cached)) {
+                return $cached;
+            }
+        } catch (Throwable) {
+            // Fresh dashboard data is safer than failing when the cache store is unavailable.
+        }
+
+        $payload = $this->buildDashboardPagePayload($user);
+
+        if ($key !== null) {
+            try {
+                Cache::put($key, $payload, now()->addMinutes(5));
+            } catch (Throwable) {
+                // This cache only speeds up the dashboard; rendering can continue without it.
+            }
+        }
+
+        return $payload;
     }
 
     /**
@@ -123,7 +150,7 @@ class DashboardController extends Controller
                 'sousActions.agent:id,name,service_id',
                 'sousActions.justificatifs:id,sous_action_id,nom_original,description,ajoute_par,created_at',
                 'sousActions.justificatifs.ajoutePar:id,name',
-                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_risque,kpi_global,progression_reelle,progression_theorique',
+                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_global,progression_reelle,progression_theorique',
             ])
             ->orderByDesc('date_echeance')
             ->get();
@@ -231,41 +258,6 @@ class DashboardController extends Controller
         $alertRows = collect($dashboardData['alert_rows'] ?? []);
         $actionRows = collect($dashboardData['action_rows'] ?? []);
         $globalScores = is_array($dashboardData['global_scores'] ?? null) ? $dashboardData['global_scores'] : [];
-        $topRiskRows = $actionRows
-            ->sortBy(fn (array $row): float => (float) ($row['kpi_risque'] ?? 100))
-            ->take(8)
-            ->map(function (array $row): array {
-                $riskKpi = (float) ($row['kpi_risque'] ?? 100);
-
-                return [
-                    'action' => (string) ($row['libelle'] ?? '-'),
-                    'score' => round(max(0, min(100, 100 - $riskKpi)), 2),
-                    'statut' => (string) ($row['statut_label'] ?? $row['statut'] ?? '-'),
-                    'echeance' => (string) ($row['date_fin'] ?? '-'),
-                    'responsable' => (string) ($row['responsable'] ?? '-'),
-                    'url' => (string) ($row['url'] ?? ''),
-                ];
-            })
-            ->values();
-
-        if ($topRiskRows->isEmpty()) {
-            $topRiskRows = $alertRows
-                ->take(8)
-                ->map(function (array $row): array {
-                    $riskKpi = (float) ($row['kpi_risque'] ?? 0);
-
-                    return [
-                        'action' => (string) ($row['action'] ?? '-'),
-                        'score' => round(max(0, min(100, 100 - $riskKpi)), 2),
-                        'statut' => (string) ($row['niveau'] ?? '-'),
-                        'echeance' => (string) ($row['details'] ?? '-'),
-                        'responsable' => '-',
-                        'url' => (string) ($row['url'] ?? ''),
-                    ];
-                })
-                ->values();
-        }
-
         $policy = [
             'scope_status' => $this->actionCalculationSettings->statisticalScope(),
             'scope_label' => $this->actionCalculationSettings->statisticalScopeLabel(),
@@ -307,7 +299,6 @@ class DashboardController extends Controller
                 'performance' => (float) ($globalScores['performance'] ?? 0),
                 'conformite' => (float) ($globalScores['conformite'] ?? 0),
                 'qualite' => (float) ($globalScores['qualite'] ?? 0),
-                'risque' => (float) ($globalScores['risque'] ?? 0),
                 'global' => (float) ($globalScores['global'] ?? 0),
             ],
             'managedKpis' => [],
@@ -359,25 +350,6 @@ class DashboardController extends Controller
                     'actions_validees' => $interannual->pluck('actions_validees')->map(fn ($value): int => (int) $value)->values()->all(),
                     'progression_moyenne' => $interannual->pluck('progression_moyenne')->map(fn ($value): float => (float) $value)->values()->all(),
                     'urls' => $interannual->pluck('url')->values()->all(),
-                ],
-                'risk_pareto' => [
-                    'labels' => ['Retards', 'KPI faible', 'Risque'],
-                    'counts' => [
-                        (int) ($alerts['actions_en_retard'] ?? 0),
-                        $alertRows->where('titre', 'Indicateur global critique')->count(),
-                        $alertRows->where('titre', 'Risque eleve')->count(),
-                    ],
-                    'cumulative_pct' => [33, 66, 100],
-                    'urls' => [
-                        route('workspace.actions.index', ['statut' => 'en_retard']),
-                        route('workspace.actions.index', ['sort' => 'kpi_global_asc']),
-                        route('workspace.actions.index', ['sort' => 'kpi_risque_asc']),
-                    ],
-                ],
-                'top_risks' => [
-                    'labels' => $topRiskRows->pluck('action')->values()->all(),
-                    'scores' => $topRiskRows->pluck('score')->map(fn ($value): float => (float) $value)->values()->all(),
-                    'rows' => $topRiskRows->all(),
                 ],
                 'retard_heatmap' => ['weeks' => [], 'units' => [], 'matrix' => [], 'max' => 0],
                 'critical_gantt' => [
@@ -1161,7 +1133,6 @@ class DashboardController extends Controller
                     'kpi_performance' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
                     'kpi_conformite' => round((float) ($action->actionKpi?->kpi_conformite ?? 0), 2),
                     'kpi_qualite' => round((float) ($action->actionKpi?->kpi_qualite ?? 0), 2),
-                    'kpi_risque' => round((float) ($action->actionKpi?->kpi_risque ?? 0), 2),
                     'date_debut' => $action->date_debut instanceof Carbon ? $action->date_debut->format('d/m/Y') : '-',
                     'date_fin' => $action->date_fin instanceof Carbon ? $action->date_fin->format('d/m/Y') : '-',
                     'mode_evaluation' => $action->resolvedEvaluationMode(),
@@ -1693,7 +1664,6 @@ class DashboardController extends Controller
             'performance' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
             'conformite' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
             'qualite' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
-            'risque' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)),
             'global' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
             'progression' => $avg($actions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
         ];
@@ -1732,7 +1702,6 @@ class DashboardController extends Controller
                 'performance' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
                 'conformite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
                 'qualite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
-                'risque' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)),
                 'global' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
             ];
         })->all();
@@ -2010,7 +1979,7 @@ class DashboardController extends Controller
             ],
             'summary_cards' => [
                 $this->makeRoleCard('Actions sensibles', $portfolio['alerts'], 'Actions a forte vigilance', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
-                $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Niveau de risque courant', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
+                $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Niveau d alerte courant', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
                 $this->makeRoleCard('Actions en retard', $portfolio['actions_en_retard'], 'Retards institutionnels', $this->actionIndexRoute(['statut' => 'en_retard']), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Actions validées', $portfolio['actions_valides_direction'], 'Clôturées dans le circuit de validation actif', $this->validatedActionIndexRoute(), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('Validations en attente', count($pendingRows), 'Actions a arbitrer', route('workspace.actions.index', ['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]), '#3996D3', '#E8F3FB', null, 'info'),
@@ -2427,7 +2396,7 @@ class DashboardController extends Controller
                     'responsable' => (string) ($action->responsable?->name ?? '-'),
                     'retard_jours' => $this->delayDays($action),
                     'validation_status' => (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE),
-                    'niveau_risque' => (float) ($action->actionKpi?->kpi_risque ?? 0),
+                    'performance_execution' => (float) ($action->actionKpi?->kpi_performance ?? 0),
                     'url' => route('workspace.actions.suivi', $action),
                 ];
             })
@@ -2444,7 +2413,7 @@ class DashboardController extends Controller
         $rows = [
             'en_avance' => ['label' => 'En avance', 'color' => '#8FC043', 'bg' => '#EEF6E1', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_avance'])],
             'en_cours' => ['label' => 'En cours', 'color' => '#3996D3', 'bg' => '#E8F3FB', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_cours'])],
-            'a_risque' => ['label' => 'A risque', 'color' => '#F0E509', 'bg' => '#FFF8D6', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'a_risque'])],
+            'a_risque' => ['label' => 'A surveiller', 'color' => '#F0E509', 'bg' => '#FFF8D6', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'a_risque'])],
             'en_retard' => ['label' => 'En retard', 'color' => '#F9B13C', 'bg' => '#FFF0DF', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_retard'])],
             'suspendu' => ['label' => 'Suspendu', 'color' => '#7C3AED', 'bg' => '#F3E8FF', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'suspendu'])],
             'annule' => ['label' => 'Annule', 'color' => '#475569', 'bg' => '#E2E8F0', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'annule'])],
@@ -2525,7 +2494,6 @@ class DashboardController extends Controller
                     'kpi_performance' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)), 2),
                     'kpi_conformite' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)), 2),
                     'kpi_qualite' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)), 2),
-                    'kpi_risque' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_risque ?? 0)), 2),
                     'alertes' => $alerts,
                     'validation_pct' => round(($validated / $total) * 100, 2),
                 ];
@@ -3706,7 +3674,6 @@ class DashboardController extends Controller
             $status = (string) ($action->statut_dynamique ?? '');
             $globalKpi = (float) ($action->actionKpi?->kpi_global ?? 0);
             $qualityKpi = (float) ($action->actionKpi?->kpi_qualite ?? 0);
-            $riskKpi = (float) ($action->actionKpi?->kpi_risque ?? 0);
             $gap = max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
 
             if ($deadline instanceof Carbon && $deadline->lt($today) && ! in_array($status, [ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, ActionTrackingService::STATUS_ACHEVE_HORS_DELAI], true)) {
@@ -3722,7 +3689,6 @@ class DashboardController extends Controller
                     'details' => $daysLate.'j',
                     'kpi' => round($globalKpi, 2),
                     'kpi_qualite' => round($qualityKpi, 2),
-                    'kpi_risque' => round($riskKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -3736,7 +3702,6 @@ class DashboardController extends Controller
                     'details' => number_format($globalKpi, 0).' / 100',
                     'kpi' => round($globalKpi, 2),
                     'kpi_qualite' => round($qualityKpi, 2),
-                    'kpi_risque' => round($riskKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -3757,7 +3722,6 @@ class DashboardController extends Controller
                     'details' => 'Escalade DG',
                     'kpi' => round($globalKpi, 2),
                     'kpi_qualite' => round($qualityKpi, 2),
-                    'kpi_risque' => round($riskKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -3771,7 +3735,6 @@ class DashboardController extends Controller
                     'details' => number_format($gap, 0).' pts',
                     'kpi' => round($globalKpi, 2),
                     'kpi_qualite' => round($qualityKpi, 2),
-                    'kpi_risque' => round($riskKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -3789,7 +3752,6 @@ class DashboardController extends Controller
                     'details' => $action->soumise_le->diffInDays($today).'j',
                     'kpi' => round($globalKpi, 2),
                     'kpi_qualite' => round($qualityKpi, 2),
-                    'kpi_risque' => round($riskKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-validation',
                 ];
             }
@@ -3980,7 +3942,7 @@ class DashboardController extends Controller
     {
         return match ($status) {
             'acheve' => 'Achevé',
-            'a_risque' => 'A risque',
+            'a_risque' => 'A surveiller',
             'en_avance' => 'En avance',
             'en_retard' => 'En retard',
             'suspendu' => 'Suspendu',

@@ -33,13 +33,13 @@ final class UiLabel
     public static function metric(string $key): string
     {
         return match ($key) {
-            'delai' => 'Indicateur délai',
-            'performance' => 'Indicateur performance',
-            'conformite' => 'Indicateur conformité',
-            'qualite' => 'Indicateur qualité',
-            'risque' => 'Indicateur risque',
-            'global' => 'Indicateur de performance',
-            'moyen' => 'Indicateur moyen',
+            'delai' => 'Délai',
+            'performance' => "Performance d'exécution",
+            'conformite' => 'Qualité / conformité',
+            'qualite' => 'Qualité / conformité',
+            'risque' => 'Point de vigilance',
+            'global' => "Performance d'exécution",
+            'moyen' => 'Score de suivi moyen',
             default => trim(self::object('kpi') . ' ' . str_replace('_', ' ', $key)),
         };
     }
@@ -61,7 +61,12 @@ final class UiLabel
         return match ((string) $status) {
             'non_demarre' => 'Non démarré',
             'en_cours' => 'En cours',
-            'a_risque' => 'À risque',
+            'a_risque' => 'A surveiller',
+            'en_attente_justificatif' => 'En attente justificatif',
+            'en_attente_validation' => 'En attente validation',
+            'realisee' => 'Réalisée',
+            'validee' => 'Validée',
+            'rejetee' => 'Rejetée',
             'en_retard' => 'En retard',
             'bloque' => 'Bloqué',
             'termine' => 'Achevé',

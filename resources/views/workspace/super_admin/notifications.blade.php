@@ -11,9 +11,9 @@
                 <p class="mt-2 text-slate-600">Pilotage des événements émis et de la surcouche d escalade sur les alertes d action. Les destinataires métier natifs restent conserves; les rôles ci-dessous s ajoutent en surveillance.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.referentials.edit') }}">Referentiels dynamiques</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.referentials.edit') }}">Référentiels dynamiques</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.workflow.edit') }}">Workflow</a>
             </div>
         </div>
@@ -23,7 +23,7 @@
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Evenements actifs</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['events_enabled'] }}</p>
-            <p class="mt-2 text-sm text-slate-600">Nombre d émissions actuellement autorisees.</p>
+            <p class="mt-2 text-sm text-slate-600">Nombre d'émissions actuellement autorisées.</p>
         </article>
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Niveaux d alerte actifs</p>
@@ -31,7 +31,7 @@
             <p class="mt-2 text-sm text-slate-600">Warning, critique et urgence peuvent etre coupes independamment.</p>
         </article>
         <article class="ui-card !mb-0">
-            <p class="text-sm text-slate-500">Roles de surveillance additionnels</p>
+            <p class="text-sm text-slate-500">Rôles de surveillance additionnels</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['oversight_roles'] }}</p>
             <p class="mt-2 text-sm text-slate-600">Comptes globaux ajoutés en plus des destinataires métier natifs.</p>
         </article>
@@ -253,4 +253,3 @@
         </form>
     </section>
 @endsection
-

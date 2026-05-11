@@ -102,13 +102,13 @@
                             <th>Service</th>
                             <th>Direction</th>
                             <th>RMO</th>
-                            <th>Montant demande</th>
+                            <th>Montant demandé</th>
                             <th>Nature</th>
                             <th>Source</th>
                             <th>Commentaire</th>
                             <th>Statut</th>
-                            <th>Piece</th>
-                            <th>Operations</th>
+                            <th>Pièce</th>
+                            <th>Opérations</th>
                         </tr>
                     </thead>
                     <tbody>

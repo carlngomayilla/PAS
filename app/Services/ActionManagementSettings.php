@@ -50,7 +50,6 @@ class ActionManagementSettings
     public function defaults(): array
     {
         return [
-            'actions_risk_plan_required' => '0',
             'actions_manual_suspend_enabled' => '1',
             'actions_auto_complete_when_target_reached' => '0',
             'actions_min_progress_for_closure' => '0',
@@ -61,7 +60,7 @@ class ActionManagementSettings
 
     public function riskPlanRequired(): bool
     {
-        return $this->get('actions_risk_plan_required', '0') === '1';
+        return false;
     }
 
     public function manualSuspendEnabled(): bool
@@ -95,7 +94,6 @@ class ActionManagementSettings
     public function summary(): array
     {
         return [
-            'risk_plan_required' => $this->riskPlanRequired(),
             'manual_suspend_enabled' => $this->manualSuspendEnabled(),
             'auto_complete_when_target_reached' => $this->autoCompleteWhenTargetReached(),
             'min_progress_for_closure' => $this->minProgressForClosure(),
@@ -111,7 +109,6 @@ class ActionManagementSettings
     public function update(array $payload, ?User $actor = null): array
     {
         foreach ([
-            'actions_risk_plan_required',
             'actions_manual_suspend_enabled',
             'actions_auto_complete_when_target_reached',
             'actions_final_justificatif_required',
@@ -154,6 +151,5 @@ class ActionManagementSettings
         }
     }
 }
-
 
 

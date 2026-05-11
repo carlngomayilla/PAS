@@ -4,10 +4,16 @@ namespace App\Services\Actions;
 
 use App\Models\Action;
 use App\Models\SousAction;
+use App\Services\ActionPerformanceService;
 use Illuminate\Support\Carbon;
 
 class ActionProgressService
 {
+    public function __construct(
+        private readonly ActionPerformanceService $actionPerformanceService
+    ) {
+    }
+
     /**
      * @return array<string, float|string|int|bool>
      */
@@ -16,44 +22,34 @@ class ActionProgressService
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
         $action->loadMissing('sousActions.justificatifs', 'weeks');
 
-        $mode = $action->resolvedEvaluationMode();
         $target = max(0.0, (float) ($action->quantite_cible ?? 0));
         $sousActions = $action->sousActions;
-        $realizedFromSubActions = $sousActions->sum(fn (SousAction $sousAction): float => max(0.0, (float) ($sousAction->quantite_realisee ?? 0)));
-        $storedRealizedQuantity = max(0.0, (float) ($action->quantite_realisee ?? 0));
-        $weeklyRealizedQuantity = $action->weeks
-            ->filter(fn ($week): bool => (bool) $week->est_renseignee)
-            ->sum(fn ($week): float => max(0.0, (float) ($week->quantite_realisee ?? 0)));
-        $realizedQuantity = $sousActions->isNotEmpty()
-            ? $realizedFromSubActions
-            : ($storedRealizedQuantity > 0.0
-                ? $storedRealizedQuantity
-                : max(0.0, (float) $weeklyRealizedQuantity));
+        $realizedQuantity = $this->actionPerformanceService->realizedQuantity($action);
         $totalSousActions = $sousActions->count();
-        $completedSousActions = $sousActions->where('est_effectuee', true)->count();
+        $completedSousActions = $sousActions
+            ->filter(fn (SousAction $sousAction): bool => $this->actionPerformanceService->isCompletedSubAction($sousAction))
+            ->count();
 
         $avancementOperationnel = $totalSousActions > 0
-            ? round(($completedSousActions / $totalSousActions) * 100, 2)
+            ? $this->actionPerformanceService->boundRate(($completedSousActions / $totalSousActions) * 100)
             : 0.0;
 
         $tauxAtteinteCible = $target > 0
-            ? round(min(100.0, ($realizedQuantity / $target) * 100), 2)
+            ? $this->actionPerformanceService->boundRate(($realizedQuantity / $target) * 100)
             : 0.0;
         $overachievementRate = $target > 0 && $realizedQuantity > $target
             ? round((($realizedQuantity - $target) / $target) * 100, 2)
             : 0.0;
         $remainingValue = round(max($target - $realizedQuantity, 0.0), 4);
 
-        $progressionReelle = match ($mode) {
-            Action::MODE_QUANTITATIF => $tauxAtteinteCible,
-            Action::MODE_MIXTE => round(($avancementOperationnel + $tauxAtteinteCible) / 2, 2),
-            default => $avancementOperationnel,
-        };
+        $progressionReelle = $target > 0
+            ? $tauxAtteinteCible
+            : ($totalSousActions > 0 ? $avancementOperationnel : 0.0);
 
         $progressionTheorique = $this->calculateTheoreticalProgress($action, $referenceDate->copy()->endOfDay());
 
         return [
-            'mode_evaluation' => $mode,
+            'mode_evaluation' => $action->resolvedEvaluationMode(),
             'total_sous_actions' => $totalSousActions,
             'sous_actions_realisees' => $completedSousActions,
             'quantite_realisee' => $realizedQuantity,
@@ -62,11 +58,7 @@ class ActionProgressService
             'taux_depassement' => $overachievementRate,
             'avancement_operationnel' => $avancementOperationnel,
             'taux_atteinte_cible' => $tauxAtteinteCible,
-            'taux_global' => match ($mode) {
-                Action::MODE_MIXTE => round(($avancementOperationnel + $tauxAtteinteCible) / 2, 2),
-                Action::MODE_QUANTITATIF => $tauxAtteinteCible,
-                default => $avancementOperationnel,
-            },
+            'taux_global' => $progressionReelle,
             'progression_reelle' => $progressionReelle,
             'progression_theorique' => $progressionTheorique,
             'has_sub_tasks' => $totalSousActions > 0,
@@ -76,9 +68,7 @@ class ActionProgressService
 
     public function isCompletedSubTask(SousAction $sousAction): bool
     {
-        return (bool) $sousAction->est_effectuee
-            && trim((string) ($sousAction->commentaire ?? '')) !== ''
-            && $sousAction->justificatifs->isNotEmpty();
+        return $this->actionPerformanceService->isCompletedSubAction($sousAction);
     }
 
     private function calculateTheoreticalProgress(Action $action, Carbon $at): float
@@ -103,4 +93,5 @@ class ActionProgressService
 
         return round(min(100.0, ($elapsed / $totalDuration) * 100), 2);
     }
+
 }

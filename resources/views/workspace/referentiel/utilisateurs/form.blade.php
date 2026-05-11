@@ -42,7 +42,7 @@
                         <input id="email" name="email" type="email" value="{{ old('email', $row->email) }}" required>
                     </div>
                     <div>
-                        <label for="role">Role</label>
+                        <label for="role">Rôle</label>
                         <select id="role" name="role" required>
                             <option value="">Sélectionner</option>
                             @foreach ($roleOptions as $role)
@@ -51,7 +51,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="!mb-2 block" for="is_active">Etat du compte</label>
+                        <label class="!mb-2 block" for="is_active">État du compte</label>
                         <label class="checkbox-pill !mb-0">
                             <input id="is_active" name="is_active" type="checkbox" value="1" @checked(old('is_active', $isEdit ? (int) $row->is_active : 1))>
                             Compte actif

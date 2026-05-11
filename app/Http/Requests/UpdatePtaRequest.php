@@ -130,8 +130,6 @@ class UpdatePtaRequest extends FormRequest
                 'max:'.$documentPolicy->maxUploadKilobytes(),
                 $documentPolicy->mimesRule(),
             ],
-            'actions.*.risque_potentiel' => ['nullable', 'string'],
-            'actions.*.mesures_preventives' => ['nullable', 'string'],
             'actions.*.financement_requis' => ['nullable', 'boolean'],
             'actions.*.rmo_ids' => ['required_with:actions', 'array', 'min:1'],
             'actions.*.rmo_ids.*' => ['required', 'integer', 'exists:users,id'],

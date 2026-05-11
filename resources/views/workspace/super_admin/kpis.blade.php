@@ -11,7 +11,7 @@
                 <p class="mt-2 text-slate-600">Registre des indicateurs consolides utilises par le reporting et les dashboards. Le calcul devient pilotable sans code via des presets de formule, des sources multiples, des poids et une cible optionnelle.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.calculation.edit') }}">Politique de calcul</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.reporting') }}">Reporting</a>
@@ -28,7 +28,7 @@
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Indicateur de performance registres</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['total'] }}</p>
-            <p class="mt-2 text-sm text-slate-600">Delai, performance, conformite, qualite, risque, global et progression.</p>
+            <p class="mt-2 text-sm text-slate-600">Délai, performance d'exécution, conformité, qualité, global et progression.</p>
         </article>
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Profils cibles distincts</p>
@@ -177,4 +177,3 @@
         </form>
     </section>
 @endsection
-

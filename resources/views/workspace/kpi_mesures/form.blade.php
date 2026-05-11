@@ -36,7 +36,7 @@
                             @endforeach
                         </select>
                         @if ($kpiOptions->isEmpty())
-                            <p class="field-hint text-amber-700">Aucun indicateur a renseigner n est disponible sur votre perimetre.</p>
+                            <p class="field-hint text-amber-700">Aucun indicateur à renseigner n'est disponible sur votre périmètre.</p>
                         @endif
                     </div>
                     <div id="periode_block" class="conditional-block">

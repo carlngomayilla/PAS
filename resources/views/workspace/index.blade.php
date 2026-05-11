@@ -25,10 +25,10 @@
                 <p class="font-semibold text-[#17324a]">{{ $user->name }}</p>
                 <p class="text-sm text-[#667085]">{{ $user->email }}</p>
                 <p class="text-sm text-[#667085]">
-                    Profil: <strong>{{ $profil['role_label'] }}</strong> ({{ $profil['role'] }})
+                    Profil : <strong>{{ $profil['role_label'] }}</strong> ({{ $profil['role'] }})
                 </p>
                 <p class="text-sm text-[#667085]">
-                    Portee: <strong>{{ $profil['scope'] }}</strong>
+                    Portée : <strong>{{ $profil['scope'] }}</strong>
                 </p>
                 <p class="text-sm text-[#667085]">
                     Direction: <strong>{{ $user->direction?->libelle ?? 'Aucune' }}</strong>
@@ -45,14 +45,14 @@
                 <article class="rounded-2xl border border-slate-200/85 bg-white/95 p-4">
                     <strong class="text-[#17324a]">{{ $item['module'] }}</strong>
                     <p class="text-[#667085] mt-2">
-                        Operations: {{ implode(' | ', $item['operations']) }}
+                        Opérations : {{ implode(' | ', $item['operations']) }}
                     </p>
                     <p class="text-[#667085] mt-1">
-                        Portee: {{ $item['portee'] }}
+                        Portée : {{ $item['portee'] }}
                     </p>
                 </article>
             @empty
-                <p class="text-[#667085]">Aucune interaction configuree.</p>
+                <p class="text-[#667085]">Aucune interaction configurée.</p>
             @endforelse
         </div>
     </section>
@@ -65,7 +65,7 @@
                     <strong class="text-[#17324a]">{{ $module['label'] }}</strong>
                     <p class="text-[#667085] mt-2">{{ $module['description'] }}</p>
                     <p class="mt-2">
-                        <span class="anbg-badge {{ $module['can_write'] ? 'anbg-badge-success' : 'anbg-badge-neutral' }} px-2 py-0.5 text-xs">{{ $module['can_write'] ? 'Ecriture autorisee' : 'Lecture seule' }}</span>
+                        <span class="anbg-badge {{ $module['can_write'] ? 'anbg-badge-success' : 'anbg-badge-neutral' }} px-2 py-0.5 text-xs">{{ $module['can_write'] ? 'Écriture autorisée' : 'Lecture seule' }}</span>
                     </p>
                     <p class="text-[#667085] mt-2"><code class="text-xs">{{ $module['endpoint'] }}</code></p>
                     <p class="mt-2.5">

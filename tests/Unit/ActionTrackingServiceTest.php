@@ -11,6 +11,7 @@ use App\Models\PasAxe;
 use App\Models\PasObjectif;
 use App\Models\Pta;
 use App\Models\Service;
+use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Notifications\WorkspaceModuleNotification;
@@ -330,6 +331,114 @@ class ActionTrackingServiceTest extends TestCase
             'type_evenement' => 'justificatif_absent',
             'niveau' => 'warning',
         ]);
+    }
+
+    public function test_non_started_action_keeps_zero_progress_and_execution_performance(): void
+    {
+        $action = $this->createQuantitativeAction([
+            'quantite_cible' => 500,
+            'quantite_realisee' => 0,
+            'date_fin' => '2026-06-30',
+            'date_echeance' => '2026-06-30',
+            'evaluation_note' => 80,
+        ]);
+
+        app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
+
+        $action->refresh()->load('actionKpi');
+
+        $this->assertSame('0.00', (string) $action->progression_reelle);
+        $this->assertSame('0.00', (string) ($action->actionKpi?->kpi_performance ?? 0));
+        $this->assertSame('0.00', (string) ($action->actionKpi?->kpi_global ?? 0));
+    }
+
+    public function test_started_quantitative_action_uses_real_progress_delay_and_quality_without_risk(): void
+    {
+        $action = $this->createQuantitativeAction([
+            'quantite_cible' => 500,
+            'quantite_realisee' => 300,
+            'date_fin' => '2026-01-31',
+            'date_echeance' => '2026-01-31',
+            'evaluation_note' => 80,
+        ]);
+
+        app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
+
+        $action->refresh()->load('actionKpi');
+
+        $this->assertSame('60.00', (string) $action->progression_reelle);
+        $this->assertSame('100.00', (string) ($action->actionKpi?->kpi_delai ?? 0));
+        $this->assertSame('80.00', (string) ($action->actionKpi?->kpi_qualite ?? 0));
+        $this->assertSame('70.00', (string) ($action->actionKpi?->kpi_performance ?? 0));
+    }
+
+    public function test_sub_action_progress_uses_completed_sub_actions_ratio(): void
+    {
+        $action = $this->createQuantitativeAction([
+            'type_cible' => 'qualitative',
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'quantite_cible' => 0,
+            'date_fin' => '2026-01-31',
+            'date_echeance' => '2026-01-31',
+        ]);
+
+        foreach (range(1, 4) as $index) {
+            SousAction::query()->create([
+                'action_id' => $action->id,
+                'agent_id' => $action->responsable_id,
+                'libelle' => 'Sous-action '.$index,
+                'date_debut' => '2026-01-01',
+                'date_fin' => '2026-01-31',
+                'statut' => $index === 1 ? 'terminee' : 'a_faire',
+                'est_effectuee' => $index === 1,
+                'taux_execution' => $index === 1 ? 100 : 0,
+            ]);
+        }
+
+        app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
+
+        $action->refresh();
+
+        $this->assertSame('25.00', (string) $action->progression_reelle);
+    }
+
+    public function test_completed_action_with_full_target_delay_and_quality_reaches_full_execution_performance(): void
+    {
+        $action = $this->createQuantitativeAction([
+            'quantite_cible' => 100,
+            'quantite_realisee' => 100,
+            'date_fin' => '2026-01-31',
+            'date_echeance' => '2026-01-31',
+            'date_fin_reelle' => '2026-01-20',
+            'evaluation_note' => 100,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ]);
+
+        app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-20'));
+
+        $action->refresh()->load('actionKpi');
+
+        $this->assertSame('100.00', (string) $action->progression_reelle);
+        $this->assertSame('100.00', (string) ($action->actionKpi?->kpi_performance ?? 0));
+    }
+
+    public function test_action_without_target_or_sub_actions_stays_at_zero_progress_and_performance(): void
+    {
+        $action = $this->createQuantitativeAction([
+            'type_cible' => 'qualitative',
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'quantite_cible' => 0,
+            'date_fin' => '2026-01-31',
+            'date_echeance' => '2026-01-31',
+            'evaluation_note' => 100,
+        ]);
+
+        app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
+
+        $action->refresh()->load('actionKpi');
+
+        $this->assertSame('0.00', (string) $action->progression_reelle);
+        $this->assertSame('0.00', (string) ($action->actionKpi?->kpi_performance ?? 0));
     }
 
     /**

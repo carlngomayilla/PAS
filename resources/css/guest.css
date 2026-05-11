@@ -15,21 +15,37 @@
 }
 
 /* ============================================================
-   LOGIN — Design split-panel avec sphères (inspiré mockup)
-   Bleu ANBG #1c203d / #3996d3 · Blanc pur · Logo centre
+   LOGIN — Carte flottante sur fond bleu (modèle référence)
+   Bleu ANBG #1c203d / #3996d3 · Blanc pur · Sphères 3D
    ============================================================ */
 
 *, *::before, *::after { box-sizing: border-box; }
 
-/* ── Grille principale ─────────────────────────────────────── */
+/* ── Page — fond bleu dégradé ───────────────────────────────── */
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background: linear-gradient(145deg, #1c203d 0%, #1e3a6e 45%, #3996d3 100%);
+}
+
+/* ── Carte principale centrée ───────────────────────────────── */
 .login-root {
     display: grid;
-    grid-template-columns: 1.15fr 0.85fr;
-    min-height: 100vh;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    max-width: 880px;
+    border-radius: 1.5rem;
+    overflow: hidden;
+    box-shadow:
+        0 30px 80px -20px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 /* ════════════════════════════════════════════════════════════
-   PANNEAU GAUCHE — Bleu ANBG + sphères
+   PANNEAU GAUCHE — Bleu ANBG + sphères 3D
    ════════════════════════════════════════════════════════════ */
 .login-left {
     position: relative;
@@ -38,12 +54,127 @@
     align-items: center;
     justify-content: center;
     padding: 3rem 2.5rem;
-    min-height: 100vh;
-    background: linear-gradient(150deg, #1c203d 0%, #253d66 48%, #3996d3 100%);
+    background: linear-gradient(155deg, #1c203d 0%, #1e3460 55%, #2a6aad 100%);
 }
 
-/* ── Sphères décoratives 3D ─────────────────────────────────── */
+/* ── Sphères 3D ─────────────────────────────────────────────── */
+.login-sphere {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
 
+/* Grande sphère — bas gauche, partiellement découpée */
+.login-sphere--lg {
+    width: 260px;
+    height: 260px;
+    bottom: -80px;
+    left: -80px;
+    background: radial-gradient(circle at 32% 30%,
+        #8dd4f5 0%,
+        #4fb8ea 18%,
+        #2a90d8 40%,
+        #1760b0 62%,
+        #0e3d80 80%,
+        #071e50 100%
+    );
+    box-shadow: inset -8px -8px 24px rgba(0, 0, 0, 0.30);
+}
+
+/* Sphère moyenne — haut droite */
+.login-sphere--md {
+    width: 180px;
+    height: 180px;
+    top: -50px;
+    right: -50px;
+    background: radial-gradient(circle at 32% 30%,
+        #78caee 0%,
+        #3ea8dc 20%,
+        #2280c8 44%,
+        #1256a0 66%,
+        #0a3470 84%,
+        #051844 100%
+    );
+    box-shadow: inset -6px -6px 18px rgba(0, 0, 0, 0.28);
+}
+
+/* Petite sphère — haut gauche */
+.login-sphere--sm {
+    width: 110px;
+    height: 110px;
+    top: 55px;
+    left: 28px;
+    background: radial-gradient(circle at 32% 30%,
+        #8dd4f5 0%,
+        #4fb8ea 22%,
+        #2a90d8 46%,
+        #1760b0 68%,
+        #0e3d80 84%,
+        #071e50 100%
+    );
+    box-shadow: inset -4px -4px 14px rgba(0, 0, 0, 0.26);
+    opacity: 0.82;
+}
+
+/* ── Contenu panneau gauche ──────────────────────────────────── */
+.login-brand {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+}
+
+.login-brand-logo-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 10rem;
+    height: 10rem;
+    border-radius: 1.25rem;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.30);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 1.25rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.20);
+}
+
+.login-brand-logo {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
+.login-brand-welcome {
+    margin: 0;
+    font-size: 2.4rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    color: #ffffff;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.login-brand-appname {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.92);
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.login-brand-tagline {
+    margin: 0.6rem 0 0;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.50);
+    line-height: 1.7;
+    max-width: 20rem;
+}
 
 /* ════════════════════════════════════════════════════════════
    PANNEAU DROIT — Formulaire blanc
@@ -53,14 +184,13 @@
     align-items: center;
     justify-content: center;
     background: #ffffff;
-    padding: 3rem 2.25rem;
-    min-height: 100vh;
+    padding: 3rem 2.5rem;
 }
 
 /* ── Panel formulaire ───────────────────────────────────────── */
 .login-panel {
     width: 100%;
-    max-width: 22rem;
+    max-width: 24rem;
     display: flex;
     flex-direction: column;
 }
@@ -73,7 +203,7 @@
 }
 
 .login-mobile-logo-img {
-    width: 11rem;
+    width: 8rem;
     height: auto;
     object-fit: contain;
 }
@@ -84,18 +214,18 @@
 }
 
 .login-title {
-    margin: 0 0 0.38rem;
-    font-size: 1.9rem;
+    margin: 0 0 0.3rem;
+    font-size: 1.85rem;
     font-weight: 800;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.02em;
     color: #0d1b35;
     line-height: 1.15;
 }
 
 .login-subtitle {
     margin: 0;
-    font-size: 0.825rem;
-    color: #64748b;
+    font-size: 0.8rem;
+    color: #94a3b8;
     line-height: 1.5;
 }
 
@@ -134,8 +264,8 @@
 .login-field-ico {
     position: absolute;
     left: 0.875rem;
-    width: 1.05rem;
-    height: 1.05rem;
+    width: 1rem;
+    height: 1rem;
     color: #94a3b8;
     pointer-events: none;
     flex-shrink: 0;
@@ -148,10 +278,10 @@
 
 .login-input {
     width: 100%;
-    height: 2.9rem;
-    padding: 0 1rem 0 2.65rem;
+    height: 2.85rem;
+    padding: 0 1rem 0 2.6rem;
     border: 1.5px solid #e2e8f0;
-    border-radius: 0.6rem;
+    border-radius: 0.55rem;
     background: #f8fafc;
     color: #0f172a;
     font-size: 0.875rem;
@@ -168,8 +298,24 @@
 .login-input:focus {
     border-color: #3996d3;
     background: #ffffff;
-    box-shadow: 0 0 0 3.5px rgba(57, 150, 211, 0.18);
+    box-shadow: 0 0 0 3.5px rgba(57, 150, 211, 0.15);
 }
+
+/* ── Bouton "SHOW" mot de passe ─────────────────────────────── */
+.login-pwd-show {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #3996d3;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: color 0.15s;
+}
+.login-pwd-show:hover { color: #1c203d; }
 
 /* ── Options ─────────────────────────────────────────────────── */
 .login-opts {
@@ -212,39 +358,39 @@
     text-decoration: underline;
 }
 
-/* ── Bouton de connexion ─────────────────────────────────────── */
+/* ── Bouton principal ────────────────────────────────────────── */
 .login-submit {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 100%;
-    height: 2.9rem;
-    margin-top: 0.25rem;
+    height: 2.85rem;
+    margin-top: 0.1rem;
     border: none;
-    border-radius: 0.6rem;
+    border-radius: 0.55rem;
     background: linear-gradient(135deg, #1c203d 0%, #3996d3 100%);
     color: #ffffff;
     font-size: 0.9rem;
     font-weight: 700;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.04em;
     box-shadow:
         0 4px 18px -4px rgba(28, 32, 61, 0.42),
-        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
     transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
     cursor: pointer;
 }
 
 .login-submit:hover {
     transform: translateY(-1px);
-    filter: brightness(1.06);
+    filter: brightness(1.07);
     box-shadow:
         0 8px 24px -6px rgba(28, 32, 61, 0.52),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .login-submit:active {
     transform: translateY(0);
-    filter: brightness(0.97);
+    filter: brightness(0.96);
 }
 
 /* ── Séparateur ──────────────────────────────────────────────── */
@@ -252,12 +398,11 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    color: #cbd5e1;
     font-size: 0.72rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    margin-top: -0.15rem;
+    color: #94a3b8;
 }
 
 .login-divider::before,
@@ -268,23 +413,64 @@
     background: #e2e8f0;
 }
 
-.login-divider span { flex-shrink: 0; color: #94a3b8; }
+/* ── Bouton secondaire ───────────────────────────────────────── */
+.login-alt-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 2.85rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 0.55rem;
+    background: #ffffff;
+    color: #334155;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+}
+
+.login-alt-btn:hover {
+    border-color: #3996d3;
+    background: #f0f8ff;
+    box-shadow: 0 2px 10px -4px rgba(57, 150, 211, 0.25);
+}
 
 /* ── Note bas ────────────────────────────────────────────────── */
 .login-note {
     text-align: center;
-    font-size: 0.68rem;
+    font-size: 0.74rem;
     color: #94a3b8;
     line-height: 1.5;
     margin-top: 0.25rem;
 }
 
+.login-note a {
+    color: #3996d3;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.login-note a:hover {
+    text-decoration: underline;
+}
+
 /* ════════════════════════════════════════════════════════════
-   RESPONSIVE — Mobile : fond bleu, form centré
+   RESPONSIVE — Mobile
    ════════════════════════════════════════════════════════════ */
-@media (max-width: 700px) {
+@media (max-width: 680px) {
+    .login-page {
+        padding: 1rem;
+        align-items: flex-start;
+    }
+
     .login-root {
         grid-template-columns: 1fr;
+        border-radius: 1.25rem;
+        max-width: 420px;
+        margin: 0 auto;
     }
 
     .login-left {
@@ -292,85 +478,15 @@
     }
 
     .login-right {
-        background: linear-gradient(150deg, #1c203d 0%, #253d66 48%, #3996d3 100%);
-        min-height: 100vh;
-    }
-
-    .login-panel {
-        max-width: 23rem;
+        padding: 2.5rem 1.75rem;
     }
 
     .login-mobile-logo {
         display: flex;
     }
-
-    .login-heading {
-        text-align: center;
-    }
-
-    .login-title {
-        color: #f0f6ff;
-    }
-
-    .login-subtitle {
-        color: rgba(255, 255, 255, 0.58);
-    }
-
-    .login-input {
-        background: rgba(255, 255, 255, 0.10);
-        border-color: rgba(255, 255, 255, 0.22);
-        color: #ffffff;
-    }
-
-    .login-input::placeholder {
-        color: rgba(255, 255, 255, 0.44);
-    }
-
-    .login-input:focus {
-        border-color: #90caf9;
-        background: rgba(255, 255, 255, 0.15);
-        box-shadow: 0 0 0 3.5px rgba(144, 202, 249, 0.22);
-    }
-
-    .login-field-ico {
-        color: rgba(255, 255, 255, 0.50);
-    }
-
-    .login-field:focus-within .login-field-ico {
-        color: #90caf9;
-    }
-
-    .login-remember {
-        color: rgba(255, 255, 255, 0.62);
-    }
-
-    .login-forgot {
-        color: #90caf9;
-    }
-
-    .login-forgot:hover {
-        color: #bbdefb;
-    }
-
-    .login-divider { color: rgba(255, 255, 255, 0.25); }
-    .login-divider::before, .login-divider::after { background: rgba(255, 255, 255, 0.15); }
-    .login-divider span { color: rgba(255, 255, 255, 0.35); }
-
-    .login-note {
-        color: rgba(255, 255, 255, 0.28);
-    }
-
-    .login-alert {
-        background: rgba(127, 29, 29, 0.28);
-        border-color: rgba(248, 113, 113, 0.38);
-        border-left-color: #ef4444;
-        color: #fecaca;
-    }
-
-    .login-alert svg { color: #fca5a5; }
 }
 
-@media (max-width: 450px) {
+@media (max-width: 400px) {
     .login-right {
         padding: 2rem 1.25rem;
     }

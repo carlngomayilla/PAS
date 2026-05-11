@@ -49,7 +49,7 @@
                 <p class="showcase-data-value">{{ $cardUser->service?->libelle ?? 'Aucun' }}</p>
             </div>
             <div class="showcase-data-point">
-                <p class="showcase-data-key">Role PAS</p>
+                <p class="showcase-data-key">Rôle PAS</p>
                 <p class="showcase-data-value">{{ $cardUser->roleLabel() }}</p>
             </div>
             <div class="showcase-data-point">
@@ -57,7 +57,7 @@
                 <p class="showcase-data-value">{{ $supervisor?->name ?? 'Non determine' }}</p>
             </div>
             <div class="showcase-data-point">
-                <p class="showcase-data-key">Derniere activite</p>
+                <p class="showcase-data-key">Dernière activité</p>
                 <p class="showcase-data-value">{{ $presence['last_activity']?->diffForHumans() ?? 'Aucune session récente' }}</p>
             </div>
         </div>
@@ -92,7 +92,7 @@
                     <span class="text-xs text-slate-400">Voir</span>
                 </a>
             @empty
-                <p class="text-sm text-slate-500">Aucun collaborateur lie dans le meme perimetre.</p>
+                <p class="text-sm text-slate-500">Aucun collaborateur lié dans le même périmètre.</p>
             @endforelse
         </div>
     </div>

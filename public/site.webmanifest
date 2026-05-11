@@ -1,11 +1,14 @@
-﻿{
-  "name": "PAS ANBG",
-  "short_name": "ANBG",
-  "description": "Plateforme PAS ANBG",
-  "start_url": "/",
+{
+  "name": "ANBG — Pilotage PAS",
+  "short_name": "ANBG PAS",
+  "description": "Plateforme institutionnelle de pilotage stratégique et opérationnel ANBG",
+  "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#061022",
   "theme_color": "#1c203d",
+  "categories": ["productivity", "government"],
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -18,6 +21,23 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mes actions",
+      "url": "/workspace/actions?vue=mes_actions",
+      "description": "Accéder à mes actions"
+    },
+    {
+      "name": "Tableau de bord",
+      "url": "/dashboard",
+      "description": "Tableau de bord général"
+    },
+    {
+      "name": "Messagerie",
+      "url": "/workspace/messagerie",
+      "description": "Messagerie interne"
     }
   ]
 }

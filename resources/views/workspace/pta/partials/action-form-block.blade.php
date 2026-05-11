@@ -205,18 +205,6 @@
                                 <label>Unité</label>
                                 <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][unite]" type="text" value="{{ $subAction['unite'] ?? ($rowData['unite_cible'] ?? '') }}">
                             </div>
-                            <div class="md:col-span-2">
-                                <label>Description</label>
-                                <textarea name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][description]">{{ $subAction['description'] ?? '' }}</textarea>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label>Résultat attendu</label>
-                                <textarea name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][resultat_attendu]">{{ $subAction['resultat_attendu'] ?? '' }}</textarea>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label>Commentaire</label>
-                                <textarea name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][commentaire]">{{ $subAction['commentaire'] ?? '' }}</textarea>
-                            </div>
                         </div>
                     </div>
                 @endforeach
@@ -271,18 +259,5 @@
             </div>
         </section>
 
-        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
-            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">8. Risques</h4>
-            <div class="grid gap-4">
-                <div>
-                    <label>Risque potentiel</label>
-                    <textarea name="actions[{{ $index }}][risque_potentiel]">{{ $rowData['risque_potentiel'] ?? '' }}</textarea>
-                </div>
-                <div class="hidden">
-                    <label>Mesures préventives</label>
-                    <textarea class="hidden" disabled>{{ $rowData['mesures_preventives'] ?? '' }}</textarea>
-                </div>
-            </div>
-        </section>
     </div>
 </div>

@@ -20,7 +20,7 @@
                 <p class="text-slate-600">Identification, mise en page, contenu et affectation par défaut.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.templates.index') }}">Retour liste</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
             </div>
@@ -52,7 +52,7 @@
                 <div class="form-grid">
                     <div><label for="document_title">Titre document</label><input id="document_title" name="document_title" type="text" value="{{ old('document_title', $meta['document_title'] ?? $template->name) }}"></div>
                     <div><label for="document_subtitle">Sous-titre</label><input id="document_subtitle" name="document_subtitle" type="text" value="{{ old('document_subtitle', $meta['document_subtitle'] ?? '') }}"></div>
-                    <div><label for="filename_prefix">Prefixe fichier</label><input id="filename_prefix" name="filename_prefix" type="text" value="{{ old('filename_prefix', $meta['filename_prefix'] ?? 'reporting_anbg') }}"></div>
+                    <div><label for="filename_prefix">Préfixe fichier</label><input id="filename_prefix" name="filename_prefix" type="text" value="{{ old('filename_prefix', $meta['filename_prefix'] ?? 'reporting_anbg') }}"></div>
                 </div>
             </div>
 

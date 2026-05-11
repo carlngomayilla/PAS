@@ -204,11 +204,6 @@ class WebWorkspaceTest extends TestCase
             ->assertSee('data-row-link="', false)
             ->assertSee(route('workspace.actions.index'), false);
 
-        $topRiskUrl = $reportingPayload['charts']['top_risks']['rows'][0]['url'] ?? null;
-        if (is_string($topRiskUrl) && $topRiskUrl !== '') {
-            $chartResponse->assertSee($topRiskUrl, false);
-        }
-
         $pasRowUrl = $reportingPayload['pasConsolidation'][0]['url'] ?? null;
         if (is_string($pasRowUrl) && $pasRowUrl !== '') {
             $tableResponse->assertSee('/workspace/pao?pas_id=', false);
@@ -571,15 +566,13 @@ class WebWorkspaceTest extends TestCase
                     'performance',
                     'conformite',
                     'qualite',
-                    'risque',
                     'global',
                     'progression',
                 ],
                 'items',
                 'center_url',
             ])
-            ->assertJsonPath('kpi_summary.qualite', fn ($value) => is_numeric($value))
-            ->assertJsonPath('kpi_summary.risque', fn ($value) => is_numeric($value));
+            ->assertJsonPath('kpi_summary.qualite', fn ($value) => is_numeric($value));
 
         $response->assertJsonPath('summary.total', (int) ($expectedSummary['total'] ?? 0));
         $response->assertJsonPath('summary.unread', (int) ($expectedSummary['unread'] ?? 0));
@@ -651,7 +644,7 @@ class WebWorkspaceTest extends TestCase
         );
     }
 
-    public function test_alerts_page_exposes_quality_risk_and_escalation_context(): void
+    public function test_alerts_page_exposes_execution_quality_and_escalation_context(): void
     {
         $admin = $this->createAdminUser();
         $action = Action::query()
@@ -674,9 +667,9 @@ class WebWorkspaceTest extends TestCase
             ->get('/workspace/alertes?limit=100')
             ->assertOk()
             ->assertSee('Escalade DG')
-            ->assertSee('Indicateur global')
+            ->assertSee('Performance d execution')
             ->assertSee('Qualite')
-            ->assertSee('Risque');
+            ->assertDontSee('Risque');
     }
 
     public function test_alert_read_route_redirects_to_the_cause_and_marks_it_as_read(): void
@@ -1037,7 +1030,7 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringContainsString('Tableau 3 : Actions détaillées', (string) $sheetThreeXml);
         $this->assertStringContainsString('Description action', (string) $sheetThreeXml);
         $this->assertStringContainsString('Tableau 4 : Indicateurs par action', (string) $sheetFourXml);
-        $this->assertStringContainsString('Indicateur de performance (%)', (string) $sheetFourXml);
+        $this->assertStringContainsString('Performance d execution (%)', (string) $sheetFourXml);
         $this->assertStringContainsString('Tableau 5 : Reporting synthétique', (string) $sheetFiveXml);
         $this->assertStringContainsString('Performance (%)', (string) $sheetFiveXml);
         $this->assertStringContainsString('Tableau 6 : Alertes indicateurs sous seuil', (string) $sheetSixXml);
@@ -1136,7 +1129,7 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringContainsString('Objectif opérationnel', (string) $paoCsv);
         $this->assertStringContainsString('Service', (string) $paoCsv);
         $this->assertStringContainsString('Description action', (string) $actionsCsv);
-        $this->assertStringContainsString('Indicateur de performance (%)', (string) $kpiCsv);
+        $this->assertStringContainsString('Performance d execution (%)', (string) $kpiCsv);
         $this->assertStringContainsString('Performance (%)', (string) $summaryCsv);
         $this->assertStringContainsString('Action corrective', (string) $alertsCsv);
         $this->assertStringContainsString('Risque', (string) $risksCsv);
@@ -1144,16 +1137,18 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringContainsString('Statut validation', (string) $justificatifsCsv);
     }
 
-    public function test_reporting_pdf_template_includes_quality_and_risk_kpis(): void
+    public function test_reporting_pdf_template_includes_execution_quality_and_progress_kpis(): void
     {
         $admin = $this->createAdminUser();
         $payload = app(ReportingAnalyticsService::class)->buildPayload($admin, true, true);
 
         $html = view('workspace.monitoring.reporting-pdf', $payload)->render();
 
-        $this->assertStringContainsString('Indicateur de performance (%)', $html);
-        $this->assertStringContainsString('Indicateur risque (%)', $html);
-        $this->assertStringContainsString('Indicateur global (%)', $html);
+        $this->assertStringContainsString('Performance d execution (%)', $html);
+        $this->assertStringContainsString('Qualite / conformite (%)', $html);
+        $this->assertStringContainsString('Avancement reel (%)', $html);
+        $this->assertStringNotContainsString('Indicateur risque (%)', $html);
+        $this->assertStringNotContainsString('Indicateur global (%)', $html);
         $this->assertStringContainsString('section-kicker">Direction', $html);
         $this->assertStringContainsString('section-kicker">Service', $html);
         $this->assertStringNotContainsString('<th>Direction</th><th>Service</th><th>Axe stratégique</th>', $html);

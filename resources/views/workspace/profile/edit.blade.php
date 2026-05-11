@@ -53,11 +53,11 @@
             </div>
             <div class="showcase-data-list">
                 <div class="showcase-data-point">
-                    <p class="showcase-data-key">Role</p>
+                    <p class="showcase-data-key">Rôle</p>
                     <p class="showcase-data-value">{{ $profil['role_label'] }} ({{ $profil['role'] }})</p>
                 </div>
                 <div class="showcase-data-point">
-                    <p class="showcase-data-key">Portee</p>
+                    <p class="showcase-data-key">Portée</p>
                     <p class="showcase-data-value">{{ $profil['scope'] }}</p>
                 </div>
                 <div class="showcase-data-point">
@@ -165,7 +165,7 @@
                     <tr>
                         <th class="px-3 py-2">Statut</th>
                         <th class="px-3 py-2">Adresse IP</th>
-                        <th class="px-3 py-2">Derniere activite</th>
+                        <th class="px-3 py-2">Dernière activité</th>
                         <th class="px-3 py-2">Client</th>
                         <th class="px-3 py-2 text-right">Action</th>
                     </tr>

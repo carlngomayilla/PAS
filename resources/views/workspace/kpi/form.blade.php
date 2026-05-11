@@ -32,7 +32,7 @@
                         </select>
                     </div>
                     <div>
-                        <label for="periodicite">Periodicite</label>
+                        <label for="periodicite">Périodicité</label>
                         <select id="periodicite" name="periodicite" required>
                             @foreach ($periodiciteOptions as $periodicite)
                                 <option value="{{ $periodicite }}" @selected(old('periodicite', $row->periodicite ?: 'mensuel') === $periodicite)>{{ $periodicite }}</option>

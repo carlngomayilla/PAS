@@ -188,6 +188,9 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::get('daf/financements-actions', [ActionWebController::class, 'financingRequests'])
                 ->name('daf.financements.index');
 
+            Route::patch('actions/{action}/quick-statut', [ActionWebController::class, 'quickStatus'])
+                ->name('actions.quick-status');
+
             Route::get('actions/create', static function () {
                 return redirect()
                     ->route('workspace.pta.index')

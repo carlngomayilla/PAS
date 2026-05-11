@@ -45,7 +45,7 @@
                     <input id="q" name="q" type="text" value="{{ $filters['q'] }}" placeholder="Nom ou email">
                 </div>
                 <div>
-                    <label for="role">Role</label>
+                    <label for="role">Rôle</label>
                     <select id="role" name="role">
                         <option value="">Tous</option>
                         @foreach ($roleOptions as $role)
@@ -99,12 +99,12 @@
                     <tr>
                         <th>ID</th>
                         <th>Profil</th>
-                        <th>Role</th>
+                        <th>Rôle</th>
                         <th>Statut</th>
                         <th>Direction</th>
                         <th>Service</th>
                         @if ($canWrite)
-                            <th>Operations</th>
+                            <th>Opérations</th>
                         @endif
                     </tr>
                 </thead>

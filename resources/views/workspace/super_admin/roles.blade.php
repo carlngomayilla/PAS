@@ -1,17 +1,17 @@
 @extends('layouts.workspace')
 
-@section('title', 'Roles et permissions')
+@section('title', 'Rôles et permissions')
 
 @section('content')
     <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
-                <h1 class="mt-2">Roles et permissions</h1>
-                <p class="mt-2 text-slate-600">Matrice des droits systeme. Les rôles natifs restent verrouilles; seul le registre de permissions est modulable.</p>
+                <h1 class="mt-2">Rôles et permissions</h1>
+                <p class="mt-2 text-slate-600">Matrice des droits système. Les rôles natifs restent verrouillés; seul le registre de permissions est modulable.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Acces'])
+                @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.index') }}">Retour module</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.modules.edit') }}">Modules et navigation</a>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.appearance.edit') }}">Apparence</a>
@@ -21,24 +21,24 @@
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))] mb-3.5">
         <article class="ui-card !mb-0">
-            <p class="text-sm text-slate-500">Roles systeme</p>
+            <p class="text-sm text-slate-500">Rôles système</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ count($roles) }}</p>
-            <p class="mt-2 text-sm text-slate-600">Les rôles natifs restent verrouilles. Cette matrice pilote uniquement leurs droits effectifs.</p>
+            <p class="mt-2 text-sm text-slate-600">Les rôles natifs restent verrouillés. Cette matrice pilote uniquement leurs droits effectifs.</p>
         </article>
         <article class="ui-card !mb-0">
-            <p class="text-sm text-slate-500">Role simule</p>
+            <p class="text-sm text-slate-500">Rôle simulé</p>
             <p class="mt-2 text-2xl font-bold text-slate-900">{{ $selectedRoleLabel }}</p>
             <p class="mt-2 text-sm text-slate-600">{{ count($selectedPermissions) }} permissions actives et {{ count($selectedModules) }} modules visibles.</p>
         </article>
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Permissions sensibles</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ collect($permissionGroups)->sum(fn ($group) => collect($group['permissions'])->where('sensitive', true)->count()) }}</p>
-            <p class="mt-2 text-sm text-slate-600">Les modifications sont journalisees et le rôle `super_admin` reste force a l ensemble des permissions.</p>
+            <p class="mt-2 text-sm text-slate-600">Les modifications sont journalisées et le rôle `super_admin` reste forcé à l'ensemble des permissions.</p>
         </article>
         <article class="ui-card !mb-0">
-            <p class="text-sm text-slate-500">Roles personnalises</p>
+            <p class="text-sm text-slate-500">Rôles personnalisés</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ count($customRoles) }}</p>
-            <p class="mt-2 text-sm text-slate-600">Chaque rôle personnalise herite d'un rôle de base pour conserver le scope natif.</p>
+            <p class="mt-2 text-sm text-slate-600">Chaque rôle personnalisé hérite d'un rôle de base pour conserver le périmètre natif.</p>
         </article>
     </section>
 
@@ -71,10 +71,10 @@
             <div class="form-section">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <h2 class="form-section-title">Registre des rôles personnalises</h2>
-                        <p class="form-section-subtitle">Le code du rôle personnalise devient le profil effectif du compte. Le rôle de base conserve la logique de perimetre existante.</p>
+                        <h2 class="form-section-title">Registre des rôles personnalisés</h2>
+                        <p class="form-section-subtitle">Le code du rôle personnalisé devient le profil effectif du compte. Le rôle de base conserve la logique de périmètre existante.</p>
                     </div>
-                    <button class="btn btn-primary" type="submit">Enregistrer les rôles personnalises</button>
+                    <button class="btn btn-primary" type="submit">Enregistrer les rôles personnalisés</button>
                 </div>
 
                 <div class="mt-4 space-y-4">
@@ -86,11 +86,11 @@
                                     <input id="custom_role_code_{{ $index }}" name="custom_roles[{{ $index }}][code]" type="text" value="{{ old("custom_roles.$index.code", $row['code']) }}" placeholder="ex. chef_projet">
                                 </div>
                                 <div>
-                                    <label for="custom_role_label_{{ $index }}">Libelle</label>
+                                    <label for="custom_role_label_{{ $index }}">Libellé</label>
                                     <input id="custom_role_label_{{ $index }}" name="custom_roles[{{ $index }}][label]" type="text" value="{{ old("custom_roles.$index.label", $row['label']) }}" placeholder="Chef de projet">
                                 </div>
                                 <div>
-                                    <label for="custom_role_base_{{ $index }}">Role de base</label>
+                                    <label for="custom_role_base_{{ $index }}">Rôle de base</label>
                                     <select id="custom_role_base_{{ $index }}" name="custom_roles[{{ $index }}][base_role]">
                                         @foreach ($baseRoleOptions as $roleCode => $definition)
                                             <option value="{{ $roleCode }}" @selected(old("custom_roles.$index.base_role", $row['base_role']) === $roleCode)>{{ $definition['label'] }}</option>
@@ -187,10 +187,10 @@
             <form method="GET" action="{{ route('workspace.super-admin.roles.edit') }}" class="form-shell">
                 <div class="form-section">
                     <h2 class="form-section-title">Simulation</h2>
-                    <p class="form-section-subtitle">Previsualisation theorique du perimetre rendu par la matrice actuelle.</p>
+                    <p class="form-section-subtitle">Prévisualisation théorique du périmètre rendu par la matrice actuelle.</p>
                     <div class="form-grid">
                         <div class="md:col-span-2 xl:col-span-4">
-                            <label for="simulate_role">Role a simuler</label>
+                            <label for="simulate_role">Rôle à simuler</label>
                             <select id="simulate_role" name="simulate_role">
                                 @foreach ($roles as $roleCode => $roleLabel)
                                     <option value="{{ $roleCode }}" @selected($selectedRole === $roleCode)>{{ $roleLabel }}</option>
@@ -240,10 +240,10 @@
             <form method="GET" action="{{ route('workspace.super-admin.roles.edit') }}" class="form-shell">
                 <div class="form-section">
                     <h2 class="form-section-title">Comparaison de roles</h2>
-                    <p class="form-section-subtitle">Compare les ecarts de permissions et de modules visibles entre deux profils systeme.</p>
+                    <p class="form-section-subtitle">Compare les écarts de permissions et de modules visibles entre deux profils système.</p>
                     <div class="form-grid">
                         <div class="md:col-span-2 xl:col-span-4">
-                            <label for="compare_left_role">Role de reference</label>
+                            <label for="compare_left_role">Rôle de référence</label>
                             <select id="compare_left_role" name="compare_left_role">
                                 @foreach ($roles as $roleCode => $roleLabel)
                                     <option value="{{ $roleCode }}" @selected($compareLeftRole === $roleCode)>{{ $roleLabel }}</option>
@@ -251,7 +251,7 @@
                             </select>
                         </div>
                         <div class="md:col-span-2 xl:col-span-4">
-                            <label for="compare_right_role">Role a comparer</label>
+                            <label for="compare_right_role">Rôle à comparer</label>
                             <select id="compare_right_role" name="compare_right_role">
                                 @foreach ($roles as $roleCode => $roleLabel)
                                     <option value="{{ $roleCode }}" @selected($compareRightRole === $roleCode)>{{ $roleLabel }}</option>
@@ -285,7 +285,7 @@
                         @forelse ($roleComparison['left_only'] as $permissionCode)
                             <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $permissionCode }}</span>
                         @empty
-                            <p class="text-sm text-slate-500">Aucun ecart cote reference.</p>
+                            <p class="text-sm text-slate-500">Aucun écart côté référence.</p>
                         @endforelse
                     </div>
                 </div>
@@ -326,4 +326,3 @@
         </article>
     </section>
 @endsection
-

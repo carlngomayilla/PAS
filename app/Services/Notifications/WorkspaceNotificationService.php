@@ -833,7 +833,7 @@ class WorkspaceNotificationService
         return match ((string) $log->type_evenement) {
             'progression_sous_seuil',
             'kpi_global_sous_seuil',
-            'action_a_risque',
+            'action_a_surveiller',
             'echeance_proche',
             'alerte_combinee_critique' => route('workspace.actions.suivi', $action).'#action-status',
             default => route('workspace.actions.suivi', $action).'#action-logs',

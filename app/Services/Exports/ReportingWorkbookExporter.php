@@ -97,7 +97,6 @@ class ReportingWorkbookExporter
             $this->buildKpiFinalSheet($payload),
             $this->buildSyntheticReportingSheet($payload),
             $this->buildAlertsFinalSheet($payload),
-            $this->buildRisksFinalSheet($payload),
             $this->buildRmoPerformanceSheet($payload),
             $this->buildJustificatifsSheet($payload),
         ];
@@ -246,10 +245,10 @@ class ReportingWorkbookExporter
                 ['Retards', (int) ($payload['alertes']['actions_en_retard'] ?? 0), 17, 18],
             ],
             [
-                ['Indicateur global', (int) round((float) ($kpiSummary['global'] ?? 0)), 13, 14],
+                ['Performance execution', (int) round((float) ($kpiSummary['performance'] ?? 0)), 13, 14],
                 ['Qualite', (int) round((float) ($kpiSummary['qualite'] ?? 0)), 15, 16],
-                ['Risque', (int) round((float) ($kpiSummary['risque'] ?? 0)), 17, 18],
-                ['Progression', (int) round((float) ($kpiSummary['progression'] ?? 0)), 19, 20],
+                ['Avancement reel', (int) round((float) ($kpiSummary['progression'] ?? 0)), 17, 18],
+                ['Delai', (int) round((float) ($kpiSummary['delai'] ?? 0)), 19, 20],
             ],
         ];
         foreach ($cardsGroups as $cards) {
@@ -386,28 +385,6 @@ class ReportingWorkbookExporter
         $interannualEndRow = max($interannualStartRow, $rowIndex - 1);
         $rowIndex++;
 
-        $topRiskRows = array_slice((array) (($charts['top_risks']['rows'] ?? [])), 0, 6);
-        $riskMax = max(1.0, max(array_map(static fn (array $row): float => (float) ($row['score'] ?? 0), $topRiskRows ?: [['score' => 1]])));
-
-        $rows[] = $this->makeMergedRow($rowIndex, 'Top risques', $maxColumns, 3);
-        $merges[] = 'A'.$rowIndex.':H'.$rowIndex;
-        $rowIndex++;
-        $rows[] = $this->makeStandardRow($rowIndex, ['Action', 'Score', 'Statut', 'Échéance', 'Intensite'], ['string', 'string', 'string', 'string', 'string'], 4);
-        $rowIndex++;
-        foreach ($topRiskRows as $index => $riskRow) {
-            $score = (float) ($riskRow['score'] ?? 0.0);
-            $rows[] = $this->makeDataRow(
-                $rowIndex,
-                [(string) ($riskRow['action'] ?? ''), $score, (string) ($riskRow['statut'] ?? ''), (string) ($riskRow['echeance'] ?? ''), $this->asciiBar($score, $riskMax, 18)],
-                ['string', 'decimal', 'string', 'string', 'string'],
-                ($index % 2) === 0
-            );
-            $rowIndex++;
-        }
-        if ($topRiskRows === []) {
-            $rows[] = $this->makeDataRow($rowIndex, ['Aucun risque', 0, '', '', ''], ['string', 'decimal', 'string', 'string', 'string'], true);
-        }
-
         $sheetName = (string) ($layout['excel_graph_sheet_name'] ?? 'Synthèse graphique');
         $chartsMeta[] = [
             'title' => 'Funnel de pilotage',
@@ -514,10 +491,10 @@ class ReportingWorkbookExporter
             'ACTIONS',
             'ACTIONS',
             $this->standardReportMetaRows($payload, 'Tableau 3 : Actions détaillées'),
-            ['Direction', 'Service', 'Description action', 'RMO', 'Cible', 'Début', 'Fin', 'Statut', 'Ressources', 'Taux (%)', 'Justificatif', 'Risque'],
-            ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'percent', 'string', 'string'],
+            ['Direction', 'Service', 'Description action', 'RMO', 'Cible', 'Debut', 'Fin', 'Statut', 'Ressources', 'Avancement reel (%)', 'Justificatif'],
+            ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'percent', 'string'],
             $this->actionFinalSheetRows($payload),
-            [1 => 36, 2 => 36, 3 => 48, 4 => 26, 5 => 36, 6 => 16, 7 => 16, 8 => 18, 9 => 34, 10 => 18, 11 => 42, 12 => 42],
+            [1 => 36, 2 => 36, 3 => 48, 4 => 26, 5 => 36, 6 => 16, 7 => 16, 8 => 18, 9 => 34, 10 => 18, 11 => 42],
             [
                 'Tableau 3 : Actions detaillees',
             ]
@@ -530,10 +507,10 @@ class ReportingWorkbookExporter
             'Indicateurs',
             'Indicateurs',
             $this->standardReportMetaRows($payload, 'Tableau 4 : Indicateurs par action'),
-            ['Direction', 'Service', 'Action', 'RMO', 'Indicateur de performance (%)', 'Indicateur qualite (%)', 'Indicateur delai (%)', 'Indicateur risque (%)', 'Indicateur conformite (%)', 'Indicateur global (%)'],
-            ['string', 'string', 'string', 'string', 'percent', 'percent', 'percent', 'percent', 'percent', 'percent'],
+            ['Direction', 'Service', 'Action', 'RMO', 'Performance d execution (%)', 'Qualite / conformite (%)', 'Delai (%)', 'Avancement reel (%)'],
+            ['string', 'string', 'string', 'string', 'percent', 'percent', 'percent', 'percent'],
             $this->kpiFinalSheetRows($payload),
-            [1 => 36, 2 => 36, 3 => 42, 4 => 26, 5 => 20, 6 => 18, 7 => 18, 8 => 18, 9 => 20, 10 => 18]
+            [1 => 36, 2 => 36, 3 => 42, 4 => 26, 5 => 24, 6 => 22, 7 => 18, 8 => 20]
         );
     }
 
@@ -562,20 +539,6 @@ class ReportingWorkbookExporter
             [1 => 42, 2 => 36, 3 => 14, 4 => 14, 5 => 18, 6 => 48]
         );
     }
-
-    private function buildRisksFinalSheet(array $payload): array
-    {
-        return $this->buildTableSheet(
-            'RISQUES',
-            'RISQUES',
-            $this->standardReportMetaRows($payload, 'Tableau 7 : Risques'),
-            ['Direction', 'Service', 'Action', 'Risque', 'Niveau', 'Impact', 'Solution', 'Responsable'],
-            ['string', 'string', 'string', 'string', 'string', 'decimal', 'string', 'string'],
-            $this->riskFinalSheetRows($payload),
-            [1 => 36, 2 => 36, 3 => 42, 4 => 44, 5 => 18, 6 => 14, 7 => 44, 8 => 28]
-        );
-    }
-
     private function buildRmoPerformanceSheet(array $payload): array
     {
         return $this->buildTableSheet(
@@ -664,23 +627,6 @@ class ReportingWorkbookExporter
             [1 => 38, 2 => 34, 3 => 18, 4 => 14, 5 => 14, 6 => 18]
         );
     }
-
-    private function buildInstitutionalRisksSheet(array $payload): array
-    {
-        return $this->buildTableSheet(
-            'Risques',
-            'Risques',
-            ['RAPPORT DE REPORTING', 'Risques potentiels et mitigation'],
-            ['Action', 'Risque identifie', 'Niveau de risque', 'Mesure de mitigation', 'Responsable', 'Statut de suivi'],
-            ['string', 'string', 'string', 'string', 'string', 'string'],
-            $this->riskSheetRows($payload),
-            [1 => 34, 2 => 42, 3 => 18, 4 => 42, 5 => 24, 6 => 20]
-        );
-    }
-
-    /**
-     * @return list<string>
-     */
     private function standardReportMetaRows(array $payload, string $tableLabel): array
     {
         $exportTemplate = (array) ($payload['export_template'] ?? []);
@@ -811,7 +757,6 @@ class ReportingWorkbookExporter
                 (string) ($row['ressources_requises'] ?? '-'),
                 (float) ($row['progression_value'] ?? 0),
                 (string) ($row['justificatif'] ?? '-'),
-                (string) ($row['risque_identifie'] ?? '-'),
             ])
             ->values()
             ->all();
@@ -831,9 +776,7 @@ class ReportingWorkbookExporter
                 (float) ($row['kpi_performance_value'] ?? 0),
                 (float) ($row['kpi_qualite_value'] ?? 0),
                 (float) ($row['kpi_delai_value'] ?? 0),
-                (float) ($row['kpi_risque_value'] ?? 0),
-                (float) ($row['kpi_conformite_value'] ?? 0),
-                (float) ($row['kpi_global_value'] ?? 0),
+                (float) ($row['progression_value'] ?? 0),
             ])
             ->values()
             ->all();
@@ -898,28 +841,6 @@ class ReportingWorkbookExporter
 
     /**
      * @return array<int, array<int, mixed>>
-     */
-    private function riskFinalSheetRows(array $payload): array
-    {
-        return $this->actionRows($payload)
-            ->filter(fn (array $row): bool => trim((string) ($row['risque_identifie'] ?? '')) !== '')
-            ->map(fn (array $row): array => [
-                (string) ($row['direction_label'] ?? '-'),
-                (string) ($row['service_label'] ?? '-'),
-                (string) ($row['action'] ?? '-'),
-                (string) ($row['risque_identifie'] ?? '-'),
-                (string) ($row['niveau_risque'] ?? '-'),
-                (float) ($row['kpi_risque_value'] ?? 0),
-                (string) ($row['mesure_mitigation'] ?? '-'),
-                (string) ($row['rmo'] ?? $row['responsable'] ?? '-'),
-            ])
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return array<int, array<int, mixed>>
-     */
     private function rmoPerformanceRows(array $payload): array
     {
         return $this->actionRows($payload)
@@ -1084,23 +1005,6 @@ class ReportingWorkbookExporter
 
     /**
      * @return array<int, array<int, mixed>>
-     */
-    private function riskSheetRows(array $payload): array
-    {
-        return $this->actionRows($payload)
-            ->filter(fn (array $row): bool => trim((string) ($row['risque_identifie'] ?? '')) !== '')
-            ->map(fn (array $row): array => [
-                (string) ($row['action'] ?? '-'),
-                (string) ($row['risque_identifie'] ?? '-'),
-                (string) ($row['niveau_risque'] ?? '-'),
-                (string) ($row['mesure_mitigation'] ?? '-'),
-                (string) ($row['responsable'] ?? '-'),
-                (string) ($row['statut'] ?? '-'),
-            ])
-            ->values()
-            ->all();
-    }
-
     private function serviceReports(array $payload): Collection
     {
         return collect($payload['details']['direction_service_report'] ?? []);
@@ -1295,15 +1199,12 @@ class ReportingWorkbookExporter
 
         $sections[] = [
             'title' => 'Synthese des indicateurs',
-            'headers' => ['Indicateur delai', 'Indicateur performance', 'Indicateur conformite', 'Indicateur qualite', 'Indicateur risque', 'Indicateur global', 'Progression moyenne'],
-            'types' => ['decimal', 'decimal', 'decimal', 'decimal', 'decimal', 'decimal', 'percent'],
+            'headers' => ['Delai', 'Performance d execution', 'Qualite / conformite', 'Avancement moyen reel'],
+            'types' => ['decimal', 'decimal', 'decimal', 'percent'],
             'rows' => [[
                 (float) ($payload['kpiSummary']['delai'] ?? 0),
                 (float) ($payload['kpiSummary']['performance'] ?? 0),
-                (float) ($payload['kpiSummary']['conformite'] ?? 0),
                 (float) ($payload['kpiSummary']['qualite'] ?? 0),
-                (float) ($payload['kpiSummary']['risque'] ?? 0),
-                (float) ($payload['kpiSummary']['global'] ?? 0),
                 (float) ($payload['kpiSummary']['progression'] ?? 0),
             ]],
         ];
@@ -1323,9 +1224,9 @@ class ReportingWorkbookExporter
         ];
         $sections[] = [
             'title' => 'Details - Actions en retard',
-            'headers' => ['ID', 'Libelle', 'Échéance', 'Statut', 'PTA', 'Responsable', 'Indicateur global', 'Indicateur qualite', 'Indicateur risque'],
-            'types' => ['integer', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal', 'decimal'],
-            'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_global ?? 0), (float) ($action->actionKpi?->kpi_qualite ?? 0), (float) ($action->actionKpi?->kpi_risque ?? 0)])->all(),
+            'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable', 'Performance d execution', 'Qualite / conformite'],
+            'types' => ['integer', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal'],
+            'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_performance ?? 0), (float) ($action->actionKpi?->kpi_qualite ?? 0)])->all(),
         ];
 
         $sections[] = [

@@ -4,6 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="theme-color" content="#1c203d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ANBG PAS">
+    <link rel="manifest" href="/site.webmanifest">
     @include('partials.app-icons')
     <script @cspNonce>
         (function () {
@@ -118,6 +124,42 @@
             $headerSidebarBadges['alertes'] = $headerAlertUnreadCount;
         }
 
+        // Count actions pending validation (for managers) and returned actions (for agents)
+        $validationBadgeCount = 0;
+        if (\Illuminate\Support\Facades\Schema::hasTable('actions')) {
+            $isGlobalReader = $layoutUser->hasGlobalReadAccess()
+                || $layoutUser->hasRole(\App\Models\User::ROLE_SUPER_ADMIN)
+                || $layoutUser->hasRole(\App\Models\User::ROLE_DG)
+                || $layoutUser->hasRole(\App\Models\User::ROLE_PLANIFICATION)
+                || $layoutUser->hasRole(\App\Models\User::ROLE_CABINET);
+            $pendingQ = \App\Models\Action::query()
+                ->where('statut_validation', \App\Services\Actions\ActionTrackingService::VALIDATION_SOUMISE_CHEF);
+            if (! $isGlobalReader) {
+                if ($layoutUser->hasRole(\App\Models\User::ROLE_DIRECTION) && $layoutUser->direction_id) {
+                    $pendingQ->whereHas('pta', fn ($q) => $q->where('direction_id', $layoutUser->direction_id));
+                } elseif ($layoutUser->hasRole(\App\Models\User::ROLE_SERVICE) && $layoutUser->service_id) {
+                    $pendingQ->whereHas('pta', fn ($q) => $q->where('service_id', $layoutUser->service_id));
+                } else {
+                    $pendingQ->whereRaw('0 = 1');
+                }
+            }
+            $validationBadgeCount += (int) $pendingQ->count();
+            $returnedCount = \App\Models\Action::query()
+                ->whereIn('statut_validation', [
+                    \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_CHEF,
+                    \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+                ])
+                ->where(static fn ($q) => $q
+                    ->where('responsable_id', $layoutUser->id)
+                    ->orWhereHas('responsables', fn ($q2) => $q2->where('users.id', $layoutUser->id))
+                )
+                ->count();
+            $validationBadgeCount += (int) $returnedCount;
+            if ($validationBadgeCount > 0) {
+                $headerSidebarBadges['actions'] = (int) ($headerSidebarBadges['actions'] ?? 0) + $validationBadgeCount;
+            }
+        }
+
         if (
             \Illuminate\Support\Facades\Schema::hasTable('conversations')
             && \Illuminate\Support\Facades\Schema::hasTable('conversation_participants')
@@ -131,6 +173,7 @@
 @endphp
 
 <body class="admin-theme-scope h-full" data-auto-refresh="20">
+    <a href="#admin-main-content" class="skip-to-content">Aller au contenu principal</a>
     <div class="admin-page-root app-shell min-h-screen">
         <div id="admin-overlay" class="fixed inset-0 z-40 hidden bg-white/70 backdrop-blur-sm lg:hidden"></div>
 
@@ -199,6 +242,23 @@
                         <div class="admin-local-clock hidden lg:inline-flex" id="admin-local-clock" aria-label="Heure locale">
                             --:--:--
                         </div>
+
+                        <button
+                            type="button"
+                            id="admin-notif-toggle"
+                            class="admin-navbar-icon-button inline-flex items-center justify-center"
+                            title="Activer les notifications navigateur"
+                            aria-label="Notifications navigateur"
+                        >
+                            {{-- Bell (default / granted) --}}
+                            <svg id="notif-icon-bell" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            {{-- Bell-slash (denied) --}}
+                            <svg id="notif-icon-denied" class="hidden h-5 w-5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.172 9.172a4 4 0 015.656 0M3 3l18 18M10.343 10.343A4 4 0 006 14v3.159c0 .538-.214 1.055-.595 1.436L4 20h12.586M15 17v1a3 3 0 01-5.196 1.755M15 17H9" />
+                            </svg>
+                        </button>
 
                         <button
                             type="button"
@@ -410,7 +470,7 @@
                     </div>
 
                         <div class="admin-navbar-user flex items-center gap-3 px-3 py-2">
-                            <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-user-copy hidden text-right transition-opacity hover:opacity-75 sm:block">
+                            <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-user-copy text-right transition-opacity hover:opacity-75">
                                 <p class="text-sm font-semibold text-[#17324a]">{{ auth()->user()?->name ?? 'Utilisateur' }}</p>
                                 <p class="text-xs text-[#667085]">{{ auth()->user()?->roleLabel() ?? 'Compte' }}</p>
                             </a>
@@ -856,7 +916,6 @@
                 var cards = [
                     ['Global', summary.global],
                     ['Qualité', summary.qualite],
-                    ['Risque', summary.risque],
                     ['Progression', summary.progression],
                 ].filter(function (row) {
                     return typeof row[1] !== 'undefined';
@@ -893,7 +952,7 @@
                     var metricChips = [
                         ['Global', metrics.kpi_global],
                         ['Qualité', metrics.kpi_qualite],
-                        ['Risque', metrics.kpi_risque],
+                        ['Performance', metrics.kpi_performance],
                     ].filter(function (row) {
                         return typeof row[1] !== 'undefined';
                     }).map(function (row) {
@@ -1367,5 +1426,30 @@
         })();
     </script>
     @stack('scripts')
+    <script @cspNonce>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        }
+    </script>
+
+    {{-- ── SPOTLIGHT SEARCH MODAL ────────────────────────────────────────── --}}
+    <div id="spotlight-backdrop" class="spotlight-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Recherche globale">
+        <div class="spotlight-panel" role="search">
+            <div class="spotlight-input-row">
+                <svg class="spotlight-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input id="spotlight-input" type="search" class="spotlight-input" placeholder="Rechercher actions, PTA, utilisateurs…" autocomplete="off" spellcheck="false" aria-label="Recherche globale">
+                <kbd class="spotlight-esc-hint" title="Fermer">Échap</kbd>
+            </div>
+            <div id="spotlight-results" class="spotlight-results" role="listbox" aria-label="Résultats de recherche"></div>
+            <div class="spotlight-footer">
+                <span><kbd>↑</kbd><kbd>↓</kbd> naviguer</span>
+                <span><kbd>↵</kbd> ouvrir</span>
+                <span><kbd>Échap</kbd> fermer</span>
+                <a href="{{ route('workspace.search') }}" class="spotlight-full-search">Recherche complète →</a>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
