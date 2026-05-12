@@ -29,12 +29,19 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\View\View;
 
+/**
+ * Contrôleur des PTA — Plan de Travail Annuel.
+ *
+ * Un PTA est le plan d'un service pour une année donnée. Il est rattaché à un PAO
+ * et contient les actions à réaliser. Il suit un workflow : brouillon → soumis → validé → verrouillé.
+ */
 class PtaWebController extends Controller
 {
     use AuthorizesPlanningScope;
     use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
+    /** Affiche la liste des PTA avec filtres (direction, service, statut) et statistiques. */
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -132,6 +139,7 @@ class PtaWebController extends Controller
         ]);
     }
 
+    /** Affiche le formulaire de création d'un nouveau PTA. */
     public function create(Request $request): View
     {
         $user = $request->user();
@@ -168,6 +176,7 @@ class PtaWebController extends Controller
         ]);
     }
 
+    /** Enregistre un nouveau PTA après validation du formulaire. */
     public function store(StorePtaRequest $request): RedirectResponse
     {
         $user = $request->user();
@@ -253,6 +262,7 @@ class PtaWebController extends Controller
                 : $this->entityUpdatedMessage(UiLabel::object('pta')).' Le PTA annuel du service existait deja: les actions ont ete ajoutees ou mises a jour dedans.');
     }
 
+    /** Affiche le formulaire de modification d'un PTA existant. */
     public function edit(Request $request, Pta $pta): View
     {
         $user = $request->user();
@@ -282,6 +292,7 @@ class PtaWebController extends Controller
         ]);
     }
 
+    /** Sauvegarde les modifications apportées à un PTA. */
     public function update(UpdatePtaRequest $request, Pta $pta): RedirectResponse
     {
         $user = $request->user();
@@ -351,6 +362,7 @@ class PtaWebController extends Controller
             ->with('success', $this->entityUpdatedMessage(UiLabel::object('pta')));
     }
 
+    /** Supprime un PTA (uniquement si en brouillon et sans actions associées). */
     public function destroy(Request $request, Pta $pta): RedirectResponse
     {
         $user = $request->user();
@@ -378,6 +390,7 @@ class PtaWebController extends Controller
             ->with('success', $this->entityDeletedMessage(UiLabel::object('pta')));
     }
 
+    /** Soumet le PTA pour validation par le chef de direction. */
     public function submit(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
@@ -417,6 +430,7 @@ class PtaWebController extends Controller
                 : 'PTA valide directement selon le workflow configure.');
     }
 
+    /** Valide un PTA soumis (rôle direction ou admin). */
     public function approve(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
@@ -452,6 +466,7 @@ class PtaWebController extends Controller
             ->with('success', $this->transitionedStateMessage('PTA', 'valide'));
     }
 
+    /** Verrouille un PTA validé : il passe en lecture seule, plus aucune modification possible. */
     public function lock(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
@@ -487,6 +502,7 @@ class PtaWebController extends Controller
             ->with('success', $this->transitionedStateMessage('PTA', 'verrouille'));
     }
 
+    /** Retourne un PTA en brouillon avec un motif obligatoire (correction avant re-soumission). */
     public function reopen(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();

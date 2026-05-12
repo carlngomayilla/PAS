@@ -26,18 +26,26 @@ use App\Models\KpiMesure;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
+// ── ACCUEIL ────────────────────────────────────────────────────────────────────
+// Redirige la racine vers la page de connexion.
 Route::get('/', function () {
     return redirect()->route('login.form');
 });
 
+// ── AUTHENTIFICATION (pages publiques) ─────────────────────────────────────────
+// Accessible uniquement aux visiteurs non connectés.
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [SessionController::class, 'create'])->name('login.form');
     Route::post('/login', [SessionController::class, 'store'])->middleware('throttle:login')->name('login');
 });
 
+// ── ESPACE AUTHENTIFIÉ ─────────────────────────────────────────────────────────
+// Toutes les routes ci-dessous nécessitent d'être connecté et d'avoir un compte actif.
 Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void {
     Route::post('/logout', [SessionController::class, 'destroy'])->name('logout');
 
+    // ── PROFIL UTILISATEUR ─────────────────────────────────────────────────────
+    // Gestion du compte personnel : informations, mot de passe, sessions ouvertes.
     Route::get('/workspace/profil', [ProfileWebController::class, 'edit'])->name('workspace.profile.edit');
     Route::put('/workspace/profil', [ProfileWebController::class, 'update'])->name('workspace.profile.update');
     Route::post('/workspace/profil/sessions/revoke-current', [ProfileWebController::class, 'revokeCurrentSession'])
@@ -88,6 +96,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         Route::post('/workspace/notifications/read-all', [NotificationWebController::class, 'readAll'])
             ->name('workspace.notifications.read_all');
 
+        // ── RÉFÉRENTIEL (Directions, Services, Utilisateurs) ──────────────────────
+        // Gestion des structures organisationnelles accessibles aux administrateurs.
         Route::get('/workspace/referentiel/directions', [ReferentielWebController::class, 'directionsIndex'])
             ->name('workspace.referentiel.directions.index');
         Route::get('/workspace/referentiel/directions/create', [ReferentielWebController::class, 'directionsCreate'])
@@ -127,6 +137,7 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         Route::delete('/workspace/referentiel/utilisateurs/{utilisateur}', [ReferentielWebController::class, 'utilisateursDestroy'])
             ->name('workspace.referentiel.utilisateurs.destroy');
 
+        // ── GOUVERNANCE (Documentation API, Rétention, Délégations) ──────────────
         Route::get('/workspace/documentation-api', [GovernanceWebController::class, 'apiDocumentation'])
             ->name('workspace.api-docs.index');
         Route::get('/workspace/documentation-api/openapi.yaml', [GovernanceWebController::class, 'apiSpec'])
@@ -144,13 +155,19 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         Route::post('/workspace/referentiel/delegations/{delegation}/cancel', [GovernanceWebController::class, 'delegationsCancel'])
             ->name('workspace.delegations.cancel');
 
+        // ── WORKSPACE PRINCIPAL ────────────────────────────────────────────────────
+        // Contient tous les modules métier : PAS, PAO, PTA, Actions, KPI, Messagerie...
         Route::prefix('/workspace')->name('workspace.')->group(function (): void {
+
+            // Menus déroulants dynamiques (chargés en AJAX lors du remplissage des formulaires)
             Route::get('ajax/services', [DependentSelectController::class, 'services'])->name('ajax.services');
             Route::get('ajax/users', [DependentSelectController::class, 'users'])->name('ajax.users');
             Route::get('ajax/objectifs-operationnels', [DependentSelectController::class, 'objectifsOperationnels'])->name('ajax.objectifs-operationnels');
             Route::get('ajax/ptas', [DependentSelectController::class, 'ptas'])->name('ajax.ptas');
             Route::get('ajax/actions', [DependentSelectController::class, 'actions'])->name('ajax.actions');
 
+            // ── PAS — Plan d'Actions Stratégique ──────────────────────────────────
+            // Document pluriannuel institutionnel : axes et objectifs stratégiques.
             Route::resource('pas', PasWebController::class)
                 ->except(['show'])
                 ->parameters(['pas' => 'pas']);
@@ -169,6 +186,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 return redirect()->route('workspace.pas.index');
             })->where('legacy', '.*')->name('pas-objectifs.legacy');
 
+            // ── PAO — Plan d'Actions Opérationnel ─────────────────────────────────
+            // Déclinaison annuelle du PAS par direction, avec objectifs opérationnels.
             Route::resource('pao', PaoWebController::class)
                 ->except(['show'])
                 ->parameters(['pao' => 'pao']);
@@ -177,6 +196,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::post('pao/{pao}/lock', [PaoWebController::class, 'lock'])->name('pao.lock');
             Route::post('pao/{pao}/reopen', [PaoWebController::class, 'reopen'])->name('pao.reopen');
 
+            // ── PTA — Plan de Travail Annuel ───────────────────────────────────────
+            // Organisation des actions d'un service pour l'année, rattaché à un PAO.
             Route::resource('pta', PtaWebController::class)
                 ->except(['show'])
                 ->parameters(['pta' => 'pta']);
@@ -185,6 +206,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::post('pta/{pta}/lock', [PtaWebController::class, 'lock'])->name('pta.lock');
             Route::post('pta/{pta}/reopen', [PtaWebController::class, 'reopen'])->name('pta.reopen');
 
+            // ── ACTIONS ────────────────────────────────────────────────────────────
+            // Tâches concrètes rattachées à un PTA : suivi, validation, clôture, KPI.
             Route::get('daf/financements-actions', [ActionWebController::class, 'financingRequests'])
                 ->name('daf.financements.index');
 
@@ -280,6 +303,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
 
         });
 
+        // ── REPORTING & EXPORTS ────────────────────────────────────────────────────
+        // Synthèses de performance, tableaux de bord et exports (Excel, CSV, Word, PDF).
         Route::get('/workspace/reporting', [MonitoringWebController::class, 'reporting'])
             ->name('workspace.reporting');
         Route::get('/workspace/reporting/export/excel', [MonitoringWebController::class, 'exportExcel'])
@@ -307,11 +332,16 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->whereNumber('id')
             ->name('workspace.alertes.read');
 
+        // ── JOURNAL D'AUDIT ────────────────────────────────────────────────────────
+        // Historique de toutes les actions sensibles réalisées dans l'application.
         Route::get('/workspace/audit', [AuditWebController::class, 'index'])
             ->name('workspace.audit.index');
         Route::get('/workspace/audit/export', [AuditWebController::class, 'export'])
             ->name('workspace.audit.export');
 
+        // ── SUPER ADMINISTRATION ───────────────────────────────────────────────────
+        // Configuration avancée réservée aux super-admins : paramètres système,
+        // workflow, apparence, organisation, templates d'export, simulation...
         Route::prefix('/workspace/super-admin')->name('workspace.super-admin.')->group(function (): void {
             Route::get('/', [SuperAdminWebController::class, 'index'])->name('index');
             Route::get('/parametres-generaux', [SuperAdminWebController::class, 'settingsEdit'])->name('settings.edit');

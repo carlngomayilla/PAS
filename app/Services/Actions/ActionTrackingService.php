@@ -16,6 +16,17 @@ use App\Services\WorkflowSettings;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Service central du suivi des actions.
+ *
+ * Ce service est le cœur de l'application. Il gère :
+ * - Les statuts dynamiques des actions (en cours, en retard, achevé...)
+ * - Le workflow de validation (soumission, approbation chef/direction)
+ * - Le calcul et la mise à jour des métriques (KPI, progression)
+ * - La gestion des semaines d'exécution et des justificatifs
+ * - Le circuit de financement (DAF, DG)
+ * - Les commentaires et discussions sur les actions
+ */
 class ActionTrackingService
 {
     public function __construct(
@@ -27,15 +38,19 @@ class ActionTrackingService
     ) {
     }
 
+    // ── CONSTANTES DE FRÉQUENCE D'EXÉCUTION ───────────────────────────────────
+    // Fréquence à laquelle l'agent soumet ses rapports de progression.
     public const FREQUENCE_INSTANTANEE = 'instantanee';
     public const FREQUENCE_JOURNALIERE = 'journaliere';
     public const FREQUENCE_HEBDOMADAIRE = 'hebdomadaire';
     public const FREQUENCE_MENSUELLE = 'mensuelle';
     public const FREQUENCE_ANNUELLE = 'annuelle';
 
+    // ── CONSTANTES DE STATUT DYNAMIQUE ────────────────────────────────────────
+    // Statut calculé automatiquement par le système selon la progression et les délais.
     public const STATUS_NON_DEMARRE = 'non_demarre';
     public const STATUS_EN_COURS = 'en_cours';
-    public const STATUS_A_RISQUE = 'a_risque';
+    public const STATUS_A_RISQUE = 'a_risque';        // À surveiller (proche de l'échéance)
     public const STATUS_EN_AVANCE = 'en_avance';
     public const STATUS_EN_RETARD = 'en_retard';
     public const STATUS_SUSPENDU = 'suspendu';
@@ -45,8 +60,11 @@ class ActionTrackingService
     public const STATUS_A_CORRIGER = 'a_corriger';
     public const STATUS_CLOTUREE = 'cloturee';
 
+    // Nombre de jours avant l'échéance à partir duquel une action passe en "à surveiller".
     public const RISK_ALERT_THRESHOLD_DAYS = 3;
 
+    // ── CONSTANTES DE VALIDATION ──────────────────────────────────────────────
+    // Circuit de validation : agent → chef de service → direction.
     public const VALIDATION_NON_SOUMISE = 'non_soumise';
     public const VALIDATION_SOUMISE_CHEF = 'soumise_chef';
     public const VALIDATION_REJETEE_CHEF = 'rejetee_chef';
@@ -54,10 +72,12 @@ class ActionTrackingService
     public const VALIDATION_REJETEE_DIRECTION = 'rejetee_direction';
     public const VALIDATION_VALIDEE_DIRECTION = 'validee_direction';
 
-    public const FINANCEMENT_DECISION_VALIDER = 'valider';
-    public const FINANCEMENT_DECISION_REJETER = 'rejeter';
-    public const FINANCEMENT_DECISION_ACCORDER = 'accorder';
-    public const FINANCEMENT_DECISION_REFUSER = 'refuser';
+    // ── CONSTANTES DE FINANCEMENT ─────────────────────────────────────────────
+    // Décisions possibles sur une demande de financement d'action.
+    public const FINANCEMENT_DECISION_VALIDER = 'valider';   // DAF : dossier complet, transmis au DG
+    public const FINANCEMENT_DECISION_REJETER = 'rejeter';   // DAF : dossier incomplet, retour agent
+    public const FINANCEMENT_DECISION_ACCORDER = 'accorder'; // DG  : financement accordé
+    public const FINANCEMENT_DECISION_REFUSER = 'refuser';   // DG  : financement refusé
 
     /**
      * @return array<int, string>
@@ -79,6 +99,12 @@ class ActionTrackingService
         ];
     }
 
+    // ── PRIORISATION ──────────────────────────────────────────────────────────
+
+    /**
+     * Calcule un score de priorité pour trier les actions en retard.
+     * Plus le score est élevé, plus l'action est urgente à traiter.
+     */
     public function computeActionDelayPriorityScore(Action $action, Carbon $today): float
     {
         $lateDays = 0;
@@ -137,6 +163,12 @@ class ActionTrackingService
         ];
     }
 
+    // ── INITIALISATION ET SEMAINES D'EXÉCUTION ────────────────────────────────
+
+    /**
+     * Initialise le suivi d'une action nouvellement créée.
+     * Génère les semaines d'exécution et place l'action en statut "non démarré".
+     */
     public function initializeActionTracking(Action $action, ?User $actor = null): void
     {
         if ($action->usesStructuredProgressTracking()) {
@@ -242,6 +274,7 @@ class ActionTrackingService
     /**
      * @param array<string, mixed> $payload
      */
+    /** Enregistre le rapport de progression d'une semaine d'exécution. */
     public function submitWeek(ActionWeek $week, array $payload, ?User $actor = null): ActionWeek
     {
         $week->loadMissing('action');
@@ -291,6 +324,12 @@ class ActionTrackingService
 
     /**
      * @param array<string, mixed> $payload
+     */
+    // ── CLÔTURE ET VALIDATION ─────────────────────────────────────────────────
+
+    /**
+     * L'agent soumet une demande de clôture de son action.
+     * La demande part en validation chez le chef de service.
      */
     public function submitClosureForReview(Action $action, array $payload, ?User $actor = null): Action
     {
@@ -387,6 +426,7 @@ class ActionTrackingService
     /**
      * @param array<string, mixed> $payload
      */
+    /** Le chef de service approuve ou rejette la demande de clôture de l'agent. */
     public function reviewClosureByChef(Action $action, array $payload, ?User $actor = null): Action
     {
         $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
@@ -448,6 +488,7 @@ class ActionTrackingService
     /**
      * @param array<string, mixed> $payload
      */
+    /** La direction approuve ou rejette la clôture déjà validée par le chef de service. */
     public function reviewClosureByDirection(Action $action, array $payload, ?User $actor = null): Action
     {
         $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
@@ -503,6 +544,12 @@ class ActionTrackingService
         return $this->submitClosureForReview($action, $payload, $actor);
     }
 
+    // ── FINANCEMENT ───────────────────────────────────────────────────────────
+
+    /**
+     * Crée ou met à jour la demande de financement d'une action.
+     * Déclenche une notification à la DAF si le financement est requis.
+     */
     public function syncFinancingRequest(Action $action, ?User $actor = null): Action
     {
         if (! (bool) $action->financement_requis) {
@@ -556,6 +603,7 @@ class ActionTrackingService
     /**
      * @param array<string, mixed> $payload
      */
+    /** La DAF examine la demande de financement et la valide ou la rejette. */
     public function reviewFinancingByDaf(Action $action, array $payload, User $actor): Action
     {
         $decision = (string) ($payload['decision_financement'] ?? self::FINANCEMENT_DECISION_REJETER);
@@ -618,6 +666,7 @@ class ActionTrackingService
     /**
      * @param array<string, mixed> $payload
      */
+    /** Le DG accorde ou refuse définitivement le financement d'une action. */
     public function reviewFinancingByDg(Action $action, array $payload, User $actor): Action
     {
         $decision = (string) ($payload['decision_financement'] ?? self::FINANCEMENT_DECISION_REFUSER);
@@ -666,6 +715,13 @@ class ActionTrackingService
 
         return $action->fresh();
     }
+    // ── MÉTRIQUES ET STATUT DYNAMIQUE ─────────────────────────────────────────
+
+    /**
+     * Recalcule et sauvegarde tous les indicateurs d'une action.
+     * À appeler après chaque mise à jour de progression, de semaine, ou de sous-action.
+     * Met à jour : progression réelle/théorique, KPI global, qualité, délai, performance.
+     */
     public function refreshActionMetrics(Action $action, ?Carbon $referenceDate = null): Action
     {
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
@@ -969,6 +1025,9 @@ class ActionTrackingService
 
         return $action->fresh(['actionKpi', 'sousActions.justificatifs']);
     }
+    // ── JUSTIFICATIFS ─────────────────────────────────────────────────────────
+
+    /** Attache un fichier justificatif (PDF, image...) à une action. */
     public function addActionJustificatif(
         Action $action,
         ?ActionWeek $week,
@@ -1428,6 +1487,9 @@ class ActionTrackingService
     /**
      * @param array<string, mixed> $details
      */
+    // ── COMMENTAIRES ET DISCUSSION ────────────────────────────────────────────
+
+    /** Ajoute un commentaire dans le fil de discussion d'une action. */
     public function addDiscussionEntry(
         Action $action,
         string $message,

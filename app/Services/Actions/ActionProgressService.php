@@ -7,6 +7,16 @@ use App\Models\SousAction;
 use App\Services\ActionPerformanceService;
 use Illuminate\Support\Carbon;
 
+/**
+ * Service de calcul de la progression d'une action.
+ *
+ * Calcule la progression réelle (basée sur les réalisations) et la progression
+ * théorique (basée sur le temps écoulé) d'une action à une date de référence donnée.
+ *
+ * Deux modes de calcul :
+ * - Quantitatif : progression = quantité réalisée / quantité cible (en %)
+ * - Sous-actions : progression = nombre de sous-actions terminées / total (en %)
+ */
 class ActionProgressService
 {
     public function __construct(
@@ -15,6 +25,11 @@ class ActionProgressService
     }
 
     /**
+     * Calcule tous les indicateurs de progression d'une action.
+     *
+     * Retourne un tableau avec : progression réelle, progression théorique,
+     * quantité réalisée, reste à réaliser, taux d'atteinte de la cible, etc.
+     *
      * @return array<string, float|string|int|bool>
      */
     public function compute(Action $action, ?Carbon $referenceDate = null): array
@@ -66,11 +81,17 @@ class ActionProgressService
         ];
     }
 
+    /** Indique si une sous-action est considérée comme terminée. */
     public function isCompletedSubTask(SousAction $sousAction): bool
     {
         return $this->actionPerformanceService->isCompletedSubAction($sousAction);
     }
 
+    /**
+     * Calcule la progression théorique de l'action à une date donnée.
+     * C'est le pourcentage du temps écoulé entre la date de début et la date de fin prévue.
+     * Exemple : une action de 10 jours, à J+5 → progression théorique = 50%.
+     */
     private function calculateTheoreticalProgress(Action $action, Carbon $at): float
     {
         if ($action->date_debut === null || $action->date_fin === null) {

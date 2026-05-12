@@ -26,12 +26,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
+/**
+ * Contrôleur des PAO — Plan d'Actions Opérationnel.
+ *
+ * Un PAO est la déclinaison annuelle du PAS pour une direction. Il est rattaché à un
+ * objectif stratégique du PAS et contient les PTA des services de cette direction.
+ * Workflow : brouillon → soumis → validé (DG/Admin) → verrouillé.
+ */
 class PaoWebController extends Controller
 {
     use AuthorizesPlanningScope;
     use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
+    /** Affiche la liste des PAO avec filtres (direction, PAS, année, statut) et statistiques. */
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -154,6 +162,7 @@ class PaoWebController extends Controller
         ]);
     }
 
+    /** Affiche le formulaire de création d'un nouveau PAO. */
     public function create(Request $request): View
     {
         $user = $request->user();
@@ -189,6 +198,7 @@ class PaoWebController extends Controller
         ]);
     }
 
+    /** Enregistre un nouveau PAO après validation du formulaire. */
     public function store(StorePaoRequest $request): RedirectResponse
     {
         $user = $request->user();
@@ -228,6 +238,7 @@ class PaoWebController extends Controller
             ->with('success', $this->entityCreatedMessage(UiLabel::object('pao')).' '.count($this->validatedOperationalObjectives($validated)).' objectif(s) operationnel(s) rattache(s).');
     }
 
+    /** Affiche le formulaire de modification d'un PAO existant. */
     public function edit(Request $request, Pao $pao): View
     {
         $user = $request->user();
@@ -255,6 +266,7 @@ class PaoWebController extends Controller
         ]);
     }
 
+    /** Sauvegarde les modifications apportées à un PAO. */
     public function update(UpdatePaoRequest $request, Pao $pao): RedirectResponse
     {
         $user = $request->user();
@@ -314,6 +326,7 @@ class PaoWebController extends Controller
             ->with('success', $this->entityUpdatedMessage(UiLabel::object('pao')).' Objectifs operationnels synchronises.');
     }
 
+    /** Supprime un PAO (uniquement si en brouillon). */
     public function destroy(Request $request, Pao $pao): RedirectResponse
     {
         $user = $request->user();
@@ -337,6 +350,7 @@ class PaoWebController extends Controller
             ->with('success', $this->entityDeletedMessage(UiLabel::object('pao')));
     }
 
+    /** Soumet le PAO pour validation par le DG ou un administrateur. */
     public function submit(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
@@ -376,6 +390,7 @@ class PaoWebController extends Controller
                 : 'PAO valide directement selon le workflow configure.');
     }
 
+    /** Valide un PAO soumis (rôle DG ou admin). */
     public function approve(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
@@ -411,6 +426,7 @@ class PaoWebController extends Controller
             ->with('success', $this->transitionedStateMessage('PAO', 'valide'));
     }
 
+    /** Verrouille un PAO validé : plus aucune modification, les PTA peuvent être créés dessus. */
     public function lock(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
@@ -446,6 +462,7 @@ class PaoWebController extends Controller
             ->with('success', $this->transitionedStateMessage('PAO', 'verrouille'));
     }
 
+    /** Retourne un PAO en brouillon avec un motif obligatoire. */
     public function reopen(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();

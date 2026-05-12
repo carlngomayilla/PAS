@@ -32,12 +32,22 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
+/**
+ * Contrôleur des Actions (espace web).
+ *
+ * Gère l'affichage, la création, la modification et la suppression des actions
+ * rattachées aux Plans de Travail Annuels (PTA). Les actions sont les tâches
+ * concrètes réalisées par les agents.
+ *
+ * Voir aussi : ActionTrackingWebController pour le suivi et la validation.
+ */
 class ActionWebController extends Controller
 {
     use AuthorizesPlanningScope;
     use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
+    /** Affiche la liste des actions selon les droits de l'utilisateur connecté. */
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -130,6 +140,7 @@ class ActionWebController extends Controller
         ]);
     }
 
+    /** Mise à jour rapide du statut d'une action via un menu déroulant (appel AJAX). */
     public function quickStatus(Request $request, Action $action): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
@@ -153,6 +164,7 @@ class ActionWebController extends Controller
         return response()->json(['statut' => $statut, 'id' => $action->id]);
     }
 
+    /** Vue DAF : liste les actions ayant une demande de financement en cours. */
     public function financingRequests(Request $request): View
     {
         $user = $request->user();
@@ -265,6 +277,7 @@ class ActionWebController extends Controller
         ]);
     }
 
+    /** Affiche le formulaire de création d'une nouvelle action dans un PTA. */
     public function create(Request $request): View
     {
         $user = $request->user();
@@ -332,6 +345,7 @@ class ActionWebController extends Controller
         ]);
     }
 
+    /** Valide et enregistre une nouvelle action en base de données. */
     public function store(
         StoreActionRequest $request,
         ActionIndicatorService $indicatorService,
@@ -453,6 +467,7 @@ class ActionWebController extends Controller
                 : 'Action creee avec succes et semaines generees automatiquement.');
     }
 
+    /** Affiche le formulaire de modification d'une action existante. */
     public function edit(Request $request, Action $action): View
     {
         $user = $request->user();
@@ -499,6 +514,7 @@ class ActionWebController extends Controller
         ]);
     }
 
+    /** Valide et sauvegarde les modifications apportées à une action. */
     public function update(
         UpdateActionRequest $request,
         Action $action,
@@ -632,6 +648,7 @@ class ActionWebController extends Controller
             ->with('success', 'Action mise a jour avec succes.');
     }
 
+    /** Supprime définitivement une action (avec ses sous-actions, KPI et justificatifs). */
     public function destroy(
         Request $request,
         Action $action,
