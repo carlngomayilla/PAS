@@ -178,6 +178,21 @@
     $fmtCount = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ');
     $fmtPct = static fn ($value): string => number_format((float) ($value ?? 0), 1, ',', ' ').'%';
     $shortText = static fn ($value, int $limit = 42): string => \Illuminate\Support\Str::limit((string) ($value ?: '-'), $limit);
+    $chartFallbackPoints = static function (array $rows, string $key = 'global'): string {
+        $items = collect($rows)->values();
+        $steps = max(1, $items->count() - 1);
+
+        return $items
+            ->map(function (array $row, int $index) use ($key, $steps): string {
+                $value = min(100, max(0, (float) ($row[$key] ?? 0)));
+                $x = 20 + (($index * 320) / $steps);
+                $y = 120 - ($value * 0.9);
+
+                return number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+            })
+            ->implode(' ');
+    };
+    $unitFallbackRows = collect($unitRows)->take(6)->values();
     $actionStatusCounts = (array) ($metrics['status_breakdown']['actions'] ?? []);
     $actionValidationCounts = (array) ($metrics['status_breakdown']['actions_validation'] ?? []);
     $statusCount = static fn (string $key): int => (int) ($actionStatusCounts[$key] ?? 0);
@@ -1467,73 +1482,146 @@
         </section>
     @endif
 
-    <article class="showcase-panel mb-4">
-        <div class="mb-4 flex items-center justify-between gap-3">
-                    <div><h2 class="showcase-panel-title">Jauges des indicateurs de performance</h2></div>
-            <span class="showcase-chip">4 mesures</span>
-        </div>
-        <div class="dashboard-gauge-grid">
-            @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')],['key' => 'conformite', 'label' => $metricLabel('conformite')],['key' => 'qualite', 'label' => $metricLabel('qualite')]] as $gauge)
-                <article class="dashboard-gauge-card">
-                    <strong>{{ $gauge['label'] }}</strong>
-                    <div class="dashboard-gauge-canvas">
-                        <div id="dashboard-kpi-gauge-{{ $gauge['key'] }}" class="dashboard-chart-host"></div>
-                    </div>
-                </article>
-            @endforeach
-        </div>
-    </article>
-
-    <article class="showcase-panel mb-4">
-        <div class="mb-4 flex items-center justify-between gap-3">
-            <div><h2 class="showcase-panel-title">Répartition des statuts</h2></div>
-            <span class="showcase-chip">{{ $metrics['totals']['actions_total'] ?? 0 }} actions</span>
-        </div>
-        <div class="dashboard-canvas"><div id="dashboard-status-mix-chart" class="dashboard-chart-host"></div></div>
-    </article>
-
-    <div class="space-y-4">
+    {{-- Rangée 1 : Jauges (compact 4-col) + Score global côte à côte --}}
+    <div class="charts-row-2 mb-4">
         <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div><h2 class="showcase-panel-title">Indicateurs mensuels</h2></div>
-                <span class="showcase-chip">{{ count($analytics['monthly'] ?? []) }} mois</span>
+            <div class="chart-panel-head mb-3">
+                <h2 class="chart-title">Indicateurs KPI</h2>
+                <span class="showcase-chip">Survolez pour les détails</span>
             </div>
-            <div class="dashboard-canvas"><div id="dashboard-kpi-line-chart" class="dashboard-chart-host"></div></div>
+            <div class="dashboard-gauge-grid-4">
+                @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')],['key' => 'conformite', 'label' => $metricLabel('conformite')],['key' => 'qualite', 'label' => $metricLabel('qualite')]] as $gauge)
+                    @php
+                        $gaugeValue = min(100, max(0, (float) ($globalScores[$gauge['key']] ?? 0)));
+                        $gaugeTone = $gaugeValue >= 80 ? '#8FC043' : ($gaugeValue >= 60 ? '#3996D3' : '#F9B13C');
+                    @endphp
+                    <div class="dashboard-gauge-item">
+                        <div id="dashboard-kpi-gauge-{{ $gauge['key'] }}" class="dashboard-chart-host">
+                            <div class="dashboard-gauge-fallback" style="--value-pct: {{ $gaugeValue }}%; --tone: {{ $gaugeTone }};" aria-hidden="true">
+                                <span class="dashboard-gauge-fallback-ring">
+                                    <span class="dashboard-gauge-fallback-value">{{ number_format($gaugeValue, 0, ',', ' ') }}%</span>
+                                </span>
+                                <span class="dashboard-gauge-fallback-label">{{ $gauge['label'] }}</span>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
         </article>
 
+        <article class="showcase-panel charts-score-side">
+            <div class="chart-panel-head mb-3">
+                <h2 class="chart-title">Score global</h2>
+                <span class="showcase-chip">Seuil 60</span>
+            </div>
+            <div class="charts-score-block">
+                <p class="charts-score-value">{{ number_format((float) ($globalScores['global'] ?? 0), 1, ',', ' ') }}</p>
+                <p class="charts-score-label">{{ $metricLabel('global') }}</p>
+                <div class="charts-score-bar mt-3">
+                    <div class="charts-score-fill" style="width: {{ min(100, max(0, (float) ($globalScores['global'] ?? 0))) }}%;"></div>
+                </div>
+                <p class="charts-score-meta mt-2">Progression moy. : {{ number_format((float) ($globalScores['progression'] ?? 0), 1, ',', ' ') }}%</p>
+            </div>
+            <div class="charts-status-list mt-3">
+                @foreach ($statusCards as $card)
+                    <div class="charts-status-row">
+                        <span class="charts-status-dot" style="background: {{ $card['color'] }};"></span>
+                        <span class="charts-status-name">{{ $card['label'] }}</span>
+                        <span class="charts-status-count" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span>
+                    </div>
+                @endforeach
+            </div>
+        </article>
+    </div>
+
+    {{-- Rangée 2 : Courbe KPI mensuelle pleine largeur --}}
+    <article class="showcase-panel mb-4">
+        <div class="chart-panel-head mb-3">
+            <h2 class="chart-title">Évolution mensuelle des indicateurs</h2>
+            <div class="chart-period-bar" data-period-chart="kpi-line">
+                <button type="button" class="chart-period-btn" data-period="3">3M</button>
+                <button type="button" class="chart-period-btn" data-period="6">6M</button>
+                <button type="button" class="chart-period-btn" data-period="12">12M</button>
+                <button type="button" class="chart-period-btn active" data-period="0">Tout</button>
+            </div>
+        </div>
+        <div class="dashboard-canvas">
+            <div id="dashboard-kpi-line-chart" class="dashboard-chart-host">
+                <div class="dashboard-chart-fallback" aria-hidden="true">
+                    @if ($monthlyOfficial !== [])
+                        <svg viewBox="0 0 360 140" preserveAspectRatio="none">
+                            <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
+                            <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
+                            <polyline points="{{ $chartFallbackPoints($monthlyOfficial, 'global') }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                            @foreach (collect($monthlyOfficial)->values() as $row)
+                                @php
+                                    $x = 20 + (($loop->index * 320) / max(1, count($monthlyOfficial) - 1));
+                                    $y = 120 - (min(100, max(0, (float) ($row['global'] ?? 0))) * 0.9);
+                                @endphp
+                                <circle cx="{{ $x }}" cy="{{ $y }}" r="3.5" fill="#3996D3" />
+                            @endforeach
+                        </svg>
+                    @else
+                        <div class="dashboard-chart-empty">Aucune donnÃ©e disponible pour ce graphique.</div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </article>
+
+    {{-- Rangée 3 : Synthèse par unité + Classement Top 6 --}}
+    <div class="charts-row-2 mb-4">
         <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div><h2 class="showcase-panel-title">Synthèse par {{ strtolower($unitModeLabel) }}</h2></div>
+            <div class="chart-panel-head mb-3">
+                <h2 class="chart-title">Synthèse par {{ strtolower($unitModeLabel) }}</h2>
                 <span class="showcase-chip">{{ count($unitRows) }} {{ strtolower($unitModeLabel) }}</span>
             </div>
-            <div class="dashboard-canvas"><div id="dashboard-unit-summary-chart" class="dashboard-chart-host"></div></div>
+            <div class="dashboard-canvas">
+                <div id="dashboard-unit-summary-chart" class="dashboard-chart-host">
+                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                        @if ($unitFallbackRows->isNotEmpty())
+                            <div class="dashboard-chart-fallback-bars">
+                                @foreach ($unitFallbackRows as $row)
+                                    @php $unitValue = min(100, max(0, (float) ($row['kpi_global'] ?? $row['progression_moyenne'] ?? 0))); @endphp
+                                    <div class="dashboard-chart-fallback-bar">
+                                        <span class="truncate">{{ $row['label'] ?? '-' }}</span>
+                                        <span class="dashboard-chart-fallback-track">
+                                            <span class="dashboard-chart-fallback-fill" style="width: {{ $unitValue }}%;"></span>
+                                        </span>
+                                        <span class="text-right">{{ number_format($unitValue, 1, ',', ' ') }}%</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="dashboard-chart-empty">Aucune donnÃ©e disponible pour ce graphique.</div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <article class="showcase-panel">
+            <div class="chart-panel-head mb-3">
+                <h2 class="chart-title">Classement des actions</h2>
+                <span class="showcase-chip">Top {{ count($analytics['top_action_bars'] ?? []) }}</span>
+            </div>
+            @if ($analytics['top_action_bars'] ?? false)
+                <div class="grid gap-2">
+                    @foreach ($analytics['top_action_bars'] as $row)
+                        <a href="{{ $row['url'] }}" class="dashboard-bullet rounded-xl px-2 py-1.5 transition hover:bg-[#E8F3FB]/70">
+                            <span class="truncate text-xs font-semibold text-[#667085]">{{ $row['label'] }}</span>
+                            <span class="dashboard-bullet-track">
+                                <span class="dashboard-bullet-value" style="width: {{ min(100, max(0, (float) $row['value'])) }}%; background: {{ $row['color'] }};"></span>
+                            </span>
+                            <span class="text-right text-[11px] font-black" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 1, ',', ' ') }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            @else
+                <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action classée pour le moment.</div>
+            @endif
         </article>
     </div>
-
-    <div class="mt-4 space-y-4">
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Indicateurs par mois</h2></div><span class="showcase-chip">12 mois</span></div><div class="dashboard-canvas"><div id="dashboard-kpi-grouped-chart" class="dashboard-chart-host"></div></div></article>
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">{{ $metricLabel('global') }}</h2></div><span class="showcase-chip">Seuil 60</span></div><div class="rounded-[1.4rem] border border-slate-200/85 p-5 text-white" style="background: #3996d3;"><p class="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/75">Score actuel</p><p class="mt-3 text-5xl font-black leading-none">{{ number_format((float) ($globalScores['global'] ?? 0), 1, ',', ' ') }}</p><p class="mt-3 text-sm text-white/80">Progression moyenne: {{ number_format((float) ($globalScores['progression'] ?? 0), 1, ',', ' ') }}%</p><div class="mt-4 h-2 rounded-full bg-white/20"><div class="h-2 rounded-full bg-white" style="width: {{ min(100, max(0, (float) ($globalScores['global'] ?? 0))) }}%;"></div></div></div><div class="mt-4 grid gap-2">@foreach ($statusCards as $card)<div class="rounded-2xl border border-slate-200/80 bg-slate-50/90 px-4 py-3"><div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: {{ $card['color'] }};"></span><span class="text-sm font-semibold text-[#17324a]">{{ $card['label'] }}</span></div><span class="text-sm font-black" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span></div></div>@endforeach</div></article>
-    </div>
-
-    <div class="mt-4 space-y-4">
-        @if ($showDashboardMacroCharts)
-            <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Comparaison interannuelle</h2></div><span class="showcase-chip">{{ count($interannualRows) }} année(s)</span></div><div class="dashboard-canvas"><div id="dashboard-interannual-chart" class="dashboard-chart-host"></div></div></article>
-        @endif
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Cible vs réalisé</h2></div><span class="showcase-chip">Cible 80</span></div>@if ($bulletRows !== [])<div class="grid gap-3">@foreach ($bulletRows as $row)@php $real = (float) ($row['real'] ?? 0); $bulletColor = $real >= 80 ? '#178f5f' : ($real >= 60 ? '#3996D3' : '#b7791f'); @endphp<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#E8F3FB]/70"><span class="truncate text-xs font-semibold text-[#667085]">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-threshold"></span><span class="dashboard-bullet-target"></span><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, $real)) }}%; background: {{ $bulletColor }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $bulletColor }};">{{ number_format($real, 1, ',', ' ') }}</span></a>@endforeach</div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action avec indicateur disponible pour cette lecture.</div>@endif</article>
-    </div>
-
-    <div class="mt-4 space-y-4">
-        <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Classement des actions par indicateur</h2></div><span class="showcase-chip">Top 6</span></div>@if ($analytics['top_action_bars'] ?? false)<div class="grid gap-3">@foreach ($analytics['top_action_bars'] as $row)<a href="{{ $row['url'] }}" class="dashboard-bullet rounded-2xl px-2 py-1 transition hover:bg-[#E8F3FB]/70"><span class="truncate text-xs font-semibold text-[#667085]">{{ $row['label'] }}</span><span class="dashboard-bullet-track"><span class="dashboard-bullet-value" style="width: {{ min(100, max(0, (float) $row['value'])) }}%; background: {{ $row['color'] }};"></span></span><span class="text-right text-[11px] font-black" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 1, ',', ' ') }}</span></a>@endforeach</div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action classée pour le moment.</div>@endif</article>
-        @if ($showDashboardMacroCharts)
-            <article class="showcase-panel"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Radar de comparaison</h2></div><span class="showcase-chip">{{ min(3, count($unitRows)) }} jeux</span></div><div class="dashboard-canvas"><div id="dashboard-radar-chart" class="dashboard-chart-host"></div></div></article>
-        @endif
-    </div>
-
-    @if ($showDashboardMacroCharts)
-        <article class="showcase-panel mt-4"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Scatter performance / conformité</h2></div><span class="showcase-chip">{{ count($analytics['scatter_points'] ?? []) }} points</span></div><div class="dashboard-canvas"><div id="dashboard-scatter-chart" class="dashboard-chart-host"></div></div></article>
-    @endif
-
-    <article class="showcase-panel mt-4"><div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Diagramme de Gantt</h2></div><span class="showcase-chip">{{ count($ganttRows) }} actions</span></div>@if ($ganttRows !== [])<div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-gantt-chart" class="dashboard-chart-host"></div></div>@else<div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action datée disponible pour produire un Gantt.</div>@endif</article>
 
     @if ($showDashboardAdvancedReporting)
         <section class="mt-4">
@@ -1674,19 +1762,19 @@
 @once
     @push('scripts')
         <script @cspNonce id="anbg-dashboard-payload" type="application/json">
-            {!! json_encode($currentDashboardTab === 'charts' ? [
+            {!! json_encode([
                 'dashboardData' => $dashboardClientData ?? $dashboardData ?? [],
                 'reportingAnalytics' => $reportingClientAnalytics ?? ['charts' => (($reportingAnalytics ?? [])['charts'] ?? [])],
                 'dgPayload' => $dgPayload ?? [],
                 'ganttRows' => $ganttRows ?? [],
-            ] : [
-                'dashboardData' => [],
-                'reportingAnalytics' => ['charts' => []],
-                'dgPayload' => [],
-                'ganttRows' => [],
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
         </script>
         <script @cspNonce>
+            document.dispatchEvent(new CustomEvent('anbg:dashboard-payload-ready'));
+            if (typeof window.__anbgDashboardBoot === 'function') {
+                window.__anbgDashboardBoot(true);
+            }
+
             (() => {
                 const decodePayload = (encoded) => {
                     const binary = window.atob(encoded);

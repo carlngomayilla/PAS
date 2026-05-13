@@ -57,7 +57,6 @@ class GenerateReportJob implements ShouldQueue
             'pdf' => [Pdf::loadView('workspace.monitoring.reporting-pdf', $payload)
                 ->setPaper($template?->paperSize() ?? 'a4', $template?->orientation() ?? 'landscape')
                 ->output(), 'pdf', 'application/pdf'],
-            'word' => [view('workspace.monitoring.reporting-word', $payload)->render(), 'doc', 'application/msword'],
             default => throw new \InvalidArgumentException('Format export non supporte: '.$format),
         };
 

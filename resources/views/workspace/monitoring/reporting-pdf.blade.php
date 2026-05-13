@@ -34,6 +34,10 @@
         $alertRows = collect($details['kpi_sous_seuil'] ?? [])->map(fn ($mesure): array => ['action' => (string) ($mesure->kpi?->action?->libelle ?? '-'), 'indicateur' => trim(str_ireplace('KPI', 'Indicateur', (string) ($mesure->kpi?->libelle ?? '-'))) ?: '-', 'valeur' => (float) ($mesure->valeur ?? 0), 'seuil' => (float) ($mesure->kpi?->seuil_alerte ?? 0), 'statut' => 'Alerte', 'correctif' => "Vérifier la mesure, documenter l'écart et proposer une action corrective."])->merge(collect($details['actions_retard'] ?? [])->map(fn ($action): array => ['action' => (string) ($action->libelle ?? '-'), 'indicateur' => 'Retard action', 'valeur' => (float) ($action->progression_reelle ?? 0), 'seuil' => 100, 'statut' => 'En retard', 'correctif' => 'Replanifier, lever les blocages et mettre à jour la progression.']))->values();
         $rmoRows = $actionRows->groupBy(fn (array $row): string => implode('|', [(string) ($row['direction_label'] ?? '-'), (string) ($row['service_label'] ?? '-'), (string) ($row['rmo'] ?? $row['responsable'] ?? 'Non renseigne')]))->map(function ($rows, string $key): array { [$direction, $service, $rmo] = array_pad(explode('|', $key, 3), 3, 'Non renseigne'); return ['direction' => $direction ?: '-', 'service' => $service ?: '-', 'rmo' => $rmo ?: 'Non renseigne', 'total' => $rows->count(), 'performance' => round((float) $rows->avg(fn (array $row): float => (float) ($row['kpi_performance_value'] ?? 0)), 2)]; })->sortBy(fn (array $row): string => $row['direction'].'|'.$row['service'].'|'.sprintf('%09.2f', 10000 - (float) $row['performance']))->values();
         $justificatifRows = $actionRows->flatMap(function (array $row): array { $justificatifs = (array) ($row['justificatifs'] ?? []); if ($justificatifs === []) { return [['direction' => (string) ($row['direction_label'] ?? '-'), 'service' => (string) ($row['service_label'] ?? '-'), 'action' => (string) ($row['action'] ?? '-'), 'rmo' => (string) ($row['rmo'] ?? $row['responsable'] ?? '-'), 'justificatif' => '-', 'statut' => (string) ($row['statut_validation'] ?? '-'), 'date' => '']]; } return collect($justificatifs)->map(fn (array $justificatif): array => ['direction' => (string) ($row['direction_label'] ?? '-'), 'service' => (string) ($row['service_label'] ?? '-'), 'action' => (string) ($row['action'] ?? '-'), 'rmo' => (string) ($row['rmo'] ?? $row['responsable'] ?? '-'), 'justificatif' => (string) ($justificatif['nom'] ?? '-'), 'statut' => (string) ($row['statut_validation'] ?? '-'), 'date' => (string) ($justificatif['date'] ?? '')])->all(); })->values();
+        $allActionDates = $actionRows->flatMap(fn (array $row): array => [$row['debut'] ?? '', $row['fin'] ?? '', $row['echeance_strategique'] ?? ''])->map(fn ($v): string => trim((string) $v))->filter(fn ($v): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) === 1)->sort()->values();
+        $planPeriodStart = $allActionDates->first() !== null ? substr((string) $allActionDates->first(), 0, 4) : $generatedYear;
+        $planPeriodEnd = $allActionDates->last() !== null ? substr((string) $allActionDates->last(), 0, 4) : $generatedYear;
+        $planPeriodLabel = $planPeriodStart === $planPeriodEnd ? $planPeriodStart : $planPeriodStart.' - '.$planPeriodEnd;
     @endphp
 
     <div class="pdf-footer">{{ $templateFooter !== '' ? $templateFooter : 'ANBG - Rapport de reporting' }} | Exercice {{ $generatedYear }} | Page <span class="page-num"></span> / <span class="page-total"></span></div>
@@ -46,11 +50,11 @@
             @if ($logoDataUri)<img class="report-logo" src="{{ $logoDataUri }}" alt="ANBG">@endif
             <div class="cover-band">
                 @if ($coverGradientDataUri)<img class="cover-band-image" src="{{ $coverGradientDataUri }}" alt="">@endif
-                <div class="cover-band-title">RAPPORT DE REPORTING</div>
+                <div class="cover-band-title">{{ $templateTitle }}</div>
             </div>
-            <p class="cover-meta"><strong>{{ $templateTitle }}</strong></p>
             @if ($templateSubtitle)<p class="cover-meta"><strong>{{ $templateSubtitle }}</strong></p>@endif
-            <p class="cover-meta">Exercice : {{ $generatedYear }}</p>
+            <p class="cover-meta" style="font-size:16px;font-weight:900;color:#1C203D;">Période : {{ $planPeriodLabel }}</p>
+            <p class="cover-meta">Exercice {{ $generatedYear }}</p>
             <p class="cover-meta">Périmètre : GLOBAL / Direction / Service selon droits utilisateur</p>
             <p class="cover-meta">Généré le {{ $generatedAtLabel }} | Rôle : {{ $scope['role'] ?? '-' }} | Direction: {{ $scope['direction_id'] ?? '-' }} | Service: {{ $scope['service_id'] ?? '-' }}</p>
             <p class="cover-meta" style="font-weight:700;color:#1C203D;">{{ $officialBaseText }}</p>
@@ -64,6 +68,41 @@
     @if (($templateBlocks['include_summary'] ?? true))
         <div class="section page-break-section"><span class="section-kicker">Synthèse</span><h2>Reporting synthétique</h2><table class="cards-grid"><tr><td><div class="metric-card"><div class="metric-label">Actions</div><div class="metric-value">{{ $global['actions_total'] ?? 0 }}</div></div></td><td><div class="metric-card"><div class="metric-label">Terminées</div><div class="metric-value">{{ $global['actions_achevees'] ?? 0 }}</div></div></td><td><div class="metric-card"><div class="metric-label">En retard</div><div class="metric-value">{{ $alertes['actions_en_retard'] ?? 0 }}</div></div></td><td><div class="metric-card"><div class="metric-label">Alertes</div><div class="metric-value">{{ ($alertes['actions_en_retard'] ?? 0) + ($alertes['mesures_kpi_sous_seuil'] ?? 0) }}</div></div></td></tr></table><p class="meta">{{ $officialBaseText }}</p></div>
     @endif
+
+    <div class="section page-break-section">
+        <span class="section-kicker">Plan d'actions</span>
+        <h2>Tableau de pilotage consolidé</h2>
+        <table class="compact">
+            <thead>
+                <tr>
+                    <th style="width:17%">Axes stratégiques</th>
+                    <th style="width:5%">N°</th>
+                    <th style="width:17%">Objectifs stratégiques</th>
+                    <th style="width:16%">Objectifs opérationnels</th>
+                    <th style="width:21%">Actions détaillées</th>
+                    <th style="width:8%">Responsable</th>
+                    <th style="width:10%">Ressources</th>
+                    <th style="width:6%">Échéances</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($actionRows as $row)
+                    <tr>
+                        <td>{{ $row['axe_strategique'] ?? $row['axe'] ?? '-' }}</td>
+                        <td>{{ $row['objectif_strategique_numero'] ?? $row['axe_numero'] ?? '-' }}</td>
+                        <td>{{ $row['objectif_strategique'] ?? $row['objectif'] ?? '-' }}</td>
+                        <td>{{ $row['objectif_operationnel'] ?? '-' }}</td>
+                        <td>{{ $row['description_action'] ?? $row['action'] ?? '-' }}</td>
+                        <td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td>
+                        <td>{{ $row['ressources_requises'] ?? '-' }}</td>
+                        <td class="nowrap">{{ $row['echeance'] ?? $row['fin'] ?? '-' }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="8" class="muted">Aucune action disponible.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
 
     @include('workspace.monitoring.partials.reporting-direction-service-sections', [
         'variant' => 'pdf',

@@ -1,5 +1,5 @@
 // ANBG PAS Service Worker — static asset cache
-const CACHE = 'anbg-static-v1';
+const CACHE = 'anbg-static-v3';
 const STATIC_EXTENSIONS = ['.css', '.js', '.woff2', '.woff', '.ttf', '.png', '.ico', '.svg', '.webp'];
 
 self.addEventListener('install', function (e) {
@@ -21,6 +21,25 @@ self.addEventListener('fetch', function (e) {
     // Only cache GET requests for same-origin static assets
     if (e.request.method !== 'GET') return;
     if (url.origin !== self.location.origin) return;
+
+    if (url.pathname === '/sw.js' || url.pathname.indexOf('/build/') === 0) {
+        e.respondWith(
+            fetch(e.request, { cache: 'no-store' }).then(function (response) {
+                if (response && response.status === 200) {
+                    return caches.open(CACHE).then(function (cache) {
+                        cache.put(e.request, response.clone());
+                        return response;
+                    });
+                }
+
+                return response;
+            }).catch(function () {
+                return caches.match(e.request);
+            })
+        );
+        return;
+    }
+
     var ext = url.pathname.split('.').pop().toLowerCase();
     if (!STATIC_EXTENSIONS.some(function (s) { return url.pathname.endsWith(s); })) return;
 

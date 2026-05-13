@@ -595,6 +595,186 @@
         color: var(--app-blue);
     }
 
+    /* ── CHART TAB LAYOUT ───────────────────────────────────────────────── */
+    .charts-row-2 {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 900px) {
+        .charts-row-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    /* Panel header inside chart sections — title left-aligned, no width:100% */
+    .chart-panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .chart-title {
+        font-size: 0.9rem;
+        font-weight: 800;
+        color: var(--app-blue);
+        line-height: 1.3;
+        margin: 0;
+    }
+
+    html.dark .chart-title {
+        color: var(--app-blue);
+    }
+
+    /* Gauge grid — 4 columns compact */
+    .dashboard-gauge-grid-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+    }
+
+    @media (max-width: 640px) {
+        .dashboard-gauge-grid-4 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    .dashboard-gauge-item {
+        position: relative;
+        height: 7.5rem;
+    }
+
+    .dashboard-gauge-item .dashboard-chart-host {
+        position: absolute;
+        inset: 0;
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Score global side card */
+    .charts-score-side {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .charts-score-block {
+        background: linear-gradient(135deg, #3996d3 0%, #1c6fa8 100%);
+        border-radius: 1.1rem;
+        padding: 1rem 1.25rem;
+        color: #fff;
+    }
+
+    .charts-score-value {
+        font-size: 2.6rem;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: -0.04em;
+        margin: 0;
+    }
+
+    .charts-score-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(255,255,255,0.75);
+        margin: 0.2rem 0 0;
+    }
+
+    .charts-score-bar {
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.22);
+        overflow: hidden;
+    }
+
+    .charts-score-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: #fff;
+        transition: width 0.6s ease;
+    }
+
+    .charts-score-meta {
+        font-size: 0.78rem;
+        color: rgba(255,255,255,0.80);
+        margin: 0;
+    }
+
+    .charts-status-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        flex: 1;
+    }
+
+    .charts-status-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0.5rem;
+        border-radius: 0.6rem;
+        background: var(--app-bg-subtle, rgba(148,163,184,0.06));
+    }
+
+    .charts-status-dot {
+        flex-shrink: 0;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .charts-status-name {
+        flex: 1;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--app-text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .charts-status-count {
+        font-size: 0.82rem;
+        font-weight: 900;
+        flex-shrink: 0;
+    }
+
+    /* ── CHART PERIOD FILTER ─────────────────────────────────────────────── */
+    .chart-period-bar {
+        display: inline-flex;
+        gap: 2px;
+        background: var(--app-border);
+        border-radius: 999px;
+        padding: 2px;
+    }
+
+    .chart-period-btn {
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.5;
+        border: none;
+        background: transparent;
+        color: var(--app-text-muted);
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+    }
+
+    .chart-period-btn:hover {
+        background: rgba(57,150,211,0.10);
+        color: var(--app-blue);
+    }
+
+    .chart-period-btn.active {
+        background: var(--app-blue);
+        color: #fff;
+    }
+
     /* ── KANBAN BOARD ────────────────────────────────────────────────────── */
     .kanban-board {
         display: flex;
@@ -2183,10 +2363,17 @@
     .data-table-title {
         color: var(--app-text) !important;
         width: 100%;
-        text-align: center;
-        font-size: 1.12rem;
+        text-align: left;
+        font-size: 1rem;
         font-weight: 800;
         line-height: 1.25;
+    }
+
+    /* Dashboard chart panels: title left-aligned, no overflow behind canvas */
+    .dashboard-tab-panel .showcase-panel-title {
+        text-align: left !important;
+        width: auto !important;
+        font-size: 0.92rem !important;
     }
 
     .form-section-subtitle,
@@ -2965,9 +3152,16 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 0.75rem;
-        padding: 1rem 1.25rem 0.85rem;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        padding: 0.85rem 1.25rem 0.75rem;
         border-bottom: 1px solid var(--app-border);
+    }
+
+    .dashboard-advanced-head .showcase-panel-title {
+        text-align: left !important;
+        width: auto !important;
+        font-size: 0.88rem !important;
     }
 
     .dashboard-advanced-kpi {
@@ -3007,14 +3201,14 @@
 
     .dashboard-canvas {
         position: relative;
-        height: 18rem;
+        height: 15rem;
         border-radius: 0;
         overflow: hidden;
         padding: 0.5rem;
     }
 
     .dashboard-canvas-lg {
-        height: 24rem;
+        height: 20rem;
     }
 
     .dashboard-gauge-canvas {
@@ -3052,6 +3246,116 @@
         padding: 1rem;
         text-align: center;
         font-size: 0.84rem;
+        font-weight: 800;
+        color: var(--app-muted);
+    }
+
+    .dashboard-chart-fallback {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.85rem;
+        padding: 0.9rem;
+        border: 1px solid rgba(57, 150, 211, 0.16);
+        border-radius: 1rem;
+        background:
+            linear-gradient(90deg, rgba(57, 150, 211, 0.06) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(57, 150, 211, 0.05) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 252, 255, 0.92));
+        background-size: 28px 28px, 28px 28px, auto;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        color: var(--app-text);
+    }
+
+    .dashboard-chart-fallback svg {
+        position: static !important;
+        inset: auto !important;
+        width: 100%;
+        height: 100%;
+        min-height: 8rem;
+        overflow: visible;
+        filter: drop-shadow(0 10px 18px rgba(57, 150, 211, 0.12));
+    }
+
+    .dashboard-chart-fallback-bars {
+        display: grid;
+        gap: 0.55rem;
+    }
+
+    .dashboard-chart-fallback-bar {
+        display: grid;
+        grid-template-columns: minmax(0, 9rem) 1fr 3.5rem;
+        align-items: center;
+        gap: 0.65rem;
+        min-height: 2.1rem;
+        border-radius: 0.8rem;
+        background: rgba(255, 255, 255, 0.58);
+        padding: 0.35rem 0.45rem;
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: var(--app-muted);
+    }
+
+    .dashboard-chart-fallback-track {
+        height: 0.72rem;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(216, 236, 248, 0.98);
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .dashboard-chart-fallback-fill {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--app-blue), var(--app-success));
+        box-shadow: 0 6px 14px rgba(57, 150, 211, 0.28);
+    }
+
+    .dashboard-gauge-fallback {
+        display: flex;
+        height: 100%;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        padding: 0.5rem;
+        text-align: center;
+    }
+
+    .dashboard-gauge-fallback-ring {
+        position: relative;
+        display: grid;
+        width: min(5.8rem, 88%);
+        aspect-ratio: 1;
+        place-items: center;
+        border-radius: 999px;
+        background: conic-gradient(var(--tone, var(--app-blue)) var(--value-pct, 0%), rgba(216, 236, 248, 0.95) 0);
+        box-shadow: 0 18px 34px -24px rgba(28, 32, 61, 0.7);
+    }
+
+    .dashboard-gauge-fallback-ring::before {
+        position: absolute;
+        inset: 0.62rem;
+        border-radius: inherit;
+        background: #fff;
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+        content: "";
+    }
+
+    .dashboard-gauge-fallback-value {
+        position: relative;
+        z-index: 1;
+        font-size: 1.35rem;
+        font-weight: 900;
+        line-height: 1;
+        color: var(--tone, var(--app-blue));
+    }
+
+    .dashboard-gauge-fallback-label {
+        font-size: 0.68rem;
         font-weight: 800;
         color: var(--app-muted);
     }
@@ -3360,8 +3664,8 @@
 
     .dashboard-gauge-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.9rem;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.6rem;
     }
 
     .dashboard-gauge-card {
@@ -3370,7 +3674,7 @@
 
     .dashboard-gauge-canvas {
         position: relative;
-        height: 9rem;
+        height: 7.5rem;
     }
 
     .dashboard-heatmap-wrap,
@@ -4339,6 +4643,7 @@
     .app-stat-card::before,
     .dashboard-summary-card::before {
         content: "";
+        display: block !important;
         position: absolute;
         inset: 0 0 auto;
         height: 3px;
@@ -5301,6 +5606,536 @@
         background: #1e293b !important;
         color: #cbd5e1 !important;
         border-color: #334155 !important;
+    }
+
+    /* Subtle institutional pattern layer */
+    .pattern-card,
+    body.admin-theme-scope :where(
+        .showcase-panel,
+        .showcase-toolbar,
+        .form-section,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-advanced-kpi,
+        .dashboard-summary-card,
+        .showcase-kpi-card,
+        .showcase-inline-stat,
+        .stat-card,
+        .stat-card-link,
+        .eas-stat-card,
+        .workspace-card,
+        .report-card,
+        .reporting-hub-kpi,
+        .data-table-shell,
+        .table-container,
+        .app-table-wrapper,
+        .panel,
+        .card
+    ):not(.no-pattern):not(.dashboard-canvas) {
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+    }
+
+    .pattern-card::before,
+    body.admin-theme-scope :where(
+        .showcase-panel,
+        .showcase-toolbar,
+        .form-section,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-advanced-kpi,
+        .dashboard-summary-card,
+        .showcase-kpi-card,
+        .showcase-inline-stat,
+        .stat-card,
+        .stat-card-link,
+        .eas-stat-card,
+        .workspace-card,
+        .report-card,
+        .reporting-hub-kpi,
+        .data-table-shell,
+        .table-container,
+        .app-table-wrapper,
+        .panel,
+        .card
+    ):not(.no-pattern):not(.dashboard-canvas)::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(57, 150, 211, 0.16) 1px, transparent 0),
+            linear-gradient(135deg, rgba(57, 150, 211, 0.06) 1px, transparent 1px);
+        background-position: 0 0, 0 0;
+        background-size: 24px 24px, 34px 34px;
+        opacity: 0.28;
+        mask-image: linear-gradient(135deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.18));
+    }
+
+    .pattern-card > *,
+    body.admin-theme-scope :where(
+        .showcase-panel,
+        .showcase-toolbar,
+        .form-section,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-advanced-kpi,
+        .dashboard-summary-card,
+        .showcase-kpi-card,
+        .showcase-inline-stat,
+        .stat-card,
+        .stat-card-link,
+        .eas-stat-card,
+        .workspace-card,
+        .report-card,
+        .reporting-hub-kpi,
+        .data-table-shell,
+        .table-container,
+        .app-table-wrapper,
+        .panel,
+        .card
+    ):not(.no-pattern):not(.dashboard-canvas) > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    html.dark .pattern-card::before,
+    html.dark body.admin-theme-scope :where(
+        .showcase-panel,
+        .showcase-toolbar,
+        .form-section,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-advanced-kpi,
+        .dashboard-summary-card,
+        .showcase-kpi-card,
+        .showcase-inline-stat,
+        .stat-card,
+        .stat-card-link,
+        .eas-stat-card,
+        .workspace-card,
+        .report-card,
+        .reporting-hub-kpi,
+        .data-table-shell,
+        .table-container,
+        .app-table-wrapper,
+        .panel,
+        .card
+    ):not(.no-pattern):not(.dashboard-canvas)::before {
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.11) 1px, transparent 0),
+            linear-gradient(135deg, rgba(57, 150, 211, 0.12) 1px, transparent 1px);
+        opacity: 0.22;
+    }
+
+    body.admin-theme-scope .dashboard-canvas {
+        background-color: var(--app-white) !important;
+        background-image:
+            linear-gradient(90deg, rgba(57, 150, 211, 0.055) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(57, 150, 211, 0.05) 1px, transparent 1px) !important;
+        background-size: 32px 32px, 32px 32px !important;
+        background-position: center !important;
+    }
+
+    html.dark body.admin-theme-scope .dashboard-canvas {
+        background-color: #162033 !important;
+        background-image:
+            linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(57, 150, 211, 0.08) 1px, transparent 1px) !important;
+    }
+
+    .chart-disclosure-panel {
+        transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .chart-disclosure-toggle {
+        display: inline-flex;
+        width: 1.85rem;
+        height: 1.85rem;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(57, 150, 211, 0.22);
+        border-radius: 0.55rem;
+        background: rgba(255, 255, 255, 0.78);
+        color: var(--app-blue);
+        cursor: pointer;
+        transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 180ms ease;
+    }
+
+    .chart-disclosure-toggle:hover {
+        border-color: rgba(57, 150, 211, 0.45);
+        background: rgba(232, 243, 251, 0.95);
+        color: var(--app-primary);
+    }
+
+    .chart-disclosure-toggle svg {
+        transition: transform 180ms ease;
+    }
+
+    .chart-disclosure-collapsed .chart-disclosure-toggle svg {
+        transform: rotate(-90deg);
+    }
+
+    .chart-disclosure-body {
+        overflow: hidden;
+        transition: max-height 220ms ease, opacity 180ms ease, margin-top 180ms ease;
+    }
+
+    .chart-disclosure-collapsed .chart-disclosure-body {
+        max-height: 0 !important;
+        opacity: 0;
+        margin-top: 0 !important;
+        pointer-events: none;
+    }
+
+    html.dark body.admin-theme-scope .chart-disclosure-toggle {
+        border-color: rgba(125, 194, 240, 0.22);
+        background: rgba(22, 32, 51, 0.78);
+        color: #7cc4f0;
+    }
+
+    html.dark body.admin-theme-scope .chart-disclosure-toggle:hover {
+        border-color: rgba(125, 194, 240, 0.46);
+        background: rgba(30, 41, 59, 0.95);
+        color: #bfdbfe;
+    }
+
+    body.admin-theme-scope .pattern-card {
+        position: relative !important;
+        isolation: isolate;
+        overflow: hidden;
+    }
+
+    body.admin-theme-scope .pattern-card::before,
+    body.admin-theme-scope .pattern-card.dashboard-advanced-card::before,
+    body.admin-theme-scope .pattern-card.app-card::before,
+    body.admin-theme-scope .pattern-card.eas-section-card::before,
+    body.admin-theme-scope :where(
+        .showcase-panel,
+        .showcase-toolbar,
+        .form-section,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-advanced-kpi,
+        .dashboard-summary-card,
+        .showcase-kpi-card,
+        .showcase-inline-stat,
+        .stat-card,
+        .stat-card-link,
+        .eas-stat-card,
+        .workspace-card,
+        .report-card,
+        .reporting-hub-kpi,
+        .data-table-shell,
+        .table-container,
+        .app-table-wrapper,
+        .app-card,
+        .eas-section-card,
+        .panel,
+        .card
+    ):not(.no-pattern):not(.dashboard-canvas)::before {
+        content: "" !important;
+        display: block !important;
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        pointer-events: none !important;
+        border-radius: inherit !important;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(57, 150, 211, 0.22) 1px, transparent 1.7px),
+            linear-gradient(135deg, rgba(57, 150, 211, 0.075) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(232, 243, 251, 0.46), rgba(255, 255, 255, 0)) !important;
+        background-position: 0 0, 0 0, 0 0 !important;
+        background-size: 22px 22px, 38px 38px, auto !important;
+        opacity: 0.48 !important;
+        mask-image: linear-gradient(135deg, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.2));
+    }
+
+    body.admin-theme-scope .pattern-card > *,
+    body.admin-theme-scope :where(
+        .showcase-panel,
+        .showcase-toolbar,
+        .form-section,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-advanced-kpi,
+        .dashboard-summary-card,
+        .showcase-kpi-card,
+        .showcase-inline-stat,
+        .stat-card,
+        .stat-card-link,
+        .eas-stat-card,
+        .workspace-card,
+        .report-card,
+        .reporting-hub-kpi,
+        .data-table-shell,
+        .table-container,
+        .app-table-wrapper,
+        .app-card,
+        .eas-section-card,
+        .panel,
+        .card
+    ):not(.no-pattern):not(.dashboard-canvas) > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    html.dark body.admin-theme-scope .pattern-card::before,
+    html.dark body.admin-theme-scope .pattern-card.dashboard-advanced-card::before,
+    html.dark body.admin-theme-scope :where(
+        .showcase-panel,
+        .showcase-toolbar,
+        .form-section,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-advanced-kpi,
+        .dashboard-summary-card,
+        .showcase-kpi-card,
+        .showcase-inline-stat,
+        .stat-card,
+        .stat-card-link,
+        .eas-stat-card,
+        .workspace-card,
+        .report-card,
+        .reporting-hub-kpi,
+        .data-table-shell,
+        .table-container,
+        .app-table-wrapper,
+        .app-card,
+        .eas-section-card,
+        .panel,
+        .card
+    ):not(.no-pattern):not(.dashboard-canvas)::before {
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.13) 1px, transparent 1.7px),
+            linear-gradient(135deg, rgba(125, 194, 240, 0.11) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(57, 150, 211, 0.12), rgba(15, 23, 42, 0)) !important;
+        opacity: 0.26 !important;
+    }
+
+    body.admin-theme-scope .chart-disclosure-head {
+        display: flex !important;
+        align-items: flex-start !important;
+        justify-content: space-between !important;
+        gap: 0.8rem !important;
+    }
+
+    body.admin-theme-scope .chart-disclosure-toggle {
+        position: relative;
+        z-index: 3;
+        box-shadow: 0 10px 22px rgba(57, 150, 211, 0.12);
+    }
+
+    body.admin-theme-scope .chart-disclosure-body {
+        overflow: hidden !important;
+        transition: max-height 240ms ease, opacity 180ms ease, margin-top 180ms ease, transform 180ms ease !important;
+    }
+
+    body.admin-theme-scope .chart-disclosure-collapsed .chart-disclosure-body {
+        max-height: 0 !important;
+        opacity: 0 !important;
+        margin-top: 0 !important;
+        transform: translateY(-0.25rem);
+        pointer-events: none !important;
+    }
+
+    body.admin-theme-scope .dashboard-canvas {
+        background-color: var(--app-white) !important;
+        background-image:
+            linear-gradient(90deg, rgba(57, 150, 211, 0.075) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(57, 150, 211, 0.065) 1px, transparent 1px),
+            radial-gradient(circle at top right, rgba(57, 150, 211, 0.09), transparent 34%) !important;
+        background-size: 30px 30px, 30px 30px, auto !important;
+        background-position: center !important;
+    }
+
+    html.dark body.admin-theme-scope .dashboard-canvas {
+        background-color: #162033 !important;
+        background-image:
+            linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(125, 194, 240, 0.075) 1px, transparent 1px),
+            radial-gradient(circle at top right, rgba(57, 150, 211, 0.16), transparent 34%) !important;
+    }
+
+    body.admin-theme-scope :is(
+        #action-status,
+        #action-weeks,
+        #action-financement,
+        #action-cloture,
+        #action-review-chef,
+        #action-review-direction,
+        #action-discussion
+    ) > form,
+    body.admin-theme-scope .tracking-entry-form,
+    body.admin-theme-scope .pattern-form {
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+        background-color: rgba(255, 255, 255, 0.96) !important;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(57, 150, 211, 0.18) 1px, transparent 1.6px),
+            linear-gradient(135deg, rgba(57, 150, 211, 0.055) 1px, transparent 1px) !important;
+        background-size: 20px 20px, 36px 36px !important;
+        background-position: 0 0, 0 0 !important;
+    }
+
+    body.admin-theme-scope :is(
+        #action-status,
+        #action-weeks,
+        #action-financement,
+        #action-cloture,
+        #action-review-chef,
+        #action-review-direction,
+        #action-discussion
+    ) > form::before,
+    body.admin-theme-scope .tracking-entry-form::before,
+    body.admin-theme-scope .pattern-form::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: linear-gradient(180deg, rgba(232, 243, 251, 0.48), rgba(255, 255, 255, 0.12));
+        opacity: 0.62;
+    }
+
+    body.admin-theme-scope :is(
+        #action-status,
+        #action-weeks,
+        #action-financement,
+        #action-cloture,
+        #action-review-chef,
+        #action-review-direction,
+        #action-discussion
+    ) > form > *,
+    body.admin-theme-scope .tracking-entry-form > *,
+    body.admin-theme-scope .pattern-form > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    body.admin-theme-scope .tracking-entry-form :is(
+        label[for^="libelle_sous_action_"],
+        [name="libelle_sous_action"],
+        label[for^="date_debut_sous_action_"],
+        [name="date_debut"],
+        label[for^="date_fin_sous_action_"],
+        [name="date_fin"],
+        label[for^="resultat_attendu_sous_action_"],
+        [name="resultat_attendu"],
+        label[for^="cible_prevue_sous_action_"],
+        [name="cible_prevue"],
+        label[for^="unite_sous_action_"],
+        [name="unite"],
+        label[for^="resultat_obtenu_sous_action_"],
+        [name="resultat_obtenu"],
+        label[for^="description_sous_action_"],
+        [name="description_sous_action"],
+        label[for^="commentaire_sous_action_"],
+        [name="commentaire"]
+    ) {
+        display: none !important;
+    }
+
+    body.admin-theme-scope .tracking-entry-form div:has(> :is(
+        [name="libelle_sous_action"],
+        [name="date_debut"],
+        [name="date_fin"],
+        [name="resultat_attendu"],
+        [name="cible_prevue"],
+        [name="unite"],
+        [name="resultat_obtenu"],
+        [name="description_sous_action"],
+        [name="commentaire"]
+    )) {
+        display: none !important;
+    }
+
+    body.admin-theme-scope .tracking-entry-form :is(input, select, textarea) {
+        background-color: var(--app-surface) !important;
+        background-image: none !important;
+    }
+
+    body.admin-theme-scope .tracking-entry-form.no-target :is(
+        label[for^="quantite_realisee_sous_action_"],
+        [name="quantite_realisee"]
+    ) {
+        display: none !important;
+    }
+
+    body.admin-theme-scope .tracking-entry-form.no-target div:has(> [name="quantite_realisee"]) {
+        display: none !important;
+    }
+
+    body.admin-theme-scope :is(#action-validation, #action-fiche, #action-financement, #action-status) {
+        padding: clamp(1.35rem, 1.8vw, 2rem) !important;
+    }
+
+    body.admin-theme-scope :is(#action-validation, #action-fiche, #action-financement, #action-status) > .showcase-panel-title {
+        text-align: center !important;
+        margin-inline: auto;
+        margin-bottom: 1.1rem;
+    }
+
+    body.admin-theme-scope :is(#action-validation, #action-fiche, #action-financement, #action-status) :is(.showcase-inline-stat, .action-detail-card) {
+        min-width: 0;
+        padding: 1.15rem 1.2rem !important;
+        text-align: center;
+        overflow-wrap: anywhere;
+    }
+
+    body.admin-theme-scope :is(#action-validation, #action-fiche, #action-financement, #action-status) :is(.showcase-inline-stat, .action-detail-card) > :is(strong, h3) {
+        display: block;
+        width: 100%;
+        text-align: center;
+        line-height: 1.25;
+    }
+
+    body.admin-theme-scope :is(#action-validation, #action-fiche, #action-financement, #action-status) :is(.showcase-inline-stat, .action-detail-card) p {
+        max-width: 100%;
+        margin-inline: auto;
+        line-height: 1.55;
+    }
+
+    body.admin-theme-scope #action-fiche .action-fiche-dl {
+        width: 100%;
+        gap: 0.46rem 0.75rem;
+        text-align: left;
+    }
+
+    body.admin-theme-scope #action-fiche .action-fiche-dl :is(dt, dd) {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        line-height: 1.45;
+    }
+
+    html.dark body.admin-theme-scope :is(
+        #action-status,
+        #action-weeks,
+        #action-financement,
+        #action-cloture,
+        #action-review-chef,
+        #action-review-direction,
+        #action-discussion
+    ) > form,
+    html.dark body.admin-theme-scope .tracking-entry-form,
+    html.dark body.admin-theme-scope .pattern-form {
+        background-color: rgba(22, 32, 51, 0.94) !important;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.10) 1px, transparent 1.6px),
+            linear-gradient(135deg, rgba(125, 194, 240, 0.08) 1px, transparent 1px) !important;
     }
 
     @media (max-width: 767px) {

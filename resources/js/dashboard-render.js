@@ -11,9 +11,16 @@ function bootDashboardRender(force = false) {
     return;
   }
 
-  dashboardBooted = true;
+  let parsed = {};
 
-  const parsed = JSON.parse(payloadNode.textContent || '{}');
+  try {
+    parsed = JSON.parse(payloadNode.textContent || '{}');
+  } catch (error) {
+    console.error('Payload dashboard illisible.', error);
+    return;
+  }
+
+  dashboardBooted = true;
   const payload = parsed.dashboardData || {};
   const roleDashboard = payload.role_dashboard || {};
   const reporting = parsed.reportingAnalytics || {};
@@ -58,6 +65,7 @@ function bootDashboardRender(force = false) {
     danger: '#B42318',
   };
   let assetBootstrapPromise = null;
+  let optionalChartPluginsPromise = null;
   let renderInFlight = false;
   let renderQueued = false;
 
@@ -306,52 +314,11 @@ function bootDashboardRender(force = false) {
   }
 
   function kpiAnnotations() {
-    if (typeof window.ChartAnnotation === 'undefined') {
-      return {};
-    }
-
-    return {
-      annotation: {
-        annotations: {
-          seuil60: {
-            type: 'line',
-            yMin: 60,
-            yMax: 60,
-            borderColor: alphaColor(ANBG.warning, 0.65),
-            borderWidth: 1.5,
-            borderDash: [5, 4],
-          },
-          seuil80: {
-            type: 'line',
-            yMin: 80,
-            yMax: 80,
-            borderColor: alphaColor(ANBG.success, 0.65),
-            borderWidth: 1.5,
-            borderDash: [5, 4],
-          },
-        },
-      },
-    };
+    return {};
   }
 
   function barDataLabels(formatFn) {
-    if (typeof window.ChartDataLabels === 'undefined') {
-      return false;
-    }
-
-    const theme = dashboardTheme();
-
-    return {
-      display(context) {
-        return Number(context.dataset.data[context.dataIndex] || 0) >= 4;
-      },
-      anchor: 'end',
-      align: 'top',
-      offset: 1,
-      color: theme.muted,
-      font: { size: 9, weight: '700' },
-      formatter: formatFn || ((value) => (value > 0 ? Math.round(value) : '')),
-    };
+    return false;
   }
 
   function destroyChart(id) {
@@ -360,6 +327,49 @@ function bootDashboardRender(force = false) {
     }
 
     delete chartInstances[id];
+  }
+
+  function rememberHostFallback(host) {
+    if (!host || host.__anbgDashboardFallbackMarkup) {
+      return;
+    }
+
+    if (host.querySelector('.dashboard-chart-fallback, .dashboard-gauge-fallback, .dashboard-chart-empty')) {
+      host.__anbgDashboardFallbackMarkup = host.innerHTML;
+    }
+  }
+
+  function restoreHostFallback(host, message) {
+    if (!host) {
+      return;
+    }
+
+    const fallbackMarkup = host.__anbgDashboardFallbackMarkup || '';
+
+    if (fallbackMarkup !== '') {
+      host.innerHTML = fallbackMarkup;
+      host.dataset.chartState = 'fallback';
+      return;
+    }
+
+    mountChartEmptyState(host, message);
+  }
+
+  function filterByPeriod(data, count) {
+    if (!Array.isArray(data)) return data;
+    return count > 0 && count < data.length ? data.slice(-count) : data;
+  }
+
+  function bindPeriodButtons(containerSelector, rebuildFn) {
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+    container.querySelectorAll('[data-period]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        container.querySelectorAll('[data-period]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        rebuildFn(Number(btn.dataset.period) || 0);
+      });
+    });
   }
 
   function chartDatasetHasData(dataset) {
@@ -510,24 +520,32 @@ function bootDashboardRender(force = false) {
       return;
     }
 
+    rememberHostFallback(host);
     destroyChart(id);
-    host.innerHTML = '';
 
     if (typeof window.Chart === 'undefined') {
-      mountChartEmptyState(host, 'Moteur graphique indisponible.');
+      restoreHostFallback(host, 'Moteur graphique indisponible.');
       return;
     }
 
     if (!chartConfigHasData(config)) {
-      mountChartEmptyState(host);
+      restoreHostFallback(host);
       return;
     }
 
+    host.innerHTML = '';
     const canvas = document.createElement('canvas');
     host.appendChild(canvas);
-    host.dataset.chartState = 'ready';
 
-    chartInstances[id] = new window.Chart(canvas, config);
+    try {
+      chartInstances[id] = new window.Chart(canvas, config);
+    } catch (error) {
+      console.error(`Impossible d'afficher le graphique ${id}.`, error);
+      restoreHostFallback(host, "Impossible d'afficher ce graphique.");
+      return;
+    }
+
+    host.dataset.chartState = 'ready';
     bindChartDrilldown(chartInstances[id], drilldownResolver);
 
     // Inject export button into the closest showcase-panel header
@@ -560,11 +578,69 @@ function bootDashboardRender(force = false) {
     }
   }
 
+  async function ensureChartRegisterables() {
+    if (typeof window.Chart === 'undefined') {
+      return;
+    }
+
+    try {
+      const [{ registerables }, chartTheme] = await Promise.all([
+        import('chart.js'),
+        import('./chart-theme'),
+      ]);
+
+      if (Array.isArray(registerables) && typeof window.Chart.register === 'function') {
+        window.Chart.register(...registerables);
+      }
+
+      if (typeof chartTheme.applyAnbgChartDefaults === 'function') {
+        chartTheme.applyAnbgChartDefaults(window.Chart);
+        window.getAnbgChartTheme = chartTheme.getAnbgChartTheme;
+        window.applyAnbgChartDefaults = chartTheme.applyAnbgChartDefaults;
+      }
+    } catch (error) {
+      console.error('Impossible de preparer Chart.js.', error);
+    }
+  }
+
+  async function ensureOptionalChartPlugins({ needD3 = false } = {}) {
+    if (typeof window.Chart === 'undefined') {
+      return;
+    }
+
+    const needsD3 = needD3 && typeof window.d3 === 'undefined';
+
+    if (!needsD3) {
+      return;
+    }
+
+    if (!optionalChartPluginsPromise) {
+      optionalChartPluginsPromise = (async () => {
+        const imports = await Promise.allSettled([
+          needsD3 ? import('d3') : Promise.resolve(null),
+        ]);
+
+        const d3Module = imports[0].status === 'fulfilled' ? imports[0].value : null;
+
+        if (d3Module && typeof window.d3 === 'undefined') {
+          window.d3 = d3Module;
+        }
+      })().catch((error) => {
+        console.error('Impossible de charger les plugins graphiques du dashboard.', error);
+      }).finally(() => {
+        optionalChartPluginsPromise = null;
+      });
+    }
+
+    await optionalChartPluginsPromise;
+  }
+
   async function ensureDashboardAssets({ needD3 = false } = {}) {
     const hasChart = typeof window.Chart !== 'undefined';
-    const hasD3 = typeof window.d3 !== 'undefined';
 
-    if (hasChart && (!needD3 || hasD3)) {
+    if (hasChart) {
+      await ensureChartRegisterables();
+      await ensureOptionalChartPlugins({ needD3 });
       return;
     }
 
@@ -578,38 +654,12 @@ function bootDashboardRender(force = false) {
             ]);
 
             const optionalModules = await Promise.allSettled([
-              import('chartjs-chart-matrix'),
-              import('chartjs-chart-treemap'),
               import('d3'),
-              import('chartjs-plugin-datalabels'),
-              import('chartjs-plugin-annotation'),
             ]);
 
-            const matrixModule = optionalModules[0].status === 'fulfilled' ? optionalModules[0].value : null;
-            const treemapModule = optionalModules[1].status === 'fulfilled' ? optionalModules[1].value : null;
-            const d3Module = optionalModules[2].status === 'fulfilled' ? optionalModules[2].value : null;
-            const datalabelsModule = optionalModules[3].status === 'fulfilled' ? optionalModules[3].value : null;
-            const annotationModule = optionalModules[4].status === 'fulfilled' ? optionalModules[4].value : null;
+            const d3Module = optionalModules[0].status === 'fulfilled' ? optionalModules[0].value : null;
 
             Chart.register(...registerables);
-
-            if (matrixModule?.MatrixController && matrixModule?.MatrixElement) {
-              Chart.register(matrixModule.MatrixController, matrixModule.MatrixElement);
-            }
-
-            if (treemapModule?.TreemapController && treemapModule?.TreemapElement) {
-              Chart.register(treemapModule.TreemapController, treemapModule.TreemapElement);
-            }
-
-            if (datalabelsModule?.default) {
-              Chart.register(datalabelsModule.default);
-              window.ChartDataLabels = datalabelsModule.default;
-            }
-
-            if (annotationModule?.default) {
-              Chart.register(annotationModule.default);
-              window.ChartAnnotation = annotationModule.default;
-            }
 
             chartTheme.applyAnbgChartDefaults(Chart);
             window.Chart = Chart;
@@ -623,10 +673,7 @@ function bootDashboardRender(force = false) {
             return;
           }
 
-          if (needD3 && typeof window.d3 === 'undefined') {
-            const d3Module = await import('d3');
-            window.d3 = d3Module;
-          }
+          await ensureOptionalChartPlugins({ needD3 });
         } catch (error) {
           console.error('Impossible de charger les ressources du dashboard.', error);
         }
@@ -636,6 +683,8 @@ function bootDashboardRender(force = false) {
     }
 
     await assetBootstrapPromise;
+    await ensureChartRegisterables();
+    await ensureOptionalChartPlugins({ needD3 });
   }
 
   function safeRenderStep(label, callback) {
@@ -691,6 +740,68 @@ function bootDashboardRender(force = false) {
     });
   }
 
+  function bindChartDisclosurePanels() {
+    const panels = new Set();
+
+    document.querySelectorAll('.dashboard-chart-host').forEach((host) => {
+      const panel = host.closest('article, .showcase-panel, .dashboard-advanced-card, .dashboard-card');
+
+      if (panel) {
+        panels.add(panel);
+      }
+    });
+
+    panels.forEach((panel) => {
+      if (panel.dataset.chartDisclosureBound === '1') {
+        return;
+      }
+
+      const header = panel.querySelector('.chart-panel-head, .dashboard-advanced-head, .mb-4.flex, .mb-3.flex, [class*="justify-between"]');
+      const body = panel.querySelector('.dashboard-canvas, .dashboard-gauge-grid-4, .dashboard-gauge-grid, .dashboard-chart-host');
+
+      if (!header || !body || header.contains(body)) {
+        return;
+      }
+
+      panel.dataset.chartDisclosureBound = '1';
+      panel.classList.add('chart-disclosure-panel');
+      body.classList.add('chart-disclosure-body');
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'chart-disclosure-toggle';
+      button.setAttribute('aria-expanded', 'true');
+      button.setAttribute('aria-label', 'Replier ou deployer le graphique');
+      button.title = 'Replier ou deployer';
+      button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
+      const setExpanded = (expanded) => {
+        panel.classList.toggle('chart-disclosure-collapsed', !expanded);
+        button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+
+        if (expanded) {
+          body.style.maxHeight = `${body.scrollHeight}px`;
+          window.setTimeout(() => {
+            body.style.maxHeight = '';
+            resizeCharts();
+          }, 220);
+          return;
+        }
+
+        body.style.maxHeight = `${body.scrollHeight}px`;
+        window.requestAnimationFrame(() => {
+          body.style.maxHeight = '0px';
+        });
+      };
+
+      button.addEventListener('click', () => {
+        setExpanded(panel.classList.contains('chart-disclosure-collapsed'));
+      });
+
+      header.appendChild(button);
+    });
+  }
+
   function baseConfig(type, overrides) {
     const theme = dashboardTheme();
 
@@ -720,7 +831,10 @@ function bootDashboardRender(force = false) {
             if (context.type !== 'data' || context.mode !== 'default') {
               return 0;
             }
-            return context.dataIndex * 22;
+
+            const dataIndex = Number(context.dataIndex);
+
+            return Number.isFinite(dataIndex) ? dataIndex * 22 : 0;
           },
         },
         interaction: {
@@ -769,7 +883,12 @@ function bootDashboardRender(force = false) {
             },
             callbacks: {
               label(context) {
-                const raw = context.parsed?.y ?? context.parsed?.x ?? context.raw ?? 0;
+                let raw = context.parsed?.y ?? context.parsed?.x ?? context.parsed ?? context.raw ?? 0;
+
+                if (raw && typeof raw === 'object') {
+                  raw = raw.y ?? raw.x ?? raw.v ?? raw.value ?? 0;
+                }
+
                 return ` ${context.dataset.label || 'Valeur'}: ${formatNumber(raw)}`;
               },
             },
@@ -862,7 +981,14 @@ function bootDashboardRender(force = false) {
         cutout: '78%',
         plugins: {
           legend: { display: false },
-          tooltip: { enabled: false },
+          tooltip: {
+            filter: (item) => item.dataIndex === 0,
+            callbacks: {
+              title: () => label,
+              label: (ctx) => ` Score : ${Math.round(numeric)} %`,
+              afterLabel: () => numeric >= 80 ? ' ✔ Objectif atteint' : numeric >= 60 ? ' ⚡ À surveiller' : ' ✖ Sous le seuil',
+            },
+          },
           anbgCenterText: {
             half: true,
             lines: [
@@ -1265,7 +1391,8 @@ function bootDashboardRender(force = false) {
     }), ({ element }) => cards[element?.index]?.href || '');
   }
 
-  function mountMonthlyKpiLine(hostId = 'dashboard-kpi-line-chart', rows = monthly) {
+  function mountMonthlyKpiLine(hostId = 'dashboard-kpi-line-chart', rows = monthly, period = 0) {
+    const filtered = filterByPeriod(rows, period);
     const kpiDatasets = [
       { label: 'Délai',       key: 'delai',       color: '#3996D3' },
       { label: 'Performance', key: 'performance', color: '#16A34A' },
@@ -1276,10 +1403,10 @@ function bootDashboardRender(force = false) {
 
     mountChart(hostId, baseConfig('line', {
       data: {
-        labels: rows.map((item) => item.label),
+        labels: filtered.map((item) => item.label),
         datasets: kpiDatasets.map(({ label, key, color }) => ({
           label,
-          data: rows.map((item) => Number(item[key] || 0)),
+          data: filtered.map((item) => Number(item[key] || 0)),
           borderColor: color,
           backgroundColor: (context) => chartGradient(context.chart, color),
           fill: true,
@@ -1293,13 +1420,31 @@ function bootDashboardRender(force = false) {
         })),
       },
       options: {
-        scales: cartesianScales({
-          y: { max: 100 },
-        }),
-        plugins: { ...kpiAnnotations() },
+        scales: cartesianScales({ y: { max: 100 } }),
+        plugins: {
+          ...kpiAnnotations(),
+          tooltip: {
+            callbacks: {
+              title(items) {
+                return items[0]?.label ? `Période : ${items[0].label}` : '';
+              },
+              label(context) {
+                const value = Number(context.parsed?.y ?? 0);
+                const bar = value >= 80 ? '▓▓▓' : value >= 60 ? '▓▓░' : '▓░░';
+                return ` ${context.dataset.label} : ${formatNumber(value)} %  ${bar}`;
+              },
+              afterBody(items) {
+                const vals = items.map((i) => Number(i.parsed?.y ?? 0)).filter(Number.isFinite);
+                if (vals.length < 2) return [];
+                const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+                return [``, ` Moyenne globale : ${formatNumber(avg)} %`];
+              },
+            },
+          },
+        },
       },
     }), ({ element, chart }) => {
-      const row = rows[element?.index];
+      const row = filtered[element?.index];
       const dataset = chart?.data?.datasets?.[element?.datasetIndex];
 
       if (!row?.url) {
@@ -1342,14 +1487,14 @@ function bootDashboardRender(force = false) {
         labels: unitRows.map((item) => item.label),
         datasets: [
           {
-            label: 'Indicateur moyen',
+            label: 'Indicateur KPI moyen',
             data: unitRows.map((item) => Number(item.kpi_global || 0)),
             backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
             borderRadius: 10,
             maxBarThickness: 34,
           },
           {
-            label: 'Progression',
+            label: 'Progression moyenne',
             data: unitRows.map((item) => Number(item.progression_moyenne || 0)),
             backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
             borderRadius: 10,
@@ -1358,225 +1503,32 @@ function bootDashboardRender(force = false) {
         ],
       },
       options: {
-        scales: cartesianScales({
-          y: { max: 100 },
-        }),
+        scales: cartesianScales({ y: { max: 100 } }),
         plugins: {
           datalabels: barDataLabels(percentLabel),
           ...kpiAnnotations(),
+          tooltip: {
+            callbacks: {
+              title(items) {
+                return items[0]?.label || '';
+              },
+              label(context) {
+                const value = Number(context.parsed?.y ?? 0);
+                return ` ${context.dataset.label} : ${Math.round(value)} %`;
+              },
+              afterLabel(context) {
+                const row = unitRows[context.dataIndex];
+                if (!row) return '';
+                return ` Actions : ${row.actions_total ?? 0}  |  Alertes : ${row.alertes ?? 0}`;
+              },
+            },
+          },
         },
       },
     }), ({ element }) => unitRows[element?.index]?.url || '');
   }
 
-  function mountMonthlyKpiGrouped() {
-    const kpiSeries = [
-      { label: 'Délai', key: 'delai',       color: '#3996D3', maxBar: 22 },
-      { label: 'Perf.', key: 'performance', color: '#16A34A', maxBar: 22 },
-      { label: 'Conf.', key: 'conformite',  color: '#D97706', maxBar: 18 },
-      { label: 'Qual.', key: 'qualite',     color: '#F97316', maxBar: 18 },
-      { label: 'Global', key: 'global',     color: '#7C3AED', maxBar: 18 },
-    ];
-
-    const percentLabel = (v) => (v > 0 ? `${Math.round(v)}%` : '');
-
-    mountChart('dashboard-kpi-grouped-chart', baseConfig('bar', {
-      data: {
-        labels: monthly.map((item) => item.label),
-        datasets: kpiSeries.map(({ label, key, color, maxBar }) => ({
-          label,
-          data: monthly.map((item) => Number(item[key] || 0)),
-          backgroundColor: (context) => barGradient(context.chart, color),
-          borderRadius: 8,
-          maxBarThickness: maxBar,
-        })),
-      },
-      options: {
-        scales: cartesianScales({
-          y: { max: 100 },
-        }),
-        plugins: {
-          datalabels: barDataLabels(percentLabel),
-          ...kpiAnnotations(),
-        },
-      },
-    }), ({ element, chart }) => {
-      const row = monthly[element?.index];
-      const dataset = chart?.data?.datasets?.[element?.datasetIndex];
-
-      if (!row?.url) {
-        return '';
-      }
-
-      return withQuery(row.url, { sort: metricSortKey(dataset?.label) });
-    });
-  }
-
-  function mountInterannual() {
-    mountChart('dashboard-interannual-chart', baseConfig('bar', {
-      data: {
-        labels: interannual.map((item) => item.annee),
-        datasets: [
-          {
-            type: 'bar',
-            label: 'Actions',
-            data: interannual.map((item) => Number(item.actions_total || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
-            borderRadius: 10,
-            maxBarThickness: 34,
-            yAxisID: 'y',
-          },
-          {
-            type: 'bar',
-            label: 'Validées',
-            data: interannual.map((item) => Number(item.actions_validees || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
-            borderRadius: 10,
-            maxBarThickness: 34,
-            yAxisID: 'y',
-          },
-          {
-            type: 'line',
-            label: 'Progression moyenne',
-            data: interannual.map((item) => Number(item.progression_moyenne || 0)),
-            borderColor: '#1C203D',
-            backgroundColor: alphaColor('#1C203D', 0.18),
-            borderWidth: 3,
-            tension: 0.36,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-            yAxisID: 'y1',
-          },
-        ],
-      },
-      options: {
-        scales: cartesianScales({
-          y: {
-            title: { display: true, text: 'Volumes', color: dashboardTheme().muted },
-          },
-          y1: {
-            position: 'right',
-            beginAtZero: true,
-            max: 100,
-            grid: { drawOnChartArea: false },
-            ticks: { color: dashboardTheme().muted, font: { size: 11, weight: '600' } },
-            border: { display: false },
-            title: { display: true, text: 'Progression %', color: dashboardTheme().muted },
-          },
-        }),
-      },
-    }), ({ element }) => interannual[element?.index]?.url || '');
-  }
-
-  function mountRadar() {
-    const theme = dashboardTheme();
-
-    mountChart('dashboard-radar-chart', baseConfig('radar', {
-      data: {
-        labels: ['Délai', 'Performance', 'Conformité', 'Progression'],
-        datasets: radarDatasets.map((dataset, index) => {
-          const color = dataset.borderColor || toneForIndex(index);
-
-          return {
-            label: dataset.label,
-            data: dataset.data,
-            borderColor: color,
-            backgroundColor: alphaColor(color, 0.14),
-            pointBackgroundColor: color,
-            pointBorderColor: '#ffffff',
-            pointBorderWidth: 2,
-            pointRadius: 5,
-            pointHoverRadius: 8,
-            borderWidth: 2.5,
-          };
-        }),
-      },
-      options: {
-        scales: {
-          r: {
-            min: 0,
-            max: 100,
-            angleLines: { color: theme.grid },
-            grid: { color: theme.grid, borderDash: [4, 4] },
-            pointLabels: { color: theme.text, font: { size: 12, weight: '700' } },
-            ticks: { display: false },
-          },
-        },
-      },
-    }), ({ element }) => radarDatasets[element?.datasetIndex]?.url || '');
-  }
-
-  function mountBubble() {
-    mountChart('dashboard-scatter-chart', baseConfig('bubble', {
-      data: {
-        datasets: [{
-          label: 'Actions',
-          data: scatterPoints.map((point) => ({
-            x: Number(point.x || 0),
-            y: Number(point.y || 0),
-            r: Math.max(6, Number(point.r || 6)),
-            title: point.title,
-            color: point.color || '#3996D3',
-          })),
-          backgroundColor: (context) => alphaColor(context.raw?.color || '#3996D3', 0.55),
-          borderColor: (context) => context.raw?.color || '#3996D3',
-          borderWidth: 2,
-          hoverBorderWidth: 3,
-        }],
-      },
-      options: {
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title(items) {
-                return items[0]?.raw?.title || 'Action';
-              },
-              label(context) {
-                return `Performance ${context.raw.x}% | Conformité ${context.raw.y}%`;
-              },
-            },
-          },
-        },
-        scales: cartesianScales({
-          x: {
-            min: 0,
-            max: 100,
-            title: { display: true, text: 'Performance', color: dashboardTheme().muted },
-          },
-          y: {
-            min: 0,
-            max: 100,
-            title: { display: true, text: 'Conformité', color: dashboardTheme().muted },
-          },
-        }),
-      },
-    }), ({ element }) => scatterPoints[element?.index]?.url || '');
-  }
-
   function mountReportingCharts() {
-    const funnel = reportingCharts.funnel || { labels: [], values: [] };
-
-    mountChart('dashboard-report-funnel-chart', baseConfig('bar', {
-      data: {
-        labels: funnel.labels,
-        datasets: [{
-          label: 'Volume',
-          data: funnel.values,
-          backgroundColor: funnel.labels.map((label, index) => reportingFunnelTone(label, index, String(label || '').toLowerCase().includes('pta') ? 0.28 : 0.88)),
-          borderColor: funnel.labels.map((label, index) => reportingFunnelTone(label, index)),
-          borderWidth: 1,
-          borderRadius: 10,
-          maxBarThickness: 28,
-        }],
-      },
-      options: {
-        indexAxis: 'y',
-        plugins: { legend: { display: false } },
-        scales: cartesianScales(),
-      },
-    }), ({ element }) => (funnel.urls || [])[element?.index] || '');
-
     const statusByUnit = reportingCharts.status_by_unit || { labels: [], datasets: [] };
 
     mountChart('dashboard-report-status-unit-chart', baseConfig('bar', {
@@ -1603,325 +1555,144 @@ function bootDashboardRender(force = false) {
 
     const progressWeekly = reportingCharts.progress_weekly || { labels: [], reel: [], theorique: [] };
 
-    mountChart('dashboard-report-progress-chart', baseConfig('line', {
-      data: {
-        labels: progressWeekly.labels,
-        datasets: [
-          {
-            label: 'Réel',
-            data: progressWeekly.reel,
-            borderColor: ANBG.secondary,
-            backgroundColor: (context) => chartGradient(context.chart, ANBG.secondary),
-            fill: true,
-            tension: 0.38,
-            pointRadius: 4,
-            pointHoverRadius: 7,
-            pointBackgroundColor: ANBG.secondary,
-            pointBorderColor: '#ffffff',
-            pointBorderWidth: 2,
-            borderWidth: 2.5,
+    function buildProgressChartConfig(data) {
+      return baseConfig('line', {
+        data: {
+          labels: data.labels,
+          datasets: [
+            {
+              label: 'Avancement réel',
+              data: data.reel,
+              borderColor: ANBG.secondary,
+              backgroundColor: (context) => chartGradient(context.chart, ANBG.secondary),
+              fill: true,
+              tension: 0.38,
+              pointRadius: 4,
+              pointHoverRadius: 7,
+              pointBackgroundColor: ANBG.secondary,
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2,
+              borderWidth: 2.5,
+            },
+            {
+              label: 'Progression théorique',
+              data: data.theorique,
+              borderColor: ANBG.primary,
+              backgroundColor: (context) => chartGradient(context.chart, ANBG.primary),
+              fill: true,
+              tension: 0.38,
+              borderDash: [8, 5],
+              pointRadius: 4,
+              pointHoverRadius: 7,
+              pointBackgroundColor: ANBG.primary,
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2,
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: {
+          scales: cartesianScales({ y: { max: 100 } }),
+          plugins: {
+            ...kpiAnnotations(),
+            tooltip: {
+              callbacks: {
+                title: (items) => items[0]?.label ? `Semaine : ${items[0].label}` : '',
+                label: (ctx) => ` ${ctx.dataset.label} : ${formatNumber(ctx.parsed?.y ?? 0)} %`,
+                afterBody(items) {
+                  const reel = Number(items.find((i) => i.datasetIndex === 0)?.parsed?.y ?? 0);
+                  const theo = Number(items.find((i) => i.datasetIndex === 1)?.parsed?.y ?? 0);
+                  if (!reel && !theo) return [];
+                  const ecart = reel - theo;
+                  const sign = ecart >= 0 ? '+' : '';
+                  return [``, ` Écart réel/théorique : ${sign}${formatNumber(ecart)} pts`];
+                },
+              },
+            },
           },
-          {
-            label: 'Théorique',
-            data: progressWeekly.theorique,
-            borderColor: ANBG.primary,
-            backgroundColor: (context) => chartGradient(context.chart, ANBG.primary),
-            fill: true,
-            tension: 0.38,
-            borderDash: [8, 5],
-            pointRadius: 4,
-            pointHoverRadius: 7,
-            pointBackgroundColor: ANBG.primary,
-            pointBorderColor: '#ffffff',
-            pointBorderWidth: 2,
-            borderWidth: 2,
-          },
-        ],
-      },
-      options: {
-        scales: cartesianScales({
-          y: { max: 100 },
-        }),
-        plugins: { ...kpiAnnotations() },
-      },
-    }), ({ element }) => (progressWeekly.urls || [])[element?.index] || '');
+        },
+      });
+    }
+
+    mountChart('dashboard-report-progress-chart', buildProgressChartConfig(progressWeekly),
+      ({ element }) => (progressWeekly.urls || [])[element?.index] || '');
+
+    bindPeriodButtons('[data-period-chart="report-progress"]', (n) => {
+      const d = {
+        labels: filterByPeriod(progressWeekly.labels || [], n),
+        reel: filterByPeriod(progressWeekly.reel || [], n),
+        theorique: filterByPeriod(progressWeekly.theorique || [], n),
+        urls: filterByPeriod(progressWeekly.urls || [], n),
+      };
+      mountChart('dashboard-report-progress-chart', buildProgressChartConfig(d),
+        ({ element }) => (d.urls || [])[element?.index] || '');
+    });
 
     const kpiTrend = reportingCharts.kpi_trend || { labels: [], valeurs: [], cibles: [], seuils: [] };
 
-    mountChart('dashboard-report-kpi-trend-chart', baseConfig('bar', {
-      data: {
-        labels: kpiTrend.labels,
-        datasets: [
-          {
-            type: 'bar',
-            label: 'Valeur',
-            data: kpiTrend.valeurs,
-            backgroundColor: (context) => barGradient(context.chart, ANBG.secondary),
-            borderRadius: 9,
-            maxBarThickness: 32,
-          },
-          {
-            type: 'line',
-            label: 'Cible',
-            data: kpiTrend.cibles,
-            borderColor: ANBG.success,
-            backgroundColor: (context) => chartGradient(context.chart, ANBG.success),
-            borderWidth: 2.5,
-            tension: 0.38,
-            pointRadius: 4,
-            pointHoverRadius: 7,
-            pointBackgroundColor: ANBG.success,
-            pointBorderColor: '#ffffff',
-            pointBorderWidth: 2,
-            fill: false,
-          },
-          {
-            type: 'line',
-            label: 'Seuil',
-            data: kpiTrend.seuils,
-            borderColor: ANBG.warning,
-            backgroundColor: (context) => chartGradient(context.chart, ANBG.warning),
-            borderWidth: 2,
-            borderDash: [7, 5],
-            tension: 0.38,
-            pointRadius: 3,
-            pointHoverRadius: 6,
-            fill: false,
-          },
-        ],
-      },
-      options: {
-        scales: cartesianScales({
-          y: { max: 100 },
-        }),
-        plugins: { ...kpiAnnotations() },
-      },
-    }), ({ element }) => (kpiTrend.urls || [])[element?.index] || '');
-
-    const interannualOverview = reportingCharts.interannual_overview || {
-      labels: [],
-      actions_total: [],
-      actions_validees: [],
-      progression_moyenne: [],
-    };
-
-    mountChart('dashboard-report-interannual-chart', baseConfig('bar', {
-      data: {
-        labels: interannualOverview.labels,
-        datasets: [
-          {
-            type: 'bar',
-            label: 'Actions',
-            data: interannualOverview.actions_total,
-            backgroundColor: (context) => barGradient(context.chart, ANBG.primary),
-            borderRadius: 10,
-            maxBarThickness: 32,
-            yAxisID: 'y',
-          },
-          {
-            type: 'bar',
-            label: 'Validées',
-            data: interannualOverview.actions_validees,
-            backgroundColor: (context) => barGradient(context.chart, ANBG.secondary),
-            borderRadius: 10,
-            maxBarThickness: 32,
-            yAxisID: 'y',
-          },
-          {
-            type: 'line',
-            label: 'Progression moyenne',
-            data: interannualOverview.progression_moyenne,
-            borderColor: ANBG.success,
-            backgroundColor: alphaColor(ANBG.success, 0.18),
-            tension: 0.32,
-            borderWidth: 3,
-            pointRadius: 3,
-            yAxisID: 'y1',
-          },
-        ],
-      },
-      options: {
-        scales: cartesianScales({
-          y: {
-            title: { display: true, text: 'Volumes', color: dashboardTheme().muted },
-          },
-          y1: {
-            position: 'right',
-            beginAtZero: true,
-            max: 100,
-            grid: { drawOnChartArea: false },
-            ticks: { color: dashboardTheme().muted, font: { size: 11, weight: '600' } },
-            border: { display: false },
-            title: { display: true, text: 'Progression %', color: dashboardTheme().muted },
-          },
-        }),
-      },
-    }), ({ element }) => (interannualOverview.urls || [])[element?.index] || '');
-
-    const heatmap = reportingCharts.retard_heatmap || { weeks: [], units: [], matrix: [], max: 0 };
-    const heatmapData = [];
-    const heatMax = Math.max(1, Number(heatmap.max || 0));
-
-    (heatmap.units || []).forEach((unit, unitIndex) => {
-      (heatmap.weeks || []).forEach((week, weekIndex) => {
-        heatmapData.push({
-          x: weekIndex + 1,
-          y: unitIndex + 1,
-          v: Number((heatmap.matrix?.[unitIndex] || [])[weekIndex] || 0),
-          week,
-          unit,
-          url: ((heatmap.urls?.[unitIndex] || [])[weekIndex]) || '',
-        });
+    function buildKpiTrendChartConfig(data) {
+      return baseConfig('bar', {
+        data: {
+          labels: data.labels,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Valeur',
+              data: data.valeurs,
+              backgroundColor: (context) => barGradient(context.chart, ANBG.secondary),
+              borderRadius: 9,
+              maxBarThickness: 32,
+            },
+            {
+              type: 'line',
+              label: 'Cible',
+              data: data.cibles,
+              borderColor: ANBG.success,
+              backgroundColor: (context) => chartGradient(context.chart, ANBG.success),
+              borderWidth: 2.5,
+              tension: 0.38,
+              pointRadius: 4,
+              pointHoverRadius: 7,
+              pointBackgroundColor: ANBG.success,
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2,
+              fill: false,
+            },
+            {
+              type: 'line',
+              label: 'Seuil',
+              data: data.seuils,
+              borderColor: ANBG.warning,
+              backgroundColor: (context) => chartGradient(context.chart, ANBG.warning),
+              borderWidth: 2,
+              borderDash: [7, 5],
+              tension: 0.38,
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              fill: false,
+            },
+          ],
+        },
+        options: {
+          scales: cartesianScales({ y: { max: 100 } }),
+          plugins: { ...kpiAnnotations() },
+        },
       });
-    });
+    }
 
-    mountChart('dashboard-report-heatmap-chart', baseConfig('matrix', {
-      data: {
-        datasets: [{
-          label: 'Retards',
-          data: heatmapData,
-          borderRadius: 8,
-          borderWidth: 1,
-          borderColor: (context) => alphaColor(ANBG.primary, context.raw?.v ? 0.18 : 0.06),
-          backgroundColor: (context) => {
-            const value = Number(context.raw?.v || 0);
-            const ratio = value / heatMax;
-            const tone = ratio >= 0.75 ? ANBG.danger : (ratio >= 0.4 ? ANBG.warning : ANBG.secondary);
-            return alphaColor(tone, Math.max(0.14, Math.min(0.92, 0.2 + (ratio * 0.6))));
-          },
-          width: ({ chart }) => {
-            const chartArea = chart.chartArea;
+    mountChart('dashboard-report-kpi-trend-chart', buildKpiTrendChartConfig(kpiTrend),
+      ({ element }) => (kpiTrend.urls || [])[element?.index] || '');
 
-            if (!chartArea) {
-              return 20;
-            }
-
-            return Math.max(18, (chartArea.width / Math.max(heatmap.weeks.length, 1)) - 6);
-          },
-          height: ({ chart }) => {
-            const chartArea = chart.chartArea;
-
-            if (!chartArea) {
-              return 18;
-            }
-
-            return Math.max(18, (chartArea.height / Math.max(heatmap.units.length, 1)) - 6);
-          },
-        }],
-      },
-      options: {
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title(items) {
-                const point = items[0]?.raw;
-                return point ? `${point.unit} | ${point.week}` : '';
-              },
-              label(context) {
-                return `${context.raw.v} retard(s)`;
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            type: 'linear',
-            position: 'top',
-            offset: false,
-            min: 0.5,
-            max: Math.max(1, heatmap.weeks.length) + 0.5,
-            grid: { display: false },
-            ticks: {
-              stepSize: 1,
-              color: dashboardTheme().muted,
-              callback(value) {
-                return heatmap.weeks[Math.round(value) - 1] || '';
-              },
-            },
-            border: { display: false },
-          },
-          y: {
-            type: 'linear',
-            reverse: true,
-            min: 0.5,
-            max: Math.max(1, heatmap.units.length) + 0.5,
-            grid: { display: false },
-            ticks: {
-              stepSize: 1,
-              color: dashboardTheme().muted,
-              callback(value) {
-                return heatmap.units[Math.round(value) - 1] || '';
-              },
-            },
-            border: { display: false },
-          },
-        },
-      },
-    }), ({ element }) => heatmapData[element?.index]?.url || '');
-
-    const treemap = reportingCharts.resource_treemap || { labels: [], values: [] };
-    const treemapTree = (treemap.labels || [])
-      .map((label, index) => ({
-        label,
-        value: Number((treemap.values || [])[index] || 0),
-        url: (treemap.urls || [])[index] || '',
-      }))
-      .filter((item) => item.value > 0);
-
-    mountChart('dashboard-report-treemap-chart', baseConfig('treemap', {
-      data: {
-        datasets: [{
-          tree: treemapTree,
-          key: 'value',
-          spacing: 2,
-          borderWidth: 2,
-          borderColor: dashboardTheme().isDark ? 'rgba(15,23,42,0.92)' : '#ffffff',
-          backgroundColor: (context) => reportingTreemapTone(context.dataIndex),
-          hoverBorderColor: ANBG.secondary,
-          hoverBorderWidth: 2,
-          captions: { display: false },
-          labels: {
-            display: true,
-            overflow: 'fit',
-            formatter(ctx) {
-              return [ctx.raw._data.label, `${ctx.raw.v}`];
-            },
-            color: dashboardTheme().isDark ? '#F8FAFC' : '#0F172A',
-            font: [
-              { size: 12, weight: '700' },
-              { size: 11, weight: '600' },
-            ],
-          },
-        }],
-      },
-      options: {
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label(context) {
-                return `${context.raw._data.label}: ${context.raw.v}`;
-              },
-            },
-          },
-        },
-      },
-    }), ({ element }) => treemapTree[element?.index]?.url || '');
-
-    const performanceGauge = reportingCharts.performance_gauge || { labels: [], values: [] };
-    const gaugeLabels = Array.isArray(performanceGauge.labels) ? performanceGauge.labels : [];
-    const gaugeValues = Array.isArray(performanceGauge.values) ? performanceGauge.values : [];
-    const gaugeUrls = Array.isArray(performanceGauge.urls) ? performanceGauge.urls : [];
-    const gaugeCount = Math.max(gaugeLabels.length, gaugeValues.length);
-
-    Array.from({ length: gaugeCount }).forEach((_, index) => {
-      mountGauge(
-        `dashboard-report-gauge-${index}`,
-        gaugeLabels[index] || `Performance ${index + 1}`,
-        gaugeValues[index],
-        gaugeUrls[index] || ''
-      );
+    bindPeriodButtons('[data-period-chart="report-kpi-trend"]', (n) => {
+      const d = {
+        labels: filterByPeriod(kpiTrend.labels || [], n),
+        valeurs: filterByPeriod(kpiTrend.valeurs || [], n),
+        cibles: filterByPeriod(kpiTrend.cibles || [], n),
+        seuils: filterByPeriod(kpiTrend.seuils || [], n),
+        urls: filterByPeriod(kpiTrend.urls || [], n),
+      };
+      mountChart('dashboard-report-kpi-trend-chart', buildKpiTrendChartConfig(d),
+        ({ element }) => (d.urls || [])[element?.index] || '');
     });
   }
 
@@ -1931,8 +1702,6 @@ function bootDashboardRender(force = false) {
         chart.resize();
       }
     });
-
-    renderGantts();
   }
 
   async function render() {
@@ -1944,41 +1713,51 @@ function bootDashboardRender(force = false) {
     renderInFlight = true;
 
     try {
-    await ensureDashboardAssets({
-      needD3: Boolean(document.getElementById('dashboard-gantt-chart')),
-    });
+      const needsD3 = Boolean(
+        document.getElementById('dashboard-gantt-chart') ||
+        document.getElementById('dashboard-critical-gantt-chart')
+      );
 
-    const hasChart = typeof window.Chart !== 'undefined';
-    const hasD3 = typeof window.d3 !== 'undefined';
+      await ensureDashboardAssets({ needD3: needsD3 });
 
-    if (!hasChart && !hasD3) {
-      return;
-    }
+      const hasChart = typeof window.Chart !== 'undefined';
+      const hasD3 = typeof window.d3 !== 'undefined';
 
-    if (hasChart) {
-      safeRenderStep('plugins', ensurePlugins);
-
-      if (typeof window.applyAnbgChartDefaults === 'function') {
-        window.applyAnbgChartDefaults(window.Chart);
+      if (!hasChart && !hasD3) {
+        document.addEventListener('anbg:dashboard-assets-ready', () => {
+          void render();
+        }, { once: true });
+        return;
       }
 
-      safeRenderStep('role charts', mountRoleCharts);
-      safeRenderStep('kpi gauges', () => mountKpiGaugeSet('dashboard-kpi-gauge-', payload.global_scores || {}, true));
-      safeRenderStep('status donut', mountStatusDonut);
-      safeRenderStep('monthly line', mountMonthlyKpiLine);
-      safeRenderStep('unit summary', mountUnitSummary);
-      safeRenderStep('monthly grouped', mountMonthlyKpiGrouped);
-      safeRenderStep('interannual', mountInterannual);
-      safeRenderStep('radar', mountRadar);
-      safeRenderStep('scatter', mountBubble);
-      safeRenderStep('reporting charts', mountReportingCharts);
-    }
+      if (hasChart) {
+        safeRenderStep('plugins', ensurePlugins);
 
-    if (hasD3) {
-      safeRenderStep('gantt', renderGantts);
-    }
+        if (typeof window.applyAnbgChartDefaults === 'function') {
+          window.applyAnbgChartDefaults(window.Chart);
+        }
 
-    safeRenderStep('row links', bindRowLinks);
+        safeRenderStep('role charts', mountRoleCharts);
+        safeRenderStep('kpi gauges', () => mountKpiGaugeSet('dashboard-kpi-gauge-', payload.global_scores || {}, true));
+        safeRenderStep('monthly line', () => {
+          mountMonthlyKpiLine();
+          bindPeriodButtons('[data-period-chart="kpi-line"]', (n) => mountMonthlyKpiLine('dashboard-kpi-line-chart', monthly, n));
+        });
+        safeRenderStep('unit summary', mountUnitSummary);
+        safeRenderStep('reporting charts', mountReportingCharts);
+      }
+
+      if (hasD3) {
+        safeRenderStep('gantt', renderGantts);
+      }
+
+      safeRenderStep('row links', bindRowLinks);
+      safeRenderStep('chart disclosure panels', bindChartDisclosurePanels);
+
+      window.requestAnimationFrame(() => {
+        resizeCharts();
+        window.setTimeout(resizeCharts, 180);
+      });
     } finally {
       renderInFlight = false;
 
@@ -2072,10 +1851,23 @@ function bootDashboardRender(force = false) {
 if (!window.__anbgDashboardGlobalBindings) {
   window.__anbgDashboardGlobalBindings = true;
 
+  window.__anbgDashboardBoot = bootDashboardRender;
+
   window.addEventListener('anbg:theme-changed', () => {
     if (typeof window.__anbgDashboardRenderCurrent === 'function') {
       void window.__anbgDashboardRenderCurrent();
     }
+  });
+
+  document.addEventListener('anbg:dashboard-assets-ready', () => {
+    if (typeof window.__anbgDashboardRenderCurrent === 'function') {
+      void window.__anbgDashboardRenderCurrent();
+    }
+  });
+
+  document.addEventListener('anbg:dashboard-payload-ready', () => {
+    dashboardBooted = false;
+    bootDashboardRender(true);
   });
 
   window.addEventListener('resize', () => {
@@ -2092,6 +1884,8 @@ if (!window.__anbgDashboardGlobalBindings) {
     bootDashboardRender(true);
   });
 }
+
+window.__anbgDashboardBoot = bootDashboardRender;
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bootDashboardRender, { once: true });

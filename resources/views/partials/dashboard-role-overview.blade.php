@@ -20,6 +20,35 @@
     $officialBaseLabel = (string) ($basePolicy['scope_label'] ?? $basePolicy['threshold_label'] ?? 'Toutes les actions visibles');
     $officialBaseLower = mb_strtolower($officialBaseLabel);
     $officialBaseText = 'Base statistique : '.$officialBaseLabel;
+    $roleFallbackBars = static function (array $chart): array {
+        $labels = collect($chart['labels'] ?? [])->values();
+        $values = is_array($chart['values'] ?? null)
+            ? $chart['values']
+            : (is_array(($chart['datasets'][0]['data'] ?? null)) ? $chart['datasets'][0]['data'] : []);
+
+        return $labels
+            ->map(fn ($label, int $index): array => [
+                'label' => (string) $label,
+                'value' => min(100, max(0, (float) ($values[$index] ?? 0))),
+            ])
+            ->take(6)
+            ->all();
+    };
+    $roleFallbackPoints = static function (array $chart): string {
+        $labels = collect($chart['labels'] ?? [])->values();
+        $values = is_array(($chart['datasets'][0]['data'] ?? null)) ? $chart['datasets'][0]['data'] : [];
+        $steps = max(1, $labels->count() - 1);
+
+        return $labels
+            ->map(function ($label, int $index) use ($values, $steps): string {
+                $value = min(100, max(0, (float) ($values[$index] ?? 0)));
+                $x = 20 + (($index * 320) / $steps);
+                $y = 120 - ($value * 0.9);
+
+                return number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+            })
+            ->implode(' ');
+    };
     $validationTone = static function (string $status): string {
         return match ($status) {
             \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
@@ -51,7 +80,21 @@
             </div>
             <span class="showcase-chip">{{ count($comparisonChart['labels'] ?? []) }} indicateurs</span>
         </div>
-        <div class="dashboard-canvas"><div id="dashboard-role-comparison-chart" class="dashboard-chart-host"></div></div>
+        <div class="dashboard-canvas">
+            <div id="dashboard-role-comparison-chart" class="dashboard-chart-host">
+                <div class="dashboard-chart-fallback" aria-hidden="true">
+                    <div class="dashboard-chart-fallback-bars">
+                        @foreach ($roleFallbackBars($comparisonChart) as $row)
+                            <div class="dashboard-chart-fallback-bar">
+                                <span class="truncate">{{ $row['label'] }}</span>
+                                <span class="dashboard-chart-fallback-track"><span class="dashboard-chart-fallback-fill" style="width: {{ $row['value'] }}%;"></span></span>
+                                <span class="text-right">{{ number_format($row['value'], 1, ',', ' ') }}%</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
     </article>
 @endif
 
@@ -65,7 +108,21 @@
                     </div>
                     <span class="showcase-chip">{{ count($statusChart['labels'] ?? []) }} statuts</span>
                 </div>
-                <div class="dashboard-canvas"><div id="dashboard-role-status-chart" class="dashboard-chart-host"></div></div>
+                <div class="dashboard-canvas">
+                    <div id="dashboard-role-status-chart" class="dashboard-chart-host">
+                        <div class="dashboard-chart-fallback" aria-hidden="true">
+                            <div class="dashboard-chart-fallback-bars">
+                                @foreach ($roleFallbackBars($statusChart) as $row)
+                                    <div class="dashboard-chart-fallback-bar">
+                                        <span class="truncate">{{ $row['label'] }}</span>
+                                        <span class="dashboard-chart-fallback-track"><span class="dashboard-chart-fallback-fill" style="width: {{ $row['value'] }}%;"></span></span>
+                                        <span class="text-right">{{ number_format($row['value'], 0, ',', ' ') }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </article>
         @endif
 
@@ -77,7 +134,17 @@
                     </div>
                     <span class="showcase-chip">{{ count($trendChart['labels'] ?? []) }} points</span>
                 </div>
-                <div class="dashboard-canvas"><div id="dashboard-role-trend-chart" class="dashboard-chart-host"></div></div>
+                <div class="dashboard-canvas">
+                    <div id="dashboard-role-trend-chart" class="dashboard-chart-host">
+                        <div class="dashboard-chart-fallback" aria-hidden="true">
+                            <svg viewBox="0 0 360 140" preserveAspectRatio="none">
+                                <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
+                                <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
+                                <polyline points="{{ $roleFallbackPoints($trendChart) }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
             </article>
         @endif
     </div>
@@ -93,7 +160,21 @@
             </div>
             <span class="showcase-chip">{{ count($supportChart['labels'] ?? []) }} lignes</span>
         </div>
-        <div class="dashboard-canvas"><div id="dashboard-role-support-chart" class="dashboard-chart-host"></div></div>
+        <div class="dashboard-canvas">
+            <div id="dashboard-role-support-chart" class="dashboard-chart-host">
+                <div class="dashboard-chart-fallback" aria-hidden="true">
+                    <div class="dashboard-chart-fallback-bars">
+                        @foreach ($roleFallbackBars($supportChart) as $row)
+                            <div class="dashboard-chart-fallback-bar">
+                                <span class="truncate">{{ $row['label'] }}</span>
+                                <span class="dashboard-chart-fallback-track"><span class="dashboard-chart-fallback-fill" style="width: {{ $row['value'] }}%;"></span></span>
+                                <span class="text-right">{{ number_format($row['value'], 1, ',', ' ') }}%</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
     </article>
     @endif
 

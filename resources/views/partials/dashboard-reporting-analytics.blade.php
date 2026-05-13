@@ -29,6 +29,37 @@
         ->take(6)
         ->values();
     $managedKpis = collect($reporting['managedKpis'] ?? [])->take(6)->values();
+    $reportingFallbackBars = static function (array $chart): array {
+        $labels = collect($chart['labels'] ?? [])->values();
+        $datasets = collect($chart['datasets'] ?? []);
+
+        return $labels
+            ->map(function ($label, int $index) use ($datasets): array {
+                $value = $datasets->sum(fn ($dataset): float => (float) (($dataset['data'][$index] ?? 0)));
+
+                return [
+                    'label' => (string) $label,
+                    'value' => min(100, max(0, $value)),
+                ];
+            })
+            ->take(8)
+            ->all();
+    };
+    $reportingFallbackPoints = static function (array $chart, string $key): string {
+        $labels = collect($chart['labels'] ?? [])->values();
+        $values = is_array($chart[$key] ?? null) ? $chart[$key] : [];
+        $steps = max(1, $labels->count() - 1);
+
+        return $labels
+            ->map(function ($label, int $index) use ($values, $steps): string {
+                $value = min(100, max(0, (float) ($values[$index] ?? 0)));
+                $x = 20 + (($index * 320) / $steps);
+                $y = 120 - ($value * 0.9);
+
+                return number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+            })
+            ->implode(' ');
+    };
 
     $heatMax = max(1, (int) ($heatmap['max'] ?? 0));
     $ganttMin = \Illuminate\Support\Carbon::parse($criticalGantt['min'] ?? now()->subDays(14)->toDateString());
@@ -109,19 +140,24 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Entonnoir PAS - PAO - PTA - Actions</h2>
-                </div>
-            </div>
-            <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-funnel-chart" class="dashboard-chart-host"></div></div>
-        </article>
-
-        <article class="dashboard-advanced-card">
-            <div class="dashboard-advanced-head">
-                <div>
                     <h2 class="showcase-panel-title">Statuts empiles par {{ strtolower($reportingCharts['status_by_unit']['unit_label'] ?? 'unite') }}</h2>
                 </div>
             </div>
-            <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-status-unit-chart" class="dashboard-chart-host"></div></div>
+            <div class="dashboard-canvas dashboard-canvas-lg">
+                <div id="dashboard-report-status-unit-chart" class="dashboard-chart-host">
+                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                        <div class="dashboard-chart-fallback-bars">
+                            @foreach ($reportingFallbackBars($reportingCharts['status_by_unit'] ?? []) as $row)
+                                <div class="dashboard-chart-fallback-bar">
+                                    <span class="truncate">{{ $row['label'] }}</span>
+                                    <span class="dashboard-chart-fallback-track"><span class="dashboard-chart-fallback-fill" style="width: {{ $row['value'] }}%;"></span></span>
+                                    <span class="text-right">{{ number_format($row['value'], 0, ',', ' ') }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
         </article>
 
         <article class="dashboard-advanced-card">
@@ -129,8 +165,25 @@
                 <div>
                     <h2 class="showcase-panel-title">Avancement réel vs théorique</h2>
                 </div>
+                <div class="chart-period-bar" data-period-chart="report-progress">
+                    <button type="button" class="chart-period-btn" data-period="4">4S</button>
+                    <button type="button" class="chart-period-btn" data-period="8">8S</button>
+                    <button type="button" class="chart-period-btn" data-period="13">3M</button>
+                    <button type="button" class="chart-period-btn active" data-period="0">Tout</button>
+                </div>
             </div>
-            <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-progress-chart" class="dashboard-chart-host"></div></div>
+            <div class="dashboard-canvas dashboard-canvas-lg">
+                <div id="dashboard-report-progress-chart" class="dashboard-chart-host">
+                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                        <svg viewBox="0 0 360 140" preserveAspectRatio="none">
+                            <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
+                            <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['progress_weekly'] ?? [], 'reel') }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['progress_weekly'] ?? [], 'theorique') }}" fill="none" stroke="#1C203D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 5" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
         </article>
 
         <article class="dashboard-advanced-card">
@@ -138,77 +191,29 @@
                 <div>
                     <h2 class="showcase-panel-title">Indicateurs suivis: valeur, cible, seuil</h2>
                 </div>
-            </div>
-            <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-kpi-trend-chart" class="dashboard-chart-host"></div></div>
-        </article>
-
-        <article class="dashboard-advanced-card">
-            <div class="dashboard-advanced-head">
-                <div>
-                    <h2 class="showcase-panel-title">Evolution interannuelle</h2>
+                <div class="chart-period-bar" data-period-chart="report-kpi-trend">
+                    <button type="button" class="chart-period-btn" data-period="3">3M</button>
+                    <button type="button" class="chart-period-btn" data-period="6">6M</button>
+                    <button type="button" class="chart-period-btn" data-period="12">12M</button>
+                    <button type="button" class="chart-period-btn active" data-period="0">Tout</button>
                 </div>
             </div>
-            <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-interannual-chart" class="dashboard-chart-host"></div></div>
-        </article>
-
-    </div>
-
-    <div class="mt-4 space-y-4">
-        <article class="dashboard-advanced-card">
-            <div class="dashboard-advanced-head">
-                <div>
-                    <h2 class="showcase-panel-title">Heatmap des retards</h2>
-                </div>
-            </div>
-            <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-heatmap-chart" class="dashboard-chart-host"></div></div>
-        </article>
-
-    </div>
-
-    <div class="mt-4 space-y-4">
-        <article class="dashboard-advanced-card">
-            <div class="dashboard-advanced-head">
-                <div>
-                    <h2 class="showcase-panel-title">Gantt des actions critiques</h2>
-                </div>
-            </div>
-            @if (($criticalGantt['items'] ?? []) !== [])
-                <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-critical-gantt-chart" class="dashboard-chart-host"></div></div>
-            @else
-                <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune action critique détectée.</div>
-            @endif
-        </article>
-
-        <article class="dashboard-advanced-card">
-            <div class="dashboard-advanced-head">
-                <div>
-                    <h2 class="showcase-panel-title">Treemap ressources et budget</h2>
-                </div>
-            </div>
-            <div class="dashboard-canvas dashboard-canvas-lg"><div id="dashboard-report-treemap-chart" class="dashboard-chart-host"></div></div>
-        </article>
-    </div>
-
-        <article class="dashboard-advanced-card mt-4">
-        <div class="dashboard-advanced-head">
-            <div>
-                <h2 class="showcase-panel-title">Jauges de performance par {{ strtolower($performanceGaugeScopeLabel) }}</h2>
-            </div>
-        </div>
-        <div class="dashboard-gauge-grid">
-            @forelse ($performanceGauge['labels'] as $index => $label)
-                <article class="dashboard-gauge-card">
-                    <strong>{{ $label }}</strong>
-                    <div class="dashboard-gauge-canvas">
-                        <div id="dashboard-report-gauge-{{ $index }}" class="dashboard-chart-host"></div>
+            <div class="dashboard-canvas dashboard-canvas-lg">
+                <div id="dashboard-report-kpi-trend-chart" class="dashboard-chart-host">
+                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                        <svg viewBox="0 0 360 140" preserveAspectRatio="none">
+                            <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
+                            <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'valeurs') }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'cibles') }}" fill="none" stroke="#8FC043" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'seuils') }}" fill="none" stroke="#F9B13C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 5" />
+                        </svg>
                     </div>
-                    <p>{{ number_format((float) ($performanceGauge['values'][$index] ?? 0), 1, ',', ' ') }}%</p>
-                </article>
-            @empty
-                <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">{{ $performanceGaugeEmptyLabel }}</div>
-            @endforelse
-        </div>
-    </article>
+                </div>
+            </div>
+        </article>
+
+    </div>
     @endif
 
     @if ($showTableBlocks)

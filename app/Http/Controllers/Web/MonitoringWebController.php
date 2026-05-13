@@ -415,7 +415,6 @@ class MonitoringWebController extends Controller
             : null;
         $payload['activeExportTemplates'] = [
             'excel' => $this->resolveReportingExportTemplate($user, 'excel')?->name,
-            'word' => $this->resolveReportingExportTemplate($user, 'word')?->name,
             'pdf' => $this->resolveReportingExportTemplate($user, 'pdf')?->name,
         ];
 
@@ -541,32 +540,6 @@ class MonitoringWebController extends Controller
             ->download($filename);
     }
 
-    public function exportWord(Request $request)
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        $this->denyUnlessPlanningReader($user);
-        $this->denyUnlessAlertReader($user);
-
-        $payload = $this->reportingAnalyticsService->buildPayload($user, true, true);
-        $template = $this->resolveReportingExportTemplate($user, 'word');
-        if ($template !== null) {
-            $payload['exportTemplate'] = $template;
-        }
-
-        $generatedAt = $payload['generatedAt'];
-        $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
-        $filename = $this->institutionalReportFilename('REPORTING', $payload, 'doc', $filenamePrefix);
-
-        return response()
-            ->view('workspace.monitoring.reporting-word', $payload)
-            ->header('Content-Type', 'application/msword; charset=UTF-8')
-            ->header('Content-Disposition', 'attachment; filename="'.$filename.'"');
-    }
-
     public function queueExport(Request $request, string $format): RedirectResponse
     {
         $user = $request->user();
@@ -575,7 +548,7 @@ class MonitoringWebController extends Controller
         }
 
         $format = strtolower($format);
-        if (! in_array($format, ['excel', 'csv', 'word', 'pdf'], true)) {
+        if (! in_array($format, ['excel', 'csv', 'pdf'], true)) {
             abort(404);
         }
 

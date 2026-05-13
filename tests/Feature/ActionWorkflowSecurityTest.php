@@ -40,6 +40,79 @@ class ActionWorkflowSecurityTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_agent_sees_historical_tracking_form_for_legacy_quantitative_action(): void
+    {
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
+
+        $this->assertNull($action->mode_evaluation);
+
+        $this->actingAs($agent)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('action-week-'.$week->id, false)
+            ->assertSee('quantite_realisee_'.$week->id, false)
+            ->assertSee('justificatif_'.$week->id, false)
+            ->assertSee('Valider la sous-action');
+    }
+
+    public function test_agent_marks_planned_sub_action_done_with_justificatif_and_optional_quantity(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'type_cible' => 'qualitative',
+        ])->save();
+        $action->weeks()->delete();
+
+        $sousAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Verifier les dossiers transmis',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-14',
+            'cible_prevue' => 12,
+            'unite' => 'dossiers',
+            'quantite_realisee' => 0,
+            'taux_realisation' => 0,
+            'statut' => 'a_faire',
+            'est_effectuee' => false,
+            'taux_execution' => 0,
+        ]);
+
+        $this->actingAs($agent)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('tracking-entry-form', false)
+            ->assertSee('execution_only', false)
+            ->assertSee('quantite_realisee_sous_action_'.$sousAction->id, false);
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.sub-actions.update', [$action, $sousAction]), [
+                '_method' => 'PUT',
+                'execution_only' => '1',
+                'est_effectuee' => '1',
+                'quantite_realisee' => 12,
+                'justificatif' => UploadedFile::fake()->create('preuve-sous-action.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $sousAction->refresh();
+        $this->assertTrue((bool) $sousAction->est_effectuee);
+        $this->assertSame('12.0000', (string) $sousAction->quantite_realisee);
+        $this->assertSame('100.00', (string) $sousAction->taux_execution);
+        $this->assertDatabaseHas('justificatifs', [
+            'sous_action_id' => $sousAction->id,
+            'categorie' => 'sous_action',
+        ]);
+    }
+
     public function test_action_validation_workflow_reaches_direction_approval(): void
     {
         Storage::fake('local');
@@ -500,4 +573,3 @@ class ActionWorkflowSecurityTest extends TestCase
         ];
     }
 }
-

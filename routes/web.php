@@ -304,19 +304,17 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         });
 
         // ── REPORTING & EXPORTS ────────────────────────────────────────────────────
-        // Synthèses de performance, tableaux de bord et exports (Excel, CSV, Word, PDF).
+        // Synthèses de performance, tableaux de bord et exports (Excel, CSV, PDF).
         Route::get('/workspace/reporting', [MonitoringWebController::class, 'reporting'])
             ->name('workspace.reporting');
         Route::get('/workspace/reporting/export/excel', [MonitoringWebController::class, 'exportExcel'])
             ->name('workspace.reporting.export.excel');
         Route::get('/workspace/reporting/export/csv', [MonitoringWebController::class, 'exportCsv'])
             ->name('workspace.reporting.export.csv');
-        Route::get('/workspace/reporting/export/word', [MonitoringWebController::class, 'exportWord'])
-            ->name('workspace.reporting.export.word');
         Route::get('/workspace/reporting/export/pdf', [MonitoringWebController::class, 'exportPdf'])
             ->name('workspace.reporting.export.pdf');
         Route::post('/workspace/reporting/export/{format}/queue', [MonitoringWebController::class, 'queueExport'])
-            ->whereIn('format', ['excel', 'csv', 'word', 'pdf'])
+            ->whereIn('format', ['excel', 'csv', 'pdf'])
             ->name('workspace.reporting.export.queue');
         Route::get('/workspace/reporting/export-ready', [MonitoringWebController::class, 'downloadQueuedExport'])
             ->middleware('signed')

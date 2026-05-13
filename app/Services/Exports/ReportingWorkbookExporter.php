@@ -91,6 +91,7 @@ class ReportingWorkbookExporter
     private function buildSheets(array $payload): array
     {
         $sheets = [
+            $this->buildPasPlanSheet($payload),
             $this->buildStrategySheet($payload),
             $this->buildPaoSheet($payload),
             $this->buildActionDetailsFinalSheet($payload),
@@ -453,6 +454,41 @@ class ReportingWorkbookExporter
             'freeze_header' => false,
             'auto_filter_ref' => null,
         ];
+    }
+
+    private function buildPasPlanSheet(array $payload): array
+    {
+        return $this->buildTableSheet(
+            'PAS PLAN',
+            'PAS PLAN',
+            $this->standardReportMetaRows($payload, 'Plan d\'actions — Tableau de pilotage consolidé'),
+            ['Axes stratégiques', 'N°', 'Objectifs stratégiques', 'Objectifs opérationnels', 'Actions détaillées', 'Responsable', 'Ressources', 'Cible', 'État', 'Échéances'],
+            ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string'],
+            $this->pasPlanSheetRows($payload),
+            [1 => 36, 2 => 6, 3 => 36, 4 => 36, 5 => 44, 6 => 26, 7 => 28, 8 => 14, 9 => 18, 10 => 16]
+        );
+    }
+
+    /**
+     * @return array<int, array<int, mixed>>
+     */
+    private function pasPlanSheetRows(array $payload): array
+    {
+        return $this->actionRows($payload)
+            ->map(fn (array $row): array => [
+                (string) ($row['axe_strategique'] ?? $row['axe'] ?? '-'),
+                (string) (($row['objectif_strategique_numero'] ?? '') !== '' ? $row['objectif_strategique_numero'] : '-'),
+                (string) ($row['objectif_strategique'] ?? $row['objectif'] ?? '-'),
+                (string) ($row['objectif_operationnel'] ?? '-'),
+                (string) ($row['description_action'] ?? $row['action'] ?? '-'),
+                (string) ($row['rmo'] ?? $row['responsable'] ?? '-'),
+                (string) ($row['ressources_requises'] ?? '-'),
+                (string) ($row['cible'] ?? '-'),
+                (string) ($row['statut'] ?? '-'),
+                (string) ($row['echeance'] ?? $row['fin'] ?? ''),
+            ])
+            ->values()
+            ->all();
     }
 
     private function buildStrategySheet(array $payload): array
@@ -839,8 +875,6 @@ class ReportingWorkbookExporter
         return $rows->merge($lateRows)->values()->all();
     }
 
-    /**
-     * @return array<int, array<int, mixed>>
     private function rmoPerformanceRows(array $payload): array
     {
         return $this->actionRows($payload)
@@ -1003,8 +1037,6 @@ class ReportingWorkbookExporter
             ->all();
     }
 
-    /**
-     * @return array<int, array<int, mixed>>
     private function serviceReports(array $payload): Collection
     {
         return collect($payload['details']['direction_service_report'] ?? []);

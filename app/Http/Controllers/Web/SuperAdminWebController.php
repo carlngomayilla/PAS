@@ -2955,14 +2955,6 @@ class SuperAdminWebController extends Controller
                 ];
             }
 
-            if ($template->format === ExportTemplate::FORMAT_WORD) {
-                return [
-                    'type' => 'html',
-                    'label' => 'Apercu Word',
-                    'html' => view('workspace.monitoring.reporting-word', $payload)->render(),
-                ];
-            }
-
             if ($template->format === ExportTemplate::FORMAT_EXCEL) {
                 return [
                     'type' => 'excel',

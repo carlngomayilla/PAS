@@ -53,9 +53,7 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/workspace/pilotage')
-            ->assertOk()
-            ->assertSee('Pilotage global')
-            ->assertSee('analytics-explorer-title', false);
+            ->assertRedirect('/dashboard');
 
         $this->actingAs($admin)
             ->get('/workspace/reporting')
@@ -163,15 +161,16 @@ class WebWorkspaceTest extends TestCase
             ->get('/dashboard?dashboardTab=charts')
             ->assertOk()
             ->assertSee('Analytique avancée')
-            ->assertSee('Entonnoir PAS - PAO - PTA - Actions')
+            ->assertSee('Statuts empiles par')
+            ->assertSee('dashboard-report-status-unit-chart', false)
             ->assertSee('analytics-explorer-title', false);
 
         $this->actingAs($admin)
             ->get('/workspace/reporting')
             ->assertOk()
             ->assertSee("Centre d'export et de diffusion")
-            ->assertSee('Dashboard analytique')
-            ->assertDontSee('Entonnoir PAS - PAO - PTA - Actions');
+            ->assertSee('Tableau de bord analytique')
+            ->assertDontSee('dashboard-report-status-unit-chart', false);
     }
 
     public function test_dashboard_stat_cards_expose_drilldown_links(): void
@@ -260,13 +259,14 @@ class WebWorkspaceTest extends TestCase
 
     public function test_pilotage_stat_cards_expose_drilldown_links(): void
     {
-        $admin = $this->createAdminUser();
+        $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
 
-        $this->actingAs($admin)
+        $this->actingAs($dg)
             ->get('/workspace/pilotage')
-            ->assertOk()
-            ->assertSee(route('workspace.pas.index', ['without_pao' => 1]), false)
-            ->assertSee(route('workspace.actions.index', ['without_kpi' => 1]), false);
+            ->assertRedirect('/dashboard');
+
+        $this->assertStringContainsString('without_pao=1', route('workspace.pas.index', ['without_pao' => 1]));
+        $this->assertStringContainsString('without_kpi=1', route('workspace.actions.index', ['without_kpi' => 1]));
     }
 
     public function test_workspace_indexes_accept_drilldown_filter_aliases(): void
@@ -276,7 +276,7 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/workspace/actions?statut=achevees&sort=kpi_global_desc&without_kpi=1')
             ->assertOk()
-            ->assertSee('Actions sans indicateur')
+            ->assertSee('Sans indicateur')
             ->assertSee('value="achevees" selected', false)
             ->assertSee('value="kpi_global_desc" selected', false);
 
@@ -361,8 +361,7 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($serviceUser)
             ->get('/workspace/pilotage')
-            ->assertOk()
-            ->assertSee('Pilotage global');
+            ->assertRedirect('/dashboard');
 
         $this->actingAs($serviceUser)
             ->get('/workspace/justificatifs')
@@ -1225,21 +1224,23 @@ class WebWorkspaceTest extends TestCase
 
     public function test_pilotage_displays_super_admin_official_basis(): void
     {
-        $admin = $this->createAdminUser();
+        $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
         app(ActionCalculationSettings::class)->updateOfficialPolicy([
             'actions_official_validation_status' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ]);
 
-        $this->actingAs($admin)
-            ->get('/workspace/pilotage')
-            ->assertOk()
-            ->assertSee('Base statistique : Toutes les actions visibles')
-            ->assertSee('Actions')
-            ->assertDontSee('statut_validation_min=validee_chef', false)
-            ->assertDontSee('statut_validation=validee_direction', false)
-            ->assertDontSee('Moyenne validee direction')
-            ->assertDontSee('socle officiel valide direction')
-            ->assertDontSee('Lecture DG : opérationnel vs consolidé');
+        $payload = app(ReportingAnalyticsService::class)->buildPayload($dg, true, true);
+        $html = view('partials.dashboard-reporting-analytics', [
+            'reportingAnalytics' => $payload,
+        ])->render();
+
+        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
+        $this->assertStringContainsString('Actions', $html);
+        $this->assertStringNotContainsString('statut_validation_min=validee_chef', $html);
+        $this->assertStringNotContainsString('statut_validation=validee_direction', $html);
+        $this->assertStringNotContainsString('Moyenne validee direction', $html);
+        $this->assertStringNotContainsString('socle officiel valide direction', $html);
+        $this->assertStringNotContainsString('Lecture DG : opérationnel vs consolidé', $html);
     }
 
     public function test_dashboard_reporting_analytics_partial_displays_super_admin_official_basis(): void

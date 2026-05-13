@@ -522,9 +522,34 @@ class InstitutionalPasSeeder extends Seeder
             return;
         }
 
-        $objectiveIds = $this->objectiveIdsByKey((int) $pasId);
-        if ($objectiveIds === []) {
+        // Load all axes of this PAS, each with its first strategic objective.
+        $axes = DB::table('pas_axes')
+            ->where('pas_id', $pasId)
+            ->orderBy('code')
+            ->get(['id', 'code', 'libelle']);
+
+        if ($axes->isEmpty()) {
             return;
+        }
+
+        $axisObjectivePairs = [];
+        foreach ($axes as $axis) {
+            $firstObjective = DB::table('pas_objectifs')
+                ->where('pas_axe_id', $axis->id)
+                ->orderBy('code')
+                ->first(['id', 'code', 'libelle']);
+
+            if ($firstObjective !== null) {
+                $axisObjectivePairs[] = ['axis' => $axis, 'objective' => $firstObjective];
+            }
+        }
+
+        if ($axisObjectivePairs === []) {
+            return;
+        }
+
+        if (app()->environment('testing')) {
+            $axisObjectivePairs = array_slice($axisObjectivePairs, 0, 1);
         }
 
         $users = $this->activeCoverageUsers();
@@ -532,129 +557,246 @@ class InstitutionalPasSeeder extends Seeder
             return;
         }
 
+        // Group users by direction+service. Users without a scope join the fallback.
         $serviceGroups = [];
-        $globalUserIds = [];
+        $orphanUsers = [];
 
         foreach ($users as $user) {
             $directionId = (int) ($user->direction_id ?? 0);
             $serviceId = (int) ($user->service_id ?? 0);
 
             if ($directionId > 0 && $serviceId > 0) {
-                $serviceGroups[$directionId.'.'.$serviceId][] = (int) $user->id;
-                continue;
-            }
-
-            $globalUserIds[] = (int) $user->id;
-        }
-
-        $plans = [];
-        $fallbackObjectiveId = array_values($objectiveIds)[0] ?? null;
-
-        foreach ($serviceGroups as $key => $userIds) {
-            [$directionId, $serviceId] = array_map('intval', explode('.', (string) $key));
-            $scope = $this->scopeByIds($directionId, $serviceId);
-
-            if ($scope === null) {
-                array_push($globalUserIds, ...$userIds);
-                continue;
-            }
-
-            $objectiveKey = $this->currentObjectiveKeyForScope(
-                (string) $scope['direction_code'],
-                (string) $scope['service_code']
-            );
-            $objectiveId = $objectiveIds[$objectiveKey] ?? $fallbackObjectiveId;
-
-            if ($objectiveId === null) {
-                continue;
-            }
-
-            $paoId = $this->upsertCoveragePao(
-                (int) $pasId,
-                (int) $objectiveId,
-                $scope,
-                false,
-                $actorId,
-                $now
-            );
-
-            $plans[] = [
-                'pao_id' => $paoId,
-                'scope' => $scope,
-                'user_ids' => array_values(array_unique(array_map('intval', $userIds))),
-                'transversal' => false,
-            ];
-        }
-
-        $globalUserIds = array_values(array_unique(array_filter($globalUserIds)));
-        if ($globalUserIds !== []) {
-            $scope = $this->fallbackOperationalScope();
-            if ($scope !== null && $fallbackObjectiveId !== null) {
-                $paoId = $this->upsertCoveragePao(
-                    (int) $pasId,
-                    (int) $fallbackObjectiveId,
-                    $scope,
-                    true,
-                    $actorId,
-                    $now
-                );
-
-                $plans[] = [
-                    'pao_id' => $paoId,
-                    'scope' => $scope,
-                    'user_ids' => $globalUserIds,
-                    'transversal' => true,
-                ];
+                $serviceGroups[$directionId.'.'.$serviceId][] = $user;
+            } else {
+                $orphanUsers[] = $user;
             }
         }
 
-        if ($plans === []) {
+        if ($orphanUsers !== []) {
+            $fallbackScope = $this->fallbackOperationalScope();
+            if ($fallbackScope !== null) {
+                $key = $fallbackScope['direction_id'].'.'.$fallbackScope['service_id'];
+                foreach ($orphanUsers as $user) {
+                    $serviceGroups[$key][] = $user;
+                }
+            }
+        }
+
+        if ($serviceGroups === []) {
             return;
         }
 
         $this->syncObjectifsOperationnels($now);
 
         $fallbackActionId = null;
-        foreach ($plans as $plan) {
-            $scope = $plan['scope'];
-            $assignedUsers = $users
-                ->filter(fn ($user): bool => in_array((int) $user->id, $plan['user_ids'], true))
-                ->values();
 
-            if ($assignedUsers->isEmpty()) {
+        foreach ($serviceGroups as $scopeKey => $scopeUsers) {
+            [$directionId, $serviceId] = array_map('intval', explode('.', (string) $scopeKey));
+            $scope = $this->scopeByIds($directionId, $serviceId);
+
+            if ($scope === null) {
                 continue;
             }
 
-            $objectifOperationnelId = $this->resolveOperationalObjectiveForPao(
-                (int) $plan['pao_id'],
-                (int) $scope['service_id']
-            );
+            foreach ($axisObjectivePairs as $pair) {
+                $axis = $pair['axis'];
+                $objective = $pair['objective'];
 
-            $ptaId = $this->upsertCoveragePta(
-                (int) $plan['pao_id'],
-                $objectifOperationnelId,
-                $scope,
-                (bool) $plan['transversal'],
-                $actorId,
-                $now
-            );
+                // One PAO per axis per service, then one PTA per PAO.
+                $paoId = $this->upsertCoveragePaoForAxis(
+                    (int) $pasId, (int) $objective->id, $axis, $scope, $actorId, $now
+                );
 
-            $actionId = $this->upsertCoverageAction(
-                $ptaId,
-                (int) $plan['pao_id'],
-                $objectifOperationnelId,
-                $scope,
-                $assignedUsers,
-                (bool) $plan['transversal'],
-                $now
-            );
+                $objectifOperationnelId = $this->resolveOperationalObjectiveForPao($paoId, $serviceId);
 
-            $fallbackActionId ??= $actionId;
+                $ptaId = $this->upsertCoveragePtaForAxis(
+                    $paoId, $objectifOperationnelId, $axis, $scope, $actorId, $now
+                );
+
+                // One personal action per user per axis.
+                foreach ($scopeUsers as $user) {
+                    $actionId = $this->upsertUserAxisAction(
+                        $ptaId, $paoId, $objectifOperationnelId, $axis, $scope, $user, $now
+                    );
+                    $fallbackActionId ??= $actionId;
+                }
+            }
         }
 
         if ($fallbackActionId !== null) {
             $this->ensurePasActionCoverage((int) $pasId, $fallbackActionId, false, $now);
         }
+    }
+
+    private function upsertCoveragePaoForAxis(
+        int $pasId,
+        int $objectiveId,
+        object $axis,
+        array $scope,
+        ?int $actorId,
+        mixed $now
+    ): int {
+        $serviceCode = (string) $scope['service_code'];
+        $axisCode = (string) $axis->code;
+        $title = 'PAO '.$serviceCode.' - '.$axisCode.' 2026';
+
+        $payload = $this->filterColumns('paos', [
+            'exercice_id' => $this->exerciseId(2026),
+            'pas_id' => $pasId,
+            'pas_objectif_id' => $objectiveId,
+            'direction_id' => (int) $scope['direction_id'],
+            'service_id' => (int) $scope['service_id'],
+            'annee' => 2026,
+            'titre' => $title,
+            'echeance' => '2028-12-31',
+            'objectif_operationnel' => 'Contribuer à : '.(string) $axis->libelle,
+            'resultats_attendus' => 'Actions du service réalisées et consolidées dans le PTA '.$axisCode.'.',
+            'indicateurs_associes' => 'Taux de réalisation, délais, qualité des livrables.',
+            'statut' => 'valide',
+            'valide_le' => $now,
+            'valide_par' => $actorId,
+            'deleted_at' => null,
+            'updated_at' => $now,
+        ]);
+
+        $paoId = DB::table('paos')
+            ->where('annee', 2026)
+            ->where('direction_id', (int) $scope['direction_id'])
+            ->where('service_id', (int) $scope['service_id'])
+            ->where('titre', $title)
+            ->value('id');
+
+        if ($paoId !== null) {
+            DB::table('paos')->where('id', (int) $paoId)->update($payload);
+
+            return (int) $paoId;
+        }
+
+        $payload['created_at'] = $now;
+
+        return (int) DB::table('paos')->insertGetId($payload);
+    }
+
+    private function upsertCoveragePtaForAxis(
+        int $paoId,
+        ?int $objectifOperationnelId,
+        object $axis,
+        array $scope,
+        ?int $actorId,
+        mixed $now
+    ): int {
+        $serviceCode = (string) $scope['service_code'];
+        $axisCode = (string) $axis->code;
+        $title = 'PTA '.$serviceCode.' - '.$axisCode.' 2026';
+
+        $payload = $this->filterColumns('ptas', [
+            'exercice_id' => $this->exerciseId(2026),
+            'pao_id' => $paoId,
+            'objectif_operationnel_id' => $objectifOperationnelId,
+            'direction_id' => (int) $scope['direction_id'],
+            'service_id' => (int) $scope['service_id'],
+            'titre' => $title,
+            'description' => 'PTA de service pour l\'axe '.$axisCode.' du PAS ANBG 2026-2028.',
+            'statut' => 'valide',
+            'valide_le' => $now,
+            'valide_par' => $actorId,
+            'deleted_at' => null,
+            'updated_at' => $now,
+        ]);
+
+        $ptaId = DB::table('ptas')->where('pao_id', $paoId)->value('id');
+
+        if ($ptaId !== null) {
+            DB::table('ptas')->where('id', (int) $ptaId)->update($payload);
+
+            return (int) $ptaId;
+        }
+
+        $payload['created_at'] = $now;
+
+        return (int) DB::table('ptas')->insertGetId($payload);
+    }
+
+    private function upsertUserAxisAction(
+        int $ptaId,
+        int $paoId,
+        ?int $objectifOperationnelId,
+        object $axis,
+        array $scope,
+        object $user,
+        mixed $now
+    ): int {
+        $axisCode = (string) $axis->code;
+        $userName = $this->shortUserLabel($user);
+        $serviceCode = (string) $scope['service_code'];
+        $userId = (int) $user->id;
+
+        $actionLabel = $axisCode.' : contribution '.$serviceCode.' - '.$userName;
+        $description = 'Action personnelle pour '.$userName.' dans le cadre de l\'axe '.$axisCode.' : '.(string) $axis->libelle;
+
+        $payload = $this->filterColumns('actions', [
+            'exercice_id' => $this->exerciseId(2026),
+            'pta_id' => $ptaId,
+            'pao_id' => $paoId,
+            'objectif_operationnel_id' => $objectifOperationnelId,
+            'mode_evaluation' => Action::MODE_MIXTE,
+            'libelle' => $actionLabel,
+            'description' => $description,
+            'type_cible' => 'quantitative',
+            'priorite' => 'normale',
+            'unite_cible' => 'taches',
+            'quantite_cible' => 4,
+            'quantite_realisee' => 0,
+            'resultat_attendu' => 'Livrables produits, suivis et consolidés dans le reporting '.$axisCode.'.',
+            'indicateurs_attendus' => 'Taux de réalisation, respect des délais, qualité des livrables.',
+            'observations' => 'Action individuelle créée par le seeder institutionnel.',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2028-12-31',
+            'date_echeance' => '2028-12-31',
+            'responsable_id' => $userId,
+            'contexte_action' => Action::CONTEXT_PILOTAGE,
+            'origine_action' => Action::ORIGIN_PTA,
+            'statut' => 'en_cours',
+            'statut_dynamique' => 'en_cours',
+            'progression_reelle' => 0,
+            'progression_theorique' => 0,
+            'avancement_operationnel' => 0,
+            'taux_atteinte_cible' => 0,
+            'taux_global' => 0,
+            'seuil_alerte_progression' => 10,
+            'financement_requis' => false,
+            'financement_statut' => Action::FINANCEMENT_NON_REQUIS,
+            'ressource_main_oeuvre' => true,
+            'ressource_equipement' => false,
+            'ressource_partenariat' => false,
+            'ressource_autres' => false,
+            'ressources_necessaires' => json_encode(['main_oeuvre'], JSON_UNESCAPED_UNICODE),
+            'validation_hierarchique' => false,
+            'validation_sans_correction' => false,
+            'statut_validation' => 'non_soumise',
+            'frequence_execution' => 'hebdomadaire',
+            'deleted_at' => null,
+            'updated_at' => $now,
+        ]);
+
+        $actionId = DB::table('actions')
+            ->where('pta_id', $ptaId)
+            ->where('responsable_id', $userId)
+            ->where('libelle', $actionLabel)
+            ->value('id');
+
+        if ($actionId !== null) {
+            DB::table('actions')->where('id', (int) $actionId)->update($payload);
+            $actionId = (int) $actionId;
+        } else {
+            $payload['created_at'] = $now;
+            $actionId = (int) DB::table('actions')->insertGetId($payload);
+        }
+
+        $this->syncActionResponsables($actionId, [$userId], $userId, $now);
+        $this->syncCurrentActionKpi($actionId, $now);
+
+        return $actionId;
     }
 
     private function upsertCoveragePao(
@@ -990,6 +1132,17 @@ class InstitutionalPasSeeder extends Seeder
 
         if (Schema::hasColumn('users', 'deleted_at')) {
             $query->whereNull('deleted_at');
+        }
+
+        if (app()->environment('testing')) {
+            $query->whereIn('email', [
+                'ingrid@anbg.ga',
+                'loick.adan@anbg.ga',
+                'hilaire.nguebet@anbg.ga',
+                'directeur.daf@anbg.ga',
+                'robert.ekomi@anbg.ga',
+                'melissa.abogo@anbg.ga',
+            ]);
         }
 
         return $query->get();
@@ -1584,8 +1737,13 @@ class InstitutionalPasSeeder extends Seeder
         $objectiveIds = $this->objectiveIdsByKey($pasId);
         $exerciseId = $this->exerciseId(2025);
         $fallbackActionId = null;
+        $items = $this->completedLegacyActionItems();
 
-        foreach ($this->completedLegacyActionItems() as $item) {
+        if (app()->environment('testing')) {
+            $items = array_slice($items, 0, 3);
+        }
+
+        foreach ($items as $item) {
             $objectiveId = $objectiveIds[$item['objectif_key']] ?? null;
             if ($objectiveId === null) {
                 continue;

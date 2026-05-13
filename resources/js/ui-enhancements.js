@@ -134,6 +134,39 @@ import { gsap } from 'gsap';
         return true;
     }
 
+    var actionAccordionStoragePrefix = 'anbg:action-accordion:';
+
+    function actionAccordionStorageKey(section) {
+        if (!section || !section.id) return '';
+        return actionAccordionStoragePrefix + window.location.pathname + ':' + section.id;
+    }
+
+    function readActionAccordionOpen(section, fallback) {
+        var key = actionAccordionStorageKey(section);
+        if (!key) return fallback;
+
+        try {
+            var value = window.localStorage.getItem(key);
+            if (value === 'open') return true;
+            if (value === 'closed') return false;
+        } catch (_error) {
+            return fallback;
+        }
+
+        return fallback;
+    }
+
+    function writeActionAccordionOpen(section, isOpen) {
+        var key = actionAccordionStorageKey(section);
+        if (!key) return;
+
+        try {
+            window.localStorage.setItem(key, isOpen ? 'open' : 'closed');
+        } catch (_error) {
+            // Optional UI preference only.
+        }
+    }
+
     function initEmptyTableSections() {
         document.querySelectorAll('.showcase-panel, .ui-card, .form-section, .data-table-shell').forEach(function (section) {
             if (section.dataset.keepEmpty === '1') return;
@@ -147,6 +180,7 @@ import { gsap } from 'gsap';
 
     function applyAccordion(section, startOpen) {
         if (section.dataset.accordionReady === '1') return;
+        var initialOpen = readActionAccordionOpen(section, startOpen);
 
         var title = section.querySelector('.showcase-panel-title, .data-table-title, .showcase-kpi-card-title');
         if (!title) {
@@ -171,20 +205,21 @@ import { gsap } from 'gsap';
         var button = document.createElement('button');
         button.type = 'button';
         button.className = 'action-accordion-toggle';
-        button.setAttribute('aria-expanded', startOpen ? 'true' : 'false');
+        button.setAttribute('aria-expanded', initialOpen ? 'true' : 'false');
         button.innerHTML = '<span>' + title.textContent.trim() + '</span><span aria-hidden="true">▾</span>';
 
         headerChild.replaceWith(button);
         section.appendChild(content);
         section.classList.add('action-accordion-panel');
-        section.classList.toggle('is-collapsed', !startOpen);
-        content.hidden = !startOpen;
+        section.classList.toggle('is-collapsed', !initialOpen);
+        content.hidden = !initialOpen;
 
         button.addEventListener('click', function () {
             var isNowCollapsed = !section.classList.contains('is-collapsed');
             section.classList.toggle('is-collapsed', isNowCollapsed);
             content.hidden = isNowCollapsed;
             button.setAttribute('aria-expanded', isNowCollapsed ? 'false' : 'true');
+            writeActionAccordionOpen(section, !isNowCollapsed);
         });
 
         section.dataset.accordionReady = '1';
@@ -392,7 +427,17 @@ import { gsap } from 'gsap';
         return region;
     }
 
-    function showToast(options) {
+    function showToast(options, legacyTone, legacyDuration) {
+        if (typeof options === 'string') {
+            options = {
+                message: options,
+                tone: legacyTone,
+                duration: legacyDuration,
+            };
+        }
+
+        options = options || {};
+
         var tone    = options.tone    || 'info';
         var title   = options.title   || '';
         var message = options.message || '';
@@ -817,7 +862,7 @@ import { gsap } from 'gsap';
     }
 
     // ── INIT ─────────────────────────────────────────────────────────────
-    function init() {
+    function initDynamicDom() {
         initFlash();
         flashToToast();
         initClientValidation();
@@ -827,10 +872,14 @@ import { gsap } from 'gsap';
         initEmptyTableSections();
         initActionAccordions();
         initTableAccordions();
-        initSidebarCollapse();
-        initMobileSidebar();
         initTableDataLabels();
         initDeadLinks();
+    }
+
+    function init() {
+        initDynamicDom();
+        initSidebarCollapse();
+        initMobileSidebar();
         initBrowserNotifications();
         initSpotlight();
         initKeyboardShortcuts();
@@ -844,7 +893,8 @@ import { gsap } from 'gsap';
     }
 
     // Re-run on Livewire/Turbo updates if ever added
-    window.addEventListener('anbg:page-updated', init);
+    window.addEventListener('anbg:page-updated', initDynamicDom);
+    document.addEventListener('anbg:page-soft-refreshed', initDynamicDom);
 
     // Expose toast API globally
     window.anbgToast = showToast;

@@ -144,7 +144,6 @@
                 $serviceSummary = (array) ($service['summary'] ?? []);
                 $serviceActions = collect($service['actions'] ?? [])->values();
                 $servicePeriodLabel = $tablePeriodLabel($serviceActions, $defaultPeriodLabel);
-                    ->values();
                 $serviceRmoRows = $serviceActions
                     ->groupBy(fn (array $row): string => (string) ($row['rmo'] ?? $row['responsable'] ?? 'Non renseigné'))
                     ->map(function ($rows, string $rmo): array {
@@ -337,32 +336,6 @@
                             </tr>
                         @empty
                             <tr><td colspan="6" class="muted">Aucun Indicateur de performance disponible pour ce service.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-
-                @include('workspace.monitoring.partials.reporting-table-header', [
-                    'directionLabel' => $directionLabel,
-                    'directionResponsable' => $directionResponsable,
-                    'serviceLabel' => $serviceLabel,
-                    'serviceResponsable' => $serviceResponsable,
-                    'periodLabel' => $servicePeriodLabel,
-                    'generatedAtLabel' => $generatedAtLabel,
-                ])
-
-                <table class="compact">
-                    <thead>
-                        <tr>
-                            <th>Action</th>
-                            <th>Responsable</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                            <tr>
-                                <td>{{ $row['action'] ?? '-' }}</td>
-                                <td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td>
-                            </tr>
-                        @empty
                         @endforelse
                     </tbody>
                 </table>

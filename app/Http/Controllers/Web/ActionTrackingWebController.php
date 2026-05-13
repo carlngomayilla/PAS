@@ -289,6 +289,104 @@ class ActionTrackingWebController extends Controller
             ]);
         }
 
+        if ($request->boolean('execution_only')) {
+            /** @var array<string, mixed> $validated */
+            $validated = $request->validate([
+                'quantite_realisee' => ['nullable', 'numeric', 'min:0'],
+                'commentaire' => ['nullable', 'string', 'max:5000'],
+                'resultat_obtenu' => ['nullable', 'string', 'max:5000'],
+                'est_effectuee' => ['accepted'],
+                'justificatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
+            ]);
+
+            $hasJustificatif = $request->hasFile('justificatif') || $sousAction->justificatifs()->exists();
+            if (! $hasJustificatif) {
+                return back()->withInput()->withErrors([
+                    'justificatif' => 'Veuillez televerser un justificatif avant de marquer cette sous-action comme realisee.',
+                ]);
+            }
+
+            $plannedTargetValue = $sousAction->cible_prevue === null || $sousAction->cible_prevue === ''
+                ? null
+                : max(0.0, (float) $sousAction->cible_prevue);
+            $realizedValue = max(0.0, (float) ($validated['quantite_realisee'] ?? $sousAction->quantite_realisee ?? 0));
+
+            if ($plannedTargetValue !== null && $plannedTargetValue > 0.0 && $realizedValue <= 0.0) {
+                return back()->withInput()->withErrors([
+                    'quantite_realisee' => 'La quantite effectuee est obligatoire pour cette sous-action.',
+                ]);
+            }
+
+            $before = $sousAction->toArray();
+
+            DB::transaction(function () use ($sousAction, $validated, $user, $request, $secureStorage, $plannedTargetValue, $realizedValue): void {
+                $completionRate = $plannedTargetValue !== null && $plannedTargetValue > 0.0
+                    ? round(min(100.0, ($realizedValue / $plannedTargetValue) * 100), 2)
+                    : 100;
+
+                $sousAction->fill([
+                    'quantite_realisee' => $realizedValue,
+                    'resultat_obtenu' => $validated['resultat_obtenu'] ?? $sousAction->resultat_obtenu,
+                    'taux_realisation' => $completionRate,
+                    'commentaire' => $validated['commentaire'] ?? $sousAction->commentaire,
+                    'date_realisation' => $sousAction->date_realisation ?: now(),
+                    'completed_at' => $sousAction->completed_at ?: now(),
+                    'statut' => 'effectuee',
+                    'est_effectuee' => true,
+                    'taux_execution' => $completionRate,
+                ])->save();
+
+                if ($request->hasFile('justificatif')) {
+                    $file = $request->file('justificatif');
+                    $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
+
+                    Justificatif::query()->create([
+                        'justifiable_type' => Action::class,
+                        'justifiable_id' => $sousAction->action_id,
+                        'sous_action_id' => $sousAction->id,
+                        'categorie' => 'sous_action',
+                        'nom_original' => $storedFile['nom_original'],
+                        'chemin_stockage' => $storedFile['path'],
+                        'est_chiffre' => $storedFile['est_chiffre'],
+                        'mime_type' => $storedFile['mime_type'],
+                        'taille_octets' => $storedFile['taille_octets'],
+                        'description' => 'Justificatif de sous-action agent',
+                        'ajoute_par' => $user->id,
+                    ]);
+                }
+
+                ActionLog::query()->create([
+                    'action_id' => $sousAction->action_id,
+                    'niveau' => 'info',
+                    'type_evenement' => 'sous_action_effectuee',
+                    'message' => 'Sous-action marquee comme effectuee par l agent.',
+                    'details' => [
+                        'sous_action_id' => (int) $sousAction->id,
+                        'libelle' => (string) $sousAction->libelle,
+                        'est_effectuee' => true,
+                        'quantite_realisee' => $realizedValue,
+                    ],
+                    'cible_role' => 'chef_service',
+                    'utilisateur_id' => $user->id,
+                ]);
+            });
+
+            $trackingService->refreshActionMetrics($action);
+
+            $this->recordAudit(
+                $request,
+                'sous_action',
+                'update',
+                $sousAction,
+                $before,
+                $sousAction->fresh()?->toArray()
+            );
+
+            return redirect()
+                ->route('workspace.actions.suivi', $action)
+                ->with('success', 'Sous-action marquee comme realisee.');
+        }
+
         /** @var array<string, mixed> $validated */
         $validated = $request->validate([
             'libelle_sous_action' => ['required', 'string', 'max:255'],

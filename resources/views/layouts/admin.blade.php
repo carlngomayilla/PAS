@@ -569,7 +569,11 @@
     @stack('scripts')
     <script @cspNonce>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js', { scope: '/' });
+            navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+                .then(function (registration) {
+                    registration.update();
+                })
+                .catch(function () {});
         }
     </script>
 

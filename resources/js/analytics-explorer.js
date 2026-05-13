@@ -142,7 +142,7 @@ function createZoomableBadge(target) {
 
   const badge = document.createElement('span');
   badge.className = 'analytics-zoom-badge';
-  badge.textContent = 'Plein ecran';
+  badge.textContent = '';
   target.appendChild(badge);
 }
 

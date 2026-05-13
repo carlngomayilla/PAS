@@ -38,7 +38,7 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('Diagramme de Gantt');
+        $charts->assertSee('Indicateurs KPI');
         $charts->assertDontSee('Analytique avancee');
         $charts->assertSee('dashboard-role-status-chart', false);
         $charts->assertSee('dashboard-role-support-chart', false);
@@ -109,7 +109,7 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('Jauges de performance par directions');
+        $charts->assertSee('Indicateurs KPI');
     }
 
     public function test_seeded_dg_user_sees_dg_dashboard_sections(): void
@@ -129,8 +129,7 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('Performance par direction');
-        $charts->assertSee('Indicateurs mensuels');
+        $charts->assertSee('Indicateurs KPI');
         $charts->assertSee('dashboard-role-support-chart', false);
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');

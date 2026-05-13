@@ -218,41 +218,46 @@ class SuperAdminWebTest extends TestCase
             $this->assertTrue($zip->open($tempFile) === true);
             $workbookXml = $zip->getFromName('xl/workbook.xml');
             $sheetOneXml = $zip->getFromName('xl/worksheets/sheet1.xml');
-            $sheetTwoXml = $zip->getFromName('xl/worksheets/sheet2.xml');
             $sheetThreeXml = $zip->getFromName('xl/worksheets/sheet3.xml');
-            $sheetSixXml = $zip->getFromName('xl/worksheets/sheet6.xml');
+            $sheetFourXml = $zip->getFromName('xl/worksheets/sheet4.xml');
+            $sheetSevenXml = $zip->getFromName('xl/worksheets/sheet7.xml');
             $coreXml = $zip->getFromName('docProps/core.xml');
             $zip->close();
         } else {
             $entries = app(SimpleZipReader::class)->read($tempFile);
             $workbookXml = $entries['xl/workbook.xml'] ?? false;
             $sheetOneXml = $entries['xl/worksheets/sheet1.xml'] ?? false;
-            $sheetTwoXml = $entries['xl/worksheets/sheet2.xml'] ?? false;
             $sheetThreeXml = $entries['xl/worksheets/sheet3.xml'] ?? false;
-            $sheetSixXml = $entries['xl/worksheets/sheet6.xml'] ?? false;
+            $sheetFourXml = $entries['xl/worksheets/sheet4.xml'] ?? false;
+            $sheetSevenXml = $entries['xl/worksheets/sheet7.xml'] ?? false;
             $coreXml = $entries['docProps/core.xml'] ?? false;
         }
         @unlink($tempFile);
 
         $this->assertNotFalse($workbookXml);
         $this->assertNotFalse($sheetOneXml);
-        $this->assertNotFalse($sheetTwoXml);
         $this->assertNotFalse($sheetThreeXml);
-        $this->assertNotFalse($sheetSixXml);
+        $this->assertNotFalse($sheetFourXml);
+        $this->assertNotFalse($sheetSevenXml);
         $this->assertNotFalse($coreXml);
+        // sheet1 = PAS PLAN — carries template title & subtitle via standardReportMetaRows
         $this->assertStringContainsString('Reporting DG Excel', (string) $sheetOneXml);
         $this->assertStringContainsString('Classeur synthese sans graphiques', (string) $sheetOneXml);
+        $this->assertStringContainsString('PAS PLAN', (string) $workbookXml);
         $this->assertStringContainsString('STRATEGIE', (string) $workbookXml);
         $this->assertStringContainsString('PAO', (string) $workbookXml);
         $this->assertStringContainsString('RMO_PERFORMANCE', (string) $workbookXml);
-        $this->assertStringContainsString('Tableau 2 : Objectifs operationnels &amp; Actions', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Direction', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Service', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Objectif operationnel', (string) $sheetTwoXml);
-        $this->assertStringContainsString('Tableau 3 : Actions detaillees', (string) $sheetThreeXml);
-        $this->assertStringContainsString('Description action', (string) $sheetThreeXml);
-        $this->assertStringContainsString('Tableau 6 : Alertes indicateurs sous seuil', (string) $sheetSixXml);
-        $this->assertStringContainsString('Action corrective', (string) $sheetSixXml);
+        // sheet3 = PAO (Tableau 2)
+        $this->assertStringContainsString('Tableau 2 : Objectifs operationnels &amp; Actions', (string) $sheetThreeXml);
+        $this->assertStringContainsString('Direction', (string) $sheetThreeXml);
+        $this->assertStringContainsString('Service', (string) $sheetThreeXml);
+        $this->assertStringContainsString('Objectif operationnel', (string) $sheetThreeXml);
+        // sheet4 = ACTIONS (Tableau 3)
+        $this->assertStringContainsString('Tableau 3 : Actions detaillees', (string) $sheetFourXml);
+        $this->assertStringContainsString('Description action', (string) $sheetFourXml);
+        // sheet7 = ALERTES (Tableau 6)
+        $this->assertStringContainsString('Tableau 6 : Alertes indicateurs sous seuil', (string) $sheetSevenXml);
+        $this->assertStringContainsString('Action corrective', (string) $sheetSevenXml);
         $this->assertStringContainsString('Reporting DG Excel', (string) $coreXml);
         $this->assertStringNotContainsString('Synthese graphique', (string) $workbookXml);
     }
@@ -315,86 +320,6 @@ class SuperAdminWebTest extends TestCase
         $this->assertStringNotContainsString('Synthese graphique', $html);
         $this->assertStringNotContainsString('Alertes de synthese', $html);
         $this->assertStringNotContainsString('Details actions en retard', $html);
-    }
-
-    public function test_reporting_word_export_uses_super_admin_template_metadata(): void
-    {
-        $admin = $this->createAdminUser();
-
-        ExportTemplate::query()
-            ->where('module', 'reporting')
-            ->where('report_type', 'consolidated_reporting')
-            ->where('format', 'word')
-            ->update(['is_default' => false]);
-        ExportTemplateAssignment::query()
-            ->where('module', 'reporting')
-            ->where('report_type', 'consolidated_reporting')
-            ->where('format', 'word')
-            ->update(['is_default' => false, 'is_active' => false]);
-
-        $template = ExportTemplate::query()->create([
-            'code' => 'reporting-word-officiel',
-            'name' => 'Reporting Word officiel',
-            'description' => 'Template Word DG.',
-            'format' => 'word',
-            'module' => 'reporting',
-            'report_type' => 'consolidated_reporting',
-            'reading_level' => 'officiel',
-            'status' => ExportTemplate::STATUS_PUBLISHED,
-            'is_default' => true,
-            'is_active' => true,
-            'blocks_config' => [
-                'include_cover' => true,
-                'include_summary' => true,
-                'include_detail_table' => true,
-                'include_charts' => false,
-                'include_alerts' => true,
-                'include_signatures' => true,
-            ],
-            'layout_config' => [
-                'paper_size' => 'a4',
-                'orientation' => 'portrait',
-                'header_text' => 'ANBG | WORD',
-                'footer_text' => 'Diffusion Word',
-                'watermark_text' => 'WORD DG',
-            ],
-            'content_config' => [
-                'visible_columns' => ['libelle', 'statut'],
-                'dynamic_variables' => ['{report_title}'],
-            ],
-            'style_config' => [
-                'color_primary' => '#1E3A8A',
-                'color_secondary' => '#3B82F6',
-                'font_family' => 'Times New Roman',
-            ],
-            'meta_config' => [
-                'document_title' => 'Reporting Word DG',
-                'document_subtitle' => 'Version diffusable',
-                'filename_prefix' => 'dg_word_template',
-            ],
-        ]);
-
-        ExportTemplateAssignment::query()->create([
-            'export_template_id' => $template->id,
-            'module' => 'reporting',
-            'report_type' => 'consolidated_reporting',
-            'format' => 'word',
-            'target_profile' => null,
-            'reading_level' => 'officiel',
-            'direction_id' => null,
-            'service_id' => null,
-            'is_default' => true,
-            'is_active' => true,
-        ]);
-
-        $response = $this->actingAs($admin)->get(route('workspace.reporting.export.word'));
-
-        $response->assertOk();
-        $this->assertStringContainsString('dg_word_template_', (string) $response->headers->get('content-disposition'));
-        $response->assertSee('Reporting Word DG');
-        $response->assertSee('Version diffusable');
-        $response->assertSee('ANBG | WORD');
-        $response->assertSee('WORD DG');
     }
 
     public function test_super_admin_can_preview_and_restore_export_template_version(): void
@@ -500,7 +425,7 @@ class SuperAdminWebTest extends TestCase
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.organization.index'))
             ->assertOk()
-            ->assertSee('Historique recent des connexions')
+            ->assertSee('Historique récent des connexions')
             ->assertSee('Agent test')
             ->assertSee('Connexion');
     }

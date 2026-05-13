@@ -48,7 +48,7 @@
         $usesQuantitativeProgress = $action->usesQuantitativeProgress();
         $usesStructuredProgress = $action->usesStructuredProgressTracking();
         $usesHistoricalProgress = ! $usesStructuredProgress;
-        $showSubActionsPanel = $usesSubTasksProgress && ! $usesQuantitativeProgress && ($usesStructuredProgress || $usesHistoricalProgress);
+        $showSubActionsPanel = $usesHistoricalProgress || $usesSubTasksProgress;
         $workflow = $workflowConfig ?? [
             'service_enabled' => true,
             'direction_enabled' => true,
@@ -227,7 +227,7 @@
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Sous-actions suivies</p>
             <p class="showcase-kpi-number">{{ $sousActionsDone }}/{{ $sousActionsTotal }}</p>
-            <p class="showcase-kpi-meta">Sous-actions créées par l'agent</p>
+            <p class="showcase-kpi-meta">Sous-actions planifiées</p>
         </article>
     </section>
 
@@ -235,7 +235,7 @@
         <h2 class="showcase-panel-title">Circuit de validation</h2>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Étape 1 — Soumission agent</strong>
+                <h3 class="form-section-title">Étape 1 — Soumission agent</h3>
                 <p class="mt-2 text-slate-600 flex flex-wrap items-center gap-2">Statut :
                     @if (in_array($validationStatus, ['non_soumise', 'rejetee_chef', 'rejetee_direction'], true))
                         <span class="anbg-badge anbg-badge-warning px-3">À corriger</span>
@@ -248,7 +248,7 @@
             </article>
             @if ($workflow['service_enabled'])
                 <article class="showcase-inline-stat action-detail-card">
-                    <strong>Étape 2 — Évaluation chef de service</strong>
+                    <h3 class="form-section-title">Étape 2 — Évaluation chef de service</h3>
                     <p class="mt-2 text-slate-600">Statut : <strong>{{ in_array($validationStatus, ['validee_chef', 'rejetee_direction', 'validee_direction'], true) ? 'Effectuée' : ($isAwaitingChef ? 'En attente' : '-') }}</strong></p>
                     <p class="text-slate-600">Évaluateur : <strong>{{ $action->evaluePar?->name ?? '-' }}</strong></p>
                     <p class="text-slate-600">Note : <strong>{{ $action->evaluation_note !== null ? number_format((float) $action->evaluation_note, 1, ',', ' ') . '/100' : '-' }}</strong></p>
@@ -257,7 +257,7 @@
             @endif
             @if ($workflow['direction_enabled'])
                 <article class="showcase-inline-stat action-detail-card">
-                    <strong>Étape {{ $workflow['service_enabled'] ? '3' : '2' }} — Validation direction</strong>
+                    <h3 class="form-section-title">Étape {{ $workflow['service_enabled'] ? '3' : '2' }} — Validation direction</h3>
                     <p class="mt-2 text-slate-600">Statut : <strong>{{ $isValidatedDirection ? 'Validée' : ($isAwaitingDirection ? 'En attente' : '-') }}</strong></p>
                     <p class="text-slate-600">Évaluateur : <strong>{{ $action->directionValidePar?->name ?? '-' }}</strong></p>
                     <p class="text-slate-600">Note : <strong>{{ $action->direction_evaluation_note !== null ? number_format((float) $action->direction_evaluation_note, 1, ',', ' ') . '/100' : '-' }}</strong></p>
@@ -278,7 +278,7 @@
 
             {{-- Planification --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Planification</strong>
+                <h3 class="form-section-title">Planification</h3>
                 <dl class="action-fiche-dl mt-2">
                     <dt>PAS</dt><dd>{{ $pas?->titre ?? '-' }}</dd>
                     <dt>Période PAS</dt><dd>{{ $pas?->periode_debut ?? '-' }} – {{ $pas?->periode_fin ?? '-' }}</dd>
@@ -292,7 +292,7 @@
 
             {{-- Identification --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Identification</strong>
+                <h3 class="form-section-title">Identification</h3>
                 <dl class="action-fiche-dl mt-2">
                     <dt>ID</dt><dd>#{{ $action->id }}</dd>
                     <dt>Libellé</dt><dd>{{ $action->libelle }}</dd>
@@ -311,7 +311,7 @@
 
             {{-- Responsable & échéances --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Responsable & échéances</strong>
+                <h3 class="form-section-title">Responsable & échéances</h3>
                 <dl class="action-fiche-dl mt-2">
                     <dt>Responsable</dt><dd>{{ $action->responsable?->name ?? '-' }}</dd>
                     <dt>RMO</dt><dd>{{ $rmoNames !== [] ? implode(', ', $rmoNames) : '-' }}</dd>
@@ -329,7 +329,7 @@
 
             {{-- Progression --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Progression</strong>
+                <h3 class="form-section-title">Progression</h3>
                 <dl class="action-fiche-dl mt-2">
                     <dt>Mode évaluation</dt><dd>{{ $modeEvaluationLabel }}</dd>
                     @if ($usesQuantitativeProgress)
@@ -355,7 +355,7 @@
 
             {{-- Ressources --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Ressources</strong>
+                <h3 class="form-section-title">Ressources</h3>
                 <dl class="action-fiche-dl mt-2">
                     <dt>Mobilisées</dt><dd>{{ $ressources !== [] ? implode(', ', $ressources) : '-' }}</dd>
                     <dt>Détails</dt><dd>{{ $action->ressources_details ?: '-' }}</dd>
@@ -364,7 +364,7 @@
 
             {{-- Financement sommaire --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Financement</strong>
+                <h3 class="form-section-title">Financement</h3>
                 <dl class="action-fiche-dl mt-2">
                     <dt>Requis</dt><dd>{{ $action->financement_requis ? 'Oui' : 'Non' }}</dd>
                     <dt>Montant estimé</dt><dd>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 2, ',', ' ') : '-' }}</dd>
@@ -381,7 +381,7 @@
 
             {{-- Clôture --}}
             <article class="showcase-inline-stat action-detail-card">
-                <strong>Clôture et évaluation</strong>
+                <h3 class="form-section-title">Clôture et évaluation</h3>
                 <dl class="action-fiche-dl mt-2">
                     <dt>Rapport final</dt><dd>{{ $action->rapport_final ?: '-' }}</dd>
                     <dt>Commentaire chef</dt><dd>{{ $action->evaluation_commentaire ?: '-' }}</dd>
@@ -398,7 +398,7 @@
         @if ($action->financement_requis)
             <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
                 <article class="showcase-inline-stat action-detail-card">
-                    <strong>Besoin déclaré</strong>
+                    <h3 class="form-section-title">Besoin déclaré</h3>
                     <p class="mt-2 text-slate-600">Statut financement : <strong>{{ $financingLabel }}</strong></p>
                     <p class="text-slate-600">Montant estimé : <strong>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 2) : '-' }}</strong></p>
                     <p class="text-slate-600">Nature : <strong>{{ $action->nature_financement ?: $action->description_financement ?: '-' }}</strong></p>
@@ -415,7 +415,7 @@
                     <p class="text-slate-600">Notification DAF : <strong>{{ optional($action->financement_notifie_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                 </article>
                 <article class="showcase-inline-stat action-detail-card">
-                    <strong>Décision DAF</strong>
+                    <h3 class="form-section-title">Décision DAF</h3>
                     <p class="mt-2 text-slate-600">Responsable DAF : <strong>{{ $action->financementDafPar?->name ?? '-' }}</strong></p>
                     <p class="text-slate-600">Date de décision : <strong>{{ optional($action->financement_daf_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                     <p class="text-slate-600">Décision : <strong>{{ $action->financement_daf_decision ?: '-' }}</strong></p>
@@ -424,7 +424,7 @@
                     <p class="text-slate-600">Commentaire : <strong>{{ $action->financement_daf_commentaire ?: '-' }}</strong></p>
                 </article>
                 <article class="showcase-inline-stat action-detail-card">
-                    <strong>Accord DG</strong>
+                    <h3 class="form-section-title">Accord DG</h3>
                     <p class="mt-2 text-slate-600">Décideur DG : <strong>{{ $action->financementDgPar?->name ?? '-' }}</strong></p>
                     <p class="text-slate-600">Date accord / refus : <strong>{{ optional($action->financement_dg_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                     <p class="text-slate-600">Décision : <strong>{{ $action->financement_dg_decision ?: '-' }}</strong></p>
@@ -518,7 +518,7 @@
             </article>
             <article class="showcase-inline-stat">
                 <strong>Validation</strong>
-                <p class="mt-1 text-lg">{{ $validationStatusLabel($validationStatus) }}</p>
+                <p class="mt-2 dd-badges"><span class="{{ $validationClass }}">{{ $validationLabel }}</span></p>
             </article>
             <article class="showcase-inline-stat">
                 <strong>Justificatif</strong>
@@ -553,16 +553,18 @@
                 </div>
                 <button class="btn btn-blue mt-3" type="submit">Enregistrer la quantité réalisée</button>
             </form>
+        @elseif ($usesStructuredProgress && $usesQuantitativeProgress && $agentLocked)
+            <p class="action-section-note mt-4">Saisie gelée : action soumise. Le formulaire de suivi sera de nouveau disponible après rejet motivé.</p>
         @endif
     </section>
 
     @if ($showSubActionsPanel)
     <section id="action-weeks" class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">Sous-actions de traitement</h2>
+        <h2 class="showcase-panel-title">{{ $usesHistoricalProgress ? "Suivi périodique de l'action" : 'Sous-actions de traitement' }}</h2>
         @if ($agentLocked)
             <p class="action-section-note mb-3">Saisie gelée : action soumise. Modifications possibles uniquement après rejet motivé.</p>
         @endif
-        @if ($canTrackWeekly && $usesStructuredProgress)
+        @if (false && $canTrackWeekly && $usesStructuredProgress)
             <form class="mb-4 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.sub-actions.store', $action) }}">
                 @csrf
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -627,6 +629,9 @@
                 <button class="btn btn-blue mt-3" type="submit">+ Ajouter une sous-action</button>
             </form>
         @endif
+        @if ($canTrackWeekly && $usesStructuredProgress && $action->sousActions->isEmpty())
+            <p class="action-section-note mb-3">Aucune sous-action planifiée. Les sous-actions doivent être ajoutées depuis la fiche action ou le PTA par le responsable habilité.</p>
+        @endif
         @if (false)
             <p class="action-section-note mb-3">Cette action est suivie en mode quantitatif. La saisie se fait dans le bloc « Quantité réalisée ».</p>
         @endif
@@ -637,11 +642,11 @@
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <div>
                             <strong>{{ $sousAction->libelle }}</strong>
-                            <span class="ml-2 rounded-full bg-[#3996d3]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3996d3]">Sous-action agent</span>
+                            <span class="ml-2 rounded-full bg-[#3996d3]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3996d3]">Sous-action planifiée</span>
                             <p class="text-slate-600">{{ optional($sousAction->date_debut)->format('d/m/Y') }} → {{ optional($sousAction->date_fin)->format('d/m/Y') }}</p>
                             <p class="text-slate-600">Agent : <strong>{{ $sousAction->agent?->name ?? '-' }}</strong></p>
                             <p class="text-slate-600">Statut : <strong>{{ $sousAction->est_effectuee ? 'Effectuée' : 'À faire' }}</strong> | Exécution : <strong>{{ number_format((float) ($sousAction->taux_execution ?? 0), 1, ',', ' ') }}%</strong></p>
-                            @if ($usesQuantitativeProgress)
+                            @if ($usesQuantitativeProgress || ($sousAction->cible_prevue !== null && (float) $sousAction->cible_prevue > 0))
                                 <p class="text-slate-600">Cible prévue : <strong>{{ $sousAction->cible_prevue !== null ? number_format((float) $sousAction->cible_prevue, 1, ',', ' ') : '-' }} {{ $sousAction->unite ?: $action->unite_cible }}</strong></p>
                                 <p class="text-slate-600">Quantité réalisée : <strong>{{ number_format((float) ($sousAction->quantite_realisee ?? 0), 1, ',', ' ') }} {{ $sousAction->unite ?: $action->unite_cible }}</strong> | Taux : <strong>{{ number_format((float) ($sousAction->taux_realisation ?? 0), 1, ',', ' ') }}%</strong></p>
                                 @if ($sousAction->resultat_obtenu)
@@ -669,9 +674,10 @@
                             && (int) $sousAction->agent_id === (int) auth()->id();
                     @endphp
                     @if ($canEditSousAction)
-                        <form class="mt-3 rounded-2xl border border-slate-200 bg-white p-3" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.sub-actions.update', [$action, $sousAction]) }}">
+                        <form class="tracking-entry-form {{ $sousAction->cible_prevue !== null && (float) $sousAction->cible_prevue > 0 ? 'has-target' : 'no-target' }} mt-3 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.sub-actions.update', [$action, $sousAction]) }}">
                             @csrf
                             @method('PUT')
+                            <input type="hidden" name="execution_only" value="1">
                             <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
                                 <div>
                                     <label for="libelle_sous_action_{{ $sousAction->id }}">Libellé</label>
@@ -689,13 +695,13 @@
                                     <label for="resultat_attendu_sous_action_{{ $sousAction->id }}">Résultat attendu</label>
                                     <textarea id="resultat_attendu_sous_action_{{ $sousAction->id }}" name="resultat_attendu">{{ old('resultat_attendu', $sousAction->resultat_attendu) }}</textarea>
                                 </div>
-                                @if ($usesQuantitativeProgress)
+                                @if ($usesQuantitativeProgress || ($sousAction->cible_prevue !== null && (float) $sousAction->cible_prevue > 0))
                                     <div>
                                         <label for="cible_prevue_sous_action_{{ $sousAction->id }}">Cible prévue</label>
                                         <input id="cible_prevue_sous_action_{{ $sousAction->id }}" name="cible_prevue" type="number" step="0.0001" min="0" value="{{ old('cible_prevue', $sousAction->cible_prevue) }}">
                                     </div>
                                     <div>
-                                        <label for="quantite_realisee_sous_action_{{ $sousAction->id }}">Quantité réalisée</label>
+                                        <label for="quantite_realisee_sous_action_{{ $sousAction->id }}">Quantité effectuée</label>
                                         <input id="quantite_realisee_sous_action_{{ $sousAction->id }}" name="quantite_realisee" type="number" step="0.0001" min="0" value="{{ old('quantite_realisee', $sousAction->quantite_realisee) }}">
                                     </div>
                                     <div>
@@ -717,20 +723,20 @@
                                 </div>
                                 <div>
                                     <label for="justificatif_sous_action_{{ $sousAction->id }}">Pièce justificative</label>
-                                    <input id="justificatif_sous_action_{{ $sousAction->id }}" name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
+                                    <input id="justificatif_sous_action_{{ $sousAction->id }}" name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}" @if($sousAction->justificatifs->isEmpty()) required @endif>
                                 </div>
                                 <label class="checkbox-pill self-end">
                                     <input type="hidden" name="est_effectuee" value="0">
                                     <input id="est_effectuee_sous_action_{{ $sousAction->id }}" name="est_effectuee" type="checkbox" value="1" @checked(old('est_effectuee'))>
-                                    Marquer comme réalisée
+                                    Je confirme que cette sous-action est effectuée
                                 </label>
                             </div>
-                            <button class="btn btn-blue mt-3" type="submit">Enregistrer la sous-action</button>
+                            <button class="btn btn-blue mt-3" type="submit">Marquer la sous-action comme effectuée</button>
                         </form>
                     @endif
                 </article>
             @empty
-                <p class="mb-3 text-slate-600">Aucune sous-action créée par l'agent pour cette action.</p>
+                <p class="mb-3 text-slate-600">Aucune sous-action planifiée pour cette action.</p>
             @endforelse
         </div>
 

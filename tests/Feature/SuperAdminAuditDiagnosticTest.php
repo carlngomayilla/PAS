@@ -38,7 +38,7 @@ class SuperAdminAuditDiagnosticTest extends TestCase
             ->get(route('workspace.super-admin.audit-diagnostic.index'))
             ->assertOk()
             ->assertSee('Audit et diagnostic')
-            ->assertSee('Controle de coherence')
+            ->assertSee('Contrôle de cohérence')
             ->assertSee('Changements sensibles')
             ->assertSee('Actions organisation')
             ->assertSee('Modules touches');
