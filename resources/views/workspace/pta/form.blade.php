@@ -67,6 +67,9 @@
                         'autres_ressources' => (bool) $action->ressource_autres,
                     ])),
                     'ressources_details' => $action->ressources_details ?: $action->ressource_autres_details,
+                    'risque_potentiel' => $action->risque_potentiel,
+                    'niveau_risque' => $action->niveau_risque,
+                    'mesures_preventives' => $action->mesures_preventives,
                     'rmo_ids' => $action->relationLoaded('responsables')
                         ? $action->responsables->pluck('id')->map(fn ($id) => (int) $id)->values()->all()
                         : array_filter([(int) $action->responsable_id]),
@@ -101,6 +104,9 @@
                 'observations' => '',
                 'ressources_necessaires' => [],
                 'ressources_details' => '',
+                'risque_potentiel' => '',
+                'niveau_risque' => '',
+                'mesures_preventives' => '',
                 'rmo_ids' => [],
             ]]);
         }
@@ -324,6 +330,9 @@
                 'observations' => '',
                 'ressources_necessaires' => [],
                 'ressources_details' => '',
+                'risque_potentiel' => '',
+                'niveau_risque' => '',
+                'mesures_preventives' => '',
             ],
             'selectedRmos' => collect([null]),
             'responsableOptions' => $responsableOptions,

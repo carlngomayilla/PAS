@@ -235,7 +235,35 @@
         </section>
 
         <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
-            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">7. Financement</h4>
+            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">7. Risques</h4>
+            <div class="form-grid">
+                <div class="md:col-span-2">
+                    <label>Risque potentiel</label>
+                    <textarea name="actions[{{ $index }}][risque_potentiel]">{{ $rowData['risque_potentiel'] ?? '' }}</textarea>
+                    @error("actions.$index.risque_potentiel") <p class="field-error">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label>Niveau de risque</label>
+                    @php $riskLevel = (string) ($rowData['niveau_risque'] ?? ''); @endphp
+                    <select name="actions[{{ $index }}][niveau_risque]">
+                        <option value="" @selected($riskLevel === '')>Non renseigne</option>
+                        <option value="faible" @selected($riskLevel === 'faible')>Faible</option>
+                        <option value="modere" @selected($riskLevel === 'modere')>Modere</option>
+                        <option value="eleve" @selected($riskLevel === 'eleve')>Eleve</option>
+                        <option value="critique" @selected($riskLevel === 'critique')>Critique</option>
+                    </select>
+                    @error("actions.$index.niveau_risque") <p class="field-error">{{ $message }}</p> @enderror
+                </div>
+                <div class="md:col-span-2">
+                    <label>Mesures preventives</label>
+                    <textarea name="actions[{{ $index }}][mesures_preventives]">{{ $rowData['mesures_preventives'] ?? '' }}</textarea>
+                    @error("actions.$index.mesures_preventives") <p class="field-error">{{ $message }}</p> @enderror
+                </div>
+            </div>
+        </section>
+
+        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
+            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">8. Financement</h4>
             <div class="form-grid">
                 <div>
                     <label>Besoin de financement</label>

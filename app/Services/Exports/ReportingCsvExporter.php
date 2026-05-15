@@ -240,6 +240,7 @@ class ReportingCsvExporter
 
     /**
      * @return array<int, array<int, mixed>>
+     */
     private function rmoPerformanceRows(array $payload): array
     {
         return $this->actionRows($payload)

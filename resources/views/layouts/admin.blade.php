@@ -122,6 +122,7 @@
             );
             $headerAlertUnreadCount = (int) ($headerAlertSummary['unread'] ?? 0);
             $headerSidebarBadges['alertes'] = $headerAlertUnreadCount;
+            $headerSidebarBadges['pilotage'] = $headerAlertUnreadCount;
         }
 
         // Count actions pending validation (for managers) and returned actions (for agents)

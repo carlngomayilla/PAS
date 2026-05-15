@@ -279,7 +279,7 @@ class PtaWebController extends Controller
         $pta->loadMissing([
             'actions.responsables:id,name,email',
             'actions.sousActions:id,action_id,agent_id,libelle,description,resultat_attendu,cible_prevue,unite,commentaire,date_debut,date_fin,statut,est_effectuee',
-            'actions:id,pta_id,pao_id,objectif_operationnel_id,mode_evaluation,libelle,description,date_debut,date_fin,statut,priorite,intitule_cible,unite_cible,quantite_cible,seuil_minimum,seuil_mode,seuil_t1,seuil_t2,seuil_t3,seuil_t4,methode_calcul,justificatif_obligatoire,echeance_cible,resultat_attendu,observations,montant_estime,nature_financement,source_financement,commentaire_financement,justificatif_financement_path,ressources_necessaires,ressources_details,ressource_main_oeuvre,ressource_equipement,ressource_partenariat,ressource_autres,ressource_autres_details,financement_requis,financement_statut,financement_soumis_le,financement_notifie_le,responsable_id',
+            'actions:id,pta_id,pao_id,objectif_operationnel_id,mode_evaluation,libelle,description,date_debut,date_fin,statut,priorite,intitule_cible,unite_cible,quantite_cible,seuil_minimum,seuil_mode,seuil_t1,seuil_t2,seuil_t3,seuil_t4,methode_calcul,justificatif_obligatoire,echeance_cible,resultat_attendu,observations,montant_estime,nature_financement,source_financement,commentaire_financement,justificatif_financement_path,ressources_necessaires,ressources_details,ressource_main_oeuvre,ressource_equipement,ressource_partenariat,ressource_autres,ressource_autres_details,risque_potentiel,niveau_risque,mesures_preventives,financement_requis,financement_statut,financement_soumis_le,financement_notifie_le,responsable_id',
         ]);
 
         return view('workspace.pta.form', [
@@ -806,6 +806,22 @@ class PtaWebController extends Controller
             ->values()
             ->all();
         $resourceDetails = ($value = trim((string) ($actionPayload['ressources_details'] ?? ''))) !== '' ? $value : null;
+        $riskPotential = ($value = trim((string) (
+            $actionPayload['risque_potentiel']
+            ?? $actionPayload['risques']
+            ?? ($isNewAction ? '' : $existingAction?->risque_potentiel)
+            ?? ''
+        ))) !== '' ? $value : null;
+        $riskLevel = ($value = trim((string) (
+            $actionPayload['niveau_risque']
+            ?? ($isNewAction ? '' : $existingAction?->niveau_risque)
+            ?? ''
+        ))) !== '' ? $value : null;
+        $preventiveMeasures = ($value = trim((string) (
+            $actionPayload['mesures_preventives']
+            ?? ($isNewAction ? '' : $existingAction?->mesures_preventives)
+            ?? ''
+        ))) !== '' ? $value : null;
         $natureFinancement = ($value = trim((string) ($actionPayload['nature_financement'] ?? ''))) !== '' ? $value : null;
         $sourceFinancement = ($value = trim((string) ($actionPayload['source_financement'] ?? ''))) !== '' ? $value : null;
         $commentaireFinancement = ($value = trim((string) ($actionPayload['commentaire_financement'] ?? ''))) !== '' ? $value : null;
@@ -876,6 +892,9 @@ class PtaWebController extends Controller
             'ressource_partenariat' => in_array('partenariat', $selectedResources, true),
             'ressource_autres' => in_array('autres_ressources', $selectedResources, true),
             'ressource_autres_details' => $resourceDetails,
+            'risque_potentiel' => $riskPotential,
+            'niveau_risque' => $riskLevel,
+            'mesures_preventives' => $preventiveMeasures,
             'nature_financement' => $financementRequis ? $natureFinancement : null,
             'description_financement' => $financementRequis ? $natureFinancement : null,
             'source_financement' => $financementRequis ? $sourceFinancement : null,

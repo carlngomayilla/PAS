@@ -27,7 +27,7 @@ class SuperAdminRolePermissionsTest extends TestCase
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.roles.edit'))
             ->assertOk()
-            ->assertSee('Roles et permissions');
+            ->assertSee('Rôles et permissions');
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.roles.edit'))

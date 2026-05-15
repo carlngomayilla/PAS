@@ -192,15 +192,17 @@ class PlatformSettings
 
     public function brandAssetUrl(string $variant = 'full'): string
     {
-        $settingKey = match ($variant) {
-            'mark' => 'logo_mark_path',
-            'wordmark' => 'logo_wordmark_path',
-            default => 'logo_full_path',
+        $settingKeys = match ($variant) {
+            'mark' => ['logo_mark_path'],
+            'wordmark' => ['logo_wordmark_path', 'logo_full_path'],
+            default => ['logo_full_path', 'logo_wordmark_path', 'logo_mark_path'],
         };
 
-        $storedPath = trim((string) $this->get($settingKey, ''));
-        if ($storedPath !== '') {
-            return $this->publicStorageUrl($storedPath);
+        foreach ($settingKeys as $settingKey) {
+            $storedPath = trim((string) $this->get($settingKey, ''));
+            if ($storedPath !== '') {
+                return $this->publicStorageUrl($storedPath);
+            }
         }
 
         return match ($variant) {

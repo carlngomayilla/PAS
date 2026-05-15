@@ -1562,7 +1562,7 @@
                             @endforeach
                         </svg>
                     @else
-                        <div class="dashboard-chart-empty">Aucune donnÃ©e disponible pour ce graphique.</div>
+                        <div class="dashboard-chart-empty">Aucune donnée disponible pour ce graphique.</div>
                     @endif
                 </div>
             </div>
@@ -1593,7 +1593,7 @@
                                 @endforeach
                             </div>
                         @else
-                            <div class="dashboard-chart-empty">Aucune donnÃ©e disponible pour ce graphique.</div>
+                            <div class="dashboard-chart-empty">Aucune donnée disponible pour ce graphique.</div>
                         @endif
                     </div>
                 </div>

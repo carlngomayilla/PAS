@@ -26,7 +26,7 @@ class SuperAdminDynamicReferentialsTest extends TestCase
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.referentials.edit'))
             ->assertOk()
-            ->assertSee('Referentiels dynamiques');
+            ->assertSee('Référentiels dynamiques');
 
         $this->actingAs($superAdmin)
             ->put(route('workspace.super-admin.referentials.update'), [

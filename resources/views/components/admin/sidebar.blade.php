@@ -34,11 +34,12 @@
     $sections = [];
 
     $menuItems = [[
-        'code' => 'dashboard',
-        'label' => 'Dashboard',
+        'code' => 'pilotage',
+        'label' => $moduleLabel('pilotage', 'Pilotage'),
         'route' => 'dashboard',
         'icon' => 'dashboard',
         'patterns' => ['dashboard', 'admin.dashboard'],
+        'badge' => (int) ($moduleBadges['pilotage'] ?? 0),
         'display_order' => -100 + $moduleOrder('pilotage', 20),
     ]];
 

@@ -104,7 +104,7 @@ class AlertRoutingService
 
     public function userCanSeeActionLog(User $user, ActionLog $log): bool
     {
-        if ($user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN)) {
+        if ($user->hasGlobalReadAccess()) {
             return true;
         }
 

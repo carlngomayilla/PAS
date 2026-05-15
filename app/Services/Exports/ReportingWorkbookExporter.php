@@ -580,7 +580,7 @@ class ReportingWorkbookExporter
         return $this->buildTableSheet(
             'RMO_PERFORMANCE',
             'RMO_PERFORMANCE',
-            $this->standardReportMetaRows($payload, 'Tableau 8 : Performance par RMO'),
+            $this->standardReportMetaRows($payload, 'Tableau 7 : Performance par RMO'),
             ['Direction', 'Service', 'RMO', 'Nombre d actions', 'Performance moyenne (%)'],
             ['string', 'string', 'string', 'integer', 'percent'],
             $this->rmoPerformanceRows($payload),
@@ -593,7 +593,7 @@ class ReportingWorkbookExporter
         return $this->buildTableSheet(
             'JUSTIFICATIFS',
             'JUSTIFICATIFS',
-            $this->standardReportMetaRows($payload, 'Tableau 9 : Suivi des justificatifs'),
+            $this->standardReportMetaRows($payload, 'Tableau 8 : Suivi des justificatifs'),
             ['Direction', 'Service', 'Action', 'RMO', 'Justificatif', 'Statut validation', 'Date'],
             ['string', 'string', 'string', 'string', 'string', 'string', 'string'],
             $this->justificatifSheetRows($payload),

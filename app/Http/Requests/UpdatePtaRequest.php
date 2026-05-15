@@ -123,6 +123,9 @@ class UpdatePtaRequest extends FormRequest
             'actions.*.ressources_necessaires' => ['nullable', 'array'],
             'actions.*.ressources_necessaires.*' => ['string', Rule::in(array_keys(Action::resourceOptions()))],
             'actions.*.ressources_details' => ['nullable', 'string'],
+            'actions.*.risque_potentiel' => ['nullable', 'string'],
+            'actions.*.niveau_risque' => ['nullable', 'string', 'max:50'],
+            'actions.*.mesures_preventives' => ['nullable', 'string'],
             'actions.*.commentaire_financement' => ['nullable', 'string'],
             'actions.*.justificatif_financement' => [
                 'nullable',

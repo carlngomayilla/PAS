@@ -193,7 +193,7 @@ class SuperAdminPlatformConfigurationTest extends TestCase
             ->assertSee('#102A43', false)
             ->assertSee('Poppins', false)
             ->assertSee('Manrope', false)
-            ->assertSee('var theme = "light"', false)
+            ->assertSee("root.setAttribute('data-theme', 'light')", false)
             ->assertSee('--app-screen-max-width: 1180px', false)
             ->assertSee('--app-sidebar-width: 152px', false);
     }
