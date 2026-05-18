@@ -2164,8 +2164,8 @@
         border-radius: 999px !important;
         background: var(--app-surface) !important;
         color: var(--app-primary) !important;
-        box-shadow: none !important;
-        transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+        transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
     }
 
     .admin-navbar-icon-button:hover,
@@ -2173,6 +2173,14 @@
         border-color: var(--app-primary) !important;
         background: var(--app-primary-light) !important;
         color: var(--app-primary) !important;
+        box-shadow: 0 4px 12px -4px rgba(57, 150, 211, 0.4) !important;
+        transform: translateY(-1px);
+    }
+
+    .admin-navbar-icon-button:active,
+    .admin-dropdown-link:active {
+        transform: translateY(0);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
     }
 
     .admin-exercise-filter,
@@ -2182,7 +2190,108 @@
         border-radius: 999px !important;
         background: var(--app-white) !important;
         color: var(--app-text) !important;
-        box-shadow: none !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+        transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .admin-exercise-filter:hover,
+    .admin-local-clock:hover,
+    .admin-navbar-user:hover {
+        border-color: color-mix(in srgb, var(--app-primary) 60%, var(--app-border));
+        box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.08) !important;
+    }
+
+    /* Horloge : largeur fixe + chiffres monospaced pour éviter le shift à chaque seconde. */
+    .admin-local-clock {
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum";
+        min-width: 6.4rem;
+        height: 2.35rem;
+        padding: 0 0.9rem;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.82rem;
+        letter-spacing: 0.02em;
+        color: var(--app-text);
+        gap: 0.45rem;
+    }
+
+    .admin-local-clock::before {
+        content: "";
+        display: inline-block;
+        width: 0.4rem;
+        height: 0.4rem;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+        animation: anbgClockPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes anbgClockPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.45; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .admin-local-clock::before { animation: none; }
+        .admin-navbar-icon-button,
+        .admin-dropdown-link,
+        .admin-exercise-filter,
+        .admin-local-clock,
+        .admin-navbar-user { transition: none !important; }
+    }
+
+    /* Filtre exercice/trimestre : alignement vertical propre. */
+    .admin-exercise-filter {
+        height: 2.35rem;
+        padding: 0 0.25rem 0 0.55rem;
+        gap: 0.1rem;
+        align-items: center;
+    }
+
+    .admin-exercise-filter select {
+        height: 100%;
+        background: transparent;
+        font-weight: 600;
+        cursor: pointer;
+        appearance: none;
+        padding-right: 1.1rem;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2317324a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.35rem center;
+        background-size: 0.65rem;
+    }
+
+    .admin-exercise-filter select:focus {
+        outline: 2px solid var(--app-primary);
+        outline-offset: 2px;
+        border-radius: 6px;
+    }
+
+    /* Bloc utilisateur : harmonisation hauteur. */
+    .admin-navbar-user {
+        height: 2.35rem;
+        padding: 0 0.35rem 0 0.85rem !important;
+        gap: 0.65rem;
+    }
+
+    .admin-navbar-user .admin-navbar-avatar-media {
+        width: 1.85rem !important;
+        height: 1.85rem !important;
+        border-radius: 999px !important;
+    }
+
+    /* Chip de périmètre dans la navbar. */
+    .admin-navbar-scope-chip {
+        height: 2.35rem;
+        font-feature-settings: "tnum";
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        transition: box-shadow 160ms ease, transform 160ms ease;
+    }
+
+    .admin-navbar-scope-chip:hover {
+        box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.08);
     }
 
     .admin-navbar-avatar-media {
