@@ -432,6 +432,7 @@ class ReferentielWebController extends Controller
             'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
+            'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'roleOptions' => $this->roleOptions($user),
             'canManageRoles' => $this->canManageRoles($user),
         ]);
@@ -460,6 +461,7 @@ class ReferentielWebController extends Controller
                 'agent_telephone' => $validated['agent_telephone'] ?? null,
                 'direction_id' => $validated['direction_id'] ?? null,
                 'service_id' => $validated['service_id'] ?? null,
+                'unite_dg_id' => $validated['unite_dg_id'] ?? null,
                 'password' => 'temp-password-placeholder',
                 'password_changed_at' => now(),
             ]);
@@ -489,6 +491,7 @@ class ReferentielWebController extends Controller
             'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
+            'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'roleOptions' => $this->roleOptions($user, $utilisateur),
             'canManageRoles' => $this->canManageRoles($user),
         ]);
@@ -516,6 +519,7 @@ class ReferentielWebController extends Controller
             'agent_telephone' => $validated['agent_telephone'] ?? null,
             'direction_id' => $validated['direction_id'] ?? null,
             'service_id' => $validated['service_id'] ?? null,
+            'unite_dg_id' => $validated['unite_dg_id'] ?? null,
         ];
 
         if (! empty($validated['password'])) {
@@ -600,6 +604,7 @@ class ReferentielWebController extends Controller
             'agent_telephone' => ['nullable', 'string', 'max:40'],
             'direction_id' => ['nullable', 'integer', 'exists:directions,id'],
             'service_id' => ['nullable', 'integer', 'exists:services,id'],
+            'unite_dg_id' => ['nullable', 'integer', 'exists:unites_dg,id'],
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
             'remove_profile_photo' => ['nullable', 'boolean'],
             'password' => $creating

@@ -62,6 +62,7 @@ class Action extends Model
         'pta_id',
         'pao_id',
         'objectif_operationnel_id',
+        'unite_dg_id',
         'mode_evaluation',
         'libelle',
         'description',
@@ -245,6 +246,11 @@ class Action extends Model
     public function objectifOperationnel(): BelongsTo
     {
         return $this->belongsTo(ObjectifOperationnel::class, 'objectif_operationnel_id');
+    }
+
+    public function uniteDg(): BelongsTo
+    {
+        return $this->belongsTo(UniteDg::class, 'unite_dg_id');
     }
 
     public function responsable(): BelongsTo

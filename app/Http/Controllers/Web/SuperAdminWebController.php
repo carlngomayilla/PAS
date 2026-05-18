@@ -707,6 +707,7 @@ class SuperAdminWebController extends Controller
             'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
+            'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'roleOptions' => $this->profileOptions(),
             'roleLabels' => $this->profileLabels(),
             'bulkActionOptions' => [

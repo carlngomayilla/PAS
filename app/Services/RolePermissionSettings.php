@@ -244,6 +244,115 @@ class RolePermissionSettings
                 'audit.read',
                 'messagerie.read',
             ],
+
+            // Profils ajoutés (Lot 2) — alignement organisation ANBG.
+
+            // Admin métier (gestion paramétrage, sans pouvoirs techniques type api_docs/retention).
+            User::ROLE_ADMIN_FONCTIONNEL => [
+                'scope.global.read',
+                'scope.global.write',
+                'planning.read',
+                'planning.write.global',
+                'planning.strategic.manage',
+                'reporting.read',
+                'alerts.read',
+                'referentiel.read',
+                'referentiel.write',
+                'users.manage',
+                'delegations.manage',
+                'messagerie.read',
+            ],
+
+            // SCIQ — Suivi global (équivalent fonctionnel de Planification, rattaché à l'unité SCIQ).
+            User::ROLE_SCIQ_SUIVI_GLOBAL => [
+                'scope.global.read',
+                'scope.global.write',
+                'planning.read',
+                'planning.write.global',
+                'planning.strategic.manage',
+                'reporting.read',
+                'alerts.read',
+                'referentiel.read',
+                'delegations.manage',
+                'messagerie.read',
+            ],
+
+            // Chef d'unité SCIQ — gère SCIQ + suivi global agence.
+            User::ROLE_CHEF_UNITE_SCIQ => [
+                'scope.global.read',
+                'scope.global.write',
+                'planning.read',
+                'planning.write.global',
+                'planning.strategic.manage',
+                'reporting.read',
+                'alerts.read',
+                'delegations.manage',
+                'messagerie.read',
+            ],
+
+            // DGA — supervision vue globale (lecture).
+            User::ROLE_DGA_SUPERVISION => [
+                'scope.global.read',
+                'planning.read',
+                'planning.strategic.manage',
+                'reporting.read',
+                'alerts.read',
+                'messagerie.read',
+            ],
+
+            // Chef d'unité DGA — gère DGA + vue globale.
+            User::ROLE_CHEF_UNITE_DGA => [
+                'scope.global.read',
+                'planning.read',
+                'planning.write.global',
+                'reporting.read',
+                'alerts.read',
+                'messagerie.read',
+            ],
+
+            // Cabinet — supervision (équivalent au Cabinet actuel, vue globale lecture).
+            User::ROLE_CABINET_SUPERVISION => [
+                'scope.global.read',
+                'planning.read',
+                'planning.strategic.manage',
+                'reporting.read',
+                'alerts.read',
+                'audit.read',
+                'messagerie.read',
+            ],
+
+            // Chef d'unité Cabinet — gère Cabinet + vue globale.
+            User::ROLE_CHEF_UNITE_CABINET => [
+                'scope.global.read',
+                'planning.read',
+                'planning.write.global',
+                'reporting.read',
+                'alerts.read',
+                'messagerie.read',
+            ],
+
+            // Chef d'unité UCAS — portée limitée à son unité uniquement.
+            User::ROLE_CHEF_UNITE_UCAS => [
+                'planning.read',
+                'planning.write.service',
+                'reporting.read',
+                'alerts.read',
+                'messagerie.read',
+            ],
+
+            // Auditeur — lecture seule sur audit et reporting.
+            User::ROLE_AUDITEUR => [
+                'planning.read',
+                'reporting.read',
+                'audit.read',
+                'messagerie.read',
+            ],
+
+            // Invité — lecture très limitée.
+            User::ROLE_INVITE_LECTURE => [
+                'reporting.read',
+                'messagerie.read',
+            ],
         ];
     }
 

@@ -7,6 +7,25 @@
     $user = auth()->user();
     $moduleBadges = is_array($notificationCounts) ? $notificationCounts : [];
     $workspaceModules = collect($user?->workspaceModules() ?? [])->keyBy('code');
+
+    // Périmètre d'accès — affiché en chip dans la sidebar pour rappel.
+    $accessScope = $user?->accessScope() ?? [];
+    $scopeType = (string) ($accessScope['scope_type'] ?? 'limited');
+    $scopeLabel = match ($scopeType) {
+        'global' => 'Vue globale',
+        'direction' => 'Direction : '.($user?->direction?->libelle ?? '—'),
+        'service' => 'Service : '.($user?->service?->libelle ?? '—'),
+        'unite' => 'Unité : '.($user?->uniteDg?->libelle ?? '—'),
+        'agent' => 'Mes actions',
+        default => 'Accès limité',
+    };
+    $scopeTone = match ($scopeType) {
+        'global' => 'bg-emerald-500/20 text-emerald-50 border-emerald-300/30',
+        'direction', 'unite' => 'bg-sky-500/20 text-sky-50 border-sky-300/30',
+        'service' => 'bg-amber-500/20 text-amber-50 border-amber-300/30',
+        'agent' => 'bg-violet-500/20 text-violet-50 border-violet-300/30',
+        default => 'bg-slate-500/20 text-slate-50 border-slate-300/30',
+    };
     $isDafFinanceReviewer = $user
         && $user->hasRole(\App\Models\User::ROLE_DIRECTION)
         && $user->direction_id !== null
@@ -262,6 +281,17 @@
                     </button>
                 </div>
             </div>
+
+            @if ($user)
+                <div class="app-sidebar-scope px-3 pb-2" data-sidebar-scope-chip>
+                    <span class="inline-flex w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10.5px] font-semibold tracking-wide {{ $scopeTone }}" title="Périmètre d'accès : {{ $scopeLabel }}">
+                        <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7l9-4 9 4M3 7l9 4m-9-4v10l9 4m0-14l9-4v10l-9 4m0-14v14" />
+                        </svg>
+                        <span class="truncate" data-sidebar-label>{{ $scopeLabel }}</span>
+                    </span>
+                </div>
+            @endif
 
             <div class="app-sidebar-search px-3 pb-2" data-sidebar-search-wrap>
                 <div class="relative">

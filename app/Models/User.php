@@ -28,6 +28,18 @@ class User extends Authenticatable
     public const ROLE_AGENT = 'agent';
     public const ROLE_CABINET = 'cabinet';
 
+    // Profils ajoutés (Lot 2) — pour aligner l'application sur l'organisation réelle ANBG.
+    public const ROLE_ADMIN_FONCTIONNEL = 'admin_fonctionnel';
+    public const ROLE_SCIQ_SUIVI_GLOBAL = 'sciq_suivi_global';
+    public const ROLE_CHEF_UNITE_SCIQ = 'chef_unite_sciq';
+    public const ROLE_CHEF_UNITE_DGA = 'chef_unite_dga';
+    public const ROLE_CHEF_UNITE_CABINET = 'chef_unite_cabinet';
+    public const ROLE_CHEF_UNITE_UCAS = 'chef_unite_ucas';
+    public const ROLE_DGA_SUPERVISION = 'dga_supervision';
+    public const ROLE_CABINET_SUPERVISION = 'cabinet_supervision';
+    public const ROLE_AUDITEUR = 'auditeur';
+    public const ROLE_INVITE_LECTURE = 'invite_lecture';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -50,6 +62,7 @@ class User extends Authenticatable
         'agent_telephone',
         'direction_id',
         'service_id',
+        'unite_dg_id',
     ];
 
     /**
@@ -164,6 +177,11 @@ class User extends Authenticatable
     public function service(): BelongsTo
     {
         return $this->belongsTo(Service::class, 'service_id');
+    }
+
+    public function uniteDg(): BelongsTo
+    {
+        return $this->belongsTo(UniteDg::class, 'unite_dg_id');
     }
 
     public function conversations(): BelongsToMany
@@ -405,6 +423,16 @@ class User extends Authenticatable
         }
 
         return $this->profileInteractionsCache = app(\App\Services\UserProfileService::class)->interactionsFor($this);
+    }
+
+    /**
+     * Retourne le périmètre d'accès de l'utilisateur (global, direction, service, unité, agent ou limited).
+     *
+     * @return array<string, mixed>
+     */
+    public function accessScope(): array
+    {
+        return app(\App\Services\AccessScopeService::class)->scopeFor($this);
     }
 
     /**

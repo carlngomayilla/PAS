@@ -71,6 +71,7 @@ class DashboardController extends Controller
             'user' => $user,
             'profil' => $user->profileInteractions(),
             'modules' => $user->workspaceModules(),
+            'accessScope' => $user->accessScope(),
             'metrics' => $payload['metrics'],
             'dashboardData' => $payload['dashboardData'],
             'dashboardClientData' => $payload['dashboardClientData'],

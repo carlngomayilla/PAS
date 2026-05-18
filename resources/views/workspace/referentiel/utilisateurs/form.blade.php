@@ -79,6 +79,17 @@
                             @endforeach
                         </select>
                     </div>
+                    <div>
+                        <label for="unite_dg_id">Unité DG</label>
+                        <select id="unite_dg_id" name="unite_dg_id">
+                            <option value="">Aucune</option>
+                            @foreach ($uniteDgOptions ?? [] as $unite)
+                                <option value="{{ $unite->id }}" @selected((int) old('unite_dg_id', $row->unite_dg_id) === $unite->id)>
+                                    {{ $unite->code }} - {{ $unite->libelle }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
 
                 <div id="agent-fields" class="conditional-block mt-4">

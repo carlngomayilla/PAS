@@ -27,12 +27,22 @@ class RoleRegistryService
         return [
             User::ROLE_SUPER_ADMIN => ['label' => 'Super Admin', 'base_role' => User::ROLE_SUPER_ADMIN, 'system' => true],
             User::ROLE_ADMIN => ['label' => 'Administrateur', 'base_role' => User::ROLE_ADMIN, 'system' => true],
-            User::ROLE_DG => ['label' => 'DG', 'base_role' => User::ROLE_DG, 'system' => true],
+            User::ROLE_ADMIN_FONCTIONNEL => ['label' => 'Administrateur fonctionnel', 'base_role' => User::ROLE_ADMIN_FONCTIONNEL, 'system' => true],
+            User::ROLE_DG => ['label' => 'Directeur Général', 'base_role' => User::ROLE_DG, 'system' => true],
             User::ROLE_PLANIFICATION => ['label' => 'Planification', 'base_role' => User::ROLE_PLANIFICATION, 'system' => true],
-            User::ROLE_DIRECTION => ['label' => 'Direction', 'base_role' => User::ROLE_DIRECTION, 'system' => true],
-            User::ROLE_SERVICE => ['label' => 'Service', 'base_role' => User::ROLE_SERVICE, 'system' => true],
-            User::ROLE_AGENT => ['label' => 'Agent', 'base_role' => User::ROLE_AGENT, 'system' => true],
+            User::ROLE_SCIQ_SUIVI_GLOBAL => ['label' => 'SCIQ — Suivi global', 'base_role' => User::ROLE_SCIQ_SUIVI_GLOBAL, 'system' => true],
+            User::ROLE_CHEF_UNITE_SCIQ => ['label' => 'Chef d’unité SCIQ', 'base_role' => User::ROLE_CHEF_UNITE_SCIQ, 'system' => true],
+            User::ROLE_DGA_SUPERVISION => ['label' => 'DGA — Supervision', 'base_role' => User::ROLE_DGA_SUPERVISION, 'system' => true],
+            User::ROLE_CHEF_UNITE_DGA => ['label' => 'Chef d’unité DGA', 'base_role' => User::ROLE_CHEF_UNITE_DGA, 'system' => true],
             User::ROLE_CABINET => ['label' => 'Cabinet', 'base_role' => User::ROLE_CABINET, 'system' => true],
+            User::ROLE_CABINET_SUPERVISION => ['label' => 'Cabinet — Supervision', 'base_role' => User::ROLE_CABINET_SUPERVISION, 'system' => true],
+            User::ROLE_CHEF_UNITE_CABINET => ['label' => 'Chef d’unité Cabinet', 'base_role' => User::ROLE_CHEF_UNITE_CABINET, 'system' => true],
+            User::ROLE_CHEF_UNITE_UCAS => ['label' => 'Chef d’unité UCAS', 'base_role' => User::ROLE_CHEF_UNITE_UCAS, 'system' => true],
+            User::ROLE_DIRECTION => ['label' => 'Directeur de direction', 'base_role' => User::ROLE_DIRECTION, 'system' => true],
+            User::ROLE_SERVICE => ['label' => 'Chef de service', 'base_role' => User::ROLE_SERVICE, 'system' => true],
+            User::ROLE_AGENT => ['label' => 'Agent', 'base_role' => User::ROLE_AGENT, 'system' => true],
+            User::ROLE_AUDITEUR => ['label' => 'Auditeur', 'base_role' => User::ROLE_AUDITEUR, 'system' => true],
+            User::ROLE_INVITE_LECTURE => ['label' => 'Invité — Lecture', 'base_role' => User::ROLE_INVITE_LECTURE, 'system' => true],
         ];
     }
 
