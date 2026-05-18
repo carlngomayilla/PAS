@@ -971,19 +971,9 @@
             </details>
         @endif
     </div>
-@else
-    <div class="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[#3996d3]/18 bg-[#e8f3fb] px-4 py-3 text-sm font-semibold text-[#17324a]">
-        <span>{{ $profileRoleLabel }}</span>
-        <span class="text-[#3996d3]">|</span>
-        <span>{{ $profileScope }}</span>
-        <span class="text-[#3996d3]">|</span>
-        <span>{{ $profileDirectionLabel }}</span>
-        <span class="text-[#3996d3]">|</span>
-        <span>{{ $profileServiceLabel }}</span>
-        <span class="text-[#3996d3]">|</span>
-        <span>{{ $exerciseFilter['label'] ?? 'Exercice courant' }}</span>
-    </div>
 @endif
+{{-- Badge redondant supprimé : les informations rôle/périmètre/direction/service/exercice
+     sont désormais accessibles via le chip de périmètre dans la navbar (et le filtre exercice). --}}
 
 @php
     $showRoleOverview = ($roleDashboard['enabled'] ?? false)
