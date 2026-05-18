@@ -49,17 +49,7 @@ class PaoWebController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        $query = Pao::query()
-            ->with([
-                'pas:id,titre,periode_debut,periode_fin,statut',
-                'pasObjectif:id,pas_axe_id,code,libelle,ordre',
-                'pasObjectif.pasAxe:id,pas_id,code,libelle,ordre',
-                'direction:id,code,libelle',
-                'service:id,direction_id,code,libelle',
-                'objectifsOperationnels:id,pao_id,service_id,libelle,echeance,statut',
-                'validateur:id,name,email',
-            ])
-            ->withCount(['ptas', 'objectifsOperationnels']);
+        $query = Pao::query();
 
         $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
         app(ExerciceContext::class)->applyToPao(
@@ -127,8 +117,9 @@ class PaoWebController extends Controller
         });
 
         $statsBase = clone $query;
-        $byStatus = (clone $statsBase)->toBase()
-            ->selectRaw('statut, COUNT(*) as cnt')
+        $byStatus = (clone $statsBase)
+            ->select('statut')
+            ->selectRaw('COUNT(*) as cnt')
             ->groupBy('statut')
             ->pluck('cnt', 'statut');
         $paoStats = [
@@ -137,11 +128,27 @@ class PaoWebController extends Controller
             'brouillons' => (int) ($byStatus['brouillon'] ?? 0),
             'avec_pta'   => (clone $statsBase)->has('ptas')->count(),
             'sans_pta'   => (clone $statsBase)->doesntHave('ptas')->count(),
-            'directions' => (clone $statsBase)->toBase()->distinct()->count('direction_id'),
+            'directions' => (clone $statsBase)->distinct()->count('direction_id'),
         ];
 
+        $rows = $query
+            ->with([
+                'pas:id,titre,periode_debut,periode_fin,statut',
+                'pasObjectif:id,pas_axe_id,code,libelle,ordre',
+                'pasObjectif.pasAxe:id,pas_id,code,libelle,ordre',
+                'direction:id,code,libelle',
+                'service:id,direction_id,code,libelle',
+                'objectifsOperationnels:id,pao_id,service_id,libelle,echeance,statut',
+                'validateur:id,name,email',
+            ])
+            ->withCount(['ptas', 'objectifsOperationnels'])
+            ->orderByDesc('annee')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
         return view('workspace.pao.index', [
-            'rows' => $query->orderByDesc('annee')->orderByDesc('id')->paginate(15)->withQueryString(),
+            'rows' => $rows,
             'paoStats' => $paoStats,
             'pasOptions' => $this->pasOptions($user),
             'objectifOptions' => $this->objectifOptions($user),

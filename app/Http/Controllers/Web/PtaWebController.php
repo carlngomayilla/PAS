@@ -51,19 +51,7 @@ class PtaWebController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        $query = Pta::query()
-            ->with([
-                'pao:id,pas_id,direction_id,service_id,annee,titre,statut',
-                'pao.service:id,direction_id,code,libelle',
-                'objectifOperationnel:id,pao_id,pas_id,pas_axe_id,pas_objectif_id,direction_id,service_id,libelle,echeance',
-                'objectifOperationnel.pas:id,titre,periode_debut,periode_fin',
-                'objectifOperationnel.pasAxe:id,pas_id,code,libelle',
-                'objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
-                'direction:id,code,libelle',
-                'service:id,direction_id,code,libelle',
-                'validateur:id,name,email',
-            ])
-            ->withCount('actions');
+        $query = Pta::query();
 
         $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
         app(ExerciceContext::class)->applyToPta($query);
@@ -105,22 +93,40 @@ class PtaWebController extends Controller
         });
 
         $statsBase = clone $query;
-        $byStatus = (clone $statsBase)->toBase()
-            ->selectRaw('statut, COUNT(*) as cnt')
+        $byStatus = (clone $statsBase)
+            ->select('statut')
+            ->selectRaw('COUNT(*) as cnt')
             ->groupBy('statut')
             ->pluck('cnt', 'statut');
-        $ptaIdsSubquery = (clone $statsBase)->toBase()->select('id');
+        $ptaIdsSubquery = (clone $statsBase)->select('id');
         $ptaStats = [
             'total'          => (int) $byStatus->sum(),
             'actifs'         => (int) (($byStatus['valide'] ?? 0) + ($byStatus['verrouille'] ?? 0)),
             'brouillons'     => (int) ($byStatus['brouillon'] ?? 0),
             'sans_action'    => (clone $statsBase)->doesntHave('actions')->count(),
             'actions_total'  => DB::table('actions')->whereIn('pta_id', $ptaIdsSubquery)->count(),
-            'services'       => (clone $statsBase)->toBase()->distinct()->count('service_id'),
+            'services'       => (clone $statsBase)->distinct()->count('service_id'),
         ];
 
+        $rows = $query
+            ->with([
+                'pao:id,pas_id,direction_id,service_id,annee,titre,statut',
+                'pao.service:id,direction_id,code,libelle',
+                'objectifOperationnel:id,pao_id,pas_id,pas_axe_id,pas_objectif_id,direction_id,service_id,libelle,echeance',
+                'objectifOperationnel.pas:id,titre,periode_debut,periode_fin',
+                'objectifOperationnel.pasAxe:id,pas_id,code,libelle',
+                'objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
+                'direction:id,code,libelle',
+                'service:id,direction_id,code,libelle',
+                'validateur:id,name,email',
+            ])
+            ->withCount('actions')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
         return view('workspace.pta.index', [
-            'rows' => $query->orderByDesc('id')->paginate(15)->withQueryString(),
+            'rows' => $rows,
             'ptaStats' => $ptaStats,
             'objectifOperationnelOptions' => $this->objectifOperationnelOptions($user),
             'paoOptions' => $this->paoOptions($user),
