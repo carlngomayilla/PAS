@@ -1485,17 +1485,24 @@ class ActionWebController extends Controller
     private function buildActionIndexSummary(Builder $query): array
     {
         $baseQuery = (clone $query)->toBase();
+        // Reset des colonnes héritées (actions.* et sous-requêtes withCount) :
+        // PostgreSQL rejette les SELECT qui mélangent agrégats et colonnes non-groupées.
+        $baseQuery->columns = null;
 
         $stats = (clone $baseQuery)
-            ->selectRaw('COUNT(*) as total')
-            ->selectRaw('AVG(progression_reelle) as avg_progression')
-            ->selectRaw('SUM(CASE WHEN financement_requis THEN 1 ELSE 0 END) as funded_count')
+            ->select([
+                DB::raw('COUNT(*) as total'),
+                DB::raw('AVG(progression_reelle) as avg_progression'),
+                DB::raw('SUM(CASE WHEN financement_requis THEN 1 ELSE 0 END) as funded_count'),
+            ])
             ->first();
 
         /** @var array<string, int> $statusCounts */
         $statusCounts = (clone $baseQuery)
-            ->select('statut_dynamique as status_label')
-            ->selectRaw('COUNT(*) as total')
+            ->select([
+                'statut_dynamique as status_label',
+                DB::raw('COUNT(*) as total'),
+            ])
             ->groupBy('statut_dynamique')
             ->pluck('total', 'status_label')
             ->map(fn ($value): int => (int) $value)
