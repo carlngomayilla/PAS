@@ -179,7 +179,7 @@ class ReportingCsvExporter
                 (float) ($mesure->valeur ?? 0),
                 (float) ($mesure->kpi?->seuil_alerte ?? 0),
                 'Alerte',
-                'Verifier la mesure, documenter l ecart et proposer une action corrective.',
+                'Vérifier la mesure, documenter l’écart et proposer une action corrective.',
             ]);
 
         $lateRows = collect($payload['details']['actions_retard'] ?? [])
@@ -189,7 +189,7 @@ class ReportingCsvExporter
                 (float) ($action->progression_reelle ?? 0),
                 100.0,
                 'En retard',
-                'Replanifier, lever les blocages et mettre a jour la progression.',
+                'Replanifier, lever les blocages et mettre à jour la progression.',
             ]);
 
         return $kpiRows->merge($lateRows)->values()->all();

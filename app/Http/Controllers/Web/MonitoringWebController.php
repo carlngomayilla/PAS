@@ -2007,13 +2007,7 @@ class MonitoringWebController extends Controller
      */
     private function completedActionStatuses(): array
     {
-        return [
-            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
-            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
-            ActionTrackingService::STATUS_SUSPENDU,
-            ActionTrackingService::STATUS_ANNULE,
-            ActionTrackingService::STATUS_CLOTUREE,
-        ];
+        return ActionTrackingService::completedActionStatuses();
     }
 
     /**

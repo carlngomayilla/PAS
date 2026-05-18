@@ -82,6 +82,26 @@ class ActionTrackingService
     /**
      * @return array<int, string>
      */
+    /**
+     * Liste centralisée des statuts considérés comme "action terminée".
+     *
+     * Utilisée à la fois par le dashboard, le reporting (Excel/CSV/PDF) et le
+     * monitoring pour garantir que toutes les surfaces comptent les mêmes
+     * actions comme terminées. Inclut volontairement les actions clôturées.
+     *
+     * @return list<string>
+     */
+    public static function completedActionStatuses(): array
+    {
+        return [
+            self::STATUS_ACHEVE_DANS_DELAI,
+            self::STATUS_ACHEVE_HORS_DELAI,
+            self::STATUS_SUSPENDU,
+            self::STATUS_ANNULE,
+            self::STATUS_CLOTUREE,
+        ];
+    }
+
     public static function dynamicStatusOptions(): array
     {
         return [
@@ -1145,7 +1165,10 @@ class ActionTrackingService
             'kpi_performance' => (float) $existingKpi->kpi_performance,
             'kpi_conformite' => (float) $existingKpi->kpi_conformite,
             'kpi_qualite' => (float) $existingKpi->kpi_qualite,
-            'kpi_global' => round(max(0.0, min(100.0, (float) $existingKpi->kpi_performance)), 2),
+            // Lecture de la valeur réellement stockée (gel des KPI).
+            // L'ancien code écrasait kpi_global avec kpi_performance, ce qui faisait
+            // perdre la valeur figée pour les actions suspendues.
+            'kpi_global' => round(max(0.0, min(100.0, (float) $existingKpi->kpi_global)), 2),
         ];
     }
 

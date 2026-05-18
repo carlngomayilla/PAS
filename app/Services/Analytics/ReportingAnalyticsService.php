@@ -1518,12 +1518,7 @@ class ReportingAnalyticsService
      */
     private function completedActionStatuses(): array
     {
-        return [
-            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
-            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
-            ActionTrackingService::STATUS_SUSPENDU,
-            ActionTrackingService::STATUS_ANNULE,
-        ];
+        return ActionTrackingService::completedActionStatuses();
     }
 
     /**

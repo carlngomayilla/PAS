@@ -577,7 +577,7 @@ class WebWorkspaceTest extends TestCase
         $response->assertJsonPath('summary.unread', (int) ($expectedSummary['unread'] ?? 0));
     }
 
-    public function test_sidebar_alert_badge_uses_real_alert_unread_count_not_notification_module_count(): void
+    public function test_sidebar_alert_badge_is_only_on_alertes_entry_not_pilotage(): void
     {
         $admin = $this->createAdminUser();
         $expectedAlertUnreadCount = (int) (app(AlertCenterService::class)->summaryForUser(
@@ -616,31 +616,23 @@ class WebWorkspaceTest extends TestCase
         $response = $this->actingAs($admin)->get('/dashboard')->assertOk();
         $content = $response->getContent();
 
+        // Le menu Pilotage est présent dans la sidebar...
         $this->assertStringContainsString('data-sidebar-module="pilotage"', $content);
 
-        if ($expectedAlertUnreadCount > 0) {
-            $expectedBadge = $expectedAlertUnreadCount > 99 ? '99+' : (string) $expectedAlertUnreadCount;
-            $fakeBadge = $fakeNotificationCount > 99 ? '99+' : (string) $fakeNotificationCount;
-
-            $this->assertMatchesRegularExpression(
-                '/data-sidebar-module="pilotage"[\s\S]*?data-sidebar-badge-for="pilotage">' . preg_quote($expectedBadge, '/') . '<\/span>/',
-                $content
-            );
-
-            if ($fakeBadge !== $expectedBadge) {
-                $this->assertDoesNotMatchRegularExpression(
-                    '/data-sidebar-module="pilotage"[\s\S]*?data-sidebar-badge-for="pilotage">' . preg_quote($fakeBadge, '/') . '<\/span>/',
-                    $content
-                );
-            }
-
-            return;
-        }
-
+        // ...mais ne doit JAMAIS porter de badge d'alertes (qui faisait double emploi avec le menu Alertes).
         $this->assertDoesNotMatchRegularExpression(
             '/data-sidebar-module="pilotage"[\s\S]*?data-sidebar-badge-for="pilotage">/',
             $content
         );
+
+        // Le badge d'alertes reste sur l'entrée Alertes uniquement, basé sur le compteur réel d'alertes.
+        if ($expectedAlertUnreadCount > 0) {
+            $expectedBadge = $expectedAlertUnreadCount > 99 ? '99+' : (string) $expectedAlertUnreadCount;
+            $this->assertMatchesRegularExpression(
+                '/data-sidebar-module="alertes"[\s\S]*?data-sidebar-badge-for="alertes">' . preg_quote($expectedBadge, '/') . '<\/span>/',
+                $content
+            );
+        }
     }
 
     public function test_alerts_page_exposes_execution_quality_and_escalation_context(): void
