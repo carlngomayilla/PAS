@@ -36,11 +36,6 @@ class SuperAdminOrgUsersTest extends TestCase
             'password_changed_at' => now(),
         ]);
 
-        $this->actingAs($superAdmin)
-            ->get(route('workspace.super-admin.organization.users.export', ['role' => User::ROLE_AGENT]))
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
-
         $csv = implode(PHP_EOL, [
             'name;email;role;direction_code;service_code;agent_matricule;agent_fonction;agent_telephone;is_active;is_agent;suspended_until;suspension_reason;password',
             'Importe ANBG;importe.user@anbg.test;agent;'.$direction->code.';'.$service->code.';IMP-001;Charge import;060101010;1;1;;;Password-Import@123',
@@ -122,38 +117,6 @@ class SuperAdminOrgUsersTest extends TestCase
         ]);
     }
 
-    public function test_super_admin_can_export_filtered_login_history(): void
-    {
-        $superAdmin = $this->createSuperAdminUser();
-        $agent = User::factory()->create([
-            'role' => User::ROLE_AGENT,
-            'email' => 'history.agent@anbg.test',
-        ]);
-
-        \App\Models\JournalAudit::query()->create([
-            'user_id' => $agent->id,
-            'module' => 'auth',
-            'entite_type' => User::class,
-            'entite_id' => $agent->id,
-            'action' => 'login_success',
-            'nouvelle_valeur' => ['login_identifier' => $agent->email],
-            'adresse_ip' => '127.0.0.1',
-            'user_agent' => 'phpunit',
-        ]);
-
-        $response = $this->actingAs($superAdmin)
-            ->get(route('workspace.super-admin.organization.login-history.export', [
-                'q' => 'history.agent',
-                'auth_action' => 'login_success',
-            ]));
-
-        $response->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
-
-        $csv = $response->streamedContent();
-        $this->assertStringContainsString('history.agent@anbg.test', $csv);
-        $this->assertStringContainsString('login_success', $csv);
-    }
 }
 
 

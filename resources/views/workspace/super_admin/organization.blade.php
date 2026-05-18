@@ -104,7 +104,6 @@
             <div class="flex flex-wrap gap-2">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.organization.index') }}">Réinitialiser</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.organization.users.export', request()->query()) }}">Exporter CSV</a>
             </div>
         </form>
     </section>
@@ -497,7 +496,6 @@
             </div>
             <div class="flex items-center gap-2">
                 <span class="showcase-chip">{{ $loginHistory->count() }} événements</span>
-                <a class="btn btn-secondary" href="{{ route('workspace.super-admin.organization.login-history.export', request()->query()) }}">Exporter CSV</a>
             </div>
         </div>
         <div class="mt-4 overflow-x-auto">

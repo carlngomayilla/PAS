@@ -7,9 +7,7 @@ use App\Models\JournalAudit;
 use App\Models\User;
 use App\Services\PlatformDiagnosticService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Response;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AuditWebController extends Controller
 {
@@ -56,65 +54,6 @@ class AuditWebController extends Controller
         ]);
     }
 
-    public function export(Request $request): StreamedResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $user->hasPermission('audit.read')) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        $filename = 'journal_audit_'.now()->format('Ymd_His').'.csv';
-        $query = $this->filteredQuery($request)->orderByDesc('id');
-
-        return Response::streamDownload(function () use ($query): void {
-            $handle = fopen('php://output', 'wb');
-            if ($handle === false) {
-                return;
-            }
-
-            fputcsv($handle, [
-                'id',
-                'created_at',
-                'user_id',
-                'user_email',
-                'module',
-                'action',
-                'entite_type',
-                'entite_id',
-                'adresse_ip',
-                'user_agent',
-                'ancienne_valeur',
-                'nouvelle_valeur',
-            ], ';');
-
-            $query->chunk(250, function ($logs) use ($handle): void {
-                foreach ($logs as $log) {
-                    fputcsv($handle, [
-                        $log->id,
-                        optional($log->created_at)?->toDateTimeString(),
-                        $log->user_id,
-                        $log->user?->email,
-                        $log->module,
-                        $log->action,
-                        $log->entite_type,
-                        $log->entite_id,
-                        $log->adresse_ip,
-                        $log->user_agent,
-                        is_array($log->ancienne_valeur) ? json_encode($log->ancienne_valeur, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : $log->ancienne_valeur,
-                        is_array($log->nouvelle_valeur) ? json_encode($log->nouvelle_valeur, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : $log->nouvelle_valeur,
-                    ], ';');
-                }
-            });
-
-            fclose($handle);
-        }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-        ]);
-    }
 
     private function filteredQuery(Request $request)
     {

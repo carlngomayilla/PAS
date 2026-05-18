@@ -60,7 +60,6 @@
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
                 <a class="btn btn-blue" href="{{ route('workspace.audit.index') }}">Réinitialiser</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.audit.export', request()->query()) }}">Exporter CSV</a>
             </div>
         </form>
     </section>

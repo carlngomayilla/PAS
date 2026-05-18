@@ -29,7 +29,6 @@ use App\Services\Alerting\AlertReadService;
 use App\Services\Exports\ExportTemplateResolver;
 use App\Services\ExerciceContext;
 use App\Services\Analytics\ReportingAnalyticsService;
-use App\Services\Exports\ReportingCsvExporter;
 use App\Services\Exports\ReportingWorkbookExporter;
 use App\Support\SafeSql;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -55,7 +54,6 @@ class MonitoringWebController extends Controller
         private readonly AlertCenterService $alertCenter,
         private readonly AlertReadService $alertReadService,
         private readonly ReportingWorkbookExporter $reportingWorkbookExporter,
-        private readonly ReportingCsvExporter $reportingCsvExporter,
         private readonly ReportingAnalyticsService $reportingAnalyticsService,
         private readonly ExportTemplateResolver $exportTemplateResolver,
         private readonly ActionTrackingService $actionTrackingService
@@ -474,46 +472,6 @@ class MonitoringWebController extends Controller
         ]);
     }
 
-    public function exportCsv(Request $request): StreamedResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        $this->denyUnlessPlanningReader($user);
-        $this->denyUnlessReportingReader($user);
-
-        $payload = $this->reportingAnalyticsService->buildPayload($user, true, false);
-        $filename = $this->institutionalReportFilename('REPORTING', $payload, 'zip', 'csv');
-        $tempPath = $this->reportingCsvExporter->create($payload);
-
-        return response()->streamDownload(function () use ($tempPath): void {
-            $stream = fopen($tempPath, 'rb');
-            if (! is_resource($stream)) {
-                @unlink($tempPath);
-
-                return;
-            }
-
-            try {
-                while (! feof($stream)) {
-                    $chunk = fread($stream, 8192);
-                    if ($chunk === false) {
-                        break;
-                    }
-
-                    echo $chunk;
-                }
-            } finally {
-                fclose($stream);
-                @unlink($tempPath);
-            }
-        }, $filename, [
-            'Content-Type' => 'application/zip',
-        ]);
-    }
-
     public function exportPdf(Request $request)
     {
         $user = $request->user();
@@ -548,7 +506,7 @@ class MonitoringWebController extends Controller
         }
 
         $format = strtolower($format);
-        if (! in_array($format, ['excel', 'csv', 'pdf'], true)) {
+        if (! in_array($format, ['excel', 'pdf'], true)) {
             abort(404);
         }
 

@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Exports\ExportTemplateResolver;
-use App\Services\Exports\ReportingCsvExporter;
 use App\Services\Exports\ReportingWorkbookExporter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Bus\Queueable;
@@ -38,8 +37,7 @@ class GenerateReportJob implements ShouldQueue
     public function handle(
         ReportingAnalyticsService $analyticsService,
         ExportTemplateResolver $templateResolver,
-        ReportingWorkbookExporter $workbookExporter,
-        ReportingCsvExporter $csvExporter
+        ReportingWorkbookExporter $workbookExporter
     ): void {
         $user = User::query()->findOrFail($this->userId);
         $format = strtolower($this->format);
@@ -53,7 +51,6 @@ class GenerateReportJob implements ShouldQueue
 
         [$contents, $extension, $contentType] = match ($format) {
             'excel' => [$this->readAndDelete($workbookExporter->create($payload)), 'xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
-            'csv' => [$this->readAndDelete($csvExporter->create($payload)), 'zip', 'application/zip'],
             'pdf' => [Pdf::loadView('workspace.monitoring.reporting-pdf', $payload)
                 ->setPaper($template?->paperSize() ?? 'a4', $template?->orientation() ?? 'landscape')
                 ->output(), 'pdf', 'application/pdf'],

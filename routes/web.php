@@ -304,17 +304,15 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         });
 
         // ── REPORTING & EXPORTS ────────────────────────────────────────────────────
-        // Synthèses de performance, tableaux de bord et exports (Excel, CSV, PDF).
+        // Synthèses de performance, tableaux de bord et exports (Excel, PDF).
         Route::get('/workspace/reporting', [MonitoringWebController::class, 'reporting'])
             ->name('workspace.reporting');
         Route::get('/workspace/reporting/export/excel', [MonitoringWebController::class, 'exportExcel'])
             ->name('workspace.reporting.export.excel');
-        Route::get('/workspace/reporting/export/csv', [MonitoringWebController::class, 'exportCsv'])
-            ->name('workspace.reporting.export.csv');
         Route::get('/workspace/reporting/export/pdf', [MonitoringWebController::class, 'exportPdf'])
             ->name('workspace.reporting.export.pdf');
         Route::post('/workspace/reporting/export/{format}/queue', [MonitoringWebController::class, 'queueExport'])
-            ->whereIn('format', ['excel', 'csv', 'pdf'])
+            ->whereIn('format', ['excel', 'pdf'])
             ->name('workspace.reporting.export.queue');
         Route::get('/workspace/reporting/export-ready', [MonitoringWebController::class, 'downloadQueuedExport'])
             ->middleware('signed')
@@ -334,8 +332,6 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         // Historique de toutes les actions sensibles réalisées dans l'application.
         Route::get('/workspace/audit', [AuditWebController::class, 'index'])
             ->name('workspace.audit.index');
-        Route::get('/workspace/audit/export', [AuditWebController::class, 'export'])
-            ->name('workspace.audit.export');
 
         // ── SUPER ADMINISTRATION ───────────────────────────────────────────────────
         // Configuration avancée réservée aux super-admins : paramètres système,
@@ -369,8 +365,6 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::post('/organisation-utilisateurs/utilisateurs/{managedUser}/toggle', [SuperAdminWebController::class, 'organizationUserToggle'])->name('organization.users.toggle');
             Route::post('/organisation-utilisateurs/utilisateurs/{managedUser}/reset-password', [SuperAdminWebController::class, 'organizationUserResetPassword'])->name('organization.users.reset-password');
             Route::post('/organisation-utilisateurs/utilisateurs/{managedUser}/revoke-sessions', [SuperAdminWebController::class, 'organizationUserRevokeSessions'])->name('organization.users.revoke-sessions');
-            Route::get('/organisation-utilisateurs/utilisateurs/export', [SuperAdminWebController::class, 'organizationUsersExport'])->name('organization.users.export');
-            Route::get('/organisation-utilisateurs/connexions/export', [SuperAdminWebController::class, 'organizationLoginHistoryExport'])->name('organization.login-history.export');
             Route::post('/organisation-utilisateurs/utilisateurs/import', [SuperAdminWebController::class, 'organizationUsersImport'])->name('organization.users.import');
             Route::post('/organisation-utilisateurs/utilisateurs/bulk', [SuperAdminWebController::class, 'organizationUsersBulk'])->name('organization.users.bulk');
             Route::get('/dashboards-profils', [SuperAdminWebController::class, 'dashboardProfilesEdit'])->name('dashboard-profiles.edit');

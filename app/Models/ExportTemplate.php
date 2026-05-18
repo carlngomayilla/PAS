@@ -18,7 +18,6 @@ class ExportTemplate extends Model
     public const FORMAT_PDF = 'pdf';
     public const FORMAT_EXCEL = 'excel';
     public const FORMAT_WORD = 'word';
-    public const FORMAT_CSV = 'csv';
 
     /**
      * @var list<string>
@@ -99,7 +98,6 @@ class ExportTemplate extends Model
             self::FORMAT_PDF => 'PDF',
             self::FORMAT_EXCEL => 'Excel',
             self::FORMAT_WORD => 'Word',
-            self::FORMAT_CSV => 'CSV',
             default => strtoupper((string) $this->format),
         };
     }
@@ -138,7 +136,7 @@ class ExportTemplate extends Model
      */
     public static function formatOptions(): array
     {
-        return [self::FORMAT_PDF, self::FORMAT_EXCEL, self::FORMAT_WORD, self::FORMAT_CSV];
+        return [self::FORMAT_PDF, self::FORMAT_EXCEL, self::FORMAT_WORD];
     }
 
     /**

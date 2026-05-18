@@ -72,32 +72,4 @@ class SuperAdminAuditDiagnosticTest extends TestCase
             ->assertSee('Date fin');
     }
 
-    public function test_audit_index_can_export_filtered_logs_to_csv(): void
-    {
-        $admin = $this->createAdminUser();
-
-        JournalAudit::query()->create([
-            'user_id' => $admin->id,
-            'module' => 'super_admin',
-            'entite_type' => 'diagnostic',
-            'entite_id' => 7,
-            'action' => 'configuration_snapshot_create',
-            'ancienne_valeur' => ['before' => 'old'],
-            'nouvelle_valeur' => ['after' => 'new'],
-            'adresse_ip' => '127.0.0.9',
-            'user_agent' => 'PHPUnit',
-        ]);
-
-        $response = $this->actingAs($admin)
-            ->get(route('workspace.audit.export', [
-                'module' => 'super_admin',
-            ]));
-
-        $response->assertOk();
-        $this->assertStringContainsString('text/csv', (string) $response->headers->get('content-type'));
-        $this->assertStringContainsString('journal_audit_', (string) $response->headers->get('content-disposition'));
-        $csv = $response->streamedContent();
-        $this->assertStringContainsString('configuration_snapshot_create', $csv);
-        $this->assertStringContainsString('super_admin', $csv);
-    }
 }
