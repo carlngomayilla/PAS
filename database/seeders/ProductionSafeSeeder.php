@@ -17,8 +17,6 @@ class ProductionSafeSeeder extends Seeder
         $this->call([
             SyncOrgUsersPreservingPasswordsSeeder::class,
             UniteDgSeeder::class,
-            // InstitutionalPasSeeder retiré du seeder production : le PAS doit être créé par le client via l'interface.
-            // Lancer manuellement avec `php artisan db:seed --class=InstitutionalPasSeeder` en local/demo si besoin.
             SuperAdminSeeder::class,
             PlatformSettingsSeeder::class,
             RoleRegistrySeeder::class,

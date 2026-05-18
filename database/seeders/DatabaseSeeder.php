@@ -16,9 +16,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ProductionSafeSeeder::class,
-            // Institutional PAS demo data — utilisé en dev/test uniquement,
-            // exclu de ProductionSafeSeeder pour que la prod ne contienne pas de jeu de démonstration.
-            InstitutionalPasSeeder::class,
         ]);
     }
 }
