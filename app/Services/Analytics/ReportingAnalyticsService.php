@@ -292,6 +292,8 @@ class ReportingAnalyticsService
                     $query
                         ->select(['id', 'name', 'role', 'service_id'])
                         ->where('role', User::ROLE_SERVICE)
+                        ->where('name', 'not like', '%compléter%')
+                        ->where('name', 'not like', '%completer%')
                         ->orderBy('name');
                 },
             ]);
@@ -321,6 +323,8 @@ class ReportingAnalyticsService
                     $query
                         ->select(['id', 'name', 'role', 'direction_id'])
                         ->where('role', User::ROLE_DIRECTION)
+                        ->where('name', 'not like', '%compléter%')
+                        ->where('name', 'not like', '%completer%')
                         ->orderBy('name');
                 },
             ])

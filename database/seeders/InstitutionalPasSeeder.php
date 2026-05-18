@@ -490,7 +490,9 @@ class InstitutionalPasSeeder extends Seeder
                 'action_id' => $actionId,
                 'kpi_delai' => 0,
                 'kpi_performance' => 0,
-                'kpi_conformite' => 100,
+                // kpi_conformite ne doit pas être seedée à 100 quand l'action n'a aucune exécution :
+                // les reportings calculaient une moyenne de conformité de 100 % alors que rien n'avait commencé.
+                'kpi_conformite' => 0,
                 'kpi_qualite' => 0,
                 'kpi_global' => 0,
                 'progression_reelle' => 0,
