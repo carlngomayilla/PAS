@@ -45,16 +45,7 @@ class PasWebController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        $query = Pas::query()
-            ->with([
-                'validateur:id,name,email',
-                'axes' => fn ($subQuery) => $subQuery
-                    ->select(['id', 'pas_id', 'code', 'libelle', 'periode_debut', 'periode_fin', 'ordre'])
-                    ->orderBy('ordre')
-                    ->orderBy('id')
-                    ->with(['objectifs:id,pas_axe_id,code,libelle,ordre,valeurs_cible']),
-            ])
-            ->withCount(['axes', 'paos']);
+        $query = Pas::query();
 
         $this->scopePasByUser($query, $user);
         app(ExerciceContext::class)->applyToPas($query);
@@ -78,11 +69,12 @@ class PasWebController extends Controller
         });
 
         $statsBase = clone $query;
-        $byStatus = (clone $statsBase)->toBase()
-            ->selectRaw('statut, COUNT(*) as cnt')
+        $byStatus = (clone $statsBase)
+            ->select('statut')
+            ->selectRaw('COUNT(*) as cnt')
             ->groupBy('statut')
             ->pluck('cnt', 'statut');
-        $pasIdsSubquery = (clone $statsBase)->toBase()->select('id');
+        $pasIdsSubquery = (clone $statsBase)->select('id');
         $pasStats = [
             'total'           => (int) $byStatus->sum(),
             'actifs'          => (int) (($byStatus['valide'] ?? 0) + ($byStatus['verrouille'] ?? 0)),
@@ -96,8 +88,23 @@ class PasWebController extends Controller
             )->count(),
         ];
 
+        $rows = $query
+            ->with([
+                'validateur:id,name,email',
+                'axes' => fn ($subQuery) => $subQuery
+                    ->select(['id', 'pas_id', 'code', 'libelle', 'periode_debut', 'periode_fin', 'ordre'])
+                    ->orderBy('ordre')
+                    ->orderBy('id')
+                    ->with(['objectifs:id,pas_axe_id,code,libelle,ordre,valeurs_cible']),
+            ])
+            ->withCount(['axes', 'paos'])
+            ->orderByDesc('periode_debut')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
         return view('workspace.pas.index', [
-            'rows' => $query->orderByDesc('periode_debut')->orderByDesc('id')->paginate(15)->withQueryString(),
+            'rows' => $rows,
             'pasStats' => $pasStats,
             'canWrite' => $this->canWrite($user),
             'statusOptions' => array_merge($this->statusOptions($user), ['valide_ou_verrouille']),
