@@ -204,6 +204,38 @@
                             </div>
                         </div>
 
+                        @if ($layoutUser)
+                            @php
+                                $navbarScope = $layoutUser->accessScope();
+                                $navbarScopeType = (string) ($navbarScope['scope_type'] ?? 'limited');
+                                $navbarScopeLabel = match ($navbarScopeType) {
+                                    'global' => 'Vue globale',
+                                    'direction' => 'Direction : '.($layoutUser->direction?->libelle ?? '—'),
+                                    'service' => 'Service : '.($layoutUser->service?->libelle ?? '—'),
+                                    'unite' => 'Unité : '.($layoutUser->uniteDg?->libelle ?? '—'),
+                                    'agent' => 'Mes actions',
+                                    default => 'Accès limité',
+                                };
+                                $navbarScopeTone = match ($navbarScopeType) {
+                                    'global' => 'border-emerald-300 bg-emerald-50 text-emerald-700',
+                                    'direction', 'unite' => 'border-sky-300 bg-sky-50 text-sky-700',
+                                    'service' => 'border-amber-300 bg-amber-50 text-amber-700',
+                                    'agent' => 'border-violet-300 bg-violet-50 text-violet-700',
+                                    default => 'border-slate-300 bg-slate-50 text-slate-700',
+                                };
+                            @endphp
+                            <span
+                                class="admin-navbar-scope-chip hidden md:inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold {{ $navbarScopeTone }}"
+                                title="Périmètre d'accès : {{ $navbarScopeLabel }}"
+                                data-navbar-scope-chip
+                            >
+                                <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7l9-4 9 4M3 7l9 4m-9-4v10l9 4m0-14l9-4v10l-9 4m0-14v14" />
+                                </svg>
+                                <span class="max-w-[180px] truncate">{{ $navbarScopeLabel }}</span>
+                            </span>
+                        @endif
+
 <form method="GET" action="{{ url()->current() }}" class="admin-exercise-filter flex shrink-0 items-center gap-1 px-2 py-1.5 text-[11px]">
                             @foreach ($exerciseHiddenQuery as $queryKey => $queryValue)
                                 @if (is_array($queryValue))
