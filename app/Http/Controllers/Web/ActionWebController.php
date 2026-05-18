@@ -156,10 +156,27 @@ class ActionWebController extends Controller
             return response()->json(['error' => 'Statut non autorisé via glisser-déposer.'], 422);
         }
 
+        $currentStatut = (string) ($action->statut_dynamique ?: $action->statut ?: '');
+        $terminalStates = [
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_CLOTUREE,
+        ];
+        if (in_array($currentStatut, $terminalStates, true)) {
+            return response()->json(['error' => "Action terminée ou clôturée : statut non modifiable."], 422);
+        }
+        if ($currentStatut === $statut) {
+            return response()->json(['error' => "L'action est déjà dans ce statut."], 422);
+        }
+
+        $before = $action->only(['statut', 'statut_dynamique']);
+
         $action->forceFill([
             'statut' => $statut,
             'statut_dynamique' => $statut,
         ])->save();
+
+        $this->recordAudit($request, 'action', 'quick_status', $action, $before, $action->only(['statut', 'statut_dynamique']));
 
         return response()->json(['statut' => $statut, 'id' => $action->id]);
     }

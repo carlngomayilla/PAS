@@ -562,26 +562,35 @@ import { gsap } from 'gsap';
     var _notifGranted = false;
 
     function updateNotifButton() {
-        var btn  = document.getElementById('admin-notif-toggle');
-        var bell = document.getElementById('notif-icon-bell');
-        var deny = document.getElementById('notif-icon-denied');
+        var btn    = document.getElementById('admin-notif-toggle');
+        var bell   = document.getElementById('notif-icon-bell');
+        var deny   = document.getElementById('notif-icon-denied');
+        var label  = document.getElementById('admin-notif-toggle-label');
+        var status = document.getElementById('admin-notif-status');
         if (!btn) return;
         var perm = ('Notification' in window) ? Notification.permission : 'denied';
         if (perm === 'denied') {
             if (bell) bell.classList.add('hidden');
             if (deny) deny.classList.remove('hidden');
             btn.title = 'Notifications bloquées par le navigateur';
+            if (label) label.textContent = 'Bloquées';
+            if (status) status.textContent = 'Bloquées au niveau du navigateur';
+            btn.style.color = '';
         } else if (perm === 'granted') {
             _notifGranted = true;
             if (deny) deny.classList.add('hidden');
             if (bell) bell.classList.remove('hidden');
             btn.title = 'Notifications activées — cliquer pour désactiver';
+            if (label) label.textContent = 'Activées';
+            if (status) status.textContent = 'Activées — alertes même onglet en arrière-plan';
             btn.style.color = 'var(--app-blue, #3996d3)';
         } else {
             _notifGranted = false;
             if (deny) deny.classList.add('hidden');
             if (bell) bell.classList.remove('hidden');
             btn.title = 'Activer les notifications navigateur';
+            if (label) label.textContent = 'Activer';
+            if (status) status.textContent = 'Recevoir des alertes même onglet fermé';
             btn.style.color = '';
         }
     }

@@ -41,7 +41,7 @@ class UserWorkspaceService
         $canReadRetention = $user->hasAnyPermission('retention.read', 'retention.manage');
         $canManageRetention = $user->hasPermission('retention.manage');
         $canManageDelegations = $user->hasPermission('delegations.manage');
-        $canReadReporting = $canReadPlanning && $user->hasPermission('reporting.read');
+        $canReadReporting = ($canReadPlanning || $isAgent) && $user->hasPermission('reporting.read');
         $canReadAlerts = $canReadPlanning && $user->hasPermission('alerts.read');
         $canUseMessaging = $user->hasPermission('messagerie.read');
         $isTechnicalAdmin = $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN);
@@ -68,7 +68,12 @@ class UserWorkspaceService
             ];
         }
 
-        if ($canReadPlanning) {
+        $isServiceOnly = $user->hasRole(User::ROLE_SERVICE)
+            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET);
+        $isDirectionOnly = $user->hasRole(User::ROLE_DIRECTION)
+            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET);
+
+        if ($canReadPlanning && ! $isServiceOnly && ! $isDirectionOnly) {
             $modules[] = [
                 'code' => 'pas',
                 'label' => 'PAS',
@@ -79,7 +84,9 @@ class UserWorkspaceService
                     ? ['Consulter', 'Créer', 'Modifier', 'Valider', 'Verrouiller']
                     : ['Consulter'],
             ];
+        }
 
+        if ($canReadPlanning && ! $isServiceOnly) {
             $modules[] = [
                 'code' => 'pao',
                 'label' => 'PAO',
@@ -90,7 +97,9 @@ class UserWorkspaceService
                     ? ['Consulter', 'Créer', 'Modifier', 'Suivre']
                     : ['Consulter'],
             ];
+        }
 
+        if ($canReadPlanning) {
             $modules[] = [
                 'code' => 'pta',
                 'label' => 'PTA',

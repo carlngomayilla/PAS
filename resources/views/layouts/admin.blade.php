@@ -246,23 +246,6 @@
 
                         <button
                             type="button"
-                            id="admin-notif-toggle"
-                            class="admin-navbar-icon-button inline-flex items-center justify-center"
-                            title="Activer les notifications navigateur"
-                            aria-label="Notifications navigateur"
-                        >
-                            {{-- Bell (default / granted) --}}
-                            <svg id="notif-icon-bell" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            {{-- Bell-slash (denied) --}}
-                            <svg id="notif-icon-denied" class="hidden h-5 w-5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.172 9.172a4 4 0 015.656 0M3 3l18 18M10.343 10.343A4 4 0 006 14v3.159c0 .538-.214 1.055-.595 1.436L4 20h12.586M15 17v1a3 3 0 01-5.196 1.755M15 17H9" />
-                            </svg>
-                        </button>
-
-                        <button
-                            type="button"
                             id="admin-theme-toggle"
                             class="admin-navbar-icon-button inline-flex items-center justify-center"
                             title="Changer le thème"
@@ -368,7 +351,8 @@
                             type="button"
                             id="header-notifications-toggle"
                             class="admin-navbar-icon-button relative inline-flex items-center justify-center"
-                            aria-label="Notifications"
+                            title="Centre de notifications et alertes"
+                            aria-label="Centre de notifications et alertes"
                         >
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .53-.21 1.04-.59 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
@@ -402,6 +386,28 @@
                                     </a>
                                 </div>
                                 <div id="header-alerts-kpi-summary" class="admin-dropdown-kpi-summary mt-2 hidden flex flex-wrap gap-2"></div>
+                            </div>
+
+                            <div class="flex items-center justify-between gap-2 border-b border-[#d8ecf8] bg-[#f8fbfd] px-3 py-2">
+                                <div class="min-w-0">
+                                    <p class="text-xs font-semibold text-[#17324a]">Notifications navigateur</p>
+                                    <p id="admin-notif-status" class="truncate text-[11px] text-[#667085]">Recevoir des alertes même onglet fermé</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    id="admin-notif-toggle"
+                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#d8ecf8] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#17324a] transition hover:bg-[#eaf6fd]"
+                                    title="Activer les notifications navigateur"
+                                    aria-label="Activer ou désactiver les notifications du navigateur"
+                                >
+                                    <svg id="notif-icon-bell" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                    </svg>
+                                    <svg id="notif-icon-denied" class="hidden h-3.5 w-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.172 9.172a4 4 0 015.656 0M3 3l18 18M10.343 10.343A4 4 0 006 14v3.159c0 .538-.214 1.055-.595 1.436L4 20h12.586M15 17v1a3 3 0 01-5.196 1.755M15 17H9" />
+                                    </svg>
+                                    <span id="admin-notif-toggle-label">Activer</span>
+                                </button>
                             </div>
 
                             <div id="header-alerts-items" class="admin-dropdown-alerts border-b border-[#d8ecf8]">

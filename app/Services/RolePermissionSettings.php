@@ -200,11 +200,6 @@ class RolePermissionSettings
                 'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
-                'referentiel.read',
-                'delegations.manage',
-                'retention.read',
-                'audit.read',
-                'api_docs.read',
                 'messagerie.read',
             ],
             User::ROLE_PLANIFICATION => [
@@ -220,10 +215,6 @@ class RolePermissionSettings
                 'users.manage',
                 'users.manage_roles',
                 'delegations.manage',
-                'retention.read',
-                'retention.manage',
-                'audit.read',
-                'api_docs.read',
                 'messagerie.read',
             ],
             User::ROLE_DIRECTION => [
@@ -241,6 +232,7 @@ class RolePermissionSettings
                 'messagerie.read',
             ],
             User::ROLE_AGENT => [
+                'reporting.read',
                 'messagerie.read',
             ],
             User::ROLE_CABINET => [
@@ -249,9 +241,6 @@ class RolePermissionSettings
                 'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
-                'referentiel.read',
-                'retention.read',
-                'api_docs.read',
                 'audit.read',
                 'messagerie.read',
             ],
