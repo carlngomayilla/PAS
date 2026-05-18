@@ -225,7 +225,7 @@
                                 };
                             @endphp
                             <span
-                                class="admin-navbar-scope-chip hidden md:inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold {{ $navbarScopeTone }}"
+                                class="admin-navbar-scope-chip hidden sm:inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold {{ $navbarScopeTone }}"
                                 title="Périmètre d'accès : {{ $navbarScopeLabel }}"
                                 data-navbar-scope-chip
                             >
@@ -272,7 +272,7 @@
                             </select>
                         </form>
 
-                        <div class="admin-local-clock hidden lg:inline-flex" id="admin-local-clock" aria-label="Heure locale">
+                        <div class="admin-local-clock hidden md:inline-flex" id="admin-local-clock" aria-label="Heure locale">
                             --:--:--
                         </div>
 
