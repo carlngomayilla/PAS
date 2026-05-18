@@ -122,7 +122,8 @@
             );
             $headerAlertUnreadCount = (int) ($headerAlertSummary['unread'] ?? 0);
             $headerSidebarBadges['alertes'] = $headerAlertUnreadCount;
-            $headerSidebarBadges['pilotage'] = $headerAlertUnreadCount;
+            // Le compteur d'alertes reste sur l'entrée Alertes uniquement.
+            // (Pas de duplication sur Pilotage pour éviter la pastille rouge confuse sur Dashboard.)
         }
 
         // Count actions pending validation (for managers) and returned actions (for agents)
