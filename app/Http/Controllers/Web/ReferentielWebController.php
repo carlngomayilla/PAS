@@ -29,7 +29,8 @@ class ReferentielWebController extends Controller
 
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy,
-        private readonly AntivirusScanner $scanner
+        private readonly AntivirusScanner $scanner,
+        private readonly \App\Services\ChefUniteSyncService $chefUniteSync
     ) {
     }
 
@@ -471,6 +472,8 @@ class ReferentielWebController extends Controller
             return $created->fresh();
         });
 
+        $this->chefUniteSync->sync($created);
+
         $this->recordAudit($request, 'referentiel_utilisateur', 'create', $created, null, $created->toArray());
 
         return redirect()
@@ -538,6 +541,8 @@ class ReferentielWebController extends Controller
             }
         });
         $utilisateur->refresh();
+
+        $this->chefUniteSync->sync($utilisateur);
 
         $this->recordAudit($request, 'referentiel_utilisateur', 'update', $utilisateur, $before, $utilisateur->toArray());
 
@@ -621,6 +626,24 @@ class ReferentielWebController extends Controller
         $validated['agent_telephone'] = isset($validated['agent_telephone'])
             ? trim((string) $validated['agent_telephone'])
             : null;
+
+        // Cohérence Direction ↔ Service/Unité DG :
+        //   - Direction "DG" : utilise une Unité DG, pas de Service.
+        //   - Autre direction : utilise un Service, pas d'Unité DG.
+        $directionId = $validated['direction_id'] ?? null;
+        if ($directionId !== null) {
+            $direction = Direction::query()->find($directionId);
+            $isDg = $direction && (string) $direction->code === 'DG';
+            if ($isDg) {
+                $validated['service_id'] = null;
+            } else {
+                $validated['unite_dg_id'] = null;
+            }
+        } else {
+            // Pas de direction sélectionnée : on s'assure que service et unité sont vidés.
+            $validated['service_id'] = null;
+            $validated['unite_dg_id'] = null;
+        }
 
         return $validated;
     }

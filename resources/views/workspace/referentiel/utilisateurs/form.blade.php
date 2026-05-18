@@ -59,27 +59,35 @@
                     </div>
                     <div>
                         <label for="direction_id">Direction</label>
-                        <select id="direction_id" name="direction_id">
+                        <select id="direction_id" name="direction_id" data-direction-selector>
                             <option value="">Aucune</option>
                             @foreach ($directionOptions as $direction)
-                                <option value="{{ $direction->id }}" @selected((int) old('direction_id', $row->direction_id) === $direction->id)>
+                                <option
+                                    value="{{ $direction->id }}"
+                                    data-direction-code="{{ $direction->code }}"
+                                    @selected((int) old('direction_id', $row->direction_id) === $direction->id)
+                                >
                                     {{ $direction->code }} - {{ $direction->libelle }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
-                    <div>
+                    <div data-service-field>
                         <label for="service_id">Service</label>
-                        <select id="service_id" name="service_id">
+                        <select id="service_id" name="service_id" data-service-selector>
                             <option value="">Aucun</option>
                             @foreach ($serviceOptions as $service)
-                                <option value="{{ $service->id }}" @selected((int) old('service_id', $row->service_id) === $service->id)>
+                                <option
+                                    value="{{ $service->id }}"
+                                    data-direction-id="{{ $service->direction_id }}"
+                                    @selected((int) old('service_id', $row->service_id) === $service->id)
+                                >
                                     {{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
-                    <div>
+                    <div data-unite-dg-field>
                         <label for="unite_dg_id">Unité DG</label>
                         <select id="unite_dg_id" name="unite_dg_id">
                             <option value="">Aucune</option>
@@ -91,6 +99,55 @@
                         </select>
                     </div>
                 </div>
+
+                @push('scripts')
+                    <script @cspNonce>
+                        (function () {
+                            var directionSelect = document.querySelector('[data-direction-selector]');
+                            var serviceField = document.querySelector('[data-service-field]');
+                            var serviceSelect = document.querySelector('[data-service-selector]');
+                            var uniteField = document.querySelector('[data-unite-dg-field]');
+                            var uniteSelect = document.getElementById('unite_dg_id');
+                            if (! directionSelect || ! serviceField || ! uniteField) return;
+
+                            function selectedDirectionCode() {
+                                var opt = directionSelect.options[directionSelect.selectedIndex];
+                                return opt ? (opt.getAttribute('data-direction-code') || '') : '';
+                            }
+
+                            function filterServiceOptions(directionId) {
+                                if (! serviceSelect) return;
+                                Array.prototype.forEach.call(serviceSelect.options, function (opt) {
+                                    if (opt.value === '') { opt.hidden = false; return; }
+                                    var optDir = opt.getAttribute('data-direction-id');
+                                    opt.hidden = directionId !== '' && optDir !== String(directionId);
+                                });
+                                if (serviceSelect.options[serviceSelect.selectedIndex] && serviceSelect.options[serviceSelect.selectedIndex].hidden) {
+                                    serviceSelect.value = '';
+                                }
+                            }
+
+                            function syncFields() {
+                                var code = selectedDirectionCode();
+                                var directionId = directionSelect.value;
+
+                                if (code === 'DG') {
+                                    serviceField.style.display = 'none';
+                                    if (serviceSelect) serviceSelect.value = '';
+                                    uniteField.style.display = '';
+                                } else {
+                                    serviceField.style.display = '';
+                                    uniteField.style.display = 'none';
+                                    if (uniteSelect) uniteSelect.value = '';
+                                    filterServiceOptions(directionId);
+                                }
+                            }
+
+                            directionSelect.addEventListener('change', syncFields);
+                            syncFields();
+                        })();
+                    </script>
+                @endpush
 
                 <div id="agent-fields" class="conditional-block mt-4">
                     <div class="form-grid-compact mt-2">

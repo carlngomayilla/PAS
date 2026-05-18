@@ -73,7 +73,8 @@ class SuperAdminWebController extends Controller
         private readonly RoleRegistryService $roleRegistry,
         private readonly RolePermissionSettings $rolePermissionSettings,
         private readonly WorkflowSettings $workflowSettings,
-        private readonly WorkspaceModuleSettings $workspaceModuleSettings
+        private readonly WorkspaceModuleSettings $workspaceModuleSettings,
+        private readonly \App\Services\ChefUniteSyncService $chefUniteSync
     ) {
     }
 
@@ -828,6 +829,8 @@ class SuperAdminWebController extends Controller
             return $managedUser->fresh(['direction:id,code,libelle', 'service:id,direction_id,code,libelle']) ?? $managedUser;
         });
 
+        $this->chefUniteSync->sync($managedUser);
+
         $this->recordAudit($request, 'super_admin', 'organization_user_create', $managedUser, null, Arr::except($managedUser->toArray(), ['password']));
 
         return redirect()
@@ -868,6 +871,8 @@ class SuperAdminWebController extends Controller
 
         $managedUser->refresh();
         $managedUser->loadMissing(['direction:id,code,libelle', 'service:id,direction_id,code,libelle']);
+
+        $this->chefUniteSync->sync($managedUser);
 
         $this->recordAudit($request, 'super_admin', 'organization_user_update', $managedUser, $before, Arr::except($managedUser->toArray(), ['password']));
 
