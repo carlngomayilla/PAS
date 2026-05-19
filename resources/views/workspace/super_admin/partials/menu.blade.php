@@ -17,6 +17,7 @@
             'links' => [
                 ['label' => 'Rôles', 'description' => 'Matrice, registre, comparaison.', 'route' => route('workspace.super-admin.roles.edit'), 'active' => request()->routeIs('workspace.super-admin.roles.*')],
                 ['label' => 'Organisation', 'description' => 'Directions, services, comptes.', 'route' => route('workspace.super-admin.organization.index'), 'active' => request()->routeIs('workspace.super-admin.organization.*')],
+                ['label' => 'Unités DG', 'description' => 'SCIQ, DGA, Cabinet, UCAS — chef et membres.', 'route' => route('workspace.super-admin.unites-dg.index'), 'active' => request()->routeIs('workspace.super-admin.unites-dg.*')],
                 ['label' => 'Dashboards', 'description' => 'Cartes et visibilité.', 'route' => route('workspace.super-admin.dashboard-profiles.edit'), 'active' => request()->routeIs('workspace.super-admin.dashboard-profiles.*')],
                 ['label' => 'Diagnostic', 'description' => 'Contrôle plateforme et incidents.', 'route' => route('workspace.super-admin.audit-diagnostic.index'), 'active' => request()->routeIs('workspace.super-admin.audit-diagnostic.*')],
                 ['label' => 'Audit', 'description' => 'Journal des actions sensibles.', 'route' => route('workspace.audit.index'), 'active' => request()->routeIs('workspace.audit.*')],

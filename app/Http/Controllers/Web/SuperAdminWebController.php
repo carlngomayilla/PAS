@@ -614,6 +614,94 @@ class SuperAdminWebController extends Controller
             ->with('success', 'Roles et permissions mis a jour.');
     }
 
+    /**
+     * Affiche les 4 unités de la Direction Générale (SCIQ, DGA, Cabinet, UCAS),
+     * leur chef d'unité actuel et la liste des membres rattachés.
+     */
+    public function unitesDgIndex(Request $request): View
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessSuperAdmin($user);
+
+        $unites = \App\Models\UniteDg::query()
+            ->with([
+                'chef:id,name,email,role',
+                'direction:id,code,libelle',
+                'users:id,name,email,role,unite_dg_id',
+            ])
+            ->orderBy('code')
+            ->get();
+
+        $roleToCode = [
+            \App\Models\User::ROLE_CHEF_UNITE_SCIQ => \App\Models\UniteDg::CODE_SCIQ,
+            \App\Models\User::ROLE_CHEF_UNITE_DGA => \App\Models\UniteDg::CODE_DGA,
+            \App\Models\User::ROLE_CHEF_UNITE_CABINET => \App\Models\UniteDg::CODE_CABINET,
+            \App\Models\User::ROLE_CHEF_UNITE_UCAS => \App\Models\UniteDg::CODE_UCAS,
+        ];
+
+        // Pour chaque unité on liste les candidats : users ayant déjà le rôle
+        // chef_unite_X correspondant ou déjà rattachés à l'unité.
+        $candidatesByUnite = $unites->mapWithKeys(function (\App\Models\UniteDg $unite) use ($roleToCode) {
+            $matchingRole = array_search($unite->code, $roleToCode, true) ?: null;
+
+            $query = \App\Models\User::query()
+                ->where('is_active', true)
+                ->orderBy('name');
+
+            $query->where(function ($q) use ($unite, $matchingRole) {
+                $q->where('unite_dg_id', $unite->id);
+                if ($matchingRole !== null) {
+                    $q->orWhere('role', $matchingRole);
+                }
+            });
+
+            return [$unite->id => $query->get(['id', 'name', 'email', 'role'])];
+        });
+
+        return view('workspace.super_admin.unites_dg', [
+            'unites' => $unites,
+            'candidatesByUnite' => $candidatesByUnite,
+        ]);
+    }
+
+    /**
+     * Assigne (ou retire) le chef d'une unité DG.
+     */
+    public function unitesDgSetChef(Request $request, \App\Models\UniteDg $uniteDg): RedirectResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessSuperAdmin($user);
+
+        $validated = $request->validate([
+            'chef_user_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $before = ['chef_user_id' => $uniteDg->chef_user_id];
+
+        // Si on désigne un nouveau chef, on aligne son unite_dg_id sur cette unité.
+        if (! empty($validated['chef_user_id'])) {
+            $newChef = \App\Models\User::query()->find($validated['chef_user_id']);
+            if ($newChef && (int) ($newChef->unite_dg_id ?? 0) !== (int) $uniteDg->id) {
+                $newChef->forceFill(['unite_dg_id' => $uniteDg->id])->save();
+            }
+        }
+
+        $uniteDg->forceFill(['chef_user_id' => $validated['chef_user_id'] ?? null])->save();
+
+        $this->recordAudit(
+            $request,
+            'super_admin',
+            'unite_dg_set_chef',
+            $uniteDg,
+            $before,
+            ['chef_user_id' => $uniteDg->chef_user_id]
+        );
+
+        return redirect()
+            ->route('workspace.super-admin.unites-dg.index')
+            ->with('success', 'Chef d’unité mis à jour pour '.$uniteDg->code.'.');
+    }
+
     public function organizationIndex(Request $request): View
     {
         $user = $this->authUser($request);

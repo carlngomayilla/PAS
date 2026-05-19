@@ -365,6 +365,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::put('/roles-permissions/registry', [SuperAdminWebController::class, 'rolesRegistryUpdate'])->name('roles.registry.update');
             Route::post('/roles-permissions/registry/duplicate', [SuperAdminWebController::class, 'rolesRegistryDuplicate'])->name('roles.registry.duplicate');
             Route::post('/roles-permissions/registry/restore/{versionId}', [SuperAdminWebController::class, 'rolesRegistryRestore'])->name('roles.registry.restore');
+            // Unités DG (SCIQ, DGA, Cabinet, UCAS) — pilotage des chefs d'unité
+            Route::get('/unites-dg', [SuperAdminWebController::class, 'unitesDgIndex'])->name('unites-dg.index');
+            Route::put('/unites-dg/{uniteDg}/chef', [SuperAdminWebController::class, 'unitesDgSetChef'])->name('unites-dg.set-chef');
+
             Route::get('/organisation-utilisateurs', [SuperAdminWebController::class, 'organizationIndex'])->name('organization.index');
             Route::post('/organisation-utilisateurs/directions', [SuperAdminWebController::class, 'organizationDirectionStore'])->name('organization.directions.store');
             Route::put('/organisation-utilisateurs/directions/{direction}', [SuperAdminWebController::class, 'organizationDirectionUpdate'])->name('organization.directions.update');

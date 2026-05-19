@@ -1329,23 +1329,45 @@ class DashboardController extends Controller
 
     private function resolveDashboardRole(User $user): string
     {
+        // DG — pilotage stratégique
         if ($user->hasRole(User::ROLE_DG)) {
             return 'dg';
         }
 
-        if ($user->hasRole(User::ROLE_CABINET)) {
+        // Cabinet, supervision Cabinet, supervision DGA — vue d'ensemble lecture
+        if ($user->hasRole(
+            User::ROLE_CABINET,
+            User::ROLE_CABINET_SUPERVISION,
+            User::ROLE_DGA_SUPERVISION,
+        )) {
             return 'cabinet';
         }
 
-        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_PLANIFICATION)) {
+        // Planification, SCIQ suivi global, Admin fonctionnel, Chefs d'unité
+        // (SCIQ/DGA/Cabinet) — vue globale avec capacité de pilotage
+        if ($user->hasRole(
+            User::ROLE_ADMIN,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_PLANIFICATION,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_CHEF_UNITE_DGA,
+            User::ROLE_CHEF_UNITE_CABINET,
+        )) {
             return 'planification';
+        }
+
+        // Auditeur / invité — vue lecture seule globale
+        if ($user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE)) {
+            return 'global';
         }
 
         if ($user->isAgent()) {
             return 'agent';
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE)) {
+        // Chef d'unité UCAS — opère comme un chef de service sur son unité
+        if ($user->hasRole(User::ROLE_SERVICE, User::ROLE_CHEF_UNITE_UCAS)) {
             return 'service';
         }
 
