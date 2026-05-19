@@ -30,7 +30,8 @@ class ReferentielWebController extends Controller
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy,
         private readonly AntivirusScanner $scanner,
-        private readonly \App\Services\ChefUniteSyncService $chefUniteSync
+        private readonly \App\Services\ChefUniteSyncService $chefUniteSync,
+        private readonly \App\Services\RoleRegistryService $roleRegistry
     ) {
     }
 
@@ -832,24 +833,25 @@ class ReferentielWebController extends Controller
      */
     private function roleOptions(?User $actor = null, ?User $subject = null): array
     {
-        $roles = [
-            User::ROLE_ADMIN,
-            User::ROLE_DG,
-            User::ROLE_PLANIFICATION,
-            User::ROLE_DIRECTION,
-            User::ROLE_SERVICE,
-            User::ROLE_AGENT,
-            User::ROLE_CABINET,
-        ];
+        // Liste complète des rôles système (18 entrées) : super_admin, admin,
+        // admin_fonctionnel, dg, planification, sciq_suivi_global, chef_unite_*,
+        // dga_supervision, cabinet, cabinet_supervision, direction, service,
+        // agent, auditeur, invite_lecture.
+        $allRoles = array_values($this->roleRegistry->codes());
+
+        // Rôles considérés comme "techniques" — réservés au super admin.
+        $superAdminOnly = [User::ROLE_SUPER_ADMIN];
+
+        // Sous-ensemble accessible aux gestionnaires non super-admin :
+        // on retire les rôles techniques.
+        $globalManagerRoles = array_values(array_diff($allRoles, $superAdminOnly));
 
         if ($actor === null) {
-            return $roles;
+            return $globalManagerRoles;
         }
 
         if ($actor->isSuperAdmin()) {
-            array_unshift($roles, User::ROLE_SUPER_ADMIN);
-
-            return $roles;
+            return $allRoles;
         }
 
         if (! $this->canManageRoles($actor)) {
@@ -857,14 +859,16 @@ class ReferentielWebController extends Controller
         }
 
         if ($actor->hasGlobalReadAccess()) {
-            return $roles;
+            return $globalManagerRoles;
         }
 
+        // Direction : peut affecter chefs de service et agents.
         if ($actor->hasRole(User::ROLE_DIRECTION)) {
             return [User::ROLE_SERVICE, User::ROLE_AGENT];
         }
 
-        if ($actor->hasRole(User::ROLE_SERVICE)) {
+        // Service / chef d'unité UCAS : ne peut affecter que des agents.
+        if ($actor->hasRole(User::ROLE_SERVICE, User::ROLE_CHEF_UNITE_UCAS)) {
             return [User::ROLE_AGENT];
         }
 
