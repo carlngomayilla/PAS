@@ -18,6 +18,12 @@ class Service extends Model
         'direction_id',
         'code',
         'libelle',
+        'type',
+        'has_global_view',
+        'has_global_write',
+        'has_dual_interface',
+        'is_control_unit',
+        'is_operational',
         'actif',
     ];
 
@@ -28,6 +34,11 @@ class Service extends Model
     {
         return [
             'actif' => 'boolean',
+            'has_global_view' => 'boolean',
+            'has_global_write' => 'boolean',
+            'has_dual_interface' => 'boolean',
+            'is_control_unit' => 'boolean',
+            'is_operational' => 'boolean',
         ];
     }
 

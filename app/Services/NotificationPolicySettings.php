@@ -154,6 +154,14 @@ class NotificationPolicySettings
             'action_financing_requested' => ['group' => 'Financement', 'label' => 'Besoin de financement', 'description' => 'Notification envoyée à la DAF et aux responsables de suivi lorsqu’une action demande un financement.'],
             'action_financing_reviewed_by_daf' => ['group' => 'Financement', 'label' => 'Décision DAF', 'description' => 'Notification après validation ou rejet DAF du financement.'],
             'action_financing_reviewed_by_dg' => ['group' => 'Financement', 'label' => 'Accord DG', 'description' => 'Notification après accord ou refus DG du financement.'],
+            'pao_transmitted_to_service' => ['group' => 'Planification', 'label' => 'PAO transmis au service', 'description' => 'Notification métier envoyée aux chefs de service concernés lorsqu’un PAO leur est transmis.'],
+            'pao_updated_for_service' => ['group' => 'Planification', 'label' => 'PAO modifié pour service', 'description' => 'Notification métier envoyée aux chefs de service lorsqu’un objectif opérationnel de leur périmètre est modifié.'],
+            'pta_created_to_direction' => ['group' => 'Planification', 'label' => 'PTA créé vers direction', 'description' => 'Notification envoyée à la direction lorsqu’un service ou une unité DG crée son PTA.'],
+            'pta_submitted_for_validation' => ['group' => 'Planification', 'label' => 'PTA soumis pour validation', 'description' => 'Notification de validation envoyée à la direction et aux profils de contrôle selon le workflow.'],
+            'pta_reviewed_by_direction' => ['group' => 'Planification', 'label' => 'Décision direction sur PTA', 'description' => 'Notification envoyée au chef de service après validation ou retour du PTA.'],
+            'sub_action_created' => ['group' => 'Actions', 'label' => 'Sous-action créée', 'description' => 'Notification envoyée au chef hiérarchique lorsqu’un agent crée une sous-action.'],
+            'sub_action_completed' => ['group' => 'Actions', 'label' => 'Sous-action effectuée', 'description' => 'Notification de contrôle envoyée au chef hiérarchique lorsqu’un agent termine une sous-action.'],
+            'justificatif_added' => ['group' => 'Actions', 'label' => 'Justificatif ajouté', 'description' => 'Notification envoyée au chef hiérarchique lorsqu’un agent ajoute une pièce justificative.'],
             'pas_status' => ['group' => 'Planification', 'label' => 'Statuts PAS', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PAS.'],
             'pao_status' => ['group' => 'Planification', 'label' => 'Statuts PAO', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PAO.'],
             'pta_status' => ['group' => 'Planification', 'label' => 'Statuts PTA', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PTA.'],
@@ -488,6 +496,14 @@ class NotificationPolicySettings
             'action_financing_requested' => ['title' => 'Financement à traiter', 'message' => 'L’action \"{action_label}\" nécessite un financement estimé à {montant_estime}. Traitement DAF requis.', 'channels' => ['in_app', 'audit']],
             'action_financing_reviewed_by_daf' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit']],
             'action_financing_reviewed_by_dg' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit']],
+            'pao_transmitted_to_service' => ['title' => 'Nouveau PAO reçu', 'message' => 'Un nouveau PAO a été transmis à votre service pour l’exercice {year}.', 'channels' => ['in_app']],
+            'pao_updated_for_service' => ['title' => 'PAO mis à jour', 'message' => 'Un objectif opérationnel de votre service a été modifié par votre direction.', 'channels' => ['in_app']],
+            'pta_created_to_direction' => ['title' => 'Nouveau PTA créé', 'message' => 'Le service {service_label} a créé son PTA pour l’exercice {year}.', 'channels' => ['in_app']],
+            'pta_submitted_for_validation' => ['title' => 'PTA soumis pour validation', 'message' => 'Le service {service_label} a soumis son PTA à la direction.', 'channels' => ['in_app']],
+            'pta_reviewed_by_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
+            'sub_action_created' => ['title' => 'Nouvelle sous-action créée', 'message' => '{actor_name} a créé une sous-action dans l’action \"{action_label}\".', 'channels' => ['in_app']],
+            'sub_action_completed' => ['title' => 'Action soumise pour vérification', 'message' => '{actor_name} a marqué une action ou sous-action comme effectuée.', 'channels' => ['in_app']],
+            'justificatif_added' => ['title' => 'Justificatif ajouté', 'message' => '{actor_name} a ajouté une pièce justificative sur l’action \"{action_label}\".', 'channels' => ['in_app']],
             'pas_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'pao_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'pta_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
@@ -657,4 +673,3 @@ class NotificationPolicySettings
         }
     }
 }
-

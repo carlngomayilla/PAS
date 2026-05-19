@@ -48,7 +48,8 @@ class AnbgUsersDirectorySeeder extends Seeder
         };
         $resolveUnite = fn (?string $code): ?int => $code ? ($unites[$code] ?? null) : null;
 
-        foreach ($this->directory() as $row) {
+        foreach ($this->directory() as $rawRow) {
+            $row = $this->normalizeDirectoryRow($rawRow);
             $directionId = $resolveDir($row['dir'] ?? null);
             $serviceId = $resolveSrv($row['dir'] ?? null, $row['service'] ?? null);
             $uniteDgId = $resolveUnite($row['unite'] ?? null);
@@ -294,5 +295,32 @@ class AnbgUsersDirectorySeeder extends Seeder
             ['name' => 'OSSI Hans', 'email' => 'hans.ossi@anbg.ga', 'role' => User::ROLE_AGENT,
              'dir' => 'DSIC', 'service' => 'CRP', 'unite' => null, 'poste' => 'Agent'],
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeDirectoryRow(array $row): array
+    {
+        if (($row['role'] ?? null) === User::ROLE_CABINET) {
+            $row['role'] = User::ROLE_COLLABORATEUR;
+            $row['dir'] = 'DG';
+            $row['service'] = 'COLLAB';
+            $row['unite'] = UniteDg::CODE_CABINET;
+        }
+
+        if (($row['role'] ?? null) === User::ROLE_PLANIFICATION) {
+            $row['dir'] = 'DS';
+            $row['service'] = 'PLANIF';
+            $row['unite'] = null;
+            $row['poste'] = 'Planification';
+        }
+
+        if (($row['dir'] ?? null) === 'DS' && ($row['service'] ?? null) === 'EB') {
+            $row['service'] = 'EN';
+        }
+
+        return $row;
     }
 }

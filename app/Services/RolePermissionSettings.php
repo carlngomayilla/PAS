@@ -217,6 +217,19 @@ class RolePermissionSettings
                 'delegations.manage',
                 'messagerie.read',
             ],
+            User::ROLE_SCIQ => [
+                'scope.global.read',
+                'scope.global.write',
+                'planning.read',
+                'planning.write.global',
+                'planning.strategic.manage',
+                'reporting.read',
+                'alerts.read',
+                'referentiel.read',
+                'referentiel.write',
+                'delegations.manage',
+                'messagerie.read',
+            ],
             User::ROLE_DIRECTION => [
                 'planning.read',
                 'planning.write.direction',
@@ -231,11 +244,27 @@ class RolePermissionSettings
                 'alerts.read',
                 'messagerie.read',
             ],
+            User::ROLE_CHEF_UNITE => [
+                'planning.read',
+                'planning.write.service',
+                'reporting.read',
+                'alerts.read',
+                'messagerie.read',
+            ],
             User::ROLE_AGENT => [
                 'reporting.read',
                 'messagerie.read',
             ],
             User::ROLE_CABINET => [
+                'scope.global.read',
+                'planning.read',
+                'planning.strategic.manage',
+                'reporting.read',
+                'alerts.read',
+                'audit.read',
+                'messagerie.read',
+            ],
+            User::ROLE_COLLABORATEUR => [
                 'scope.global.read',
                 'planning.read',
                 'planning.strategic.manage',
@@ -342,6 +371,12 @@ class RolePermissionSettings
             ],
 
             // Auditeur — lecture seule sur audit et reporting.
+            User::ROLE_UCAS => [
+                'planning.read',
+                'reporting.read',
+                'alerts.read',
+                'messagerie.read',
+            ],
             User::ROLE_AUDITEUR => [
                 'planning.read',
                 'reporting.read',

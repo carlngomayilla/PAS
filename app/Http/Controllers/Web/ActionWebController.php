@@ -423,6 +423,7 @@ class ActionWebController extends Controller
             $payload['frequence_execution'] = $payload['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
             $payload['date_echeance'] = $payload['date_fin'];
             $payload['exercice_id'] = $pta->exercice_id;
+            $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds);
 
             $action = $existingAction instanceof Action ? $existingAction : Action::query()->make();
             $isNewAction = ! $action->exists;
@@ -607,6 +608,7 @@ class ActionWebController extends Controller
         DB::transaction(function () use ($action, $validated, $indicatorPayload, $request, $trackingService, $indicatorService, $user, $dateChanged, $frequencyChanged, $targetTypeChanged, $secureStorage, $rmoIds, $subActionsPayload): void {
             $payload = $validated;
             $payload['date_echeance'] = $payload['date_fin'];
+            $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds) ?? $action->unite_dg_id;
             $action->fill($payload);
             $action->save();
             $this->syncActionRmos($action, $rmoIds);
@@ -936,6 +938,20 @@ class ActionWebController extends Controller
     private function nullableFloat(mixed $value): ?float
     {
         return $value === null || $value === '' ? null : (float) $value;
+    }
+
+    /**
+     * @param list<int> $rmoIds
+     */
+    private function primaryRmoUniteId(array $rmoIds): ?int
+    {
+        if (! isset($rmoIds[0]) || (int) $rmoIds[0] <= 0) {
+            return null;
+        }
+
+        $unitId = User::query()->whereKey((int) $rmoIds[0])->value('unite_dg_id');
+
+        return $unitId !== null ? (int) $unitId : null;
     }
 
     /**
@@ -1390,25 +1406,7 @@ class ActionWebController extends Controller
 
     private function shouldUseDualActionTabs(User $user): bool
     {
-        if ($user->isAgent()) {
-            return false;
-        }
-
-        if (! $user->hasRole(User::ROLE_CABINET, User::ROLE_PLANIFICATION, User::ROLE_DIRECTION, User::ROLE_SERVICE)) {
-            return false;
-        }
-
-        if ($user->direction_id === null || $user->service_id === null) {
-            return false;
-        }
-
-        return DB::table('directions')
-            ->join('services', 'services.direction_id', '=', 'directions.id')
-            ->where('directions.id', (int) $user->direction_id)
-            ->where('directions.code', 'DG')
-            ->where('services.id', (int) $user->service_id)
-            ->whereIn('services.code', ['CAB', 'SCIQ', 'DGA', 'UCAS'])
-            ->exists();
+        return app(\App\Services\AccessScopeService::class)->hasDualInterface($user);
     }
 
     private function scopeAction(Builder $query, User $user): void
@@ -1417,7 +1415,7 @@ class ActionWebController extends Controller
             return;
         }
 
-        if ($user->isAgent()) {
+        if ($user->isAgent() || $user->hasRole(User::ROLE_UCAS)) {
             $query->where(function (Builder $agentQuery) use ($user): void {
                 $agentQuery->where('responsable_id', (int) $user->id);
 

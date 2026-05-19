@@ -1337,6 +1337,7 @@ class DashboardController extends Controller
         // Cabinet, supervision Cabinet, supervision DGA — vue d'ensemble lecture
         if ($user->hasRole(
             User::ROLE_CABINET,
+            User::ROLE_COLLABORATEUR,
             User::ROLE_CABINET_SUPERVISION,
             User::ROLE_DGA_SUPERVISION,
         )) {
@@ -1349,7 +1350,9 @@ class DashboardController extends Controller
             User::ROLE_ADMIN,
             User::ROLE_ADMIN_FONCTIONNEL,
             User::ROLE_PLANIFICATION,
+            User::ROLE_SCIQ,
             User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE,
             User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,
@@ -1362,7 +1365,7 @@ class DashboardController extends Controller
             return 'global';
         }
 
-        if ($user->isAgent()) {
+        if ($user->isAgent() || $user->hasRole(User::ROLE_UCAS)) {
             return 'agent';
         }
 

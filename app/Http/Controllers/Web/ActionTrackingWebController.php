@@ -98,7 +98,8 @@ class ActionTrackingWebController extends Controller
         Request $request,
         Action $action,
         ActionTrackingService $trackingService,
-        SecureJustificatifStorage $secureStorage
+        SecureJustificatifStorage $secureStorage,
+        WorkspaceNotificationService $notificationService
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -241,6 +242,14 @@ class ActionTrackingWebController extends Controller
             $sousAction->toArray()
         );
 
+        $notificationService->notifySubActionCreated($action, $sousAction, $user);
+        if ($isDone) {
+            $notificationService->notifySubActionCompleted($action, $sousAction, $user);
+        }
+        if ($request->hasFile('justificatif')) {
+            $notificationService->notifyJustificatifAdded($action, $user, $sousAction, 'sous_action');
+        }
+
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', 'Sous-action ajoutee avec succes.');
@@ -251,7 +260,8 @@ class ActionTrackingWebController extends Controller
         Action $action,
         SousAction $sousAction,
         ActionTrackingService $trackingService,
-        SecureJustificatifStorage $secureStorage
+        SecureJustificatifStorage $secureStorage,
+        WorkspaceNotificationService $notificationService
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -382,6 +392,12 @@ class ActionTrackingWebController extends Controller
                 $sousAction->fresh()?->toArray()
             );
 
+            $freshSubAction = $sousAction->fresh() ?? $sousAction;
+            $notificationService->notifySubActionCompleted($action, $freshSubAction, $user);
+            if ($request->hasFile('justificatif')) {
+                $notificationService->notifyJustificatifAdded($action, $user, $freshSubAction, 'sous_action');
+            }
+
             return redirect()
                 ->route('workspace.actions.suivi', $action)
                 ->with('success', 'Sous-action marquee comme realisee.');
@@ -507,6 +523,14 @@ class ActionTrackingWebController extends Controller
             $sousAction->fresh()?->toArray()
         );
 
+        $freshSubAction = $sousAction->fresh() ?? $sousAction;
+        if ($isDone) {
+            $notificationService->notifySubActionCompleted($action, $freshSubAction, $user);
+        }
+        if ($request->hasFile('justificatif')) {
+            $notificationService->notifyJustificatifAdded($action, $user, $freshSubAction, 'sous_action');
+        }
+
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', $isDone ? 'Sous-action marquee comme realisee.' : 'Sous-action mise a jour avec succes.');
@@ -517,7 +541,8 @@ class ActionTrackingWebController extends Controller
         Action $action,
         ActionWeek $actionWeek,
         ActionTrackingService $trackingService,
-        SecureJustificatifStorage $secureStorage
+        SecureJustificatifStorage $secureStorage,
+        WorkspaceNotificationService $notificationService
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -596,6 +621,8 @@ class ActionTrackingWebController extends Controller
             $actionWeek->fresh()?->toArray()
         );
 
+        $notificationService->notifyJustificatifAdded($action, $user, null, 'hebdomadaire');
+
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', 'Semaine renseignee avec succes.');
@@ -605,7 +632,8 @@ class ActionTrackingWebController extends Controller
         Request $request,
         Action $action,
         ActionTrackingService $trackingService,
-        SecureJustificatifStorage $secureStorage
+        SecureJustificatifStorage $secureStorage,
+        WorkspaceNotificationService $notificationService
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -690,6 +718,9 @@ class ActionTrackingWebController extends Controller
 
         $trackingService->refreshActionMetrics($action);
         $this->recordAudit($request, 'action', 'execution_quantitative_update', $action, $before, $action->fresh()?->toArray());
+        if ($request->hasFile('justificatif_quantitatif')) {
+            $notificationService->notifyJustificatifAdded($action, $user, null, 'execution_quantitative');
+        }
 
         return redirect()
             ->route('workspace.actions.suivi', $action)

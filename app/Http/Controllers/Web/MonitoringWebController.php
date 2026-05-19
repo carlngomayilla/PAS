@@ -1456,11 +1456,11 @@ class MonitoringWebController extends Controller
             return 'dg';
         }
 
-        if ($user->hasRole(User::ROLE_CABINET)) {
+        if ($user->hasRole(User::ROLE_CABINET, User::ROLE_COLLABORATEUR, User::ROLE_CABINET_SUPERVISION, User::ROLE_CHEF_UNITE_CABINET)) {
             return 'cabinet';
         }
 
-        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_PLANIFICATION)) {
+        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ)) {
             return 'planification';
         }
 
@@ -1468,7 +1468,7 @@ class MonitoringWebController extends Controller
             return 'direction';
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE)) {
+        if ($user->hasRole(User::ROLE_SERVICE, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_UNITE_UCAS, User::ROLE_UCAS)) {
             return 'service';
         }
 

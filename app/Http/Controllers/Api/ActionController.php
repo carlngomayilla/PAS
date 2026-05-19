@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\ExerciceContext;
+use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -120,7 +121,8 @@ class ActionController extends Controller
         StoreActionRequest $request,
         ActionIndicatorService $indicatorService,
         ActionTrackingService $trackingService,
-        SecureJustificatifStorage $secureStorage
+        SecureJustificatifStorage $secureStorage,
+        WorkspaceNotificationService $notificationService
     ): JsonResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -167,6 +169,7 @@ class ActionController extends Controller
             $payload['seuil_alerte_progression'] = $payload['seuil_alerte_progression'] ?? 10;
             $payload['date_echeance'] = $payload['date_fin'];
             $payload['exercice_id'] = $pta->exercice_id;
+            $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds);
 
             $action = Action::query()->create($payload);
             $this->syncActionRmos($action, $rmoIds);
@@ -195,6 +198,7 @@ class ActionController extends Controller
         });
 
         $this->recordAudit($request, 'action', 'create', $action, null, $action->toArray());
+        $notificationService->notifyActionAssigned($action, $user);
 
         return response()->json([
             'message' => 'Action creee avec succes.',
@@ -294,6 +298,7 @@ class ActionController extends Controller
             $payload['date_echeance'] = $payload['date_fin'];
             $payload['seuil_alerte_progression'] = $payload['seuil_alerte_progression'] ?? 10;
             $payload['frequence_execution'] = $payload['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
+            $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds) ?? $action->unite_dg_id;
 
             $action->fill($payload);
             $action->save();
@@ -409,6 +414,20 @@ class ActionController extends Controller
         }
 
         return $rmoIds;
+    }
+
+    /**
+     * @param list<int> $rmoIds
+     */
+    private function primaryRmoUniteId(array $rmoIds): ?int
+    {
+        if (! isset($rmoIds[0]) || (int) $rmoIds[0] <= 0) {
+            return null;
+        }
+
+        $unitId = User::query()->whereKey((int) $rmoIds[0])->value('unite_dg_id');
+
+        return $unitId !== null ? (int) $unitId : null;
     }
 
     /**

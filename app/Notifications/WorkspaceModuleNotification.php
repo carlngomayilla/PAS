@@ -39,6 +39,9 @@ class WorkspaceModuleNotification extends Notification implements ShouldQueue
      */
     public function toArray(object $notifiable): array
     {
+        $destinationUserId = $notifiable->id ?? null;
+        $triggerUserId = $this->payload['user_id_declencheur'] ?? $this->payload['actor_id'] ?? null;
+
         return [
             'title' => (string) ($this->payload['title'] ?? 'Notification'),
             'message' => (string) ($this->payload['message'] ?? ''),
@@ -49,6 +52,18 @@ class WorkspaceModuleNotification extends Notification implements ShouldQueue
             'icon' => (string) ($this->payload['icon'] ?? 'bell'),
             'status' => (string) ($this->payload['status'] ?? 'info'),
             'priority' => (string) ($this->payload['priority'] ?? 'normal'),
+            'user_id_destinataire' => $destinationUserId !== null ? (int) $destinationUserId : null,
+            'user_id_declencheur' => $triggerUserId !== null ? (int) $triggerUserId : null,
+            'notification_type' => $this->payload['notification_type'] ?? $this->payload['type'] ?? 'evenement',
+            'categorie' => $this->payload['categorie'] ?? 'metier',
+            'niveau' => $this->payload['niveau'] ?? $this->payload['status'] ?? 'info',
+            'direction_id' => $this->payload['direction_id'] ?? null,
+            'service_id' => $this->payload['service_id'] ?? null,
+            'unite_dg_id' => $this->payload['unite_dg_id'] ?? null,
+            'action_id' => $this->payload['action_id'] ?? null,
+            'pao_id' => $this->payload['pao_id'] ?? null,
+            'pta_id' => $this->payload['pta_id'] ?? null,
+            'pas_id' => $this->payload['pas_id'] ?? null,
             'meta' => is_array($this->payload['meta'] ?? null) ? $this->payload['meta'] : [],
         ];
     }

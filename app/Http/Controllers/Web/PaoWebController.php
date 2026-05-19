@@ -207,7 +207,7 @@ class PaoWebController extends Controller
     }
 
     /** Enregistre un nouveau PAO après validation du formulaire. */
-    public function store(StorePaoRequest $request): RedirectResponse
+    public function store(StorePaoRequest $request, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -240,6 +240,8 @@ class PaoWebController extends Controller
 
             return $pao;
         });
+
+        $notificationService->notifyPaoTransmittedToServices($pao, $user);
 
         return redirect()
             ->route('workspace.pao.index')
@@ -275,7 +277,7 @@ class PaoWebController extends Controller
     }
 
     /** Sauvegarde les modifications apportées à un PAO. */
-    public function update(UpdatePaoRequest $request, Pao $pao): RedirectResponse
+    public function update(UpdatePaoRequest $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -328,6 +330,8 @@ class PaoWebController extends Controller
                 ->whereDoesntHave('actions')
                 ->delete();
         });
+
+        $notificationService->notifyPaoUpdatedForServices($pao->fresh() ?? $pao, $user);
 
         return redirect()
             ->route('workspace.pao.index')

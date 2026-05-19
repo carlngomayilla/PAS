@@ -1,0 +1,87 @@
+﻿Nom;Email;Rôle;Poste;Direction;Service;"Unité DG";Matricule;Téléphone;"Compte actif"
+"Super Administrateur PAS";superadmin@anbg.ga;"Super Admin";"Super administration de la plateforme";;;;;;Oui
+"Administrateur ANBG";admin@anbg.ga;Administrateur;"Administration fonctionnelle de l’application";;;;;;Oui
+Ingrid;ingrid@anbg.ga;"Directeur Général";"Directeur Général";"DG - Direction Générale";;;;;Oui
+"ADAN-GBLENOU Loick Eklu Gagnon";loick.adan@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"ATSAKOUNA Judicael";judicael.atsakouna@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"EVOUNA OBAME Serge";serge.evouna@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"KANGA Monique";monique.kanga@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"LEYOGHO MAYILA Clif Loic";clif.leyogho@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"MABADY BEHOBE Dick-Daniel";dick.mabady@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"MAYAGUI MANAMY Gilles";gilles.mayagui@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"MBAZOGO ELLA Urielle";urielle.mbazogo@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"MOMBO Stecy Michel";stecy.mombo@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"NGUEMA Nadia Pascale";nadia.nguema@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"NTSAGA LEKELE Maureen";maureen.ntsaga@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"SIBHA NZE NZONG Ornelia";ornelia.sibha@anbg.ga;Cabinet;"Membre Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";;;Oui
+"ANGUE ALADE Kassirath";kassirath.angue@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";;;Oui
+"DOGUI Marie Raphaelle";raphaelle.dogui@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";PLA-045;;Oui
+"DOGUI Marie Raphaelle";marie.dogui@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";;;Oui
+"KOMBA Joelle";joelle.komba@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";;;Oui
+"LEANDRY MBIRA";leandry.mbira@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";;;Oui
+"MOUELLE MASSALA NDONGO Aaron";aaron.mouelle@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";;;Oui
+"NDOUTOUME Jean Servais";servais.ndoutoume@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";PLA-029;;Oui
+"NDOUTOUME Jean Servais";jean.ndoutoume@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";;;Oui
+"NGUEBET MOGOULA Hilaire";hilaire.nguebet@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";;;Oui
+"NTSITSIGUI Yannis";yannis.ntsitsigui@anbg.ga;Planification;"Planification / SCIQ";"DG - Direction Générale";;"SCIQ - Service de Contrôle Interne et Qualité";;;Oui
+"Directeur DAF";directeur.daf@anbg.ga;"Directeur de direction";"Directeur DAF";"DAF - Direction Administrative et Financière";;;;;Oui
+"Directeur DS";directeur.ds@anbg.ga;"Directeur de direction";"Directeur DS";"DS - Direction DS";;;;;Oui
+"Directeur DSIC";directeur.dsic@anbg.ga;"Directeur de direction";"Directeur DSIC";"DSIC - Direction des Systèmes d’Information et de la Communication";;;;;Oui
+"MBAZOGO NGUEMA Suzy";suzy.mbazogo@anbg.ga;"Directeur de direction";"Directrice / Responsable de direction";;;;DIR-021;;Oui
+"À compléter";dga@anbg.ga;"Directeur de direction";"Directeur Général Adjoint";"DG - Direction Générale";;"DGA - Direction Générale Adjointe";DIR-016;;Oui
+"AFFANE Saturnin";saturnin.affane@anbg.ga;"Chef de service";"Chef de service";"DAF - Direction Administrative et Financière";"AMG - Administration des Moyens Généraux";;;;Oui
+"Arnold MINDZELI";arnold.mindzeli@anbg.ga;"Chef de service";"Chef de service";"DSIC - Direction des Systèmes d’Information et de la Communication";"SIRS - SIRS";;;;Oui
+"BINGOUMA Ines";ines.bingouma@anbg.ga;"Chef de service";"Chef de service";"DAF - Direction Administrative et Financière";"AMG - Administration des Moyens Généraux";;;;Oui
+"EKOMI Robert";robert.ekomi@anbg.ga;"Chef de service";"Chef de service";"DAF - Direction Administrative et Financière";"SFC - Service Financier et Comptable";;;;Oui
+"ENGONE Charles";charles.engone@anbg.ga;"Chef de service";"Chef de service";"DAF - Direction Administrative et Financière";"AJARH - Affaires Juridiques, Administration et Ressources Humaines";;;;Oui
+"EYEANG Sonia";sonia.eyeang@anbg.ga;"Chef de service";"Chef de service";"DAF - Direction Administrative et Financière";"AMG - Administration des Moyens Généraux";;;;Oui
+"KOMBA Staelle";staelle.komba@anbg.ga;"Chef de service";"Chef de service";"DSIC - Direction des Systèmes d’Information et de la Communication";"GDS - Gestion Documentaire et Statistique";;;;Oui
+"MAGNANGANI ERIMI Belinda";belinda.magnangani@anbg.ga;"Chef de service";"Chef de service";"DS - Direction DS";"EB - Service EB";;;;Oui
+"MATTEYA Aicha";aicha.matteya@anbg.ga;"Chef de service";"Chef de service";"DAF - Direction Administrative et Financière";"AJARH - Affaires Juridiques, Administration et Ressources Humaines";;;;Oui
+"MBOUMBA Noelle";noelle.mboumba@anbg.ga;"Chef de service";"Chef de service";"DSIC - Direction des Systèmes d’Information et de la Communication";"CRP - CRP";;;;Oui
+"MENOUETON Codjo";codjo.menoueton@anbg.ga;"Chef de service";"Chef de service";"DS - Direction DS";"EB - Service EB";;;;Oui
+"MIKOLO Ulrich";ulrich.mikolo@anbg.ga;"Chef de service";"Chef de service";"DAF - Direction Administrative et Financière";"AMG - Administration des Moyens Généraux";;;;Oui
+"MOULOUNGUI Audrey";audrey.mouloungui@anbg.ga;"Chef de service";"Chef de service";"DAF - Direction Administrative et Financière";"SFC - Service Financier et Comptable";;;;Oui
+"NGOMBI Charlaine";charlaine.ngombi@anbg.ga;"Chef de service";"Chef de service";"DAF - Direction Administrative et Financière";"AJARH - Affaires Juridiques, Administration et Ressources Humaines";;;;Oui
+"SIMBA Marie Louise";marie.simba@anbg.ga;"Chef de service";"Chef de service";"DS - Direction DS";"ENB - Service ENB";;;;Oui
+"TOUNGOU Carine";carine.toungou@anbg.ga;"Chef de service";"Chef de service";"DS - Direction DS";"EB - Service EB";;;;Oui
+"YEMBI Marvin";marvin.yembi@anbg.ga;"Chef de service";"Chef de service";"DSIC - Direction des Systèmes d’Information et de la Communication";"CRP - CRP";;;;Oui
+"À compléter";ucas@anbg.ga;"Chef de service";"Responsable UCAS";"DG - Direction Générale";;"UCAS - Unité de Coordination et d’Appui au Suivi";UCAS-001;;Oui
+"ABOGO Melissa";melissa.abogo@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"SFC - Service Financier et Comptable";;;;Oui
+"AZIZET AKEWA Claude";claude.azizet@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"BISSONGUI MAKITA Raissa";raissa.bissongui@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"CAMARA Francois";francois.camara@anbg.ga;Agent;Agent;"DSIC - Direction des Systèmes d’Information et de la Communication";"SIRS - SIRS";;;;Oui
+"EBINDA Roger";roger.ebinda@anbg.ga;Agent;Agent;"DSIC - Direction des Systèmes d’Information et de la Communication";"SIRS - SIRS";;;;Oui
+"INDENGUELA Aldrich";aldrich.indenguela@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"AJARH - Affaires Juridiques, Administration et Ressources Humaines";;;;Oui
+"LEKA Noeline";noeline.leka@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"LEKOSSO Ismene";ismene.lekosso@anbg.ga;Agent;Agent;;;;AGT-022;;Oui
+"LEMBA Sigrid";sigrid.lemba@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"LEYIGUI Wilfried";wilfried.leyigui@anbg.ga;Agent;Agent;"DSIC - Direction des Systèmes d’Information et de la Communication";"GDS - Gestion Documentaire et Statistique";;;;Oui
+"MADIBA Herbert";herbert.madiba@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"SFC - Service Financier et Comptable";;;;Oui
+"MAGNET Clovis";clovis.magnet@anbg.ga;Agent;Agent;"DSIC - Direction des Systèmes d’Information et de la Communication";"GDS - Gestion Documentaire et Statistique";;;;Oui
+"MAKANGOU Zita";zita.makangou@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"MAPAGA Yannis";yannis.mapaga@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"SFC - Service Financier et Comptable";;;;Oui
+"MATSOMBI DOGUI Reine";reine.matsombi@anbg.ga;Agent;Agent;;;;AGT-023;;Oui
+"MAVIOGA Leger";leger.mavioga@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"MBAZOO Christel";christel.mbazoo@anbg.ga;Agent;Agent;"DSIC - Direction des Systèmes d’Information et de la Communication";"CRP - CRP";;;;Oui
+"MENDOME Nadine";nadine.mendome@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"MIKODJI Casimir";casimir.mikodji@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"AMG - Administration des Moyens Généraux";;;;Oui
+"MOUALOUANGO Molan";molan.moualouango@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"SFC - Service Financier et Comptable";;;;Oui
+"MOUEBI Yannick";yannick.mouebi@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"SFC - Service Financier et Comptable";;;;Oui
+"MOUKAGNI Estelle";estelle.moukagni@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"MOUKAMBOU Guy Vincent";guy.moukambou@anbg.ga;Agent;Agent;;;;AGT-024;;Oui
+"MOUKONGO Candy";candy.moukongo@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"SFC - Service Financier et Comptable";;;;Oui
+"MOUSSAVOU Orphe Tresor";tresor.moussavou@anbg.ga;Agent;"Agent Cabinet";"DG - Direction Générale";;"CABINET - Cabinet du Directeur Général";AGT-015;;Oui
+"NDAKISSA Tassiana";tassiana.ndakissa@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"SFC - Service Financier et Comptable";;;;Oui
+"NGALIBAMA Grasmy";grasmy.ngalibama@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"AMG - Administration des Moyens Généraux";;;;Oui
+"NGOMA Lucrecia";lucrecia.ngoma@anbg.ga;Agent;Agent;"DSIC - Direction des Systèmes d’Information et de la Communication";"CRP - CRP";;;;Oui
+"NGOUBILI Lidy";lidy.ngoubili@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"NGUEMEDZANG Renaud";renaud.nguemedzang@anbg.ga;Agent;Agent;"DSIC - Direction des Systèmes d’Information et de la Communication";"SIRS - SIRS";;;;Oui
+"NGWELEH Igor";igor.ngweleh@anbg.ga;Agent;Agent;"DAF - Direction Administrative et Financière";"AMG - Administration des Moyens Généraux";;;;Oui
+"NKOURA Charly";charly.nkoura@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"NYANGUI Sandrine";sandrine.nyangui@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"OKOUMA Miguelle";miguelle.okouma@anbg.ga;Agent;Agent;;;;AGT-025;;Oui
+"OSSA Charles";charles.ossa@anbg.ga;Agent;Agent;"DSIC - Direction des Systèmes d’Information et de la Communication";"SIRS - SIRS";;;;Oui
+"OSSI Hans";hans.ossi@anbg.ga;Agent;Agent;"DSIC - Direction des Systèmes d’Information et de la Communication";"CRP - CRP";;;;Oui
+"SIMBOU Laurencienne";laurencienne.simbou@anbg.ga;Agent;Agent;"DS - Direction DS";"EB - Service EB";;;;Oui
+"À compléter";agent.ucas@anbg.ga;Agent;"Agent UCAS";"DG - Direction Générale";;"UCAS - Unité de Coordination et d’Appui au Suivi";UCAS-002;;Oui

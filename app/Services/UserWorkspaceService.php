@@ -30,7 +30,8 @@ class UserWorkspaceService
             || $hasDelegatedPlanningWrite;
         $canWriteService = ($user->hasRole(User::ROLE_SERVICE) && $user->hasPermission('planning.write.service'))
             || $hasDelegatedPlanningWrite;
-        $isAgent = $user->isAgent();
+        $isAgent = $user->isAgent() || $user->hasRole(User::ROLE_UCAS);
+        $hasOwnExecutionSpace = $isAgent || $user->hasRole(User::ROLE_SCIQ, User::ROLE_COLLABORATEUR, User::ROLE_CABINET);
         $canWriteOperational = $canWriteGlobal || $canWriteDirection || $canWriteService;
         $canManageActions = $canWriteOperational && ! $isAgent;
         $canReadReferentiel = $user->hasAnyPermission('referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles');
@@ -49,6 +50,7 @@ class UserWorkspaceService
         // pour la gestion des référentiels métier.
         $isPlanification = $user->hasRole(
             User::ROLE_PLANIFICATION,
+            User::ROLE_SCIQ,
             User::ROLE_ADMIN_FONCTIONNEL,
             User::ROLE_SCIQ_SUIVI_GLOBAL,
             User::ROLE_CHEF_UNITE_SCIQ,
@@ -56,6 +58,7 @@ class UserWorkspaceService
         // Cabinet et ses variantes (supervision DGA/Cabinet, auditeur) peuvent voir l'audit.
         $isCabinet = $user->hasRole(
             User::ROLE_CABINET,
+            User::ROLE_COLLABORATEUR,
             User::ROLE_CABINET_SUPERVISION,
             User::ROLE_DGA_SUPERVISION,
             User::ROLE_CHEF_UNITE_DGA,
@@ -84,9 +87,9 @@ class UserWorkspaceService
         }
 
         $isServiceOnly = $user->hasRole(User::ROLE_SERVICE)
-            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET);
+            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_CABINET, User::ROLE_COLLABORATEUR);
         $isDirectionOnly = $user->hasRole(User::ROLE_DIRECTION)
-            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET);
+            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_CABINET, User::ROLE_COLLABORATEUR);
 
         if ($canReadPlanning && ! $isServiceOnly && ! $isDirectionOnly) {
             $modules[] = [
@@ -127,14 +130,14 @@ class UserWorkspaceService
             ];
         }
 
-        if ($canReadPlanning || $isAgent || $hasDelegatedActionReview) {
+        if ($canReadPlanning || $hasOwnExecutionSpace || $hasDelegatedActionReview) {
             $modules[] = [
                 'code' => 'execution',
                 'label' => 'Actions',
                 'description' => 'Exécution des tâches et suivi de progression',
                 'endpoint' => '/api/v1/actions',
-                'can_write' => $canWriteOperational || $isAgent || $hasDelegatedActionReview,
-                'actions' => $isAgent
+                'can_write' => $canWriteOperational || $hasOwnExecutionSpace || $hasDelegatedActionReview,
+                'actions' => ($isAgent || ($hasOwnExecutionSpace && ! $canManageActions))
                     ? ['Consulter', 'Renseigner suivi hebdomadaire', 'Téléverser justificatifs hebdomadaires']
                     : ($canManageActions
                         ? ['Consulter', 'Créer', 'Modifier', 'Paramétrer indicateur', 'Supprimer', 'Clôturer', 'Suivi hebdomadaire']

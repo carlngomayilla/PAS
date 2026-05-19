@@ -9,6 +9,7 @@ use App\Models\ActionWeek;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\DocumentPolicySettings;
+use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,7 +43,8 @@ class ActionWeekController extends Controller
         Action $action,
         ActionWeek $actionWeek,
         ActionTrackingService $trackingService,
-        SecureJustificatifStorage $secureStorage
+        SecureJustificatifStorage $secureStorage,
+        WorkspaceNotificationService $notificationService
     ): JsonResponse {
         if (! $request->user() instanceof User) {
             abort(401);
@@ -101,6 +103,8 @@ class ActionWeekController extends Controller
                 $storedFile['est_chiffre']
             );
         });
+
+        $notificationService->notifyJustificatifAdded($action, $user, null, 'hebdomadaire');
 
         return response()->json([
             'message' => 'Semaine renseignee avec succes.',

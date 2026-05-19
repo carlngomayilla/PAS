@@ -15,6 +15,7 @@ use App\Models\Pta;
 use App\Models\User;
 use App\Support\UiLabel;
 use App\Services\ExerciceContext;
+use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -85,7 +86,7 @@ class PtaController extends Controller
         return PtaResource::collection($result)->response();
     }
 
-    public function store(StorePtaRequest $request): JsonResponse
+    public function store(StorePtaRequest $request, WorkspaceNotificationService $notificationService): JsonResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -131,6 +132,10 @@ class PtaController extends Controller
             $existingPta?->toArray(),
             $pta->toArray()
         );
+
+        if ($existingPta === null) {
+            $notificationService->notifyPtaCreatedToDirection($pta, $user);
+        }
 
         return response()->json([
             'message' => $existingPta === null

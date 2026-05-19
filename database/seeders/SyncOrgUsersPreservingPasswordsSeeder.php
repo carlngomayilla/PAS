@@ -43,12 +43,7 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
                     'direction_id' => $directionId,
                     'code' => $service['code'],
                 ],
-                [
-                    'libelle' => $service['libelle'],
-                    'actif' => true,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]
+                $this->servicePayload($service, $now)
             );
         }
 
@@ -61,7 +56,8 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
             ])
             ->all();
 
-        foreach ($this->users() as $index => $user) {
+        foreach ($this->users() as $index => $rawUser) {
+            $user = $this->normalizeUserOrganization($rawUser);
             $email = strtolower((string) $user['email']);
             $directionId = $directionIds[$user['direction_code']] ?? null;
             $serviceId = null;

@@ -2203,6 +2203,7 @@
 
     /* Horloge : largeur fixe + chiffres monospaced pour éviter le shift à chaque seconde. */
     .admin-local-clock {
+        display: none !important;
         font-variant-numeric: tabular-nums;
         font-feature-settings: "tnum";
         min-width: 6.4rem;
@@ -2215,6 +2216,12 @@
         letter-spacing: 0.02em;
         color: var(--app-text);
         gap: 0.45rem;
+    }
+
+    @media (min-width: 768px) {
+        .admin-local-clock {
+            display: inline-flex !important;
+        }
     }
 
     .admin-local-clock::before {

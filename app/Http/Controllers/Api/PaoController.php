@@ -16,6 +16,7 @@ use App\Models\PasObjectif;
 use App\Models\User;
 use App\Support\UiLabel;
 use App\Services\ExerciceContext;
+use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -118,7 +119,7 @@ class PaoController extends Controller
         return PaoResource::collection($result)->response();
     }
 
-    public function store(StorePaoRequest $request): JsonResponse
+    public function store(StorePaoRequest $request, WorkspaceNotificationService $notificationService): JsonResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -143,6 +144,8 @@ class PaoController extends Controller
 
             return $pao;
         });
+
+        $notificationService->notifyPaoTransmittedToServices($pao, $user);
 
         return response()->json([
             'message' => $this->entityCreatedMessage(UiLabel::object('pao')),
@@ -182,7 +185,7 @@ class PaoController extends Controller
         ]);
     }
 
-    public function update(UpdatePaoRequest $request, Pao $pao): JsonResponse
+    public function update(UpdatePaoRequest $request, Pao $pao, WorkspaceNotificationService $notificationService): JsonResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -235,6 +238,8 @@ class PaoController extends Controller
                 ->whereDoesntHave('actions')
                 ->delete();
         });
+
+        $notificationService->notifyPaoUpdatedForServices($pao->fresh() ?? $pao, $user);
 
         return response()->json([
             'message' => $this->entityUpdatedMessage(UiLabel::object('pao')),

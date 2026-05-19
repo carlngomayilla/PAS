@@ -18,13 +18,25 @@ class ProductionSafeSeederTest extends TestCase
         $this->seed(ProductionSafeSeeder::class);
 
         // Structure organisationnelle attendue en prod.
-        $this->assertSame(5, DB::table('directions')->where('actif', true)->count());
-        $this->assertSame(19, DB::table('services')->count());
-        $this->assertGreaterThanOrEqual(84, DB::table('users')->count());
+        $this->assertSame(4, DB::table('directions')->where('actif', true)->count());
+        $this->assertSame(12, DB::table('services')->where('actif', true)->count());
+        $this->assertSame(66, DB::table('users')->count());
         $this->assertEqualsCanonicalizing(
-            ['DAF', 'DG', 'DIR021', 'DS', 'DSIC'],
+            ['DAF', 'DG', 'DS', 'DSIC'],
             DB::table('directions')->where('actif', true)->pluck('code')->all()
         );
+        $this->assertEqualsCanonicalizing(
+            ['UCAS', 'SCIQ', 'COLLAB'],
+            DB::table('services')
+                ->join('directions', 'directions.id', '=', 'services.direction_id')
+                ->where('directions.code', 'DG')
+                ->where('services.actif', true)
+                ->pluck('services.code')
+                ->all()
+        );
+        $this->assertDatabaseMissing('users', ['name' => 'À compléter']);
+        $this->assertDatabaseMissing('users', ['email' => 'claude.azizet@anbg.ga']);
+        $this->assertDatabaseMissing('users', ['email' => 'belinda.magnangani@anbg.ga']);
 
         // Paramètres plateforme et templates seedés en prod.
         $this->assertGreaterThan(0, DB::table('platform_settings')->count());

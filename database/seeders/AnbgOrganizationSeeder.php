@@ -7,9 +7,19 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
+use SimpleXMLElement;
+use ZipArchive;
 
 class AnbgOrganizationSeeder extends Seeder
 {
+    private const USERS_WORKBOOK = 'docs/base_utilisateurs_pas_anbg_refaite_nouvelle_logique.xlsx';
+
+    /**
+     * @var array<int, array<string, mixed>>|null
+     */
+    private ?array $workbookUsers = null;
+
     public function run(): void
     {
         $now = now();
@@ -44,12 +54,7 @@ class AnbgOrganizationSeeder extends Seeder
                     'direction_id' => $directionId,
                     'code' => $service['code'],
                 ],
-                [
-                    'libelle' => $service['libelle'],
-                    'actif' => true,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]
+                $this->servicePayload($service, $now)
             );
         }
 
@@ -58,16 +63,17 @@ class AnbgOrganizationSeeder extends Seeder
             ->whereIn('directions.code', array_keys($directionIds))
             ->get(['directions.code as direction_code', 'services.code', 'services.id'])
             ->mapWithKeys(static fn ($row): array => [
-                (string) $row->direction_code . '.' . (string) $row->code => (int) $row->id,
+                (string) $row->direction_code.'.'.(string) $row->code => (int) $row->id,
             ])
             ->all();
 
-        foreach ($this->users() as $index => $user) {
+        foreach ($this->users() as $index => $rawUser) {
+            $user = $this->normalizeUserOrganization($rawUser);
             $directionId = $directionIds[$user['direction_code']] ?? null;
             $serviceId = null;
 
             if ($user['service_code'] !== null) {
-                $serviceId = $serviceIds[$user['direction_code'] . '.' . $user['service_code']] ?? null;
+                $serviceId = $serviceIds[$user['direction_code'].'.'.$user['service_code']] ?? null;
             }
 
             DB::table('users')->updateOrInsert(
@@ -99,43 +105,34 @@ class AnbgOrganizationSeeder extends Seeder
     protected function directions(): array
     {
         return [
-            ['code' => 'DG', 'libelle' => 'Direction Générale'],
-            ['code' => 'DIR021', 'libelle' => 'Direction à identifier 1'],
-            ['code' => 'DS', 'libelle' => 'Direction DS'],
-            ['code' => 'DSIC', 'libelle' => 'Direction des Systèmes d’Information et de la Communication'],
-            ['code' => 'DAF', 'libelle' => 'Direction Administrative et Financière'],
+            ['code' => 'DG', 'libelle' => 'Cabinet du DG'],
+            ['code' => 'DSIC', 'libelle' => 'DSIC'],
+            ['code' => 'DAF', 'libelle' => 'DAF'],
+            ['code' => 'DS', 'libelle' => 'DS'],
         ];
     }
 
     /**
-     * @return array<int, array{direction_code:string, code:string, libelle:string}>
+     * @return array<int, array<string, mixed>>
      */
     protected function services(): array
     {
         return [
-            ['direction_code' => 'DG', 'code' => 'DIRGEN', 'libelle' => 'Direction Générale'],
-            ['direction_code' => 'DG', 'code' => 'CAB', 'libelle' => 'Cabinet de la Direction Générale'],
-            ['direction_code' => 'DG', 'code' => 'SCIQ', 'libelle' => 'Service Contrôle Interne et Qualité / Planification'],
-            ['direction_code' => 'DG', 'code' => 'DGA', 'libelle' => 'Direction Générale Adjointe'],
-            ['direction_code' => 'DG', 'code' => 'UCAS', 'libelle' => 'UCAS'],
+            ['direction_code' => 'DG', 'code' => 'UCAS', 'libelle' => 'UCAS', 'type' => 'cabinet_unit', 'is_operational' => true],
+            ['direction_code' => 'DG', 'code' => 'SCIQ', 'libelle' => 'SCIQ', 'type' => 'cabinet_unit', 'has_global_view' => true, 'has_global_write' => true, 'has_dual_interface' => true, 'is_control_unit' => true, 'is_operational' => true],
+            ['direction_code' => 'DG', 'code' => 'COLLAB', 'libelle' => 'Collaborateurs', 'type' => 'cabinet_unit', 'has_global_view' => true, 'has_dual_interface' => true, 'is_operational' => true],
 
-            ['direction_code' => 'DIR021', 'code' => 'DIRECTION', 'libelle' => 'Direction DIR-021'],
-            ['direction_code' => 'DIR021', 'code' => 'OPS', 'libelle' => 'Équipe opérationnelle DIR-021'],
+            ['direction_code' => 'DSIC', 'code' => 'SIRS', 'libelle' => 'SIRS', 'type' => 'operational_service', 'is_operational' => true],
+            ['direction_code' => 'DSIC', 'code' => 'CRP', 'libelle' => 'CRP', 'type' => 'operational_service', 'is_operational' => true],
+            ['direction_code' => 'DSIC', 'code' => 'GDS', 'libelle' => 'GDS', 'type' => 'operational_service', 'is_operational' => true],
 
-            ['direction_code' => 'DS', 'code' => 'DIRECTION', 'libelle' => 'Direction'],
-            ['direction_code' => 'DS', 'code' => 'ENB', 'libelle' => 'Service ENB'],
-            ['direction_code' => 'DS', 'code' => 'EB', 'libelle' => 'Service EB'],
-            ['direction_code' => 'DS', 'code' => 'PLANIF', 'libelle' => 'Planification DS'],
+            ['direction_code' => 'DAF', 'code' => 'AJARH', 'libelle' => 'AJARH', 'type' => 'operational_service', 'is_operational' => true],
+            ['direction_code' => 'DAF', 'code' => 'AMG', 'libelle' => 'AMG', 'type' => 'operational_service', 'is_operational' => true],
+            ['direction_code' => 'DAF', 'code' => 'SFC', 'libelle' => 'SFC', 'type' => 'operational_service', 'is_operational' => true],
 
-            ['direction_code' => 'DSIC', 'code' => 'DIRECTION', 'libelle' => 'Direction'],
-            ['direction_code' => 'DSIC', 'code' => 'SIRS', 'libelle' => 'SIRS'],
-            ['direction_code' => 'DSIC', 'code' => 'CRP', 'libelle' => 'CRP'],
-            ['direction_code' => 'DSIC', 'code' => 'GDS', 'libelle' => 'Gestion Documentaire et Statistique'],
-
-            ['direction_code' => 'DAF', 'code' => 'DIRECTION', 'libelle' => 'Direction'],
-            ['direction_code' => 'DAF', 'code' => 'AJARH', 'libelle' => 'Affaires Juridiques, Administration et Ressources Humaines'],
-            ['direction_code' => 'DAF', 'code' => 'SFC', 'libelle' => 'Service Financier et Comptable'],
-            ['direction_code' => 'DAF', 'code' => 'AMG', 'libelle' => 'Administration des Moyens Généraux'],
+            ['direction_code' => 'DS', 'code' => 'EB', 'libelle' => 'EB', 'type' => 'operational_service', 'is_operational' => true],
+            ['direction_code' => 'DS', 'code' => 'ENB', 'libelle' => 'ENB', 'type' => 'operational_service', 'is_operational' => true],
+            ['direction_code' => 'DS', 'code' => 'PLANIF', 'libelle' => 'Planification', 'type' => 'operational_service', 'has_global_view' => true, 'has_global_write' => true, 'has_dual_interface' => true, 'is_control_unit' => true, 'is_operational' => true],
         ];
     }
 
@@ -152,186 +149,334 @@ class AnbgOrganizationSeeder extends Seeder
      */
     protected function users(): array
     {
-        return [
-            ['matricule' => 'SAD-001', 'name' => 'Super Administrateur PAS', 'email' => 'superadmin@anbg.ga', 'direction_code' => '', 'service_code' => null, 'fonction' => 'Super administration de la plateforme', 'role' => User::ROLE_SUPER_ADMIN],
-            ['matricule' => 'ADM-002', 'name' => 'Administrateur ANBG', 'email' => 'admin@anbg.ga', 'direction_code' => '', 'service_code' => null, 'fonction' => 'Administration fonctionnelle de l’application', 'role' => User::ROLE_ADMIN],
-            ['matricule' => 'DG-003', 'name' => 'Ingrid', 'email' => 'ingrid@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'DIRGEN', 'fonction' => 'Directeur Général', 'role' => User::ROLE_DG],
+        return $this->workbookUsers ??= $this->loadUsersFromWorkbook();
+    }
 
-            ['matricule' => 'CAB-004', 'name' => 'ADAN-GBLENOU Loick Eklu Gagnon', 'email' => 'loick.adan@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-005', 'name' => 'LEYOGHO MAYILA Clif Loic', 'email' => 'clif.leyogho@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-006', 'name' => 'MBAZOGO ELLA Urielle', 'email' => 'urielle.mbazogo@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-007', 'name' => 'ATSAKOUNA Judicael', 'email' => 'judicael.atsakouna@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-008', 'name' => 'MOMBO Stecy Michel', 'email' => 'stecy.mombo@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-009', 'name' => 'MABADY BEHOBE Dick-Daniel', 'email' => 'dick.mabady@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-010', 'name' => 'NTSAGA LEKELE Maureen', 'email' => 'maureen.ntsaga@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-011', 'name' => 'MAYAGUI MANAMY Gilles', 'email' => 'gilles.mayagui@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-012', 'name' => 'EVOUNA OBAME Serge', 'email' => 'serge.evouna@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-013', 'name' => 'SIBHA NZE NZONG Ornelia', 'email' => 'ornelia.sibha@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'CAB-014', 'name' => 'NGUEMA Nadia Pascale', 'email' => 'nadia.nguema@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
-            ['matricule' => 'AGT-015', 'name' => 'MOUSSAVOU Orphe Tresor', 'email' => 'tresor.moussavou@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Agent Cabinet', 'role' => User::ROLE_AGENT],
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadUsersFromWorkbook(): array
+    {
+        $path = $this->workbookPath();
+        $zip = new ZipArchive();
 
-            ['matricule' => 'DIR-016', 'name' => 'À compléter', 'email' => 'dga@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'DGA', 'fonction' => 'Directeur Général Adjoint', 'role' => User::ROLE_DIRECTION],
-            ['matricule' => 'CAB-017', 'name' => 'KANGA Monique', 'email' => 'monique.kanga@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'CAB', 'fonction' => 'Membre Cabinet', 'role' => User::ROLE_CABINET],
+        if ($zip->open($path) !== true) {
+            throw new RuntimeException(sprintf('Impossible d ouvrir le classeur utilisateurs: %s', $path));
+        }
 
-            ['matricule' => 'PLA-018', 'name' => 'NGUEBET MOGOULA Hilaire', 'email' => 'hilaire.nguebet@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'SCIQ', 'fonction' => 'Planification / SCIQ', 'role' => User::ROLE_PLANIFICATION],
-            ['matricule' => 'PLA-019', 'name' => 'ANGUE ALADE Kassirath', 'email' => 'kassirath.angue@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'SCIQ', 'fonction' => 'Planification / SCIQ', 'role' => User::ROLE_PLANIFICATION],
-            ['matricule' => 'PLA-020', 'name' => 'MOUELLE MASSALA NDONGO Aaron', 'email' => 'aaron.mouelle@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'SCIQ', 'fonction' => 'Planification / SCIQ', 'role' => User::ROLE_PLANIFICATION],
+        try {
+            $sharedStrings = $this->readSharedStrings($zip);
+            $sheetPath = $this->sheetPathByName($zip, 'Base_Import');
+            $sheetXml = $zip->getFromName($sheetPath);
 
-            ['matricule' => 'DIR-021', 'name' => 'MBAZOGO NGUEMA Suzy', 'email' => 'suzy.mbazogo@anbg.ga', 'direction_code' => 'DIR021', 'service_code' => 'DIRECTION', 'fonction' => 'Directrice / Responsable de direction', 'role' => User::ROLE_DIRECTION],
-            ['matricule' => 'AGT-022', 'name' => 'LEKOSSO Ismene', 'email' => 'ismene.lekosso@anbg.ga', 'direction_code' => 'DIR021', 'service_code' => 'OPS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-023', 'name' => 'MATSOMBI DOGUI Reine', 'email' => 'reine.matsombi@anbg.ga', 'direction_code' => 'DIR021', 'service_code' => 'OPS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-024', 'name' => 'MOUKAMBOU Guy Vincent', 'email' => 'guy.moukambou@anbg.ga', 'direction_code' => 'DIR021', 'service_code' => 'OPS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-025', 'name' => 'OKOUMA Miguelle', 'email' => 'miguelle.okouma@anbg.ga', 'direction_code' => 'DIR021', 'service_code' => 'OPS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
+            if ($sheetXml === false) {
+                throw new RuntimeException(sprintf('Feuille Base_Import introuvable dans %s', $path));
+            }
 
-            ['matricule' => 'DIR-026', 'name' => 'À compléter', 'email' => 'directeur.ds@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'DIRECTION', 'fonction' => 'Directeur DS', 'role' => User::ROLE_DIRECTION],
-            ['matricule' => 'SRV-027', 'name' => 'SIMBA Marie Louise', 'email' => 'marie.simba@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'ENB', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'SRV-028', 'name' => 'MAGNANGANI ERIMI Belinda', 'email' => 'belinda.magnangani@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'PLA-029', 'name' => 'NDOUTOUME Jean Servais', 'email' => 'servais.ndoutoume@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'SCIQ', 'fonction' => 'Planification / SCIQ', 'role' => User::ROLE_PLANIFICATION],
-            ['matricule' => 'AGT-030', 'name' => 'AZIZET AKEWA Claude', 'email' => 'claude.azizet@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-031', 'name' => 'BISSONGUI MAKITA Raissa', 'email' => 'raissa.bissongui@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-032', 'name' => 'LEKA Noeline', 'email' => 'noeline.leka@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-033', 'name' => 'LEMBA Sigrid', 'email' => 'sigrid.lemba@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-034', 'name' => 'MAKANGOU Zita', 'email' => 'zita.makangou@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-035', 'name' => 'MAVIOGA Leger', 'email' => 'leger.mavioga@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-036', 'name' => 'MENDOME Nadine', 'email' => 'nadine.mendome@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'SRV-037', 'name' => 'MENOUETON Codjo', 'email' => 'codjo.menoueton@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'AGT-038', 'name' => 'MOUKAGNI Estelle', 'email' => 'estelle.moukagni@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-039', 'name' => 'NGOUBILI Lidy', 'email' => 'lidy.ngoubili@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-040', 'name' => 'NKOURA Charly', 'email' => 'charly.nkoura@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-041', 'name' => 'NYANGUI Sandrine', 'email' => 'sandrine.nyangui@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-042', 'name' => 'SIMBOU Laurencienne', 'email' => 'laurencienne.simbou@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'SRV-043', 'name' => 'TOUNGOU Carine', 'email' => 'carine.toungou@anbg.ga', 'direction_code' => 'DS', 'service_code' => 'EB', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
+            $rows = [];
+            $sheet = new SimpleXMLElement($sheetXml);
+            $sheet->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
 
-            ['matricule' => 'PLA-044', 'name' => 'LEANDRY MBIRA', 'email' => 'leandry.mbira@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'SCIQ', 'fonction' => 'Planification / SCIQ', 'role' => User::ROLE_PLANIFICATION],
-            ['matricule' => 'PLA-045', 'name' => 'DOGUI Marie Raphaelle', 'email' => 'raphaelle.dogui@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'SCIQ', 'fonction' => 'Planification / SCIQ', 'role' => User::ROLE_PLANIFICATION],
-            ['matricule' => 'PLA-046', 'name' => 'NTSITSIGUI Yannis', 'email' => 'yannis.ntsitsigui@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'SCIQ', 'fonction' => 'Planification / SCIQ', 'role' => User::ROLE_PLANIFICATION],
-            ['matricule' => 'PLA-047', 'name' => 'KOMBA Joelle', 'email' => 'joelle.komba@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'SCIQ', 'fonction' => 'Planification / SCIQ', 'role' => User::ROLE_PLANIFICATION],
+            foreach ($sheet->xpath('//x:sheetData/x:row') ?: [] as $row) {
+                $rowNumber = (int) ($row['r'] ?? 0);
+                if ($rowNumber < 5) {
+                    continue;
+                }
 
-            ['matricule' => 'DIR-048', 'name' => 'À compléter', 'email' => 'directeur.dsic@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'DIRECTION', 'fonction' => 'Directeur DSIC', 'role' => User::ROLE_DIRECTION],
-            ['matricule' => 'SRV-049', 'name' => 'Arnold MINDZELI', 'email' => 'arnold.mindzeli@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'SIRS', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'AGT-050', 'name' => 'CAMARA Francois', 'email' => 'francois.camara@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'SIRS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-051', 'name' => 'EBINDA Roger', 'email' => 'roger.ebinda@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'SIRS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-052', 'name' => 'NGUEMEDZANG Renaud', 'email' => 'renaud.nguemedzang@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'SIRS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-053', 'name' => 'OSSA Charles', 'email' => 'charles.ossa@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'SIRS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'SRV-054', 'name' => 'YEMBI Marvin', 'email' => 'marvin.yembi@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'CRP', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'SRV-055', 'name' => 'MBOUMBA Noelle', 'email' => 'noelle.mboumba@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'CRP', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'AGT-056', 'name' => 'MBAZOO Christel', 'email' => 'christel.mbazoo@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'CRP', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-057', 'name' => 'NGOMA Lucrecia', 'email' => 'lucrecia.ngoma@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'CRP', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-058', 'name' => 'OSSI Hans', 'email' => 'hans.ossi@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'CRP', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'SRV-059', 'name' => 'KOMBA Staelle', 'email' => 'staelle.komba@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'GDS', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'AGT-060', 'name' => 'LEYIGUI Wilfried', 'email' => 'wilfried.leyigui@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'GDS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-061', 'name' => 'MAGNET Clovis', 'email' => 'clovis.magnet@anbg.ga', 'direction_code' => 'DSIC', 'service_code' => 'GDS', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
+                $cells = $this->readRowCells($row, $sharedStrings);
+                $email = strtolower($this->cell($cells, 4));
 
-            ['matricule' => 'DIR-062', 'name' => 'À compléter', 'email' => 'directeur.daf@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'DIRECTION', 'fonction' => 'Directeur DAF', 'role' => User::ROLE_DIRECTION],
-            ['matricule' => 'SRV-063', 'name' => 'MATTEYA Aicha', 'email' => 'aicha.matteya@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AJARH', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'SRV-064', 'name' => 'ENGONE Charles', 'email' => 'charles.engone@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AJARH', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'AGT-065', 'name' => 'INDENGUELA Aldrich', 'email' => 'aldrich.indenguela@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AJARH', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'SRV-066', 'name' => 'NGOMBI Charlaine', 'email' => 'charlaine.ngombi@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AJARH', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'SRV-067', 'name' => 'EKOMI Robert', 'email' => 'robert.ekomi@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'SFC', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'AGT-068', 'name' => 'ABOGO Melissa', 'email' => 'melissa.abogo@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'SFC', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-069', 'name' => 'MADIBA Herbert', 'email' => 'herbert.madiba@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'SFC', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-070', 'name' => 'MAPAGA Yannis', 'email' => 'yannis.mapaga@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'SFC', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-071', 'name' => 'MOUALOUANGO Molan', 'email' => 'molan.moualouango@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'SFC', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-072', 'name' => 'MOUEBI Yannick', 'email' => 'yannick.mouebi@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'SFC', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-073', 'name' => 'MOUKONGO Candy', 'email' => 'candy.moukongo@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'SFC', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'SRV-074', 'name' => 'MOULOUNGUI Audrey', 'email' => 'audrey.mouloungui@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'SFC', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'AGT-075', 'name' => 'NDAKISSA Tassiana', 'email' => 'tassiana.ndakissa@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'SFC', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'SRV-076', 'name' => 'EYEANG Sonia', 'email' => 'sonia.eyeang@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AMG', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'AGT-077', 'name' => 'NGWELEH Igor', 'email' => 'igor.ngweleh@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AMG', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'AGT-078', 'name' => 'MIKODJI Casimir', 'email' => 'casimir.mikodji@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AMG', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'SRV-079', 'name' => 'MIKOLO Ulrich', 'email' => 'ulrich.mikolo@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AMG', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'AGT-080', 'name' => 'NGALIBAMA Grasmy', 'email' => 'grasmy.ngalibama@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AMG', 'fonction' => 'Agent', 'role' => User::ROLE_AGENT],
-            ['matricule' => 'SRV-081', 'name' => 'BINGOUMA Ines', 'email' => 'ines.bingouma@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AMG', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'SRV-082', 'name' => 'AFFANE Saturnin', 'email' => 'saturnin.affane@anbg.ga', 'direction_code' => 'DAF', 'service_code' => 'AMG', 'fonction' => 'Chef de service', 'role' => User::ROLE_SERVICE],
+                if (
+                    $email === ''
+                    || $this->cell($cells, 19) !== 'Oui'
+                    || ! $this->isReadyForImport($this->cell($cells, 18))
+                ) {
+                    continue;
+                }
 
-            ['matricule' => 'UCAS-001', 'name' => 'À compléter', 'email' => 'ucas@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'UCAS', 'fonction' => 'Responsable UCAS', 'role' => User::ROLE_SERVICE],
-            ['matricule' => 'UCAS-002', 'name' => 'À compléter', 'email' => 'agent.ucas@anbg.ga', 'direction_code' => 'DG', 'service_code' => 'UCAS', 'fonction' => 'Agent UCAS', 'role' => User::ROLE_AGENT],
+                $directionCode = $this->directionCodeFromWorkbook($this->cell($cells, 9));
+                $serviceCode = $this->serviceCodeFromWorkbook($this->cell($cells, 10));
+
+                $rows[] = [
+                    'matricule' => '',
+                    'name' => $this->cell($cells, 3),
+                    'email' => $email,
+                    'direction_code' => $directionCode,
+                    'service_code' => $serviceCode,
+                    'fonction' => $this->cell($cells, 7),
+                    'role' => $this->roleFromWorkbook($this->cell($cells, 14), $serviceCode),
+                ];
+            }
+
+            if ($rows === []) {
+                throw new RuntimeException(sprintf('Aucun utilisateur importable trouve dans %s', $path));
+            }
+
+            return $rows;
+        } finally {
+            $zip->close();
+        }
+    }
+
+    private function workbookPath(): string
+    {
+        $path = function_exists('base_path')
+            ? base_path(self::USERS_WORKBOOK)
+            : dirname(__DIR__, 2).DIRECTORY_SEPARATOR.self::USERS_WORKBOOK;
+
+        if (! is_file($path)) {
+            throw new RuntimeException(sprintf('Classeur utilisateurs introuvable: %s', $path));
+        }
+
+        return $path;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function readSharedStrings(ZipArchive $zip): array
+    {
+        $xml = $zip->getFromName('xl/sharedStrings.xml');
+        if ($xml === false) {
+            return [];
+        }
+
+        $sharedStrings = [];
+        $sharedXml = new SimpleXMLElement($xml);
+        $sharedXml->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+
+        foreach ($sharedXml->xpath('//x:si') ?: [] as $item) {
+            $text = '';
+            foreach ($item->xpath('.//x:t') ?: [] as $part) {
+                $text .= (string) $part;
+            }
+            $sharedStrings[] = $text;
+        }
+
+        return $sharedStrings;
+    }
+
+    private function sheetPathByName(ZipArchive $zip, string $sheetName): string
+    {
+        $workbookXml = $zip->getFromName('xl/workbook.xml');
+        $relsXml = $zip->getFromName('xl/_rels/workbook.xml.rels');
+
+        if ($workbookXml === false || $relsXml === false) {
+            throw new RuntimeException('Structure XLSX invalide: workbook ou relations introuvables.');
+        }
+
+        $workbook = new SimpleXMLElement($workbookXml);
+        $workbook->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+        $workbook->registerXPathNamespace('r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+
+        $relationshipId = null;
+        foreach ($workbook->xpath('//x:sheet') ?: [] as $sheet) {
+            if ((string) $sheet['name'] === $sheetName) {
+                $attributes = $sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+                $relationshipId = (string) $attributes['id'];
+                break;
+            }
+        }
+
+        if ($relationshipId === null) {
+            throw new RuntimeException(sprintf('Onglet "%s" introuvable dans le classeur utilisateurs.', $sheetName));
+        }
+
+        $rels = new SimpleXMLElement($relsXml);
+        foreach ($rels->Relationship as $relationship) {
+            if ((string) $relationship['Id'] === $relationshipId) {
+                $target = ltrim((string) $relationship['Target'], '/');
+
+                return str_starts_with($target, 'xl/')
+                    ? $target
+                    : 'xl/'.$target;
+            }
+        }
+
+        throw new RuntimeException(sprintf('Relation XLSX introuvable pour l onglet "%s".', $sheetName));
+    }
+
+    /**
+     * @param array<int, string> $sharedStrings
+     * @return array<int, string>
+     */
+    private function readRowCells(SimpleXMLElement $row, array $sharedStrings): array
+    {
+        $cells = [];
+        $row->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+
+        foreach ($row->xpath('x:c') ?: [] as $cell) {
+            $reference = (string) $cell['r'];
+            $column = $this->columnNumber(preg_replace('/\d+/', '', $reference) ?? '');
+            $type = (string) $cell['t'];
+            $valueNode = $cell->xpath('x:v')[0] ?? null;
+
+            if ($valueNode === null) {
+                $inlineText = '';
+                foreach ($cell->xpath('.//x:t') ?: [] as $textPart) {
+                    $inlineText .= (string) $textPart;
+                }
+                $cells[$column] = trim($inlineText);
+                continue;
+            }
+
+            $rawValue = (string) $valueNode;
+            $cells[$column] = trim($type === 's'
+                ? ($sharedStrings[(int) $rawValue] ?? '')
+                : $rawValue);
+        }
+
+        return $cells;
+    }
+
+    private function columnNumber(string $column): int
+    {
+        $number = 0;
+        foreach (str_split(strtoupper($column)) as $character) {
+            $number = ($number * 26) + (ord($character) - ord('A') + 1);
+        }
+
+        return $number;
+    }
+
+    /**
+     * @param array<int, string> $cells
+     */
+    private function cell(array $cells, int $column): string
+    {
+        return trim((string) ($cells[$column] ?? ''));
+    }
+
+    private function directionCodeFromWorkbook(string $direction): string
+    {
+        return match ($direction) {
+            'Cabinet du DG' => 'DG',
+            'DAF', 'DS', 'DSIC' => $direction,
+            default => '',
+        };
+    }
+
+    private function serviceCodeFromWorkbook(string $service): ?string
+    {
+        return match ($service) {
+            '', 'Administration', 'Direction Générale', 'DIRECTION' => null,
+            'Collaborateurs' => 'COLLAB',
+            'Planification' => 'PLANIF',
+            default => $service,
+        };
+    }
+
+    private function isReadyForImport(string $status): bool
+    {
+        return $status === 'Prêt pour import'
+            || str_starts_with($status, 'Valide');
+    }
+
+    private function roleFromWorkbook(string $roleSlug, ?string $serviceCode): string
+    {
+        return match ($roleSlug) {
+            'admin' => User::ROLE_ADMIN,
+            'super_admin' => User::ROLE_SUPER_ADMIN,
+            'dg' => User::ROLE_DG,
+            'directeur' => User::ROLE_DIRECTION,
+            'chef_service' => User::ROLE_SERVICE,
+            'chef_unite' => match ($serviceCode) {
+                'UCAS' => User::ROLE_CHEF_UNITE_UCAS,
+                'SCIQ' => User::ROLE_CHEF_UNITE_SCIQ,
+                default => User::ROLE_CHEF_UNITE,
+            },
+            'collaborateur' => User::ROLE_COLLABORATEUR,
+            'sciq' => User::ROLE_SCIQ,
+            'ucas' => User::ROLE_UCAS,
+            'planification' => User::ROLE_PLANIFICATION,
+            default => User::ROLE_AGENT,
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $service
+     * @return array<string, mixed>
+     */
+    protected function servicePayload(array $service, mixed $now): array
+    {
+        $payload = [
+            'libelle' => $service['libelle'],
+            'actif' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
         ];
+
+        foreach ([
+            'type' => 'service',
+            'has_global_view' => false,
+            'has_global_write' => false,
+            'has_dual_interface' => false,
+            'is_control_unit' => false,
+            'is_operational' => true,
+        ] as $column => $default) {
+            if (Schema::hasColumn('services', $column)) {
+                $payload[$column] = $service[$column] ?? $default;
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @return array<string, mixed>
+     */
+    protected function normalizeUserOrganization(array $user): array
+    {
+        if (in_array((string) ($user['direction_code'] ?? ''), ['DAF', 'DS', 'DSIC'], true) && ($user['service_code'] ?? null) === 'DIRECTION') {
+            $user['service_code'] = null;
+        }
+
+        return $user;
     }
 
     protected function deleteLegacyOrganizationEntries(mixed $now): void
     {
-        $legacyDirectionIds = DB::table('directions')
-            ->whereIn('code', ['DGA', 'SCIQ', 'UCAS'])
-            ->pluck('id');
+        $this->deactivateLegacyOrganizationEntries($now);
 
-        if ($legacyDirectionIds->isEmpty()) {
-            return;
-        }
+        return;
+    }
 
-        $this->deleteLegacyPlanningScope($legacyDirectionIds->all());
-        $this->clearLegacyOptionalScopes($legacyDirectionIds->all(), $now);
-
-        DB::table('services')
-            ->whereIn('direction_id', $legacyDirectionIds)
-            ->delete();
+    protected function deactivateLegacyOrganizationEntries(mixed $now): void
+    {
+        $officialDirectionCodes = array_column($this->directions(), 'code');
+        $officialServiceCodesByDirection = collect($this->services())
+            ->groupBy('direction_code')
+            ->map(fn ($services) => collect($services)->pluck('code')->all())
+            ->all();
 
         DB::table('directions')
-            ->whereIn('id', $legacyDirectionIds)
-            ->delete();
-    }
+            ->whereNotIn('code', $officialDirectionCodes)
+            ->update(['actif' => false, 'updated_at' => $now]);
 
-    /**
-     * @param array<int, int> $legacyDirectionIds
-     */
-    protected function deleteLegacyPlanningScope(array $legacyDirectionIds): void
-    {
-        if ($legacyDirectionIds === []) {
-            return;
-        }
+        $directions = DB::table('directions')
+            ->whereIn('code', $officialDirectionCodes)
+            ->pluck('id', 'code')
+            ->mapWithKeys(static fn ($id, $code): array => [(string) $code => (int) $id])
+            ->all();
 
-        if (Schema::hasTable('ptas') && Schema::hasColumn('ptas', 'direction_id')) {
-            DB::table('ptas')
-                ->whereIn('direction_id', $legacyDirectionIds)
-                ->delete();
-        }
-
-        if (Schema::hasTable('paos') && Schema::hasColumn('paos', 'direction_id')) {
-            DB::table('paos')
-                ->whereIn('direction_id', $legacyDirectionIds)
-                ->delete();
-        }
-
-        if (Schema::hasTable('pas_directions') && Schema::hasColumn('pas_directions', 'direction_id')) {
-            DB::table('pas_directions')
-                ->whereIn('direction_id', $legacyDirectionIds)
-                ->delete();
-        }
-
-        if (Schema::hasTable('pas_axes') && Schema::hasColumn('pas_axes', 'direction_id')) {
-            DB::table('pas_axes')
-                ->whereIn('direction_id', $legacyDirectionIds)
-                ->update(['direction_id' => null]);
-        }
-    }
-
-    /**
-     * @param array<int, int> $legacyDirectionIds
-     */
-    protected function clearLegacyOptionalScopes(array $legacyDirectionIds, mixed $now): void
-    {
-        if ($legacyDirectionIds === []) {
-            return;
-        }
-
-        foreach (['users', 'delegations', 'export_template_assignments'] as $table) {
-            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'direction_id')) {
+        foreach ($officialServiceCodesByDirection as $directionCode => $serviceCodes) {
+            $directionId = $directions[$directionCode] ?? null;
+            if (! is_int($directionId)) {
                 continue;
             }
 
-            $payload = ['direction_id' => null];
+            DB::table('services')
+                ->where('direction_id', $directionId)
+                ->whereNotIn('code', $serviceCodes)
+                ->update(['actif' => false, 'updated_at' => $now]);
+        }
 
-            if (Schema::hasColumn($table, 'service_id')) {
-                $payload['service_id'] = null;
-            }
-
-            if (Schema::hasColumn($table, 'updated_at')) {
-                $payload['updated_at'] = $now;
-            }
-
-            DB::table($table)
-                ->whereIn('direction_id', $legacyDirectionIds)
-                ->update($payload);
+        $activeDirectionIds = array_values($directions);
+        if ($activeDirectionIds !== []) {
+            DB::table('services')
+                ->whereNotIn('direction_id', $activeDirectionIds)
+                ->update(['actif' => false, 'updated_at' => $now]);
         }
     }
 
@@ -354,7 +499,13 @@ class AnbgOrganizationSeeder extends Seeder
             User::ROLE_ADMIN => 'ADM',
             User::ROLE_DG => 'DG',
             User::ROLE_CABINET => 'CAB',
+            User::ROLE_COLLABORATEUR => 'COL',
+            User::ROLE_SCIQ => 'SCIQ',
+            User::ROLE_UCAS => 'UCAS',
             User::ROLE_PLANIFICATION => 'PLA',
+            User::ROLE_CHEF_UNITE => 'CHU',
+            User::ROLE_CHEF_UNITE_SCIQ => 'SCIQ',
+            User::ROLE_CHEF_UNITE_UCAS => 'UCAS',
             User::ROLE_DIRECTION => 'DIR',
             User::ROLE_SERVICE => 'SRV',
             User::ROLE_AGENT => 'AGT',

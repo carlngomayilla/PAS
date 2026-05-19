@@ -34,14 +34,14 @@ class AlertRoutingService
         $serviceId = (int) ($action->pta?->service_id ?? 0);
         $targetRole = strtolower(trim((string) ($log->cible_role ?? '')));
         $serviceRecipients = $this->mergeRecipients(
-            $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]),
+            $this->serviceUsers($directionId, $serviceId, $this->serviceManagerRoles()),
             $this->delegationService->delegatedServiceReviewers($directionId, $serviceId)
         );
         $directionRecipients = $this->mergeRecipients(
             $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
             $this->delegationService->delegatedDirectionReviewers($directionId)
         );
-        $planificationRecipients = $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_PLANIFICATION]);
+        $planificationRecipients = $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ]);
         $dgRecipients = $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG]);
 
         if (in_array($targetRole, ['responsable', 'agent'], true)) {
@@ -141,6 +141,20 @@ class AlertRoutingService
     }
 
     /**
+     * @return array<int, string>
+     */
+    private function serviceManagerRoles(): array
+    {
+        return [
+            User::ROLE_SERVICE,
+            User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_CHEF_UNITE_CABINET,
+            User::ROLE_CHEF_UNITE_UCAS,
+        ];
+    }
+
+    /**
      * @param int|array<int, int> $directionIds
      * @param array<int, string> $roles
      * @return EloquentCollection<int, User>
@@ -199,7 +213,7 @@ class AlertRoutingService
         }
 
         $serviceRecipients = $this->mergeRecipients(
-            $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]),
+            $this->serviceUsers($directionId, $serviceId, $this->serviceManagerRoles()),
             $this->delegationService->delegatedServiceReviewers($directionId, $serviceId)
         );
         $directionRecipients = $this->mergeRecipients(
@@ -214,11 +228,11 @@ class AlertRoutingService
                 'responsable' => $this->agentRecipient($action),
                 'service' => $serviceRecipients,
                 'direction' => $directionRecipients,
-                'planification' => $this->globalUsers([User::ROLE_PLANIFICATION]),
+                'planification' => $this->globalUsers([User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ]),
                 'dg' => $this->globalUsers([User::ROLE_DG]),
                 User::ROLE_ADMIN => $this->globalUsers([User::ROLE_ADMIN]),
                 User::ROLE_SUPER_ADMIN => $this->globalUsers([User::ROLE_SUPER_ADMIN]),
-                User::ROLE_CABINET => $this->globalUsers([User::ROLE_CABINET]),
+                User::ROLE_CABINET => $this->globalUsers([User::ROLE_CABINET, User::ROLE_COLLABORATEUR]),
                 default => new EloquentCollection(),
             };
 

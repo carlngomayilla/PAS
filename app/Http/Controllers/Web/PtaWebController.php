@@ -184,7 +184,7 @@ class PtaWebController extends Controller
     }
 
     /** Enregistre un nouveau PTA après validation du formulaire. */
-    public function store(StorePtaRequest $request): RedirectResponse
+    public function store(StorePtaRequest $request, WorkspaceNotificationService $notificationService): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -261,6 +261,10 @@ class PtaWebController extends Controller
             $before,
             $after
         );
+
+        if ($existingPta === null) {
+            $notificationService->notifyPtaCreatedToDirection($pta, $user);
+        }
 
         return redirect()
             ->route('workspace.pta.index')
@@ -429,6 +433,11 @@ class PtaWebController extends Controller
 
         $this->recordAudit($request, 'pta', 'submit', $pta, $before, $pta->toArray());
         $notificationService->notifyPtaStatus($pta, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
+        if ($targetStatus === 'soumis') {
+            $notificationService->notifyPtaSubmittedForValidation($pta, $user);
+        } else {
+            $notificationService->notifyPtaReviewedByDirection($pta, true, $user);
+        }
 
         return redirect()
             ->route('workspace.pta.index')
@@ -467,6 +476,7 @@ class PtaWebController extends Controller
 
         $this->recordAudit($request, 'pta', 'approve', $pta, $before, $pta->toArray());
         $notificationService->notifyPtaStatus($pta, 'approved', $user);
+        $notificationService->notifyPtaReviewedByDirection($pta, true, $user);
 
         return redirect()
             ->route('workspace.pta.index')
@@ -557,6 +567,7 @@ class PtaWebController extends Controller
         $after = array_merge($pta->toArray(), ['motif_retour' => $motifRetour]);
         $this->recordAudit($request, 'pta', 'reopen', $pta, $before, $after);
         $notificationService->notifyPtaStatus($pta, 'reopened', $user);
+        $notificationService->notifyPtaReviewedByDirection($pta, false, $user);
 
         return redirect()
             ->route('workspace.pta.index')
@@ -844,12 +855,16 @@ class PtaWebController extends Controller
             ? (int) $objectifOperationnel->id
             : (int) ($existingAction?->objectif_operationnel_id ?: $objectifOperationnel->id);
         $thresholdMode = (string) ($actionPayload['seuil_mode'] ?? $existingAction?->seuil_mode ?? 'unique');
+        $primaryRmoUniteId = isset($rmoIds[0])
+            ? User::query()->whereKey((int) $rmoIds[0])->value('unite_dg_id')
+            : null;
 
         $payload = [
             'exercice_id' => $pta->exercice_id,
             'pta_id' => (int) $pta->id,
             'pao_id' => $actionPaoId,
             'objectif_operationnel_id' => $actionObjectifId,
+            'unite_dg_id' => $primaryRmoUniteId !== null ? (int) $primaryRmoUniteId : $existingAction?->unite_dg_id,
             'mode_evaluation' => $modeEvaluation,
             'libelle' => trim((string) ($actionPayload['libelle'] ?? '')),
             'description' => ($value = trim((string) ($actionPayload['description'] ?? ''))) !== ''

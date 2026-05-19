@@ -27,6 +27,10 @@ class User extends Authenticatable
     public const ROLE_SERVICE = 'service';
     public const ROLE_AGENT = 'agent';
     public const ROLE_CABINET = 'cabinet';
+    public const ROLE_CHEF_UNITE = 'chef_unite';
+    public const ROLE_COLLABORATEUR = 'collaborateur';
+    public const ROLE_SCIQ = 'sciq';
+    public const ROLE_UCAS = 'ucas';
 
     // Profils ajoutés (Lot 2) — pour aligner l'application sur l'organisation réelle ANBG.
     public const ROLE_ADMIN_FONCTIONNEL = 'admin_fonctionnel';
@@ -314,6 +318,7 @@ class User extends Authenticatable
         // Rôles à portée globale en lecture seule (cabinet, supervision, audit, invité).
         if ($this->hasRole(
             self::ROLE_CABINET,
+            self::ROLE_COLLABORATEUR,
             self::ROLE_CABINET_SUPERVISION,
             self::ROLE_DGA_SUPERVISION,
             self::ROLE_AUDITEUR,
@@ -324,6 +329,7 @@ class User extends Authenticatable
 
         // Chefs d'unité SCIQ/DGA/Cabinet : vue globale agence + gestion de leur unité.
         if ($this->hasRole(
+            self::ROLE_CHEF_UNITE,
             self::ROLE_CHEF_UNITE_SCIQ,
             self::ROLE_CHEF_UNITE_DGA,
             self::ROLE_CHEF_UNITE_CABINET,
@@ -332,7 +338,7 @@ class User extends Authenticatable
         }
 
         // Chef d'unité UCAS : limité à son unité.
-        if ($this->hasRole(self::ROLE_CHEF_UNITE_UCAS)) {
+        if ($this->hasRole(self::ROLE_CHEF_UNITE_UCAS, self::ROLE_UCAS)) {
             return 'Portée unité DG (UCAS)';
         }
 

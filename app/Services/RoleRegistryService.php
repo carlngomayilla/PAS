@@ -30,14 +30,18 @@ class RoleRegistryService
             User::ROLE_ADMIN_FONCTIONNEL => ['label' => 'Administrateur fonctionnel', 'base_role' => User::ROLE_ADMIN_FONCTIONNEL, 'system' => true],
             User::ROLE_DG => ['label' => 'Directeur Général', 'base_role' => User::ROLE_DG, 'system' => true],
             User::ROLE_PLANIFICATION => ['label' => 'Planification', 'base_role' => User::ROLE_PLANIFICATION, 'system' => true],
+            User::ROLE_SCIQ => ['label' => 'SCIQ', 'base_role' => User::ROLE_SCIQ, 'system' => true],
+            User::ROLE_CHEF_UNITE => ['label' => 'Chef unite', 'base_role' => User::ROLE_CHEF_UNITE, 'system' => true],
             User::ROLE_SCIQ_SUIVI_GLOBAL => ['label' => 'SCIQ — Suivi global', 'base_role' => User::ROLE_SCIQ_SUIVI_GLOBAL, 'system' => true],
             User::ROLE_CHEF_UNITE_SCIQ => ['label' => 'Chef d’unité SCIQ', 'base_role' => User::ROLE_CHEF_UNITE_SCIQ, 'system' => true],
             User::ROLE_DGA_SUPERVISION => ['label' => 'DGA — Supervision', 'base_role' => User::ROLE_DGA_SUPERVISION, 'system' => true],
             User::ROLE_CHEF_UNITE_DGA => ['label' => 'Chef d’unité DGA', 'base_role' => User::ROLE_CHEF_UNITE_DGA, 'system' => true],
             User::ROLE_CABINET => ['label' => 'Cabinet', 'base_role' => User::ROLE_CABINET, 'system' => true],
+            User::ROLE_COLLABORATEUR => ['label' => 'Collaborateur', 'base_role' => User::ROLE_COLLABORATEUR, 'system' => true],
             User::ROLE_CABINET_SUPERVISION => ['label' => 'Cabinet — Supervision', 'base_role' => User::ROLE_CABINET_SUPERVISION, 'system' => true],
             User::ROLE_CHEF_UNITE_CABINET => ['label' => 'Chef d’unité Cabinet', 'base_role' => User::ROLE_CHEF_UNITE_CABINET, 'system' => true],
             User::ROLE_CHEF_UNITE_UCAS => ['label' => 'Chef d’unité UCAS', 'base_role' => User::ROLE_CHEF_UNITE_UCAS, 'system' => true],
+            User::ROLE_UCAS => ['label' => 'UCAS', 'base_role' => User::ROLE_UCAS, 'system' => true],
             User::ROLE_DIRECTION => ['label' => 'Directeur de direction', 'base_role' => User::ROLE_DIRECTION, 'system' => true],
             User::ROLE_SERVICE => ['label' => 'Chef de service', 'base_role' => User::ROLE_SERVICE, 'system' => true],
             User::ROLE_AGENT => ['label' => 'Agent', 'base_role' => User::ROLE_AGENT, 'system' => true],
@@ -414,6 +418,3 @@ class RoleRegistryService
         }
     }
 }
-
-
-

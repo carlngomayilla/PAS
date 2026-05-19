@@ -32,7 +32,7 @@ class MessagingDirectoryServiceTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame(['DG', 'DIR021', 'DS', 'DSIC', 'DAF'], $directionLabels);
+        $this->assertSame(['DG', 'DSIC', 'DAF', 'DS'], $directionLabels);
 
         $dafNode = collect($root['children'] ?? [])
             ->first(fn (array $node): bool => ($node['label'] ?? null) === 'DAF');
@@ -45,7 +45,7 @@ class MessagingDirectoryServiceTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame(['DIRECTION', 'AJARH', 'SFC', 'AMG'], $dafServiceLabels);
+        $this->assertSame(['AJARH', 'AMG', 'SFC'], $dafServiceLabels);
     }
 
     public function test_org_chart_orders_people_inside_services_by_responsibility_then_name(): void
@@ -74,13 +74,13 @@ class MessagingDirectoryServiceTest extends TestCase
             ->all();
 
         $this->assertSame([
-            'MOULOUNGUI Audrey',
             'ABOGO Melissa',
             'MADIBA Herbert',
             'MAPAGA Yannis',
             'MOUALOUANGO Molan',
             'MOUEBI Yannick',
             'MOUKONGO Candy',
+            'MOULOUNGUI Audrey',
             'NDAKISSA Tassiana',
         ], $sfcPeople);
     }

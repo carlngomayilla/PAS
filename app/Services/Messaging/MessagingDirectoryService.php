@@ -16,19 +16,16 @@ class MessagingDirectoryService
     /**
      * @var list<string>
      */
-    private const DIRECTION_ORDER = ['DG', 'DIR021', 'DS', 'DSIC', 'DAF'];
+    private const DIRECTION_ORDER = ['DG', 'DSIC', 'DAF', 'DS'];
 
     /**
      * @var array<string, list<string>>
      */
     private const SERVICE_ORDER = [
-        'DG' => ['DIRGEN', 'CAB'],
-        'DGA' => ['DIRECTION', 'SECDGA'],
-        'SCIQ' => ['CTRLINT'],
-        'UCAS' => ['UCAS', 'ACCUEIL'],
-        'DS' => ['DIRECTION', 'ENB', 'EB', 'PLANIF'],
-        'DSIC' => ['DIRECTION', 'SIRS', 'CRP', 'GDS'],
-        'DAF' => ['DIRECTION', 'AJARH', 'SFC', 'AMG'],
+        'DG' => ['UCAS', 'SCIQ', 'COLLAB'],
+        'DSIC' => ['SIRS', 'CRP', 'GDS'],
+        'DAF' => ['AJARH', 'AMG', 'SFC'],
+        'DS' => ['EB', 'ENB', 'PLANIF'],
     ];
 
     /**
@@ -51,6 +48,8 @@ class MessagingDirectoryService
             User::ROLE_ADMIN,
             User::ROLE_DG,
             User::ROLE_PLANIFICATION,
+            User::ROLE_SCIQ,
+            User::ROLE_COLLABORATEUR,
             User::ROLE_CABINET,
         ];
 
@@ -121,8 +120,8 @@ class MessagingDirectoryService
 
         $strategic = [
             'leadership' => $users->filter(fn (User $user): bool => $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG))->values(),
-            'cabinet' => $users->filter(fn (User $user): bool => $user->hasRole(User::ROLE_CABINET))->values(),
-            'planification' => $users->filter(fn (User $user): bool => $user->hasRole(User::ROLE_PLANIFICATION))->values(),
+            'cabinet' => $users->filter(fn (User $user): bool => $user->hasRole(User::ROLE_CABINET, User::ROLE_COLLABORATEUR))->values(),
+            'planification' => $users->filter(fn (User $user): bool => $user->hasRole(User::ROLE_PLANIFICATION, User::ROLE_SCIQ))->values(),
         ];
 
         $sortedDirectionIds = collect($directionIds)
@@ -154,7 +153,15 @@ class MessagingDirectoryService
 
                         $serviceHeads = $serviceUsers
                             ->filter(function (User $user) use ($service): bool {
-                                if ($user->hasRole(User::ROLE_SERVICE, User::ROLE_PLANIFICATION)) {
+                                if ($user->hasRole(
+                                    User::ROLE_SERVICE,
+                                    User::ROLE_PLANIFICATION,
+                                    User::ROLE_SCIQ,
+                                    User::ROLE_CHEF_UNITE,
+                                    User::ROLE_CHEF_UNITE_SCIQ,
+                                    User::ROLE_CHEF_UNITE_CABINET,
+                                    User::ROLE_CHEF_UNITE_UCAS,
+                                )) {
                                     return true;
                                 }
 
@@ -371,7 +378,7 @@ class MessagingDirectoryService
             return null;
         }
 
-        if ($subject->hasRole(User::ROLE_CABINET)) {
+        if ($subject->hasRole(User::ROLE_CABINET, User::ROLE_COLLABORATEUR)) {
             /** @var User|null $directionLead */
             $directionLead = $users->first(function (User $user) use ($subject): bool {
                 return $user->direction_id === $subject->direction_id && $user->hasRole(User::ROLE_DIRECTION, User::ROLE_DG);
@@ -384,7 +391,7 @@ class MessagingDirectoryService
             return $dg;
         }
 
-        if ($subject->hasRole(User::ROLE_PLANIFICATION, User::ROLE_SERVICE)) {
+        if ($subject->hasRole(User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SERVICE, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_UNITE_SCIQ, User::ROLE_CHEF_UNITE_CABINET, User::ROLE_CHEF_UNITE_UCAS)) {
             /** @var User|null $directionLead */
             $directionLead = $users->first(function (User $user) use ($subject): bool {
                 return $user->id !== $subject->id
@@ -400,7 +407,7 @@ class MessagingDirectoryService
             return $user->id !== $subject->id
                 && $subject->service_id !== null
                 && $user->service_id === $subject->service_id
-                && $user->hasRole(User::ROLE_SERVICE, User::ROLE_PLANIFICATION);
+                && $user->hasRole(User::ROLE_SERVICE, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_UNITE_SCIQ, User::ROLE_CHEF_UNITE_CABINET, User::ROLE_CHEF_UNITE_UCAS);
         });
 
         if ($serviceLead instanceof User) {
@@ -657,8 +664,8 @@ class MessagingDirectoryService
     {
         return match ($user->role) {
             User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG => 'blue',
-            User::ROLE_CABINET => 'amber',
-            User::ROLE_PLANIFICATION => 'green',
+            User::ROLE_CABINET, User::ROLE_COLLABORATEUR => 'amber',
+            User::ROLE_PLANIFICATION, User::ROLE_SCIQ => 'green',
             User::ROLE_DIRECTION => 'rose',
             User::ROLE_SERVICE => 'violet',
             default => 'slate',
@@ -708,8 +715,8 @@ class MessagingDirectoryService
         return match (true) {
             $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_DG, User::ROLE_ADMIN) => 0,
             $user->hasRole(User::ROLE_DIRECTION) => 1,
-            $user->hasRole(User::ROLE_CABINET) => 2,
-            $user->hasRole(User::ROLE_PLANIFICATION, User::ROLE_SERVICE) => 3,
+            $user->hasRole(User::ROLE_CABINET, User::ROLE_COLLABORATEUR) => 2,
+            $user->hasRole(User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SERVICE, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_UNITE_SCIQ, User::ROLE_CHEF_UNITE_CABINET, User::ROLE_CHEF_UNITE_UCAS) => 3,
             default => 4,
         };
     }
@@ -718,7 +725,7 @@ class MessagingDirectoryService
     {
         return match (true) {
             $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_DG, User::ROLE_ADMIN, User::ROLE_DIRECTION) => 'direction',
-            $user->hasRole(User::ROLE_CABINET, User::ROLE_PLANIFICATION, User::ROLE_SERVICE) => 'service',
+            $user->hasRole(User::ROLE_CABINET, User::ROLE_COLLABORATEUR, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SERVICE, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_UNITE_SCIQ, User::ROLE_CHEF_UNITE_CABINET, User::ROLE_CHEF_UNITE_UCAS) => 'service',
             default => 'agent',
         };
     }

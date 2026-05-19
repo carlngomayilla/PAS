@@ -60,7 +60,7 @@ class UserProfileService
                     'portee'     => 'Globale',
                 ],
             ],
-            User::ROLE_PLANIFICATION => [
+            User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ => [
                 [
                     'module'     => 'Structuration PAS/PAO/PTA',
                     'operations' => ['Créer', 'Modifier', 'Soumettre', 'Consulter'],
@@ -89,7 +89,7 @@ class UserProfileService
                     'portee'     => 'Direction rattachee',
                 ],
             ],
-            User::ROLE_SERVICE => [
+            User::ROLE_SERVICE, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_UNITE_UCAS => [
                 [
                     'module'     => 'PTA du service',
                     'operations' => ['Exécuter taches', 'Mettre à jour statuts'],
@@ -101,14 +101,14 @@ class UserProfileService
                     'portee'     => 'Direction et service rattaches',
                 ],
             ],
-            User::ROLE_AGENT => [
+            User::ROLE_AGENT, User::ROLE_UCAS => [
                 [
                     'module'     => 'Suivi hebdomadaire des actions',
                     'operations' => ['Renseigner suivi hebdomadaire', 'Mettre à jour progression', 'Signaler difficultés', 'Téléverser justificatifs hebdomadaires'],
                     'portee'     => 'Direction et service rattaches',
                 ],
             ],
-            User::ROLE_CABINET => [
+            User::ROLE_CABINET, User::ROLE_COLLABORATEUR, User::ROLE_CABINET_SUPERVISION, User::ROLE_CHEF_UNITE_CABINET => [
                 [
                     'module'     => 'Pilotage',
                     'operations' => ['Consulter PAS/PAO/PTA', 'Consulter reporting'],

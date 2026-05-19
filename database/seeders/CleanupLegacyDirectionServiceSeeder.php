@@ -9,6 +9,10 @@ class CleanupLegacyDirectionServiceSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->deactivateLegacyEntries();
+
+        return;
+
         $keepDirectionCodes = ['DG', 'DGA', 'SCIQ', 'UCAS', 'DS', 'DSIC', 'DAF'];
         $keepServiceCodes = [
             'DIRGEN',
@@ -103,5 +107,37 @@ class CleanupLegacyDirectionServiceSeeder extends Seeder
                 DB::table('directions')->whereIn('id', $removeDirectionIds)->delete();
             }
         });
+    }
+
+    private function deactivateLegacyEntries(): void
+    {
+        $keepDirectionCodes = ['DG', 'DSIC', 'DAF', 'DS'];
+        $keepServiceCodesByDirection = [
+            'DG' => ['UCAS', 'SCIQ', 'COLLAB'],
+            'DSIC' => ['SIRS', 'CRP', 'GDS'],
+            'DAF' => ['AJARH', 'AMG', 'SFC'],
+            'DS' => ['EB', 'ENB', 'PLANIF'],
+        ];
+
+        DB::table('directions')
+            ->whereNotIn('code', $keepDirectionCodes)
+            ->update(['actif' => false, 'updated_at' => now()]);
+
+        $directionIds = DB::table('directions')
+            ->whereIn('code', $keepDirectionCodes)
+            ->pluck('id', 'code')
+            ->all();
+
+        foreach ($keepServiceCodesByDirection as $directionCode => $serviceCodes) {
+            $directionId = $directionIds[$directionCode] ?? null;
+            if ($directionId === null) {
+                continue;
+            }
+
+            DB::table('services')
+                ->where('direction_id', (int) $directionId)
+                ->whereNotIn('code', $serviceCodes)
+                ->update(['actif' => false, 'updated_at' => now()]);
+        }
     }
 }
