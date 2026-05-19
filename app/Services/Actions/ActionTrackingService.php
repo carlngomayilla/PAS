@@ -360,7 +360,7 @@ class ActionTrackingService
         $submissionTarget = $this->workflowSettings->actionSubmissionTarget();
         $status = match ($submissionTarget) {
             'direction' => self::VALIDATION_VALIDEE_CHEF,
-            'final' => self::VALIDATION_VALIDEE_DIRECTION,
+            'final' => self::VALIDATION_VALIDEE_CHEF,
             default => self::VALIDATION_SOUMISE_CHEF,
         };
         $message = match ($submissionTarget) {
@@ -455,9 +455,9 @@ class ActionTrackingService
 
         $action->fill([
             'statut_validation' => $isApproved
-                ? ($directionEnabled ? self::VALIDATION_VALIDEE_CHEF : self::VALIDATION_VALIDEE_DIRECTION)
+                ? self::VALIDATION_VALIDEE_CHEF
                 : self::VALIDATION_REJETEE_CHEF,
-            'validation_hierarchique' => $isApproved ? ! $directionEnabled : false,
+            'validation_hierarchique' => $isApproved,
             'validation_sans_correction' => $isApproved
                 ? ($payload['validation_sans_correction'] ?? $action->validation_sans_correction)
                 : null,
@@ -474,13 +474,13 @@ class ActionTrackingService
             $isApproved ? 'info' : 'warning',
             $isApproved
                 ? ($directionEnabled
-                    ? 'Action validee par le chef de service.'
+                    ? 'Action validee par le chef de service. Validation finale du circuit.'
                     : 'Action validee par le chef de service. Validation finale du circuit.')
                 : 'Action rejetee par le chef de service.',
             [
                 'evaluation_note' => $action->evaluation_note,
                 'statut_validation' => $action->statut_validation,
-                'workflow_final_stage' => $directionEnabled ? 'direction' : 'service',
+                'workflow_final_stage' => 'service',
             ],
             'responsable',
             $actor?->id
@@ -489,7 +489,7 @@ class ActionTrackingService
         $this->addDiscussionEntry(
             $action,
             (string) ($payload['evaluation_commentaire'] ?? ($isApproved
-                ? ($directionEnabled ? 'Validation chef de service.' : 'Validation finale chef de service.')
+                ? 'Validation finale chef de service.'
                 : 'Rejet chef de service.')),
             $isApproved ? 'action_validee_chef' : 'action_rejetee_chef',
             $isApproved ? 'info' : 'warning',
@@ -497,7 +497,7 @@ class ActionTrackingService
                 'evaluation_note' => $action->evaluation_note,
                 'statut_validation' => $action->statut_validation,
                 'validation_sans_correction' => $action->validation_sans_correction,
-                'workflow_final_stage' => $directionEnabled ? 'direction' : 'service',
+                'workflow_final_stage' => 'service',
             ],
             $actor
         );

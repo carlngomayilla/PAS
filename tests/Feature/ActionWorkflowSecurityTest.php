@@ -113,7 +113,65 @@ class ActionWorkflowSecurityTest extends TestCase
         ]);
     }
 
-    public function test_action_validation_workflow_reaches_direction_approval(): void
+    public function test_secondary_responsable_can_execute_shared_planned_sub_action(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+        $otherAgent = $fixture['other_agent'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'type_cible' => 'qualitative',
+        ])->save();
+        $action->responsables()->sync([
+            $agent->id => ['is_primary' => true],
+            $otherAgent->id => ['is_primary' => false],
+        ]);
+        $action->weeks()->delete();
+
+        $sousAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Traiter le dossier commun',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-14',
+            'cible_prevue' => 1,
+            'unite' => 'dossier',
+            'quantite_realisee' => 0,
+            'taux_realisation' => 0,
+            'statut' => 'a_faire',
+            'est_effectuee' => false,
+            'taux_execution' => 0,
+        ]);
+
+        $this->actingAs($otherAgent)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('tracking-entry-form', false)
+            ->assertSee('quantite_realisee_sous_action_'.$sousAction->id, false);
+
+        $this->actingAs($otherAgent)
+            ->post(route('workspace.actions.sub-actions.update', [$action, $sousAction]), [
+                '_method' => 'PUT',
+                'execution_only' => '1',
+                'est_effectuee' => '1',
+                'quantite_realisee' => 1,
+                'justificatif' => UploadedFile::fake()->create('preuve-second-agent.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $sousAction->refresh();
+        $this->assertTrue((bool) $sousAction->est_effectuee);
+        $this->assertDatabaseHas('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'sous_action_effectuee',
+            'utilisateur_id' => $otherAgent->id,
+        ]);
+    }
+
+    public function test_action_validation_workflow_finishes_at_chef_and_direction_can_read(): void
     {
         Storage::fake('local');
 
@@ -158,6 +216,12 @@ class ActionWorkflowSecurityTest extends TestCase
 
         $action->refresh();
         $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
+        $this->assertTrue((bool) $action->validation_hierarchique);
+
+        $this->actingAs($directionUser)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('Action securite test');
 
         $this->actingAs($directionUser)
             ->post(route('workspace.actions.review-direction', $action), [
@@ -165,11 +229,10 @@ class ActionWorkflowSecurityTest extends TestCase
                 'evaluation_note' => 95,
                 'evaluation_commentaire' => 'Validation finale',
             ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
+            ->assertForbidden();
 
         $action->refresh();
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, $action->statut_validation);
-        $this->assertTrue((bool) $action->validation_hierarchique);
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
         $this->assertDatabaseHas('action_kpis', [
             'action_id' => $action->id,
         ]);
@@ -377,7 +440,7 @@ class ActionWorkflowSecurityTest extends TestCase
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
         $action->refresh();
-        self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, $action->statut_validation);
+        self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
         self::assertTrue((bool) $action->validation_hierarchique);
 
         $this->actingAs($directionUser)
@@ -389,7 +452,7 @@ class ActionWorkflowSecurityTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_workflow_can_skip_service_and_send_action_directly_to_direction(): void
+    public function test_workflow_keeps_chef_as_final_stage_even_when_direction_setting_is_requested(): void
     {
         Storage::fake('local');
 
@@ -425,6 +488,7 @@ class ActionWorkflowSecurityTest extends TestCase
 
         $action->refresh();
         self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
+        self::assertFalse(app(WorkflowSettings::class)->directionValidationEnabled());
 
         $this->actingAs($serviceUser)
             ->post(route('workspace.actions.review', $action), [
@@ -441,10 +505,10 @@ class ActionWorkflowSecurityTest extends TestCase
                 'evaluation_note' => 95,
                 'evaluation_commentaire' => 'Validation direction',
             ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
+            ->assertForbidden();
 
         $action->refresh();
-        self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, $action->statut_validation);
+        self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
     }
 
     /**

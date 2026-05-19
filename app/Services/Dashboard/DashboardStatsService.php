@@ -3,6 +3,7 @@
 namespace App\Services\Dashboard;
 
 use App\Models\Action;
+use App\Models\ActionLog;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\Pta;
@@ -38,7 +39,7 @@ class DashboardStatsService
             'objectifs_strategiques' => 0,
             'objectifs_operationnels' => 0,
             'indicateurs_sous_seuil' => 0,
-            'alertes_critiques' => 0,
+            'alertes_critiques' => $this->criticalActiveAlerts($user),
             'ruptures_chaine' => 0,
             'actions_en_retard' => $this->delayedActions($actions),
         ];
@@ -159,6 +160,17 @@ class DashboardStatsService
 
         return (clone $query)
             ->whereIn('statut_validation', ['soumise_chef', 'soumise_direction', 'en_attente_validation'])
+            ->count();
+    }
+
+    private function criticalActiveAlerts(User $user): int
+    {
+        return ActionLog::query()
+            ->activeAlert()
+            ->whereIn('niveau', ['critical', 'urgence'])
+            ->whereHas('action', function (Builder $actionQuery) use ($user): void {
+                $this->scope->applyToActions($actionQuery, $user);
+            })
             ->count();
     }
 

@@ -88,7 +88,7 @@ final class UiLabel
             'non_soumise' => 'Non soumise',
             'soumise_chef' => 'Soumise service',
             'rejetee_chef' => 'Rejetée service',
-            'validee_chef' => 'Validée service',
+            'validee_chef' => 'Validée chef',
             'rejetee_direction' => 'Rejetée direction',
             'validee_direction' => 'Validée',
             default => ucfirst(str_replace('_', ' ', (string) $status)),

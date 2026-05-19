@@ -51,7 +51,7 @@ class WorkflowSettings
     {
         return [
             'actions_service_validation_enabled' => '1',
-            'actions_direction_validation_enabled' => '1',
+            'actions_direction_validation_enabled' => '0',
             'actions_rejection_comment_required' => '1',
             'pas_workflow_mode' => 'full',
             'pao_workflow_mode' => 'full',
@@ -66,7 +66,7 @@ class WorkflowSettings
 
     public function directionValidationEnabled(): bool
     {
-        return $this->get('actions_direction_validation_enabled', '1') === '1';
+        return false;
     }
 
     public function rejectionCommentRequired(): bool
@@ -148,19 +148,11 @@ class WorkflowSettings
             return 'service';
         }
 
-        if ($this->directionValidationEnabled()) {
-            return 'direction';
-        }
-
         return 'final';
     }
 
     public function actionFinalStage(): string
     {
-        if ($this->directionValidationEnabled()) {
-            return 'direction';
-        }
-
         if ($this->serviceValidationEnabled()) {
             return 'service';
         }
@@ -178,21 +170,17 @@ class WorkflowSettings
 
         return [
             'service_enabled' => $this->serviceValidationEnabled(),
-            'direction_enabled' => $this->directionValidationEnabled(),
+            'direction_enabled' => false,
             'rejection_comment_required' => $this->rejectionCommentRequired(),
             'submission_target' => $submissionTarget,
             'final_stage' => $finalStage,
             'chain_label' => match ($submissionTarget) {
-                'service' => $this->directionValidationEnabled()
-                    ? 'Agent -> Chef de service -> Direction'
-                    : 'Agent -> Chef de service',
+                'service' => 'Agent -> Chef de service',
                 'direction' => 'Agent -> Direction',
                 default => 'Agent -> cloture directe',
             },
             'submission_help_text' => match ($submissionTarget) {
-                'service' => $this->directionValidationEnabled()
-                    ? 'L action est d abord revue par le chef de service, puis par la direction.'
-                    : 'L action est revue uniquement par le chef de service, qui cloture le circuit.',
+                'service' => 'L action est revue uniquement par le chef de service, qui cloture le circuit. Le directeur est notifie et conserve la lecture du dossier.',
                 'direction' => 'Le niveau service est desactive. La soumission est adressee directement a la direction.',
                 default => 'Le circuit hierarchique est desactive. La cloture rend l action finale immediatement.',
             },
@@ -201,14 +189,9 @@ class WorkflowSettings
                 'direction' => 'Soumettre a la direction',
                 default => 'Cloturer sans validation',
             },
-            'service_review_button_label' => $this->directionValidationEnabled()
-                ? 'Valider la revue chef'
-                : 'Valider la cloture',
-            'service_review_success_text' => $this->directionValidationEnabled()
-                ? 'Action validee par le chef de service et transmise a la direction.'
-                : 'Action validee par le chef de service. Elle est maintenant prise en compte dans les statistiques.',
+            'service_review_button_label' => 'Valider la cloture',
+            'service_review_success_text' => 'Action validee par le chef de service. Le directeur et l agent sont notifies.',
             'final_statistics_hint' => match ($finalStage) {
-                'direction' => 'Oui apres validation direction.',
                 'service' => 'Oui apres validation finale du chef de service.',
                 default => 'Oui des la cloture de l action.',
             },
@@ -228,6 +211,9 @@ class WorkflowSettings
         ] as $key) {
             $defaultValue = $this->defaults()[$key];
             $value = ($payload[$key] ?? $defaultValue) === '1' ? '1' : '0';
+            if ($key === 'actions_direction_validation_enabled') {
+                $value = '0';
+            }
 
             PlatformSetting::query()->updateOrCreate(
                 ['group' => 'workflow', 'key' => $key],
@@ -284,5 +270,4 @@ class WorkflowSettings
         }
     }
 }
-
 

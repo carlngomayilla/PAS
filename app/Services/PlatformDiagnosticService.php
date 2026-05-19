@@ -84,6 +84,7 @@ class PlatformDiagnosticService
                 'critical_alerts_unread',
                 'Alertes critiques non lues',
                 ActionLog::query()
+                    ->activeAlert()
                     ->whereIn('niveau', ['critical', 'urgence'])
                     ->where('lu', false)
                     ->count(),

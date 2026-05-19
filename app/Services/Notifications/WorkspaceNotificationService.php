@@ -158,8 +158,8 @@ class WorkspaceNotificationService
             'action_submitted_to_direction',
             $this->agentRecipient($action),
             [
-                'title' => 'Action transmise directement a la direction',
-                'message' => sprintf('Votre action "%s" est en attente de validation direction.', (string) $action->libelle),
+                'title' => 'Action cloturee',
+                'message' => sprintf('Votre action "%s" a ete finalisee dans le circuit actif.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -192,17 +192,13 @@ class WorkspaceNotificationService
                 $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
                 $this->delegationService->delegatedDirectionReviewers($directionId)
             );
-            $directionRecipients = $this->mergeRecipients(
-                $directionRecipients,
-                $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION])
-            );
 
             $this->dispatchEvent(
                 'action_reviewed_by_chef',
                 $directionRecipients,
                 [
                     'title' => 'Action validee par le chef',
-                    'message' => sprintf('L action "%s" est prete pour validation direction.', (string) $action->libelle),
+                    'message' => sprintf('L action "%s" a ete validee par le chef de service. Vous pouvez la consulter en lecture.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,
@@ -223,7 +219,7 @@ class WorkspaceNotificationService
                 'action_reviewed_by_chef',
                 $agentRecipients,
                 [
-                    'title' => 'Action transmise a la direction',
+                    'title' => 'Action validee par le chef',
                     'message' => sprintf('Votre action "%s" a ete validee par le chef de service.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
@@ -246,7 +242,13 @@ class WorkspaceNotificationService
 
         $this->dispatchEvent(
             'action_reviewed_by_chef',
-            $agentRecipients,
+            $this->mergeRecipients(
+                $agentRecipients,
+                $this->mergeRecipients(
+                    $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
+                    $this->delegationService->delegatedDirectionReviewers($directionId)
+                )
+            ),
             [
                 'title' => 'Action rejetee par le chef',
                 'message' => sprintf('Votre action "%s" a ete rejetee. Consultez le motif.', (string) $action->libelle),
@@ -283,18 +285,10 @@ class WorkspaceNotificationService
             $this->delegationService->delegatedServiceReviewers($directionId, $serviceId)
         );
         $serviceRecipients = $this->mergeRecipients($serviceRecipients, $this->unitChiefRecipientsForAction($action));
-        $agentRecipients = $this->agentRecipient($action);
-
         if ($approved) {
-            $targets = $this->mergeRecipients($serviceRecipients, $agentRecipients);
-            $targets = $this->mergeRecipients(
-                $targets,
-                $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET])
-            );
-
             $this->dispatchEvent(
                 'action_reviewed_by_direction',
-                $targets,
+                $serviceRecipients,
                 [
                     'title' => 'Action validee par la direction',
                     'message' => sprintf('L action "%s" est comptabilisee dans les statistiques.', (string) $action->libelle),
@@ -317,10 +311,9 @@ class WorkspaceNotificationService
             return;
         }
 
-        $targets = $this->mergeRecipients($serviceRecipients, $agentRecipients);
         $this->dispatchEvent(
             'action_reviewed_by_direction',
-            $targets,
+            $serviceRecipients,
             [
                 'title' => 'Action rejetee par la direction',
                 'message' => sprintf('L action "%s" doit etre corrigee puis resoumise.', (string) $action->libelle),
@@ -350,16 +343,17 @@ class WorkspaceNotificationService
         $action->loadMissing('pta:id,direction_id,service_id');
 
         $directionId = (int) ($action->pta?->direction_id ?? 0);
-        $serviceId = (int) ($action->pta?->service_id ?? 0);
 
         $targets = $this->mergeRecipients(
-            $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]),
-            $this->agentRecipient($action)
+            $this->agentRecipient($action),
+            $this->mergeRecipients(
+                $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
+                $this->delegationService->delegatedDirectionReviewers($directionId)
+            )
         );
-        $targets = $this->mergeRecipients($targets, $this->unitChiefRecipientsForAction($action));
         $targets = $this->mergeRecipients(
             $targets,
-            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET])
+            $this->unitSupervisionRecipients($actor)
         );
 
         $this->dispatchEvent(

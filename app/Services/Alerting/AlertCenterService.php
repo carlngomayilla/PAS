@@ -118,6 +118,7 @@ class AlertCenterService
             'role' => (string) $user->role,
             'direction_id' => $user->direction_id !== null ? (int) $user->direction_id : null,
             'service_id' => $user->service_id !== null ? (int) $user->service_id : null,
+            'version' => (int) Cache::get('alert-center:version', 1),
             'context' => $context,
         ], JSON_THROW_ON_ERROR));
     }
@@ -212,7 +213,7 @@ class AlertCenterService
                 'week:id,action_id,numero_semaine',
                 'utilisateur:id,name',
             ])
-            ->whereIn('niveau', ['warning', 'critical', 'urgence']);
+            ->activeAlert();
 
         if (! $user->hasGlobalReadAccess()) {
             $query->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {
@@ -433,7 +434,7 @@ class AlertCenterService
                 'utilisateur:id,name',
             ])
             ->whereKey($id)
-            ->whereIn('niveau', ['warning', 'critical', 'urgence']);
+            ->activeAlert();
 
         if (! $user->hasGlobalReadAccess()) {
             $query->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {

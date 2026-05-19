@@ -1509,11 +1509,9 @@ class ActionWebController extends Controller
 
         $pendingValidationStatuses = [
             ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ];
         $validatedStatuses = [
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ];
 
         $pendingValidationCount = (int) (clone $baseQuery)

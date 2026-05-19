@@ -2141,6 +2141,7 @@ class MonitoringWebController extends Controller
             'alertes' => [
                 'actions_en_retard' => $retardsActions,
                 'mesures_kpi_sous_seuil' => $kpiSousSeuilQuery->count(),
+                'alertes_action_actives' => $this->activeActionAlertLogsCount($user),
             ],
             'pasConsolidation' => $this->buildPasConsolidation($user),
             'interannualComparison' => $this->buildInterannualComparison($user),
@@ -2156,6 +2157,16 @@ class MonitoringWebController extends Controller
             ->filter(static fn ($notification): bool => strtolower((string) ($notification->data['module'] ?? '')) === 'alertes')
             ->each
             ->markAsRead();
+    }
+
+    private function activeActionAlertLogsCount(User $user): int
+    {
+        return ActionLog::query()
+            ->activeAlert()
+            ->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {
+                $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
+            })
+            ->count();
     }
 
     private function denyUnlessReportingReader(User $user): void

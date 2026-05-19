@@ -76,6 +76,7 @@
     $layoutUser = auth()->user();
     $headerNotifications = collect();
     $headerUnreadCount = 0;
+    $headerNotificationUnreadCount = 0;
     $headerUnreadByModule = [];
     $headerSidebarBadges = [];
     $headerMessages = collect();
@@ -99,8 +100,11 @@
     if ($layoutUser) {
         $headerNotifications = $layoutUser->notifications()
             ->latest()
-            ->limit(12)
-            ->get();
+            ->limit(24)
+            ->get()
+            ->reject(static fn ($notification): bool => strtolower((string) ($notification->data['module'] ?? '')) === 'alertes')
+            ->take(12)
+            ->values();
 
         $unreadNotifications = $layoutUser->unreadNotifications()
             ->latest()
@@ -111,6 +115,9 @@
             ->groupBy(static fn ($notification): string => strtolower((string) ($notification->data['module'] ?? 'autres')))
             ->map(static fn ($rows): int => $rows->count())
             ->toArray();
+        $headerNotificationUnreadCount = (int) $unreadNotifications
+            ->reject(static fn ($notification): bool => strtolower((string) ($notification->data['module'] ?? '')) === 'alertes')
+            ->count();
         $headerSidebarBadges = $headerUnreadByModule;
 
         if ($layoutUser->hasPermission('alerts.read')) {
@@ -172,9 +179,23 @@
             $headerMessageUnreadCount = $messagingService->unreadCount($layoutUser);
         }
     }
+
+    $headerBellUnreadCount = $headerNotificationUnreadCount + $headerAlertUnreadCount;
+    $headerBellBadgeKind = match (true) {
+        $headerNotificationUnreadCount > 0 && $headerAlertUnreadCount > 0 => 'both',
+        $headerAlertUnreadCount > 0 => 'alert',
+        $headerNotificationUnreadCount > 0 => 'notification',
+        default => 'none',
+    };
+    $headerBellBadgeClass = match ($headerBellBadgeKind) {
+        'both' => 'bg-[#7c3aed]',
+        'alert' => 'bg-[#f59e0b]',
+        'notification' => 'bg-[#3996d3]',
+        default => 'bg-[#3996d3]',
+    };
 @endphp
 
-<body class="admin-theme-scope h-full" data-auto-refresh="20" data-alert-unread="{{ (int) $headerAlertUnreadCount }}" data-message-unread="{{ (int) $headerMessageUnreadCount }}">
+<body class="admin-theme-scope h-full" data-auto-refresh="20" data-alert-unread="{{ (int) $headerAlertUnreadCount }}" data-notification-unread="{{ (int) $headerNotificationUnreadCount }}" data-message-unread="{{ (int) $headerMessageUnreadCount }}">
     <a href="#admin-main-content" class="skip-to-content">Aller au contenu principal</a>
     <div class="admin-page-root app-shell min-h-screen">
         <div id="admin-overlay" class="fixed inset-0 z-40 hidden bg-white/70 backdrop-blur-sm lg:hidden"></div>
@@ -392,9 +413,13 @@
                             </svg>
                             <span
                                 id="header-notifications-badge"
-                                class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#3996d3] px-1 text-[10px] font-semibold leading-none text-white {{ $headerAlertUnreadCount > 0 ? '' : 'hidden' }}"
+                                class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none text-white {{ $headerBellBadgeClass }} {{ $headerBellUnreadCount > 0 ? '' : 'hidden' }}"
+                                data-notification-unread="{{ (int) $headerNotificationUnreadCount }}"
+                                data-alert-unread="{{ (int) $headerAlertUnreadCount }}"
+                                data-badge-kind="{{ $headerBellBadgeKind }}"
+                                title="{{ $headerNotificationUnreadCount }} notification(s), {{ $headerAlertUnreadCount }} alerte(s)"
                             >
-                                {{ $headerAlertUnreadCount > 99 ? '99+' : $headerAlertUnreadCount }}
+                                {{ $headerBellUnreadCount > 99 ? '99+' : $headerBellUnreadCount }}
                             </span>
                         </button>
 
@@ -452,7 +477,7 @@
                             <div class="admin-dropdown-head flex items-center justify-between border-b border-[#d8ecf8] px-3 py-2">
                                 <div>
                                     <p class="text-sm font-semibold">Notifications</p>
-                                    <p class="text-xs text-[#667085]">{{ $headerUnreadCount }} non lue(s)</p>
+                                    <p class="text-xs text-[#667085]">{{ $headerNotificationUnreadCount }} non lue(s)</p>
                                 </div>
                                 <form method="POST" action="{{ route('workspace.notifications.read_all') }}">
                                     @csrf

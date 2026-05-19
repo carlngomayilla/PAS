@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Models\Action;
 use App\Models\ActionKpi;
+use App\Models\ActionLog;
 use App\Models\Direction;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
@@ -198,6 +199,7 @@ class DashboardController extends Controller
         $alerts = [
             'actions_en_retard' => $actionsRetard,
             'mesures_kpi_sous_seuil' => $kpiSousSeuilQuery->count(),
+            'alertes_action_actives' => $this->activeActionAlertLogsCount($user),
         ];
 
         $dashboardData = $this->buildDashboardData($user, $scopedActions);
@@ -444,6 +446,7 @@ class DashboardController extends Controller
             'direction_id' => $user->direction_id !== null ? (int) $user->direction_id : null,
             'service_id' => $user->service_id !== null ? (int) $user->service_id : null,
             'statistical_scope' => $this->actionCalculationSettings->statisticalScope(),
+            'alert_version' => (int) Cache::get('alert-center:version', 1),
             'exercice' => $this->exerciceContext->selectedYear(),
             'trimestre' => $this->exerciceContext->selectedQuarter(),
             'direction_filter' => $this->selectedDashboardDirectionId($user),
@@ -1036,10 +1039,11 @@ class DashboardController extends Controller
                 ],
             ],
             'alerts' => [
-                'labels' => ['Actions en retard', 'Indicateurs sous seuil'],
+                'labels' => ['Actions en retard', 'Indicateurs sous seuil', 'Alertes workflow actives'],
                 'values' => [
                     (int) ($alerts['actions_en_retard'] ?? 0),
                     (int) ($alerts['mesures_kpi_sous_seuil'] ?? 0),
+                    (int) ($alerts['alertes_action_actives'] ?? 0),
                 ],
             ],
             'status' => [
@@ -1542,13 +1546,8 @@ class DashboardController extends Controller
                 'url' => $this->actionIndexRoute(),
             ],
             [
-                'label' => 'Validees service',
+                'label' => 'Validees chef',
                 'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_CHEF)->count(),
-                'url' => $this->actionIndexRoute(),
-            ],
-            [
-                'label' => 'Validees direction',
-                'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_DIRECTION)->count(),
                 'url' => $this->actionIndexRoute(),
             ],
         ];
@@ -2023,7 +2022,7 @@ class DashboardController extends Controller
             ],
             'support_chart' => [
                 'title' => 'Pipeline de validation transverse',
-                'subtitle' => 'Repartition des actions entre soumission, validation service et validation direction.',
+                'subtitle' => 'Repartition des actions entre soumission et validation finale chef.',
                 ...$this->buildValidationPipelineChart($actions),
             ],
             'primary_rows' => $pendingRows,
@@ -2126,7 +2125,7 @@ class DashboardController extends Controller
             ],
             'support_chart' => [
                 'title' => 'Pipeline de validation du service',
-                'subtitle' => 'Ou se situent les actions entre soumission, validation service et validation direction.',
+                'subtitle' => 'Ou se situent les actions entre soumission et validation finale chef.',
                 ...$this->buildValidationPipelineChart($actions),
             ],
             'primary_rows' => $this->buildServiceValidationRows($actions, 8),
@@ -2153,7 +2152,6 @@ class DashboardController extends Controller
         $pendingValidation = $actions
             ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
             ], true))
             ->count();
         $alertCount = $actions->filter(fn (Action $action): bool => $this->isAlertAction($action))->count();
@@ -2176,7 +2174,7 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Actions en retard', $statusCounts['en_retard'], 'Retards directionnels', $this->actionIndexRoute(['statut' => 'en_retard']), '#B42318', '#FFF1EF', null, 'danger'),
                 $this->makeRoleCard('Actions validées service', $validatedService, 'Niveau chef atteint', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]), '#3996D3', '#E8F3FB', null, 'info'),
                 $this->makeRoleCard('Actions validées', $validatedDirection, 'Clôturées dans le circuit de validation actif', $this->validatedActionIndexRoute(), '#8FC043', '#F2F8E8', null, 'success'),
-                $this->makeRoleCard('En attente validation', $pendingValidation, 'Soumises ou attente direction', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]), '#F9B13C', '#FFF8D6', null, 'warning'),
+                $this->makeRoleCard('En attente validation', $pendingValidation, 'Soumises au chef', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Alertes critiques', $alertCount, 'Actions à traiter', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
                 $this->makeRoleCard('Taux exécution direction', number_format($completionRate, 0).'%', 'Actions achevées / total', route('workspace.actions.index', ['statut' => 'achevees']), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('Respect des delais', number_format($delayRate, 0).'%', 'Actions hors retard', route('workspace.actions.index', ['statut' => 'en_retard']), '#1C203D', '#E8F3FB', null, 'info'),
@@ -2811,7 +2809,6 @@ class DashboardController extends Controller
     {
         $pendingStatuses = [
             ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ];
 
         return $actions
@@ -2820,7 +2817,7 @@ class DashboardController extends Controller
             ->take($limit)
             ->map(function (Action $action): array {
                 $validationStatus = (string) ($action->statut_validation ?? '');
-                $level = $validationStatus === ActionTrackingService::VALIDATION_VALIDEE_CHEF ? 'Direction' : 'Chef de service';
+                $level = 'Chef de service';
 
                 return [
                     'element' => (string) $action->libelle,
@@ -4023,6 +4020,41 @@ class DashboardController extends Controller
         return $isOverdue
             || $isLowKpi
             || max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0)) >= 15;
+    }
+
+    private function activeActionAlertLogsCount(User $user): int
+    {
+        $query = ActionLog::query()
+            ->activeAlert()
+            ->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {
+                $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
+            });
+
+        if (($directionId = $this->selectedDashboardDirectionId($user)) !== null) {
+            $query->whereHas('action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', $directionId));
+        }
+
+        if (($serviceId = $this->selectedDashboardServiceId($user)) !== null) {
+            $query->whereHas('action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
+        }
+
+        if (! $user->isAgent()) {
+            $query->whereHas('action', function (Builder $actionQuery) use ($user): void {
+                $actionQuery
+                    ->where(function (Builder $contextQuery): void {
+                        $contextQuery
+                            ->whereNull('contexte_action')
+                            ->orWhere('contexte_action', Action::CONTEXT_PILOTAGE);
+                    })
+                    ->where(function (Builder $responsableQuery) use ($user): void {
+                        $responsableQuery
+                            ->whereNull('responsable_id')
+                            ->orWhere('responsable_id', '!=', (int) $user->id);
+                    });
+            });
+        }
+
+        return $query->count();
     }
 
     private function completionRate(int $completed, int $total): float

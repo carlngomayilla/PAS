@@ -3,7 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Direction;
+use App\Models\Service;
 use App\Models\UniteDg;
+use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -49,10 +51,6 @@ class UniteDgSeeder extends Seeder
         ];
 
         foreach ($unites as $unite) {
-            if ($unite['code'] === UniteDg::CODE_DGA) {
-                continue;
-            }
-
             if ($unite['code'] === UniteDg::CODE_CABINET) {
                 $unite['libelle'] = 'Collaborateurs';
             }
@@ -68,47 +66,63 @@ class UniteDgSeeder extends Seeder
             );
         }
 
-        UniteDg::query()
-            ->where('code', UniteDg::CODE_DGA)
-            ->update(['actif' => false]);
-
         $this->syncUsersWithCabinetUnits();
     }
 
     private function syncUsersWithCabinetUnits(): void
     {
-        $units = UniteDg::query()->pluck('id', 'code');
+        $units = UniteDg::query()->get(['id', 'direction_id', 'code'])->keyBy('code');
+        $services = Service::query()
+            ->whereHas('direction', fn ($query) => $query->where('code', 'DG'))
+            ->pluck('id', 'code');
 
         $assignments = [
-            UniteDg::CODE_SCIQ => [\App\Models\User::ROLE_SCIQ, \App\Models\User::ROLE_SCIQ_SUIVI_GLOBAL, \App\Models\User::ROLE_CHEF_UNITE_SCIQ],
-            UniteDg::CODE_CABINET => [\App\Models\User::ROLE_COLLABORATEUR, \App\Models\User::ROLE_CABINET, \App\Models\User::ROLE_CABINET_SUPERVISION, \App\Models\User::ROLE_CHEF_UNITE_CABINET],
-            UniteDg::CODE_UCAS => [\App\Models\User::ROLE_UCAS, \App\Models\User::ROLE_CHEF_UNITE_UCAS],
+            UniteDg::CODE_SCIQ => [User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ],
+            UniteDg::CODE_DGA => [User::ROLE_DGA_SUPERVISION, User::ROLE_CHEF_UNITE_DGA],
+            UniteDg::CODE_CABINET => [User::ROLE_COLLABORATEUR, User::ROLE_CABINET, User::ROLE_CABINET_SUPERVISION, User::ROLE_CHEF_UNITE_CABINET],
+            UniteDg::CODE_UCAS => [User::ROLE_UCAS, User::ROLE_CHEF_UNITE_UCAS],
+        ];
+        $serviceCodeByUnit = [
+            UniteDg::CODE_SCIQ => 'SCIQ',
+            UniteDg::CODE_CABINET => 'COLLAB',
+            UniteDg::CODE_UCAS => 'UCAS',
         ];
 
         foreach ($assignments as $unitCode => $roles) {
-            $unitId = $units[$unitCode] ?? null;
-            if ($unitId === null) {
+            $unit = $units->get($unitCode);
+            if ($unit === null) {
                 continue;
             }
 
-            \App\Models\User::query()
+            $payload = [
+                'direction_id' => (int) $unit->direction_id,
+                'unite_dg_id' => (int) $unit->id,
+            ];
+
+            $serviceCode = $serviceCodeByUnit[$unitCode] ?? null;
+            if ($serviceCode !== null && isset($services[$serviceCode])) {
+                $payload['service_id'] = (int) $services[$serviceCode];
+            }
+
+            User::query()
                 ->whereIn('role', $roles)
-                ->update(['unite_dg_id' => (int) $unitId]);
+                ->update($payload);
 
             $chefRole = match ($unitCode) {
-                UniteDg::CODE_SCIQ => \App\Models\User::ROLE_CHEF_UNITE_SCIQ,
-                UniteDg::CODE_UCAS => \App\Models\User::ROLE_CHEF_UNITE_UCAS,
-                default => \App\Models\User::ROLE_CHEF_UNITE_CABINET,
+                UniteDg::CODE_SCIQ => User::ROLE_CHEF_UNITE_SCIQ,
+                UniteDg::CODE_DGA => User::ROLE_CHEF_UNITE_DGA,
+                UniteDg::CODE_UCAS => User::ROLE_CHEF_UNITE_UCAS,
+                default => User::ROLE_CHEF_UNITE_CABINET,
             };
 
-            $chefId = \App\Models\User::query()
+            $chefId = User::query()
                 ->where('role', $chefRole)
-                ->where('unite_dg_id', (int) $unitId)
+                ->where('unite_dg_id', (int) $unit->id)
                 ->value('id');
 
             if ($chefId !== null) {
                 UniteDg::query()
-                    ->whereKey((int) $unitId)
+                    ->whereKey((int) $unit->id)
                     ->update(['chef_user_id' => (int) $chefId]);
             }
         }

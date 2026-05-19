@@ -51,27 +51,30 @@
         $showSubActionsPanel = $usesHistoricalProgress || $usesSubTasksProgress;
         $workflow = $workflowConfig ?? [
             'service_enabled' => true,
-            'direction_enabled' => true,
+            'direction_enabled' => false,
             'submission_target' => 'service',
-            'chain_label' => 'Agent -> Chef de service -> Direction',
-            'submission_help_text' => 'L action est d abord revue par le chef de service, puis par la direction.',
+            'chain_label' => 'Agent -> Chef de service',
+            'submission_help_text' => 'L action est revue par le chef de service. Le directeur est notifie et conserve la lecture du dossier.',
             'submission_button_label' => 'Soumettre au chef de service',
-            'service_review_button_label' => 'Valider la revue chef',
-            'service_review_success_text' => 'Action validee par le chef de service et transmise a la direction.',
-            'final_statistics_hint' => 'Oui apres validation direction.',
+            'service_review_button_label' => 'Valider la cloture',
+            'service_review_success_text' => 'Action validee par le chef de service.',
+            'final_statistics_hint' => 'Oui apres validation finale du chef de service.',
             'rejection_comment_required' => true,
         ];
         $agentLocked = auth()->check()
             && (int) auth()->id() === (int) $action->responsable_id
             && !in_array($validationStatus, ['non_soumise', 'rejetee_chef', 'rejetee_direction'], true);
         $isAwaitingChef = $workflow['service_enabled'] && $validationStatus === 'soumise_chef';
-        $isAwaitingDirection = $workflow['direction_enabled'] && $validationStatus === 'validee_chef';
+        $isAwaitingDirection = false;
         $isValidatedDirection = $validationStatus === 'validee_direction';
         $ressources = $action->resourceLabels();
         $financingJustificatif = $action->justificatifs->firstWhere('categorie', 'financement');
         $rmoNames = $action->relationLoaded('responsables')
             ? $action->responsables->pluck('name')->filter()->values()->all()
             : [];
+        $rmoIds = $action->relationLoaded('responsables')
+            ? $action->responsables->pluck('id')->push($action->responsable_id)->filter()->map(fn ($id) => (int) $id)->unique()->values()
+            : collect(array_filter([(int) $action->responsable_id]));
         $discussionEntries = $action->actionLogs
             ->filter(fn ($log) => in_array($log->type_evenement, [
                 'commentaire',
@@ -253,15 +256,6 @@
                     <p class="text-slate-600">Évaluateur : <strong>{{ $action->evaluePar?->name ?? '-' }}</strong></p>
                     <p class="text-slate-600">Note : <strong>{{ $action->evaluation_note !== null ? number_format((float) $action->evaluation_note, 1, ',', ' ') . '/100' : '-' }}</strong></p>
                     <p class="text-slate-600">Date : <strong>{{ optional($action->evalue_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
-                </article>
-            @endif
-            @if ($workflow['direction_enabled'])
-                <article class="showcase-inline-stat action-detail-card">
-                    <h3 class="form-section-title">Étape {{ $workflow['service_enabled'] ? '3' : '2' }} — Validation direction</h3>
-                    <p class="mt-2 text-slate-600">Statut : <strong>{{ $isValidatedDirection ? 'Validée' : ($isAwaitingDirection ? 'En attente' : '-') }}</strong></p>
-                    <p class="text-slate-600">Évaluateur : <strong>{{ $action->directionValidePar?->name ?? '-' }}</strong></p>
-                    <p class="text-slate-600">Note : <strong>{{ $action->direction_evaluation_note !== null ? number_format((float) $action->direction_evaluation_note, 1, ',', ' ') . '/100' : '-' }}</strong></p>
-                    <p class="text-slate-600">Date : <strong>{{ optional($action->direction_valide_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                 </article>
             @endif
         </div>
@@ -671,7 +665,10 @@
                         $canEditSousAction = $canTrackWeekly
                             && $usesStructuredProgress
                             && ! $sousAction->est_effectuee
-                            && (int) $sousAction->agent_id === (int) auth()->id();
+                            && (
+                                (int) $sousAction->agent_id === (int) auth()->id()
+                                || $rmoIds->contains((int) auth()->id())
+                            );
                     @endphp
                     @if ($canEditSousAction)
                         <form class="tracking-entry-form {{ $sousAction->cible_prevue !== null && (float) $sousAction->cible_prevue > 0 ? 'has-target' : 'no-target' }} mt-3 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.sub-actions.update', [$action, $sousAction]) }}">
@@ -884,43 +881,6 @@
                 </form>
             @else
                 <p class="text-slate-600">Aucune action en attente de revue chef pour le moment.</p>
-            @endif
-        </section>
-    @endif
-
-    @if ($canReviewDirection)
-        <section id="action-review-direction" class="showcase-panel mb-4">
-            <h2 class="showcase-panel-title">Validation direction</h2>
-            @if ($isAwaitingDirection)
-                <form method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.review-direction', $action) }}">
-                    @csrf
-                    <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                        <div>
-                            <label for="direction_decision_validation">Decision</label>
-                            <select id="direction_decision_validation" name="decision_validation" required>
-                                <option value="valider" @selected(old('decision_validation') === 'valider')>Valider</option>
-                                <option value="rejeter" @selected(old('decision_validation') === 'rejeter')>Rejeter</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="direction_evaluation_note">Note sur 100</label>
-                            <input id="direction_evaluation_note" name="evaluation_note" type="number" step="0.01" min="0" max="100" value="{{ old('evaluation_note') }}" required>
-                        </div>
-                        <div>
-                        <label for="justificatif_evaluation_direction">Justificatif evaluation direction (optionnel)</label>
-                            <input id="justificatif_evaluation_direction" name="justificatif_evaluation_direction" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
-                        </div>
-                    </div>
-                    <div>
-                        <label for="direction_evaluation_commentaire">Commentaire d'evaluation direction{{ $workflow['rejection_comment_required'] ? ' (obligatoire au rejet)' : '' }}</label>
-                        <textarea id="direction_evaluation_commentaire" name="evaluation_commentaire">{{ old('evaluation_commentaire') }}</textarea>
-                    </div>
-                    <button class="btn btn-blue mt-2.5" type="submit">
-                        Valider la revue direction
-                    </button>
-                </form>
-            @else
-                <p class="text-slate-600">Aucune action en attente de validation direction pour le moment.</p>
             @endif
         </section>
     @endif

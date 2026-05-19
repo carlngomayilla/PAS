@@ -26,7 +26,8 @@ class SuperAdminWorkflowSettingsTest extends TestCase
             ->get(route('workspace.super-admin.workflow.edit'))
             ->assertOk()
             ->assertSee('Workflow et validations')
-            ->assertSee('Agent -> Chef de service -> Direction');
+            ->assertSee('Agent -> Chef de service')
+            ->assertDontSee('Agent -> Chef de service -> Direction');
 
         $this->actingAs($superAdmin)
             ->put(route('workspace.super-admin.workflow.update'), [

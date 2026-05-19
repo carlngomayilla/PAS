@@ -330,6 +330,8 @@ class User extends Authenticatable
         // Chefs d'unité SCIQ/DGA/Cabinet : vue globale agence + gestion de leur unité.
         if ($this->hasRole(
             self::ROLE_CHEF_UNITE,
+            self::ROLE_SCIQ,
+            self::ROLE_SCIQ_SUIVI_GLOBAL,
             self::ROLE_CHEF_UNITE_SCIQ,
             self::ROLE_CHEF_UNITE_DGA,
             self::ROLE_CHEF_UNITE_CABINET,

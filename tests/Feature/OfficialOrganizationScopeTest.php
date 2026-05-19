@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\UniteDg;
 use App\Services\AccessScopeService;
 use Database\Seeders\ProductionSafeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -81,5 +82,59 @@ class OfficialOrganizationScopeTest extends TestCase
         $this->assertSame('UCAS', $ucas->service?->code);
         $this->assertFalse($scopeService->scopeFor($ucas)['has_dual_interface']);
         $this->assertSame(AccessScopeService::TYPE_AGENT, $scopeService->scopeFor($ucas)['scope_type']);
+    }
+
+    public function test_dg_units_are_active_and_users_keep_service_unit_consistency(): void
+    {
+        $this->seed(ProductionSafeSeeder::class);
+
+        $this->assertEqualsCanonicalizing(
+            [UniteDg::CODE_CABINET, UniteDg::CODE_DGA, UniteDg::CODE_SCIQ, UniteDg::CODE_UCAS],
+            UniteDg::query()->where('actif', true)->pluck('code')->all()
+        );
+
+        $expectedServiceByUnit = [
+            UniteDg::CODE_CABINET => 'COLLAB',
+            UniteDg::CODE_SCIQ => 'SCIQ',
+            UniteDg::CODE_UCAS => 'UCAS',
+        ];
+
+        $users = User::query()
+            ->with(['service', 'uniteDg'])
+            ->whereIn('role', [
+                User::ROLE_COLLABORATEUR,
+                User::ROLE_CABINET,
+                User::ROLE_CABINET_SUPERVISION,
+                User::ROLE_CHEF_UNITE_CABINET,
+                User::ROLE_SCIQ,
+                User::ROLE_SCIQ_SUIVI_GLOBAL,
+                User::ROLE_CHEF_UNITE_SCIQ,
+                User::ROLE_UCAS,
+                User::ROLE_CHEF_UNITE_UCAS,
+            ])
+            ->get();
+
+        $this->assertNotEmpty($users);
+
+        foreach ($users as $user) {
+            $unitCode = $user->uniteDg?->code;
+            $this->assertNotNull($unitCode, "Missing unite_dg_id for {$user->email}");
+            $this->assertSame($expectedServiceByUnit[$unitCode], $user->service?->code);
+        }
+    }
+
+    public function test_unit_scope_can_drive_dual_interface_without_service(): void
+    {
+        $this->seed(ProductionSafeSeeder::class);
+
+        $dga = UniteDg::query()->where('code', UniteDg::CODE_DGA)->firstOrFail();
+        $user = User::factory()->create([
+            'role' => User::ROLE_DGA_SUPERVISION,
+            'direction_id' => $dga->direction_id,
+            'service_id' => null,
+            'unite_dg_id' => $dga->id,
+        ]);
+
+        $this->assertTrue(app(AccessScopeService::class)->hasDualInterface($user));
     }
 }

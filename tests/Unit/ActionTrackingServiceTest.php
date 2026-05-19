@@ -14,6 +14,7 @@ use App\Models\Service;
 use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\Alerting\AlertCenterService;
 use App\Notifications\WorkspaceModuleNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -331,6 +332,54 @@ class ActionTrackingServiceTest extends TestCase
             'type_evenement' => 'justificatif_absent',
             'niveau' => 'warning',
         ]);
+    }
+
+    public function test_execution_justificatif_resolves_missing_justificatif_alert(): void
+    {
+        $action = $this->createQuantitativeAction([
+            'date_fin' => '2026-01-10',
+            'date_echeance' => '2026-01-10',
+        ]);
+        $action->update([
+            'date_fin_reelle' => '2026-01-09',
+        ]);
+
+        $trackingService = app(ActionTrackingService::class);
+        $trackingService->refreshActionMetrics($action, Carbon::parse('2026-01-09'));
+
+        $this->assertDatabaseHas('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'justificatif_absent',
+            'niveau' => 'warning',
+        ]);
+
+        $trackingService->addActionJustificatif(
+            $action,
+            null,
+            'execution_quantitative',
+            'justificatifs/test.pdf',
+            'test.pdf',
+            'application/pdf',
+            128,
+            'Justificatif test',
+            null,
+            false
+        );
+
+        $this->assertDatabaseHas('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'justificatif_absent',
+            'niveau' => 'info',
+            'lu' => true,
+        ]);
+
+        $agent = $action->responsable()->firstOrFail();
+        $alerts = app(AlertCenterService::class)->buildForUser($agent, 20);
+
+        $this->assertFalse($alerts->contains(
+            fn (array $alert): bool => ($alert['type'] ?? null) === 'justificatif_absent'
+                && (int) ($alert['action']['id'] ?? 0) === (int) $action->id
+        ));
     }
 
     public function test_non_started_action_keeps_zero_progress_and_execution_performance(): void

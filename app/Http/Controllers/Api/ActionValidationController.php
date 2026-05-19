@@ -44,16 +44,18 @@ class ActionValidationController extends Controller
         $currentValidationStatus = (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE);
         if (in_array($currentValidationStatus, [
             ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ], true)) {
             return response()->json([
                 'message' => 'Action deja soumise. En attente de validation hierarchique.',
             ], 409);
         }
 
-        if ($currentValidationStatus === ActionTrackingService::VALIDATION_VALIDEE_DIRECTION) {
+        if (in_array($currentValidationStatus, [
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
             return response()->json([
-                'message' => 'Action deja validee par la direction.',
+                'message' => 'Action deja validee par le chef de service.',
             ], 409);
         }
 
@@ -212,9 +214,7 @@ class ActionValidationController extends Controller
 
         $decision = (string) ($validated['decision_validation'] ?? 'rejeter');
         $action->refresh()->loadMissing('pta:id,direction_id,service_id');
-        $directionEnabled = $workflowSettings->directionValidationEnabled();
-
-        if ($decision === 'valider' && ! $directionEnabled) {
+        if ($decision === 'valider') {
             $notificationService->notifyActionFinalizedByChef($action, $user);
         } else {
             $notificationService->notifyActionReviewedByChef($action, $decision === 'valider', $user);
@@ -222,9 +222,7 @@ class ActionValidationController extends Controller
 
         return response()->json([
             'message' => $decision === 'valider'
-                ? ($directionEnabled
-                    ? 'Action validee par le chef de service et transmise a la direction.'
-                    : 'Action validee par le chef de service. Elle est maintenant prise en compte dans les statistiques.')
+                ? 'Action validee par le chef de service. Le directeur et l agent sont notifies.'
                 : 'Action rejetee. L agent peut mettre a jour et resoumettre.',
             'data' => $action->fresh(['actionKpi', 'weeks']),
         ]);

@@ -277,7 +277,7 @@ class ActionTrackingWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        if ($user->isAgent() && (int) $sousAction->agent_id !== (int) $user->id) {
+        if ($user->isAgent() && ! $this->canUpdateSubAction($user, $action, $sousAction)) {
             abort(403, 'Acces non autorise.');
         }
 
@@ -754,13 +754,15 @@ class ActionTrackingWebController extends Controller
         $currentValidationStatus = (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE);
         if (in_array($currentValidationStatus, [
             ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ], true)) {
             return back()->withErrors(['general' => 'Action deja soumise. En attente de validation hierarchique.']);
         }
 
-        if ($currentValidationStatus === ActionTrackingService::VALIDATION_VALIDEE_DIRECTION) {
-            return back()->withErrors(['general' => 'Action deja validee par la direction.']);
+        if (in_array($currentValidationStatus, [
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
+            return back()->withErrors(['general' => 'Action deja validee par le chef de service.']);
         }
 
         $hasExecutionJustificatif = $action->justificatifs()
@@ -946,9 +948,7 @@ class ActionTrackingWebController extends Controller
         $this->recordAudit($request, 'action', 'review_closure', $action, $before, $action->toArray());
 
         $decision = (string) ($validated['decision_validation'] ?? 'rejeter');
-        $directionEnabled = $this->workflowSettings()->directionValidationEnabled();
-
-        if ($decision === 'valider' && ! $directionEnabled) {
+        if ($decision === 'valider') {
             $notificationService->notifyActionFinalizedByChef($action, $user);
         } else {
             $notificationService->notifyActionReviewedByChef($action, $decision === 'valider', $user);
@@ -1310,6 +1310,23 @@ class ActionTrackingWebController extends Controller
     {
         return $action->isResponsible($user)
             && ($user->isAgent() || $action->isOperationalContext());
+    }
+
+    private function canUpdateSubAction(User $user, Action $action, SousAction $sousAction): bool
+    {
+        if ((int) $sousAction->action_id !== (int) $action->id) {
+            return false;
+        }
+
+        if (! $this->canTrackWeekly($user, $action)) {
+            return false;
+        }
+
+        if ((int) $sousAction->agent_id === (int) $user->id) {
+            return true;
+        }
+
+        return $action->isResponsible($user);
     }
 
     private function canReadAction(User $user, Action $action): bool

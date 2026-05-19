@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -50,5 +51,27 @@ class ActionLog extends Model
     {
         return $this->belongsTo(User::class, 'utilisateur_id');
     }
-}
 
+    /**
+     * @param Builder<ActionLog> $query
+     * @return Builder<ActionLog>
+     */
+    public function scopeActiveAlert(Builder $query): Builder
+    {
+        return $query
+            ->whereIn('niveau', ['warning', 'critical', 'urgence'])
+            ->where(function (Builder $detailsQuery): void {
+                $detailsQuery
+                    ->whereNull('details->resolved')
+                    ->orWhere('details->resolved', false);
+            });
+    }
+
+    public function isActiveAlert(): bool
+    {
+        $details = is_array($this->details) ? $this->details : [];
+
+        return in_array((string) $this->niveau, ['warning', 'critical', 'urgence'], true)
+            && ($details['resolved'] ?? false) !== true;
+    }
+}

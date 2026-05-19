@@ -183,6 +183,7 @@
     var notificationsAlertsLoadedAt = 0;
     var notificationsAlertsPending = null;
     var previousAlertUnreadCount = Number(document.body.dataset.alertUnread || 0);
+    var previousNotificationUnreadCount = Number(document.body.dataset.notificationUnread || 0);
     var previousMessageUnreadCount = Number(document.body.dataset.messageUnread || 0);
     var notificationAudioContext = null;
     var notificationSoundUnlocked = false;
@@ -263,6 +264,35 @@
         messagingBadge.classList.toggle('hidden', previousMessageUnreadCount <= 0);
     }
 
+    function updateNotificationsBadge(notificationUnread, alertUnread) {
+        previousNotificationUnreadCount = Math.max(0, Number(notificationUnread || 0));
+        previousAlertUnreadCount = Math.max(0, Number(alertUnread || 0));
+
+        if (!notificationsBadge) {
+            return;
+        }
+
+        var total = previousNotificationUnreadCount + previousAlertUnreadCount;
+        var kind = 'none';
+
+        if (previousNotificationUnreadCount > 0 && previousAlertUnreadCount > 0) {
+            kind = 'both';
+        } else if (previousAlertUnreadCount > 0) {
+            kind = 'alert';
+        } else if (previousNotificationUnreadCount > 0) {
+            kind = 'notification';
+        }
+
+        notificationsBadge.textContent = total > 99 ? '99+' : String(total);
+        notificationsBadge.classList.toggle('hidden', total <= 0);
+        notificationsBadge.classList.remove('bg-[#3996d3]', 'bg-[#f59e0b]', 'bg-[#7c3aed]');
+        notificationsBadge.classList.add(kind === 'both' ? 'bg-[#7c3aed]' : (kind === 'alert' ? 'bg-[#f59e0b]' : 'bg-[#3996d3]'));
+        notificationsBadge.dataset.notificationUnread = String(previousNotificationUnreadCount);
+        notificationsBadge.dataset.alertUnread = String(previousAlertUnreadCount);
+        notificationsBadge.dataset.badgeKind = kind;
+        notificationsBadge.title = previousNotificationUnreadCount + ' notification(s), ' + previousAlertUnreadCount + ' alerte(s)';
+    }
+
     function renderNavbarMessageSummary(payload) {
         var unread = Number((payload && payload.unread_count) || 0);
 
@@ -333,9 +363,7 @@
                     detail: { unread: unread }
                 }));
             }
-            previousAlertUnreadCount = unread;
-            notificationsBadge.textContent = unread > 99 ? '99+' : String(unread);
-            notificationsBadge.classList.toggle('hidden', unread <= 0);
+            updateNotificationsBadge(previousNotificationUnreadCount, unread);
         }
     }
 

@@ -43,9 +43,9 @@ class PlatformSimulationService
         $simulatedAutoComplete = (string) ($payload['actions_auto_complete_when_target_reached'] ?? ($currentAutoComplete ? '1' : '0')) === '1';
 
         $currentServiceEnabled = $this->workflowSettings->serviceValidationEnabled();
-        $currentDirectionEnabled = $this->workflowSettings->directionValidationEnabled();
+        $currentDirectionEnabled = false;
         $simulatedServiceEnabled = (string) ($payload['actions_service_validation_enabled'] ?? ($currentServiceEnabled ? '1' : '0')) === '1';
-        $simulatedDirectionEnabled = (string) ($payload['actions_direction_validation_enabled'] ?? ($currentDirectionEnabled ? '1' : '0')) === '1';
+        $simulatedDirectionEnabled = false;
 
         $autoCompleteCandidates = $actions
             ->filter(function (Action $action): bool {
@@ -122,7 +122,7 @@ class PlatformSimulationService
             ),
             'payload' => [
                 'actions_service_validation_enabled' => $simulatedServiceEnabled ? '1' : '0',
-                'actions_direction_validation_enabled' => $simulatedDirectionEnabled ? '1' : '0',
+                'actions_direction_validation_enabled' => '0',
                 'actions_min_progress_for_closure' => (string) $simulatedClosureProgress,
                 'actions_auto_complete_when_target_reached' => $simulatedAutoComplete ? '1' : '0',
             ],

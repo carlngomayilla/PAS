@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Service;
+use App\Models\UniteDg;
 use App\Models\User;
 
 /**
@@ -190,6 +191,11 @@ class AccessScopeService
             return true;
         }
 
+        $unit = $this->userUniteDg($user);
+        if ($unit instanceof UniteDg) {
+            return $unit->isGlobalScope();
+        }
+
         return $this->userService($user)?->has_dual_interface === true;
     }
 
@@ -237,6 +243,8 @@ class AccessScopeService
                 User::ROLE_SCIQ,
                 User::ROLE_SCIQ_SUIVI_GLOBAL,
                 User::ROLE_CHEF_UNITE_SCIQ,
+                User::ROLE_DGA_SUPERVISION,
+                User::ROLE_CHEF_UNITE_DGA,
             );
     }
 
@@ -253,6 +261,7 @@ class AccessScopeService
                 User::ROLE_CHEF_UNITE,
                 User::ROLE_CHEF_UNITE_UCAS,
                 User::ROLE_CHEF_UNITE_SCIQ,
+                User::ROLE_CHEF_UNITE_DGA,
                 User::ROLE_CHEF_UNITE_CABINET,
             );
     }
@@ -268,5 +277,18 @@ class AccessScopeService
         }
 
         return $user->service()->first();
+    }
+
+    private function userUniteDg(User $user): ?UniteDg
+    {
+        if ($user->unite_dg_id === null) {
+            return null;
+        }
+
+        if ($user->relationLoaded('uniteDg')) {
+            return $user->uniteDg;
+        }
+
+        return $user->uniteDg()->first();
     }
 }

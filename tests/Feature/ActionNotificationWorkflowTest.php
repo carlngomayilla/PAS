@@ -47,6 +47,12 @@ class ActionNotificationWorkflowTest extends TestCase
         $this->assertNotNull($fixture['service_user']->fresh()->notifications->first(
             fn ($notification) => ($notification->data['title'] ?? null) === 'Action soumise pour validation'
         ));
+        $this->assertNull($fixture['direction_user']->fresh()->notifications->first(
+            fn ($notification) => ($notification->data['title'] ?? null) === 'Action soumise pour validation'
+        ));
+        $this->assertNull($fixture['agent']->fresh()->notifications->first(
+            fn ($notification) => ($notification->data['title'] ?? null) === 'Action soumise pour validation'
+        ));
 
         Sanctum::actingAs($fixture['service_user']);
         $this->postJson('/api/v1/actions/'.$action->id.'/review', [
@@ -57,10 +63,10 @@ class ActionNotificationWorkflowTest extends TestCase
         ])->assertOk();
 
         $this->assertNotNull($fixture['direction_user']->fresh()->notifications->first(
-            fn ($notification) => ($notification->data['title'] ?? null) === 'Action validee par le chef'
+            fn ($notification) => in_array(($notification->data['title'] ?? null), ['Action validee par le chef', 'Action validée par le chef'], true)
         ));
         $this->assertNotNull($fixture['agent']->fresh()->notifications->first(
-            fn ($notification) => ($notification->data['title'] ?? null) === 'Action transmise a la direction'
+            fn ($notification) => in_array(($notification->data['title'] ?? null), ['Action validee par le chef', 'Action validée par le chef'], true)
         ));
 
         Sanctum::actingAs($fixture['direction_user']);
@@ -68,12 +74,12 @@ class ActionNotificationWorkflowTest extends TestCase
             'decision_validation' => 'valider',
             'evaluation_note' => 95,
             'evaluation_commentaire' => 'Validation finale',
-        ])->assertOk();
+        ])->assertForbidden();
 
-        $this->assertNotNull($fixture['agent']->fresh()->notifications->first(
+        $this->assertNull($fixture['agent']->fresh()->notifications->first(
             fn ($notification) => ($notification->data['title'] ?? null) === 'Action validee par la direction'
         ));
-        $this->assertNotNull($fixture['service_user']->fresh()->notifications->first(
+        $this->assertNull($fixture['service_user']->fresh()->notifications->first(
             fn ($notification) => ($notification->data['title'] ?? null) === 'Action validee par la direction'
         ));
     }

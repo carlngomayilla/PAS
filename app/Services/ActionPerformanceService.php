@@ -132,12 +132,14 @@ class ActionPerformanceService
             return 'rejetee';
         }
 
-        if ($validationStatus === ActionTrackingService::VALIDATION_SOUMISE_CHEF
-            || $validationStatus === ActionTrackingService::VALIDATION_VALIDEE_CHEF) {
+        if ($validationStatus === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
             return 'en_attente_validation';
         }
 
-        if ($validationStatus === ActionTrackingService::VALIDATION_VALIDEE_DIRECTION) {
+        if (in_array($validationStatus, [
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
             return 'validee';
         }
 
@@ -146,7 +148,7 @@ class ActionPerformanceService
         return match ($status) {
             'non_demarre', 'non demarre', 'non_demarree', 'not_started' => 'en_cours',
             'en_attente_justificatif', 'justificatif_attendu' => 'en_attente_justificatif',
-            'en_attente_validation', 'soumise_chef', 'validee_chef' => 'en_attente_validation',
+            'en_attente_validation', 'soumise_chef' => 'en_attente_validation',
             'realisee', 'realise', 'termine', 'acheve', 'acheve_dans_delai', 'acheve_hors_delai' => 'realisee',
             'validee', 'validee_direction' => 'validee',
             'rejetee', 'rejetee_chef', 'rejetee_direction', 'a_corriger' => 'rejetee',

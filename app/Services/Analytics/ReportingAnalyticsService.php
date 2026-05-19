@@ -4,6 +4,7 @@ namespace App\Services\Analytics;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Models\Action;
+use App\Models\ActionLog;
 use App\Models\ActionWeek;
 use App\Models\Direction;
 use App\Models\KpiMesure;
@@ -272,6 +273,7 @@ class ReportingAnalyticsService
             'alertes' => [
                 'actions_en_retard' => $retardsActions,
                 'mesures_kpi_sous_seuil' => $kpiSousSeuilQuery->count(),
+                'alertes_action_actives' => $this->activeActionAlertLogsCount($user),
             ],
             'pasConsolidation' => $this->buildPasConsolidation($user),
             'interannualComparison' => $this->buildInterannualComparison($user),
@@ -786,10 +788,22 @@ class ReportingAnalyticsService
             'service_id' => $user->service_id !== null ? (int) $user->service_id : null,
             'with_details' => $withDetails,
             'with_charts' => $withCharts,
+            'version' => $this->cacheVersionService->reportingVersion(),
+            'alert_version' => (int) Cache::get('alert-center:version', 1),
             'statistical_scope' => $this->actionCalculationSettings->statisticalScope(),
             'exercice' => $this->exerciceContext->selectedYear(),
             'trimestre' => $this->exerciceContext->selectedQuarter(),
         ], JSON_THROW_ON_ERROR));
+    }
+
+    private function activeActionAlertLogsCount(User $user): int
+    {
+        return ActionLog::query()
+            ->activeAlert()
+            ->whereHas('action.pta', function (Builder $ptaQuery) use ($user): void {
+                $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
+            })
+            ->count();
     }
 
     private function scopePao(Builder|Relation $query, User $user): void

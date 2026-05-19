@@ -45,9 +45,10 @@
                         <input class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" name="actions_service_validation_enabled" value="1" @checked(old('actions_service_validation_enabled', $defaults['actions_service_validation_enabled']) === '1')>
                         <span><strong class="block text-slate-900">Validation service</strong><span class="mt-1 block text-slate-500">Inclure l'étape chef de service.</span></span>
                     </label>
-                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
-                        <input class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" name="actions_direction_validation_enabled" value="1" @checked(old('actions_direction_validation_enabled', $defaults['actions_direction_validation_enabled']) === '1')>
-                        <span><strong class="block text-slate-900">Validation direction</strong><span class="mt-1 block text-slate-500">Maintenir l'étape finale direction.</span></span>
+                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                        <input type="hidden" name="actions_direction_validation_enabled" value="0">
+                        <input class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-400" type="checkbox" value="0" disabled>
+                        <span><strong class="block text-slate-900">Validation direction supprimee</strong><span class="mt-1 block text-slate-500">La simulation conserve le circuit cible : validation finale par le chef, direction en lecture.</span></span>
                     </label>
                     <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
                         <input class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" name="actions_auto_complete_when_target_reached" value="1" @checked(old('actions_auto_complete_when_target_reached', $defaults['actions_auto_complete_when_target_reached']) === '1')>

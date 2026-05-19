@@ -84,7 +84,10 @@ class ActionPolicy
     public function update(User $user, Action $action): bool
     {
         // Sécurité supplémentaire : On ne modifie pas une action déjà validée par la direction
-        if ($action->statut_validation === ActionTrackingService::VALIDATION_VALIDEE_DIRECTION) {
+        if (in_array((string) $action->statut_validation, [
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
             return $user->hasRole(User::ROLE_ADMIN) || $user->hasRole(User::ROLE_PLANIFICATION);
         }
 
@@ -156,6 +159,8 @@ class ActionPolicy
      */
     public function reviewByDirection(User $user, Action $action): bool
     {
+        return false;
+
         if ($action->isResponsible($user)) {
             return false;
         }

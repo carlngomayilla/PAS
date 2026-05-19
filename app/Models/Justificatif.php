@@ -6,10 +6,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Model;
+use App\Services\Analytics\AnalyticsCacheVersionService;
+use Illuminate\Support\Facades\Cache;
 
 class Justificatif extends Model
 {
     use HasFactory;
+
+    private const EXECUTION_CATEGORIES = [
+        'hebdomadaire',
+        'final',
+        'execution_quantitative',
+        'execution_mixte',
+        'sous_action',
+    ];
 
     /**
      * @var list<string>
@@ -40,6 +50,13 @@ class Justificatif extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::created(function (Justificatif $justificatif): void {
+            $justificatif->resolveMissingExecutionJustificatifAlert();
+        });
+    }
+
     public function justifiable(): MorphTo
     {
         return $this->morphTo();
@@ -58,5 +75,42 @@ class Justificatif extends Model
     public function sousAction(): BelongsTo
     {
         return $this->belongsTo(SousAction::class, 'sous_action_id');
+    }
+
+    private function resolveMissingExecutionJustificatifAlert(): void
+    {
+        if ((string) $this->justifiable_type !== Action::class) {
+            return;
+        }
+
+        $category = strtolower(trim((string) $this->categorie));
+        if (! in_array($category, self::EXECUTION_CATEGORIES, true) && $this->sous_action_id === null) {
+            return;
+        }
+
+        $updated = ActionLog::query()
+            ->where('action_id', (int) $this->justifiable_id)
+            ->where('type_evenement', 'justificatif_absent')
+            ->whereIn('niveau', ['warning', 'critical', 'urgence'])
+            ->update([
+                'niveau' => 'info',
+                'message' => 'Justificatif d execution depose: l alerte de justificatif absent est resolue.',
+                'details' => [
+                    'resolved' => true,
+                    'resolved_at' => now()->toIso8601String(),
+                    'resolved_by_justificatif_id' => (int) $this->id,
+                    'categorie' => (string) $this->categorie,
+                ],
+                'lu' => true,
+                'updated_at' => now(),
+            ]);
+
+        if ($updated > 0) {
+            if (Cache::increment('alert-center:version') === false) {
+                Cache::forever('alert-center:version', 2);
+            }
+
+            app(AnalyticsCacheVersionService::class)->bumpAll();
+        }
     }
 }

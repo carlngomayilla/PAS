@@ -103,14 +103,12 @@ class ActionCalculationSettings
             ActionTrackingService::VALIDATION_SOUMISE_CHEF => [
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
             ActionTrackingService::VALIDATION_VALIDEE_CHEF => [
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
             default => [
-                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
             ],
         };
     }
@@ -266,6 +264,5 @@ class ActionCalculationSettings
         }
     }
 }
-
 
 
