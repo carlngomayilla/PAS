@@ -127,6 +127,7 @@ class PtaWebController extends Controller
 
         return view('workspace.pta.index', [
             'rows' => $rows,
+            'scope' => $user->accessScope(),
             'ptaStats' => $ptaStats,
             'objectifOperationnelOptions' => $this->objectifOperationnelOptions($user),
             'paoOptions' => $this->paoOptions($user),

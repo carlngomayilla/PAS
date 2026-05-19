@@ -149,6 +149,7 @@ class PaoWebController extends Controller
 
         return view('workspace.pao.index', [
             'rows' => $rows,
+            'scope' => $user->accessScope(),
             'paoStats' => $paoStats,
             'pasOptions' => $this->pasOptions($user),
             'objectifOptions' => $this->objectifOptions($user),

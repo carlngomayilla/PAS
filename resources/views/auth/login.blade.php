@@ -66,10 +66,15 @@
                     >
                 </div>
 
-                <label class="flex items-center gap-2 text-sm text-slate-700" for="remember">
-                    <input id="remember" name="remember" type="checkbox" value="1" class="h-4 w-4">
-                    Se souvenir de moi
-                </label>
+                <div class="flex items-center justify-between gap-3">
+                    <label class="flex items-center gap-2 text-sm text-slate-700" for="remember">
+                        <input id="remember" name="remember" type="checkbox" value="1" class="h-4 w-4">
+                        Se souvenir de moi
+                    </label>
+                    @if (Route::has('password.request'))
+                        <a href="{{ route('password.request') }}" class="text-sm font-medium text-[#3996d3] hover:underline">Mot de passe oublié ?</a>
+                    @endif
+                </div>
 
                 <button
                     type="submit"

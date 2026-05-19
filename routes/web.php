@@ -37,6 +37,18 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [SessionController::class, 'create'])->name('login.form');
     Route::post('/login', [SessionController::class, 'store'])->middleware('throttle:login')->name('login');
+
+    // ── Réinitialisation du mot de passe ──────────────────────────────────────
+    Route::get('/password/forgot', [\App\Http\Controllers\Auth\PasswordResetController::class, 'showRequestForm'])
+        ->name('password.request');
+    Route::post('/password/forgot', [\App\Http\Controllers\Auth\PasswordResetController::class, 'sendResetLink'])
+        ->middleware('throttle:6,1')
+        ->name('password.email');
+    Route::get('/password/reset/{token}', [\App\Http\Controllers\Auth\PasswordResetController::class, 'showResetForm'])
+        ->name('password.reset');
+    Route::post('/password/reset', [\App\Http\Controllers\Auth\PasswordResetController::class, 'reset'])
+        ->middleware('throttle:6,1')
+        ->name('password.update');
 });
 
 // ── ESPACE AUTHENTIFIÉ ─────────────────────────────────────────────────────────

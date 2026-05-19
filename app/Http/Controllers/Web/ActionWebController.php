@@ -106,6 +106,7 @@ class ActionWebController extends Controller
 
         return view('workspace.actions.index', [
             'rows' => $query->paginate($perPage)->withQueryString(),
+            'scope' => $user->accessScope(),
             'summary' => $summary,
             'ptaOptions' => $this->ptaOptions($user),
             'statusOptions' => array_merge(['achevees'], ActionTrackingService::dynamicStatusOptions()),
