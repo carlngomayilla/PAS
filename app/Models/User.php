@@ -311,8 +311,29 @@ class User extends Authenticatable
             return 'Portée globale (lecture/écriture)';
         }
 
-        if ($this->hasRole(self::ROLE_CABINET)) {
+        // Rôles à portée globale en lecture seule (cabinet, supervision, audit, invité).
+        if ($this->hasRole(
+            self::ROLE_CABINET,
+            self::ROLE_CABINET_SUPERVISION,
+            self::ROLE_DGA_SUPERVISION,
+            self::ROLE_AUDITEUR,
+            self::ROLE_INVITE_LECTURE,
+        )) {
             return 'Portée globale (lecture seule)';
+        }
+
+        // Chefs d'unité SCIQ/DGA/Cabinet : vue globale agence + gestion de leur unité.
+        if ($this->hasRole(
+            self::ROLE_CHEF_UNITE_SCIQ,
+            self::ROLE_CHEF_UNITE_DGA,
+            self::ROLE_CHEF_UNITE_CABINET,
+        )) {
+            return 'Portée globale + unité DG';
+        }
+
+        // Chef d'unité UCAS : limité à son unité.
+        if ($this->hasRole(self::ROLE_CHEF_UNITE_UCAS)) {
+            return 'Portée unité DG (UCAS)';
         }
 
         if ($this->hasRole(self::ROLE_DIRECTION)) {

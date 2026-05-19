@@ -168,7 +168,7 @@
                             <input id="agent_fonction" name="agent_fonction" type="text" value="{{ old('agent_fonction', $row->agent_fonction) }}" placeholder="Ex: Charge du suivi hebdomadaire">
                         </div>
                         <div>
-                            <label for="agent_telephone">Telephone</label>
+                            <label for="agent_telephone">Téléphone</label>
                             <input id="agent_telephone" name="agent_telephone" type="text" value="{{ old('agent_telephone', $row->agent_telephone) }}" placeholder="+241 ...">
                         </div>
                     </div>
@@ -199,18 +199,17 @@
     </div>
 @endsection
 
-@push('scripts')
-    <script @cspNonce>
-        (function () {
-            var rôle = document.getElementById('role');
+<script @cspNonce>
+    (function () {
+        function initRoleAgentFieldsToggle() {
+            var roleSelect = document.getElementById('role');
             var fields = document.getElementById('agent-fields');
+            if (!roleSelect || !fields) {
+                return;
+            }
 
             function syncAgentFields() {
-                if (!rôle || !fields) {
-                    return;
-                }
-
-                var isAgent = role.value === 'agent';
+                var isAgent = roleSelect.value === 'agent';
                 fields.classList.toggle('hidden', !isAgent);
                 fields.classList.toggle('is-frozen', !isAgent);
 
@@ -220,11 +219,14 @@
                 });
             }
 
-            if (role) {
-                role.addEventListener('change', syncAgentFields);
-            }
-
+            roleSelect.addEventListener('change', syncAgentFields);
             syncAgentFields();
-        })();
-    </script>
-@endpush
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initRoleAgentFieldsToggle);
+        } else {
+            initRoleAgentFieldsToggle();
+        }
+    })();
+</script>

@@ -11,15 +11,10 @@
     $roleDashboard = $analytics['role_dashboard'] ?? [];
     $roleHero = $roleDashboard['hero'] ?? [];
     $profil = is_array($profil ?? null) ? $profil : [];
-    $profileRoleLabel = (string) ($profil['role_label'] ?? $profil['role'] ?? ucfirst((string) $dashboardRole));
     $profileRole = (string) ($profil['role'] ?? $dashboardRole);
-    $profileScope = (string) ($profil['scope'] ?? '-');
-    $profileDirectionLabel = $currentDashboardUser?->direction
-        ? trim((string) ($currentDashboardUser->direction->code ?: '').' - '.(string) $currentDashboardUser->direction->libelle, ' -')
-        : 'Toutes les directions visibles';
-    $profileServiceLabel = $currentDashboardUser?->service
-        ? trim((string) ($currentDashboardUser->service->code ?: '').' - '.(string) $currentDashboardUser->service->libelle, ' -')
-        : 'Tous les services visibles';
+    // Variables profileRoleLabel / profileScope / profileDirectionLabel / profileServiceLabel
+    // ont été retirées après suppression du bandeau profil redondant en haut du dashboard
+    // (le périmètre est désormais affiché par le chip de la navbar).
     $operationalGlobalScores = $analytics['operational_global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'global' => 0, 'progression' => 0];
     $globalScores = $analytics['global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'global' => 0, 'progression' => 0];
     $operationalStatusCards = $analytics['operational_status_cards'] ?? [];

@@ -273,7 +273,7 @@
                             </select>
                         </form>
 
-                        <div class="admin-local-clock hidden md:inline-flex" id="admin-local-clock" aria-label="Heure locale">
+                        <div class="admin-local-clock" id="admin-local-clock" aria-label="Heure locale">
                             --:--:--
                         </div>
 

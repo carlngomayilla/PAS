@@ -33,8 +33,8 @@
                 <p class="showcase-data-value">{{ $cardUser->email }}</p>
             </div>
             <div class="showcase-data-point">
-                <p class="showcase-data-key">Telephone</p>
-                <p class="showcase-data-value">{{ $cardUser->agent_telephone ?: 'Non renseigne' }}</p>
+                <p class="showcase-data-key">Téléphone</p>
+                <p class="showcase-data-value">{{ $cardUser->agent_telephone ?: 'Non renseigné' }}</p>
             </div>
             <div class="showcase-data-point">
                 <p class="showcase-data-key">Matricule</p>

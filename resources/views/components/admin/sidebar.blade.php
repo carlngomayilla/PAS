@@ -328,7 +328,7 @@
                         <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $icons['logout'] }}" />
                         </svg>
-                        <span data-sidebar-label>Deconnexion</span>
+                        <span data-sidebar-label>Déconnexion</span>
                     </button>
                 </form>
             </div>

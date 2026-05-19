@@ -45,8 +45,23 @@ class UserWorkspaceService
         $canReadAlerts = $canReadPlanning && $user->hasPermission('alerts.read');
         $canUseMessaging = $user->hasPermission('messagerie.read');
         $isTechnicalAdmin = $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN);
-        $isPlanification = $user->hasRole(User::ROLE_PLANIFICATION);
-        $isCabinet = $user->hasRole(User::ROLE_CABINET);
+        // Admin fonctionnel et SCIQ suivi global ont un rôle proche de Planification
+        // pour la gestion des référentiels métier.
+        $isPlanification = $user->hasRole(
+            User::ROLE_PLANIFICATION,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ,
+        );
+        // Cabinet et ses variantes (supervision DGA/Cabinet, auditeur) peuvent voir l'audit.
+        $isCabinet = $user->hasRole(
+            User::ROLE_CABINET,
+            User::ROLE_CABINET_SUPERVISION,
+            User::ROLE_DGA_SUPERVISION,
+            User::ROLE_CHEF_UNITE_DGA,
+            User::ROLE_CHEF_UNITE_CABINET,
+            User::ROLE_AUDITEUR,
+        );
 
         $modules = [[
             'code' => 'pilotage',

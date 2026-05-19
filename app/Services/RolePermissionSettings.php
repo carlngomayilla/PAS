@@ -273,6 +273,7 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
+                'referentiel.write',
                 'delegations.manage',
                 'messagerie.read',
             ],

@@ -89,7 +89,7 @@
                     <select id="auth_action" name="auth_action">
                         <option value="">Toutes</option>
                         <option value="login_success" @selected($filters['auth_action'] === 'login_success')>Connexions</option>
-                        <option value="logout" @selected($filters['auth_action'] === 'logout')>Deconnexions</option>
+                        <option value="logout" @selected($filters['auth_action'] === 'logout')>Déconnexions</option>
                     </select>
                 </div>
                 <div>
@@ -266,7 +266,7 @@
                     <input id="managed_fonction" name="agent_fonction" type="text" value="{{ old('agent_fonction', $editingUser?->agent_fonction) }}">
                 </div>
                 <div>
-                    <label for="managed_telephone">Telephone</label>
+                    <label for="managed_telephone">Téléphone</label>
                     <input id="managed_telephone" name="agent_telephone" type="text" value="{{ old('agent_telephone', $editingUser?->agent_telephone) }}">
                 </div>
                 <div>
@@ -511,7 +511,7 @@
                             </td>
                             <td>
                                 <span class="anbg-badge {{ $row->action === 'login_success' ? 'anbg-badge-success' : 'anbg-badge-neutral' }} px-3">
-                                    {{ $row->action === 'login_success' ? 'Connexion' : 'Deconnexion' }}
+                                    {{ $row->action === 'login_success' ? 'Connexion' : 'Déconnexion' }}
                                 </span>
                             </td>
                             <td>{{ $row->adresse_ip ?: '-' }}</td>
