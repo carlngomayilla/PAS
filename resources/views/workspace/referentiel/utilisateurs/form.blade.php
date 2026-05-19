@@ -100,9 +100,11 @@
                     </div>
                 </div>
 
-                @push('scripts')
-                    <script @cspNonce>
-                        (function () {
+                {{-- Adaptation dynamique : DG → Unité DG visible / autre → Service visible.
+                     Script inline (hors @push) pour garantir l'exécution quel que soit le layout. --}}
+                <script @cspNonce>
+                    (function () {
+                        function initDirectionFieldsToggle() {
                             var directionSelect = document.querySelector('[data-direction-selector]');
                             var serviceField = document.querySelector('[data-service-field]');
                             var serviceSelect = document.querySelector('[data-service-selector]');
@@ -145,9 +147,15 @@
 
                             directionSelect.addEventListener('change', syncFields);
                             syncFields();
-                        })();
-                    </script>
-                @endpush
+                        }
+
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', initDirectionFieldsToggle);
+                        } else {
+                            initDirectionFieldsToggle();
+                        }
+                    })();
+                </script>
 
                 <div id="agent-fields" class="conditional-block mt-4">
                     <div class="form-grid-compact mt-2">
