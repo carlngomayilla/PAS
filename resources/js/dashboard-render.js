@@ -21,6 +21,7 @@ function bootDashboardRender(force = false) {
   }
 
   dashboardBooted = true;
+  window.__anbgDashboardLastPayloadText = payloadNode.textContent || '';
   const payload = parsed.dashboardData || {};
   const roleDashboard = payload.role_dashboard || {};
   const reporting = parsed.reportingAnalytics || {};
@@ -1880,6 +1881,16 @@ if (!window.__anbgDashboardGlobalBindings) {
   });
 
   document.addEventListener('anbg:page-soft-refreshed', () => {
+    // Reboot uniquement si le payload JSON a réellement changé. Sinon les
+    // charts D3/Chart.js ne sont pas retracés inutilement (élimine le flash).
+    const payloadNode = document.getElementById('anbg-dashboard-payload');
+    const nextPayloadText = payloadNode?.textContent || '';
+
+    if (nextPayloadText === window.__anbgDashboardLastPayloadText) {
+      return;
+    }
+
+    window.__anbgDashboardLastPayloadText = nextPayloadText;
     dashboardBooted = false;
     bootDashboardRender(true);
   });

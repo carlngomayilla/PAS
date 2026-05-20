@@ -11,15 +11,28 @@
         return;
     }
 
+    // Plancher à 60s pour éviter tout flash perceptible sur écrans stables.
+    // Le data-auto-refresh du layout reste utile pour désactiver (=0) ou pour
+    // augmenter (ex: 120) mais on n'accepte plus de cadence agressive.
+    const intervalMs = Math.max(seconds, 60) * 1000;
+
     const editableSelector = 'input, textarea, select, [contenteditable="true"]';
     const refreshRegionSelector = '[data-auto-refresh-region]';
+    const skipRefreshAttribute = 'data-skip-refresh';
+
     let hasUnsavedInput = false;
     let refreshInFlight = false;
+    let lastSnapshot = '';
+    let lastScrollAt = 0;
 
     const markUnsavedInput = (event) => {
         if (event.target instanceof Element && event.target.matches(editableSelector)) {
             hasUnsavedInput = true;
         }
+    };
+
+    const markScrollActivity = () => {
+        lastScrollAt = Date.now();
     };
 
     const clearUnsavedState = () => {
@@ -29,6 +42,8 @@
     document.addEventListener('input', markUnsavedInput, true);
     document.addEventListener('change', markUnsavedInput, true);
     document.addEventListener('submit', markUnsavedInput, true);
+    document.addEventListener('scroll', markScrollActivity, { passive: true, capture: true });
+    window.addEventListener('scroll', markScrollActivity, { passive: true });
 
     const isEditing = () => {
         const activeElement = document.activeElement;
@@ -44,12 +59,19 @@
         document.querySelector('[data-messaging-page], [data-disable-soft-refresh="1"]'),
     );
 
+    const isScrollingRecently = () => (Date.now() - lastScrollAt) < 1500;
+
     const canRefresh = () => {
         if (document.visibilityState !== 'visible') {
             return false;
         }
 
-        if (refreshInFlight || hasUnsavedInput || isEditing() || hasOpenOverlay() || hasBlockedPageContext()) {
+        if (refreshInFlight
+            || hasUnsavedInput
+            || isEditing()
+            || hasOpenOverlay()
+            || hasBlockedPageContext()
+            || isScrollingRecently()) {
             return false;
         }
 
@@ -106,20 +128,31 @@
     };
 
     const syncFormState = (currentElement, nextElement) => {
+        // Ne JAMAIS écraser la valeur du champ focus : l'utilisateur est en train de taper.
+        if (currentElement === document.activeElement) {
+            return;
+        }
+
         if (currentElement instanceof HTMLInputElement && nextElement instanceof HTMLInputElement) {
             if (currentElement.type === 'checkbox' || currentElement.type === 'radio') {
-                currentElement.checked = nextElement.checked;
-            } else {
+                if (currentElement.checked !== nextElement.checked) {
+                    currentElement.checked = nextElement.checked;
+                }
+            } else if (currentElement.value !== nextElement.value) {
                 currentElement.value = nextElement.value;
             }
         }
 
         if (currentElement instanceof HTMLTextAreaElement && nextElement instanceof HTMLTextAreaElement) {
-            currentElement.value = nextElement.value;
+            if (currentElement.value !== nextElement.value) {
+                currentElement.value = nextElement.value;
+            }
         }
 
         if (currentElement instanceof HTMLSelectElement && nextElement instanceof HTMLSelectElement) {
-            currentElement.value = nextElement.value;
+            if (currentElement.value !== nextElement.value) {
+                currentElement.value = nextElement.value;
+            }
         }
     };
 
@@ -166,12 +199,33 @@
             return;
         }
 
-        if (currentNode.tagName === 'SCRIPT') {
-            if (currentNode.textContent !== nextNode.textContent) {
-                currentNode.textContent = nextNode.textContent;
-            }
+        // Zone explicitement exclue du soft-refresh : charts, vidéos, iframes,
+        // dashboards… Tout l'arbre est laissé intact.
+        if (currentNode.hasAttribute(skipRefreshAttribute)) {
+            return;
+        }
 
-            syncAttributes(currentNode, nextNode);
+        // Les <script type="application/json"> (ou ld+json, +json…) portent
+        // des payloads de données inertes : on met à jour leur contenu sans
+        // ré-évaluation. Les <script> exécutables sont laissés intacts pour
+        // éviter toute réexécution silencieuse. Les <style> idem (idempotents).
+        if (currentNode.tagName === 'SCRIPT') {
+            const scriptType = (currentNode.getAttribute('type') || '').toLowerCase();
+            const isDataScript = scriptType === 'application/json'
+                || scriptType === 'application/ld+json'
+                || scriptType.endsWith('+json')
+                || scriptType === 'text/plain';
+
+            if (isDataScript) {
+                syncAttributes(currentNode, nextNode);
+                if (currentNode.textContent !== nextNode.textContent) {
+                    currentNode.textContent = nextNode.textContent;
+                }
+            }
+            return;
+        }
+
+        if (currentNode.tagName === 'STYLE') {
             return;
         }
 
@@ -180,22 +234,115 @@
         morphChildren(currentNode, nextNode);
     };
 
+    const captureScrollState = () => ({
+        windowX: window.scrollX,
+        windowY: window.scrollY,
+        scrollables: [...document.querySelectorAll('[data-preserve-scroll]')].map((node) => ({
+            node,
+            top: node.scrollTop,
+            left: node.scrollLeft,
+        })),
+    });
+
+    const restoreScrollState = (state) => {
+        window.scrollTo(state.windowX, state.windowY);
+        state.scrollables.forEach(({ node, top, left }) => {
+            if (node.isConnected) {
+                node.scrollTop = top;
+                node.scrollLeft = left;
+            }
+        });
+    };
+
+    const captureFocusState = () => {
+        const active = document.activeElement;
+        if (!(active instanceof HTMLElement) || active === document.body) {
+            return null;
+        }
+
+        const id = active.getAttribute('id');
+        const name = active.getAttribute('name');
+        if (!id && !name) {
+            return null;
+        }
+
+        let selection = null;
+        if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+            try {
+                selection = {
+                    start: active.selectionStart,
+                    end: active.selectionEnd,
+                    direction: active.selectionDirection,
+                };
+            } catch (_error) {
+                selection = null;
+            }
+        }
+
+        return { id, name, selection };
+    };
+
+    const restoreFocusState = (state) => {
+        if (!state) {
+            return;
+        }
+
+        let target = null;
+        if (state.id) {
+            target = document.getElementById(state.id);
+        }
+        if (!target && state.name) {
+            target = document.querySelector(`[name="${CSS.escape(state.name)}"]`);
+        }
+
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+
+        target.focus({ preventScroll: true });
+
+        if (state.selection && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
+            try {
+                target.setSelectionRange(state.selection.start, state.selection.end, state.selection.direction);
+            } catch (_error) {
+                // Type d'input non sélectionnable : ignorer.
+            }
+        }
+    };
+
+    const snapshotOf = (element) => element instanceof HTMLElement ? element.innerHTML : '';
+
     const swapMainContent = (nextDocument) => {
         const currentMain = document.querySelector(refreshRegionSelector);
         const nextMain = nextDocument.querySelector(refreshRegionSelector);
 
         if (!(currentMain instanceof HTMLElement) || !(nextMain instanceof HTMLElement)) {
-            return false;
+            return { ok: false, changed: false };
         }
 
-        morphNode(currentMain, nextMain);
-        document.title = nextDocument.title || document.title;
-        document.dispatchEvent(new CustomEvent('anbg:page-soft-refreshed'));
-        window.dispatchEvent(new CustomEvent('anbg:theme-changed', {
-            detail: { source: 'soft-refresh' },
-        }));
+        const nextSnapshot = snapshotOf(nextMain);
 
-        return true;
+        // Court-circuit principal : si le HTML est strictement identique au dernier
+        // état morphé, on ne touche pas au DOM → aucun flash, aucun reboot de chart.
+        if (nextSnapshot === lastSnapshot) {
+            return { ok: true, changed: false };
+        }
+
+        const scrollState = captureScrollState();
+        const focusState = captureFocusState();
+
+        morphNode(currentMain, nextMain);
+
+        restoreScrollState(scrollState);
+        restoreFocusState(focusState);
+
+        lastSnapshot = snapshotOf(currentMain);
+
+        if (nextDocument.title && nextDocument.title !== document.title) {
+            document.title = nextDocument.title;
+        }
+
+        return { ok: true, changed: true };
     };
 
     const softRefresh = async () => {
@@ -220,6 +367,8 @@
             }
 
             if (response.redirected && response.url) {
+                // Session expirée ou redirection vers /login : on laisse le browser
+                // naviguer normalement plutôt que de morpher un layout étranger.
                 window.location.assign(response.url);
                 return;
             }
@@ -228,20 +377,37 @@
             const parser = new DOMParser();
             const nextDocument = parser.parseFromString(html, 'text/html');
 
-            if (!swapMainContent(nextDocument)) {
-                window.location.reload();
+            const result = swapMainContent(nextDocument);
+
+            if (!result.ok) {
+                // Région manquante côté serveur : pas de fallback brutal — on retentera
+                // au prochain tick. Un reload ferait flasher pour rien.
                 return;
+            }
+
+            if (result.changed) {
+                document.dispatchEvent(new CustomEvent('anbg:page-soft-refreshed'));
+                window.dispatchEvent(new CustomEvent('anbg:theme-changed', {
+                    detail: { source: 'soft-refresh' },
+                }));
             }
 
             clearUnsavedState();
         } catch (_error) {
-            // Le refresh silencieux reste opportuniste.
+            // Le refresh silencieux reste opportuniste : on n'avertit pas l'utilisateur.
         } finally {
             refreshInFlight = false;
         }
     };
 
+    // Snapshot initial : évite que le premier tick remorphe inutilement le DOM
+    // alors que la page vient d'être rendue par le serveur.
+    const initialMain = document.querySelector(refreshRegionSelector);
+    if (initialMain instanceof HTMLElement) {
+        lastSnapshot = snapshotOf(initialMain);
+    }
+
     window.setInterval(() => {
         void softRefresh();
-    }, seconds * 1000);
+    }, intervalMs);
 })();
