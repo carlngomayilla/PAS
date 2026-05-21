@@ -92,13 +92,22 @@
                     <span class="text-xs text-slate-400">Voir</span>
                 </a>
             @empty
-                <p class="text-sm text-slate-500">Aucun collaborateur lié dans le même périmètre.</p>
+                <x-ui.empty-state
+                    title="Aucun collaborateur"
+                    message="Aucun collaborateur n'est lié dans le même périmètre."
+                    icon="users"
+                    tone="neutral"
+                />
             @endforelse
         </div>
     </div>
 @else
     <div class="messaging-empty-state">
-        <p class="font-medium text-slate-900">Aucun collaborateur sélectionné.</p>
-        <p class="mt-1 text-sm text-slate-500">Sélectionnez un contact pour afficher sa fiche détaillée et lancer un échange.</p>
+        <x-ui.empty-state
+            title="Aucun collaborateur sélectionné"
+            message="Sélectionnez un contact dans l'organigramme pour afficher sa fiche détaillée et lancer un échange."
+            icon="users"
+            tone="info"
+        />
     </div>
 @endif

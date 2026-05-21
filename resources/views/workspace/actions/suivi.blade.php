@@ -733,7 +733,13 @@
                     @endif
                 </article>
             @empty
-                <p class="mb-3 text-slate-600">Aucune sous-action planifiée pour cette action.</p>
+                <x-ui.empty-state
+                    title="Aucune sous-action planifiée"
+                    message="Aucune sous-action n'est planifiée pour cette action. Ajoutez-en depuis la fiche action ou le PTA."
+                    icon="filter"
+                    tone="neutral"
+                    class="mb-3"
+                />
             @endforelse
         </div>
 
@@ -812,7 +818,12 @@
                 @endif
             </article>
         @empty
-            <p class="text-slate-600">Aucune période générée pour cette action.</p>
+            <x-ui.empty-state
+                title="Aucune période générée"
+                message="Le suivi périodique n'a pas encore généré de période pour cette action. Vérifiez la planification (dates de début/fin) et la fréquence d'exécution."
+                icon="clock"
+                tone="neutral"
+            />
         @endforelse
         @endif
     </section>
@@ -880,7 +891,12 @@
                     </button>
                 </form>
             @else
-                <p class="text-slate-600">Aucune action en attente de revue chef pour le moment.</p>
+                <x-ui.empty-state
+                    title="Aucune action en attente"
+                    message="Aucune action n'est en attente de revue chef pour le moment."
+                    icon="check"
+                    tone="success"
+                />
             @endif
         </section>
     @endif
@@ -919,7 +935,14 @@
                     <p class="mt-3 whitespace-pre-line text-slate-700">{{ $entry->message }}</p>
                 </article>
             @empty
-                <p id="discussion-empty" class="text-slate-600">Aucun commentaire ou retour de validation pour le moment.</p>
+                <div id="discussion-empty">
+                    <x-ui.empty-state
+                        title="Aucun commentaire"
+                        message="Aucun commentaire ni retour de validation pour le moment."
+                        icon="inbox"
+                        tone="neutral"
+                    />
+                </div>
             @endforelse
         </div>
     </section>
@@ -1069,7 +1092,12 @@
                 </div>
             </div>
         @empty
-            <div class="py-6 text-center text-sm text-[#667085]">Aucun justificatif importé.</div>
+            <x-ui.empty-state
+                title="Aucun justificatif"
+                message="Aucun justificatif n'a encore été importé sur cette action."
+                icon="file"
+                tone="neutral"
+            />
         @endforelse
     </section>
 

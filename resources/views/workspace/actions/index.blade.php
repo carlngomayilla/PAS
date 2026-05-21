@@ -354,7 +354,14 @@
                                 </div>
                             </a>
                         @empty
-                            <div class="kanban-empty">Aucune action</div>
+                            <div class="kanban-empty">
+                                <x-ui.empty-state
+                                    title="Aucune action"
+                                    message="Aucune action ne correspond à ce statut sur le périmètre courant."
+                                    icon="inbox"
+                                    tone="neutral"
+                                />
+                            </div>
                         @endforelse
                     </div>
                 </div>

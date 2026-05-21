@@ -63,12 +63,14 @@ class DashboardProfileSettings
     public function roleOptions(): array
     {
         return [
-            'agent' => 'Agent',
-            'service' => 'Chef de service',
-            'direction' => 'Direction',
-            'planification' => 'Planification',
-            'dg' => 'DG',
-            'cabinet' => 'Cabinet',
+            User::ROLE_SUPER_ADMIN => 'Super Admin',
+            User::ROLE_ADMIN_FONCTIONNEL => 'Administrateur fonctionnel',
+            User::ROLE_DG => 'Direction Générale',
+            User::ROLE_PLANIFICATION => 'Planification',
+            User::ROLE_DIRECTION => 'Directeur de direction',
+            User::ROLE_SERVICE => 'Chef de service',
+            User::ROLE_AGENT => 'Agent',
+            User::ROLE_AUDITEUR => 'Auditeur',
         ];
     }
 
@@ -247,6 +249,36 @@ class DashboardProfileSettings
     public function defaults(): array
     {
         return [
+            'super_admin' => [
+                'overview_enabled' => true,
+                'comparison_chart_enabled' => true,
+                'status_chart_enabled' => true,
+                'trend_chart_enabled' => true,
+                'support_chart_enabled' => true,
+                'cards' => $this->cards([
+                    'Plateforme',
+                    'Utilisateurs actifs',
+                    'Actions en retard',
+                    'Alertes critiques',
+                    'Audit',
+                    'Parametrage',
+                ]),
+            ],
+            'admin_fonctionnel' => [
+                'overview_enabled' => true,
+                'comparison_chart_enabled' => true,
+                'status_chart_enabled' => true,
+                'trend_chart_enabled' => true,
+                'support_chart_enabled' => true,
+                'cards' => $this->cards([
+                    'Directions actives',
+                    'Services actifs',
+                    'Actions en retard',
+                    'Validations en attente',
+                    'Utilisateurs actifs',
+                    'Alertes critiques',
+                ]),
+            ],
             'agent' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
@@ -334,19 +366,18 @@ class DashboardProfileSettings
                     'Directions en difficulte',
                 ]),
             ],
-            'cabinet' => [
+            'auditeur' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
                 'status_chart_enabled' => true,
                 'trend_chart_enabled' => true,
                 'support_chart_enabled' => true,
                 'cards' => $this->cards([
-                    'Actions sensibles',
+                    'Actions auditees',
                     'Alertes critiques',
                     'Actions en retard',
-                    'Actions validees',
-                    'Validations en attente',
-                    'Directions en difficulte',
+                    'Taux execution',
+                    'Journaux audit',
                 ]),
             ],
         ];
@@ -508,5 +539,3 @@ class DashboardProfileSettings
         }
     }
 }
-
-

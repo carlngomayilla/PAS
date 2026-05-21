@@ -26,27 +26,36 @@ class RoleRegistryService
     {
         return [
             User::ROLE_SUPER_ADMIN => ['label' => 'Super Admin', 'base_role' => User::ROLE_SUPER_ADMIN, 'system' => true],
-            User::ROLE_ADMIN => ['label' => 'Administrateur', 'base_role' => User::ROLE_ADMIN, 'system' => true],
             User::ROLE_ADMIN_FONCTIONNEL => ['label' => 'Administrateur fonctionnel', 'base_role' => User::ROLE_ADMIN_FONCTIONNEL, 'system' => true],
             User::ROLE_DG => ['label' => 'Directeur Général', 'base_role' => User::ROLE_DG, 'system' => true],
             User::ROLE_PLANIFICATION => ['label' => 'Planification', 'base_role' => User::ROLE_PLANIFICATION, 'system' => true],
-            User::ROLE_SCIQ => ['label' => 'SCIQ', 'base_role' => User::ROLE_SCIQ, 'system' => true],
-            User::ROLE_CHEF_UNITE => ['label' => 'Chef unite', 'base_role' => User::ROLE_CHEF_UNITE, 'system' => true],
-            User::ROLE_SCIQ_SUIVI_GLOBAL => ['label' => 'SCIQ — Suivi global', 'base_role' => User::ROLE_SCIQ_SUIVI_GLOBAL, 'system' => true],
-            User::ROLE_CHEF_UNITE_SCIQ => ['label' => 'Chef d’unité SCIQ', 'base_role' => User::ROLE_CHEF_UNITE_SCIQ, 'system' => true],
-            User::ROLE_DGA_SUPERVISION => ['label' => 'DGA — Supervision', 'base_role' => User::ROLE_DGA_SUPERVISION, 'system' => true],
-            User::ROLE_CHEF_UNITE_DGA => ['label' => 'Chef d’unité DGA', 'base_role' => User::ROLE_CHEF_UNITE_DGA, 'system' => true],
-            User::ROLE_CABINET => ['label' => 'Cabinet', 'base_role' => User::ROLE_CABINET, 'system' => true],
-            User::ROLE_COLLABORATEUR => ['label' => 'Collaborateur', 'base_role' => User::ROLE_COLLABORATEUR, 'system' => true],
-            User::ROLE_CABINET_SUPERVISION => ['label' => 'Cabinet — Supervision', 'base_role' => User::ROLE_CABINET_SUPERVISION, 'system' => true],
-            User::ROLE_CHEF_UNITE_CABINET => ['label' => 'Chef d’unité Cabinet', 'base_role' => User::ROLE_CHEF_UNITE_CABINET, 'system' => true],
-            User::ROLE_CHEF_UNITE_UCAS => ['label' => 'Chef d’unité UCAS', 'base_role' => User::ROLE_CHEF_UNITE_UCAS, 'system' => true],
-            User::ROLE_UCAS => ['label' => 'UCAS', 'base_role' => User::ROLE_UCAS, 'system' => true],
             User::ROLE_DIRECTION => ['label' => 'Directeur de direction', 'base_role' => User::ROLE_DIRECTION, 'system' => true],
             User::ROLE_SERVICE => ['label' => 'Chef de service', 'base_role' => User::ROLE_SERVICE, 'system' => true],
             User::ROLE_AGENT => ['label' => 'Agent', 'base_role' => User::ROLE_AGENT, 'system' => true],
             User::ROLE_AUDITEUR => ['label' => 'Auditeur', 'base_role' => User::ROLE_AUDITEUR, 'system' => true],
-            User::ROLE_INVITE_LECTURE => ['label' => 'Invité — Lecture', 'base_role' => User::ROLE_INVITE_LECTURE, 'system' => true],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function deprecatedRoleMap(): array
+    {
+        return [
+            User::ROLE_ADMIN => User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_CABINET => User::ROLE_DG,
+            User::ROLE_CABINET_SUPERVISION => User::ROLE_DG,
+            User::ROLE_CHEF_UNITE_CABINET => User::ROLE_DG,
+            User::ROLE_COLLABORATEUR => User::ROLE_DG,
+            User::ROLE_DGA_SUPERVISION => User::ROLE_DG,
+            User::ROLE_CHEF_UNITE_DGA => User::ROLE_DG,
+            User::ROLE_SCIQ => User::ROLE_PLANIFICATION,
+            User::ROLE_SCIQ_SUIVI_GLOBAL => User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_UNITE_SCIQ => User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_UNITE => User::ROLE_DG,
+            User::ROLE_CHEF_UNITE_UCAS => User::ROLE_DG,
+            User::ROLE_UCAS => User::ROLE_DG,
+            User::ROLE_INVITE_LECTURE => User::ROLE_AUDITEUR,
         ];
     }
 
@@ -117,19 +126,20 @@ class RoleRegistryService
 
     public function baseRole(string $roleCode): string
     {
+        $roleCode = trim($roleCode);
         $role = $this->allRoles()[$roleCode] ?? null;
         if (is_array($role) && is_string($role['base_role'] ?? null)) {
             return (string) $role['base_role'];
         }
 
-        return array_key_exists($roleCode, $this->systemRoles())
-            ? $roleCode
-            : User::ROLE_AGENT;
+        return $this->deprecatedRoleMap()[$roleCode] ?? User::ROLE_AGENT;
     }
 
     public function label(string $roleCode): string
     {
-        return $this->labels()[$roleCode] ?? Str::headline($roleCode);
+        return $this->labels()[$roleCode]
+            ?? $this->labels()[$this->baseRole($roleCode)]
+            ?? Str::headline($roleCode);
     }
 
     /**

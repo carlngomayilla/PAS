@@ -1643,10 +1643,15 @@
         font-family: var(--font-sans);
     }
 
+    /* UI-E — `!important` retire : le `body` global (ligne ~1640) applique
+       deja `background: var(--app-bg)` sans !important. Forcer un !important
+       ici bloquait les composants enfants (modals, dropdowns, panels sombres
+       intentionnels) qui voulaient leur propre fond. Tailwind / classes
+       utilitaires restent prioritaires si besoin. */
     body.admin-theme-scope,
     .admin-theme-scope {
-        background: var(--app-bg) !important;
-        color: var(--app-text) !important;
+        background: var(--app-bg);
+        color: var(--app-text);
     }
 
     .admin-theme-scope *,

@@ -34,7 +34,7 @@ class TestSeeder extends Seeder
             [
                 'name' => 'Administrateur technique',
                 'password' => Hash::make('Pass@12345'),
-                'role' => User::ROLE_ADMIN,
+                'role' => User::ROLE_ADMIN_FONCTIONNEL,
                 'is_agent' => false,
                 'direction_id' => null,
                 'service_id' => null,

@@ -402,7 +402,7 @@ class ReferentielWebController extends Controller
                         User::ROLE_DIRECTION,
                         User::ROLE_PLANIFICATION,
                         User::ROLE_DG,
-                        User::ROLE_ADMIN,
+                        User::ROLE_ADMIN_FONCTIONNEL,
                         User::ROLE_SUPER_ADMIN,
                     ])->count(),
                 'directions_total' => (clone $userSummaryBase)->whereNotNull('direction_id')->distinct()->count('direction_id'),
@@ -720,6 +720,8 @@ class ReferentielWebController extends Controller
                 ]);
             }
 
+            $this->ensureOperationalDirectionAllowed($directionId);
+
             $service = Service::query()->find($serviceId);
             if ($service === null || (int) $service->direction_id !== $directionId) {
                 throw ValidationException::withMessages([
@@ -759,6 +761,8 @@ class ReferentielWebController extends Controller
                 ]);
             }
 
+            $this->ensureOperationalDirectionAllowed($directionId);
+
             if ($serviceId !== null) {
                 throw ValidationException::withMessages([
                     'service_id' => 'Le service doit etre vide pour un profil direction.',
@@ -773,6 +777,28 @@ class ReferentielWebController extends Controller
                 'direction_id' => 'Direction/service doivent etre vides pour ce profil global.',
             ]);
         }
+    }
+
+    private function ensureOperationalDirectionAllowed(int $directionId): void
+    {
+        $direction = Direction::query()->find($directionId);
+        $code = strtoupper(trim((string) ($direction?->code ?? '')));
+
+        if (in_array($code, $this->operationalDirectionCodes(), true)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'direction_id' => 'Les profils direction, service et agent sont reserves aux directions DAF, DSIQ/DSIC et DS.',
+        ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function operationalDirectionCodes(): array
+    {
+        return ['DAF', 'DSIQ', 'DSIC', 'DS'];
     }
 
     private function authUser(Request $request): User
@@ -827,12 +853,7 @@ class ReferentielWebController extends Controller
     private function canManageUsers(User $user): bool
     {
         return $user->hasAnyPermission('users.manage', 'users.manage_roles')
-            || $user->hasRole(
-                User::ROLE_PLANIFICATION,
-                User::ROLE_SCIQ,
-                User::ROLE_SCIQ_SUIVI_GLOBAL,
-                User::ROLE_CHEF_UNITE_SCIQ
-            );
+            || $user->hasRole(User::ROLE_PLANIFICATION);
     }
 
     private function canManageRoles(User $user): bool
@@ -856,10 +877,8 @@ class ReferentielWebController extends Controller
      */
     private function roleOptions(?User $actor = null, ?User $subject = null): array
     {
-        // Liste complète des rôles système (18 entrées) : super_admin, admin,
-        // admin_fonctionnel, dg, planification, sciq_suivi_global, chef_unite_*,
-        // dga_supervision, cabinet, cabinet_supervision, direction, service,
-        // agent, auditeur, invite_lecture.
+        // Liste des rôles métier actifs : super_admin, admin_fonctionnel, dg,
+        // planification, direction, service, agent, auditeur.
         $allRoles = array_values($this->roleRegistry->codes());
 
         // Rôles considérés comme "techniques" — réservés au super admin.
@@ -891,7 +910,7 @@ class ReferentielWebController extends Controller
         }
 
         // Service / chef d'unité UCAS : ne peut affecter que des agents.
-        if ($actor->hasRole(User::ROLE_SERVICE, User::ROLE_CHEF_UNITE_UCAS)) {
+        if ($actor->hasRole(User::ROLE_SERVICE)) {
             return [User::ROLE_AGENT];
         }
 

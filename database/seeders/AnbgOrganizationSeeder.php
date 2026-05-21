@@ -457,19 +457,13 @@ class AnbgOrganizationSeeder extends Seeder
     private function roleFromWorkbook(string $roleSlug, ?string $serviceCode): string
     {
         return match ($roleSlug) {
-            'admin' => User::ROLE_ADMIN,
+            'admin' => User::ROLE_ADMIN_FONCTIONNEL,
             'super_admin' => User::ROLE_SUPER_ADMIN,
             'dg' => User::ROLE_DG,
             'directeur' => User::ROLE_DIRECTION,
             'chef_service' => User::ROLE_SERVICE,
-            'chef_unite' => match ($serviceCode) {
-                'UCAS' => User::ROLE_CHEF_UNITE_UCAS,
-                'SCIQ' => User::ROLE_CHEF_UNITE_SCIQ,
-                default => User::ROLE_CHEF_UNITE,
-            },
-            'collaborateur' => User::ROLE_COLLABORATEUR,
-            'sciq' => User::ROLE_SCIQ,
-            'ucas' => User::ROLE_UCAS,
+            'chef_unite', 'collaborateur', 'ucas' => User::ROLE_DG,
+            'sciq' => User::ROLE_PLANIFICATION,
             'planification' => User::ROLE_PLANIFICATION,
             default => User::ROLE_AGENT,
         };
@@ -578,19 +572,13 @@ class AnbgOrganizationSeeder extends Seeder
     {
         $prefix = match ($role) {
             User::ROLE_SUPER_ADMIN => 'SAD',
-            User::ROLE_ADMIN => 'ADM',
+            User::ROLE_ADMIN_FONCTIONNEL => 'ADF',
             User::ROLE_DG => 'DG',
-            User::ROLE_CABINET => 'CAB',
-            User::ROLE_COLLABORATEUR => 'COL',
-            User::ROLE_SCIQ => 'SCIQ',
-            User::ROLE_UCAS => 'UCAS',
             User::ROLE_PLANIFICATION => 'PLA',
-            User::ROLE_CHEF_UNITE => 'CHU',
-            User::ROLE_CHEF_UNITE_SCIQ => 'SCIQ',
-            User::ROLE_CHEF_UNITE_UCAS => 'UCAS',
             User::ROLE_DIRECTION => 'DIR',
             User::ROLE_SERVICE => 'SRV',
             User::ROLE_AGENT => 'AGT',
+            User::ROLE_AUDITEUR => 'AUD',
             default => 'USR',
         };
 

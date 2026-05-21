@@ -52,7 +52,12 @@
                     </p>
                 </article>
             @empty
-                <p class="text-[#667085]">Aucune interaction configurée.</p>
+                <x-ui.empty-state
+                    title="Aucune interaction configurée"
+                    message="Aucune interaction n'est définie pour votre profil. Contactez votre administrateur pour en ajouter."
+                    icon="users"
+                    tone="info"
+                />
             @endforelse
         </div>
     </section>

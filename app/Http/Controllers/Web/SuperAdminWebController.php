@@ -424,14 +424,14 @@ class SuperAdminWebController extends Controller
         $this->denyUnlessSuperAdmin($user);
 
         $roles = $this->rolePermissionSettings->roles();
-        $selectedRole = (string) $request->string('simulate_role', User::ROLE_ADMIN);
+        $selectedRole = (string) $request->string('simulate_role', User::ROLE_ADMIN_FONCTIONNEL);
         if (! array_key_exists($selectedRole, $roles)) {
-            $selectedRole = User::ROLE_ADMIN;
+            $selectedRole = User::ROLE_ADMIN_FONCTIONNEL;
         }
 
-        $compareLeftRole = (string) $request->string('compare_left_role', User::ROLE_ADMIN);
+        $compareLeftRole = (string) $request->string('compare_left_role', User::ROLE_ADMIN_FONCTIONNEL);
         if (! array_key_exists($compareLeftRole, $roles)) {
-            $compareLeftRole = User::ROLE_ADMIN;
+            $compareLeftRole = User::ROLE_ADMIN_FONCTIONNEL;
         }
 
         $compareRightRole = (string) $request->string('compare_right_role', User::ROLE_DIRECTION);
@@ -609,7 +609,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.roles.edit', [
-                'simulate_role' => (string) $request->string('simulate_role', User::ROLE_ADMIN),
+                'simulate_role' => (string) $request->string('simulate_role', User::ROLE_ADMIN_FONCTIONNEL),
             ])
             ->with('success', 'Roles et permissions mis a jour.');
     }
@@ -1143,7 +1143,7 @@ class SuperAdminWebController extends Controller
                         : null,
                 ];
 
-                if (in_array($baseRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET], true)) {
+                if (in_array($baseRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_AUDITEUR], true)) {
                     $payload['direction_id'] = null;
                     $payload['service_id'] = null;
                 } elseif ($baseRole === User::ROLE_DIRECTION) {
@@ -1277,7 +1277,7 @@ class SuperAdminWebController extends Controller
                             'custom_role_code' => $customRoleCode,
                             'is_agent' => $baseRole === User::ROLE_AGENT,
                         ];
-                        if (in_array($baseRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET], true)) {
+                        if (in_array($baseRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_AUDITEUR], true)) {
                             $payload['direction_id'] = null;
                             $payload['service_id'] = null;
                         } elseif ($baseRole === User::ROLE_DIRECTION) {
@@ -2736,6 +2736,10 @@ class SuperAdminWebController extends Controller
             ]);
         }
 
+        if (in_array($role, [User::ROLE_DIRECTION, User::ROLE_SERVICE, User::ROLE_AGENT], true) && $directionId !== null) {
+            $this->ensureOperationalDirectionAllowed($directionId);
+        }
+
         if (in_array($role, [User::ROLE_SERVICE, User::ROLE_AGENT], true) && ($directionId === null || $serviceId === null)) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'service_id' => 'Ce profil doit etre rattache a un service.',
@@ -2757,7 +2761,7 @@ class SuperAdminWebController extends Controller
         $directionId = isset($validated['direction_id']) ? (int) $validated['direction_id'] : null;
         $serviceId = isset($validated['service_id']) ? (int) $validated['service_id'] : null;
 
-        if (in_array($role, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET], true)) {
+        if (in_array($role, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_AUDITEUR], true)) {
             $directionId = null;
             $serviceId = null;
         } elseif ($role === User::ROLE_DIRECTION) {
@@ -2783,6 +2787,28 @@ class SuperAdminWebController extends Controller
             'suspended_until' => $suspendedUntil,
             'suspension_reason' => $suspendedUntil !== null ? (($validated['suspension_reason'] ?? null) ?: null) : null,
         ];
+    }
+
+    private function ensureOperationalDirectionAllowed(int $directionId): void
+    {
+        $direction = Direction::query()->find($directionId);
+        $code = strtoupper(trim((string) ($direction?->code ?? '')));
+
+        if (in_array($code, $this->operationalDirectionCodes(), true)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'direction_id' => 'Les profils direction, service et agent sont reserves aux directions DAF, DSIQ/DSIC et DS.',
+        ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function operationalDirectionCodes(): array
+    {
+        return ['DAF', 'DSIQ', 'DSIC', 'DS'];
     }
 
     /**
@@ -3166,13 +3192,13 @@ class SuperAdminWebController extends Controller
     {
         $permissions = $this->rolePermissionSettings->forRole($role);
         $baseRole = $this->roleRegistry->baseRole($role);
-        $isTechnicalAdmin = in_array($baseRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN], true);
+        $isTechnicalAdmin = in_array($baseRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL], true);
         $isPlanification = $baseRole === User::ROLE_PLANIFICATION;
-        $isCabinet = $baseRole === User::ROLE_CABINET;
+        $isAuditor = $baseRole === User::ROLE_AUDITEUR;
 
         return collect($this->workspaceModuleSettings->configuredModules())
             ->sortBy('order')
-            ->filter(function (array $module) use ($permissions, $baseRole, $isTechnicalAdmin, $isPlanification, $isCabinet): bool {
+            ->filter(function (array $module) use ($permissions, $baseRole, $isTechnicalAdmin, $isPlanification, $isAuditor): bool {
                 if (! ($module['enabled'] ?? false) && ($module['code'] ?? null) !== 'super_admin') {
                     return false;
                 }
@@ -3184,7 +3210,7 @@ class SuperAdminWebController extends Controller
                     'execution' => in_array('planning.read', $permissions, true) || $baseRole === User::ROLE_AGENT,
                     'referentiel' => ($isTechnicalAdmin || $isPlanification) && collect(['referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles'])
                         ->contains(fn (string $permission): bool => in_array($permission, $permissions, true)),
-                    'audit' => ($isTechnicalAdmin || $isCabinet) && in_array('audit.read', $permissions, true),
+                    'audit' => ($isTechnicalAdmin || $isAuditor || $baseRole === User::ROLE_DG) && in_array('audit.read', $permissions, true),
                     'api_docs' => $isTechnicalAdmin && in_array('api_docs.read', $permissions, true),
                     'retention' => $isTechnicalAdmin && collect(['retention.read', 'retention.manage'])
                         ->contains(fn (string $permission): bool => in_array($permission, $permissions, true)),
