@@ -334,7 +334,7 @@
                         <div
                             id="header-messaging-menu"
                             data-messages-endpoint="{{ route('workspace.messaging.dropdown') }}"
-                            class="admin-dropdown-panel admin-navbar-dropdown admin-navbar-messaging-dropdown absolute right-0 z-40 mt-2 hidden w-[360px] overflow-hidden border border-[#d8ecf8] bg-white"
+                            class="admin-dropdown-panel admin-navbar-dropdown admin-navbar-messaging-dropdown absolute right-0 z-40 mt-2 hidden w-[min(22rem,calc(100vw-2rem))] max-h-[72vh] overflow-hidden border border-[#d8ecf8] bg-white"
                         >
                             <div class="admin-dropdown-head flex items-center justify-between border-b border-[#d8ecf8] px-3 py-2">
                                 <div>
@@ -426,7 +426,7 @@
                         <div
                             id="header-notifications-menu"
                             data-alerts-endpoint="{{ route('workspace.alertes.dropdown') }}"
-                            class="admin-dropdown-panel admin-navbar-dropdown admin-navbar-notifications-dropdown absolute right-0 z-40 mt-2 hidden w-[340px] overflow-hidden border border-[#d8ecf8] bg-white"
+                            class="admin-dropdown-panel admin-navbar-dropdown admin-navbar-notifications-dropdown absolute right-0 z-40 mt-2 hidden w-[min(22rem,calc(100vw-2rem))] max-h-[72vh] overflow-hidden border border-[#d8ecf8] bg-white"
                         >
                             <div class="admin-dropdown-head admin-dropdown-alert-head border-b border-[#d8ecf8] px-3 py-2">
                                 <div class="flex items-center justify-between gap-2">

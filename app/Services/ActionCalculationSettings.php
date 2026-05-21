@@ -13,6 +13,13 @@ class ActionCalculationSettings
 {
     public const OFFICIAL_SCOPE_ALL_VISIBLE = 'all_visible';
     public const STATISTICAL_SCOPE_ALL_VISIBLE = self::OFFICIAL_SCOPE_ALL_VISIBLE;
+
+    // A10 — Politique par defaut : exclut les actions rejetees du calcul des
+    // KPI consolides. Les rejetees restent visibles dans le workflow mais ne
+    // gonflent plus les statistiques officielles. Le super-admin peut basculer
+    // sur STATISTICAL_SCOPE_ALL_VISIBLE pour retrouver l ancien comportement.
+    public const SCOPE_EXCLUDE_REJECTED = 'exclude_rejected';
+
     public const SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS = 'actions_official_validation_status';
     public const SETTING_ACTIONS_STATISTICAL_SCOPE = 'actions_statistical_scope';
 
@@ -58,14 +65,19 @@ class ActionCalculationSettings
     public function defaults(): array
     {
         return [
-            self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => self::OFFICIAL_SCOPE_ALL_VISIBLE,
-            self::SETTING_ACTIONS_STATISTICAL_SCOPE => self::STATISTICAL_SCOPE_ALL_VISIBLE,
+            // A10 — Defaut institutionnel : exclure les actions rejetees.
+            self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => self::SCOPE_EXCLUDE_REJECTED,
+            self::SETTING_ACTIONS_STATISTICAL_SCOPE => self::SCOPE_EXCLUDE_REJECTED,
         ];
     }
 
     public function statisticalScope(): string
     {
-        return self::STATISTICAL_SCOPE_ALL_VISIBLE;
+        $value = (string) ($this->get(self::SETTING_ACTIONS_STATISTICAL_SCOPE, self::SCOPE_EXCLUDE_REJECTED) ?? self::SCOPE_EXCLUDE_REJECTED);
+
+        return array_key_exists($value, $this->statisticalScopeOptions())
+            ? $value
+            : self::SCOPE_EXCLUDE_REJECTED;
     }
 
     /**
@@ -74,7 +86,8 @@ class ActionCalculationSettings
     public function statisticalScopeOptions(): array
     {
         return [
-            self::STATISTICAL_SCOPE_ALL_VISIBLE => 'Toutes les actions visibles',
+            self::SCOPE_EXCLUDE_REJECTED => 'Toutes les actions visibles, sauf les rejetées (recommandé)',
+            self::STATISTICAL_SCOPE_ALL_VISIBLE => 'Toutes les actions visibles (y compris rejetées)',
         ];
     }
 
@@ -100,6 +113,13 @@ class ActionCalculationSettings
                 ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
+            // A10 — Statuts comptes dans les KPI quand on exclut les rejetees.
+            self::SCOPE_EXCLUDE_REJECTED => [
+                ActionTrackingService::VALIDATION_NON_SOUMISE,
+                ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ],
             ActionTrackingService::VALIDATION_SOUMISE_CHEF => [
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
@@ -113,6 +133,23 @@ class ActionCalculationSettings
         };
     }
 
+    /**
+     * Statuts de validation que la politique courante REJETTE explicitement
+     * des agregats (KPI consolides, reporting officiel).
+     *
+     * @return list<string>
+     */
+    public function rejectedValidationStatuses(): array
+    {
+        return match ($this->statisticalScope()) {
+            self::SCOPE_EXCLUDE_REJECTED => [
+                ActionTrackingService::VALIDATION_REJETEE_CHEF,
+                ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+            ],
+            default => [],
+        };
+    }
+
     public function statisticalScopeLabel(): string
     {
         return $this->statisticalScopeOptions()[$this->statisticalScope()]
@@ -121,12 +158,16 @@ class ActionCalculationSettings
 
     public function statisticalScopeSummary(): string
     {
-        return 'Les statistiques et les KPI sont calcules sur toutes les actions visibles. Les validations chef et direction restent purement workflow.';
+        return $this->statisticalScope() === self::SCOPE_EXCLUDE_REJECTED
+            ? 'Les statistiques et les KPI excluent les actions rejetees (par le chef ou la direction). Les autres validations restent comptees.'
+            : 'Les statistiques et les KPI sont calcules sur toutes les actions visibles. Les validations chef et direction restent purement workflow.';
     }
 
     public function statisticalAverageSummary(): string
     {
-        return 'Moyenne calculee sur toutes les actions visibles.';
+        return $this->statisticalScope() === self::SCOPE_EXCLUDE_REJECTED
+            ? 'Moyenne calculee sur toutes les actions visibles, hors actions rejetees.'
+            : 'Moyenne calculee sur toutes les actions visibles.';
     }
 
     /**
@@ -139,7 +180,15 @@ class ActionCalculationSettings
 
     public function applyStatisticalScope(Builder $query, string $column = 'statut_validation'): void
     {
-        unset($query, $column);
+        // A10 — Filtre SQL pour exclure les statuts rejetes des agregats
+        // officiels. Si la politique active autorise tous les statuts
+        // (OFFICIAL_SCOPE_ALL_VISIBLE), aucun filtre n est applique.
+        $rejected = $this->rejectedValidationStatuses();
+        if ($rejected === []) {
+            return;
+        }
+
+        $query->whereNotIn($column, $rejected);
     }
 
     /**
@@ -148,9 +197,17 @@ class ActionCalculationSettings
      */
     public function filterStatistical(Collection $items, string $field = 'statut_validation'): Collection
     {
-        unset($field);
+        // A10 — Pendant in-memory du filtre SQL : exclut les actions rejetees
+        // des collections agregees cote PHP. Aucun filtre si la politique active
+        // autorise tous les statuts.
+        $rejected = $this->rejectedValidationStatuses();
+        if ($rejected === []) {
+            return $items->values();
+        }
 
-        return $items->values();
+        return $items
+            ->reject(fn ($item): bool => in_array((string) data_get($item, $field, ''), $rejected, true))
+            ->values();
     }
 
     /**
@@ -161,10 +218,10 @@ class ActionCalculationSettings
     {
         $status = (string) ($payload[self::SETTING_ACTIONS_STATISTICAL_SCOPE]
             ?? $payload[self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS]
-            ?? self::STATISTICAL_SCOPE_ALL_VISIBLE);
+            ?? self::SCOPE_EXCLUDE_REJECTED);
 
         if (! array_key_exists($status, $this->statisticalScopeOptions())) {
-            $status = self::STATISTICAL_SCOPE_ALL_VISIBLE;
+            $status = self::SCOPE_EXCLUDE_REJECTED;
         }
 
         foreach ([self::SETTING_ACTIONS_STATISTICAL_SCOPE, self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS] as $key) {
@@ -264,5 +321,3 @@ class ActionCalculationSettings
         }
     }
 }
-
-

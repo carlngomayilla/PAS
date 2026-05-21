@@ -20,21 +20,21 @@
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Logs total</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['logs_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Dernieres 24h</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['logs_last_24h'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Dernières 24h</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['logs_last_24h'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Actions Super Admin</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['super_admin_changes'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Changements sensibles</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['sensitive_changes'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Actions organisation</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['organization_actions'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Modules touches</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['modules_touched'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Modules touchés</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['modules_touched'] }}</p></article>
     </section>
 
     <section class="showcase-panel mb-4">
         <h2>Contrôle de cohérence</h2>
-        <div class="mt-4 overflow-x-auto">
-            <table class="min-w-full text-sm">
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
-                        <th class="px-3 py-2 text-left">Controle</th>
-                        <th class="px-3 py-2 text-left">Resultat</th>
+                        <th class="px-3 py-2 text-left">Contrôle</th>
+                        <th class="px-3 py-2 text-left">Résultat</th>
                         <th class="px-3 py-2 text-left">Diagnostic</th>
                     </tr>
                 </thead>
@@ -56,9 +56,9 @@
     </section>
 
     <section class="ui-card">
-        <h2>Dernieres operations sensibles</h2>
-        <div class="mt-4 overflow-x-auto">
-            <table class="min-w-full text-sm">
+        <h2>Dernières opérations sensibles</h2>
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
                         <th class="px-3 py-2 text-left">Date</th>
@@ -78,7 +78,17 @@
                             <td class="px-3 py-2">{{ $audit->adresse_ip ?? '-' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-3 py-4 text-slate-500">Aucune operation journalisee.</td></tr>
+                        <tr>
+                            <td colspan="5">
+                                <x-ui.empty-state
+                                    title="Aucune opération journalisée"
+                                    message="Les opérations sensibles apparaîtront ici dès qu'elles seront disponibles."
+                                    icon="clock"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

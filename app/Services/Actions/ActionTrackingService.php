@@ -399,8 +399,7 @@ class ActionTrackingService
             $closureData['cloture_le'] = now();
         }
 
-        $action->fill($closureData);
-        $action->save();
+        $action->forceFill($closureData)->save();
 
         $this->createLogIfMissingToday(
             $action,
@@ -453,7 +452,7 @@ class ActionTrackingService
         $isApproved = $decision === 'valider';
         $directionEnabled = $this->workflowSettings->directionValidationEnabled();
 
-        $action->fill([
+        $action->forceFill([
             'statut_validation' => $isApproved
                 ? self::VALIDATION_VALIDEE_CHEF
                 : self::VALIDATION_REJETEE_CHEF,
@@ -465,8 +464,7 @@ class ActionTrackingService
             'evalue_le' => now(),
             'evaluation_note' => $payload['evaluation_note'] ?? null,
             'evaluation_commentaire' => $payload['evaluation_commentaire'] ?? null,
-        ]);
-        $action->save();
+        ])->save();
 
         $this->createLogIfMissingToday(
             $action,
@@ -514,7 +512,7 @@ class ActionTrackingService
         $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
         $isApproved = $decision === 'valider';
 
-        $action->fill([
+        $action->forceFill([
             'statut_validation' => $isApproved ? self::VALIDATION_VALIDEE_DIRECTION : self::VALIDATION_REJETEE_DIRECTION,
             'validation_hierarchique' => $isApproved,
             'direction_valide_par' => $actor?->id,
@@ -573,10 +571,9 @@ class ActionTrackingService
     public function syncFinancingRequest(Action $action, ?User $actor = null): Action
     {
         if (! (bool) $action->financement_requis) {
-            $action->fill([
+            $action->forceFill([
                 'financement_statut' => Action::FINANCEMENT_NON_REQUIS,
-            ]);
-            $action->save();
+            ])->save();
 
             return $action->fresh();
         }
@@ -629,7 +626,7 @@ class ActionTrackingService
         $decision = (string) ($payload['decision_financement'] ?? self::FINANCEMENT_DECISION_REJETER);
         $approved = $decision === self::FINANCEMENT_DECISION_VALIDER;
 
-        $action->fill([
+        $action->forceFill([
             'financement_statut' => $approved ? Action::FINANCEMENT_VALIDE_DAF : Action::FINANCEMENT_REJETE_DAF,
             'financement_daf_par' => $actor->id,
             'financement_daf_le' => now(),
@@ -692,14 +689,13 @@ class ActionTrackingService
         $decision = (string) ($payload['decision_financement'] ?? self::FINANCEMENT_DECISION_REFUSER);
         $approved = $decision === self::FINANCEMENT_DECISION_ACCORDER;
 
-        $action->fill([
+        $action->forceFill([
             'financement_statut' => $approved ? Action::FINANCEMENT_ACCORDE_DG : Action::FINANCEMENT_REFUSE_DG,
             'financement_dg_par' => $actor->id,
             'financement_dg_le' => now(),
             'financement_dg_decision' => $decision,
             'financement_dg_commentaire' => $payload['commentaire_financement'] ?? null,
-        ]);
-        $action->save();
+        ])->save();
 
         $this->createLogIfMissingToday(
             $action,
@@ -743,6 +739,25 @@ class ActionTrackingService
      * Met à jour : progression réelle/théorique, KPI global, qualité, délai, performance.
      */
     public function refreshActionMetrics(Action $action, ?Carbon $referenceDate = null): Action
+    {
+        // A28 — Wrapper toute la chaine recalcul (refresh + structured) dans
+        // une transaction avec lockForUpdate sur l action courante : evite la
+        // race condition ou une sous-action sauvegarde pendant le calcul vienne
+        // corrompre les KPI consolides (lecture partielle / KPI tronques).
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($action, $referenceDate): Action {
+            // Lock pessimiste sur la ligne action courante (PG / MySQL). En
+            // SQLite, lockForUpdate est silencieusement ignore mais la
+            // transaction reste serialisable au niveau base.
+            \App\Models\Action::query()
+                ->whereKey($action->id)
+                ->lockForUpdate()
+                ->first();
+
+            return $this->refreshActionMetricsInternal($action, $referenceDate);
+        });
+    }
+
+    private function refreshActionMetricsInternal(Action $action, ?Carbon $referenceDate): Action
     {
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
         $action->loadMissing('weeks', 'sousActions.justificatifs', 'actionKpi');
@@ -801,14 +816,13 @@ class ActionTrackingService
         $legacyStatus = $this->mapLegacyStatus($status);
         $beforeStatus = (string) $action->statut_dynamique;
 
-        $action->fill([
+        $action->forceFill([
             'date_echeance' => $action->date_echeance ?? $action->date_fin,
             'progression_reelle' => $realProgress,
             'progression_theorique' => $theoreticalProgress,
             'statut_dynamique' => $status,
             'statut' => $legacyStatus,
-        ]);
-        $action->save();
+        ])->save();
 
         if ($status === self::STATUS_SUSPENDU) {
             $kpis = $this->frozenActionKpis($action)
@@ -851,13 +865,12 @@ class ActionTrackingService
         );
 
         $tauxRealisation = round(max(0.0, min(100.0, (float) ($kpis['kpi_performance'] ?? 0))), 2);
-        $action->fill([
+        $action->forceFill([
             'taux_performance' => $kpis['kpi_performance'] ?? null,
             'taux_conformite' => $kpis['kpi_conformite'] ?? null,
             'taux_delai' => $kpis['kpi_delai'] ?? null,
             'taux_realisation_global' => $tauxRealisation,
-        ]);
-        $action->save();
+        ])->save();
 
         if ($beforeStatus !== '' && $beforeStatus !== $status) {
             $this->createLogIfMissingToday(
@@ -955,8 +968,7 @@ class ActionTrackingService
             }
         }
 
-        $action->fill($updates);
-        $action->save();
+        $action->forceFill($updates)->save();
 
         $quantitativeBase = $action->usesQuantitativeProgress()
             ? (float) ($metrics['quantite_realisee'] ?? 0)
@@ -990,13 +1002,12 @@ class ActionTrackingService
 
         $tauxRealisation = round(max(0.0, min(100.0, (float) ($kpis['kpi_performance'] ?? 0))), 2);
 
-        $action->fill([
+        $action->forceFill([
             'taux_performance' => $kpis['kpi_performance'] ?? null,
             'taux_conformite' => $kpis['kpi_conformite'] ?? null,
             'taux_delai' => $kpis['kpi_delai'] ?? null,
             'taux_realisation_global' => $tauxRealisation,
-        ]);
-        $action->save();
+        ])->save();
 
         if ($beforeStatus !== '' && $beforeStatus !== $status) {
             $this->createLogIfMissingToday(

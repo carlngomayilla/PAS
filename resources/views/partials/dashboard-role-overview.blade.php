@@ -187,8 +187,8 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
-            <div class="overflow-x-auto">
-                <table class="dashboard-table">
+            <div class="app-table-wrapper">
+                <table class="app-table data-table">
                     <thead><tr><th>Action</th><th>PTA</th><th>Échéance</th><th>Statut</th><th>Progression</th><th>Validation</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
@@ -201,7 +201,11 @@
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($validationTone($row['validation_status'])) }}">{{ $validationStatusLabel($row['validation_status']) }}</span></td>
                             </tr>
                         @empty
-                            <tr><td colspan="6">Aucune action prioritaire disponible.</td></tr>
+                            <tr>
+                                <td colspan="6">
+                                    <x-ui.empty-state title="Aucune action prioritaire" message="Aucune action prioritaire disponible." icon="filter" />
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -213,8 +217,8 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
-            <div class="overflow-x-auto">
-                <table class="dashboard-table">
+            <div class="app-table-wrapper">
+                <table class="app-table data-table">
                     <thead><tr><th>Action</th><th>Agent</th><th>Date soumission</th><th>Statut</th><th>Progression</th><th>Retard</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
@@ -227,7 +231,11 @@
                                 <td>{{ (int) ($row['retard_jours'] ?? 0) }}j</td>
                             </tr>
                         @empty
-                            <tr><td colspan="6">Aucune action à valider pour le moment.</td></tr>
+                            <tr>
+                                <td colspan="6">
+                                    <x-ui.empty-state title="Aucune validation" message="Aucune action à valider pour le moment." icon="check" />
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -239,8 +247,8 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} services</span>
             </div>
-            <div class="overflow-x-auto">
-                <table class="dashboard-table">
+            <div class="app-table-wrapper">
+                <table class="app-table data-table">
                     <thead><tr><th>Service</th><th>Actions</th><th>Achevées</th><th>Retard</th><th>Validées</th><th>Score</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
@@ -253,7 +261,11 @@
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 1) }}</span></td>
                             </tr>
                         @empty
-                            <tr><td colspan="6">Aucun service disponible pour cette direction.</td></tr>
+                            <tr>
+                                <td colspan="6">
+                                    <x-ui.empty-state title="Aucun service" message="Aucun service disponible pour cette direction." icon="users" />
+                                </td>
+                            </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -265,8 +277,8 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} directions</span>
             </div>
-            <div class="overflow-x-auto">
-                <table class="dashboard-table">
+            <div class="app-table-wrapper">
+                <table class="app-table data-table">
                     <thead><tr><th>Direction</th><th>Actions</th><th>Validées</th><th>Exéc.</th><th>Taux validation</th><th>Retards</th><th>Score</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
@@ -280,7 +292,11 @@
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 1) }}</span></td>
                             </tr>
                         @empty
-                            <tr><td colspan="7">Aucune direction disponible.</td></tr>
+                            <tr>
+                                <td colspan="7">
+                                    <x-ui.empty-state title="Aucune direction" message="Aucune direction disponible." icon="users" />
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -292,8 +308,8 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} directions</span>
             </div>
-            <div class="overflow-x-auto">
-                <table class="dashboard-table">
+            <div class="app-table-wrapper">
+                <table class="app-table data-table">
                     <thead><tr><th>Direction</th><th>Actions</th><th>Achevées</th><th>Retard</th><th>Validées</th><th>Score</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
@@ -306,7 +322,11 @@
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 1) }}</span></td>
                             </tr>
                         @empty
-                            <tr><td colspan="6">Aucune direction disponible.</td></tr>
+                            <tr>
+                                <td colspan="6">
+                                    <x-ui.empty-state title="Aucune direction" message="Aucune direction disponible." icon="users" />
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -318,8 +338,8 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
-            <div class="overflow-x-auto">
-                <table class="dashboard-table">
+            <div class="app-table-wrapper">
+                <table class="app-table data-table">
                     <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Responsable</th><th>Validation</th><th>Soumise le</th></tr></thead>
                     <tbody>
                         @forelse ($primaryRows as $row)
@@ -332,7 +352,11 @@
                                 <td>{{ $row['soumise_le'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="6">Aucune validation en attente sur ce périmètre.</td></tr>
+                            <tr>
+                                <td colspan="6">
+                                    <x-ui.empty-state title="Aucune validation" message="Aucune validation en attente sur ce périmètre." icon="check" />
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -352,8 +376,8 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead><tr><th>Action</th><th>Échéance</th><th>Retard</th><th>Progression</th><th>Validation</th><th>Accès</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
@@ -366,7 +390,11 @@
                             <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="6">Aucune action en retard sur le périmètre courant.</td></tr>
+                        <tr>
+                            <td colspan="6">
+                                <x-ui.empty-state title="Aucun retard" message="Aucune action en retard sur le périmètre courant." icon="clock" />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -378,8 +406,8 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} agents</span>
         </div>
-        <div class="overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead><tr><th>Agent</th><th>Actions</th><th>Achevées</th><th>Retard</th><th>Taux exécution</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
@@ -391,7 +419,11 @@
                             <td>{{ number_format((float) ($row['taux_execution'] ?? 0), 1) }}%</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5">Aucune performance agent disponible.</td></tr>
+                        <tr>
+                            <td colspan="5">
+                                <x-ui.empty-state title="Aucune performance" message="Aucune performance agent disponible." icon="chart" />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -403,8 +435,8 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead><tr><th>Action</th><th>Service</th><th>Responsable</th><th>Retard</th><th>Validation</th><th>Performance d'exécution</th><th>Accès</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
@@ -418,7 +450,11 @@
                             <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="7">Aucune action critique sur le périmètre courant.</td></tr>
+                        <tr>
+                            <td colspan="7">
+                                <x-ui.empty-state title="Aucune action critique" message="Aucune action critique sur le périmètre courant." icon="alert" />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -430,8 +466,8 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead><tr><th>Direction</th><th>Service critique</th><th>Retard</th><th>Taux validation</th><th>Score</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
@@ -443,7 +479,11 @@
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['score'] ?? 0))) }}">{{ number_format((float) ($row['score'] ?? 0), 1) }}</span></td>
                         </tr>
                     @empty
-                        <tr><td colspan="5">Aucune direction en difficulté actuellement.</td></tr>
+                        <tr>
+                            <td colspan="5">
+                                <x-ui.empty-state title="Aucune difficulté" message="Aucune direction en difficulté actuellement." icon="chart" />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -455,8 +495,8 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Performance d'exécution</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
@@ -469,7 +509,11 @@
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone((float) ($row['performance_execution'] ?? 0))) }}">{{ number_format((float) ($row['performance_execution'] ?? 0), 1) }}</span></td>
                         </tr>
                     @empty
-                        <tr><td colspan="6">Aucune action critique validee.</td></tr>
+                        <tr>
+                            <td colspan="6">
+                                <x-ui.empty-state title="Aucune action validée" message="Aucune action critique validée." icon="check" />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -481,8 +525,8 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Performance d'exécution</th><th>Accès</th></tr></thead>
                 <tbody>
                     @forelse ($secondaryRows as $row)
@@ -496,7 +540,11 @@
                             <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="7">Aucune alerte critique transverse.</td></tr>
+                        <tr>
+                            <td colspan="7">
+                                <x-ui.empty-state title="Aucune alerte critique" message="Aucune alerte critique transverse." icon="alert" />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

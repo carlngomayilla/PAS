@@ -16,7 +16,7 @@
                     <form method="POST" action="{{ route('workspace.retention.run') }}">
                         @csrf
                         <input type="hidden" name="mode" value="dry-run">
-                        <button class="btn btn-blue" type="submit">Lancer dry-run</button>
+                        <button class="btn btn-secondary" type="submit">Lancer dry-run</button>
                     </form>
                     <form method="POST" action="{{ route('workspace.retention.run') }}" data-confirm-message="Exécuter l'archivage non destructif maintenant ?" data-confirm-tone="warning" data-confirm-label="Exécuter">
                         @csrf
@@ -54,8 +54,8 @@
 
     <section class="ui-card">
         <h2>Dernieres archives</h2>
-        <div class="table-wrap">
-            <table>
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -84,7 +84,15 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-slate-600">Aucune archive enregistree.</td>
+                            <td colspan="6">
+                                <x-ui.empty-state
+                                    title="Aucune archive enregistrée"
+                                    message="Les archives non destructives apparaîtront ici après exécution."
+                                    icon="file"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

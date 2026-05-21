@@ -793,7 +793,7 @@ class SuperAdminWebController extends Controller
                 ->get(),
             'userRows' => $users,
             'loginHistory' => $loginHistory,
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
+            'directionOptions' => Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
             'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
@@ -906,7 +906,9 @@ class SuperAdminWebController extends Controller
             $payload = $this->normalizeManagedUserPayload($validated, $request);
             $plainPassword = (string) ($validated['password'] ?? '');
 
-            $managedUser = User::query()->create([
+            // forceCreate : role / direction_id / service_id / unite_dg_id / is_active
+            // ne sont plus mass-assignables (cf. A02). Voie reservee au super-admin.
+            $managedUser = User::query()->forceCreate([
                 ...$payload,
                 'password' => $temporaryPlaceholder,
                 'password_changed_at' => now(),
@@ -1009,7 +1011,8 @@ class SuperAdminWebController extends Controller
         }
 
         $before = $managedUser->toArray();
-        $managedUser->update(['is_active' => ! $managedUser->is_active]);
+        // is_active n est plus mass-assignable (cf. A02) : forceFill pour la bascule admin.
+        $managedUser->forceFill(['is_active' => ! $managedUser->is_active])->save();
 
         $sessionCount = 0;
         if (! $managedUser->is_active) {
@@ -1168,7 +1171,9 @@ class SuperAdminWebController extends Controller
                     $password = 'TempPass@'.now()->format('mdY');
                 }
 
-                $createdUser = User::query()->create([
+                // forceCreate : champs admin (role, direction_id, etc.) ne sont plus
+                // mass-assignables (cf. A02). Import CSV reserve au super-admin.
+                $createdUser = User::query()->forceCreate([
                     ...$payload,
                     'password' => 'temp-password-placeholder',
                     'password_changed_at' => now(),
@@ -1431,7 +1436,7 @@ class SuperAdminWebController extends Controller
             'settings' => $this->managedKpiSettings->all(),
             'summary' => $this->managedKpiSettings->summary(),
             'profileOptions' => $this->profileLabels(),
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
+            'directionOptions' => Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()
                 ->with('direction:id,code')
                 ->orderBy('direction_id')
@@ -2279,7 +2284,7 @@ class SuperAdminWebController extends Controller
             'moduleOptions' => $this->moduleOptions(),
             'profileOptions' => $this->profileOptions(),
             'readingLevelOptions' => $this->readingLevelOptions(),
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
+            'directionOptions' => Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')->get(['id', 'direction_id', 'code', 'libelle']),
         ]);
     }

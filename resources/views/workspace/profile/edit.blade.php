@@ -140,7 +140,7 @@
             </div>
 
             <div class="form-actions">
-                <button class="btn btn-green rounded-2xl px-4 py-2.5" type="submit">Enregistrer</button>
+                <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">Enregistrer</button>
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('dashboard') }}">Retour dashboard</a>
             </div>
         </form>
@@ -154,49 +154,51 @@
             <form method="POST" action="{{ route('workspace.profile.sessions.revoke_others') }}">
                 @csrf
                 <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
-                    Revoquer toutes les autres sessions
+                    Révoquer toutes les autres sessions
                 </button>
             </form>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-                <thead class="text-left text-slate-500">
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
+                <thead>
                     <tr>
-                        <th class="px-3 py-2">Statut</th>
-                        <th class="px-3 py-2">Adresse IP</th>
-                        <th class="px-3 py-2">Dernière activité</th>
-                        <th class="px-3 py-2">Client</th>
-                        <th class="px-3 py-2 text-right">Action</th>
+                        <th>Statut</th>
+                        <th>Adresse IP</th>
+                        <th>Dernière activité</th>
+                        <th>Client</th>
+                        <th class="text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($activeSessions as $session)
-                        <tr class="border-t border-slate-200">
-                            <td class="px-3 py-2">
+                        <tr>
+                            <td>
                                 @if ($session['is_current'])
                                     <span class="rounded-full bg-[#eef6e1] px-2 py-1 text-xs font-semibold text-[#1c203d]">Session courante</span>
                                 @else
                                     <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Active</span>
                                 @endif
                             </td>
-                            <td class="px-3 py-2 font-medium text-slate-800">{{ $session['ip_address'] }}</td>
-                            <td class="px-3 py-2 text-slate-600">
+                            <td class="font-medium text-slate-800">{{ $session['ip_address'] }}</td>
+                            <td>
                                 {{ $session['last_activity']?->format('d/m/Y H:i:s') ?? 'N/A' }}
                             </td>
-                            <td class="px-3 py-2 text-slate-600">{{ $session['user_agent'] }}</td>
-                            <td class="px-3 py-2 text-right">
+                            <td>{{ $session['user_agent'] }}</td>
+                            <td class="text-right">
                                 <form method="POST" action="{{ $session['is_current'] ? route('workspace.profile.sessions.revoke_current') : route('workspace.profile.sessions.revoke', $session['id']) }}">
                                     @csrf
                                     <button class="btn btn-primary btn-sm" type="submit">
-                                        {{ $session['is_current'] ? 'Fermer cette session' : 'Revoquer' }}
+                                        {{ $session['is_current'] ? 'Fermer cette session' : 'Révoquer' }}
                                     </button>
                                 </form>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-3 py-6 text-center text-slate-500">Aucune session active détectée.</td>
+                            <td colspan="5">
+                                <x-ui.empty-state title="Aucune session" message="Aucune session active détectée." icon="lock" />
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

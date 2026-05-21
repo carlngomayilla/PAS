@@ -1,5 +1,5 @@
 @props([
-    'publishedTitle' => 'Version publiee',
+    'publishedTitle' => 'Version publiée',
     'editableTitle' => 'Version en edition',
     'sectionClass' => 'grid gap-4 xl:grid-cols-2',
     'publishedPanelClass' => 'ui-card !mb-0',

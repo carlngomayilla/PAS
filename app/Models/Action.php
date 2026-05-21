@@ -57,6 +57,18 @@ class Action extends Model
     /**
      * @var list<string>
      */
+    /**
+     * Champs mass-assignables : UNIQUEMENT les champs saisis par l utilisateur
+     * dans un formulaire (definition metier d une action).
+     *
+     * Sont volontairement EXCLUS (cf. A02 mass-assignment) : les statuts, le workflow
+     * de validation, les traces utilisateurs (valide_par, cloture_par, etc.),
+     * les calculs automatiques (taux_*, progression_*) et le workflow financement
+     * DAF/DG. Ces champs doivent etre poses uniquement via les services / endpoints
+     * dedies (ActionTrackingService, *_workflow controllers) et utilisent forceFill().
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'exercice_id',
         'pta_id',
@@ -71,7 +83,6 @@ class Action extends Model
         'priorite',
         'unite_cible',
         'quantite_cible',
-        'quantite_realisee',
         'seuil_minimum',
         'seuil_mode',
         'seuil_t1',
@@ -81,10 +92,6 @@ class Action extends Model
         'methode_calcul',
         'justificatif_obligatoire',
         'echeance_cible',
-        'reste_a_realiser',
-        'taux_depassement',
-        'statut_performance',
-        'statut_execution_quantitative',
         'resultat_attendu',
         'indicateurs_attendus',
         'observations',
@@ -93,15 +100,10 @@ class Action extends Model
         'date_debut',
         'date_fin',
         'frequence_execution',
-        'date_fin_reelle',
         'date_echeance',
         'responsable_id',
         'contexte_action',
         'origine_action',
-        'statut',
-        'statut_dynamique',
-        'progression_reelle',
-        'progression_theorique',
         'seuil_alerte_progression',
         'risque_lie',
         'risques',
@@ -127,49 +129,7 @@ class Action extends Model
         'observation_financement',
         'montant_estime',
         'nature_financement',
-        'justificatif_financement_path',
         'commentaire_financement',
-        'financement_statut',
-        'financement_soumis_le',
-        'financement_notifie_le',
-        'financement_daf_par',
-        'financement_daf_le',
-        'financement_daf_decision',
-        'financement_daf_commentaire',
-        'financement_montant_valide',
-        'financement_reference',
-        'financement_dg_par',
-        'financement_dg_le',
-        'financement_dg_decision',
-        'financement_dg_commentaire',
-        'rapport_final',
-        'validation_hierarchique',
-        'validation_sans_correction',
-        'statut_validation',
-        'soumise_par',
-        'soumise_le',
-        'evalue_par',
-        'evalue_le',
-        'evaluation_note',
-        'evaluation_commentaire',
-        'direction_valide_par',
-        'direction_valide_le',
-        'direction_evaluation_note',
-        'direction_evaluation_commentaire',
-        'resultat_cloture',
-        'difficultes_rencontrees',
-        'mesures_correctives',
-        'responsable_suivi_risque',
-        'justification_cloture',
-        'cloture_par',
-        'cloture_le',
-        'taux_performance',
-        'taux_conformite',
-        'taux_delai',
-        'taux_realisation_global',
-        'avancement_operationnel',
-        'taux_atteinte_cible',
-        'taux_global',
     ];
 
     /**
@@ -495,6 +455,33 @@ class Action extends Model
         return app(ActionPerformanceService::class)->calculateExecutionPerformance($this);
     }
 
+    /**
+     * A17 — Source UNIQUE de verite pour la progression d une action.
+     *
+     * Conventions des colonnes stockees (synchronisees par recalculateRealization
+     * et par ActionTrackingService::refreshActionMetrics) :
+     *   - progression_reelle         : valeur autoritaire (taux global %)
+     *   - progression_theorique      : taux attendu a la date courante
+     *   - taux_realisation_global    : alias historique = progression_reelle
+     *   - taux_global                : alias historique = progression_reelle
+     *   - taux_atteinte_cible        : taux quantitatif quantite_realisee/cible
+     *   - avancement_operationnel    : taux sous-actions completees / total
+     *   - taux_performance           : KPI execution (different : pondere delai/qualite)
+     *   - taux_delai                 : KPI delai pur
+     *   - taux_conformite            : KPI qualite (alias)
+     *
+     * **Le code metier doit consommer authoritativeProgress() ci-dessous** :
+     * en cas de drift entre les colonnes (race condition, recalcul partiel), on
+     * privilegie progression_reelle calcule en live par ActionProgressService.
+     */
+    public function authoritativeProgress(): float
+    {
+        $live = app(ActionPerformanceService::class)
+            ->calculateRealProgress($this);
+
+        return round(max(0.0, min(100.0, $live)), 2);
+    }
+
     public function isCloturee(): bool
     {
         return $this->statut_dynamique === 'cloturee';
@@ -525,7 +512,7 @@ class Action extends Model
         $query->where(function (Builder $scopedQuery) use ($userId): void {
             $scopedQuery->where('responsable_id', $userId);
 
-            if (Schema::hasTable('action_responsables')) {
+            if (\App\Support\SchemaIntrospectionCache::hasTable('action_responsables')) {
                 $scopedQuery->orWhereHas('responsables', fn (Builder $responsableQuery) => $responsableQuery->whereKey($userId));
             }
         });
@@ -699,6 +686,27 @@ class Action extends Model
             return $selected;
         }
 
+        return $this->legacyResourceLabels($options);
+    }
+
+    /**
+     * A23 — Lecture des resources via les anciennes colonnes booleennes.
+     *
+     * Source de verite CANONIQUE = `ressources_necessaires` (array JSON).
+     * Les colonnes booleennes `ressource_main_oeuvre`, `ressource_equipement`,
+     * `ressource_partenariat`, `ressource_autres` sont DEPRECATED et restent
+     * UNIQUEMENT pour la retrocompatibilite des fixtures historiques.
+     *
+     * Toute nouvelle ecriture DOIT passer par `ressources_necessaires`.
+     * Une migration future pourra supprimer les booleens une fois que
+     * `ressources_necessaires` est rempli pour 100 % des lignes (cf. plan
+     * Phase 3 du rapport d audit).
+     *
+     * @param array<string, string> $options
+     * @return list<string>
+     */
+    public function legacyResourceLabels(array $options): array
+    {
         $legacy = [];
         if ((bool) $this->ressource_main_oeuvre) {
             $legacy[] = $options['main_oeuvre'];
@@ -714,6 +722,45 @@ class Action extends Model
         }
 
         return $legacy;
+    }
+
+    /**
+     * A23 — Aligne `ressources_necessaires` (canonique) avec les booleens
+     * legacy si ils sont les seuls remplis. A appeler avant un export ou un
+     * agregat pour garantir la coherence.
+     *
+     * Ne sauvegarde pas en BD : retourne la liste canonique attendue.
+     *
+     * @return list<string>
+     */
+    public function canonicalResources(): array
+    {
+        $selected = collect($this->ressources_necessaires ?? [])
+            ->filter(fn ($value): bool => is_string($value) && array_key_exists($value, self::resourceOptions()))
+            ->map(fn (string $value): string => $value)
+            ->values()
+            ->all();
+
+        if ($selected !== []) {
+            return $selected;
+        }
+
+        // Fallback : on derive depuis les booleens legacy.
+        $derived = [];
+        if ((bool) $this->ressource_main_oeuvre) {
+            $derived[] = 'main_oeuvre';
+        }
+        if ((bool) $this->ressource_equipement) {
+            $derived[] = 'ressources_materielles';
+        }
+        if ((bool) $this->ressource_partenariat) {
+            $derived[] = 'partenariat';
+        }
+        if ((bool) $this->ressource_autres) {
+            $derived[] = 'autres_ressources';
+        }
+
+        return $derived;
     }
 
     public function financementStatus(): string
@@ -757,7 +804,7 @@ class Action extends Model
             return true;
         }
 
-        if (! Schema::hasTable('action_responsables')) {
+        if (! \App\Support\SchemaIntrospectionCache::hasTable('action_responsables')) {
             return false;
         }
 

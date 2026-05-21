@@ -110,6 +110,8 @@ class PtaController extends Controller
             ->where('objectif_operationnel_id', (int) $objectifOperationnel->id)
             ->first();
 
+        // statut / valide_* ne sont plus exposes via l API (cf. A02). Pour les
+        // transitions de workflow, utiliser submit/approve/lock dedies.
         $pta = Pta::query()->updateOrCreate([
             'objectif_operationnel_id' => (int) $objectifOperationnel->id,
         ], [
@@ -119,9 +121,6 @@ class PtaController extends Controller
             'service_id' => $serviceId,
             'titre' => (string) $validated['titre'],
             'description' => $validated['description'] ?? null,
-            'statut' => (string) ($validated['statut'] ?? 'brouillon'),
-            'valide_le' => $validated['valide_le'] ?? null,
-            'valide_par' => $validated['valide_par'] ?? null,
             'exercice_id' => $pao->exercice_id,
         ]);
         $this->recordAudit(
@@ -213,6 +212,7 @@ class PtaController extends Controller
         );
 
         $before = $pta->toArray();
+        // statut / valide_* ne sont plus exposes via l API (cf. A02).
         $pta->fill([
             'pao_id' => (int) $targetPao->id,
             'objectif_operationnel_id' => (int) $objectifOperationnel->id,
@@ -220,9 +220,6 @@ class PtaController extends Controller
             'service_id' => $targetServiceId,
             'titre' => (string) $validated['titre'],
             'description' => $validated['description'] ?? null,
-            'statut' => (string) ($validated['statut'] ?? $pta->statut),
-            'valide_le' => $validated['valide_le'] ?? null,
-            'valide_par' => $validated['valide_par'] ?? null,
             'exercice_id' => $targetPao->exercice_id,
         ]);
         $pta->save();

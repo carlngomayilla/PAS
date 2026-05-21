@@ -98,12 +98,12 @@
             <div class="form-section">
                 <h2 class="form-section-title">Registre des modules</h2>
                 <p class="form-section-subtitle">Le module `Super Administration` reste toujours actif pour eviter un verrouillage de la plateforme.</p>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
+                <div class="app-table-wrapper">
+                    <table class="app-table data-table">
                         <thead>
                             <tr>
                                 <th class="px-3 py-2 text-left">Code</th>
-                                <th class="px-3 py-2 text-left">Libelle visible</th>
+                                <th class="px-3 py-2 text-left">Libellé visible</th>
                                 <th class="px-3 py-2 text-left">Description</th>
                                 <th class="px-3 py-2 text-left">Ordre</th>
                                 <th class="px-3 py-2 text-left">Section</th>

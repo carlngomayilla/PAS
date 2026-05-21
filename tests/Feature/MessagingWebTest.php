@@ -96,7 +96,7 @@ class MessagingWebTest extends TestCase
         $response->assertSee('Directions');
         $response->assertSee('Services');
         $response->assertSee('Agents');
-        $response->assertSee('Réinitialiser l’arbre');
+        $response->assertSee("Réinitialiser l'arbre", false);
         $response->assertSee('data-org-quick-search', false);
         $response->assertSee('data-org-clear-search', false);
         $response->assertSee('profil(s) visible(s)');

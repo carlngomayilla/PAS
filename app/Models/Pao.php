@@ -33,9 +33,6 @@ class Pao extends Model
         'objectif_operationnel',
         'resultats_attendus',
         'indicateurs_associes',
-        'statut',
-        'valide_le',
-        'valide_par',
     ];
 
     /**

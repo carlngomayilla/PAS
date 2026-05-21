@@ -27,9 +27,6 @@ class Pta extends Model
         'service_id',
         'titre',
         'description',
-        'statut',
-        'valide_le',
-        'valide_par',
     ];
 
     /**

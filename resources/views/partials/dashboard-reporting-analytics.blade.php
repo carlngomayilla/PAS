@@ -90,7 +90,7 @@
 <div class="dashboard-advanced-shell">
     @if ($showSummary)
         <div class="flex flex-wrap gap-2">
-            <span class="anbg-badge anbg-badge-success px-3 py-1">Actions validees</span>
+            <span class="anbg-badge anbg-badge-success px-3 py-1">Actions validées</span>
             <span class="anbg-badge anbg-badge-info px-3 py-1">{{ $officialBaseText }}</span>
         </div>
 
@@ -224,8 +224,8 @@
                     <h2 class="showcase-panel-title">Consolidation PAS</h2>
                 </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="dashboard-table dashboard-table-compact">
+            <div class="app-table-wrapper">
+                <table class="app-table data-table dashboard-table-compact">
                     <thead>
                         <tr>
                             <th>PAS</th>
@@ -253,7 +253,11 @@
                                 <td>{{ number_format((float) $row['taux_realisation'], 1, ',', ' ') }}%</td>
                             </tr>
                         @empty
-                            <tr><td colspan="9">Aucune consolidation disponible.</td></tr>
+                            <tr>
+                                <td colspan="9">
+                                    <x-ui.empty-state title="Aucune consolidation" message="Aucune consolidation disponible." icon="file" />
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -278,7 +282,12 @@
                         </div>
                     </div>
                 @empty
-                    <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune vue statutaire disponible.</div>
+                    <x-ui.empty-state
+                        title="Aucune vue statutaire"
+                        message="Aucune vue statutaire disponible."
+                        icon="chart"
+                        tone="info"
+                    />
                 @endforelse
             </div>
         </article>
@@ -291,8 +300,8 @@
                     <h2 class="showcase-panel-title">Comparaison interannuelle détaillée</h2>
                 </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="dashboard-table dashboard-table-compact">
+            <div class="app-table-wrapper">
+                <table class="app-table data-table dashboard-table-compact">
                     <thead>
                         <tr>
                             <th>Année</th>
@@ -318,7 +327,11 @@
                                 <td>{{ number_format((float) $row['taux_validation'], 1, ',', ' ') }}%</td>
                             </tr>
                         @empty
-                            <tr><td colspan="8">Aucune comparaison disponible.</td></tr>
+                            <tr>
+                                <td colspan="8">
+                                    <x-ui.empty-state title="Aucune comparaison" message="Aucune comparaison disponible." icon="chart" />
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -338,7 +351,7 @@
                             <strong class="text-[#17324a]">{{ $row['objectif_operationnel'] ?: '-' }}</strong>
                             <span class="dashboard-pill">{{ $row['etat_realisation'] ?: 'non renseigne' }}</span>
                         </div>
-                        <p class="mt-2 text-sm text-[#667085]">{{ $row['description_actions_detaillees'] ?: 'Aucune description detaillee.' }}</p>
+                        <p class="mt-2 text-sm text-[#667085]">{{ $row['description_actions_detaillees'] ?: 'Aucune description détaillée.' }}</p>
                         <div class="mt-3 grid gap-2 md:grid-cols-2">
                             <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Ressources:</strong> {{ $row['ressources_requises'] ?: '-' }}</div>
                             <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Indicateurs:</strong> {{ $row['indicateurs_performance'] ?: '-' }}</div>
@@ -346,7 +359,12 @@
                         </div>
                     </article>
                 @empty
-                    <div class="rounded-[1.15rem] border border-dashed border-slate-300/90 bg-slate-50/80 px-4 py-12 text-center text-sm text-[#667085]">Aucune extraction de structure disponible.</div>
+                    <x-ui.empty-state
+                        title="Aucune extraction"
+                        message="Aucune extraction de structure disponible."
+                        icon="file"
+                        tone="info"
+                    />
                 @endforelse
             </div>
         </article>

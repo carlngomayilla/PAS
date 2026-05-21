@@ -3,16 +3,22 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Services\Security\PasswordPolicyService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
 {
+    /**
+     * @var array<int, array{email:string, name:string, matricule:?string, temporary_password:string}>
+     */
+    private array $generatedCredentialsForNewUsers = [];
+
     public function run(): void
     {
         $now = now();
-        $defaultPassword = Hash::make('Pass@12345');
+        $passwordPolicy = app(PasswordPolicyService::class);
 
         foreach ($this->directions() as $direction) {
             DB::table('directions')->updateOrInsert(
@@ -98,24 +104,79 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
                 continue;
             }
 
+            // A08 — Nouveau compte : mdp aleatoire + password_changed_at NULL
+            // (force renouvellement au 1er login). Les credentials sont affiches
+            // en fin de run pour distribution.
+            // En tests on conserve le mdp fixture `Pass@12345` pour que les tests
+            // qui se loggent sur les comptes seedes continuent a marcher.
+            $matricule = $this->resolveMatricule($user, $index + 1);
+
+            if (app()->environment('testing')) {
+                $temporaryPassword = 'Pass@12345';
+                $passwordChangedAt = $now;
+            } else {
+                $temporaryPassword = $passwordPolicy->generateInitialPassword();
+                $passwordChangedAt = null;
+
+                $this->generatedCredentialsForNewUsers[] = [
+                    'email' => $email,
+                    'name' => (string) $user['name'],
+                    'matricule' => $matricule,
+                    'temporary_password' => $temporaryPassword,
+                ];
+            }
+
             DB::table('users')->insert([
                 'name' => $user['name'],
                 'email' => $email,
-                'password' => $defaultPassword,
+                'password' => Hash::make($temporaryPassword),
                 'role' => $user['role'],
                 'is_agent' => $user['role'] === User::ROLE_AGENT,
-                'agent_matricule' => $this->resolveMatricule($user, $index + 1),
+                'agent_matricule' => $matricule,
                 'agent_fonction' => $user['fonction'],
                 'agent_telephone' => null,
                 'direction_id' => $directionId,
                 'service_id' => $serviceId,
                 'email_verified_at' => $now,
-                'password_changed_at' => $now,
+                'password_changed_at' => $passwordChangedAt,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
         }
 
         $this->deleteLegacyOrganizationEntries($now);
+
+        $this->reportNewUserCredentials();
+    }
+
+    protected function reportNewUserCredentials(): void
+    {
+        if ($this->generatedCredentialsForNewUsers === []) {
+            return;
+        }
+
+        $command = $this->command ?? null;
+        if ($command === null) {
+            return;
+        }
+
+        $command->newLine();
+        $command->warn('A08 — '.count($this->generatedCredentialsForNewUsers).' nouveau(x) compte(s) cree(s) avec un mot de passe temporaire :');
+        $command->warn('Les comptes deja existants ont conserve leur mot de passe.');
+        $command->warn('A transmettre par un canal sur, puis a renouveler au 1er login.');
+        $command->newLine();
+
+        $command->table(
+            ['Email', 'Nom', 'Matricule', 'Mot de passe temporaire'],
+            array_map(
+                static fn (array $row): array => [
+                    $row['email'],
+                    $row['name'],
+                    $row['matricule'] ?? '-',
+                    $row['temporary_password'],
+                ],
+                $this->generatedCredentialsForNewUsers
+            )
+        );
     }
 }

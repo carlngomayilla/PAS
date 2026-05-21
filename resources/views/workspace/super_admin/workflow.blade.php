@@ -8,7 +8,7 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Workflow et validations</h1>
-                <p class="mt-2 text-slate-600">Parametrage du circuit de validation des actions. La validation chef de service est l'etape finale; la direction est notifiee et conserve la lecture du dossier.</p>
+                <p class="mt-2 text-slate-600">Paramétrage du circuit de validation des actions. La validation chef de service est l'étape finale; la direction est notifiée et conserve la lecture du dossier.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
@@ -25,14 +25,14 @@
             <p class="mt-2 text-sm text-slate-600">{{ $summary['submission_help_text'] }}</p>
         </article>
         <article class="ui-card !mb-0">
-            <p class="text-sm text-slate-500">Etape finale</p>
+            <p class="text-sm text-slate-500">Étape finale</p>
             <p class="mt-2 text-xl font-semibold">
                 @if ($summary['final_stage'] === 'direction')
                     Direction
                 @elseif ($summary['final_stage'] === 'service')
                     Chef de service
                 @else
-                    Cloture directe
+                    Clôture directe
                 @endif
             </p>
             <p class="mt-2 text-sm text-slate-600">{{ $summary['final_statistics_hint'] }}</p>
@@ -40,7 +40,7 @@
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Motif de rejet</p>
             <p class="mt-2 text-xl font-semibold">{{ $summary['rejection_comment_required'] ? 'Obligatoire' : 'Optionnel' }}</p>
-            <p class="mt-2 text-sm text-slate-600">Regle appliquee aux validations chef de service.</p>
+            <p class="mt-2 text-sm text-slate-600">Règle appliquée aux validations chef de service.</p>
         </article>
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Workflow PAS</p>
@@ -78,7 +78,7 @@
                         >
                         <span>
                             <strong class="block text-slate-900">Activer la validation chef de service</strong>
-                            <span class="mt-1 block text-slate-500">Le chef de service valide ou rejette la cloture. En cas de validation, le circuit est finalise.</span>
+                            <span class="mt-1 block text-slate-500">Le chef de service valide ou rejette la clôture. En cas de validation, le circuit est finalisé.</span>
                         </span>
                     </label>
 
@@ -106,7 +106,7 @@
                         >
                         <span>
                             <strong class="block text-slate-900">Rendre le motif de rejet obligatoire</strong>
-                            <span class="mt-1 block text-slate-500">Quand cette regle est active, une validation de rejet sans commentaire est refusée en web comme en API.</span>
+                            <span class="mt-1 block text-slate-500">Quand cette règle est active, une validation de rejet sans commentaire est refusée en web comme en API.</span>
                         </span>
                     </label>
                 </div>
@@ -114,7 +114,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Circuit PAS / PAO / PTA</h2>
-                <p class="form-section-subtitle">Chaque module peut conserver le workflow complet, s arreter a la validation, ou autoriser une validation directe sans etape `soumis`.</p>
+                <p class="form-section-subtitle">Chaque module peut conserver le workflow complet, s'arrêter à la validation, ou autoriser une validation directe sans étape `soumis`.</p>
                 <div class="grid gap-4 md:grid-cols-3">
                     @foreach (['pas' => 'PAS', 'pao' => 'PAO', 'pta' => 'PTA'] as $module => $label)
                         <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
@@ -139,9 +139,9 @@
     </section>
 
     <section class="ui-card">
-        <h2>Resolution appliquee</h2>
-        <div class="mt-4 overflow-x-auto">
-            <table class="min-w-full text-sm">
+        <h2>Résolution appliquée</h2>
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
                         <th class="px-3 py-2 text-left">Configuration</th>
@@ -157,8 +157,8 @@
                     </tr>
                     <tr>
                         <td class="px-3 py-2">Service inactif</td>
-                        <td class="px-3 py-2">Cloture directe</td>
-                        <td class="px-3 py-2">Aucune etape supplementaire</td>
+                        <td class="px-3 py-2">Clôture directe</td>
+                        <td class="px-3 py-2">Aucune étape supplémentaire</td>
                     </tr>
                 </tbody>
             </table>

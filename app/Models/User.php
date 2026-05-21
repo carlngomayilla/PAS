@@ -45,7 +45,18 @@ class User extends Authenticatable
     public const ROLE_INVITE_LECTURE = 'invite_lecture';
 
     /**
-     * The attributes that are mass assignable.
+     * Champs mass-assignables : UNIQUEMENT les champs modifiables par l utilisateur
+     * lui-meme depuis son propre profil.
+     *
+     * Sont volontairement EXCLUS (cf. A02 mass-assignment) :
+     *   - role, custom_role_code : escalade de privileges directe
+     *   - is_active, suspended_until, suspension_reason : contournement de la suspension
+     *   - is_agent, agent_matricule, agent_fonction, agent_telephone : changement d identite
+     *   - direction_id, service_id, unite_dg_id : changement de perimetre organisationnel
+     *
+     * Toutes les modifications de ces champs doivent passer par les controleurs
+     * admin (SuperAdminWebController, ReferentielWebController) ou par les seeders
+     * via forceFill() / Model::unguarded().
      *
      * @var list<string>
      */
@@ -55,18 +66,6 @@ class User extends Authenticatable
         'email',
         'password',
         'password_changed_at',
-        'role',
-        'custom_role_code',
-        'is_active',
-        'suspended_until',
-        'suspension_reason',
-        'is_agent',
-        'agent_matricule',
-        'agent_fonction',
-        'agent_telephone',
-        'direction_id',
-        'service_id',
-        'unite_dg_id',
     ];
 
     /**
@@ -225,9 +224,41 @@ class User extends Authenticatable
         return $this->hasMany(Delegation::class, 'delegue_id');
     }
 
+    /**
+     * Verifie si l utilisateur possede l un des roles donnes.
+     *
+     * Couvre 3 sources (cf. A04 — RBAC custom_role_code) :
+     *   1. le `role` de base persiste sur la ligne user
+     *   2. la valeur litterale de `custom_role_code` (rôle système OU custom)
+     *   3. le `base_role` referrence par le rôle custom (cas d un rôle custom
+     *      derive d un rôle système).
+     *
+     * Ainsi un user avec `role=agent` + `custom_role_code=planification` est
+     * reconnu a la fois comme agent (heritage) et comme planification (rôle
+     * effectif), ce qui s aligne enfin avec les permissions resolues par
+     * `RolePermissionSettings::forUser()` qui regarde le rôle effectif.
+     *
+     * Note : `isAgent()` continue d utiliser `$this->role` directement, on ne
+     * casse donc pas la semantique "l user est un agent par nature".
+     */
     public function hasRole(string ...$roles): bool
     {
-        return in_array($this->role, $roles, true);
+        if (in_array($this->role, $roles, true)) {
+            return true;
+        }
+
+        $customCode = trim((string) ($this->custom_role_code ?? ''));
+        if ($customCode === '') {
+            return false;
+        }
+
+        if (in_array($customCode, $roles, true)) {
+            return true;
+        }
+
+        $baseRole = app(\App\Services\RoleRegistryService::class)->baseRole($customCode);
+
+        return in_array($baseRole, $roles, true);
     }
 
     public function hasEffectiveRole(string ...$roles): bool

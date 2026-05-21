@@ -327,7 +327,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->whereIn('format', ['excel', 'pdf'])
             ->name('workspace.reporting.export.queue');
         Route::get('/workspace/reporting/export-ready', [MonitoringWebController::class, 'downloadQueuedExport'])
-            ->middleware('signed')
+            // A29 — La route est `signed` (anti-tampering) ET throttled
+            // (`api-downloads`, 30 req/min) pour bloquer le scraping massif
+            // d exports meme avec une URL signed valide.
+            ->middleware(['signed', 'throttle:api-downloads'])
             ->name('workspace.reporting.exports.download');
         Route::redirect('/workspace/pilotage', '/dashboard');
         Route::get('/workspace/alertes', [MonitoringWebController::class, 'alertes'])

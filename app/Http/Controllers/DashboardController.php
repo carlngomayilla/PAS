@@ -238,6 +238,15 @@ class DashboardController extends Controller
      * panel from data already calculated for the dashboard. Full report details
      * remain available from the reporting/export screens.
      *
+     * A35 — DIVERGENCE METIER : ce payload reconstruit localement les totaux
+     * `pas_total / paos_total / ptas_total / actions_total / actions_validees /
+     * kpi_mesures_total` (cf. ligne 'global' plus bas) tandis que
+     * `ReportingAnalyticsService::buildPayload(... )['global']` les recalcule
+     * de son cote. Les deux DOIVENT toujours retourner les memes valeurs pour
+     * un meme user + meme exercice. Toute divergence visible dans le test
+     * `tests/Feature/Phase3CDashboardReportingAlignmentTest.php` doit etre
+     * traitee comme un bug et corrigee a la racine (pas via cache busting).
+     *
      * @param  array<string, int>  $totals
      * @param  array<string, int>  $alerts
      * @param  array<string, array<string, int>>  $statusBreakdown

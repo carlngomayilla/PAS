@@ -9,16 +9,14 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\DocumentPolicySettings;
+use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class UpdatePtaRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    use RequiresPlanningWriter;
 
     protected function prepareForValidation(): void
     {
@@ -87,8 +85,6 @@ class UpdatePtaRequest extends FormRequest
             'service_id' => ['required', 'integer', 'exists:services,id'],
             'titre' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'valide_le' => ['nullable', 'date'],
-            'valide_par' => ['nullable', 'integer', 'exists:users,id'],
             'actions' => ['nullable', 'array', 'min:1'],
             'actions.*.id' => ['nullable', 'integer', 'exists:actions,id'],
             'actions.*.libelle' => ['required_with:actions', 'string', 'max:255'],

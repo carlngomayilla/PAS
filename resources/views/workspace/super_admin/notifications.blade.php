@@ -8,7 +8,7 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Alertes et notifications</h1>
-                <p class="mt-2 text-slate-600">Pilotage des événements émis et de la surcouche d escalade sur les alertes d action. Les destinataires métier natifs restent conserves; les rôles ci-dessous s ajoutent en surveillance.</p>
+                <p class="mt-2 text-slate-600">Pilotage des événements émis et de la surcouche d'escalade sur les alertes d'action. Les destinataires métier natifs restent conservés ; les rôles ci-dessous s'ajoutent en surveillance.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
@@ -36,7 +36,7 @@
             <p class="mt-2 text-sm text-slate-600">Comptes globaux ajoutés en plus des destinataires métier natifs.</p>
         </article>
         <article class="ui-card !mb-0">
-            <p class="text-sm text-slate-500">Règles d escalade actives</p>
+            <p class="text-sm text-slate-500">Règles d'escalade actives</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['rules_enabled'] }}</p>
             <p class="mt-2 text-sm text-slate-600">Recipients et message ajustes par niveau via le moteur de règles.</p>
         </article>
@@ -125,7 +125,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Escalade des alertes action</h2>
-                <p class="form-section-subtitle">Les rôles selectionnes sont ajoutés aux destinataires calcules par le moteur d alerte pour chaque niveau.</p>
+                <p class="form-section-subtitle">Les rôles sélectionnés sont ajoutés aux destinataires calculés par le moteur d'alerte pour chaque niveau.</p>
                 <div class="space-y-4">
                     @foreach ($alertLevels as $level => $definition)
                         @php($selectedRoles = is_array($settings['alert_'.$level.'_roles'] ?? null) ? ($settings['alert_'.$level.'_roles'] ?? []) : (json_decode((string) ($settings['alert_'.$level.'_roles'] ?? '[]'), true) ?: []))
@@ -164,8 +164,8 @@
             </div>
 
             <div class="form-section">
-                <h2 class="form-section-title">Moteur de règles d escalade</h2>
-                <p class="form-section-subtitle">Chaque regle ajoute des destinataires au circuit natif et peut surcharger le message envoye. Variables supportees : <code>{action_label}</code>, <code>{level}</code>, <code>{event}</code>, <code>{message}</code>.</p>
+                <h2 class="form-section-title">Moteur de règles d'escalade</h2>
+                <p class="form-section-subtitle">Chaque règle ajoute des destinataires au circuit natif et peut surcharger le message envoyé. Variables supportées : <code>{action_label}</code>, <code>{level}</code>, <code>{event}</code>, <code>{message}</code>.</p>
                 <div class="space-y-4">
                     @foreach ($ruleRows as $index => $rule)
                         <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
@@ -205,7 +205,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Règles temporelles sur échéance</h2>
-                <p class="form-section-subtitle">Chaque règle se déclenche à une distance exacte de l'échéance. Exemple : <code>-3</code> pour J-3, <code>7</code> pour J+7. Variables supportees : <code>{action_label}</code>, <code>{level}</code>, <code>{message}</code>, <code>{offset_days}</code>.</p>
+                <p class="form-section-subtitle">Chaque règle se déclenche à une distance exacte de l'échéance. Exemple : <code>-3</code> pour J-3, <code>7</code> pour J+7. Variables supportées : <code>{action_label}</code>, <code>{level}</code>, <code>{message}</code>, <code>{offset_days}</code>.</p>
                 <div class="space-y-4">
                     @foreach ($timelineRows as $index => $rule)
                         <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">

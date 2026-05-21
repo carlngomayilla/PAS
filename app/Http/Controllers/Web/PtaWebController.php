@@ -215,12 +215,8 @@ class PtaWebController extends Controller
             'service_id' => $serviceId,
             'titre' => $this->generatedPtaTitle($objectifOperationnel->service),
             'description' => null,
-            'statut' => $statut,
             'exercice_id' => $pao->exercice_id,
         ];
-
-        $payload['valide_le'] = null;
-        $payload['valide_par'] = null;
 
         $existingPta = $this->findServiceYearPta($serviceId, $pao);
         if ($existingPta instanceof Pta && $existingPta->statut === 'verrouille') {
@@ -240,7 +236,13 @@ class PtaWebController extends Controller
             $payload['titre'] = (string) ($existingPta->titre ?: $payload['titre']);
         }
         $pta->fill($payload);
-        $pta->save();
+        // statut / valide_* ne sont plus mass-assignables (defense en profondeur
+        // contre l'escalade de privileges). On les positionne via forceFill.
+        $pta->forceFill([
+            'statut' => $existingPta?->statut ?: $statut,
+            'valide_le' => $existingPta?->valide_le,
+            'valide_par' => $existingPta?->valide_par,
+        ])->save();
 
         $savedActions = $this->syncPtaActions(
             $pta,
@@ -347,13 +349,14 @@ class PtaWebController extends Controller
             'service_id' => $targetServiceId,
             'titre' => $this->generatedPtaTitle($objectifOperationnel->service),
             'description' => null,
-            'statut' => $statut,
             'exercice_id' => $targetPao->exercice_id,
         ];
 
 
         $before = $pta->toArray();
-        $pta->update($payload);
+        $pta->fill($payload);
+        // statut n est plus mass-assignable : on conserve l etat workflow courant.
+        $pta->forceFill(['statut' => $statut])->save();
 
         $savedActions = $this->syncPtaActions(
             $pta,
@@ -425,11 +428,11 @@ class PtaWebController extends Controller
 
         $before = $pta->toArray();
         $targetStatus = (string) $workflow['submit_target_status'];
-        $pta->update([
+        $pta->forceFill([
             'statut' => $targetStatus,
             'valide_le' => in_array($targetStatus, ['valide', 'verrouille'], true) ? now() : null,
             'valide_par' => in_array($targetStatus, ['valide', 'verrouille'], true) ? $user->id : null,
-        ]);
+        ])->save();
 
         $this->recordAudit($request, 'pta', 'submit', $pta, $before, $pta->toArray());
         $notificationService->notifyPtaStatus($pta, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
@@ -468,11 +471,11 @@ class PtaWebController extends Controller
         }
 
         $before = $pta->toArray();
-        $pta->update([
+        $pta->forceFill([
             'statut' => 'valide',
             'valide_le' => now(),
             'valide_par' => $user->id,
-        ]);
+        ])->save();
 
         $this->recordAudit($request, 'pta', 'approve', $pta, $before, $pta->toArray());
         $notificationService->notifyPtaStatus($pta, 'approved', $user);
@@ -505,11 +508,11 @@ class PtaWebController extends Controller
         }
 
         $before = $pta->toArray();
-        $pta->update([
+        $pta->forceFill([
             'statut' => 'verrouille',
             'valide_le' => now(),
             'valide_par' => $user->id,
-        ]);
+        ])->save();
 
         $this->recordAudit($request, 'pta', 'lock', $pta, $before, $pta->toArray());
         $notificationService->notifyPtaStatus($pta, 'locked', $user);
@@ -558,11 +561,11 @@ class PtaWebController extends Controller
         $motifRetour = trim((string) $validated['motif_retour']);
 
         $before = $pta->toArray();
-        $pta->update([
+        $pta->forceFill([
             'statut' => 'brouillon',
             'valide_le' => null,
             'valide_par' => null,
-        ]);
+        ])->save();
 
         $after = array_merge($pta->toArray(), ['motif_retour' => $motifRetour]);
         $this->recordAudit($request, 'pta', 'reopen', $pta, $before, $after);
@@ -707,8 +710,10 @@ class PtaWebController extends Controller
                     ->firstOrFail();
 
             $payload = $this->normalizePtaActionPayload($actionPayload, $pta, $objectifOperationnel, $rmoIds, $isNewAction, $action);
-            $action->fill($payload);
-            $action->save();
+            // forceFill : le payload est integralement construit par normalizePtaActionPayload
+            // (entrees utilisateur deja filtrees) et contient des champs workflow/calculs
+            // qui ne sont plus mass-assignables (cf. A02).
+            $action->forceFill($payload)->save();
 
             $this->syncActionRmos($action, $rmoIds);
             $this->syncPlannedSubActions($action, $actionPayload, $rmoIds);

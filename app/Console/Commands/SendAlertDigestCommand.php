@@ -72,7 +72,11 @@ class SendAlertDigestCommand extends Command
                 continue;
             }
 
-            Mail::to($user->email)->send(new AlertDigestMail($user, $digest));
+            // A26 — Envoi via queue (au lieu de send synchrone) pour eviter
+            // que le cron digest ne reste bloque par un SMTP lent, et pour
+            // pouvoir distribuer la charge sur le worker `notifications`.
+            Mail::to($user->email)
+                ->queue((new AlertDigestMail($user, $digest))->onQueue('notifications'));
             $sent++;
 
             if ($withDbNotifications && ! $this->alreadyNotifiedToday($user)) {

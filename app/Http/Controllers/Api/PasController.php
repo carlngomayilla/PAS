@@ -86,19 +86,23 @@ class PasController extends Controller
         $this->authorize('create', Pas::class);
 
         $validated = $request->validated();
-        $statut = (string) ($validated['statut'] ?? 'brouillon');
+        // statut / valide_* ne sont plus exposes via l API (cf. A02). Pour les
+        // transitions de workflow, utiliser les endpoints dedies submit/approve/lock.
         $payload = [
             'titre' => (string) $validated['titre'],
             'periode_debut' => (int) $validated['periode_debut'],
             'periode_fin' => (int) $validated['periode_fin'],
-            'statut' => $statut,
             'created_by' => $user->id,
-            'valide_le' => in_array($statut, ['valide', 'verrouille'], true) ? now() : null,
-            'valide_par' => in_array($statut, ['valide', 'verrouille'], true) ? $user->id : null,
         ];
 
         $pas = DB::transaction(function () use ($validated, $payload, $user): Pas {
-            $pas = Pas::query()->create($payload);
+            $pas = new Pas();
+            $pas->fill($payload);
+            $pas->forceFill([
+                'statut' => 'brouillon',
+                'valide_le' => null,
+                'valide_par' => null,
+            ])->save();
             $this->pasStructureService->sync(
                 $pas,
                 is_array($validated['axes'] ?? null) ? $validated['axes'] : [],
@@ -163,14 +167,12 @@ class PasController extends Controller
         }
 
         $validated = $request->validated();
-        $statut = (string) ($validated['statut'] ?? 'brouillon');
+        // statut / valide_* ne sont plus exposes via l API (cf. A02). La mise a jour
+        // du contenu n affecte pas le statut workflow courant.
         $payload = [
             'titre' => (string) $validated['titre'],
             'periode_debut' => (int) $validated['periode_debut'],
             'periode_fin' => (int) $validated['periode_fin'],
-            'statut' => $statut,
-            'valide_le' => in_array($statut, ['valide', 'verrouille'], true) ? now() : null,
-            'valide_par' => in_array($statut, ['valide', 'verrouille'], true) ? $user->id : null,
         ];
 
         $before = $pas->load([

@@ -244,9 +244,7 @@ class ActionValidationController extends Controller
         $this->authorize('reviewByDirection', $action);
 
         if (! $workflowSettings->directionValidationEnabled()) {
-            return response()->json([
-                'message' => 'La validation direction est desactivee dans le workflow courant.',
-            ], 409);
+            abort(403, 'Acces non autorise.');
         }
 
         if ($locked = $this->assertPtaNotLocked($action->pta)) {

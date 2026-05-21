@@ -22,7 +22,7 @@
                 <p class="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700">{{ $title }}</p>
                 <h2 class="mt-2">{{ $message }}</h2>
                 <p class="mt-2 text-slate-600">
-                    Le brouillon reste prive tant qu il n est pas publie.
+                    Le brouillon reste privé tant qu'il n'est pas publié.
                     @if ($draftUpdatedAtLabel)
                         Derniere mise a jour du brouillon : {{ $draftUpdatedAtLabel }}.
                     @endif

@@ -99,7 +99,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Libellés documentaires et alertes</h2>
-                <p class="form-section-subtitle">Pilotage des libellés visibles dans le suivi d action et le centre d alertes sans changer les codes internes.</p>
+                <p class="form-section-subtitle">Pilotage des libellés visibles dans le suivi d'action et le centre d'alertes sans changer les codes internes.</p>
                 <div class="form-grid">
                     <div><label for="justificatif_category_label_hebdomadaire">Justificatif `hebdomadaire`</label><input id="justificatif_category_label_hebdomadaire" name="justificatif_category_label_hebdomadaire" type="text" maxlength="60" value="{{ old('justificatif_category_label_hebdomadaire', $settings['justificatif_category_labels']['hebdomadaire'] ?? 'Justificatif hebdomadaire') }}" required></div>
                     <div><label for="justificatif_category_label_final">Justificatif `final`</label><input id="justificatif_category_label_final" name="justificatif_category_label_final" type="text" maxlength="60" value="{{ old('justificatif_category_label_final', $settings['justificatif_category_labels']['final'] ?? 'Justificatif final') }}" required></div>

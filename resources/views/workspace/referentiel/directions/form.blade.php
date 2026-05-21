@@ -17,14 +17,14 @@
             @endif
 
             <div class="form-section">
-                <h2 class="form-section-title">Parametrage direction</h2>
+                <h2 class="form-section-title">Paramétrage direction</h2>
                 <div class="grid gap-4">
                     <div>
                         <label for="code">Code</label>
                         <input id="code" name="code" type="text" maxlength="30" value="{{ old('code', $row->code) }}" required>
                     </div>
                     <div>
-                        <label for="libelle">Libelle</label>
+                        <label for="libelle">Libellé</label>
                         <input id="libelle" name="libelle" type="text" value="{{ old('libelle', $row->libelle) }}" required>
                     </div>
                     <div>

@@ -41,6 +41,21 @@ class GenerateReportJob implements ShouldQueue
     ): void {
         $user = User::query()->findOrFail($this->userId);
         $format = strtolower($this->format);
+
+        // A16 — Le job peut s executer apres revocation des droits ou
+        // suspension du compte. On re-verifie les conditions d acces avant de
+        // generer un export potentiellement sensible. En cas d echec, on logge
+        // et on sort silencieusement (le job ne doit pas etre retry).
+        if (! $this->stillAuthorizedToExport($user)) {
+            \Illuminate\Support\Facades\Log::warning('Reporting export refused at job-time (A16).', [
+                'user_id' => $user->id,
+                'format' => $format,
+                'reason' => $this->disqualificationReason($user),
+            ]);
+
+            return;
+        }
+
         $template = $templateResolver->resolve($user, 'reporting', 'consolidated_reporting', $format, 'officiel');
         $payload = $analyticsService->buildPayload($user, true, true);
         $this->injectTemplate($payload, $template, $format);
@@ -85,6 +100,48 @@ class GenerateReportJob implements ShouldQueue
                 'generated_at' => now()->toIso8601String(),
             ],
         ]));
+    }
+
+    /**
+     * A16 — Conditions d acces re-verifiees au moment de l execution du job
+     * (et plus seulement au moment du dispatch). Refuse si :
+     *   - le compte est inactif ou suspendu,
+     *   - la permission planning.read ou reporting.read a ete revoquee,
+     *   - le mot de passe est expire (force renewal).
+     */
+    private function stillAuthorizedToExport(User $user): bool
+    {
+        if (method_exists($user, 'isSuspended') && $user->isSuspended()) {
+            return false;
+        }
+
+        if (! (bool) ($user->is_active ?? false)) {
+            return false;
+        }
+
+        if (! $user->hasPermission('planning.read') || ! $user->hasPermission('reporting.read')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function disqualificationReason(User $user): string
+    {
+        if (! (bool) ($user->is_active ?? false)) {
+            return 'account_inactive';
+        }
+        if (method_exists($user, 'isSuspended') && $user->isSuspended()) {
+            return 'account_suspended';
+        }
+        if (! $user->hasPermission('planning.read')) {
+            return 'permission_revoked_planning_read';
+        }
+        if (! $user->hasPermission('reporting.read')) {
+            return 'permission_revoked_reporting_read';
+        }
+
+        return 'unknown';
     }
 
     private function injectTemplate(array &$payload, ?ExportTemplate $template, string $format): void

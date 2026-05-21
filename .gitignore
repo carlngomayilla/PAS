@@ -30,3 +30,4 @@ Thumbs.db
 # Artefacts temporaires d'analyse / extraction
 /tmp_*
 /diff.txt
+database/backups/

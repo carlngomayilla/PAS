@@ -318,6 +318,7 @@ class PaoController extends Controller
      */
     private function paoPayload(PasObjectif $objectif, array $validated, array $operationalObjective): array
     {
+        // statut n est plus mass-assignable (cf. A02) : default DB = brouillon.
         return [
             'pas_id' => (int) $objectif->pasAxe->pas_id,
             'pas_objectif_id' => (int) $objectif->id,
@@ -331,7 +332,6 @@ class PaoController extends Controller
             'objectif_operationnel' => $operationalObjective['libelle'],
             'resultats_attendus' => $operationalObjective['description'],
             'indicateurs_associes' => $operationalObjective['indicateurs'],
-            'statut' => (string) ($validated['statut'] ?? 'brouillon'),
             'exercice_id' => app(ExerciceContext::class)->idForYear((int) $validated['annee']),
         ];
     }

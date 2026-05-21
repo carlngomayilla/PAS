@@ -30,17 +30,27 @@
     $showSubActionForm = $modeEvaluation === \App\Models\Action::MODE_SOUS_ACTIONS;
 @endphp
 
-<div class="rounded-lg border border-[#e5e7eb] bg-white p-4 shadow-sm" data-action-block data-action-index="{{ $index }}">
-    <div class="mb-4 flex items-center justify-between gap-3">
-        <h3 class="text-sm font-extrabold uppercase tracking-wide text-[#1c203d]" data-action-title>Action {{ $number }}</h3>
-        <button class="btn btn-danger {{ !$isTemplate && (int) $index === 0 ? 'hidden' : '' }}" type="button" data-remove-action>Supprimer</button>
-    </div>
+<details class="pta-action-block rounded-lg border border-[#d8ecf8] bg-white shadow-sm" data-action-block data-action-index="{{ $index }}" {{ !$isTemplate && (int) $index === 0 ? 'open' : '' }}>
+    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+        <span class="min-w-0">
+            <span class="block text-sm font-extrabold uppercase tracking-wide text-[#1c203d]" data-action-title>Action {{ $number }}</span>
+            <span class="block truncate text-xs font-semibold text-slate-500" data-action-summary>{{ $rowData['libelle'] ?? 'Nouvelle action' }}</span>
+        </span>
+        <span class="flex shrink-0 items-center gap-2">
+            <button class="btn btn-danger {{ !$isTemplate && (int) $index === 0 ? 'hidden' : '' }}" type="button" data-remove-action>Supprimer</button>
+            <svg class="app-collapsible-chevron h-4 w-4 text-[#3996d3] transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        </span>
+    </summary>
+<div class="border-t border-[#d8ecf8] p-4">
 
     <input type="hidden" name="actions[{{ $index }}][id]" value="{{ $rowData['id'] ?? '' }}">
 
     <div class="space-y-4">
-        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
-            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">1. Identification de l'action</h4>
+        <details class="form-step-accordion" open>
+            <summary>1. Identification de l'action</summary>
+            <div class="form-step-body">
             <div class="form-grid">
                 <div class="md:col-span-2">
                     <label>Libellé de l'action</label>
@@ -69,10 +79,12 @@
                     <textarea class="hidden" disabled>{{ $rowData['observations'] ?? '' }}</textarea>
                 </div>
             </div>
-        </section>
+            </div>
+        </details>
 
-        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
-            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">2. Responsable / affectation</h4>
+        <details class="form-step-accordion">
+            <summary>2. Responsable / affectation</summary>
+            <div class="form-step-body">
             <div class="form-grid">
                 <div class="md:col-span-2">
                     <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -100,10 +112,12 @@
                     @error("actions.$index.rmo_ids") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
             </div>
-        </section>
+            </div>
+        </details>
 
-        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
-            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">3. Planification</h4>
+        <details class="form-step-accordion">
+            <summary>3. Planification</summary>
+            <div class="form-step-body">
             <div class="form-grid-compact">
                 <div>
                     <label>Date de début</label>
@@ -120,10 +134,12 @@
                     <input class="hidden" type="date" value="{{ $rowData['date_fin'] ?? '' }}" readonly data-echeance-preview>
                 </div>
             </div>
-        </section>
+            </div>
+        </details>
 
-        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
-            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">4. Cible et seuil</h4>
+        <details class="form-step-accordion">
+            <summary>4. Cible et seuil</summary>
+            <div class="form-step-body">
             <div class="form-grid">
                 <div>
                     <label>Type de cible</label>
@@ -169,11 +185,14 @@
                     Justificatif obligatoire
                 </label>
             </div>
-        </section>
+            </div>
+        </details>
 
-        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4 {{ $showSubActionForm ? '' : 'hidden' }}" data-sub-actions-section>
+        <details class="form-step-accordion {{ $showSubActionForm ? '' : 'hidden' }}" data-sub-actions-section>
+            <summary>5. Sous-actions prévues</summary>
+            <div class="form-step-body">
             <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h4 class="text-sm font-extrabold text-[#3996d3]">5. Sous-actions prévues</h4>
+                <h4 class="text-sm font-extrabold text-[#3996d3]">Sous-actions prévues</h4>
                 <button class="btn btn-secondary" type="button" data-add-sub-action>+ Ajouter une sous-action</button>
             </div>
             <div class="space-y-3" data-sub-actions-list>
@@ -209,10 +228,12 @@
                     </div>
                 @endforeach
             </div>
-        </section>
+            </div>
+        </details>
 
-        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
-            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">6. Ressources nécessaires</h4>
+        <details class="form-step-accordion">
+            <summary>6. Ressources nécessaires</summary>
+            <div class="form-step-body">
             <div class="form-grid-compact">
                 @foreach ($resourceOptions as $resourceCode => $resourceLabel)
                     <label class="checkbox-pill">
@@ -232,10 +253,12 @@
                 <label>Précisions sur les ressources nécessaires</label>
                 <textarea name="actions[{{ $index }}][ressources_details]">{{ $rowData['ressources_details'] ?? '' }}</textarea>
             </div>
-        </section>
+            </div>
+        </details>
 
-        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
-            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">7. Risques</h4>
+        <details class="form-step-accordion">
+            <summary>7. Risques</summary>
+            <div class="form-step-body">
             <div class="form-grid">
                 <div class="md:col-span-2">
                     <label>Risque potentiel</label>
@@ -246,7 +269,7 @@
                     <label>Niveau de risque</label>
                     @php $riskLevel = (string) ($rowData['niveau_risque'] ?? ''); @endphp
                     <select name="actions[{{ $index }}][niveau_risque]">
-                        <option value="" @selected($riskLevel === '')>Non renseigne</option>
+                        <option value="" @selected($riskLevel === '')>Non renseigné</option>
                         <option value="faible" @selected($riskLevel === 'faible')>Faible</option>
                         <option value="modere" @selected($riskLevel === 'modere')>Modere</option>
                         <option value="eleve" @selected($riskLevel === 'eleve')>Eleve</option>
@@ -260,10 +283,12 @@
                     @error("actions.$index.mesures_preventives") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
             </div>
-        </section>
+            </div>
+        </details>
 
-        <section class="rounded-lg border border-[#e5e7eb] bg-white p-4">
-            <h4 class="mb-3 text-sm font-extrabold text-[#3996d3]">8. Financement</h4>
+        <details class="form-step-accordion">
+            <summary>8. Financement</summary>
+            <div class="form-step-body">
             <div class="form-grid">
                 <div>
                     <label>Besoin de financement</label>
@@ -285,7 +310,9 @@
                     @error("actions.$index.justificatif_financement") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
             </div>
-        </section>
+            </div>
+        </details>
 
     </div>
 </div>
+</details>

@@ -407,7 +407,7 @@ class SuperAdminPlatformConfigurationTest extends TestCase
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.maintenance.index'))
             ->assertOk()
-            ->assertSee('Maintenance legere');
+            ->assertSee('Maintenance légère');
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.maintenance.run', 'clear_views'))

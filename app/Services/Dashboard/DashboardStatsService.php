@@ -139,14 +139,32 @@ class DashboardStatsService
 
     private function delayedActions(Builder $query): int
     {
+        // A19 — Aligne sur la regle metier centrale du reporting :
+        //   "en retard" = date_echeance/date_fin depassee + statut_dynamique
+        //   PAS dans la liste des statuts terminaux (acheve, suspendu, annule,
+        //   cloturee). Cela elimine la divergence entre dashboard (qui filtrait
+        //   sur statut_dynamique='en_retard' uniquement) et reporting (qui
+        //   regardait l echeance + l etat).
         $table = $query->getModel()->getTable();
+        $completed = \App\Services\Actions\ActionTrackingService::completedActionStatuses();
+        $today = Carbon::today();
+
+        if (Schema::hasColumn($table, 'date_echeance') && Schema::hasColumn($table, 'statut_dynamique')) {
+            return (clone $query)
+                ->whereNotNull('date_echeance')
+                ->whereDate('date_echeance', '<', $today)
+                ->whereNotIn('statut_dynamique', $completed)
+                ->count();
+        }
 
         if (Schema::hasColumn($table, 'statut_dynamique')) {
             return (clone $query)->where('statut_dynamique', 'en_retard')->count();
         }
 
         if (Schema::hasColumn($table, 'date_fin')) {
-            return (clone $query)->whereDate('date_fin', '<', Carbon::today())->count();
+            return (clone $query)
+                ->whereDate('date_fin', '<', $today)
+                ->count();
         }
 
         return 0;

@@ -18,9 +18,11 @@ use App\Services\NotificationPolicySettings;
 use App\Notifications\WorkspaceModuleNotification;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Throwable;
 
 class WorkspaceNotificationService
 {
@@ -1281,6 +1283,20 @@ class WorkspaceNotificationService
         ]);
     }
 
+    /**
+     * A20 — Destinataires de supervision en fonction de l'unite DG de l'actor.
+     *
+     * Regles d'escalade :
+     *   - Le chef d'unite est TOUJOURS prevenu (relation hierarchique directe).
+     *   - L'escalade transverse (DG + Planification) est reservee aux chefs
+     *     d'unite, pas aux agents simples (qui ne doivent pas declencher des
+     *     notifs systemes globales par leurs actions du quotidien).
+     *   - Les unites SCIQ/DGA/Cabinet diffusent vers les profils de supervision
+     *     croisee (instance de pilotage transversal).
+     *   - L'unite UCAS, qui est une unite OPERATIONNELLE simple, NE diffuse PAS
+     *     vers DGA/Cabinet/SCIQ — son chef et le DG suffisent. Cela evite la
+     *     fuite d'info inter-unites pour les actions UCAS purement metier.
+     */
     private function unitSupervisionRecipients(?User $actor): Collection
     {
         if (! $actor instanceof User || $actor->unite_dg_id === null) {
@@ -1316,6 +1332,14 @@ class WorkspaceNotificationService
         );
 
         $unitCode = strtoupper((string) $unit->code);
+
+        // A20 — UCAS est une unite operationnelle simple : on n elargit PAS
+        // a DGA/Cabinet/SCIQ pour ne pas polluer ces destinataires avec des
+        // events purement UCAS (cf. perimetre UCAS dans le rapport d'audit).
+        if ($unitCode === UniteDg::CODE_UCAS) {
+            return $targets;
+        }
+
         if ($unitCode === UniteDg::CODE_SCIQ) {
             return $this->mergeRecipients(
                 $targets,
@@ -1599,23 +1623,38 @@ class WorkspaceNotificationService
             return;
         }
 
-        JournalAudit::query()->create([
-            'user_id' => $excludeUserId,
-            'module' => (string) ($payload['module'] ?? 'notifications'),
-            'entite_type' => (string) ($payload['entity_type'] ?? 'notification'),
-            'entite_id' => isset($payload['entity_id']) ? (int) $payload['entity_id'] : null,
-            'action' => 'notification_'.$event,
-            'ancienne_valeur' => null,
-            'nouvelle_valeur' => [
-                'title' => (string) ($payload['title'] ?? ''),
-                'message' => (string) ($payload['message'] ?? ''),
-                'channels' => $payload['channels'] ?? [],
-                'recipient_ids' => $targets->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+        // A07 — Trace audit best-effort : on logge l'echec en critical mais on ne
+        // casse pas le workflow metier appelant (creation d'action, validation,
+        // etc.). Un audit perdu reste anormal et doit etre supervise via les logs.
+        try {
+            JournalAudit::query()->create([
+                'user_id' => $excludeUserId,
+                'module' => (string) ($payload['module'] ?? 'notifications'),
+                'entite_type' => (string) ($payload['entity_type'] ?? 'notification'),
+                'entite_id' => isset($payload['entity_id']) ? (int) $payload['entity_id'] : null,
+                'action' => 'notification_'.$event,
+                'ancienne_valeur' => null,
+                'nouvelle_valeur' => [
+                    'title' => (string) ($payload['title'] ?? ''),
+                    'message' => (string) ($payload['message'] ?? ''),
+                    'channels' => $payload['channels'] ?? [],
+                    'recipient_ids' => $targets->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+                    'recipient_count' => $targets->count(),
+                ],
+                'adresse_ip' => null,
+                'user_agent' => 'workspace_notification_service',
+            ]);
+        } catch (Throwable $exception) {
+            Log::critical('Audit trace notification failed (A07).', [
+                'event' => $event,
                 'recipient_count' => $targets->count(),
-            ],
-            'adresse_ip' => null,
-            'user_agent' => 'workspace_notification_service',
-        ]);
+                'module' => (string) ($payload['module'] ?? 'notifications'),
+                'entity_type' => (string) ($payload['entity_type'] ?? 'notification'),
+                'entity_id' => isset($payload['entity_id']) ? (int) $payload['entity_id'] : null,
+                'exception_class' => get_class($exception),
+                'exception_message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -1639,6 +1678,22 @@ class WorkspaceNotificationService
             return;
         }
 
-        Notification::send($targets, new WorkspaceModuleNotification($payload));
+        // A07 — Notification best-effort : si la queue/DB est indisponible, on
+        // logge en critical mais on n interrompt PAS le metier appelant. Les
+        // alertes perdues doivent etre surveillees via le canal logs.
+        try {
+            Notification::send($targets, new WorkspaceModuleNotification($payload));
+        } catch (Throwable $exception) {
+            Log::critical('Workspace notification dispatch failed (A07).', [
+                'recipient_count' => $targets->count(),
+                'recipient_ids' => $targets->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+                'module' => (string) ($payload['module'] ?? 'unknown'),
+                'entity_type' => (string) ($payload['entity_type'] ?? 'unknown'),
+                'entity_id' => isset($payload['entity_id']) ? (int) $payload['entity_id'] : null,
+                'title' => (string) ($payload['title'] ?? ''),
+                'exception_class' => get_class($exception),
+                'exception_message' => $exception->getMessage(),
+            ]);
+        }
     }
 }

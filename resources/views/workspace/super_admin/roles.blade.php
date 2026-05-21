@@ -124,7 +124,7 @@
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <h2 class="form-section-title">Matrice de permissions</h2>
-                        <p class="form-section-subtitle">Un rôle sans permission ne voit plus le module correspondant et perd l acces direct a ses routes principales.</p>
+                        <p class="form-section-subtitle">Un rôle sans permission ne voit plus le module correspondant et perd l'accès direct à ses routes principales.</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <a class="btn btn-secondary" href="{{ route('workspace.super-admin.roles.edit', ['simulate_role' => $selectedRole]) }}">Recharger</a>
@@ -132,8 +132,8 @@
                     </div>
                 </div>
 
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full text-sm">
+                <div class="app-table-wrapper mt-4">
+                    <table class="app-table data-table">
                         <thead>
                             <tr>
                                 <th class="px-3 py-2 text-left">Permission</th>
@@ -206,7 +206,7 @@
         </article>
 
         <article class="ui-card !mb-0">
-            <h2>Resultat de la simulation</h2>
+            <h2>Résultat de la simulation</h2>
             <div class="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Permissions actives</h3>
@@ -239,7 +239,7 @@
         <article class="ui-card !mb-0">
             <form method="GET" action="{{ route('workspace.super-admin.roles.edit') }}" class="form-shell">
                 <div class="form-section">
-                    <h2 class="form-section-title">Comparaison de roles</h2>
+                    <h2 class="form-section-title">Comparaison de rôles</h2>
                     <p class="form-section-subtitle">Compare les écarts de permissions et de modules visibles entre deux profils système.</p>
                     <div class="form-grid">
                         <div class="md:col-span-2 xl:col-span-4">
@@ -267,7 +267,7 @@
         </article>
 
         <article class="ui-card !mb-0">
-            <h2>Ecarts de permissions</h2>
+            <h2>Écarts de permissions</h2>
             <div class="mt-4 grid gap-4 xl:grid-cols-3">
                 <div>
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Communes</h3>
@@ -295,7 +295,7 @@
                         @forelse ($roleComparison['right_only'] as $permissionCode)
                             <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{{ $permissionCode }}</span>
                         @empty
-                            <p class="text-sm text-slate-500">Aucun ecart cote compare.</p>
+                            <p class="text-sm text-slate-500">Aucun écart côté comparé.</p>
                         @endforelse
                     </div>
                 </div>

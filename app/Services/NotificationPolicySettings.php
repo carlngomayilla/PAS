@@ -166,6 +166,14 @@ class NotificationPolicySettings
             'pao_status' => ['group' => 'Planification', 'label' => 'Statuts PAO', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PAO.'],
             'pta_status' => ['group' => 'Planification', 'label' => 'Statuts PTA', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PTA.'],
             'delegation_created' => ['group' => 'Gouvernance', 'label' => 'Nouvelle délégation', 'description' => 'Notification envoyée au délégué lors de la création d’une délégation.'],
+
+            // A21 — Nouveaux événements de conformité institutionnelle.
+            // Déclarés au registre pour que le super-admin puisse les activer
+            // et choisir les destinataires dès maintenant. L emission effective
+            // sera assurée par un job d audit periodique (cf. Phase 3).
+            'justificatif_manquant' => ['group' => 'Alertes', 'label' => 'Justificatif manquant', 'description' => 'Alerte de conformité quand une action validée n a pas de pièce justificative obligatoire.'],
+            'pao_en_retard' => ['group' => 'Alertes', 'label' => 'PAO en retard', 'description' => 'Alerte quand un PAO depasse son délai de soumission ou de validation sans transition de statut.'],
+            'validation_bloquee_5j' => ['group' => 'Alertes', 'label' => 'Validation bloquée &gt; 5 jours', 'description' => 'Alerte quand une action reste à l’état "soumise" pendant plus de 5 jours sans décision chef/direction.'],
         ];
     }
 

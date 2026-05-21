@@ -228,7 +228,9 @@ class PaoWebController extends Controller
         $pao = DB::transaction(function () use ($validated, $objectif, $statut, $user, $request): Pao {
             $operationalObjectives = $this->validatedOperationalObjectives($validated);
             $payload = $this->paoPayload($objectif, $validated, $operationalObjectives[0], $statut, $user);
-            $pao = Pao::query()->create($payload);
+            $pao = new Pao();
+            $pao->fill($payload);
+            $pao->forceFill(['statut' => $statut])->save();
             $this->recordAudit($request, 'pao', 'create', $pao, null, $pao->toArray());
 
             foreach ($operationalObjectives as $operationalObjective) {
@@ -300,7 +302,8 @@ class PaoWebController extends Controller
         $before = $pao->toArray();
         DB::transaction(function () use ($pao, $before, $validated, $objectif, $statut, $user, $request, $operationalObjectives): void {
             $firstPayload = $this->paoPayload($objectif, $validated, $operationalObjectives[0], $statut, $user);
-            $pao->update($firstPayload);
+            $pao->fill($firstPayload);
+            $pao->forceFill(['statut' => $statut])->save();
             $this->recordAudit($request, 'pao', 'update', $pao, $before, $pao->toArray());
 
             $keptObjectiveIds = [];
@@ -386,11 +389,11 @@ class PaoWebController extends Controller
 
         $before = $pao->toArray();
         $targetStatus = (string) $workflow['submit_target_status'];
-        $pao->update([
+        $pao->forceFill([
             'statut' => $targetStatus,
             'valide_le' => in_array($targetStatus, ['valide', 'verrouille'], true) ? now() : null,
             'valide_par' => in_array($targetStatus, ['valide', 'verrouille'], true) ? $user->id : null,
-        ]);
+        ])->save();
 
         $this->recordAudit($request, 'pao', 'submit', $pao, $before, $pao->toArray());
         $notificationService->notifyPaoStatus($pao, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
@@ -424,11 +427,11 @@ class PaoWebController extends Controller
         }
 
         $before = $pao->toArray();
-        $pao->update([
+        $pao->forceFill([
             'statut' => 'valide',
             'valide_le' => now(),
             'valide_par' => $user->id,
-        ]);
+        ])->save();
 
         $this->recordAudit($request, 'pao', 'approve', $pao, $before, $pao->toArray());
         $notificationService->notifyPaoStatus($pao, 'approved', $user);
@@ -460,11 +463,11 @@ class PaoWebController extends Controller
         }
 
         $before = $pao->toArray();
-        $pao->update([
+        $pao->forceFill([
             'statut' => 'verrouille',
             'valide_le' => now(),
             'valide_par' => $user->id,
-        ]);
+        ])->save();
 
         $this->recordAudit($request, 'pao', 'lock', $pao, $before, $pao->toArray());
         $notificationService->notifyPaoStatus($pao, 'locked', $user);
@@ -513,11 +516,11 @@ class PaoWebController extends Controller
         $motifRetour = trim((string) $validated['motif_retour']);
 
         $before = $pao->toArray();
-        $pao->update([
+        $pao->forceFill([
             'statut' => 'brouillon',
             'valide_le' => null,
             'valide_par' => null,
-        ]);
+        ])->save();
 
         $after = array_merge($pao->toArray(), ['motif_retour' => $motifRetour]);
         $this->recordAudit($request, 'pao', 'reopen', $pao, $before, $after);
@@ -535,7 +538,10 @@ class PaoWebController extends Controller
 
     private function canApprove(User $user): bool
     {
-        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG);
+        // A06 — DG est en lecture seule pure : il consulte le PAO mais ne le
+        // valide / verrouille pas. La validation finale revient aux profils
+        // SUPER_ADMIN et ADMIN uniquement.
+        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN);
     }
 
     /**
@@ -766,6 +772,8 @@ class PaoWebController extends Controller
      */
     private function paoPayload(PasObjectif $objectif, array $validated, array $operationalObjective, string $statut, User $user): array
     {
+        // Note: `statut` n est PAS renvoye ici : il est positionne via forceFill par les
+        // callers (store/update) car il n est plus mass-assignable sur Pao.
         $payload = [
             'pas_id' => (int) $objectif->pasAxe->pas_id,
             'pas_objectif_id' => (int) $objectif->id,
@@ -780,7 +788,6 @@ class PaoWebController extends Controller
             'objectif_operationnel' => $operationalObjective['libelle'],
             'resultats_attendus' => $operationalObjective['description'],
             'indicateurs_associes' => $operationalObjective['indicateurs'],
-            'statut' => $statut,
             'exercice_id' => app(ExerciceContext::class)->idForYear((int) $validated['annee']),
         ];
 
@@ -807,6 +814,8 @@ class PaoWebController extends Controller
             'statut' => $statut,
         ];
     }
+    // NOTE: operationalObjectivePayload conserve `statut` car ObjectifOperationnel
+    // a son propre $fillable. Si necessaire, le caller pourra appliquer forceFill.
 
     private function generatedPaoTitle(int $directionId, int $year): string
     {

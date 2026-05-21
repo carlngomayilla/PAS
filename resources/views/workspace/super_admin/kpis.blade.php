@@ -44,14 +44,14 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Registre pilote</h2>
-                <p class="form-section-subtitle">Chaque Indicateur de performance peut maintenant lire une source simple, inverser une source, combiner plusieurs sources, prendre le minimum ou le maximum, ou mesurer un ecart a une cible. Les formules restent bornees et auditables.</p>
+                <p class="form-section-subtitle">Chaque Indicateur de performance peut maintenant lire une source simple, inverser une source, combiner plusieurs sources, prendre le minimum ou le maximum, ou mesurer un écart à une cible. Les formules restent bornées et auditables.</p>
                 <div class="space-y-4">
                     @foreach ($settings as $code => $definition)
                         <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
                             <input type="hidden" name="definitions[{{ $code }}][code]" value="{{ $code }}">
                             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                 <div>
-                                    <label for="kpi_label_{{ $code }}">Libelle</label>
+                                    <label for="kpi_label_{{ $code }}">Libellé</label>
                                     <input id="kpi_label_{{ $code }}" name="definitions[{{ $code }}][label]" type="text" maxlength="60" value="{{ old("definitions.$code.label", $definition['label'] ?? '') }}" required>
                                 </div>
                                 <div>
@@ -71,7 +71,7 @@
                                     <textarea id="kpi_description_{{ $code }}" name="definitions[{{ $code }}][description]" rows="2">{{ old("definitions.$code.description", $definition['description'] ?? '') }}</textarea>
                                 </div>
                                 <div>
-                                    <label for="kpi_source_metric_{{ $code }}">Metrique source</label>
+                                    <label for="kpi_source_metric_{{ $code }}">Métrique source</label>
                                     <select id="kpi_source_metric_{{ $code }}" name="definitions[{{ $code }}][source_metric]" required>
                                         @foreach ($sourceMetricOptions as $metricCode => $metricLabel)
                                             <option value="{{ $metricCode }}" @selected(old("definitions.$code.source_metric", $definition['source_metric'] ?? $code) === $metricCode)>{{ $metricLabel }}</option>
@@ -113,7 +113,7 @@
                                     <input id="kpi_tertiary_weight_{{ $code }}" name="definitions[{{ $code }}][tertiary_weight]" type="number" min="0" max="100" value="{{ old("definitions.$code.tertiary_weight", $definition['tertiary_weight'] ?? 0) }}">
                                 </div>
                                 <div>
-                                    <label for="kpi_target_value_{{ $code }}">Cible numerique</label>
+                                    <label for="kpi_target_value_{{ $code }}">Cible numérique</label>
                                     <input id="kpi_target_value_{{ $code }}" name="definitions[{{ $code }}][target_value]" type="number" step="0.01" min="0" max="100" value="{{ old("definitions.$code.target_value", $definition['target_value'] ?? '') }}">
                                 </div>
                                 <div>
@@ -125,11 +125,11 @@
                                         Presets disponibles :
                                         <span class="font-medium">direct</span>,
                                         <span class="font-medium">inverse</span>,
-                                        <span class="font-medium">moyenne ponderee</span>,
-                                        <span class="font-medium">ecart a la cible</span>,
+                                        <span class="font-medium">moyenne pondérée</span>,
+                                        <span class="font-medium">écart à la cible</span>,
                                         <span class="font-medium">minimum</span>,
                                         <span class="font-medium">maximum</span>.
-                                        Pour la moyenne ponderee, la source principale recupere automatiquement le poids restant.
+                                        Pour la moyenne pondérée, la source principale récupère automatiquement le poids restant.
                                     </div>
                                 </div>
                                 <div class="md:col-span-2 xl:col-span-3">

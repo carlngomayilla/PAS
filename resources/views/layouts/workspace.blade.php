@@ -9,7 +9,7 @@
         str_starts_with($routeName, 'workspace.actions.financements') => 'Financements DAF',
         str_starts_with($routeName, 'workspace.actions.suivi') => 'Suivi des actions',
         str_starts_with($routeName, 'workspace.actions.') => 'Suivi des actions',
-        str_starts_with($routeName, 'workspace.kpi_mesures.') => 'Mesures des indicateurs',
+        str_starts_with($routeName, 'workspace.kpi-mesures.') => 'Mesures des indicateurs',
         str_starts_with($routeName, 'workspace.kpi.') => 'Indicateurs de performance',
         str_starts_with($routeName, 'workspace.messaging.') => 'Messagerie',
         str_starts_with($routeName, 'workspace.audit.') => 'Audit',

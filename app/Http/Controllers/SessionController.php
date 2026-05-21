@@ -163,10 +163,17 @@ class SessionController extends Controller
                 'user_agent' => $request->userAgent(),
             ]);
         } catch (Throwable $exception) {
-            Log::warning('Authentication audit could not be recorded.', [
+            // A27 — Un evenement d authentification non audite est une perte
+            // SECURITAIRE (impossible de tracer les login/logout en cas
+            // d incident). On logge en `critical` pour declencher l alerte
+            // operationnelle, mais on ne casse pas le flow de login/logout.
+            Log::critical('Authentication audit could not be recorded (A27).', [
                 'user_id' => $user->id,
                 'action' => $action,
-                'error' => $exception->getMessage(),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'exception_class' => get_class($exception),
+                'exception_message' => $exception->getMessage(),
             ]);
         }
     }

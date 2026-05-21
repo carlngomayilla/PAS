@@ -21,7 +21,7 @@
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Profils pilotes</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['profiles_total'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Cartes pilotables</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['cards_total'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Vues detail actives</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['overviews_enabled'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Vues détail actives</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['overviews_enabled'] }}</p></article>
     </section>
 
     <section class="showcase-panel mb-4">
@@ -38,12 +38,12 @@
                     <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                             <h2>{{ $label }}</h2>
-                            <p class="text-slate-600">Activer ou masquer les blocs analytiques et reordonner les cartes de synthèse.</p>
+                            <p class="text-slate-600">Activer ou masquer les blocs analytiques et réordonner les cartes de synthèse.</p>
                         </div>
                         <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
                             <label class="checkbox-pill !mb-0">
                                 <input type="checkbox" name="profiles[{{ $role }}][overview_enabled]" value="1" @checked(old("profiles.$role.overview_enabled", $profile['overview_enabled'] ?? true))>
-                                Vue detail
+                                Vue détail
                             </label>
                             <label class="checkbox-pill !mb-0">
                                 <input type="checkbox" name="profiles[{{ $role }}][comparison_chart_enabled]" value="1" @checked(old("profiles.$role.comparison_chart_enabled", $profile['comparison_chart_enabled'] ?? true))>
@@ -64,8 +64,8 @@
                         </div>
                     </div>
 
-                    <div class="mt-4 overflow-x-auto">
-                        <table class="dashboard-table">
+                    <div class="app-table-wrapper mt-4">
+                        <table class="app-table data-table">
                             <thead><tr><th>Carte</th><th>Visible</th><th>Ordre</th><th>Taille</th><th>Ton</th><th>Redirection</th><th>Filtres</th></tr></thead>
                             <tbody>
                                 @foreach ($cards as $card)

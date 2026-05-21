@@ -6,12 +6,10 @@
         $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
         $ps = is_array($paoStats ?? null) ? $paoStats : [];
         $summaryCards = [
-            ['label' => 'Total PAO',            'value' => $ps['total'] ?? $rows->total(), 'meta' => null, 'href' => route('workspace.pao.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Actifs',               'value' => $ps['actifs'] ?? 0,             'meta' => null, 'href' => route('workspace.pao.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Brouillons',           'value' => $ps['brouillons'] ?? 0,         'meta' => null, 'href' => route('workspace.pao.index', ['statut' => 'brouillon']),  'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Avec PTA',             'value' => $ps['avec_pta'] ?? 0,           'meta' => null, 'href' => route('workspace.pta.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Sans PTA',             'value' => $ps['sans_pta'] ?? 0,           'meta' => null, 'href' => route('workspace.pao.index', ['without_pta' => 1]),       'badge' => null, 'badge_tone' => ($ps['sans_pta'] ?? 0) > 0 ? 'warning' : 'neutral'],
-            ['label' => 'Directions couvertes', 'value' => $ps['directions'] ?? 0,         'meta' => null, 'href' => route('workspace.pao.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
         ];
     @endphp
 
@@ -100,7 +98,7 @@
             @endif
             <div class="mt-4 flex flex-wrap gap-2">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.pao.index') }}">Réinitialiser</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.pao.index') }}">Réinitialiser</a>
             </div>
             @if ($filters['without_pta'])
                 <div class="mt-4 rounded-[1rem] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-900">
@@ -117,11 +115,10 @@
             </div>
             <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
-        <div class="overflow-auto">
-            <table>
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>PAO</th>
                         <th>PAS</th>
                         <th>Objectif stratégique</th>
@@ -131,7 +128,7 @@
                         <th>PTA</th>
                         <th>Validateur</th>
                         @if ($canWrite)
-                            <th>Opérations</th>
+                            <th>Actions</th>
                         @endif
                     </tr>
                 </thead>
@@ -163,10 +160,9 @@
                                 );
                         @endphp
                         <tr>
-                            <td>#{{ $row->id }}</td>
                             <td>
                                 <div class="font-semibold text-slate-900">{{ $row->titre }}</div>
-                                <div class="mt-1 text-xs text-slate-500">{{ $row->echeance ?? '-' }}</div>
+                                <div class="mt-1 text-xs text-slate-500">PAO #{{ $row->id }} · {{ $row->echeance ?? '-' }}</div>
                             </td>
                             <td>{{ $row->pas?->titre ?? '-' }}</td>
                             <td class="min-w-[240px]">
@@ -193,17 +189,17 @@
                             @if ($canWrite)
                                 <td>
                                     <div class="row-actions">
-                                        <a class="btn btn-amber" href="{{ route('workspace.pao.edit', $row) }}">Modifier</a>
+                                        <a class="btn btn-warning" href="{{ route('workspace.pao.edit', $row) }}">Modifier</a>
                                         @if ($canSubmit)
                                             <form method="POST" action="{{ route('workspace.pao.submit', $row) }}">
                                                 @csrf
-                                                <button class="btn btn-blue" type="submit">Soumettre</button>
+                                                <button class="btn btn-primary" type="submit">Soumettre</button>
                                             </form>
                                         @endif
                                         @if ($canApprove)
                                             <form method="POST" action="{{ route('workspace.pao.approve', $row) }}">
                                                 @csrf
-                                                <button class="btn btn-green" type="submit">Valider</button>
+                                                <button class="btn btn-success" type="submit">Valider</button>
                                             </form>
                                         @endif
                                         @if ($canLock)
@@ -216,13 +212,13 @@
                                             <form method="POST" action="{{ route('workspace.pao.reopen', $row) }}" data-prompt-title="Retour brouillon" data-prompt-message="Saisir le motif de retour brouillon (PAO)." data-prompt-label="Motif de retour" data-prompt-placeholder="Minimum 5 caracteres" data-prompt-target="motif_retour" data-prompt-minlength="5" data-prompt-confirm="Confirmer">
                                                 @csrf
                                                 <input type="hidden" name="motif_retour" value="">
-                                                <button class="btn btn-blue" type="submit">Retour brouillon</button>
+                                                <button class="btn btn-warning" type="submit">Retour brouillon</button>
                                             </form>
                                         @endif
                                         <form method="POST" action="{{ route('workspace.pao.destroy', $row) }}" data-confirm-message="Supprimer ce PAO ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="btn btn-red" type="submit">Supprimer</button>
+                                            <button class="btn btn-danger" type="submit">Supprimer</button>
                                         </form>
                                     </div>
                                 </td>
@@ -230,7 +226,15 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 10 : 9 }}" class="text-slate-500">Aucun PAO trouvé.</td>
+                            <td colspan="{{ $canWrite ? 9 : 8 }}">
+                                <x-ui.empty-state
+                                    title="Aucun PAO trouvé"
+                                    message="Aucun plan d'actions opérationnel ne correspond aux filtres courants."
+                                    icon="filter"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

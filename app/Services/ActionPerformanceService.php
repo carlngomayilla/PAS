@@ -172,6 +172,13 @@ class ActionPerformanceService
         return max($storedRealizedQuantity, (float) $weeklyRealizedQuantity, (float) $subActionRealizedQuantity);
     }
 
+    /**
+     * "Realisee" du point de vue de l agent (action consideree comme faite).
+     * Utilisee dans le calcul de la progression brute. Volontairement
+     * permissive (accepte est_effectuee=true OU statut='effectuee'). Pour
+     * un usage CONFORMITE / KPI institutionnel strict, utiliser plutot
+     * isValidatedSubAction() (cf. A18).
+     */
     public function isCompletedSubAction(SousAction $subAction): bool
     {
         $status = strtolower(trim((string) ($subAction->statut ?? '')));
@@ -180,6 +187,37 @@ class ActionPerformanceService
             || $subAction->completed_at !== null
             || $subAction->date_realisation !== null
             || in_array($status, ['effectuee', 'terminee', 'termine', 'realisee', 'realise', 'validee', 'cloturee'], true);
+    }
+
+    /**
+     * A18 — "Validee" du point de vue institutionnel : pour qu une sous-action
+     * pese dans un KPI consolide / un rapport officiel, on exige :
+     *   - soit le statut explicite "validee" / "cloturee" (validation hierarchique
+     *     passe pour la sous-action),
+     *   - soit que l action parente ait elle-meme un statut_validation valide
+     *     (validee_chef ou validee_direction), ce qui implique le bouclage
+     *     workflow.
+     *
+     * Cela evite qu une simple coche "est_effectuee" suffise a poser un 100 %
+     * institutionnel : la preuve est requise.
+     */
+    public function isValidatedSubAction(SousAction $subAction): bool
+    {
+        $status = strtolower(trim((string) ($subAction->statut ?? '')));
+
+        if (in_array($status, ['validee', 'cloturee'], true)) {
+            return true;
+        }
+
+        $parent = $subAction->action ?? null;
+        if ($parent !== null && in_array((string) $parent->statut_validation, [
+            \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
+            return $this->isCompletedSubAction($subAction);
+        }
+
+        return false;
     }
 
     private function hasRealExecution(Action $action): bool

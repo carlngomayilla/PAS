@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Services\Security\PasswordPolicyService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -20,10 +21,20 @@ class AnbgOrganizationSeeder extends Seeder
      */
     private ?array $workbookUsers = null;
 
+    /**
+     * Credentials temporaires genres pour les nouveaux comptes : on les expose
+     * a la fin du run pour que l administrateur puisse les distribuer. La
+     * `password_changed_at = null` qu on inscrit en base force le renouvellement
+     * au premier login (cf. A08 + PasswordPolicyService::isExpired).
+     *
+     * @var array<int, array{email:string, name:string, matricule:?string, temporary_password:string}>
+     */
+    private array $generatedCredentials = [];
+
     public function run(): void
     {
         $now = now();
-        $password = Hash::make('Pass@12345');
+        $passwordPolicy = app(PasswordPolicyService::class);
 
         foreach ($this->directions() as $direction) {
             DB::table('directions')->updateOrInsert(
@@ -76,20 +87,53 @@ class AnbgOrganizationSeeder extends Seeder
                 $serviceId = $serviceIds[$user['direction_code'].'.'.$user['service_code']] ?? null;
             }
 
+            $email = strtolower((string) $user['email']);
+            $matricule = $this->resolveMatricule($user, $index + 1);
+            $existing = DB::table('users')->where('email', $email)->first(['id', 'password']);
+
+            // A08 — Pour un nouveau user on genere un mot de passe aleatoire
+            // conforme a la policy + password_changed_at NULL (force renouvellement
+            // au 1er login). Un user existant garde son mdp et son timestamp.
+            //
+            // En environnement de tests on conserve le mdp fixture `Pass@12345`
+            // avec password_changed_at=now() pour que les tests qui se loggent
+            // sur les comptes seedes (PlanningApiTest, etc.) continuent a marcher.
+            if ($existing === null) {
+                if (app()->environment('testing')) {
+                    $temporaryPassword = 'Pass@12345';
+                    $passwordChangedAt = $now;
+                } else {
+                    $temporaryPassword = $passwordPolicy->generateInitialPassword();
+                    $passwordChangedAt = null;
+
+                    $this->generatedCredentials[] = [
+                        'email' => $email,
+                        'name' => (string) $user['name'],
+                        'matricule' => $matricule,
+                        'temporary_password' => $temporaryPassword,
+                    ];
+                }
+
+                $hashedPassword = Hash::make($temporaryPassword);
+            } else {
+                $hashedPassword = (string) $existing->password;
+                $passwordChangedAt = $now;
+            }
+
             DB::table('users')->updateOrInsert(
-                ['email' => strtolower((string) $user['email'])],
+                ['email' => $email],
                 [
                     'name' => $user['name'],
-                    'password' => $password,
+                    'password' => $hashedPassword,
                     'role' => $user['role'],
                     'is_agent' => $user['role'] === User::ROLE_AGENT,
-                    'agent_matricule' => $this->resolveMatricule($user, $index + 1),
+                    'agent_matricule' => $matricule,
                     'agent_fonction' => $user['fonction'],
                     'agent_telephone' => null,
                     'direction_id' => $directionId,
                     'service_id' => $serviceId,
                     'email_verified_at' => $now,
-                    'password_changed_at' => $now,
+                    'password_changed_at' => $passwordChangedAt,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]
@@ -97,6 +141,44 @@ class AnbgOrganizationSeeder extends Seeder
         }
 
         $this->deleteLegacyOrganizationEntries($now);
+
+        $this->reportGeneratedCredentials();
+    }
+
+    /**
+     * Affiche dans la console les mots de passe temporaires des comptes crees
+     * pendant ce run. L admin doit imperativement les transmettre (mail, papier
+     * scelle) puis les effacer du terminal. Le password_changed_at = NULL en
+     * base force le user a changer son mdp au premier login.
+     */
+    protected function reportGeneratedCredentials(): void
+    {
+        if ($this->generatedCredentials === []) {
+            return;
+        }
+
+        $command = $this->command ?? null;
+        if ($command === null) {
+            return;
+        }
+
+        $command->newLine();
+        $command->warn('A08 — '.count($this->generatedCredentials).' compte(s) cree(s) avec un mot de passe temporaire :');
+        $command->warn('A transmettre par un canal sur, puis a renouveler au 1er login.');
+        $command->newLine();
+
+        $command->table(
+            ['Email', 'Nom', 'Matricule', 'Mot de passe temporaire'],
+            array_map(
+                static fn (array $row): array => [
+                    $row['email'],
+                    $row['name'],
+                    $row['matricule'] ?? '-',
+                    $row['temporary_password'],
+                ],
+                $this->generatedCredentials
+            )
+        );
     }
 
     /**

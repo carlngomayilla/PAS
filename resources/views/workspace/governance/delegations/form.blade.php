@@ -57,7 +57,7 @@
                         <select id="service_id" name="service_id">
                             <option value="">Sélectionner...</option>
                             @foreach ($serviceOptions as $option)
-                                <option value="{{ $option->id }}" @selected(old('service_id') == $option->id)>
+                                <option value="{{ $option->id }}" data-direction-id="{{ $option->direction_id }}" @selected(old('service_id') == $option->id)>
                                     {{ $option->code }} - {{ $option->libelle }}
                                 </option>
                             @endforeach
@@ -93,10 +93,57 @@
             </div>
 
             <div class="form-actions">
-                <button class="btn btn-blue" type="submit">Enregistrer delegation</button>
+                <button class="btn btn-primary" type="submit">Enregistrer delegation</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.delegations.index') }}">Retour</a>
             </div>
         </form>
     </section>
     </div>
 @endsection
+
+@push('scripts')
+    <script @cspNonce>
+        (function () {
+            var directionInput = document.getElementById('direction_id');
+            var serviceInput = document.getElementById('service_id');
+            var scopeInput = document.getElementById('role_scope');
+
+            if (!directionInput || !serviceInput) {
+                return;
+            }
+
+            function syncServices() {
+                var selectedDirection = String(directionInput.value || '');
+                var selectedService = String(serviceInput.value || '');
+                var serviceRequired = scopeInput && scopeInput.value === 'service';
+                var selectedStillVisible = false;
+
+                serviceInput.required = serviceRequired;
+
+                Array.prototype.forEach.call(serviceInput.options, function (option, index) {
+                    if (index === 0) {
+                        option.hidden = false;
+                        option.disabled = false;
+                        return;
+                    }
+
+                    var visible = selectedDirection === '' || String(option.getAttribute('data-direction-id') || '') === selectedDirection;
+                    option.hidden = !visible;
+                    option.disabled = !visible;
+
+                    if (visible && option.value === selectedService) {
+                        selectedStillVisible = true;
+                    }
+                });
+
+                if (selectedService && !selectedStillVisible) {
+                    serviceInput.value = '';
+                }
+            }
+
+            directionInput.addEventListener('change', syncServices);
+            if (scopeInput) scopeInput.addEventListener('change', syncServices);
+            syncServices();
+        })();
+    </script>
+@endpush

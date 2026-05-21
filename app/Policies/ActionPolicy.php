@@ -159,8 +159,6 @@ class ActionPolicy
      */
     public function reviewByDirection(User $user, Action $action): bool
     {
-        return false;
-
         if ($action->isResponsible($user)) {
             return false;
         }

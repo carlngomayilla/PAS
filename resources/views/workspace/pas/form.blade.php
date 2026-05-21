@@ -24,7 +24,7 @@
                     <h1 class="showcase-title">{{ $isEdit ? 'Modifier un PAS existant' : 'Enregistrer un nouveau PAS' }}</h1>
                 </div>
                 <div class="showcase-action-row">
-                    <a class="btn btn-blue" href="{{ route('workspace.pas.index') }}">Retour liste</a>
+                    <a class="btn btn-secondary" href="{{ route('workspace.pas.index') }}">Retour liste</a>
                 </div>
             </div>
         </section>
@@ -40,7 +40,7 @@
                     <div class="form-grid">
                         <input id="titre" name="titre" type="hidden" value="{{ old('titre', $row->titre ?: 'PAS') }}">
                         <div>
-                            <label for="pas_label_preview">Libelle PAS</label>
+                            <label for="pas_label_preview">Libellé PAS</label>
                             <input id="pas_label_preview" type="text" value="{{ $row->titre ?: 'PAS' }}" readonly>
                         </div>
                         <div>
@@ -76,7 +76,7 @@
 
                 <div class="form-actions">
                     <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
-                    <a class="btn btn-blue" href="{{ route('workspace.pas.index') }}">Retour</a>
+                    <a class="btn btn-secondary" href="{{ route('workspace.pas.index') }}">Retour</a>
                 </div>
             </form>
         </section>
@@ -84,8 +84,8 @@
         @if ($isEdit)
             <section class="showcase-panel mb-4 app-screen-block">
                 <h2 class="showcase-panel-title">Timeline validation</h2>
-                <div class="overflow-auto">
-                    <table>
+                <div class="app-table-wrapper">
+                    <table class="app-table data-table">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -112,7 +112,15 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-slate-500">Aucune transition enregistrée.</td>
+                                    <td colspan="5">
+                                        <x-ui.empty-state
+                                            title="Aucune transition enregistrée"
+                                            message="Le circuit de validation apparaîtra ici après les premiers changements de statut."
+                                            icon="clock"
+                                            tone="info"
+                                            class="my-4"
+                                        />
+                                    </td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -169,7 +177,7 @@
                     '<div class="rounded-2xl border border-slate-200/85 p-3" data-objectif-index="' + objectifIndex + '">' +
                         '<div class="mb-2 flex items-center justify-between gap-2">' +
                             '<h4 class="text-sm font-semibold">Objectif stratégique</h4>' +
-                            '<button type="button" class="remove-objectif btn btn-amber px-2 py-1 text-xs">Supprimer</button>' +
+                            '<button type="button" class="remove-objectif btn btn-warning px-2 py-1 text-xs">Supprimer</button>' +
                         '</div>' +
                         '<div>' +
                             '<label>Libellé objectif</label>' +
@@ -204,16 +212,16 @@
                 card.innerHTML = '' +
                     '<div class="mb-3 flex items-center justify-between gap-2">' +
                         '<h3 class="text-base font-semibold">Axe stratégique</h3>' +
-                        '<button type="button" class="remove-axe btn btn-amber px-2 py-1 text-xs">Supprimer axe</button>' +
+                        '<button type="button" class="remove-axe btn btn-warning px-2 py-1 text-xs">Supprimer axe</button>' +
                     '</div>' +
                     '<div>' +
-                        '<label>Libelle axe</label>' +
+                        '<label>Libellé axe</label>' +
                         '<input type="text" name="axes[' + axeIndex + '][libelle]" value="' + escapeHtml(payload.libelle || '') + '" required>' +
                     '</div>' +
                     '<div class="mt-4">' +
                         '<div class="mb-2 flex items-center justify-between gap-2">' +
                             '<h4 class="text-sm font-semibold">Objectifs stratégiques</h4>' +
-                            '<button type="button" class="add-objectif btn btn-blue px-3 py-1.5 text-xs">Ajouter un objectif</button>' +
+                            '<button type="button" class="add-objectif btn btn-secondary px-3 py-1.5 text-xs">Ajouter un objectif</button>' +
                         '</div>' +
                         '<div class="objectifs-list space-y-3"></div>' +
                     '</div>';

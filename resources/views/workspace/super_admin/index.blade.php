@@ -70,8 +70,8 @@
 
     <section class="showcase-panel mb-4">
         <h2>Historique récent</h2>
-        <div class="mt-4 overflow-x-auto">
-            <table class="min-w-full text-sm">
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
                 <thead><tr><th class="px-3 py-2 text-left">Date</th><th class="px-3 py-2 text-left">Utilisateur</th><th class="px-3 py-2 text-left">Module</th><th class="px-3 py-2 text-left">Action</th></tr></thead>
                 <tbody>
                     @forelse ($recentAudits as $audit)
@@ -82,7 +82,17 @@
                             <td class="px-3 py-2">{{ $audit->action }}</td>
                         </tr>
                     @empty
-                        <tr><td class="px-3 py-4 text-slate-500" colspan="4">Aucune modification super admin journalisee pour le moment.</td></tr>
+                        <tr>
+                            <td colspan="4">
+                                <x-ui.empty-state
+                                    title="Aucune modification journalisée"
+                                    message="Les changements Super Admin apparaîtront ici dès qu'ils seront disponibles."
+                                    icon="clock"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

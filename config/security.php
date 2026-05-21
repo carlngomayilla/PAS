@@ -15,14 +15,21 @@ return [
     'uploads' => [
         'encrypt_justificatifs' => (bool) env('SECURITY_ENCRYPT_JUSTIFICATIFS', true),
         'antivirus' => [
-            'enabled' => (bool) env('ANTIVIRUS_SCAN_ENABLED', false),
+            // A12 — Antivirus actif par defaut hors env testing (les tests ne
+            // disposent pas de clamscan et n ont pas a scanner les fixtures).
+            // L admin peut toujours desactiver via ANTIVIRUS_SCAN_ENABLED=false.
+            'enabled' => (bool) env('ANTIVIRUS_SCAN_ENABLED', env('APP_ENV', 'production') !== 'testing'),
             'binary' => env('ANTIVIRUS_BINARY', 'clamscan'),
             'arguments' => array_values(array_filter(array_map(
                 static fn (string $value): string => trim($value),
                 explode(',', (string) env('ANTIVIRUS_ARGUMENTS', '--no-summary'))
             ))),
             'timeout' => (int) env('ANTIVIRUS_TIMEOUT', 30),
-            'fail_open' => (bool) env('ANTIVIRUS_FAIL_OPEN', false),
+            // A12 — fail_open=false en production (un scanner indisponible
+            // bloque l upload), true ailleurs pour ne pas bloquer le DEV si
+            // clamscan n est pas installe. La prod doit obligatoirement avoir
+            // ClamAV installe avec le service clamd actif.
+            'fail_open' => (bool) env('ANTIVIRUS_FAIL_OPEN', env('APP_ENV', 'production') !== 'production'),
         ],
     ],
 ];

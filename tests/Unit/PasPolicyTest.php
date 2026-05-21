@@ -35,11 +35,14 @@ class PasPolicyTest extends TestCase
         $this->assertTrue($this->policy->update($fixture['admin'], $fixture['pas']));
         $this->assertTrue($this->policy->delete($fixture['admin'], $fixture['pas']));
 
+        // A06 — Cabinet voit tout mais ne pilote plus le PAS strategique
+        // (planning.strategic.manage retiree). Seuls SUPER_ADMIN / ADMIN /
+        // PLANIFICATION / SCIQ peuvent creer / modifier / supprimer un PAS.
         $this->assertTrue($this->policy->viewAny($fixture['cabinet']));
         $this->assertTrue($this->policy->view($fixture['cabinet'], $fixture['pas']));
-        $this->assertTrue($this->policy->create($fixture['cabinet']));
-        $this->assertTrue($this->policy->update($fixture['cabinet'], $fixture['pas']));
-        $this->assertTrue($this->policy->delete($fixture['cabinet'], $fixture['pas']));
+        $this->assertFalse($this->policy->create($fixture['cabinet']));
+        $this->assertFalse($this->policy->update($fixture['cabinet'], $fixture['pas']));
+        $this->assertFalse($this->policy->delete($fixture['cabinet'], $fixture['pas']));
 
         $this->assertTrue($this->policy->viewAny($fixture['direction_user']));
         $this->assertTrue($this->policy->view($fixture['direction_user'], $fixture['pas']));

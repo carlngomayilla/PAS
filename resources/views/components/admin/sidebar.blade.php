@@ -133,7 +133,7 @@
         ];
     }
     if ($pilotageItems !== []) {
-        $sections[] = ['title' => 'Dashboard', 'items' => $sortItems($pilotageItems)];
+        $sections[] = ['title' => 'Pilotage', 'items' => $sortItems($pilotageItems)];
     }
 
     $toolItems = [];
@@ -188,7 +188,7 @@
         ];
     }
     if ($toolItems !== []) {
-        $sections[] = ['title' => 'Outils', 'items' => $sortItems($toolItems)];
+        $sections[] = ['title' => 'Administration', 'items' => $sortItems($toolItems)];
     }
 
     if ($canSeeModule('super_admin')) {
@@ -260,24 +260,6 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
-                </div>
-            </div>
-
-            <div class="app-sidebar-search px-3 pb-2" data-sidebar-search-wrap>
-                <div class="relative">
-                    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[#94a3b8]">
-                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/>
-                        </svg>
-                    </span>
-                    <input
-                        id="sidebar-search-input"
-                        type="search"
-                        placeholder="Rechercher..."
-                        autocomplete="off"
-                        data-sidebar-search
-                        class="w-full rounded-full border border-white/20 bg-white/10 py-2 pl-8 pr-3 text-xs text-white placeholder-white/50 outline-none transition focus:border-white/40 focus:bg-white/15 focus:ring-0"
-                    >
                 </div>
             </div>
 

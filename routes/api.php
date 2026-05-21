@@ -23,7 +23,9 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->name('v1.')->group(function (): void {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:api-login')->name('api.login');
 
-    Route::middleware(['auth:sanctum', EnsureActiveAccount::class, EnsurePasswordIsFresh::class])->group(function (): void {
+    // A29 — Tout endpoint API authentifie hors `login` est limite par defaut a
+    // 120 req/min/utilisateur via le rate limiter `api` (cf. AppServiceProvider).
+    Route::middleware(['auth:sanctum', EnsureActiveAccount::class, EnsurePasswordIsFresh::class, 'throttle:api'])->group(function (): void {
         Route::get('me', [AuthController::class, 'me'])->name('api.me');
         Route::post('logout', [AuthController::class, 'logout'])->name('api.logout');
 

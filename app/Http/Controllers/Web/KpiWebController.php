@@ -11,112 +11,15 @@ use App\Http\Requests\UpdateKpiRequest;
 use App\Models\Action;
 use App\Models\Kpi;
 use App\Models\User;
-use App\Services\DynamicReferentialSettings;
 use App\Support\UiLabel;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 
 class KpiWebController extends Controller
 {
     use AuthorizesPlanningScope;
     use FormatsWorkflowMessages;
     use RecordsAuditTrail;
-
-    public function index(Request $request): View
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        $this->denyUnlessPlanningReader($user);
-
-        $query = Kpi::query()
-            ->with([
-                'action:id,pta_id,libelle,statut',
-                'action.pta:id,direction_id,service_id,titre',
-            ])
-            ->withCount('mesures');
-
-        $this->scopePlanningKpis($query, $user);
-
-        $query->when(
-            $request->filled('action_id'),
-            fn ($q) => $q->where('action_id', (int) $request->integer('action_id'))
-        );
-        $query->when(
-            $request->filled('periodicite'),
-            fn ($q) => $q->where('periodicite', (string) $request->string('periodicite'))
-        );
-        $query->when(
-            $request->filled('est_a_renseigner'),
-            fn ($q) => $q->where('est_a_renseigner', $request->boolean('est_a_renseigner'))
-        );
-        $query->when(
-            $request->boolean('without_mesure'),
-            fn ($q) => $q->where('est_a_renseigner', true)->doesntHave('mesures')
-        );
-        $query->when($request->filled('q'), function ($q) use ($request): void {
-            $search = trim((string) $request->string('q'));
-            $q->where(function ($subQuery) use ($search): void {
-                $subQuery->where('libelle', 'like', "%{$search}%")
-                    ->orWhere('unite', 'like', "%{$search}%");
-            });
-        });
-
-        $summaryBase = clone $query;
-
-        return view('workspace.kpi.index', [
-            'rows' => $query->orderByDesc('id')->paginate(15)->withQueryString(),
-            'summary' => [
-                'total' => (clone $summaryBase)->count(),
-                'manual_total' => (clone $summaryBase)->where('est_a_renseigner', true)->count(),
-                'automatic_total' => (clone $summaryBase)->where('est_a_renseigner', false)->count(),
-                'with_threshold_total' => (clone $summaryBase)->whereNotNull('seuil_alerte')->count(),
-                'without_measure_total' => (clone $summaryBase)
-                    ->where('est_a_renseigner', true)
-                    ->doesntHave('mesures')
-                    ->count(),
-                'actions_total' => (clone $summaryBase)->whereNotNull('action_id')->distinct()->count('action_id'),
-            ],
-            'actionOptions' => $this->actionOptions($user),
-            'periodiciteOptions' => $this->periodiciteOptions(),
-            'modeSaisieOptions' => $this->modeSaisieOptions(),
-            'canWrite' => $this->canWrite($user),
-            'filters' => [
-                'q' => (string) $request->string('q'),
-                'action_id' => $request->filled('action_id') ? (int) $request->integer('action_id') : null,
-                'periodicite' => (string) $request->string('periodicite'),
-                'est_a_renseigner' => $request->filled('est_a_renseigner')
-                    ? (int) $request->boolean('est_a_renseigner')
-                    : null,
-                'without_mesure' => $request->boolean('without_mesure'),
-            ],
-        ]);
-    }
-
-    public function create(Request $request): View
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $this->canWrite($user)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        return view('workspace.kpi.form', [
-            'mode' => 'create',
-            'row' => new Kpi(),
-            'actionOptions' => $this->actionOptions($user),
-            'periodiciteOptions' => $this->periodiciteOptions(),
-            'modeSaisieOptions' => $this->modeSaisieOptions(),
-            'unitSuggestions' => app(DynamicReferentialSettings::class)->kpiUnitSuggestions(),
-        ]);
-    }
 
     public function store(StoreKpiRequest $request): RedirectResponse
     {
@@ -160,30 +63,6 @@ class KpiWebController extends Controller
         return redirect()
             ->route('workspace.kpi.index')
             ->with('success', $this->entityCreatedMessage(UiLabel::object('kpi')));
-    }
-
-    public function edit(Request $request, Kpi $kpi): View
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        $kpi->loadMissing('action.pta:id,direction_id,service_id');
-        $this->denyUnlessWriteService(
-            $user,
-            (int) $kpi->action?->pta?->direction_id,
-            (int) $kpi->action?->pta?->service_id
-        );
-
-        return view('workspace.kpi.form', [
-            'mode' => 'edit',
-            'row' => $kpi,
-            'actionOptions' => $this->actionOptions($user),
-            'periodiciteOptions' => $this->periodiciteOptions(),
-            'modeSaisieOptions' => $this->modeSaisieOptions(),
-            'unitSuggestions' => app(DynamicReferentialSettings::class)->kpiUnitSuggestions(),
-        ]);
     }
 
     public function update(UpdateKpiRequest $request, Kpi $kpi): RedirectResponse
@@ -280,36 +159,4 @@ class KpiWebController extends Controller
             || $user->hasDelegatedPermission('planning_write');
     }
 
-    /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Action>
-     */
-    private function actionOptions(User $user)
-    {
-        $query = Action::query()
-            ->with('pta:id,direction_id,service_id,titre')
-            ->orderByDesc('id');
-
-        $this->scopePlanningActions($query, $user);
-
-        return $query->get(['id', 'pta_id', 'libelle', 'statut']);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function periodiciteOptions(): array
-    {
-        return ['mensuel', 'trimestriel', 'semestriel', 'annuel', 'ponctuel'];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function modeSaisieOptions(): array
-    {
-        return [
-            '1' => UiLabel::indicatorInputMode(true),
-            '0' => UiLabel::indicatorInputMode(false),
-        ];
-    }
 }

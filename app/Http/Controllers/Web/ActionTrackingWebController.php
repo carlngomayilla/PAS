@@ -1189,7 +1189,7 @@ class ActionTrackingWebController extends Controller
         $before = $action->toArray();
         $status = (string) $validated['statut_financement'];
 
-        $action->fill([
+        $action->forceFill([
             'financement_statut' => $status,
             'financement_daf_par' => $user->id,
             'financement_daf_le' => now(),

@@ -155,7 +155,7 @@ class GovernanceWebController extends Controller
             ]),
             'delegantOptions' => $this->delegationEligibleUsers(),
             'delegateOptions' => $this->delegateReceivers(),
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
+            'directionOptions' => Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->orderBy('code')->get(['id', 'direction_id', 'code', 'libelle']),
         ]);
     }

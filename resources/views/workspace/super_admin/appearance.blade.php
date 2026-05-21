@@ -8,7 +8,7 @@
             'primary_color' => 'Primaire',
             'secondary_color' => 'Secondaire',
             'surface_color' => 'Surface sombre',
-            'success_color' => 'Succes',
+            'success_color' => 'Succès',
             'accent_color' => 'Accent',
             'warning_color' => 'Alerte',
             'danger_color' => 'Critique',
@@ -30,7 +30,7 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Apparence de la plateforme</h1>
-                <p class="mt-2 text-slate-600">Pilotage fin des couleurs, composants, largeurs, densites et styles globaux avec apercu temps reel avant enregistrement.</p>
+                <p class="mt-2 text-slate-600">Pilotage fin des couleurs, composants, largeurs, densités et styles globaux avec aperçu temps réel avant enregistrement.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
@@ -57,7 +57,7 @@
 
                 <div class="form-section">
                     <h2 class="form-section-title">Palette principale</h2>
-                    <p class="form-section-subtitle">Couleurs systeme reutilisees dans les boutons, fonds, etats et accents graphiques.</p>
+                    <p class="form-section-subtitle">Couleurs système réutilisées dans les boutons, fonds, états et accents graphiques.</p>
                     <div class="form-grid">
                         @foreach ($paletteFields as $key => $label)
                             <div>
@@ -89,7 +89,7 @@
 
                 <div class="form-section">
                     <h2 class="form-section-title">Typographie et lecture</h2>
-                    <p class="form-section-subtitle">Police globale, police de titre, densite de lecture et largeur des contenus.</p>
+                    <p class="form-section-subtitle">Police globale, police de titre, densité de lecture et largeur des contenus.</p>
                     <div class="form-grid">
                         <div>
                             <label for="font_family">Police globale</label>
@@ -116,7 +116,7 @@
                             </select>
                         </div>
                         <div>
-                            <label for="visual_density">Densite visuelle</label>
+                            <label for="visual_density">Densité visuelle</label>
                             <select id="visual_density" name="visual_density">
                                 @foreach ($densityOptions as $value => $label)
                                     <option value="{{ $value }}" @selected(old('visual_density', $settings['visual_density']) === $value)>{{ $label }}</option>
@@ -144,7 +144,7 @@
 
                 <div class="form-section">
                     <h2 class="form-section-title">Composants visuels</h2>
-                    <p class="form-section-subtitle">Styles des arrieres-plans, cartes, boutons, tableaux et zones de saisie.</p>
+                    <p class="form-section-subtitle">Styles des arrière-plans, cartes, boutons, tableaux et zones de saisie.</p>
                     <div class="form-grid">
                         <div>
                             <label for="page_background_style">Fond de page</label>
@@ -215,7 +215,7 @@
 
                 <div class="form-section">
                     <h2 class="form-section-title">Rayons et profondeur</h2>
-                    <p class="form-section-subtitle">Ajuste l arrondi et le flou pour uniformiser toute l application.</p>
+                    <p class="form-section-subtitle">Ajuste l'arrondi et le flou pour uniformiser toute l'application.</p>
                     <div class="form-grid">
                         <div>
                             <label for="card_radius">Rayon cartes</label>
@@ -248,7 +248,7 @@
         <aside class="ui-card mb-0 xl:sticky xl:top-24">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <h2>Apercu temps reel</h2>
+                    <h2>Aperçu temps réel</h2>
                     <p class="text-slate-600">Le rendu ci-dessous se met a jour avant enregistrement.</p>
                 </div>
                 <div class="text-right text-xs text-slate-500">
@@ -293,7 +293,7 @@
                             <header class="appearance-live-preview-header">
                                 <div>
                                     <p class="appearance-live-preview-eyebrow">Pilotage</p>
-                                    <h3 class="appearance-live-preview-title">Apercu du dashboard</h3>
+                                    <h3 class="appearance-live-preview-title">Aperçu du dashboard</h3>
                                 </div>
                                 <button type="button" class="appearance-live-preview-button appearance-live-preview-button-secondary">Exporter</button>
                             </header>

@@ -69,16 +69,11 @@
             'validee_direction'  => 'anbg-badge anbg-badge-success',
         ];
         $summaryCards = [
-            ['label' => 'Actions non démarrées', 'value' => $statusCounts['non_demarre'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'non_demarre']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Total actions', 'value' => $summaryTotal, 'meta' => null, 'href' => route('workspace.actions.index'), 'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Actions en cours', 'value' => $statusCounts['en_cours'] + $statusCounts['a_risque'] + $statusCounts['en_avance'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_cours']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Actions réalisées', 'value' => $statusCounts['achevees'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'achevees']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Actions validées', 'value' => $validatedCount, 'meta' => null, 'href' => route('workspace.actions.index', ['statut_validation_min' => 'validee_chef']), 'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Actions en retard', 'value' => $statusCounts['en_retard'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => null, 'badge_tone' => $statusCounts['en_retard'] > 0 ? 'danger' : 'neutral'],
-            ['label' => 'Avancement moyen réel', 'value' => number_format($avgProgression, 1).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'progression_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => "Performance moyenne d'exécution", 'value' => number_format($avgKpi, 1).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Actions en attente validation', 'value' => $pendingValidationCount, 'meta' => null, 'href' => route('workspace.actions.index', ['statut_validation_min' => 'soumise_chef']), 'badge' => null, 'badge_tone' => $pendingValidationCount > 0 ? 'warning' : 'neutral'],
-            ['label' => 'Justificatifs en attente', 'value' => $pendingJustificatifCount, 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'non_demarre']), 'badge' => null, 'badge_tone' => $pendingJustificatifCount > 0 ? 'warning' : 'neutral'],
-            ['label' => 'Taux de conformité qualité', 'value' => number_format($avgQuality, 1).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_qualite_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'En attente validation', 'value' => $pendingValidationCount, 'meta' => null, 'href' => route('workspace.actions.index', ['statut_validation_min' => 'soumise_chef']), 'badge' => null, 'badge_tone' => $pendingValidationCount > 0 ? 'warning' : 'neutral'],
+            ['label' => 'Performance moyenne', 'value' => number_format($avgKpi, 1).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
         ];
         $layoutMode = request()->query('layout', 'list');
         $kanbanColumns = [
@@ -302,7 +297,7 @@
                         <a href="{{ request()->fullUrlWithQuery([$chip['remove'] => '']) }}" class="active-filter-chip" title="Retirer ce filtre">
                             <span class="active-filter-chip-dot" style="background: {{ $chip['color'] }};"></span>
                             {{ $chip['label'] }}
-                            <span class="active-filter-chip-remove" aria-hidden="true">✕</span>
+                            <span class="active-filter-chip-remove" aria-hidden="true">×</span>
                         </a>
                     @endforeach
                     <a href="{{ route('workspace.actions.index', array_filter(['vue' => $filters['vue'], 'layout' => $layoutMode !== 'list' ? $layoutMode : null])) }}" class="text-xs font-bold text-[#b42318] hover:underline ml-1">
@@ -347,7 +342,7 @@
                                data-patch-url="{{ route('workspace.actions.quick-status', $row) }}">
                                 <div class="kanban-card-id">ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }}</div>
                                 <div class="kanban-card-title">{{ $row->libelle }}</div>
-                                <div class="kanban-card-meta">{{ $row->responsable?->name ?? '—' }} · {{ $row->pta?->titre ?? '—' }}</div>
+                                <div class="kanban-card-meta">{{ $row->responsable?->name ?? '-' }} · {{ $row->pta?->titre ?? '-' }}</div>
                                 <div class="kanban-card-progress">
                                     <div class="kanban-card-progress-bar" style="width: {{ $pct }}%; background: {{ $pctColor }};"></div>
                                 </div>
@@ -598,23 +593,17 @@
             <span class="showcase-chip">{{ $rows->total() }}</span>
         </div>
 
-        <div class="overflow-auto eas-table-shell">
-            <table class="dashboard-table min-w-full">
+        <div class="app-table-wrapper">
+            <table class="app-table data-table min-w-full">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Action</th>
-                        <th>PTA</th>
                         <th>Responsable</th>
-                        <th>Avancement réel</th>
-                        <th>Cible</th>
+                        <th>Échéance</th>
                         <th>Statut</th>
-                        <th>Délai</th>
-                        <th>Qualité / conformité</th>
-                        <th>Justificatif</th>
+                        <th>Progression</th>
                         <th>Validation</th>
-                        <th>Performance d'exécution</th>
-                        <th>Opérations</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -640,26 +629,36 @@
                                 : 'text-slate-400';
                         @endphp
                         <tr>
-                            <td class="font-mono text-xs text-slate-500">ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }}</td>
                             <td class="min-w-[260px]">
                                 <div class="font-semibold text-slate-900">{{ $row->libelle }}</div>
+                                <p class="mt-1 text-xs font-medium text-slate-500">
+                                    ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }} · PTA : {{ $row->pta?->titre ?? '-' }}
+                                </p>
                                 @if ($row->description)
                                     <p class="mt-1 max-w-sm text-sm text-slate-500">{{ $row->description }}</p>
                                 @endif
-                                <div class="mt-2 flex flex-wrap gap-2">
-                                    @if ($row->date_echeance)
-                                        <span class="anbg-badge anbg-badge-neutral">
-                                            Échéance {{ \Illuminate\Support\Carbon::parse($row->date_echeance)->format('d/m/Y') }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </td>
-                            <td class="min-w-[170px]">
-                                <div class="font-medium text-slate-900">{{ $row->pta?->titre ?? '-' }}</div>
                             </td>
                             <td class="min-w-[180px]">
                                 <div class="font-medium text-slate-900">{{ $row->responsable?->name ?? '-' }}</div>
                                 <p class="mt-1 text-xs text-slate-500">{{ $row->responsable?->agent_matricule ?? $row->responsable?->email ?? '-' }}</p>
+                            </td>
+                            <td class="min-w-[140px] text-sm text-slate-700">
+                                @if ($row->date_echeance)
+                                    <span class="font-semibold text-slate-900">{{ \Illuminate\Support\Carbon::parse($row->date_echeance)->format('d/m/Y') }}</span>
+                                @else
+                                    <span class="text-slate-500">Non définie</span>
+                                @endif
+                                <p class="mt-1 text-xs text-slate-500">
+                                    {{ $modeEvaluationLabel }}
+                                </p>
+                            </td>
+                            <td>
+                                <span class="{{ $statusClass }} px-3">
+                                    {{ $actionStatusLabel($row->statut_dynamique ?: 'non_demarre') }}
+                                </span>
+                                <p class="mt-2 text-xs text-slate-500">
+                                    Justificatif : {{ $justificatifsTotal > 0 ? $justificatifsTotal.' pièce(s)' : 'aucun' }}
+                                </p>
                             </td>
                             <td class="min-w-[180px]">
                                 <div class="mb-2 flex items-center justify-between gap-2 text-xs">
@@ -669,66 +668,33 @@
                                 <div class="showcase-progress-track">
                                     <span class="showcase-progress-bar {{ $progressColor }}" style="width: {{ $progressValue }}%"></span>
                                 </div>
-                            </td>
-                            <td class="min-w-[210px] text-sm text-slate-700">
-                                <div class="font-semibold text-slate-900">{{ $modeEvaluationLabel }}</div>
                                 @if ($row->usesQuantitativeProgress())
                                     <p class="mt-1 text-xs text-slate-500">
-                                        Cible : {{ $row->quantite_cible !== null ? number_format((float) $row->quantite_cible, 1, ',', ' ') : '0' }} {{ $row->unite_cible ?: '' }}
-                                        | Realise : {{ number_format($realizedValue, 1, ',', ' ') }}
-                                        | Reste : {{ number_format($remainingValue, 1, ',', ' ') }}
-                                    </p>
-                                    <p class="mt-1 text-xs text-slate-500">
-                                        Realisation : {{ number_format($targetRate, 1) }}%
-                                        | Technique : {{ number_format((float) ($row->avancement_operationnel ?? 0), 1) }}%
-                                        @if ($overachievementRate > 0)
-                                            | Depassement : +{{ number_format($overachievementRate, 1) }}%
-                                        @endif
+                                        Cible {{ $row->quantite_cible !== null ? number_format((float) $row->quantite_cible, 1, ',', ' ') : '0' }} {{ $row->unite_cible ?: '' }}
+                                        · Réalisé {{ number_format($realizedValue, 1, ',', ' ') }}
                                     </p>
                                 @else
-                                    <p class="mt-1 text-xs text-slate-500">Sous-actions de suivi : {{ $semainesRenseignees }}/{{ $semainesTotal }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">Sous-actions : {{ $semainesRenseignees }}/{{ $semainesTotal }}</p>
                                 @endif
-                            </td>
-                            <td>
-                                <span class="{{ $statusClass }} px-3">
-                                    {{ $actionStatusLabel($row->statut_dynamique ?: 'non_demarre') }}
-                                </span>
-                            </td>
-                            <td>
-                                <div class="text-sm font-semibold text-slate-700">
-                                    {{ $kpiDelay !== null ? number_format((float) $kpiDelay, 1) . '%' : '-' }}
-                                </div>
-                            </td>
-                            <td>
-                                <div class="text-sm font-semibold text-slate-700">
-                                    {{ $kpiQuality !== null ? number_format((float) $kpiQuality, 1) . '%' : '-' }}
-                                </div>
-                            </td>
-                            <td>
-                                <span class="{{ $justificatifsTotal > 0 ? 'anbg-badge anbg-badge-success' : 'anbg-badge anbg-badge-neutral' }} px-3">
-                                    {{ $justificatifsTotal > 0 ? $justificatifsTotal.' pièce(s)' : 'Aucun' }}
-                                </span>
                             </td>
                             <td>
                                 @php $rowValidationStatus = $row->statut_validation ?: 'non_soumise'; @endphp
                                 <span class="{{ $validationStyles[$rowValidationStatus] ?? 'anbg-badge anbg-badge-neutral' }} px-3">
                                     {{ $validationStatusLabel($rowValidationStatus) }}
                                 </span>
-                            </td>
-                            <td>
-                                <div class="text-base font-semibold {{ $kpiColor }}">
-                                    {{ $kpiPerformance !== null ? number_format((float) $kpiPerformance, 1) . '%' : '-' }}
-                                </div>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Performance {{ $kpiPerformance !== null ? number_format((float) $kpiPerformance, 1).'%' : '-' }}
+                                </p>
                             </td>
                             <td>
                                 <div class="row-actions">
                                     <a class="btn btn-follow btn-sm rounded-xl" href="{{ route('workspace.actions.suivi', $row) }}">Suivi</a>
                                     @if ($canWrite)
-                                        <a class="btn btn-amber btn-sm rounded-xl" href="{{ route('workspace.actions.edit', $row) }}">Modifier</a>
+                                        <a class="btn btn-warning btn-sm rounded-xl" href="{{ route('workspace.actions.edit', $row) }}">Modifier</a>
                                         <form method="POST" action="{{ route('workspace.actions.destroy', $row) }}" data-confirm-message="Supprimer cette action ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="btn btn-red btn-sm" type="submit">Supprimer</button>
+                                            <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
                                         </form>
                                     @endif
                                 </div>
@@ -736,7 +702,15 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="13" class="py-8 text-center text-slate-500">Aucune action trouvée pour les filtres courants.</td>
+                            <td colspan="7">
+                                <x-ui.empty-state
+                                    title="Aucune action trouvée"
+                                    message="Aucune action ne correspond aux filtres courants."
+                                    icon="filter"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

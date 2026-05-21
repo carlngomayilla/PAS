@@ -110,9 +110,32 @@ class PasswordPolicyService
             return false;
         }
 
-        $changedAt = $user->password_changed_at ?? $user->created_at ?? now();
+        // A08 — Force le renouvellement au 1er login pour tout user dont le mot
+        // de passe n a jamais ete change (seeder, import CSV, reset admin sans
+        // distribution). password_changed_at = NULL est le signal explicite.
+        if ($user->password_changed_at === null) {
+            return true;
+        }
 
-        return $changedAt === null || $changedAt->copy()->addDays($expireDays)->isPast();
+        return $user->password_changed_at->copy()->addDays($expireDays)->isPast();
+    }
+
+    /**
+     * Genere un mot de passe aleatoire conforme a la policy (longueur min,
+     * lettres + chiffres + symboles + mixte casse). Utilise par les seeders et
+     * imports admin pour eviter tout mdp partage `Pass@12345` (cf. A08).
+     */
+    public function generateInitialPassword(): string
+    {
+        $minLength = max(12, (int) config('security.passwords.min_length', 12));
+
+        return \Illuminate\Support\Str::password(
+            length: $minLength + 4,
+            letters: true,
+            numbers: true,
+            symbols: true,
+            spaces: false,
+        );
     }
 
     public function assertNotExpired(User $user): void

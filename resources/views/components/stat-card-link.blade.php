@@ -18,7 +18,7 @@
     $resolvedTone = $tone ?? ($badge ? $badgeTone : null);
 @endphp
 
-<a href="{{ $href }}" {{ $attributes->class([$cardClass, 'stat-card-link stat-card flex min-w-[150px] max-w-[260px] flex-col items-center justify-center p-3 text-center', $resolvedTone ? 'showcase-tone-card showcase-tone-card-'.$resolvedTone : null]) }}>
+<a href="{{ $href }}" {{ $attributes->class([$cardClass, 'no-kpi-band stat-card-link stat-card flex min-w-[150px] max-w-[260px] flex-col items-center justify-center p-3 text-center', $resolvedTone ? 'showcase-tone-card showcase-tone-card-'.$resolvedTone : null]) }}>
     <div class="flex w-full flex-col items-center justify-center gap-2">
         <p class="{{ $labelClass }} max-w-full text-center leading-snug">{{ $label }}</p>
         @if ($badge)

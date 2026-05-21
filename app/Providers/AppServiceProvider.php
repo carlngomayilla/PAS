@@ -5,9 +5,6 @@ namespace App\Providers;
 use App\Database\Connectors\PostgresConnector;
 use App\Models\Action;
 use App\Models\Pao;
-use App\Models\PaoAxe;
-use App\Models\PaoObjectifOperationnel;
-use App\Models\PaoObjectifStrategique;
 use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\User;
@@ -31,9 +28,6 @@ use App\Services\WorkflowSettings;
 use App\Services\WorkspaceModuleSettings;
 use App\Policies\ActionPolicy;
 use App\Policies\PaoPolicy;
-use App\Policies\PaoAxePolicy;
-use App\Policies\PaoObjectifOperationnelPolicy;
-use App\Policies\PaoObjectifStrategiquePolicy;
 use App\Policies\PasPolicy;
 use App\Observers\ActionObserver;
 use App\Observers\PlanningCacheObserver;
@@ -96,9 +90,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Action::class, ActionPolicy::class);
         Gate::policy(Pas::class, PasPolicy::class);
         Gate::policy(Pao::class, PaoPolicy::class);
-        Gate::policy(PaoAxe::class, PaoAxePolicy::class);
-        Gate::policy(PaoObjectifStrategique::class, PaoObjectifStrategiquePolicy::class);
-        Gate::policy(PaoObjectifOperationnel::class, PaoObjectifOperationnelPolicy::class);
 
         RateLimiter::for('login', function (Request $request): array {
             $identifier = Str::lower(trim((string) $request->input('email', 'guest')));
@@ -116,6 +107,27 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinutes(10, 5)->by('api-login:'.$identifier.'|'.$request->ip()),
                 Limit::perMinutes(10, 25)->by('api-login-ip:'.$request->ip()),
             ];
+        });
+
+        // A29 — Rate limiters generaux pour proteger l API et les telechargements.
+        // - `api` : limite par utilisateur authentifie (fallback IP), evite l abus
+        //           de scraping / boucles de requete.
+        // - `api-downloads` : plus strict, applique aux endpoints qui generent ou
+        //                    livrent des artefacts (exports, justificatifs).
+        RateLimiter::for('api', function (Request $request): Limit {
+            $key = $request->user()?->id
+                ? 'api-user:'.$request->user()->id
+                : 'api-ip:'.$request->ip();
+
+            return Limit::perMinute(120)->by($key);
+        });
+
+        RateLimiter::for('api-downloads', function (Request $request): Limit {
+            $key = $request->user()?->id
+                ? 'api-downloads-user:'.$request->user()->id
+                : 'api-downloads-ip:'.$request->ip();
+
+            return Limit::perMinute(30)->by($key);
         });
 
         View::share('appearanceSettings', $this->app->make(AppearanceSettings::class));

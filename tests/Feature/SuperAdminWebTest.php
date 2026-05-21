@@ -439,7 +439,7 @@ class SuperAdminWebTest extends TestCase
             ->assertOk()
             ->assertSee('{app_name}')
             ->assertSee('{generated_at}')
-            ->assertSee('Variables supportees');
+            ->assertSee('Variables supportées');
     }
 
     public function test_super_admin_roles_screen_displays_role_comparison_details(): void
@@ -452,8 +452,8 @@ class SuperAdminWebTest extends TestCase
                 'compare_right_role' => User::ROLE_AGENT,
             ]))
             ->assertOk()
-            ->assertSee('Comparaison de roles')
-            ->assertSee('Ecarts de permissions')
+            ->assertSee('Comparaison de rôles')
+            ->assertSee('Écarts de permissions')
             ->assertSee('Administrateur')
             ->assertSee('Agent');
     }

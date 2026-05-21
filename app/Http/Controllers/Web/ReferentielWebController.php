@@ -44,10 +44,11 @@ class ReferentielWebController extends Controller
             ->withCount(['services', 'users', 'paos', 'ptas'])
             ->orderBy('code');
 
-        $query->when(
-            $request->filled('actif'),
-            fn (Builder $q) => $q->where('actif', (bool) $request->boolean('actif'))
-        );
+        if ($request->filled('actif')) {
+            $query->where('actif', (bool) $request->boolean('actif'));
+        } else {
+            $query->where('actif', true);
+        }
         $query->when($request->filled('q'), function (Builder $q) use ($request): void {
             $search = trim((string) $request->string('q'));
             $q->where(function (Builder $subQuery) use ($search): void {
@@ -219,7 +220,7 @@ class ReferentielWebController extends Controller
                 'users_total' => (int) $serviceSummaryRows->sum('users_count'),
                 'ptas_total' => (int) $serviceSummaryRows->sum('ptas_count'),
             ],
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle', 'actif']),
+            'directionOptions' => $this->activeDirectionOptions(['id', 'code', 'libelle', 'actif']),
             'canWrite' => $this->canWrite($user),
             'canManageRoles' => $this->canManageRoles($user),
             'filters' => [
@@ -238,7 +239,7 @@ class ReferentielWebController extends Controller
         return view('workspace.referentiel.services.form', [
             'mode' => 'create',
             'row' => new Service(),
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle', 'actif']),
+            'directionOptions' => $this->activeDirectionOptions(['id', 'code', 'libelle', 'actif']),
         ]);
     }
 
@@ -278,7 +279,7 @@ class ReferentielWebController extends Controller
         return view('workspace.referentiel.services.form', [
             'mode' => 'edit',
             'row' => $service,
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle', 'actif']),
+            'directionOptions' => $this->activeDirectionOptions(['id', 'code', 'libelle', 'actif']),
         ]);
     }
 
@@ -409,7 +410,7 @@ class ReferentielWebController extends Controller
             ],
             'canWrite' => $this->canManageUsers($user),
             'canManageRoles' => $this->canManageRoles($user),
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
+            'directionOptions' => $this->activeDirectionOptions(),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
             'roleOptions' => $this->roleOptions($user),
@@ -431,7 +432,7 @@ class ReferentielWebController extends Controller
         return view('workspace.referentiel.utilisateurs.form', [
             'mode' => 'create',
             'row' => new User(),
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
+            'directionOptions' => $this->activeDirectionOptions(),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
             'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
@@ -451,7 +452,10 @@ class ReferentielWebController extends Controller
         $profilePhotoPath = $this->storeProfilePhoto($request);
 
         $created = DB::transaction(function () use ($validated, $profilePhotoPath, $request): User {
-            $created = User::query()->create([
+            // forceCreate : role / direction_id / service_id / unite_dg_id / is_active /
+            // is_agent / agent_* ne sont plus mass-assignables (cf. A02). Cette voie
+            // est reservee aux admins et tous les champs sont valides en amont.
+            $created = User::query()->forceCreate([
                 'name' => (string) $validated['name'],
                 'profile_photo_path' => $profilePhotoPath,
                 'email' => (string) $validated['email'],
@@ -492,7 +496,7 @@ class ReferentielWebController extends Controller
         return view('workspace.referentiel.utilisateurs.form', [
             'mode' => 'edit',
             'row' => $utilisateur,
-            'directionOptions' => Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
+            'directionOptions' => $this->activeDirectionOptions(),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
             'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
@@ -534,8 +538,10 @@ class ReferentielWebController extends Controller
 
         $before = $utilisateur->toArray();
         DB::transaction(function () use ($utilisateur, $payload, $validated): void {
-            $utilisateur->fill($payload);
-            $utilisateur->save();
+            // forceFill : role / is_active / direction_id / service_id / unite_dg_id
+            // ne sont plus mass-assignables (cf. A02). Le payload est integralement
+            // valide et controle par le controleur referentiel reserve aux admins.
+            $utilisateur->forceFill($payload)->save();
 
             if (! empty($validated['password'])) {
                 $this->passwordPolicy->persistPassword($utilisateur, (string) $validated['password']);
@@ -820,12 +826,29 @@ class ReferentielWebController extends Controller
 
     private function canManageUsers(User $user): bool
     {
-        return $user->hasAnyPermission('users.manage', 'users.manage_roles');
+        return $user->hasAnyPermission('users.manage', 'users.manage_roles')
+            || $user->hasRole(
+                User::ROLE_PLANIFICATION,
+                User::ROLE_SCIQ,
+                User::ROLE_SCIQ_SUIVI_GLOBAL,
+                User::ROLE_CHEF_UNITE_SCIQ
+            );
     }
 
     private function canManageRoles(User $user): bool
     {
         return $user->hasPermission('users.manage_roles');
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private function activeDirectionOptions(array $columns = ['id', 'code', 'libelle'])
+    {
+        return Direction::query()
+            ->where('actif', true)
+            ->orderBy('code')
+            ->get($columns);
     }
 
     /**

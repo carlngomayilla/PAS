@@ -8,13 +8,13 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Organisation et utilisateurs</h1>
-                <p class="mt-2 text-slate-600">Pilotage direct des directions, des services, des comptes, des sessions actives et des reinitialisations controlees.</p>
+                <p class="mt-2 text-slate-600">Pilotage direct des directions, des services, des comptes, des sessions actives et des réinitialisations contrôlées.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
-                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.directions.index') }}">Referentiel directions</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.services.index') }}">Referentiel services</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Referentiel utilisateurs</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.directions.index') }}">Référentiel directions</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.services.index') }}">Référentiel services</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Référentiel utilisateurs</a>
                 <a class="btn btn-primary" href="{{ route('workspace.super-admin.index') }}">Retour super admin</a>
             </div>
         </div>
@@ -24,13 +24,8 @@
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Directions actives</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['directions_active'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Services actifs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['services_active'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Utilisateurs actifs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['users_active'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Utilisateurs inactifs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['users_inactive'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Directions inactives</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['directions_inactive'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Services inactifs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['services_inactive'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Comptes hors scope</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['users_without_scope'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Sessions actives</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['sessions_active'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Comptes suspendus</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['users_suspended'] }}</p></article>
-        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Connexions journalisees</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['login_events_total'] }}</p></article>
     </section>
 
     <section class="showcase-panel mb-4">
@@ -64,7 +59,7 @@
                     <select id="service_id" name="service_id">
                         <option value="">Tous</option>
                         @foreach ($serviceOptions as $service)
-                            <option value="{{ $service->id }}" @selected($filters['service_id'] === $service->id)>{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>
+                            <option value="{{ $service->id }}" data-direction-id="{{ $service->direction_id }}" @selected($filters['service_id'] === $service->id)>{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -157,7 +152,7 @@
                     <input id="direction_code" name="code" type="text" value="{{ old('code', $editingDirection?->code) }}" required>
                 </div>
                 <div>
-                    <label for="direction_libelle">Libelle</label>
+                    <label for="direction_libelle">Libellé</label>
                     <input id="direction_libelle" name="libelle" type="text" value="{{ old('libelle', $editingDirection?->libelle) }}" required>
                 </div>
                 <div class="md:col-span-2 flex items-end gap-3">
@@ -197,7 +192,7 @@
                     <input id="service_code" name="code" type="text" value="{{ old('code', $editingService?->code) }}" required>
                 </div>
                 <div class="md:col-span-2">
-                    <label for="service_libelle">Libelle</label>
+                    <label for="service_libelle">Libellé</label>
                     <input id="service_libelle" name="libelle" type="text" value="{{ old('libelle', $editingService?->libelle) }}" required>
                 </div>
                 <div class="md:col-span-2 flex items-end gap-3">
@@ -253,7 +248,7 @@
                     <select id="managed_service_id" name="service_id">
                         <option value="">Aucun</option>
                         @foreach ($serviceOptions as $service)
-                            <option value="{{ $service->id }}" @selected((int) old('service_id', $editingUser?->service_id) === (int) $service->id)>{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>
+                            <option value="{{ $service->id }}" data-direction-id="{{ $service->direction_id }}" @selected((int) old('service_id', $editingUser?->service_id) === (int) $service->id)>{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -308,8 +303,8 @@
             </div>
             <span class="showcase-chip">{{ count($directionRows) }} lignes</span>
         </div>
-        <div class="mt-4 overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
                 <thead><tr><th>Direction</th><th>État</th><th>Services</th><th>Utilisateurs</th><th>Actions</th></tr></thead>
                 <tbody>
                     @foreach ($directionRows as $row)
@@ -323,7 +318,7 @@
                                     <a class="btn btn-secondary btn-sm rounded-xl" href="{{ route('workspace.super-admin.organization.index', ['edit_direction' => $row->id]) }}">Editer</a>
                                     <form method="POST" action="{{ route('workspace.super-admin.organization.directions.toggle', $row) }}">
                                         @csrf
-                                        <button class="btn {{ $row->actif ? 'btn-red' : 'btn-green' }} btn-sm rounded-xl" type="submit">{{ $row->actif ? 'Desactiver' : 'Activer' }}</button>
+                                        <button class="btn {{ $row->actif ? 'btn-danger' : 'btn-success' }} btn-sm rounded-xl" type="submit">{{ $row->actif ? 'Desactiver' : 'Activer' }}</button>
                                     </form>
                                 </div>
                             </td>
@@ -342,8 +337,8 @@
             </div>
             <span class="showcase-chip">{{ count($serviceRows) }} lignes</span>
         </div>
-        <div class="mt-4 overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
                 <thead><tr><th>Service</th><th>État</th><th>Utilisateurs</th><th>PTA</th><th>Actions</th></tr></thead>
                 <tbody>
                     @foreach ($serviceRows as $row)
@@ -357,7 +352,7 @@
                                     <a class="btn btn-secondary btn-sm rounded-xl" href="{{ route('workspace.super-admin.organization.index', ['edit_service' => $row->id]) }}">Editer</a>
                                     <form method="POST" action="{{ route('workspace.super-admin.organization.services.toggle', $row) }}">
                                         @csrf
-                                        <button class="btn {{ $row->actif ? 'btn-red' : 'btn-green' }} btn-sm rounded-xl" type="submit">{{ $row->actif ? 'Desactiver' : 'Activer' }}</button>
+                                        <button class="btn {{ $row->actif ? 'btn-danger' : 'btn-success' }} btn-sm rounded-xl" type="submit">{{ $row->actif ? 'Desactiver' : 'Activer' }}</button>
                                     </form>
                                 </div>
                             </td>
@@ -411,7 +406,7 @@
                     <select id="bulk_service_id" name="bulk_service_id">
                         <option value="">Aucun</option>
                         @foreach ($serviceOptions as $service)
-                            <option value="{{ $service->id }}">{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>
+                            <option value="{{ $service->id }}" data-direction-id="{{ $service->direction_id }}">{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -425,10 +420,10 @@
                 </div>
             </div>
             <div class="mb-3 flex flex-wrap gap-2">
-                <button class="btn btn-primary" type="submit">Appliquer aux lignes cochees</button>
+                <button class="btn btn-primary" type="submit">Appliquer aux lignes cochées</button>
             </div>
-        <div class="mt-4 overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
                 <thead><tr><th><input type="checkbox" data-check-all-users></th><th>Utilisateur</th><th>Rôle</th><th>Portée</th><th>État</th><th>Suspension</th><th>Sessions</th><th>Dernière activité</th><th>Opérations</th></tr></thead>
                 <tbody>
                     @forelse ($userRows as $row)
@@ -465,21 +460,31 @@
                                     <a class="btn btn-secondary btn-sm rounded-xl" href="{{ route('workspace.super-admin.organization.index', ['edit_user' => $row->id]) }}">Editer</a>
                                     <form method="POST" action="{{ route('workspace.super-admin.organization.users.toggle', $row) }}">
                                         @csrf
-                                        <button class="btn {{ $row->is_active ? 'btn-red' : 'btn-green' }} btn-sm rounded-xl" type="submit">{{ $row->is_active ? 'Desactiver' : 'Activer' }}</button>
+                                        <button class="btn {{ $row->is_active ? 'btn-danger' : 'btn-success' }} btn-sm rounded-xl" type="submit">{{ $row->is_active ? 'Desactiver' : 'Activer' }}</button>
                                     </form>
                                     <form method="POST" action="{{ route('workspace.super-admin.organization.users.revoke-sessions', $row) }}">
                                         @csrf
-                                        <button class="btn btn-blue btn-sm rounded-xl" type="submit">Couper sessions</button>
+                                        <button class="btn btn-secondary btn-sm rounded-xl" type="submit">Couper sessions</button>
                                     </form>
                                     <form method="POST" action="{{ route('workspace.super-admin.organization.users.reset-password', $row) }}">
                                         @csrf
-                                        <button class="btn btn-amber btn-sm rounded-xl" type="submit">Reset mot de passe</button>
+                                        <button class="btn btn-warning btn-sm rounded-xl" type="submit">Reset mot de passe</button>
                                     </form>
                                 </div>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="9" class="text-slate-500">Aucun compte sur ce filtre.</td></tr>
+                        <tr>
+                            <td colspan="9">
+                                <x-ui.empty-state
+                                    title="Aucun compte trouvé"
+                                    message="Aucun utilisateur ne correspond aux filtres courants."
+                                    icon="users"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -498,8 +503,8 @@
                 <span class="showcase-chip">{{ $loginHistory->count() }} événements</span>
             </div>
         </div>
-        <div class="mt-4 overflow-x-auto">
-            <table class="dashboard-table">
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
                 <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>IP</th><th>Agent</th></tr></thead>
                 <tbody>
                     @forelse ($loginHistory as $row)
@@ -518,7 +523,17 @@
                             <td class="text-xs text-slate-500">{{ \Illuminate\Support\Str::limit((string) $row->user_agent, 70) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="text-slate-500">Aucun événement de connexion récent sur le filtre courant.</td></tr>
+                        <tr>
+                            <td colspan="5">
+                                <x-ui.empty-state
+                                    title="Aucun événement récent"
+                                    message="Aucune connexion ou déconnexion ne correspond aux filtres courants."
+                                    icon="clock"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -554,10 +569,10 @@
             </form>
             @if (is_array($mergeSimulation))
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactes</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['users_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactees</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['actions_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactes</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Justificatifs impactes</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['justificatifs_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactés</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['users_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactées</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['actions_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactés</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Justificatifs impactés</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['justificatifs_total'] ?? 0 }}</p></article>
                 </div>
                 @if (($mergeSimulation['warnings'] ?? []) !== [])
                     <div class="mt-3 space-y-2">
@@ -573,7 +588,7 @@
             <h2>Simulation de transfert de service</h2>
             <form method="GET" action="{{ route('workspace.super-admin.organization.index') }}" class="mt-4 form-grid-compact">
                 <div>
-                    <label for="transfer_service_id">Service a deplacer</label>
+                    <label for="transfer_service_id">Service à déplacer</label>
                     <select id="transfer_service_id" name="transfer_service_id">
                         <option value="">Choisir</option>
                         @foreach ($serviceOptions as $service)
@@ -597,9 +612,9 @@
             </form>
             @if (is_array($transferSimulation))
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactes</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['users_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactees</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['actions_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactes</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactés</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['users_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactées</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['actions_total'] ?? 0 }}</p></article>
+                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactés</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
                     <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Direction cible</p><p class="mt-2 text-lg font-semibold">{{ $transferSimulation['target_direction'] ?? '-' }}</p></article>
                 </div>
                 @if (($transferSimulation['warnings'] ?? []) !== [])
@@ -617,13 +632,13 @@
         <div class="flex items-center justify-between gap-3">
             <div>
                 <h2>Historique d organisation</h2>
-                <p class="text-slate-600">Dernieres operations sensibles sur la structure, les comptes et les rôles pilotes.</p>
+                <p class="text-slate-600">Dernières opérations sensibles sur la structure, les comptes et les rôles pilotes.</p>
             </div>
-            <span class="showcase-chip">{{ count($orgHistory ?? []) }} operations</span>
+            <span class="showcase-chip">{{ count($orgHistory ?? []) }} opérations</span>
         </div>
-        <div class="mt-4 overflow-x-auto">
-            <table class="dashboard-table">
-                <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Entite</th></tr></thead>
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
+                <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Entité</th></tr></thead>
                 <tbody>
                     @forelse (($orgHistory ?? []) as $row)
                         <tr>
@@ -633,7 +648,17 @@
                             <td>{{ $row->entite_type ?? '-' }} #{{ $row->entite_id ?? '-' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="text-slate-500">Aucune operation récente.</td></tr>
+                        <tr>
+                            <td colspan="4">
+                                <x-ui.empty-state
+                                    title="Aucune opération récente"
+                                    message="Les opérations sensibles apparaîtront ici après les prochains changements."
+                                    icon="clock"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -643,15 +668,55 @@
     <script @cspNonce>
         document.addEventListener('DOMContentLoaded', function () {
             var toggle = document.querySelector('[data-check-all-users]');
-            if (!toggle) {
-                return;
+            if (toggle) {
+                toggle.addEventListener('change', function () {
+                    document.querySelectorAll('[data-bulk-user]').forEach(function (checkbox) {
+                        checkbox.checked = toggle.checked;
+                    });
+                });
             }
 
-            toggle.addEventListener('change', function () {
-                document.querySelectorAll('[data-bulk-user]').forEach(function (checkbox) {
-                    checkbox.checked = toggle.checked;
-                });
-            });
+            function bindDependentServices(directionId, serviceId) {
+                var directionInput = document.getElementById(directionId);
+                var serviceInput = document.getElementById(serviceId);
+
+                if (!directionInput || !serviceInput) {
+                    return;
+                }
+
+                function syncServices() {
+                    var selectedDirection = String(directionInput.value || '');
+                    var selectedService = String(serviceInput.value || '');
+                    var selectedStillVisible = false;
+
+                    Array.prototype.forEach.call(serviceInput.options, function (option, index) {
+                        if (index === 0) {
+                            option.hidden = false;
+                            option.disabled = false;
+                            return;
+                        }
+
+                        var visible = selectedDirection === '' || String(option.getAttribute('data-direction-id') || '') === selectedDirection;
+                        option.hidden = !visible;
+                        option.disabled = !visible;
+
+                        if (visible && option.value === selectedService) {
+                            selectedStillVisible = true;
+                        }
+                    });
+
+                    if (selectedService && !selectedStillVisible) {
+                        serviceInput.value = '';
+                    }
+                }
+
+                directionInput.addEventListener('change', syncServices);
+                syncServices();
+            }
+
+            bindDependentServices('direction_id', 'service_id');
+            bindDependentServices('managed_direction_id', 'managed_service_id');
+            bindDependentServices('bulk_direction_id', 'bulk_service_id');
         });
     </script>
 @endsection

@@ -43,6 +43,14 @@ class DependentSelectController extends Controller
         $directionId = $request->integer('direction_id') ?: null;
         $serviceId = $request->integer('service_id') ?: null;
 
+        // A13 — Defense en profondeur : refuser l enumeration des users si
+        // l appelant n a pas de portee globale ET pas de rattachement direction.
+        // Sans ce garde-fou, un user incompletement rattache (direction_id null)
+        // recevrait tous les utilisateurs actifs de la plateforme via /ajax/users.
+        if (! $user->hasGlobalReadAccess() && $user->direction_id === null) {
+            abort(403, 'Acces non autorise (perimetre indetermine).');
+        }
+
         $query = User::query()
             ->where('is_active', true)
             ->orderBy('name');

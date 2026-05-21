@@ -59,15 +59,15 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.audit.index') }}">Réinitialiser</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.audit.index') }}">Réinitialiser</a>
             </div>
         </form>
     </section>
 
     <section class="showcase-panel mb-4 app-screen-block">
         <h2>Historique</h2>
-        <div class="overflow-auto">
-            <table>
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -99,7 +99,17 @@
                             <td>{{ $log->adresse_ip ?? '-' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="text-slate-600">Aucune entree d'audit.</td></tr>
+                        <tr>
+                            <td colspan="8">
+                                <x-ui.empty-state
+                                    title="Aucune entrée d'audit"
+                                    message="Aucun événement ne correspond aux filtres courants."
+                                    icon="filter"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

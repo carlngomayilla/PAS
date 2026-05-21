@@ -192,19 +192,25 @@ class RolePermissionSettings
                 'audit.read',
                 'messagerie.read',
             ],
+            // A06 — DG en lecture seule pure : supervision + indicateurs consolides
+            // + audit, mais aucune ecriture ni validation directe. La validation
+            // finale PAS/PAO/PTA revient a SUPER_ADMIN / ADMIN. Le DG voit tout
+            // mais n est pas une voie d ecriture (separation des pouvoirs).
             User::ROLE_DG => [
                 'scope.global.read',
-                'scope.global.write',
                 'planning.read',
-                'planning.write.global',
-                'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
+                'audit.read',
                 'messagerie.read',
             ],
+            // A37 — Planification : retire `scope.global.write` (trop large).
+            // `planning.write.global` reste suffisant pour son metier (gerer la
+            // planification de bout en bout). `scope.global.write` est reserve
+            // aux profils purement administratifs (SUPER_ADMIN, ADMIN,
+            // ADMIN_FONCTIONNEL).
             User::ROLE_PLANIFICATION => [
                 'scope.global.read',
-                'scope.global.write',
                 'planning.read',
                 'planning.write.global',
                 'planning.strategic.manage',
@@ -217,9 +223,10 @@ class RolePermissionSettings
                 'delegations.manage',
                 'messagerie.read',
             ],
+            // A37 — SCIQ : retire `scope.global.write` (trop large) ; conserve
+            // `planning.write.global` et `referentiel.write` pour son metier.
             User::ROLE_SCIQ => [
                 'scope.global.read',
-                'scope.global.write',
                 'planning.read',
                 'planning.write.global',
                 'planning.strategic.manage',
@@ -255,10 +262,12 @@ class RolePermissionSettings
                 'reporting.read',
                 'messagerie.read',
             ],
+            // A06 — Cabinet et Collaborateurs voient tout mais ne pilotent plus
+            // le strategique. La gestion du PAS officiel passe par PLANIFICATION,
+            // SCIQ et SUPER_ADMIN/ADMIN.
             User::ROLE_CABINET => [
                 'scope.global.read',
                 'planning.read',
-                'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
                 'audit.read',
@@ -267,7 +276,6 @@ class RolePermissionSettings
             User::ROLE_COLLABORATEUR => [
                 'scope.global.read',
                 'planning.read',
-                'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
                 'audit.read',
@@ -292,10 +300,15 @@ class RolePermissionSettings
                 'messagerie.read',
             ],
 
-            // SCIQ — Suivi global (équivalent fonctionnel de Planification, rattaché à l'unité SCIQ).
+            // A36 — SCIQ_SUIVI_GLOBAL et CHEF_UNITE_SCIQ sont des ALIAS
+            // fonctionnels de SCIQ (cf. RoleRegistryService). Les 3 codes
+            // existent en BDD pour la retrocompatibilite et la traçabilite
+            // organisationnelle (qui est rattache a quelle unite) mais portent
+            // la MEME matrice de permissions. SCIQ est le code canonique : si
+            // tu modifies SCIQ, propage manuellement aux deux alias pour
+            // garder l alignement.
             User::ROLE_SCIQ_SUIVI_GLOBAL => [
                 'scope.global.read',
-                'scope.global.write',
                 'planning.read',
                 'planning.write.global',
                 'planning.strategic.manage',
@@ -307,24 +320,25 @@ class RolePermissionSettings
                 'messagerie.read',
             ],
 
-            // Chef d'unité SCIQ — gère SCIQ + suivi global agence.
+            // A36 — Alias fonctionnel de SCIQ (cf. ci-dessus). Aligne sur SCIQ.
             User::ROLE_CHEF_UNITE_SCIQ => [
                 'scope.global.read',
-                'scope.global.write',
                 'planning.read',
                 'planning.write.global',
                 'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
+                'referentiel.write',
                 'delegations.manage',
                 'messagerie.read',
             ],
 
-            // DGA — supervision vue globale (lecture).
+            // DGA — supervision vue globale (lecture). A06 : retire le pilotage
+            // strategique (gestion PAS = PLANIFICATION / SCIQ / admin uniquement).
             User::ROLE_DGA_SUPERVISION => [
                 'scope.global.read',
                 'planning.read',
-                'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
                 'messagerie.read',
@@ -341,10 +355,10 @@ class RolePermissionSettings
             ],
 
             // Cabinet — supervision (équivalent au Cabinet actuel, vue globale lecture).
+            // A06 : retire le pilotage strategique.
             User::ROLE_CABINET_SUPERVISION => [
                 'scope.global.read',
                 'planning.read',
-                'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
                 'audit.read',

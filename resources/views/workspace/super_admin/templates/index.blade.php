@@ -8,7 +8,7 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Templates d export</h1>
-                <p class="mt-2 text-slate-600">Bibliotheque centrale des modeles PDF, Excel, Word et CSV.</p>
+                <p class="mt-2 text-slate-600">Bibliothèque centrale des modèles PDF, Excel, Word et CSV.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
@@ -48,21 +48,21 @@
     </section>
 
     <section class="showcase-panel mb-4">
-        <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-                <thead><tr><th class="px-3 py-2 text-left">Nom</th><th class="px-3 py-2 text-left">Format</th><th class="px-3 py-2 text-left">Module</th><th class="px-3 py-2 text-left">Profil</th><th class="px-3 py-2 text-left">Niveau</th><th class="px-3 py-2 text-left">Statut</th><th class="px-3 py-2 text-left">Affectations</th><th class="px-3 py-2 text-left">Versions</th><th class="px-3 py-2 text-left">Actions</th></tr></thead>
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
+                <thead><tr><th>Nom</th><th>Format</th><th>Module</th><th>Profil</th><th>Niveau</th><th>Statut</th><th>Affectations</th><th>Versions</th><th>Actions</th></tr></thead>
                 <tbody>
                     @forelse ($rows as $row)
                         <tr>
-                            <td class="px-3 py-2"><div class="font-semibold">{{ $row->name }}</div><div class="text-xs text-slate-500">{{ $row->code }}</div></td>
-                            <td class="px-3 py-2">{{ $row->formatLabel() }}</td>
-                            <td class="px-3 py-2">{{ $row->module }}</td>
-                            <td class="px-3 py-2">{{ $row->target_profile ?: 'Tous profils' }}</td>
-                            <td class="px-3 py-2">{{ $row->reading_level ?: 'Non borne' }}</td>
-                            <td class="px-3 py-2">{{ $row->statusLabel() }}</td>
-                            <td class="px-3 py-2">{{ $row->assignments_count }}</td>
-                            <td class="px-3 py-2">{{ $row->versions_count }}</td>
-                            <td class="px-3 py-2">
+                            <td><div class="font-semibold">{{ $row->name }}</div><div class="text-xs text-slate-500">{{ $row->code }}</div></td>
+                            <td>{{ $row->formatLabel() }}</td>
+                            <td>{{ $row->module }}</td>
+                            <td>{{ $row->target_profile ?: 'Tous profils' }}</td>
+                            <td>{{ $row->reading_level ?: 'Non borne' }}</td>
+                            <td>{{ $row->statusLabel() }}</td>
+                            <td>{{ $row->assignments_count }}</td>
+                            <td>{{ $row->versions_count }}</td>
+                            <td>
                                 <div class="flex flex-wrap gap-2">
                                     <a class="btn btn-secondary !px-3 !py-1.5" href="{{ route('workspace.super-admin.templates.show', $row) }}">Voir</a>
                                     <a class="btn btn-primary !px-3 !py-1.5" href="{{ route('workspace.super-admin.templates.edit', $row) }}">Modifier</a>
@@ -70,7 +70,17 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td class="px-3 py-4 text-slate-500" colspan="9">Aucun template ne correspond aux filtres.</td></tr>
+                        <tr>
+                            <td colspan="9">
+                                <x-ui.empty-state
+                                    title="Aucun template trouvé"
+                                    message="Aucun modèle d'export ne correspond aux filtres courants."
+                                    icon="file"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

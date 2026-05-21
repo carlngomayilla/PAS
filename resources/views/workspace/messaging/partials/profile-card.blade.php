@@ -23,7 +23,7 @@
                     <p class="truncate text-base font-semibold text-slate-950">{{ $cardUser->name }}</p>
                     <span class="anbg-badge {{ $presence['tone'] === 'success' ? 'anbg-badge-success' : ($presence['tone'] === 'info' ? 'anbg-badge-info' : 'anbg-badge-neutral') }}">{{ $presence['label'] }}</span>
                 </div>
-                <p class="mt-1 text-sm text-slate-500">{{ $cardUser->agent_fonction ?: 'Fonction non renseignee' }}</p>
+                <p class="mt-1 text-sm text-slate-500">{{ $cardUser->agent_fonction ?: 'Fonction non renseignée' }}</p>
             </div>
         </div>
 
@@ -38,7 +38,7 @@
             </div>
             <div class="showcase-data-point">
                 <p class="showcase-data-key">Matricule</p>
-                <p class="showcase-data-value">{{ $cardUser->agent_matricule ?: 'Non renseigne' }}</p>
+                <p class="showcase-data-value">{{ $cardUser->agent_matricule ?: 'Non renseigné' }}</p>
             </div>
             <div class="showcase-data-point">
                 <p class="showcase-data-key">Direction</p>
@@ -53,8 +53,8 @@
                 <p class="showcase-data-value">{{ $cardUser->roleLabel() }}</p>
             </div>
             <div class="showcase-data-point">
-                <p class="showcase-data-key">Responsable hierarchique</p>
-                <p class="showcase-data-value">{{ $supervisor?->name ?? 'Non determine' }}</p>
+                <p class="showcase-data-key">Responsable hiérarchique</p>
+                <p class="showcase-data-value">{{ $supervisor?->name ?? 'Non déterminé' }}</p>
             </div>
             <div class="showcase-data-point">
                 <p class="showcase-data-key">Dernière activité</p>
@@ -76,7 +76,7 @@
 
     <div class="mt-5">
         <div class="mb-3 flex items-center justify-between gap-3">
-            <h3 class="text-sm font-semibold text-slate-900">Collaborateurs lies</h3>
+            <h3 class="text-sm font-semibold text-slate-900">Collaborateurs liés</h3>
             <span class="anbg-badge anbg-badge-neutral">{{ $relatedUsers->count() }}</span>
         </div>
         <div class="space-y-2.5">
@@ -98,7 +98,7 @@
     </div>
 @else
     <div class="messaging-empty-state">
-        <p class="font-medium text-slate-900">Aucun collaborateur selectionne.</p>
+        <p class="font-medium text-slate-900">Aucun collaborateur sélectionné.</p>
         <p class="mt-1 text-sm text-slate-500">Sélectionnez un contact pour afficher sa fiche détaillée et lancer un échange.</p>
     </div>
 @endif

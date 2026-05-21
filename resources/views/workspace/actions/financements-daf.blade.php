@@ -24,7 +24,7 @@
                 <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
                     <div>
                         <label for="q">Action</label>
-                        <input id="q" name="q" type="search" value="{{ $filters['q'] ?? '' }}" placeholder="Libelle, nature, source">
+                        <input id="q" name="q" type="search" value="{{ $filters['q'] ?? '' }}" placeholder="Libellé, nature, source">
                     </div>
                     <div>
                         <label for="pta_id">PTA</label>
@@ -49,7 +49,7 @@
                         <select id="service_id" name="service_id">
                             <option value="">Tous</option>
                             @foreach ($serviceOptions as $service)
-                                <option value="{{ $service->id }}" @selected((int) ($filters['service_id'] ?? 0) === (int) $service->id)>{{ $service->code }} - {{ $service->libelle }}</option>
+                                <option value="{{ $service->id }}" data-direction-id="{{ $service->direction_id }}" @selected((int) ($filters['service_id'] ?? 0) === (int) $service->id)>{{ $service->code }} - {{ $service->libelle }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -93,8 +93,8 @@
                 <span class="anbg-badge anbg-badge-info px-3 py-1 text-xs">{{ $rows->total() }} demande(s)</span>
             </div>
 
-            <div class="overflow-auto">
-                <table>
+            <div class="app-table-wrapper">
+                <table class="app-table data-table">
                     <thead>
                         <tr>
                             <th>Action</th>
@@ -191,7 +191,15 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="12" class="text-slate-600">Aucune demande de financement trouvée.</td>
+                                <td colspan="12">
+                                    <x-ui.empty-state
+                                        title="Aucune demande de financement"
+                                        message="Aucune action ne correspond aux filtres financiers courants."
+                                        icon="filter"
+                                        tone="info"
+                                        class="my-4"
+                                    />
+                                </td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -204,3 +212,45 @@
         </section>
     </div>
 @endsection
+
+@push('scripts')
+    <script @cspNonce>
+        (function () {
+            var directionInput = document.getElementById('direction_id');
+            var serviceInput = document.getElementById('service_id');
+
+            if (!directionInput || !serviceInput) {
+                return;
+            }
+
+            function syncServices() {
+                var selectedDirection = String(directionInput.value || '');
+                var selectedService = String(serviceInput.value || '');
+                var selectedStillVisible = false;
+
+                Array.prototype.forEach.call(serviceInput.options, function (option, index) {
+                    if (index === 0) {
+                        option.hidden = false;
+                        option.disabled = false;
+                        return;
+                    }
+
+                    var visible = selectedDirection === '' || String(option.getAttribute('data-direction-id') || '') === selectedDirection;
+                    option.hidden = !visible;
+                    option.disabled = !visible;
+
+                    if (visible && option.value === selectedService) {
+                        selectedStillVisible = true;
+                    }
+                });
+
+                if (selectedService && !selectedStillVisible) {
+                    serviceInput.value = '';
+                }
+            }
+
+            directionInput.addEventListener('change', syncServices);
+            syncServices();
+        })();
+    </script>
+@endpush

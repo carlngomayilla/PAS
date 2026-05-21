@@ -11,16 +11,14 @@ use App\Services\ActionManagementSettings;
 use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\DocumentPolicySettings;
+use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class UpdateActionRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    use RequiresPlanningWriter;
 
     /**
      * @return array<string, array<int, mixed>>

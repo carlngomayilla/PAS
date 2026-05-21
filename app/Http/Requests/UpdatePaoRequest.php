@@ -6,12 +6,15 @@ use App\Models\Pao;
 use App\Models\PasObjectif;
 use App\Models\Service;
 use App\Models\User;
+use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Validator;
 
 class UpdatePaoRequest extends FormRequest
 {
+    use RequiresPlanningWriter;
+
     public function authorize(): bool
     {
         $user = $this->user();
@@ -72,8 +75,6 @@ class UpdatePaoRequest extends FormRequest
             'objectifs_operationnels.*.libelle' => ['required', 'string'],
             'objectifs_operationnels.*.service_id' => ['required', 'integer', 'exists:services,id'],
             'objectifs_operationnels.*.echeance' => ['required', 'date', 'date_format:Y-m-d'],
-            'valide_le' => ['nullable', 'date'],
-            'valide_par' => ['nullable', 'integer', 'exists:users,id'],
         ];
     }
 

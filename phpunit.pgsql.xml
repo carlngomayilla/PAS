@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A11 — Variante PostgreSQL du fichier phpunit.xml par defaut.
+  Utilise par le job CI `tests-postgres` (.github/workflows/tests.yml) pour
+  reproduire le comportement de la production (PostgreSQL) au lieu de SQLite.
+
+  Differences vs phpunit.xml :
+    - DB_CONNECTION reste pilote par les variables d environnement du job
+      (postgres) au lieu d etre force a sqlite.
+    - DB_DATABASE et co. ne sont pas surcharges ici ; ils viennent du job.
+
+  Lancer en local apres avoir demarre un Postgres :
+    DB_CONNECTION=pgsql DB_HOST=127.0.0.1 DB_PORT=5432 \
+    DB_DATABASE=pas_anbg_ci DB_USERNAME=pas_ci DB_PASSWORD=pas_ci_secret \
+    php artisan test -c phpunit.pgsql.xml
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+        <!-- A11 — Pas de DB_CONNECTION/DB_DATABASE ici : on s appuie sur les
+             variables d environnement injectees par le job CI (postgres). -->
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>

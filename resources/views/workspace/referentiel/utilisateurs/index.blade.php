@@ -14,7 +14,7 @@
     @endphp
     <div class="app-screen-flow">
     <section class="showcase-panel mb-4 app-screen-block">
-        <h1 class="showcase-panel-title">Referentiel - Utilisateurs</h1>
+        <h1 class="showcase-panel-title">Référentiel - Utilisateurs</h1>
     </section>
     <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
@@ -67,9 +67,9 @@
                 <div>
                     <label for="service_id">Service</label>
                     <select id="service_id" name="service_id">
-                        <option value="">Tous</option>
-                        @foreach ($serviceOptions as $service)
-                            <option value="{{ $service->id }}" @selected($filters['service_id'] === $service->id)>
+                            <option value="">Tous</option>
+                            @foreach ($serviceOptions as $service)
+                            <option value="{{ $service->id }}" data-direction-id="{{ $service->direction_id }}" @selected($filters['service_id'] === $service->id)>
                                 {{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}
                             </option>
                         @endforeach
@@ -86,15 +86,15 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Réinitialiser</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Réinitialiser</a>
             </div>
         </form>
     </section>
 
     <section class="showcase-panel mb-4 app-screen-block">
         <h2>Liste des utilisateurs</h2>
-        <div class="overflow-auto">
-            <table>
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -149,11 +149,11 @@
                             @if ($canWrite)
                                 <td>
                                     <div class="flex flex-wrap gap-1.5">
-                                        <a class="btn btn-amber" href="{{ route('workspace.referentiel.utilisateurs.edit', $row) }}">Modifier</a>
+                                        <a class="btn btn-warning" href="{{ route('workspace.referentiel.utilisateurs.edit', $row) }}">Modifier</a>
                                         <form method="POST" action="{{ route('workspace.referentiel.utilisateurs.destroy', $row) }}" data-confirm-message="Supprimer cet utilisateur ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="btn btn-red" type="submit">Supprimer</button>
+                                            <button class="btn btn-danger" type="submit">Supprimer</button>
                                         </form>
                                     </div>
                                 </td>
@@ -161,7 +161,15 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 7 : 6 }}" class="text-slate-600">Aucun utilisateur trouve.</td>
+                            <td colspan="{{ $canWrite ? 7 : 6 }}">
+                                <x-ui.empty-state
+                                    title="Aucun utilisateur trouvé"
+                                    message="Aucun compte ne correspond aux filtres courants."
+                                    icon="users"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -171,3 +179,45 @@
     </section>
     </div>
 @endsection
+
+@push('scripts')
+    <script @cspNonce>
+        (function () {
+            var directionInput = document.getElementById('direction_id');
+            var serviceInput = document.getElementById('service_id');
+
+            if (!directionInput || !serviceInput) {
+                return;
+            }
+
+            function syncServices() {
+                var selectedDirection = String(directionInput.value || '');
+                var selectedService = String(serviceInput.value || '');
+                var selectedStillVisible = false;
+
+                Array.prototype.forEach.call(serviceInput.options, function (option, index) {
+                    if (index === 0) {
+                        option.hidden = false;
+                        option.disabled = false;
+                        return;
+                    }
+
+                    var visible = selectedDirection === '' || String(option.getAttribute('data-direction-id') || '') === selectedDirection;
+                    option.hidden = !visible;
+                    option.disabled = !visible;
+
+                    if (visible && option.value === selectedService) {
+                        selectedStillVisible = true;
+                    }
+                });
+
+                if (selectedService && !selectedStillVisible) {
+                    serviceInput.value = '';
+                }
+            }
+
+            directionInput.addEventListener('change', syncServices);
+            syncServices();
+        })();
+    </script>
+@endpush

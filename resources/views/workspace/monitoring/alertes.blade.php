@@ -143,7 +143,7 @@
                 @if (($summary['unread'] ?? 0) > 0)
                     <form method="POST" action="{{ route('workspace.alertes.read_all', ['limit' => $limit]) }}">
                         @csrf
-                        <button class="btn btn-blue rounded-2xl px-4 py-2.5" type="submit">
+                        <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
                             Tout marquer comme lu
                         </button>
                     </form>

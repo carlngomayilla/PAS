@@ -1568,24 +1568,15 @@
         z-index: 1;
     }
 
-    html.dark body.admin-theme-scope,
-    html.dark body.admin-theme-scope * {
-        border-color: var(--app-border);
-    }
-
-    html.dark body.admin-theme-scope :where(p, span, strong, small, label, h1, h2, h3, h4, h5, h6, li, td, th, div):not(.text-white):not([style*="color: #fff"]):not([style*="color:#fff"]) {
-        color: var(--app-text) !important;
-    }
-
-    html.dark body.admin-theme-scope :where(.text-slate-500, .text-slate-600, .text-slate-700, .text-[#667085], .dashboard-summary-meta, .showcase-kpi-meta, .starline-greeting) {
+    html.dark body.admin-theme-scope :where(.dashboard-summary-meta, .showcase-kpi-meta, .starline-greeting, .app-muted, .stat-card-meta, .data-table-subtitle) {
         color: #cbd5e1 !important;
     }
 
-    html.dark body.admin-theme-scope :where(.text-[#17324a], .text-[#1c203d], .text-slate-800, .text-slate-900) {
+    html.dark body.admin-theme-scope :where(.admin-navbar-title, .showcase-panel-title, .form-section-title, .data-table-title, .ui-card > h2, .ui-card > h3) {
         color: #f8fafc !important;
     }
 
-    html.dark body.admin-theme-scope :where(.bg-white, .bg-white\/95, .bg-slate-50, .bg-slate-50\/80, .bg-slate-50\/90, .bg-[#f8fbfe], .bg-[#F8FBFF]) {
+    html.dark body.admin-theme-scope :where(.app-card, .ui-card, .showcase-panel, .form-section, .form-shell, .data-table-shell, .app-table-wrapper, .admin-dropdown-panel, .admin-navbar-dropdown) {
         background-color: #162033 !important;
     }
 
@@ -1935,6 +1926,7 @@
         font-size: 0.68rem;
         font-weight: 800;
         letter-spacing: 0;
+        text-align: left;
         text-transform: uppercase;
     }
 
@@ -1943,6 +1935,7 @@
         display: flex;
         position: relative;
         align-items: center;
+        justify-content: flex-start;
         gap: 0.75rem;
         min-height: 2.75rem;
         padding: 0.55rem 0.65rem;
@@ -1952,7 +1945,14 @@
         color: var(--app-text) !important;
         font-size: 0.84rem;
         font-weight: 700;
+        text-align: left;
         transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+    }
+
+    .app-sidebar-link [data-sidebar-label],
+    .dealdeck-sidebar-link [data-sidebar-label] {
+        flex: 1 1 auto !important;
+        text-align: left;
     }
 
     @media (min-width: 1024px) {
@@ -2069,9 +2069,10 @@
         display: inline-flex;
         width: 100%;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 0.55rem;
         min-height: 2.8rem;
+        padding-inline: 0.85rem !important;
         border: 1px solid var(--app-border) !important;
         border-radius: 999px !important;
         background: var(--app-white) !important;
@@ -2387,6 +2388,71 @@
         align-items: center;
     }
 
+    .dashboard-tabs-search {
+        display: flex;
+        position: relative;
+        flex: 0 1 18rem;
+        max-width: 22rem;
+        min-width: min(100%, 13rem);
+        margin-inline: auto;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dashboard-tabs-search-icon {
+        position: absolute;
+        left: 0.78rem;
+        display: inline-flex;
+        width: 0.9rem;
+        height: 0.9rem;
+        color: var(--app-muted);
+        opacity: 0.78;
+        pointer-events: none;
+    }
+
+    .dashboard-tabs-search-icon svg {
+        width: 0.9rem !important;
+        height: 0.9rem !important;
+    }
+
+    .dashboard-tabs-search input {
+        width: 100%;
+        min-height: 2.05rem;
+        border: 1px solid var(--app-border) !important;
+        border-radius: 999px !important;
+        background: color-mix(in srgb, var(--app-surface) 96%, var(--app-blue) 4%) !important;
+        background-image: none !important;
+        color: var(--app-text) !important;
+        padding: 0.42rem 0.85rem 0.42rem 2.15rem !important;
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1.2;
+        box-shadow: inset 0 0 0 1px rgba(57, 150, 211, 0.03) !important;
+    }
+
+    .dashboard-tabs-search input:focus {
+        border-color: var(--app-blue) !important;
+        background: var(--app-surface) !important;
+        box-shadow: 0 0 0 3px var(--app-primary-soft) !important;
+    }
+
+    .dashboard-synthesis-context {
+        width: fit-content;
+        max-width: 100%;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    @media (max-width: 767px) {
+        .dashboard-tabs-search {
+            order: 20;
+            flex-basis: 100%;
+            max-width: none;
+        }
+    }
+
     .showcase-chip {
         display: inline-flex;
         align-items: center;
@@ -2518,6 +2584,25 @@
         padding: 0.9rem 1rem !important;
     }
 
+    .reporting-hub-kpi {
+        border-radius: 0.75rem !important;
+        border-color: rgba(57, 150, 211, 0.24) !important;
+        background: var(--app-surface) !important;
+        box-shadow: var(--app-shadow-soft) !important;
+    }
+
+    .reporting-hub-kpi-blue .dashboard-summary-value { color: #3996d3 !important; }
+    .reporting-hub-kpi-green .dashboard-summary-value { color: #178f5f !important; }
+    .reporting-hub-kpi-amber .dashboard-summary-value { color: #f9b13c !important; }
+    .reporting-hub-kpi-navy .dashboard-summary-value { color: #1c203d !important; }
+
+    html.dark .reporting-hub-kpi-blue .dashboard-summary-value,
+    html.dark .reporting-hub-kpi-green .dashboard-summary-value,
+    html.dark .reporting-hub-kpi-amber .dashboard-summary-value,
+    html.dark .reporting-hub-kpi-navy .dashboard-summary-value {
+        color: #f8fafc !important;
+    }
+
     .stat-card,
     .eas-stat-card,
     .dashboard-summary-card,
@@ -2553,6 +2638,115 @@
 
     .app-collapsible[open] .app-collapsible-chevron {
         transform: rotate(180deg);
+    }
+
+    .pta-action-block > summary::-webkit-details-marker,
+    .form-step-accordion > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .pta-action-block[open] > summary .app-collapsible-chevron {
+        transform: rotate(180deg);
+    }
+
+    .form-step-accordion {
+        overflow: hidden;
+        border: 1px solid var(--app-border);
+        border-radius: 0.75rem;
+        background: var(--app-surface);
+    }
+
+    .form-step-accordion > summary {
+        position: relative;
+        display: flex;
+        cursor: pointer;
+        list-style: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.85rem 1rem;
+        color: var(--app-primary);
+        font-size: 0.86rem;
+        font-weight: 800;
+    }
+
+    .form-step-accordion > summary::after {
+        content: "";
+        width: 0.55rem;
+        height: 0.55rem;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(45deg);
+        transition: transform 160ms ease;
+    }
+
+    .form-step-accordion[open] > summary::after {
+        transform: rotate(225deg);
+    }
+
+    .form-step-body {
+        border-top: 1px solid var(--app-border);
+        padding: 1rem;
+    }
+
+    .form-step-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.55rem;
+        border: 1px solid var(--app-border);
+        border-radius: 0.85rem;
+        background: var(--app-surface-soft);
+    }
+
+    .form-step-nav a {
+        border: 1px solid transparent;
+        border-radius: 999px;
+        padding: 0.5rem 0.8rem;
+        color: var(--app-primary);
+        font-size: 0.78rem;
+        font-weight: 800;
+        background: var(--app-surface);
+    }
+
+    .form-step-nav a:hover {
+        border-color: var(--app-primary);
+        background: var(--app-primary-light);
+    }
+
+    .action-form-context-strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+        gap: 0.75rem;
+        padding: 0.85rem;
+        border: 1px solid var(--app-border);
+        border-radius: 0.85rem;
+        background: var(--app-surface);
+        box-shadow: var(--app-shadow-soft);
+    }
+
+    .action-form-context-strip article {
+        min-width: 0;
+        padding: 0.75rem 0.85rem;
+        border: 1px solid var(--app-border);
+        border-radius: 0.75rem;
+        background: var(--app-surface-muted);
+    }
+
+    .action-form-context-strip .showcase-kpi-number,
+    .action-form-context-strip .showcase-kpi-meta {
+        text-align: left;
+    }
+
+    .form-actions-sticky {
+        position: sticky;
+        bottom: 1rem;
+        z-index: 20;
+        border: 1px solid var(--app-border);
+        border-radius: 0.85rem;
+        background: color-mix(in srgb, var(--app-surface) 92%, transparent);
+        box-shadow: var(--app-shadow);
+        backdrop-filter: blur(10px);
     }
 
     .pilotage-pipeline-grid {
@@ -2603,7 +2797,7 @@
     .app-table,
     .data-table,
     .dashboard-table,
-    .admin-theme-scope table {
+    .admin-theme-scope .app-table {
         width: 100%;
         min-width: 100%;
         border-collapse: separate !important;
@@ -2617,7 +2811,7 @@
     .app-table thead th,
     .data-table thead th,
     .dashboard-table thead th,
-    .admin-theme-scope table thead th {
+    .admin-theme-scope .app-table thead th {
         padding: 0.9rem 1rem !important;
         background: var(--app-primary) !important;
         color: var(--app-white) !important;
@@ -2634,7 +2828,7 @@
     .app-table tbody td,
     .data-table tbody td,
     .dashboard-table tbody td,
-    .admin-theme-scope table tbody td {
+    .admin-theme-scope .app-table tbody td {
         padding: 0.9rem 1rem !important;
         border: 0 !important;
         border-bottom: 1px solid var(--app-border) !important;
@@ -2647,14 +2841,14 @@
     .app-table tbody tr:hover td,
     .data-table tbody tr:hover td,
     .dashboard-table tbody tr:hover td,
-    .admin-theme-scope table tbody tr:hover td {
+    .admin-theme-scope .app-table tbody tr:hover td {
         background: var(--app-primary-light) !important;
     }
 
     .app-table tbody tr:last-child td,
     .data-table tbody tr:last-child td,
     .dashboard-table tbody tr:last-child td,
-    .admin-theme-scope table tbody tr:last-child td {
+    .admin-theme-scope .app-table tbody tr:last-child td {
         border-bottom: 0 !important;
     }
 
@@ -3914,6 +4108,11 @@
         color: var(--app-primary) !important;
     }
 
+    body.admin-theme-scope .reporting-hub-kpi-blue .dashboard-summary-value { color: #3996d3 !important; }
+    body.admin-theme-scope .reporting-hub-kpi-green .dashboard-summary-value { color: #178f5f !important; }
+    body.admin-theme-scope .reporting-hub-kpi-amber .dashboard-summary-value { color: #f9b13c !important; }
+    body.admin-theme-scope .reporting-hub-kpi-navy .dashboard-summary-value { color: #1c203d !important; }
+
     .dashboard-reporting-jump {
         border: 1px solid var(--app-primary) !important;
         border-radius: 999px !important;
@@ -4355,18 +4554,7 @@
     html:not(.dark) body.admin-theme-scope .form-shell,
     html:not(.dark) body.admin-theme-scope .data-table-shell,
     html:not(.dark) body.admin-theme-scope .table-container,
-    html:not(.dark) body.admin-theme-scope .app-table-wrapper,
-    html:not(.dark) body.admin-theme-scope .rounded-xl,
-    html:not(.dark) body.admin-theme-scope [class*="bg-gray-900"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-gray-800"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-slate-950"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-slate-900"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-slate-800"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-zinc-900"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-neutral-900"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-black"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-[#1c203d]"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-[#101a33]"] {
+    html:not(.dark) body.admin-theme-scope .app-table-wrapper {
         background: #ffffff !important;
         background-image: none !important;
         color: #1c203d !important;
@@ -4460,23 +4648,21 @@
         color: #ffffff !important;
     }
 
-    html:not(.dark) body.admin-theme-scope table,
-    html:not(.dark) body.admin-theme-scope tbody,
-    html:not(.dark) body.admin-theme-scope tr,
-    html:not(.dark) body.admin-theme-scope td {
+    html:not(.dark) body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody,
+    html:not(.dark) body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tr,
+    html:not(.dark) body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) td {
         background: #ffffff !important;
         color: #1c203d !important;
         border-color: #e5e7eb !important;
     }
 
-    html:not(.dark) body.admin-theme-scope thead th,
-    html:not(.dark) body.admin-theme-scope th {
+    html:not(.dark) body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) thead th {
         background: #3996d3 !important;
         color: #ffffff !important;
         border-color: #3996d3 !important;
     }
 
-    html:not(.dark) body.admin-theme-scope tbody tr:hover,
+    html:not(.dark) body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody tr:hover td,
     html:not(.dark) body.admin-theme-scope .hover\:bg-slate-50:hover,
     html:not(.dark) body.admin-theme-scope .hover\:bg-\[\#eef6fc\]:hover {
         background: #f1f5f9 !important;
@@ -4658,23 +4844,22 @@
     }
 
     /* Dark mode tables */
-    html.dark body.admin-theme-scope table,
-    html.dark body.admin-theme-scope tbody,
-    html.dark body.admin-theme-scope tr,
-    html.dark body.admin-theme-scope td {
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody,
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tr,
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) td {
         background: #1e293b !important;
         color: #f1f5f9 !important;
         border-color: #334155 !important;
     }
 
-    html.dark body.admin-theme-scope thead,
-    html.dark body.admin-theme-scope th {
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) thead,
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) th {
         background: #3996d3 !important;
         color: #f1f5f9 !important;
         border-color: #2d82bb !important;
     }
 
-    html.dark body.admin-theme-scope tbody tr:hover {
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody tr:hover td {
         background: #334155 !important;
     }
 
@@ -4690,11 +4875,10 @@
         background: #334155 !important;
     }
 
-    /* Dark mode rounded containers */
-    html.dark body.admin-theme-scope .rounded-xl,
-    html.dark body.admin-theme-scope [class*="bg-gray-900"],
-    html.dark body.admin-theme-scope [class*="bg-slate-900"],
-    html.dark body.admin-theme-scope [class*="bg-white"] {
+    /* Dark mode shell containers */
+    html.dark body.admin-theme-scope .admin-dropdown-panel,
+    html.dark body.admin-theme-scope .app-card,
+    html.dark body.admin-theme-scope .ui-card {
         background: #1e293b !important;
         color: #f1f5f9 !important;
         border-color: #334155 !important;
@@ -4703,25 +4887,6 @@
 
 @layer components {
     /* ── Sidebar search bar ── */
-    .app-sidebar-search {
-        padding: 0 0.65rem 0.5rem;
-        overflow: hidden;
-    }
-
-    body.sidebar-collapsed .app-sidebar-search {
-        display: none !important;
-    }
-
-    .app-sidebar-search svg {
-        width: 0.875rem !important;
-        height: 0.875rem !important;
-        max-width: 0.875rem !important;
-        min-width: 0.875rem !important;
-        max-height: 0.875rem !important;
-        min-height: 0.875rem !important;
-        flex-shrink: 0;
-    }
-
     .showcase-summary-grid,
     .app-screen-kpis,
     .stat-card-grid {
@@ -4758,12 +4923,8 @@
     .stat-card-link::before,
     .app-stat-card::before,
     .dashboard-summary-card::before {
-        content: "";
-        display: block !important;
-        position: absolute;
-        inset: 0 0 auto;
-        height: 3px;
-        background: #3996d3;
+        content: none !important;
+        display: none !important;
     }
 
     .showcase-kpi-label {
@@ -4804,15 +4965,13 @@
     }
 
     /* ── Blue table headers (both modes) ── */
-    .admin-theme-scope table thead th,
-    .admin-theme-scope thead th {
+    .admin-theme-scope :where(.app-table, .data-table, .dashboard-table) thead th {
         background: #3996d3 !important;
         color: #ffffff !important;
         border-color: #3996d3 !important;
     }
 
-    html.dark body.admin-theme-scope table thead th,
-    html.dark body.admin-theme-scope thead th {
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) thead th {
         background: #3996d3 !important;
         color: #f1f5f9 !important;
         border-color: #2d82bb !important;
@@ -4852,22 +5011,11 @@
         background: #eef6fc !important;
     }
 
-    /* ── Light mode: dark rounded containers inside content must be white ── */
-    html:not(.dark) body.admin-theme-scope .rounded-lg[class*="bg-[#"],
-    html:not(.dark) body.admin-theme-scope .rounded-xl[class*="bg-[#"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-[#0f172a]"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-[#1e293b]"],
-    html:not(.dark) body.admin-theme-scope [class*="bg-[#1c203d]"][class*="content"],
-    html:not(.dark) body.admin-theme-scope .admin-page-root [class*="bg-slate-800"],
-    html:not(.dark) body.admin-theme-scope .admin-page-root [class*="bg-slate-900"] {
-        background: #ffffff !important;
-        color: #1c203d !important;
-    }
-
     /* ── Light mode: filters and filter panels ── */
     html:not(.dark) body.admin-theme-scope .showcase-toolbar,
     html:not(.dark) body.admin-theme-scope .filter-panel,
-    html:not(.dark) body.admin-theme-scope [class*="filter"],
+    html:not(.dark) body.admin-theme-scope .showcase-filter-grid,
+    html:not(.dark) body.admin-theme-scope .showcase-filter-actions,
     html:not(.dark) body.admin-theme-scope .app-filter {
         background: #ffffff !important;
         color: #1c203d !important;
@@ -5419,7 +5567,6 @@
         border-top-right-radius: 0.75rem;
     }
 
-    .admin-theme-scope table tbody td,
     .app-table tbody td,
     .data-table tbody td,
     .dashboard-table tbody td {
@@ -5430,18 +5577,17 @@
         vertical-align: top;
     }
 
-    html:not(.dark) body.admin-theme-scope table tbody tr:nth-child(even) td {
+    html:not(.dark) body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody tr:nth-child(even) td {
         background: #f8fbff !important;
     }
 
-    .admin-theme-scope table tbody tr:hover td,
     .app-table tbody tr:hover td,
     .data-table tbody tr:hover td,
     .dashboard-table tbody tr:hover td {
         background: #edf7fd !important;
     }
 
-    .admin-theme-scope table tbody td[colspan] {
+    .admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody td[colspan] {
         padding: 2rem 1rem !important;
         text-align: center;
         color: var(--app-muted) !important;
@@ -5686,8 +5832,8 @@
         color: var(--app-blue) !important;
     }
 
-    html.dark body.admin-theme-scope table,
-    html.dark body.admin-theme-scope table tbody td,
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table),
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody td,
     html.dark body.admin-theme-scope .app-input,
     html.dark body.admin-theme-scope .app-select,
     html.dark body.admin-theme-scope .app-textarea,
@@ -5699,11 +5845,11 @@
         border-color: #334155 !important;
     }
 
-    html.dark body.admin-theme-scope table tbody tr:nth-child(even) td {
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody tr:nth-child(even) td {
         background: #1b2940 !important;
     }
 
-    html.dark body.admin-theme-scope table tbody tr:hover td {
+    html.dark body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody tr:hover td {
         background: #203450 !important;
     }
 
@@ -6041,6 +6187,19 @@
         opacity: 0.26 !important;
     }
 
+    body.admin-theme-scope :where(
+        .showcase-kpi-card,
+        .dashboard-summary-card,
+        .stat-card-link,
+        .app-stat-card,
+        .anbg-kpi-stat-card
+    )::before {
+        content: none !important;
+        display: none !important;
+        background: none !important;
+        background-image: none !important;
+    }
+
     body.admin-theme-scope .chart-disclosure-head {
         display: flex !important;
         align-items: flex-start !important;
@@ -6274,5 +6433,222 @@
         .stat-card-grid {
             grid-template-columns: 1fr !important;
         }
+    }
+
+    /* UI audit hardening: token-driven surfaces, compact tables, responsive header menus. */
+    body.admin-theme-scope {
+        --app-surface: #ffffff;
+        --app-surface-muted: #f8fbff;
+        --app-bg: #f5f9fc;
+        --app-border: #d8ecf8;
+        --app-text: #1c203d;
+        --app-muted: #667085;
+        --app-radius: 0.75rem;
+        --app-radius-lg: 0.875rem;
+    }
+
+    html.dark body.admin-theme-scope {
+        --app-surface: #162033;
+        --app-surface-muted: #1e293b;
+        --app-bg: #0f172a;
+        --app-border: #334155;
+        --app-text: #f8fafc;
+        --app-muted: #cbd5e1;
+    }
+
+    body.admin-theme-scope :where(.app-card, .ui-card, .showcase-panel, .showcase-toolbar, .form-section, .form-shell, .data-table-shell, .app-table-wrapper, .reporting-hub-kpi) {
+        background: var(--app-surface) !important;
+        color: var(--app-text) !important;
+        border-color: var(--app-border) !important;
+        border-radius: var(--app-radius-lg) !important;
+    }
+
+    body.admin-theme-scope :where(.app-table-wrapper, .data-table-shell, .eas-table-shell, .table-wrap) {
+        width: 100%;
+        overflow-x: auto;
+        padding: 0.5rem;
+        border: 1px solid var(--app-border) !important;
+        background: var(--app-surface) !important;
+        box-shadow: var(--app-shadow-soft, 0 10px 28px rgba(28, 32, 61, 0.07)) !important;
+    }
+
+    body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) {
+        width: 100%;
+        min-width: 48rem;
+        border: 0 !important;
+        border-collapse: separate;
+        border-spacing: 0;
+        background: var(--app-surface) !important;
+    }
+
+    body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) thead th {
+        background: #3996d3 !important;
+        color: #ffffff !important;
+        border-color: #3996d3 !important;
+        padding: 0.78rem 0.9rem !important;
+        font-size: 0.72rem !important;
+        font-weight: 850 !important;
+        letter-spacing: 0 !important;
+        white-space: nowrap;
+    }
+
+    body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody td {
+        background: var(--app-surface) !important;
+        color: var(--app-text) !important;
+        border-bottom: 1px solid var(--app-border) !important;
+        padding: 0.82rem 0.9rem !important;
+        vertical-align: top;
+    }
+
+    body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody tr:hover td {
+        background: var(--app-surface-muted) !important;
+    }
+
+    body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table) tbody td[colspan] {
+        padding: 1.5rem !important;
+        text-align: center;
+    }
+
+    body.admin-theme-scope .admin-navbar-dropdown {
+        width: min(22rem, calc(100vw - 2rem)) !important;
+        max-height: 72vh !important;
+        overflow: hidden !important;
+    }
+
+    body.admin-theme-scope .admin-dropdown-scroll {
+        max-height: min(24rem, 54vh) !important;
+    }
+
+    body.admin-theme-scope :where(
+        .no-kpi-band,
+        .showcase-summary-grid > *,
+        .app-screen-kpis > *,
+        .stat-card-grid > *,
+        .dashboard-advanced-kpi,
+        .dashboard-module-progress-card,
+        .anbg-kpi-stat-card,
+        .showcase-kpi-card,
+        .dashboard-summary-card,
+        .stat-card-link,
+        .app-stat-card
+    ) {
+        border-top-color: var(--app-border) !important;
+        background-image: none !important;
+    }
+
+    body.admin-theme-scope :where(
+        .no-kpi-band,
+        .showcase-summary-grid > *,
+        .app-screen-kpis > *,
+        .stat-card-grid > *,
+        .dashboard-advanced-kpi,
+        .dashboard-module-progress-card,
+        .anbg-kpi-stat-card,
+        .showcase-kpi-card,
+        .dashboard-summary-card,
+        .stat-card-link,
+        .app-stat-card
+    )::before,
+    body.admin-theme-scope :where(
+        .no-kpi-band,
+        .showcase-summary-grid > *,
+        .app-screen-kpis > *,
+        .stat-card-grid > *,
+        .dashboard-advanced-kpi,
+        .dashboard-module-progress-card,
+        .anbg-kpi-stat-card,
+        .showcase-kpi-card,
+        .dashboard-summary-card,
+        .stat-card-link,
+        .app-stat-card
+    )::after {
+        content: none !important;
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        border: 0 !important;
+        background: none !important;
+        background-image: none !important;
+        opacity: 0 !important;
+    }
+
+    body.admin-theme-scope :where(.btn-danger, .btn-red, .btn-delete),
+    body.admin-theme-scope :where(button.btn-danger, button.btn-red, button.btn-delete)[type="submit"] {
+        background: #fff7f7 !important;
+        color: #c2413b !important;
+        border-color: rgba(194, 65, 59, 0.34) !important;
+    }
+
+    body.admin-theme-scope :where(.btn-amber, .btn-warning),
+    body.admin-theme-scope :where(button.btn-amber, button.btn-warning)[type="submit"] {
+        background: #fff8e6 !important;
+        color: #9a5f10 !important;
+        border-color: rgba(249, 177, 60, 0.42) !important;
+    }
+
+    body.admin-theme-scope :where(.btn-green, .btn-success),
+    body.admin-theme-scope :where(button.btn-green, button.btn-success)[type="submit"] {
+        background: #178f5f !important;
+        color: #ffffff !important;
+        border-color: #178f5f !important;
+    }
+
+    body.admin-theme-scope :where(.btn-secondary, .btn-outline),
+    body.admin-theme-scope :where(button.btn-secondary, button.btn-outline)[type="submit"] {
+        background: #ffffff !important;
+        color: #3996d3 !important;
+        border-color: rgba(57, 150, 211, 0.36) !important;
+    }
+
+    @media (max-width: 900px) {
+        body.admin-theme-scope .admin-local-clock {
+            display: none !important;
+        }
+
+        body.admin-theme-scope .admin-navbar-user-copy {
+            display: none !important;
+        }
+    }
+
+    @media (max-width: 640px) {
+        body.admin-theme-scope .admin-navbar-inner {
+            gap: 0.5rem !important;
+            padding-inline: 0.75rem !important;
+        }
+
+        body.admin-theme-scope .admin-exercise-filter {
+            display: none !important;
+        }
+
+        body.admin-theme-scope .admin-navbar-dropdown {
+            position: fixed !important;
+            left: 1rem !important;
+            right: 1rem !important;
+            top: 4.75rem !important;
+            width: auto !important;
+            max-height: calc(100vh - 6rem) !important;
+        }
+    }
+
+    body.admin-theme-scope .app-sidebar-section-title {
+        text-align: left !important;
+    }
+
+    body.admin-theme-scope .app-sidebar-link,
+    body.admin-theme-scope .app-sidebar-logout {
+        justify-content: flex-start !important;
+        text-align: left !important;
+    }
+
+    body.admin-theme-scope .app-sidebar-link [data-sidebar-label],
+    body.admin-theme-scope .app-sidebar-logout [data-sidebar-label] {
+        flex: 1 1 auto !important;
+        text-align: left !important;
+    }
+
+    body.sidebar-collapsed .app-sidebar-link,
+    body.sidebar-collapsed .app-sidebar-logout {
+        justify-content: center !important;
+        text-align: center !important;
     }
 }

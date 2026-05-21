@@ -113,12 +113,21 @@ class AlertCenterService
     {
         ksort($context);
 
+        // A39 — Inclut la version d alertes maintenue par AnalyticsCacheVersionService
+        // (bumpAlerts() appele depuis ActionObserver / hooks metier) pour
+        // invalider automatiquement le cache 60s des qu un evenement modifie
+        // l etat des alertes. La cle legacy `alert-center:version` reste
+        // additionnee pour retro-compatibilite avec d eventuels incrementations
+        // manuelles existantes.
+        $alertsVersion = app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->alertsVersion();
+        $legacyVersion = (int) Cache::get('alert-center:version', 1);
+
         return 'alert-center:'.$segment.':'.sha1(json_encode([
             'user_id' => (int) $user->id,
             'role' => (string) $user->role,
             'direction_id' => $user->direction_id !== null ? (int) $user->direction_id : null,
             'service_id' => $user->service_id !== null ? (int) $user->service_id : null,
-            'version' => (int) Cache::get('alert-center:version', 1),
+            'version' => $alertsVersion + $legacyVersion,
             'context' => $context,
         ], JSON_THROW_ON_ERROR));
     }

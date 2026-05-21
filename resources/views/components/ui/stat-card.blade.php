@@ -19,7 +19,7 @@
         'orange' => 'border-[#f9b13c]/50',
         'danger' => 'border-red-200',
     ];
-    $classes = 'stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border '.($tones[$tone] ?? $tones['blue']).' bg-white px-4 py-3 text-center shadow-sm transition hover:shadow-md';
+    $classes = 'no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border '.($tones[$tone] ?? $tones['blue']).' bg-white px-4 py-3 text-center shadow-sm transition hover:shadow-md';
 @endphp
 
 @if ($href)

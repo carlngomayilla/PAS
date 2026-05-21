@@ -2,22 +2,6 @@
 
 @section('title', 'Reporting')
 
-@push('head')
-    <style>
-        .reporting-hub-kpi{border-radius:1.2rem;border:1px solid rgba(203,213,225,.82);padding:1rem;background:linear-gradient(180deg,rgba(255,255,255,.99) 0%,rgba(248,250,252,.95) 100%);box-shadow:0 18px 28px -28px rgba(15,23,42,.12)}
-        .reporting-hub-kpi .dashboard-summary-label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#6B7280}
-        .reporting-hub-kpi .dashboard-summary-value{color:#1F2937}
-        .reporting-hub-kpi .dashboard-summary-meta{color:#6B7280}
-        .reporting-hub-kpi-blue .dashboard-summary-value{color:#3996D3}
-        .reporting-hub-kpi-green .dashboard-summary-value{color:#8FC043}
-        .reporting-hub-kpi-amber .dashboard-summary-value{color:#F9B13C}
-        .reporting-hub-kpi-navy .dashboard-summary-value{color:#1C203D}
-
-
-        .dark .reporting-hub-kpi-navy .dashboard-summary-value,.dark .reporting-hub-kpi-blue .dashboard-summary-value,.dark .reporting-hub-kpi-green .dashboard-summary-value,.dark .reporting-hub-kpi-amber .dashboard-summary-value{color:#F8FAFC}
-    </style>
-@endpush
-
 @section('content')
     @php
         $roleProfile = $roleProfile ?? ['eyebrow' => 'Reporting institutionnel', 'title' => "Centre d'export et de diffusion", 'subtitle' => 'Exports et diffusion du reporting.', 'role_label' => strtoupper((string) ($scope['role'] ?? 'lecture'))];
@@ -60,7 +44,7 @@
                 </div>
             </div>
             <div class="showcase-action-row">
-                <a class="btn btn-blue rounded-2xl px-4 py-2.5" href="{{ $dashboardAnalyticsUrl }}">Tableau de bord analytique</a>
+                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ $dashboardAnalyticsUrl }}">Tableau de bord analytique</a>
                 <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.excel') }}">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h11l5 5v11H4V4zm11 0v5h5M8 13h8M8 17h8M8 9h3" />
@@ -189,15 +173,25 @@
                                     </div>
                                 </div>
                             @empty
-                                <div class="rounded-[1rem] border border-dashed border-slate-300/80 px-4 py-6 text-center text-sm text-slate-500">Aucun service actif rattaché.</div>
+                                <x-ui.empty-state
+                                    title="Aucun service actif rattaché"
+                                    message="Aucun service actif n'est disponible pour cette direction."
+                                    icon="users"
+                                    tone="info"
+                                    class="py-6"
+                                />
                             @endforelse
                         </div>
                     </section>
                 @empty
-                    <div class="rounded-[1.15rem] border border-dashed border-slate-300/80 px-4 py-8 text-center text-sm text-slate-500">Aucune donnée direction / service disponible pour le périmètre courant.</div>
+                    <x-ui.empty-state
+                        title="Aucune donnée direction / service"
+                        message="Aucune information n'est disponible pour le périmètre courant."
+                        icon="filter"
+                        tone="info"
+                    />
                 @endforelse
             </div>
         </article>
     </div>
 @endsection
-

@@ -298,7 +298,7 @@
                                 <td>{{ $row['justificatif'] ?? '-' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="muted">Aucune action detaillee disponible pour ce service.</td></tr>
+                            <tr><td colspan="9" class="muted">Aucune action détaillée disponible pour ce service.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

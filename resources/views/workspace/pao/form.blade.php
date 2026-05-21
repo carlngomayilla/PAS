@@ -48,7 +48,7 @@
                     <h1 class="showcase-title">{{ $isEdit ? 'Modifier un PAO existant' : 'Enregistrer un nouveau PAO' }}</h1>
                 </div>
                 <div class="showcase-action-row">
-                    <a class="btn btn-blue" href="{{ route('workspace.pao.index') }}">Retour liste</a>
+                    <a class="btn btn-secondary" href="{{ route('workspace.pao.index') }}">Retour liste</a>
                 </div>
             </div>
         </section>
@@ -123,7 +123,7 @@
                         <div>
                             <h2 class="form-section-title">Déclinaison opérationnelle</h2>
                         </div>
-                        <button id="add-operational-objective" class="btn btn-blue" type="button">+ Ajouter un autre objectif opérationnel</button>
+                        <button id="add-operational-objective" class="btn btn-secondary" type="button">+ Ajouter un autre objectif opérationnel</button>
                     </div>
 
                     <div id="operational-objectives-list" class="space-y-4">
@@ -172,7 +172,7 @@
                     </div>
                 </div>
 
-                <div class="form-actions">
+                <div class="form-actions form-actions-sticky">
                     <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Créer' }}</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.pao.index') }}">Retour</a>
                 </div>
@@ -182,8 +182,8 @@
         @if ($isEdit)
             <section class="showcase-panel mb-4 app-screen-block">
                 <h2 class="showcase-panel-title">Timeline validation</h2>
-                <div class="overflow-auto">
-                    <table>
+                <div class="app-table-wrapper">
+                    <table class="app-table data-table">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -210,7 +210,15 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-slate-500">Aucune transition enregistree.</td>
+                                    <td colspan="5">
+                                        <x-ui.empty-state
+                                            title="Aucune transition enregistrée"
+                                            message="Le circuit de validation apparaîtra ici après les premiers changements de statut."
+                                            icon="clock"
+                                            tone="info"
+                                            class="my-4"
+                                        />
+                                    </td>
                                 </tr>
                             @endforelse
                         </tbody>

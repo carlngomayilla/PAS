@@ -15,7 +15,7 @@
     @endphp
     <div class="app-screen-flow">
     <section class="showcase-panel mb-4 app-screen-block">
-        <h1 class="showcase-panel-title">Referentiel - Services</h1>
+        <h1 class="showcase-panel-title">Référentiel - Services</h1>
     </section>
     <section class="showcase-summary-grid mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
@@ -43,7 +43,7 @@
             <div class="form-grid-compact mb-2">
                 <div>
                     <label for="q">Recherche</label>
-                    <input id="q" name="q" type="text" value="{{ $filters['q'] }}" placeholder="Code ou libelle">
+                    <input id="q" name="q" type="text" value="{{ $filters['q'] }}" placeholder="Code ou libellé">
                 </div>
                 <div>
                     <label for="direction_id">Direction</label>
@@ -67,21 +67,21 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.referentiel.services.index') }}">Réinitialiser</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.services.index') }}">Réinitialiser</a>
             </div>
         </form>
     </section>
 
     <section class="showcase-panel mb-4 app-screen-block">
         <h2>Liste des services</h2>
-        <div class="overflow-auto">
-            <table>
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
                         <th>ID</th>
                         <th>Direction</th>
                         <th>Code</th>
-                        <th>Libelle</th>
+                        <th>Libellé</th>
                         <th>Actif</th>
                         <th>Utilisateurs</th>
                         <th>PTA</th>
@@ -103,11 +103,11 @@
                             @if ($canWrite)
                                 <td>
                                     <div class="flex flex-wrap gap-1.5">
-                                        <a class="btn btn-amber" href="{{ route('workspace.referentiel.services.edit', $row) }}">Modifier</a>
+                                        <a class="btn btn-warning" href="{{ route('workspace.referentiel.services.edit', $row) }}">Modifier</a>
                                         <form method="POST" action="{{ route('workspace.referentiel.services.destroy', $row) }}" data-confirm-message="Supprimer ce service ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="btn btn-red" type="submit">Supprimer</button>
+                                            <button class="btn btn-danger" type="submit">Supprimer</button>
                                         </form>
                                     </div>
                                 </td>
@@ -115,7 +115,15 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 8 : 7 }}" class="text-slate-600">Aucun service trouve.</td>
+                            <td colspan="{{ $canWrite ? 8 : 7 }}">
+                                <x-ui.empty-state
+                                    title="Aucun service trouvé"
+                                    message="Aucun service ne correspond aux filtres courants."
+                                    icon="filter"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

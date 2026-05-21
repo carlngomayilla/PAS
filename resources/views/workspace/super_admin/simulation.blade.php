@@ -77,17 +77,17 @@
         @endif
 
         <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-3.5">
-            <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Actions consolidees</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $result['current']['official_actions_total'] }} -> {{ $result['simulated']['official_actions_total'] }}</p><p class="mt-2 text-sm text-slate-600">Delta {{ $result['impact']['official_actions_delta'] >= 0 ? '+' : '' }}{{ $result['impact']['official_actions_delta'] }}</p></article>
+            <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Actions consolidées</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $result['current']['official_actions_total'] }} -> {{ $result['simulated']['official_actions_total'] }}</p><p class="mt-2 text-sm text-slate-600">Delta {{ $result['impact']['official_actions_delta'] >= 0 ? '+' : '' }}{{ $result['impact']['official_actions_delta'] }}</p></article>
             <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Taux d'exécution consolidé</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ number_format((float) $result['current']['official_completion_rate'], 2) }}% -> {{ number_format((float) $result['simulated']['official_completion_rate'], 2) }}%</p><p class="mt-2 text-sm text-slate-600">Delta {{ $result['impact']['official_completion_rate_delta'] >= 0 ? '+' : '' }}{{ number_format((float) $result['impact']['official_completion_rate_delta'], 2) }} pts</p></article>
-            <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Score moyen consolide</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ number_format((float) $result['current']['official_average_score'], 2) }} -> {{ number_format((float) $result['simulated']['official_average_score'], 2) }}</p><p class="mt-2 text-sm text-slate-600">Delta {{ $result['impact']['official_average_score_delta'] >= 0 ? '+' : '' }}{{ number_format((float) $result['impact']['official_average_score_delta'], 2) }}</p></article>
-            <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Clotures eligibles</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $result['current']['closure_eligible_actions'] }} -> {{ $result['simulated']['closure_eligible_actions'] }}</p><p class="mt-2 text-sm text-slate-600">Delta {{ $result['impact']['closure_eligible_actions_delta'] >= 0 ? '+' : '' }}{{ $result['impact']['closure_eligible_actions_delta'] }}</p></article>
+            <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Score moyen consolidé</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ number_format((float) $result['current']['official_average_score'], 2) }} -> {{ number_format((float) $result['simulated']['official_average_score'], 2) }}</p><p class="mt-2 text-sm text-slate-600">Delta {{ $result['impact']['official_average_score_delta'] >= 0 ? '+' : '' }}{{ number_format((float) $result['impact']['official_average_score_delta'], 2) }}</p></article>
+            <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Clôtures éligibles</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $result['current']['closure_eligible_actions'] }} -> {{ $result['simulated']['closure_eligible_actions'] }}</p><p class="mt-2 text-sm text-slate-600">Delta {{ $result['impact']['closure_eligible_actions_delta'] >= 0 ? '+' : '' }}{{ $result['impact']['closure_eligible_actions_delta'] }}</p></article>
             <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Auto-clôture potentielle</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $result['impact']['auto_complete_candidates'] }}</p><p class="mt-2 text-sm text-slate-600">Actions déjà à 100% sans date de fin réelle.</p></article>
         </section>
 
         <section class="ui-card">
-            <h2>Comparaison detaillee</h2>
-            <div class="mt-4 overflow-x-auto">
-                <table class="min-w-full text-sm">
+            <h2>Comparaison détaillée</h2>
+            <div class="app-table-wrapper mt-4">
+                <table class="app-table data-table">
                     <thead>
                         <tr>
                             <th class="px-3 py-2 text-left">Critere</th>
@@ -107,12 +107,12 @@
 
         <section class="grid gap-4 lg:grid-cols-2 mt-3.5">
             <article class="ui-card !mb-0">
-                <h2>Apercu dashboard</h2>
+                <h2>Aperçu dashboard</h2>
                 <div class="mt-4 grid gap-4 md:grid-cols-2">
                     @foreach (($result['dashboard_preview'] ?? []) as $role => $preview)
                         <div class="rounded-2xl border border-slate-200/80 p-4">
                             <h3 class="font-semibold text-slate-900">{{ strtoupper($role) }}</h3>
-                            <p class="mt-1 text-sm text-slate-600">Cartes visibles apres application de la simulation.</p>
+                            <p class="mt-1 text-sm text-slate-600">Cartes visibles après application de la simulation.</p>
                             <ul class="mt-3 space-y-2 text-sm text-slate-700">
                                 @forelse (($preview['cards'] ?? []) as $card)
                                     <li>{{ $card['label'] }} · {{ strtoupper($card['size']) }} · {{ $card['tone'] !== 'auto' ? $card['tone'] : 'auto' }}</li>
@@ -125,9 +125,9 @@
                 </div>
             </article>
             <article class="ui-card !mb-0">
-                <h2>Apercu exports</h2>
-                <div class="mt-4 overflow-x-auto">
-                    <table class="dashboard-table">
+                <h2>Aperçu exports</h2>
+                <div class="app-table-wrapper mt-4">
+                    <table class="app-table data-table">
                         <thead><tr><th>Format</th><th>Template</th><th>Niveau</th><th>Meta</th></tr></thead>
                         <tbody>
                             @forelse (($result['export_preview'] ?? []) as $row)
@@ -142,7 +142,17 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="4" class="text-slate-500">Aucun template publié disponible.</td></tr>
+                                <tr>
+                                    <td colspan="4">
+                                        <x-ui.empty-state
+                                            title="Aucun template publié"
+                                            message="Publiez un template pour alimenter l'aperçu des exports."
+                                            icon="file"
+                                            tone="info"
+                                            class="my-4"
+                                        />
+                                    </td>
+                                </tr>
                             @endforelse
                         </tbody>
                     </table>

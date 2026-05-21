@@ -120,7 +120,7 @@
                     <h1 class="showcase-title">{{ $isEdit ? 'Modifier le PTA du service' : 'Enregistrer le PTA du service' }}</h1>
                 </div>
                 <div class="showcase-action-row">
-                    <a class="btn btn-blue" href="{{ route('workspace.pta.index') }}">Retour liste</a>
+                    <a class="btn btn-secondary" href="{{ route('workspace.pta.index') }}">Retour liste</a>
                 </div>
             </div>
         </section>
@@ -219,7 +219,10 @@
                         <div>
                             <h2 class="form-section-title mb-0">Actions liées à l'objectif opérationnel</h2>
                         </div>
-                        <button id="add-action-button" class="btn btn-blue" type="button">+ Ajouter une autre action</button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="anbg-badge anbg-badge-info px-3"><span id="pta-action-count">{{ $actionRows->count() }}</span> action(s)</span>
+                            <button id="add-action-button" class="btn btn-secondary" type="button">+ Ajouter une autre action</button>
+                        </div>
                     </div>
 
                     @error('actions') <p class="field-error">{{ $message }}</p> @enderror
@@ -261,8 +264,8 @@
         @if ($isEdit)
             <section class="showcase-panel mb-4 app-screen-block">
                 <h2 class="showcase-panel-title">Timeline validation</h2>
-                <div class="overflow-auto">
-                    <table>
+                <div class="app-table-wrapper">
+                    <table class="app-table data-table">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -289,7 +292,15 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-slate-500">Aucune transition enregistree.</td>
+                                    <td colspan="5">
+                                        <x-ui.empty-state
+                                            title="Aucune transition enregistrée"
+                                            message="Le circuit de validation apparaîtra ici après les premiers changements de statut."
+                                            icon="clock"
+                                            tone="info"
+                                            class="my-4"
+                                        />
+                                    </td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -598,6 +609,7 @@
                     block.setAttribute('data-action-index', String(index));
                     var title = block.querySelector('[data-action-title]');
                     if (title) title.textContent = 'Action ' + (index + 1);
+                    syncActionSummary(block);
 
                     block.querySelectorAll('[name]').forEach(function (field) {
                         field.name = field.name.replace(/actions\[(?:\d+|__INDEX__|__ACTION_INDEX__)\]/, 'actions[' + index + ']');
@@ -638,6 +650,31 @@
                     .replaceAll('__NUMBER__', String(index + 1));
                 actionsList.insertAdjacentHTML('beforeend', html);
                 refreshActionIndexes();
+                var addedBlock = actionsList.querySelector('[data-action-block]:last-child');
+                if (addedBlock) {
+                    closeOtherActions(addedBlock);
+                    addedBlock.open = true;
+                }
+            }
+
+            function syncActionSummary(block) {
+                if (!block) return;
+
+                var labelInput = block.querySelector('input[name$="[libelle]"]');
+                var summary = block.querySelector('[data-action-summary]');
+                if (summary) {
+                    summary.textContent = labelInput && labelInput.value.trim() ? labelInput.value.trim() : 'Nouvelle action';
+                }
+            }
+
+            function closeOtherActions(activeBlock) {
+                if (!actionsList || !activeBlock) return;
+
+                actionsList.querySelectorAll('[data-action-block]').forEach(function (block) {
+                    if (block !== activeBlock && block instanceof HTMLDetailsElement) {
+                        block.open = false;
+                    }
+                });
             }
 
             function addRmo(block) {
@@ -693,6 +730,10 @@
                         syncActionMode(target.closest('[data-action-block]'));
                     }
 
+                    if (target.matches('input[name$="[libelle]"]')) {
+                        syncActionSummary(target.closest('[data-action-block]'));
+                    }
+
                     if (target.matches('input[name$="[date_fin]"]')) {
                         syncActionEcheance(target.closest('[data-action-block]'));
                     }
@@ -703,6 +744,8 @@
                     if (!(target instanceof HTMLElement)) return;
 
                     if (target.matches('[data-remove-action]')) {
+                        event.preventDefault();
+                        event.stopPropagation();
                         var block = target.closest('[data-action-block]');
                         if (block && actionsList.querySelectorAll('[data-action-block]').length > 1) {
                             block.remove();
@@ -744,6 +787,13 @@
                         }
                     }
                 });
+
+                actionsList.addEventListener('toggle', function (event) {
+                    var block = event.target;
+                    if (block instanceof HTMLDetailsElement && block.matches('[data-action-block]') && block.open) {
+                        closeOtherActions(block);
+                    }
+                }, true);
             }
 
             syncScope();

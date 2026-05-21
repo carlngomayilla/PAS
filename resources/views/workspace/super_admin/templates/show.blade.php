@@ -28,10 +28,10 @@
                 <a class="btn btn-secondary" href="{{ route('workspace.super-admin.templates.export-json', $template) }}">Exporter JSON</a>
                 <form method="POST" action="{{ route('workspace.super-admin.templates.duplicate', $template) }}">@csrf<button class="btn btn-secondary" type="submit">Dupliquer</button></form>
                 @if ($template->status !== \App\Models\ExportTemplate::STATUS_PUBLISHED)
-                    <form method="POST" action="{{ route('workspace.super-admin.templates.publish', $template) }}">@csrf<input type="hidden" name="mark_as_default" value="1"><button class="btn btn-green" type="submit">Publier</button></form>
+                    <form method="POST" action="{{ route('workspace.super-admin.templates.publish', $template) }}">@csrf<input type="hidden" name="mark_as_default" value="1"><button class="btn btn-primary" type="submit">Publier</button></form>
                 @endif
                 @if ($template->status !== \App\Models\ExportTemplate::STATUS_ARCHIVED)
-                    <form method="POST" action="{{ route('workspace.super-admin.templates.archive', $template) }}">@csrf<button class="btn btn-delete" type="submit">Archiver</button></form>
+                    <form method="POST" action="{{ route('workspace.super-admin.templates.archive', $template) }}">@csrf<button class="btn btn-danger" type="submit">Archiver</button></form>
                 @endif
             </div>
         </div>
@@ -44,7 +44,7 @@
     </section>
 
     <section class="showcase-panel mb-4">
-        <h2>Apercu fonctionnel</h2>
+        <h2>Aperçu fonctionnel</h2>
         <div class="mt-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             @foreach (($template->blocks_config ?? []) as $block => $enabled)
                 <article class="ui-card !mb-0"><p class="text-sm text-slate-500">{{ $block }}</p><p class="mt-2 text-lg font-semibold">{{ $enabled ? 'Active' : 'Inactive' }}</p></article>
@@ -52,19 +52,19 @@
         </div>
         <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p class="text-sm font-semibold text-slate-700">Variables dynamiques</p>
-            <div class="mt-2 flex flex-wrap gap-2">@forelse (($template->content_config['dynamic_variables'] ?? []) as $variable)<code>{{ $variable }}</code>@empty<span class="text-sm text-slate-500">Aucune variable declaree.</span>@endforelse</div>
+            <div class="mt-2 flex flex-wrap gap-2">@forelse (($template->content_config['dynamic_variables'] ?? []) as $variable)<code>{{ $variable }}</code>@empty<span class="text-sm text-slate-500">Aucune variable déclarée.</span>@endforelse</div>
         </div>
         <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p class="text-sm font-semibold text-slate-700">Options avancees</p>
+            <p class="text-sm font-semibold text-slate-700">Options avancées</p>
             <div class="mt-2 grid gap-2 md:grid-cols-2 text-sm text-slate-600">
                 <div>Excel freeze header : <strong>{{ ($template->layout_config['excel_freeze_header'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
                 <div>Excel auto filter : <strong>{{ ($template->layout_config['excel_auto_filter'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
-                <div>Feuille detail : <strong>{{ $template->layout_config['excel_detail_sheet_name'] ?? 'Reporting' }}</strong></div>
-                <div>Feuille graphique : <strong>{{ $template->layout_config['excel_graph_sheet_name'] ?? 'Synthese graphique' }}</strong></div>
-                <div>PDF legende niveaux : <strong>{{ ($template->layout_config['pdf_show_level_legend'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
+                <div>Feuille détail : <strong>{{ $template->layout_config['excel_detail_sheet_name'] ?? 'Reporting' }}</strong></div>
+                <div>Feuille graphique : <strong>{{ $template->layout_config['excel_graph_sheet_name'] ?? 'Synthèse graphique' }}</strong></div>
+                <div>PDF légende niveaux : <strong>{{ ($template->layout_config['pdf_show_level_legend'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
                 <div>PDF cartes Indicateur de performance : <strong>{{ ($template->layout_config['pdf_show_kpi_cards'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
                 <div>Word sommaire : <strong>{{ ($template->layout_config['word_include_toc'] ?? false) ? 'Oui' : 'Non' }}</strong></div>
-                <div>Word saut apres synthèse : <strong>{{ ($template->layout_config['word_page_break_after_summary'] ?? false) ? 'Oui' : 'Non' }}</strong></div>
+                <div>Word saut après synthèse : <strong>{{ ($template->layout_config['word_page_break_after_summary'] ?? false) ? 'Oui' : 'Non' }}</strong></div>
             </div>
         </div>
     </section>
@@ -72,20 +72,30 @@
     <section class="grid gap-3 lg:grid-cols-2 mb-3.5">
         <article class="ui-card !mb-0">
             <div class="flex items-center justify-between gap-3"><h2>Affectations</h2><span class="text-sm text-slate-500">{{ $template->assignments->count() }} affectation(s)</span></div>
-            <div class="mt-4 overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead><tr><th class="px-3 py-2 text-left">Profil</th><th class="px-3 py-2 text-left">Niveau</th><th class="px-3 py-2 text-left">Périmètre</th><th class="px-3 py-2 text-left">État</th><th class="px-3 py-2 text-left">Action</th></tr></thead>
+            <div class="app-table-wrapper mt-4">
+                <table class="app-table data-table">
+                    <thead><tr><th>Profil</th><th>Niveau</th><th>Périmètre</th><th>État</th><th>Action</th></tr></thead>
                     <tbody>
                         @forelse ($template->assignments as $assignment)
                             <tr>
-                                <td class="px-3 py-2">{{ $assignment->target_profile ?: 'Tous profils' }}</td>
-                                <td class="px-3 py-2">{{ $readingLevelLabel($assignment->reading_level) }}</td>
-                                <td class="px-3 py-2">{{ $assignment->service?->code ?: ($assignment->direction?->code ?: 'Global') }}</td>
-                                <td class="px-3 py-2">{{ $assignment->is_active ? 'Active' : 'Inactive' }}</td>
-                                <td class="px-3 py-2"><form method="POST" action="{{ route('workspace.super-admin.templates.assignments.toggle', $assignment) }}">@csrf<button class="btn btn-secondary !px-3 !py-1.5" type="submit">Basculer</button></form></td>
+                                <td>{{ $assignment->target_profile ?: 'Tous profils' }}</td>
+                                <td>{{ $readingLevelLabel($assignment->reading_level) }}</td>
+                                <td>{{ $assignment->service?->code ?: ($assignment->direction?->code ?: 'Global') }}</td>
+                                <td>{{ $assignment->is_active ? 'Active' : 'Inactive' }}</td>
+                                <td><form method="POST" action="{{ route('workspace.super-admin.templates.assignments.toggle', $assignment) }}">@csrf<button class="btn btn-secondary !px-3 !py-1.5" type="submit">Basculer</button></form></td>
                             </tr>
                         @empty
-                            <tr><td class="px-3 py-4 text-slate-500" colspan="5">Aucune affectation.</td></tr>
+                            <tr>
+                                <td colspan="5">
+                                    <x-ui.empty-state
+                                        title="Aucune affectation"
+                                        message="Aucune règle d'affectation n'est encore rattachée à ce template."
+                                        icon="users"
+                                        tone="info"
+                                        class="my-4"
+                                    />
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -103,7 +113,7 @@
                 <div><label for="assign_reading_level">Niveau</label><select id="assign_reading_level" name="reading_level"><option value="">Non borne</option>@foreach ($readingLevelOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['reading_level'] === $option)>{{ $readingLevelLabels[$option] ?? $option }}</option>@endforeach</select></div>
                 <div><label for="assign_direction_id">Direction</label><select id="assign_direction_id" name="direction_id"><option value="">Globale</option>@foreach ($directionOptions as $direction)<option value="{{ $direction->id }}">{{ $direction->code }} - {{ $direction->libelle }}</option>@endforeach</select></div>
                 <div><label for="assign_service_id">Service</label><select id="assign_service_id" name="service_id"><option value="">Aucun</option>@foreach ($serviceOptions as $service)<option value="{{ $service->id }}">{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>@endforeach</select></div>
-                <div class="flex items-end gap-3"><label class="checkbox-pill !mb-0"><input name="is_default" type="checkbox" value="1">Defaut</label><label class="checkbox-pill !mb-0"><input name="is_active" type="checkbox" value="1" checked>Active</label></div>
+                <div class="flex items-end gap-3"><label class="checkbox-pill !mb-0"><input name="is_default" type="checkbox" value="1">Défaut</label><label class="checkbox-pill !mb-0"><input name="is_active" type="checkbox" value="1" checked>Active</label></div>
                 <div class="flex items-end"><button class="btn btn-primary" type="submit">Ajouter</button></div>
             </form>
         </article>
@@ -111,25 +121,25 @@
 
     <section class="showcase-panel mb-4">
         <h2>Versions</h2>
-        <div class="mt-4 overflow-x-auto">
-            <table class="min-w-full text-sm">
-                <thead><tr><th class="px-3 py-2 text-left">Version</th><th class="px-3 py-2 text-left">Statut</th><th class="px-3 py-2 text-left">Note</th><th class="px-3 py-2 text-left">Auteur</th><th class="px-3 py-2 text-left">Date</th><th class="px-3 py-2 text-left">Snapshot</th><th class="px-3 py-2 text-left">Action</th></tr></thead>
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
+                <thead><tr><th>Version</th><th>Statut</th><th>Note</th><th>Auteur</th><th>Date</th><th>Snapshot</th><th>Action</th></tr></thead>
                 <tbody>
                     @forelse ($template->versions as $version)
                         <tr>
-                            <td class="px-3 py-2">v{{ $version->version_number }}</td>
-                            <td class="px-3 py-2">{{ $version->status }}</td>
-                            <td class="px-3 py-2">{{ $version->note ?: '-' }}</td>
-                            <td class="px-3 py-2">{{ $version->creator?->name ?? 'Système' }}</td>
-                            <td class="px-3 py-2">{{ $version->created_at?->format('Y-m-d H:i') }}</td>
-                            <td class="px-3 py-2">
+                            <td>v{{ $version->version_number }}</td>
+                            <td>{{ $version->status }}</td>
+                            <td>{{ $version->note ?: '-' }}</td>
+                            <td>{{ $version->creator?->name ?? 'Système' }}</td>
+                            <td>{{ $version->created_at?->format('Y-m-d H:i') }}</td>
+                            <td>
                                 <div class="text-xs text-slate-500">
                                     {{ $version->snapshot['format'] ?? '-' }} /
                                     {{ $version->snapshot['module'] ?? '-' }} /
                                     {{ $readingLevelLabel($version->snapshot['reading_level'] ?? null) }}
                                 </div>
                             </td>
-                            <td class="px-3 py-2">
+                            <td>
                                 <form method="POST" action="{{ route('workspace.super-admin.templates.versions.restore', [$template, $version]) }}">
                                     @csrf
                                     <button class="btn btn-secondary !px-3 !py-1.5" type="submit">Restaurer</button>
@@ -137,7 +147,17 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td class="px-3 py-4 text-slate-500" colspan="7">Aucune version n'a encore été publiée.</td></tr>
+                        <tr>
+                            <td colspan="7">
+                                <x-ui.empty-state
+                                    title="Aucune version publiée"
+                                    message="Les versions publiées du template apparaîtront ici."
+                                    icon="file"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

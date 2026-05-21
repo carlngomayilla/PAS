@@ -1,6 +1,6 @@
 @extends('layouts.workspace')
 
-@section('title', 'Apercu template')
+@section('title', 'Aperçu template')
 
 @section('content')
     <section class="showcase-panel mb-4">
@@ -8,7 +8,7 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Preview template</p>
                 <h1 class="mt-2">{{ $template->name }}</h1>
-                <p class="mt-2 text-slate-600">{{ $preview['label'] ?? 'Apercu' }}</p>
+                <p class="mt-2 text-slate-600">{{ $preview['label'] ?? 'Aperçu' }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
@@ -21,7 +21,21 @@
     @if (($preview['type'] ?? null) === 'html')
         <section class="showcase-panel mb-4">
             <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                {!! $preview['html'] ?? '' !!}
+                {{-- A34 — XSS preview : `$preview['html']` provient d un template
+                     configurable par le super_admin. On filtre via strip_tags avec
+                     une whitelist typographique stricte avant rendu. Les balises
+                     interactives (script, iframe, on*, style, link, object) sont
+                     supprimees pour empecher l execution de code malveillant.
+                     Cette voie reste accessible uniquement aux super_admin
+                     (cf. route /workspace/super-admin/templates/...). --}}
+                {!! strip_tags((string) ($preview['html'] ?? ''), [
+                    'p', 'br', 'strong', 'em', 'b', 'i', 'u', 'span',
+                    'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                    'blockquote', 'pre', 'code', 'hr', 'small', 'sub', 'sup',
+                    'div', 'section', 'article', 'header', 'footer',
+                ]) !!}
             </div>
         </section>
     @elseif (($preview['type'] ?? null) === 'excel')

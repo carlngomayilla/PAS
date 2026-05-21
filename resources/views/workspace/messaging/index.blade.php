@@ -82,7 +82,7 @@
                         <select id="conversation_service_id" name="conversation_service_id">
                             <option value="">Tous</option>
                             @foreach ($filterOptions['services'] as $service)
-                                <option value="{{ $service->id }}" @selected((int) $conversationFilters['service_id'] === (int) $service->id)>{{ $service->libelle }}</option>
+                                <option value="{{ $service->id }}" data-direction-id="{{ $service->direction_id }}" @selected((int) $conversationFilters['service_id'] === (int) $service->id)>{{ $service->libelle }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -155,10 +155,13 @@
                             </div>
                         </a>
                     @empty
-                        <div class="messaging-empty-state">
-                            <p class="font-medium text-slate-900">Aucune conversation pour l’instant.</p>
-                            <p class="mt-1 text-sm text-slate-500">Choisissez un collaborateur dans l’annuaire pour démarrer un échange.</p>
-                        </div>
+                        <x-ui.empty-state
+                            title="Aucune conversation"
+                            message="Choisissez un collaborateur dans l'annuaire pour démarrer un échange."
+                            icon="inbox"
+                            tone="info"
+                            class="messaging-empty-state"
+                        />
                     @endforelse
                 </div>
             </div>
@@ -193,9 +196,13 @@
                             </div>
                         </div>
                     @empty
-                        <div class="messaging-empty-state">
-                            <p class="font-medium text-slate-900">Aucun collaborateur ne correspond aux filtres.</p>
-                        </div>
+                        <x-ui.empty-state
+                            title="Aucun collaborateur"
+                            message="Aucun collaborateur ne correspond aux filtres."
+                            icon="users"
+                            tone="info"
+                            class="messaging-empty-state"
+                        />
                     @endforelse
                 </div>
             </div>
@@ -273,10 +280,13 @@
                             @endif
                         </article>
                     @empty
-                        <div class="messaging-empty-state">
-                            <p class="font-medium text-slate-900">La conversation est ouverte.</p>
-                            <p class="mt-1 text-sm text-slate-500">Envoyez le premier message pour lancer l’échange.</p>
-                        </div>
+                        <x-ui.empty-state
+                            title="Conversation ouverte"
+                            message="Envoyez le premier message pour lancer l'échange."
+                            icon="inbox"
+                            tone="info"
+                            class="messaging-empty-state"
+                        />
                     @endforelse
                 </div>
 
@@ -297,10 +307,13 @@
                     </div>
                 </form>
             @else
-                <div class="messaging-empty-state !h-full">
-                    <p class="text-lg font-semibold text-slate-900">Sélectionnez une conversation ou un collaborateur</p>
-                    <p class="mt-2 max-w-xl text-sm text-slate-500">L’annuaire à gauche et l’organigramme ci-dessous permettent d’ouvrir rapidement un échange direct avec un interlocuteur du PAS.</p>
-                </div>
+                <x-ui.empty-state
+                    title="Sélectionnez une conversation"
+                    message="L'annuaire à gauche et l'organigramme ci-dessous permettent d'ouvrir rapidement un échange direct."
+                    icon="users"
+                    tone="info"
+                    class="messaging-empty-state !h-full"
+                />
             @endif
         </section>
 
@@ -349,7 +362,7 @@
                     <select id="org_service_id" name="org_service_id">
                         <option value="">Tous</option>
                         @foreach ($filterOptions['services'] as $service)
-                            <option value="{{ $service->id }}" @selected((int) $orgFilters['service_id'] === (int) $service->id)>{{ $service->libelle }}</option>
+                            <option value="{{ $service->id }}" data-direction-id="{{ $service->direction_id }}" @selected((int) $orgFilters['service_id'] === (int) $service->id)>{{ $service->libelle }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -385,7 +398,7 @@
                 <div class="messaging-org-tree-toolbar-group">
                     <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-expand-all>Tout déplier</button>
                     <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-collapse-all>Tout replier</button>
-                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-reset-state>Réinitialiser l’arbre</button>
+                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-reset-state>Réinitialiser l'arbre</button>
                     <button type="button" class="btn btn-primary !px-3 !py-2" data-org-recenter>Recentrer la sélection</button>
                 </div>
                 <div class="messaging-org-tree-toolbar-group messaging-org-tree-toolbar-search">
@@ -418,12 +431,62 @@
                     </div>
                 </div>
             @else
-                <div class="messaging-empty-state">
-                    <p class="font-medium text-slate-900">Aucun bloc organisationnel visible.</p>
-                    <p class="mt-1 text-sm text-slate-500">Élargissez les filtres pour retrouver les collaborateurs attendus.</p>
-                </div>
+                <x-ui.empty-state
+                    title="Aucun bloc organisationnel"
+                    message="Élargissez les filtres pour retrouver les collaborateurs attendus."
+                    icon="filter"
+                    tone="info"
+                    class="messaging-empty-state"
+                />
             @endif
         </div>
     </section>
     </div>
 @endsection
+
+@push('scripts')
+    <script @cspNonce>
+        (function () {
+            function bindDependentServices(directionId, serviceId) {
+                var directionInput = document.getElementById(directionId);
+                var serviceInput = document.getElementById(serviceId);
+
+                if (!directionInput || !serviceInput) {
+                    return;
+                }
+
+                function syncServices() {
+                    var selectedDirection = String(directionInput.value || '');
+                    var selectedService = String(serviceInput.value || '');
+                    var selectedStillVisible = false;
+
+                    Array.prototype.forEach.call(serviceInput.options, function (option, index) {
+                        if (index === 0) {
+                            option.hidden = false;
+                            option.disabled = false;
+                            return;
+                        }
+
+                        var visible = selectedDirection === '' || String(option.getAttribute('data-direction-id') || '') === selectedDirection;
+                        option.hidden = !visible;
+                        option.disabled = !visible;
+
+                        if (visible && option.value === selectedService) {
+                            selectedStillVisible = true;
+                        }
+                    });
+
+                    if (selectedService && !selectedStillVisible) {
+                        serviceInput.value = '';
+                    }
+                }
+
+                directionInput.addEventListener('change', syncServices);
+                syncServices();
+            }
+
+            bindDependentServices('conversation_direction_id', 'conversation_service_id');
+            bindDependentServices('org_direction_id', 'org_service_id');
+        })();
+    </script>
+@endpush

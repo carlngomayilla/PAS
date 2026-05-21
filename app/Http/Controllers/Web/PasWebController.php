@@ -150,14 +150,17 @@ class PasWebController extends Controller
             'titre' => $this->generatedPasTitle($validated),
             'periode_debut' => (int) $validated['periode_debut'],
             'periode_fin' => (int) $validated['periode_fin'],
-            'statut' => 'brouillon',
             'created_by' => $user->id,
-            'valide_le' => null,
-            'valide_par' => null,
         ];
 
         $pas = DB::transaction(function () use ($validated, $payload, $user): Pas {
-            $pas = Pas::query()->create($payload);
+            $pas = new Pas();
+            $pas->fill($payload);
+            $pas->forceFill([
+                'statut' => 'brouillon',
+                'valide_le' => null,
+                'valide_par' => null,
+            ])->save();
             $this->pasStructureService->sync(
                 $pas,
                 is_array($validated['axes'] ?? null) ? $validated['axes'] : [],
@@ -292,11 +295,11 @@ class PasWebController extends Controller
         }
 
         $targetStatus = (string) $workflow['submit_target_status'];
-        $pas->update([
+        $pas->forceFill([
             'statut' => $targetStatus,
             'valide_le' => in_array($targetStatus, ['valide', 'verrouille'], true) ? now() : null,
             'valide_par' => in_array($targetStatus, ['valide', 'verrouille'], true) ? $user->id : null,
-        ]);
+        ])->save();
 
         $this->recordAudit($request, 'pas', 'submit', $pas, $before, $pas->toArray());
         $notificationService->notifyPasStatus($pas, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
@@ -329,11 +332,11 @@ class PasWebController extends Controller
         }
 
         $before = $pas->toArray();
-        $pas->update([
+        $pas->forceFill([
             'statut' => 'valide',
             'valide_le' => now(),
             'valide_par' => $user->id,
-        ]);
+        ])->save();
 
         $this->recordAudit($request, 'pas', 'approve', $pas, $before, $pas->toArray());
         $notificationService->notifyPasStatus($pas, 'approved', $user);
@@ -364,11 +367,11 @@ class PasWebController extends Controller
         }
 
         $before = $pas->toArray();
-        $pas->update([
+        $pas->forceFill([
             'statut' => 'verrouille',
             'valide_le' => now(),
             'valide_par' => $user->id,
-        ]);
+        ])->save();
 
         $this->recordAudit($request, 'pas', 'lock', $pas, $before, $pas->toArray());
         $notificationService->notifyPasStatus($pas, 'locked', $user);
@@ -403,11 +406,11 @@ class PasWebController extends Controller
         $motifRetour = trim((string) $validated['motif_retour']);
 
         $before = $pas->toArray();
-        $pas->update([
+        $pas->forceFill([
             'statut' => 'brouillon',
             'valide_le' => null,
             'valide_par' => null,
-        ]);
+        ])->save();
 
         $after = array_merge($pas->toArray(), ['motif_retour' => $motifRetour]);
         $this->recordAudit($request, 'pas', 'reopen', $pas, $before, $after);
@@ -425,7 +428,10 @@ class PasWebController extends Controller
 
     private function canApprove(User $user): bool
     {
-        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG);
+        // A06 — DG est en lecture seule pure : il consulte le PAS mais ne le
+        // valide / verrouille pas. La validation finale revient aux profils
+        // SUPER_ADMIN et ADMIN (operations) uniquement.
+        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN);
     }
 
     /**

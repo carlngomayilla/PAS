@@ -278,7 +278,7 @@ class ActionWebController extends Controller
             'rows' => $rows,
             'financingStatusOptions' => Action::financingStatusOptions(),
             'ptaOptions' => Pta::query()->orderByDesc('id')->get(['id', 'titre']),
-            'directionOptions' => \App\Models\Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']),
+            'directionOptions' => \App\Models\Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => \App\Models\Service::query()->orderBy('code')->get(['id', 'direction_id', 'code', 'libelle']),
             'rmoOptions' => User::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'email']),
             'canTreatDaf' => $this->isDafFinanceReviewer($user),
@@ -428,18 +428,23 @@ class ActionWebController extends Controller
             $action = $existingAction instanceof Action ? $existingAction : Action::query()->make();
             $isNewAction = ! $action->exists;
 
-            if ($isNewAction) {
-                $payload['statut'] = 'non_demarre';
-                $payload['statut_dynamique'] = ActionTrackingService::STATUS_NON_DEMARRE;
-                $payload['progression_reelle'] = 0;
-                $payload['progression_theorique'] = 0;
-            } else {
-                $payload['statut'] = (string) ($action->statut ?: 'non_demarre');
-                $payload['statut_dynamique'] = (string) ($action->statut_dynamique ?: ActionTrackingService::STATUS_NON_DEMARRE);
-            }
+            // statut / statut_dynamique / progression_* ne sont plus mass-assignables
+            // (cf. A02). On separe le payload metier (fill) du payload workflow
+            // (forceFill) qui est entierement controle par le serveur ici.
+            $workflowPayload = $isNewAction
+                ? [
+                    'statut' => 'non_demarre',
+                    'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
+                    'progression_reelle' => 0,
+                    'progression_theorique' => 0,
+                ]
+                : [
+                    'statut' => (string) ($action->statut ?: 'non_demarre'),
+                    'statut_dynamique' => (string) ($action->statut_dynamique ?: ActionTrackingService::STATUS_NON_DEMARRE),
+                ];
 
             $action->fill($payload);
-            $action->save();
+            $action->forceFill($workflowPayload)->save();
             $this->syncActionRmos($action, $rmoIds);
             $this->syncPlannedSubActions($action, $subActionsPayload, $rmoIds);
             if ($isNewAction) {

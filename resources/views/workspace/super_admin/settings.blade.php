@@ -92,7 +92,7 @@
                         </select>
                     </div>
                     <div>
-                        <label for="number_precision">Precision numerique</label>
+                        <label for="number_precision">Précision numérique</label>
                         <select id="number_precision" name="number_precision" required>
                             @foreach ($numberPrecisionOptions as $precisionValue => $precisionLabel)
                                 <option value="{{ $precisionValue }}" @selected((string) old('number_precision', $settings['number_precision']) === (string) $precisionValue)>{{ $precisionLabel }}</option>
@@ -113,8 +113,8 @@
             <div class="form-section">
                 <h2 class="form-section-title">Interface connectee</h2>
                 <div class="form-grid">
-                    <div><label for="sidebar_caption">Libelle sidebar</label><input id="sidebar_caption" name="sidebar_caption" type="text" value="{{ old('sidebar_caption', $settings['sidebar_caption']) }}" required></div>
-                    <div><label for="admin_header_eyebrow">Libelle header</label><input id="admin_header_eyebrow" name="admin_header_eyebrow" type="text" value="{{ old('admin_header_eyebrow', $settings['admin_header_eyebrow']) }}" required></div>
+                    <div><label for="sidebar_caption">Libellé sidebar</label><input id="sidebar_caption" name="sidebar_caption" type="text" value="{{ old('sidebar_caption', $settings['sidebar_caption']) }}" required></div>
+                    <div><label for="admin_header_eyebrow">Libellé header</label><input id="admin_header_eyebrow" name="admin_header_eyebrow" type="text" value="{{ old('admin_header_eyebrow', $settings['admin_header_eyebrow']) }}" required></div>
                     <div class="md:col-span-2 xl:col-span-4"><label for="footer_text">Footer global</label><input id="footer_text" name="footer_text" type="text" value="{{ old('footer_text', $settings['footer_text']) }}" required></div>
                 </div>
             </div>
@@ -122,13 +122,13 @@
             <div class="form-section">
                 <h2 class="form-section-title">Espace invite et connexion</h2>
                 <div class="form-grid">
-                    <div><label for="guest_space_label">Libelle espace invite</label><input id="guest_space_label" name="guest_space_label" type="text" value="{{ old('guest_space_label', $settings['guest_space_label']) }}" required></div>
+                    <div><label for="guest_space_label">Libellé espace invite</label><input id="guest_space_label" name="guest_space_label" type="text" value="{{ old('guest_space_label', $settings['guest_space_label']) }}" required></div>
                     <div><label for="login_page_title">Titre onglet connexion</label><input id="login_page_title" name="login_page_title" type="text" value="{{ old('login_page_title', $settings['login_page_title']) }}" required></div>
                     <div><label for="login_welcome_title">Titre de bienvenue</label><input id="login_welcome_title" name="login_welcome_title" type="text" value="{{ old('login_welcome_title', $settings['login_welcome_title']) }}" required></div>
                     <div><label for="login_welcome_text">Texte de bienvenue</label><input id="login_welcome_text" name="login_welcome_text" type="text" value="{{ old('login_welcome_text', $settings['login_welcome_text']) }}" required></div>
                     <div><label for="login_form_title">Titre du formulaire</label><input id="login_form_title" name="login_form_title" type="text" value="{{ old('login_form_title', $settings['login_form_title']) }}" required></div>
                     <div><label for="login_form_subtitle">Sous-titre du formulaire</label><input id="login_form_subtitle" name="login_form_subtitle" type="text" value="{{ old('login_form_subtitle', $settings['login_form_subtitle']) }}" required></div>
-                    <div><label for="login_identifier_label">Libelle identifiant</label><input id="login_identifier_label" name="login_identifier_label" type="text" value="{{ old('login_identifier_label', $settings['login_identifier_label']) }}" required></div>
+                    <div><label for="login_identifier_label">Libellé identifiant</label><input id="login_identifier_label" name="login_identifier_label" type="text" value="{{ old('login_identifier_label', $settings['login_identifier_label']) }}" required></div>
                     <div><label for="login_identifier_placeholder">Placeholder identifiant</label><input id="login_identifier_placeholder" name="login_identifier_placeholder" type="text" value="{{ old('login_identifier_placeholder', $settings['login_identifier_placeholder']) }}" required></div>
                     <div class="md:col-span-2 xl:col-span-4"><label for="login_helper_text">Aide de connexion</label><input id="login_helper_text" name="login_helper_text" type="text" value="{{ old('login_helper_text', $settings['login_helper_text']) }}" required></div>
                 </div>

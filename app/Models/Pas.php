@@ -24,10 +24,7 @@ class Pas extends Model
         'titre',
         'periode_debut',
         'periode_fin',
-        'statut',
         'created_by',
-        'valide_le',
-        'valide_par',
     ];
 
     /**

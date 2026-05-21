@@ -171,7 +171,11 @@ class ActionController extends Controller
             $payload['exercice_id'] = $pta->exercice_id;
             $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds);
 
-            $action = Action::query()->create($payload);
+            // forceFill : statut / statut_dynamique / progression_* ne sont plus
+            // mass-assignables (cf. A02). Le payload provient ici de $validated +
+            // valeurs internes posees par le controleur, jamais d input direct.
+            $action = new Action();
+            $action->forceFill($payload)->save();
             $this->syncActionRmos($action, $rmoIds);
             $trackingService->initializeActionTracking($action, $user);
             $indicatorService->syncPrimaryIndicator($action, $indicatorPayload);
@@ -300,6 +304,10 @@ class ActionController extends Controller
             $payload['frequence_execution'] = $payload['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
             $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds) ?? $action->unite_dg_id;
 
+            // L update API n autorise pas l ecriture des champs workflow (cf. A02).
+            // Le payload est construit a partir de $validated qui ne contient pas
+            // statut/valide_*/financement_*; fill suffit (les cles eventuelles
+            // injectees seraient silencieusement ignorees).
             $action->fill($payload);
             $action->save();
             $this->syncActionRmos($action, $rmoIds);

@@ -60,28 +60,21 @@ class UserScopeService
         }
 
         if ($user->isAgent()) {
-            return $query->where(function (Builder $scoped) use ($user, $directionColumn, $serviceColumn, $ownerColumn): void {
-                $hasConstraint = false;
+            // A15 — Un agent ne voit QUE les enregistrements dont il est
+            // explicitement responsable. L ancien scope incluait egalement
+            // service_id et direction_id en OR : cela ouvrait toutes les actions
+            // du service / de la direction au moindre agent. C est trop large
+            // (cf. principe "qu un agent ne puisse voir que ses propres actions
+            // ou celles autorisees").
+            //
+            // Si la table ne porte pas de colonne ownership (cas rare : table
+            // agregee sans `*_id` user), on retombe sur `whereRaw('1 = 0')` plutot
+            // que d ouvrir la vue.
+            if (! $ownerColumn) {
+                return $query->whereRaw('1 = 0');
+            }
 
-                if ($ownerColumn) {
-                    $scoped->orWhere($ownerColumn, $user->id);
-                    $hasConstraint = true;
-                }
-
-                if ($serviceColumn && $user->service_id) {
-                    $scoped->orWhere($serviceColumn, $user->service_id);
-                    $hasConstraint = true;
-                }
-
-                if ($directionColumn && $user->direction_id) {
-                    $scoped->orWhere($directionColumn, $user->direction_id);
-                    $hasConstraint = true;
-                }
-
-                if (! $hasConstraint) {
-                    $scoped->whereRaw('1 = 0');
-                }
-            });
+            return $query->where($ownerColumn, $user->id);
         }
 
         if ($ownerColumn) {
@@ -104,7 +97,9 @@ class UserScopeService
     private function column(string $table, array $candidates): ?string
     {
         foreach ($candidates as $candidate) {
-            if (Schema::hasColumn($table, $candidate)) {
+            // A31 — Cache memoise pour eviter l interrogation du schema info
+            // a chaque scope query (appelee sur quasiment chaque requete metier).
+            if (\App\Support\SchemaIntrospectionCache::hasColumn($table, $candidate)) {
                 return $candidate;
             }
         }

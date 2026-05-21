@@ -38,7 +38,7 @@
                         <input class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" name="actions_manual_suspend_enabled" value="1" @checked(($settings['actions_manual_suspend_enabled'] ?? '1') === '1')>
                         <span>
                             <strong class="block text-slate-900">Autoriser le statut manuel `Suspendu`</strong>
-                            <span class="mt-1 block text-slate-500">Si desactive, le statut `suspendu` est refuse en web et en API lors de la saisie d action.</span>
+                            <span class="mt-1 block text-slate-500">Si désactivé, le statut `suspendu` est refusé en web et en API lors de la saisie d'action.</span>
                         </span>
                     </label>
                 </div>

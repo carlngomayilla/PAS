@@ -6,13 +6,10 @@
         $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
         $ps = is_array($pasStats ?? null) ? $pasStats : [];
         $summaryCards = [
-            ['label' => 'Total PAS',                'value' => $ps['total'] ?? $rows->total(),    'meta' => null, 'href' => route('workspace.pas.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Actifs',                   'value' => $ps['actifs'] ?? 0,                'meta' => null, 'href' => route('workspace.pas.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Brouillons',               'value' => $ps['brouillons'] ?? 0,            'meta' => null, 'href' => route('workspace.pas.index', ['statut' => 'brouillon']),  'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Axes stratégiques',        'value' => $ps['axes_total'] ?? 0,            'meta' => null, 'href' => route('workspace.pao.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Objectifs stratégiques',   'value' => $ps['objectifs_total'] ?? 0,       'meta' => null, 'href' => route('workspace.pao.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Sans PAO associé',         'value' => $ps['sans_pao'] ?? 0,              'meta' => null, 'href' => route('workspace.pas.index', ['without_pao' => 1]),       'badge' => null, 'badge_tone' => ($ps['sans_pao'] ?? 0) > 0 ? 'warning' : 'neutral'],
-            ['label' => 'Sans axe stratégique',     'value' => $ps['sans_axe'] ?? 0,              'meta' => null, 'href' => route('workspace.pas.index'),                             'badge' => null, 'badge_tone' => ($ps['sans_axe'] ?? 0) > 0 ? 'warning' : 'neutral'],
         ];
     @endphp
 
@@ -64,7 +61,7 @@
             @endif
             <div class="mt-4 flex flex-wrap gap-2">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-blue" href="{{ route('workspace.pas.index') }}">Réinitialiser</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.pas.index') }}">Réinitialiser</a>
             </div>
             @if ($filters['without_pao'])
                 <div class="mt-4 rounded-[1rem] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-900">
@@ -81,19 +78,18 @@
             </div>
             <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
-        <div class="overflow-auto">
-            <table>
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Titre</th>
                         <th>Période</th>
                         <th>Statut</th>
-                        <th>Structure PAS</th>
+                        <th>Axes</th>
                         <th>PAO</th>
                         <th>Validateur</th>
                         @if ($canWrite)
-                            <th>Opérations</th>
+                            <th>Actions</th>
                         @endif
                     </tr>
                 </thead>
@@ -109,10 +105,9 @@
                             };
                         @endphp
                         <tr>
-                            <td>#{{ $row->id }}</td>
                             <td>
                                 <div class="font-semibold text-slate-900">{{ $row->titre }}</div>
-                                <div class="mt-1 text-xs text-slate-500">{{ $row->axes_count }} axe(s) stratégique(s)</div>
+                                <div class="mt-1 text-xs text-slate-500">PAS #{{ $row->id }}</div>
                             </td>
                             <td>{{ $row->periode_debut }} - {{ $row->periode_fin }}</td>
                             <td>
@@ -121,49 +116,29 @@
                                 </span>
                             </td>
                             <td>
-                                <div class="mb-1">
-                                    <span class="anbg-badge anbg-badge-neutral px-2 py-1 text-xs">
-                                        {{ $row->axes_count }} axe(s) - Toutes les directions
-                                    </span>
-                                </div>
-                                @forelse ($row->axes as $axe)
-                                    <div class="mb-2 rounded-2xl border border-slate-200/85 bg-slate-50/80 px-3 py-2 text-xs">
-                                        <div class="font-semibold text-slate-900">
-                                            {{ $axe->code }} - {{ $axe->libelle }}
-                                        </div>
-                                        <div class="mt-1 text-slate-600">
-                                            {{ $axe->objectifs->count() }} objectif(s) stratégique(s)
-                                        </div>
-                                        <div class="mt-1 text-slate-500">
-                                            @forelse ($axe->objectifs as $objectif)
-                                                <span class="anbg-badge anbg-badge-neutral px-2 py-0.5 text-[11px]">
-                                                    {{ $objectif->code ?: 'OS' }} - {{ $objectif->libelle }}
-                                                </span>
-                                            @empty
-                                                -
-                                            @endforelse
-                                        </div>
-                                    </div>
-                                @empty
-                                    <span class="text-slate-500">-</span>
-                                @endforelse
+                                <span class="anbg-badge anbg-badge-neutral px-3">
+                                    {{ $row->axes_count }} axe(s)
+                                </span>
+                                <p class="mt-2 text-xs text-slate-500">
+                                    {{ $row->axes->sum(fn ($axe) => $axe->objectifs->count()) }} objectif(s) stratégique(s)
+                                </p>
                             </td>
                             <td>{{ $row->paos_count }}</td>
                             <td>{{ $row->validateur?->name ?? '-' }}</td>
                             @if ($canWrite)
                                 <td>
                                     <div class="row-actions">
-                                        <a class="btn btn-amber" href="{{ route('workspace.pas.edit', $row) }}">Modifier</a>
+                                        <a class="btn btn-warning" href="{{ route('workspace.pas.edit', $row) }}">Modifier</a>
                                         @if ($row->statut === 'brouillon')
                                             <form method="POST" action="{{ route('workspace.pas.submit', $row) }}">
                                                 @csrf
-                                                <button class="btn btn-blue" type="submit">Soumettre</button>
+                                                <button class="btn btn-primary" type="submit">Soumettre</button>
                                             </form>
                                         @endif
                                         @if ($row->statut === 'soumis' && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_DG))
                                             <form method="POST" action="{{ route('workspace.pas.approve', $row) }}">
                                                 @csrf
-                                                <button class="btn btn-green" type="submit">Valider</button>
+                                                <button class="btn btn-success" type="submit">Valider</button>
                                             </form>
                                         @endif
                                         @if ($row->statut === 'valide' && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_DG))
@@ -176,13 +151,13 @@
                                             <form method="POST" action="{{ route('workspace.pas.reopen', $row) }}" data-prompt-title="Retour brouillon" data-prompt-message="Saisir le motif de retour brouillon (PAS)." data-prompt-label="Motif de retour" data-prompt-placeholder="Minimum 5 caracteres" data-prompt-target="motif_retour" data-prompt-minlength="5" data-prompt-confirm="Confirmer">
                                                 @csrf
                                                 <input type="hidden" name="motif_retour" value="">
-                                                <button class="btn btn-blue" type="submit">Retour brouillon</button>
+                                                <button class="btn btn-warning" type="submit">Retour brouillon</button>
                                             </form>
                                         @endif
                                         <form method="POST" action="{{ route('workspace.pas.destroy', $row) }}" data-confirm-message="Supprimer ce PAS ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="btn btn-red" type="submit">Supprimer</button>
+                                            <button class="btn btn-danger" type="submit">Supprimer</button>
                                         </form>
                                     </div>
                                 </td>
@@ -190,7 +165,15 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 8 : 7 }}" class="text-slate-500">Aucun PAS trouvé.</td>
+                            <td colspan="{{ $canWrite ? 7 : 6 }}">
+                                <x-ui.empty-state
+                                    title="Aucun PAS trouvé"
+                                    message="Aucun plan stratégique ne correspond aux filtres courants."
+                                    icon="filter"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

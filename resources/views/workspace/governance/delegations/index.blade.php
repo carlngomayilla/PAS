@@ -32,13 +32,13 @@
             <div>
                 <h1>Délégations temporaires</h1>
             </div>
-            <a class="btn btn-blue" href="{{ route('workspace.delegations.create') }}">Nouvelle délégation</a>
+            <a class="btn btn-primary" href="{{ route('workspace.delegations.create') }}">Nouvelle délégation</a>
         </div>
     </section>
 
     <section class="ui-card app-screen-block">
-        <div class="table-wrap">
-            <table>
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -96,7 +96,15 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-slate-600">Aucune delegation enregistree.</td>
+                            <td colspan="8">
+                                <x-ui.empty-state
+                                    title="Aucune délégation enregistrée"
+                                    message="Les délégations temporaires apparaîtront ici après création."
+                                    icon="users"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

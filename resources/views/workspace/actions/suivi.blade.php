@@ -54,11 +54,11 @@
             'direction_enabled' => false,
             'submission_target' => 'service',
             'chain_label' => 'Agent -> Chef de service',
-            'submission_help_text' => 'L action est revue par le chef de service. Le directeur est notifie et conserve la lecture du dossier.',
+            'submission_help_text' => "L'action est revue par le chef de service. Le directeur est notifié et conserve la lecture du dossier.",
             'submission_button_label' => 'Soumettre au chef de service',
-            'service_review_button_label' => 'Valider la cloture',
-            'service_review_success_text' => 'Action validee par le chef de service.',
-            'final_statistics_hint' => 'Oui apres validation finale du chef de service.',
+            'service_review_button_label' => 'Valider la clôture',
+            'service_review_success_text' => 'Action validée par le chef de service.',
+            'final_statistics_hint' => 'Oui après validation finale du chef de service.',
             'rejection_comment_required' => true,
         ];
         $agentLocked = auth()->check()
@@ -196,7 +196,7 @@
             </div>
             <div class="showcase-action-row">
                 @if ($canManageAction)
-                    <a class="btn btn-amber rounded-2xl px-4 py-2.5" href="{{ route('workspace.actions.edit', $action) }}">Modifier action</a>
+                    <a class="btn btn-warning rounded-2xl px-4 py-2.5" href="{{ route('workspace.actions.edit', $action) }}">Modifier action</a>
                 @endif
                 <button type="button" onclick="window.print()" class="btn btn-secondary rounded-2xl px-4 py-2.5 flex items-center gap-2 no-print" title="Imprimer la fiche action">
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -275,12 +275,12 @@
                 <h3 class="form-section-title">Planification</h3>
                 <dl class="action-fiche-dl mt-2">
                     <dt>PAS</dt><dd>{{ $pas?->titre ?? '-' }}</dd>
-                    <dt>Période PAS</dt><dd>{{ $pas?->periode_debut ?? '-' }} – {{ $pas?->periode_fin ?? '-' }}</dd>
+                    <dt>Période PAS</dt><dd>{{ $pas?->periode_debut ?? '-' }} — {{ $pas?->periode_fin ?? '-' }}</dd>
                     <dt>PAO</dt><dd>{{ $pao?->titre ?? '-' }}{{ $pao?->annee ? ' ('.$pao->annee.')' : '' }}</dd>
                     <dt>Objectif</dt><dd>{{ $objectifOperationnel?->description ?: ($objectifOperationnel?->libelle ?? '-') }}</dd>
                     <dt>PTA</dt><dd>{{ $pta?->titre ?? '-' }}</dd>
-                    <dt>Direction</dt><dd>{{ $pta?->direction?->code ?? '-' }} – {{ $pta?->direction?->libelle ?? '-' }}</dd>
-                    <dt>Service</dt><dd>{{ $pta?->service?->code ?? '-' }} – {{ $pta?->service?->libelle ?? '-' }}</dd>
+                    <dt>Direction</dt><dd>{{ $pta?->direction?->code ?? '-' }} — {{ $pta?->direction?->libelle ?? '-' }}</dd>
+                    <dt>Service</dt><dd>{{ $pta?->service?->code ?? '-' }} — {{ $pta?->service?->libelle ?? '-' }}</dd>
                 </dl>
             </article>
 
@@ -455,7 +455,7 @@
                         <label for="commentaire_financement_daf">Commentaire DAF (obligatoire au rejet)</label>
                         <textarea id="commentaire_financement_daf" name="commentaire_financement">{{ old('commentaire_financement') }}</textarea>
                     </div>
-                    <button class="btn btn-blue mt-2.5" type="submit">Enregistrer la décision DAF</button>
+                    <button class="btn btn-primary mt-2.5" type="submit">Enregistrer la décision DAF</button>
                 </form>
             @endif
 
@@ -480,7 +480,7 @@
                         <label for="commentaire_financement_dg">Commentaire DG (obligatoire au refus)</label>
                         <textarea id="commentaire_financement_dg" name="commentaire_financement">{{ old('commentaire_financement') }}</textarea>
                     </div>
-                    <button class="btn btn-blue mt-2.5" type="submit">Enregistrer l'accord DG</button>
+                    <button class="btn btn-primary mt-2.5" type="submit">Enregistrer l'accord DG</button>
                 </form>
             @endif
         @else
@@ -545,7 +545,7 @@
                         <input id="justificatif_quantitatif" name="justificatif_quantitatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
                     </div>
                 </div>
-                <button class="btn btn-blue mt-3" type="submit">Enregistrer la quantité réalisée</button>
+                <button class="btn btn-primary mt-3" type="submit">Enregistrer la quantité réalisée</button>
             </form>
         @elseif ($usesStructuredProgress && $usesQuantitativeProgress && $agentLocked)
             <p class="action-section-note mt-4">Saisie gelée : action soumise. Le formulaire de suivi sera de nouveau disponible après rejet motivé.</p>
@@ -620,7 +620,7 @@
                         Sous-action effectuée
                     </label>
                 </div>
-                <button class="btn btn-blue mt-3" type="submit">+ Ajouter une sous-action</button>
+                <button class="btn btn-secondary mt-3" type="submit">+ Ajouter une sous-action</button>
             </form>
         @endif
         @if ($canTrackWeekly && $usesStructuredProgress && $action->sousActions->isEmpty())
@@ -728,7 +728,7 @@
                                     Je confirme que cette sous-action est effectuée
                                 </label>
                             </div>
-                            <button class="btn btn-blue mt-3" type="submit">Marquer la sous-action comme effectuée</button>
+                            <button class="btn btn-primary mt-3" type="submit">Marquer la sous-action comme effectuée</button>
                         </form>
                     @endif
                 </article>
@@ -805,7 +805,7 @@
                                 <input id="justificatif_{{ $week->id }}" name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}" required>
                             </div>
                         </div>
-                        <button class="btn btn-green" type="submit">
+                        <button class="btn btn-success" type="submit">
                             {{ $week->est_renseignee ? 'Mettre à jour' : 'Valider la sous-action' }}
                         </button>
                     </form>
@@ -875,7 +875,7 @@
                         <label for="evaluation_commentaire">Commentaire d'evaluation{{ $workflow['rejection_comment_required'] ? ' (obligatoire au rejet)' : '' }}</label>
                         <textarea id="evaluation_commentaire" name="evaluation_commentaire">{{ old('evaluation_commentaire') }}</textarea>
                     </div>
-                    <button class="btn btn-blue mt-2.5" type="submit">
+                    <button class="btn btn-primary mt-2.5" type="submit">
                         {{ $workflow['service_review_button_label'] }}
                     </button>
                 </form>
@@ -1020,12 +1020,12 @@
             $fileTypeIcon = static function (string $name): string {
                 $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
                 return match (true) {
-                    in_array($ext, ['pdf'], true)                          => '📄',
-                    in_array($ext, ['doc', 'docx'], true)                 => '📝',
-                    in_array($ext, ['xls', 'xlsx', 'csv'], true)          => '📊',
-                    in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true) => '🖼️',
-                    in_array($ext, ['zip', 'rar', '7z'], true)            => '🗜️',
-                    default                                                => '📎',
+                    in_array($ext, ['pdf'], true)                          => 'PDF',
+                    in_array($ext, ['doc', 'docx'], true)                 => 'DOC',
+                    in_array($ext, ['xls', 'xlsx', 'csv'], true)          => 'XLS',
+                    in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true) => 'IMG',
+                    in_array($ext, ['zip', 'rar', '7z'], true)            => 'ZIP',
+                    default                                                => 'FILE',
                 };
             };
             $isImage = static fn (string $name): bool => in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['png', 'jpg', 'jpeg', 'gif', 'webp'], true);
@@ -1052,7 +1052,7 @@
                         @endif
                     </p>
                     <p class="justificatif-card-author">
-                        {{ $doc->ajoutePar?->name ?? '—' }}
+                        {{ $doc->ajoutePar?->name ?? '-' }}
                         <span class="text-[#667085]">·</span>
                         {{ optional($doc->created_at)->format('d/m/Y H:i') }}
                     </p>
@@ -1075,8 +1075,8 @@
 
     <section id="action-logs" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Journal d'alertes et événements</h2>
-        <div class="overflow-auto">
-            <table>
+        <div class="app-table-wrapper">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -1096,7 +1096,17 @@
                             <td>{{ $log->cible_role ?: '-' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="text-slate-600">Aucun log.</td></tr>
+                        <tr>
+                            <td colspan="5">
+                                <x-ui.empty-state
+                                    title="Aucun événement"
+                                    message="Les alertes et événements de suivi apparaîtront ici."
+                                    icon="clock"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

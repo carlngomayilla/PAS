@@ -2,16 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreKpiRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    use RequiresPlanningWriter;
 
     /**
      * @return array<string, array<int, mixed>>

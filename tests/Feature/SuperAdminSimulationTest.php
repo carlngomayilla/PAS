@@ -38,8 +38,8 @@ class SuperAdminSimulationTest extends TestCase
             ->assertSee('Toutes les actions visibles')
             ->assertSee('Agent -> cloture directe')
             ->assertSee('Vigilances de simulation')
-            ->assertSee('Apercu dashboard')
-            ->assertSee('Apercu exports');
+            ->assertSee('Aperçu dashboard')
+            ->assertSee('Aperçu exports');
 
         $this->assertDatabaseHas('journal_audit', [
             'module' => 'super_admin',

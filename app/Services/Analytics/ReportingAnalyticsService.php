@@ -32,6 +32,20 @@ class ReportingAnalyticsService
 
     private const CACHE_TTL_SECONDS = 300;
 
+    // A25 — Bornes explicites sur les listes de details (exports + dashboard).
+    // Anti-OOM en RAM cote PHP et anti-explosion de taille XLSX/PDF. Le payload
+    // expose `truncation.*.truncated` pour que les vues affichent un bandeau
+    // signalant que la liste est tronquee.
+    public const DETAIL_LIMIT_LATE_ACTIONS = 200;
+    public const DETAIL_LIMIT_KPI_BELOW_THRESHOLD = 200;
+    public const DETAIL_LIMIT_STRUCTURE = 300;
+
+    // A33 — Seuil au-dela duquel on emet un warning en logs : les agregats
+    // (KPI moyennes, repartition statuts) chargent toutes les actions visibles
+    // en RAM pour les averager. Au-dela de ce seuil, prevoir un job batch ou
+    // l agregation SQL native plutot que la fetch-everything-then-php.
+    public const AGGREGATE_WARN_THRESHOLD = 5000;
+
     public function __construct(
         private readonly ActionCalculationSettings $actionCalculationSettings,
         private readonly ManagedKpiSettings $managedKpiSettings,
@@ -92,6 +106,20 @@ class ReportingAnalyticsService
         $this->scopeObjectifOperationnel($objectifsOperationnels, $user);
         $actionsStatistics = (clone $actions);
         $this->scopeActionStatistics($actionsStatistics);
+
+        // A33 — Pre-compte pour eventuellement alerter en logs si le volume
+        // d agregats devient excessif (Pas d action sur le metier : on continue,
+        // mais on sait qu il faudra refacto en chunk/SQL natif a terme).
+        $validatedCount = (clone $actionsStatistics)->count();
+        if ($validatedCount > self::AGGREGATE_WARN_THRESHOLD) {
+            \Illuminate\Support\Facades\Log::warning('Reporting aggregate volume exceeds safe threshold (A33).', [
+                'user_id' => $user->id,
+                'validated_actions_count' => $validatedCount,
+                'threshold' => self::AGGREGATE_WARN_THRESHOLD,
+                'memory_usage_mb' => round(memory_get_usage(true) / 1048576, 1),
+            ]);
+        }
+
         $validatedActions = (clone $actionsStatistics)
             ->with([
                 'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_global',
@@ -117,26 +145,50 @@ class ReportingAnalyticsService
             'kpi_sous_seuil' => collect(),
             'structure_rapports' => collect(),
             'direction_service_report' => collect(),
+            // A25 — Meta-information sur les troncatures appliquees aux details
+            // (utilise par les vues / exports pour avertir le lecteur).
+            'truncation' => [
+                'actions_retard' => ['limit' => 0, 'total' => 0, 'truncated' => false],
+                'kpi_sous_seuil' => ['limit' => 0, 'total' => 0, 'truncated' => false],
+                'structure_rapports' => ['limit' => 0, 'total' => 0, 'truncated' => false],
+            ],
         ];
 
         if ($withDetails) {
-            $details['actions_retard'] = (clone $actions)
+            // A25 — Limites explicites + traces de troncature.
+            $lateActionsLimit = self::DETAIL_LIMIT_LATE_ACTIONS;
+            $kpiBelowLimit = self::DETAIL_LIMIT_KPI_BELOW_THRESHOLD;
+            $structureLimit = self::DETAIL_LIMIT_STRUCTURE;
+
+            $lateActionsQuery = (clone $actions)
+                ->whereNotNull('date_echeance')
+                ->whereDate('date_echeance', '<', $today)
+                ->whereNotIn('statut_dynamique', $this->completedActionStatuses());
+
+            $lateActionsTotal = (clone $lateActionsQuery)->count();
+
+            $details['actions_retard'] = $lateActionsQuery
                 ->with([
                     'pta:id,titre,direction_id,service_id',
                     'responsable:id,name,email',
                     'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
                 ])
-                ->whereNotNull('date_echeance')
-                ->whereDate('date_echeance', '<', $today)
-                ->whereNotIn('statut_dynamique', $this->completedActionStatuses())
                 ->orderBy('date_echeance')
-                ->limit(200)
+                ->limit($lateActionsLimit)
                 ->get();
+
+            $details['truncation']['actions_retard'] = [
+                'limit' => $lateActionsLimit,
+                'total' => $lateActionsTotal,
+                'truncated' => $lateActionsTotal > $lateActionsLimit,
+            ];
+
+            $kpiBelowTotal = (clone $kpiSousSeuilQuery)->count();
 
             $kpiIds = (clone $kpiSousSeuilQuery)
                 ->select('kpi_mesures.id')
                 ->orderByDesc('kpi_mesures.id')
-                ->limit(200)
+                ->limit($kpiBelowLimit)
                 ->pluck('kpi_mesures.id')
                 ->map(fn ($id): int => (int) $id)
                 ->all();
@@ -151,6 +203,14 @@ class ReportingAnalyticsService
                 ->orderByDesc('id')
                 ->get();
 
+            $details['truncation']['kpi_sous_seuil'] = [
+                'limit' => $kpiBelowLimit,
+                'total' => $kpiBelowTotal,
+                'truncated' => $kpiBelowTotal > $kpiBelowLimit,
+            ];
+
+            $structureTotal = (clone $actions)->count();
+
             $details['structure_rapports'] = (clone $actions)
                 ->with([
                     'pta:id,pao_id,titre,direction_id,service_id',
@@ -160,7 +220,7 @@ class ReportingAnalyticsService
                     'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
                 ])
                 ->orderByDesc('id')
-                ->limit(300)
+                ->limit($structureLimit)
                 ->get()
                 ->map(function (Action $action): array {
                     $ressources = [];
@@ -216,6 +276,12 @@ class ReportingAnalyticsService
                         'indicateurs_performance' => (string) $indicateurs,
                     ];
                 });
+
+            $details['truncation']['structure_rapports'] = [
+                'limit' => $structureLimit,
+                'total' => $structureTotal,
+                'truncated' => $structureTotal > $structureLimit,
+            ];
 
             $details['direction_service_report'] = $this->buildDirectionServiceReport($user);
         }

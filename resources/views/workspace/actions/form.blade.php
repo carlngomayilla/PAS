@@ -114,34 +114,40 @@
             </div>
         </section>
 
-        {{-- Indicateur de performance résumé --}}
-        <section class="showcase-summary-grid mb-4 app-screen-kpis">
-            <article class="showcase-kpi-card">
+        <section class="action-form-context-strip mb-4 app-screen-block" aria-label="Contexte de saisie">
+            <article>
                 <p class="showcase-kpi-label">Contexte</p>
-                <p class="showcase-kpi-number text-[1.35rem]">{{ $contextOptions[$selectedContext] ?? 'Pilotage' }}</p>
+                <p class="showcase-kpi-number text-[1rem]">{{ $contextOptions[$selectedContext] ?? 'Pilotage' }}</p>
                 <p class="showcase-kpi-meta">{{ $selectedContext === \App\Models\Action::CONTEXT_OPERATIONNEL ? 'Action propre ou assignée' : 'Rattachée au PTA' }}</p>
             </article>
-            <article class="showcase-kpi-card">
+            <article>
                 <p class="showcase-kpi-label">Objectif opérationnel</p>
-                <p id="kpi-obj-op" class="showcase-kpi-number text-[1.1rem] leading-tight truncate">
+                <p id="kpi-obj-op" class="showcase-kpi-number text-[1rem] leading-tight truncate">
                     {{ $selectedPao ? 'PAO #' . $selectedPao->id : '--' }}
                 </p>
                 <p class="showcase-kpi-meta">{{ $selectedPaoTitle ?: 'Aucun objectif sélectionné' }}</p>
             </article>
-            <article class="showcase-kpi-card">
+            <article>
                 <p class="showcase-kpi-label">PTA sélectionné</p>
-                <p id="kpi-pta" class="showcase-kpi-number text-[1.35rem]">{{ $selectedPta ? '#' . $selectedPta->id : '--' }}</p>
+                <p id="kpi-pta" class="showcase-kpi-number text-[1rem]">{{ $selectedPta ? '#' . $selectedPta->id : '--' }}</p>
                 <p id="kpi-pta-titre" class="showcase-kpi-meta">{{ $selectedPta?->titre ?? 'Aucun PTA sélectionné' }}</p>
             </article>
-            <article class="showcase-kpi-card">
+            <article>
                 <p class="showcase-kpi-label">RMO affectés</p>
-                <p id="kpi-rmo-count" class="showcase-kpi-number text-[1.35rem]">{{ count($selectedRmoIds) ?: '--' }}</p>
+                <p id="kpi-rmo-count" class="showcase-kpi-number text-[1rem]">{{ count($selectedRmoIds) ?: '--' }}</p>
                 <p id="kpi-rmo-label" class="showcase-kpi-meta">{{ $selectedResponsable?->name ?? 'Aucun agent sélectionné' }}</p>
             </article>
         </section>
 
         <section class="showcase-panel mb-4 app-screen-block">
             <div id="action-indicator-settings" class="hidden"></div>
+
+            <nav class="form-step-nav mb-4" aria-label="Étapes du formulaire action">
+                <a href="#action-step-scope">Rattachement</a>
+                <a href="#action_section">Action / RMO</a>
+                <a href="#resources_section">Ressources</a>
+                <a href="#form_actions">Validation</a>
+            </nav>
 
             <form
                 method="POST"
@@ -159,7 +165,7 @@
                 {{-- ============================================================
                      ÉTAPE 1 — Objectif opérationnel (sélection du PAO)
                      ============================================================ --}}
-                <div class="form-section">
+                <div id="action-step-scope" class="form-section scroll-mt-24">
                     <h2 class="form-section-title">1) Objectif opérationnel</h2>
                     <p class="form-section-subtitle mb-3">
                         Choisissez l'objectif opérationnel concerné. Le PTA, la direction et le service s'affichent automatiquement.
@@ -170,7 +176,7 @@
                         <div class="md:col-span-2">
                             <label for="pao_id_selector">Objectif opérationnel (PAO)</label>
                             <select id="objectif_operationnel_id_selector" name="objectif_operationnel_id" required>
-                                <option value="">— Sélectionner un objectif opérationnel —</option>
+                                <option value="">Sélectionner un objectif opérationnel</option>
                                 @foreach ($objectifOptions as $objectif)
                                     @php
                                         $pao = $objectif->pao;
@@ -252,7 +258,7 @@
                 {{-- ============================================================
                      ÉTAPE 2 — Action et responsabilité
                      ============================================================ --}}
-                <div id="action_section" class="form-section {{ $selectedPta ? '' : 'hidden' }}">
+                <div id="action_section" class="form-section scroll-mt-24 {{ $selectedPta ? '' : 'hidden' }}">
                     <h2 class="form-section-title">2) Action et responsabilité</h2>
 
                     <div class="form-grid">
@@ -381,7 +387,9 @@
                         </div>
                     </div>
 
-                    <section id="sub_actions_section" class="mt-4 rounded-lg border border-[#e5e7eb] bg-white p-4 {{ $showSubActionForm ? '' : 'hidden' }}" data-sub-actions-section>
+                    <details id="sub_actions_section" class="form-step-accordion mt-4 {{ $showSubActionForm ? '' : 'hidden' }}" data-sub-actions-section open>
+                        <summary>Sous-actions prévues</summary>
+                        <div class="form-step-body">
                         <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <h3 class="text-sm font-extrabold text-[#3996d3]">Sous-actions prévues</h3>
                             <button class="btn btn-secondary" type="button" id="add-sub-action">+ Ajouter une sous-action</button>
@@ -419,13 +427,14 @@
                                 </div>
                             @endforeach
                         </div>
-                    </section>
+                        </div>
+                    </details>
                 </div>
 
                 {{-- ============================================================
                      ÉTAPE 3 — Ressources et financement
                      ============================================================ --}}
-                <div id="resources_section" class="form-section {{ $selectedPta ? '' : 'hidden' }}">
+                <div id="resources_section" class="form-section scroll-mt-24 {{ $selectedPta ? '' : 'hidden' }}">
                     <h2 class="form-section-title">3) Échéances et ressources</h2>
 
                     <div class="form-grid-compact">
@@ -504,12 +513,12 @@
                     </p>
                 @endif
 
-                <div id="form_actions" class="form-actions {{ $selectedPta ? '' : 'hidden' }}">
-                    <button class="btn btn-green" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Enregistrer l\'action' }}</button>
+                <div id="form_actions" class="form-actions form-actions-sticky scroll-mt-24 {{ $selectedPta ? '' : 'hidden' }}">
+                    <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour' : 'Enregistrer l\'action' }}</button>
                     @if ($isEdit)
                         <a class="btn btn-follow" href="{{ route('workspace.actions.suivi', $row) }}">Voir le suivi</a>
                     @endif
-                    <a class="btn btn-blue" href="{{ route('workspace.actions.index') }}">Retour</a>
+                    <a class="btn btn-secondary" href="{{ route('workspace.actions.index') }}">Retour</a>
                 </div>
             </form>
         </section>
@@ -808,7 +817,7 @@
 
         // Mise à jour Indicateur de performance cards
         if (kpiPta)      kpiPta.textContent      = ptaId ? '#' + ptaId : '--';
-        if (kpiPtaTitre) kpiPtaTitre.textContent = opt ? (opt.getAttribute('data-pta-title') || 'Aucun PTA selectionne') : 'Aucun PTA selectionne';
+        if (kpiPtaTitre) kpiPtaTitre.textContent = opt ? (opt.getAttribute('data-pta-title') || 'Aucun PTA sélectionné') : 'Aucun PTA sélectionné';
 
         var hasPta = !!ptaId;
         if (hasPta) {
@@ -846,7 +855,7 @@
         }
 
         if (kpiRmoLabel) {
-            kpiRmoLabel.textContent = first ? first.textContent.trim() : 'Aucun agent selectionne';
+            kpiRmoLabel.textContent = first ? first.textContent.trim() : 'Aucun agent sélectionné';
         }
     }
 

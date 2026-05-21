@@ -248,13 +248,28 @@ class MonitoringWebController extends Controller
             $kpiSousSeuilQuery->count(), $validationsEnAttente
         );
 
+        // A32 — Anciennes 4 sous-requetes correlees par PAS remplacees par
+        // des LEFT JOINs + GROUP BY. Sur PostgreSQL le query planner peut
+        // executer 4*N sous-requetes (N=PAS), ici on tombe a 1 seule passe.
+        // Cleanup important : on garde un clone du builder source (qui porte
+        // deja le scope user) puis on overrride completement le SELECT/JOIN.
         $chaineSummary = (clone $pas)
-            ->select(['pas.id', 'pas.titre', 'pas.statut', 'pas.periode_debut', 'pas.periode_fin'])
-            ->selectRaw('(SELECT COUNT(*) FROM paos WHERE paos.pas_id = pas.id) as pao_count')
-            ->selectRaw('(SELECT COUNT(*) FROM ptas t JOIN paos p ON p.id = t.pao_id WHERE p.pas_id = pas.id) as pta_count')
-            ->selectRaw('(SELECT COUNT(*) FROM actions a JOIN ptas t ON t.id = a.pta_id JOIN paos p ON p.id = t.pao_id WHERE p.pas_id = pas.id) as action_count')
-            ->selectRaw('ROUND(COALESCE((SELECT AVG(a.taux_realisation_global) FROM actions a JOIN ptas t ON t.id = a.pta_id JOIN paos p ON p.id = t.pao_id WHERE p.pas_id = pas.id), 0), 1) as taux_moyen')
-            ->orderByDesc('periode_debut')
+            ->select([
+                'pas.id',
+                'pas.titre',
+                'pas.statut',
+                'pas.periode_debut',
+                'pas.periode_fin',
+            ])
+            ->selectRaw('COUNT(DISTINCT paos.id) as pao_count')
+            ->selectRaw('COUNT(DISTINCT ptas.id) as pta_count')
+            ->selectRaw('COUNT(DISTINCT actions.id) as action_count')
+            ->selectRaw('ROUND(COALESCE(AVG(actions.taux_realisation_global), 0), 1) as taux_moyen')
+            ->leftJoin('paos', 'paos.pas_id', '=', 'pas.id')
+            ->leftJoin('ptas', 'ptas.pao_id', '=', 'paos.id')
+            ->leftJoin('actions', 'actions.pta_id', '=', 'ptas.id')
+            ->groupBy('pas.id', 'pas.titre', 'pas.statut', 'pas.periode_debut', 'pas.periode_fin')
+            ->orderByDesc('pas.periode_debut')
             ->limit(10)
             ->get();
 
@@ -300,7 +315,10 @@ class MonitoringWebController extends Controller
             ->limit(20)
             ->get();
 
-        $directionOptions = Direction::query()->orderBy('code')->get(['id', 'code', 'libelle']);
+        $directionOptions = Direction::query()
+            ->where('actif', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'libelle']);
         $pasOptions = (clone $pas)->orderByDesc('periode_debut')->get(['id', 'titre']);
         $pilotageFilters = [
             'direction_id' => $filterDirectionId,
@@ -520,15 +538,43 @@ class MonitoringWebController extends Controller
 
     public function downloadQueuedExport(Request $request): StreamedResponse
     {
-        $path = Crypt::decryptString((string) $request->query('path'));
-        $filename = trim((string) $request->query('name')) ?: basename($path);
-        $contentType = trim((string) $request->query('content_type')) ?: 'application/octet-stream';
+        // A03 — Anti-fuite horizontale d exports :
+        // 1) Authentification obligatoire (sinon une URL signee rejouee par un
+        //    visiteur anonyme telechargerait n importe quel export).
+        // 2) Ownership : le chemin doit pointer dans le dossier de l utilisateur
+        //    courant. Les exports sont stockes sous exports/reporting/{user_id}/...
+        //    (cf. GenerateReportJob::handle()), donc on verifie le prefixe.
+        // 3) Defense en profondeur path-traversal (le decryptString controle deja
+        //    l integrite, mais on rejette explicitement les .. parasites).
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
 
-        if (! Storage::disk('local')->exists($path)) {
+        try {
+            $path = Crypt::decryptString((string) $request->query('path'));
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            abort(403, 'Lien de telechargement invalide.');
+        }
+
+        $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
+        if ($normalizedPath === '' || str_contains($normalizedPath, '..')) {
+            abort(403, 'Chemin d export invalide.');
+        }
+
+        $expectedPrefix = 'exports/reporting/'.(int) $user->id.'/';
+        if (! Str::startsWith($normalizedPath, $expectedPrefix)) {
+            abort(403, 'Acces non autorise a cet export.');
+        }
+
+        if (! Storage::disk('local')->exists($normalizedPath)) {
             abort(404);
         }
 
-        return Storage::disk('local')->download($path, $filename, [
+        $filename = trim((string) $request->query('name')) ?: basename($normalizedPath);
+        $contentType = trim((string) $request->query('content_type')) ?: 'application/octet-stream';
+
+        return Storage::disk('local')->download($normalizedPath, $filename, [
             'Content-Type' => $contentType,
         ]);
     }

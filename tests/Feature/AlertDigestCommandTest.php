@@ -50,7 +50,7 @@ class AlertDigestCommandTest extends TestCase
         $this->artisan('alertes:notifier --limit=10')
             ->assertSuccessful();
 
-        Mail::assertSent(AlertDigestMail::class, function (AlertDigestMail $mail) use ($fixture): bool {
+        Mail::assertQueued(AlertDigestMail::class, function (AlertDigestMail $mail) use ($fixture): bool {
             return $mail->hasTo($fixture['delegue']->email);
         });
     }
@@ -65,12 +65,12 @@ class AlertDigestCommandTest extends TestCase
             ->assertSuccessful();
 
         foreach (['service', 'direction', 'planification', 'dg'] as $key) {
-            Mail::assertSent(AlertDigestMail::class, function (AlertDigestMail $mail) use ($fixture, $key): bool {
+            Mail::assertQueued(AlertDigestMail::class, function (AlertDigestMail $mail) use ($fixture, $key): bool {
                 return $mail->hasTo($fixture[$key]->email);
             });
         }
 
-        Mail::assertNotSent(AlertDigestMail::class, function (AlertDigestMail $mail) use ($fixture): bool {
+        Mail::assertNotQueued(AlertDigestMail::class, function (AlertDigestMail $mail) use ($fixture): bool {
             return $mail->hasTo($fixture['outsider']->email);
         });
     }

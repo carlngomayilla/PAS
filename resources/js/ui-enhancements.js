@@ -75,7 +75,7 @@ import { gsap } from 'gsap';
         document.querySelectorAll(selectors).forEach(function (input) {
             if (input.closest('.search-field-wrapper')) return;
             if (input.closest('.admin-navbar-search')) return; // navbar search already has icon
-            if (input.closest('.app-sidebar-search')) return; // sidebar search already has icon
+            if (input.closest('.dashboard-tabs-search')) return; // dashboard tabs search already has icon
 
             var wrapper = document.createElement('div');
             wrapper.className = 'search-field-wrapper';

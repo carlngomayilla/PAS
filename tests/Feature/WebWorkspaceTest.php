@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ActionLog;
+use App\Models\Direction;
 use App\Models\Pao;
 use App\Models\Action;
 use App\Models\KpiMesure;
@@ -35,6 +36,10 @@ class WebWorkspaceTest extends TestCase
     {
         parent::setUp();
         $this->seed();
+
+        User::query()
+            ->whereNull('password_changed_at')
+            ->update(['password_changed_at' => now()]);
     }
 
     public function test_admin_can_access_workspace_pages(): void
@@ -74,17 +79,17 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/workspace/referentiel/directions')
             ->assertOk()
-            ->assertSee('Referentiel - Directions');
+            ->assertSee('Référentiel - Directions');
 
         $this->actingAs($admin)
             ->get('/workspace/referentiel/services')
             ->assertOk()
-            ->assertSee('Referentiel - Services');
+            ->assertSee('Référentiel - Services');
 
         $this->actingAs($admin)
             ->get('/workspace/referentiel/utilisateurs')
             ->assertOk()
-            ->assertSee('Referentiel - Utilisateurs');
+            ->assertSee('Référentiel - Utilisateurs');
 
         $this->actingAs($admin)
             ->get('/workspace/pas')
@@ -151,6 +156,32 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/admin/quotas')
             ->assertNotFound();
+    }
+
+    public function test_referentiel_directions_hides_inactive_entries_by_default(): void
+    {
+        $admin = $this->createAdminUser();
+
+        Direction::query()->create([
+            'code' => 'LEGACY',
+            'libelle' => 'Direction Legacy',
+            'actif' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/workspace/referentiel/directions')
+            ->assertOk()
+            ->assertSee('Référentiel - Directions')
+            ->assertSee('DAF')
+            ->assertSee('DG')
+            ->assertSee('DS')
+            ->assertSee('DSIC')
+            ->assertDontSee('Direction Legacy');
+
+        $this->actingAs($admin)
+            ->get('/workspace/referentiel/directions?actif=0')
+            ->assertOk()
+            ->assertSee('Direction Legacy');
     }
 
     public function test_dashboard_embeds_advanced_reporting_visuals_while_reporting_page_becomes_export_hub(): void
@@ -425,16 +456,18 @@ class WebWorkspaceTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_cabinet_can_open_and_submit_pas_wizard(): void
+    public function test_cabinet_cannot_open_or_submit_pas_wizard(): void
     {
+        // A06 — Cabinet a perdu planning.strategic.manage : il consulte le PAS
+        // mais ne peut plus le creer / modifier. La gestion du PAS revient a
+        // PLANIFICATION, SCIQ, SUPER_ADMIN, ADMIN.
         $cabinet = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
 
         $this->actingAs($cabinet)
             ->get(route('workspace.pas.create'))
-            ->assertOk()
-            ->assertSee('Enregistrer un nouveau PAS');
+            ->assertForbidden();
 
-        $response = $this->actingAs($cabinet)
+        $this->actingAs($cabinet)
             ->post(route('workspace.pas.store'), [
                 'titre' => 'PAS cabinet test',
                 'periode_debut' => 2029,
@@ -454,12 +487,11 @@ class WebWorkspaceTest extends TestCase
                         ],
                     ],
                 ],
-            ]);
+            ])
+            ->assertForbidden();
 
-        $response->assertRedirect(route('workspace.pas.index'));
-        $this->assertDatabaseHas('pas', [
+        $this->assertDatabaseMissing('pas', [
             'titre' => 'PAS 2029-2031',
-            'statut' => 'brouillon',
         ]);
     }
 

@@ -1,0 +1,126 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Smoke check rapide sur SQLite in-memory (matches phpunit.xml par defaut).
+  # Sert de feedback rapide aux PR ; ne valide PAS le comportement specifique
+  # PostgreSQL (CHECK constraints, JSON, locking, types DECIMAL stricts...).
+  # ─────────────────────────────────────────────────────────────────────────────
+  tests-sqlite:
+    name: Tests (SQLite in-memory)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, pdo_sqlite, sqlite3, gd, zip, xml, openssl, fileinfo, dom
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Run PHPUnit
+        run: php artisan test
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Validation sur PostgreSQL — A11 (audit pré-production).
+  # Reproduit fidèlement le comportement de la prod ANBG (Pgsql).
+  # Détecte tout test qui passerait en SQLite mais casserait en Pgsql :
+  # CHECK constraints, JSON natif, locking, types decimal stricts, etc.
+  # ─────────────────────────────────────────────────────────────────────────────
+  tests-postgres:
+    name: Tests (PostgreSQL — comportement production)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pas_ci
+          POSTGRES_PASSWORD: pas_ci_secret
+          POSTGRES_DB: pas_anbg_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pas_ci -d pas_anbg_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: pas_anbg_ci
+      DB_USERNAME: pas_ci
+      DB_PASSWORD: pas_ci_secret
+      DB_SSLMODE: prefer
+      DB_LOGIN_PREFLIGHT: 'false'
+      BCRYPT_ROUNDS: '4'
+      CACHE_STORE: array
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      ANTIVIRUS_SCAN_ENABLED: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, pdo_pgsql, pgsql, gd, zip, xml, openssl, fileinfo, dom
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h 127.0.0.1 -p 5432 -U pas_ci; do
+            echo "Waiting for postgres..."
+            sleep 1
+          done
+
+      - name: Run migrations against PostgreSQL
+        run: php artisan migrate --force --no-interaction
+
+      - name: Run PHPUnit against PostgreSQL
+        run: php artisan test -c phpunit.pgsql.xml

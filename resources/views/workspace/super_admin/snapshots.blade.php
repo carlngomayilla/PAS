@@ -31,7 +31,7 @@
                 <h2 class="form-section-title">Nouveau snapshot</h2>
                 <div class="form-grid">
                     <div>
-                        <label for="label">Libelle</label>
+                        <label for="label">Libellé</label>
                         <input id="label" name="label" type="text" value="{{ old('label') }}" required>
                     </div>
                     <div>
@@ -86,8 +86,8 @@
 
         <section class="showcase-panel mb-4">
             <h2>Differences detectees</h2>
-            <div class="mt-4 overflow-x-auto">
-                <table class="dashboard-table">
+            <div class="app-table-wrapper mt-4">
+                <table class="app-table data-table">
                     <thead><tr><th>Groupe</th><th>Cle</th><th>Reference</th><th>Comparaison</th><th>Statut</th></tr></thead>
                     <tbody>
                         @forelse ($compare['changes'] as $change)
@@ -103,7 +103,17 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="text-slate-500">Aucune difference entre les deux snapshots.</td></tr>
+                            <tr>
+                                <td colspan="5">
+                                    <x-ui.empty-state
+                                        title="Aucune difference"
+                                        message="Les deux snapshots compares sont identiques sur les groupes inspectes."
+                                        icon="check"
+                                        tone="success"
+                                        class="my-4"
+                                    />
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -113,30 +123,30 @@
 
     <section class="ui-card">
         <h2>Historique des snapshots</h2>
-        <div class="mt-4 overflow-x-auto">
-            <table class="min-w-full text-sm">
+        <div class="app-table-wrapper mt-4">
+            <table class="app-table data-table">
                 <thead>
                     <tr>
-                        <th class="px-3 py-2 text-left">Date</th>
-                        <th class="px-3 py-2 text-left">Libelle</th>
-                        <th class="px-3 py-2 text-left">Créé par</th>
-                        <th class="px-3 py-2 text-left">Derniere restauration</th>
-                        <th class="px-3 py-2 text-left">Action</th>
+                        <th>Date</th>
+                        <th>Libellé</th>
+                        <th>Créé par</th>
+                        <th>Derniere restauration</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($rows as $row)
                         <tr>
-                            <td class="px-3 py-2">{{ $row->created_at?->format('Y-m-d H:i') }}</td>
-                            <td class="px-3 py-2">
+                            <td>{{ $row->created_at?->format('Y-m-d H:i') }}</td>
+                            <td>
                                 <strong class="text-slate-900">{{ $row->label }}</strong>
                                 @if ($row->description)
                                     <div class="text-slate-500">{{ $row->description }}</div>
                                 @endif
                             </td>
-                            <td class="px-3 py-2">{{ $row->creator?->name ?? 'Système' }}</td>
-                            <td class="px-3 py-2">{{ $row->last_restored_at?->format('Y-m-d H:i') ?? 'Jamais' }}</td>
-                            <td class="px-3 py-2">
+                            <td>{{ $row->creator?->name ?? 'Système' }}</td>
+                            <td>{{ $row->last_restored_at?->format('Y-m-d H:i') ?? 'Jamais' }}</td>
+                            <td>
                                 <div class="flex flex-wrap gap-2">
                                     <form method="POST" action="{{ route('workspace.super-admin.snapshots.restore', $row) }}">
                                         @csrf
@@ -160,7 +170,17 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td class="px-3 py-4 text-slate-500" colspan="5">Aucun snapshot de configuration disponible.</td></tr>
+                        <tr>
+                            <td colspan="5">
+                                <x-ui.empty-state
+                                    title="Aucun snapshot disponible"
+                                    message="Creez un snapshot pour conserver un point de restauration."
+                                    icon="file"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

@@ -32,6 +32,10 @@ class SessionLoginTest extends TestCase
 
     public function test_seeded_anbg_user_can_login_with_default_password(): void
     {
+        // En environnement de tests, les seeders conservent le mdp fixture
+        // `Pass@12345` pour permettre aux fixtures de se logger. En production,
+        // le seeder genere un mdp aleatoire + force renewal au 1er login (cf.
+        // test_production_seeder_uses_random_password_and_forces_renewal).
         $this->seed(SyncOrgUsersPreservingPasswordsSeeder::class);
 
         $user = User::query()
@@ -44,6 +48,40 @@ class SessionLoginTest extends TestCase
         ])->assertRedirect(route('dashboard'));
 
         $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_production_seeder_uses_random_password_and_forces_renewal(): void
+    {
+        // A08 — En production le seeder NE DOIT PAS distribuer Pass@12345 mais
+        // un mdp aleatoire + password_changed_at NULL pour forcer le changement.
+        //
+        // On bascule l environnement en "production" UNIQUEMENT autour de run()
+        // (et on invoque le seeder en direct pour eviter le prompt de
+        // confirmation que `$this->seed()` declenche en prod).
+        $previousEnv = app()->environment();
+        app()->detectEnvironment(fn () => 'production');
+
+        try {
+            (new SyncOrgUsersPreservingPasswordsSeeder())->setContainer(app())->run();
+        } finally {
+            app()->detectEnvironment(fn () => $previousEnv);
+        }
+
+        $user = User::query()
+            ->where('email', 'ingrid@anbg.ga')
+            ->firstOrFail();
+
+        // password_changed_at NULL -> le user sera redirige vers profile/edit au 1er login.
+        $this->assertNull(
+            $user->password_changed_at,
+            'Le seeder de production doit poser password_changed_at = NULL pour forcer le renouvellement.'
+        );
+
+        // Le mdp fixture Pass@12345 ne doit pas etre accepte.
+        $this->assertFalse(
+            Hash::check('Pass@12345', (string) $user->password),
+            'Le seeder de production ne doit pas distribuer le mdp partage Pass@12345.'
+        );
     }
 
     public function test_user_can_login_with_matricule(): void

@@ -41,7 +41,7 @@ class SuperAdminAuditDiagnosticTest extends TestCase
             ->assertSee('Contrôle de cohérence')
             ->assertSee('Changements sensibles')
             ->assertSee('Actions organisation')
-            ->assertSee('Modules touches');
+            ->assertSee('Modules touchés');
     }
 
     public function test_audit_index_displays_reinforced_summary_and_date_filters(): void
