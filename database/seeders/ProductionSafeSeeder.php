@@ -29,6 +29,7 @@ class ProductionSafeSeeder extends Seeder
             ActionCalculationSettingsSeeder::class,
             ActionManagementSettingsSeeder::class,
             NotificationPolicySettingsSeeder::class,
+            OperationalActionCoverageSeeder::class,
         ]);
     }
 }

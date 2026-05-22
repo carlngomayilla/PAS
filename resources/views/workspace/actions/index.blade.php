@@ -24,7 +24,7 @@
         $summaryTotal = (int) ($summary['total'] ?? $rows->total());
         $avgProgression = (float) ($summary['avg_progression'] ?? ($listing->avg(fn ($item) => (float) ($item->progression_reelle ?? 0)) ?? 0));
         $avgKpi = (float) ($summary['avg_kpi_global'] ?? ($listing->avg(fn ($item) => (float) ($item->actionKpi?->kpi_performance ?? 0)) ?? 0));
-        $avgQuality = (float) ($summary['avg_quality'] ?? ($listing->avg(fn ($item) => (float) ($item->actionKpi?->kpi_qualite ?? 0)) ?? 0));
+        $avgConformite = (float) ($summary['avg_conformite'] ?? ($listing->avg(fn ($item) => (float) ($item->actionKpi?->kpi_conformite ?? 0)) ?? 0));
         $validatedCount = (int) ($summary['validated_count'] ?? 0);
         $pendingValidationCount = (int) ($summary['pending_validation_count'] ?? 0);
         $pendingJustificatifCount = (int) ($summary['pending_justificatif_count'] ?? 0);
@@ -64,6 +64,7 @@
             'non_soumise'        => 'anbg-badge anbg-badge-neutral',
             'soumise_chef'       => 'anbg-badge anbg-badge-warning',
             'rejetee_chef'       => 'anbg-badge anbg-badge-danger',
+            'correction_demandee'=> 'anbg-badge anbg-badge-warning',
             'validee_chef'       => 'anbg-badge anbg-badge-info',
             'rejetee_direction'  => 'anbg-badge anbg-badge-danger',
             'validee_direction'  => 'anbg-badge anbg-badge-success',
@@ -600,8 +601,8 @@
             <span class="showcase-chip">{{ $rows->total() }}</span>
         </div>
 
-        <div class="app-table-wrapper">
-            <table class="app-table data-table min-w-full">
+        <div class="app-table-wrapper overflow-x-auto">
+            <table class="app-table data-table min-w-[1200px] w-full text-sm">
                 <thead>
                     <tr>
                         <th>Action</th>
@@ -620,7 +621,7 @@
                             $semainesRenseignees = (int) ($row->semaines_renseignees ?? 0);
                             $kpiPerformance = $row->actionKpi?->kpi_performance;
                             $kpiDelay = $row->actionKpi?->kpi_delai;
-                            $kpiQuality = $row->actionKpi?->kpi_qualite;
+                            $kpiConformite = $row->actionKpi?->kpi_conformite;
                             $justificatifsTotal = (int) ($row->justificatifs_total ?? 0);
                             $modeEvaluationLabel = $row->mode_evaluation_label ?? 'Par sous-actions';
                             $statusClass = $statusStyles[$row->statut_dynamique ?: 'non_demarre'] ?? $statusStyles['non_demarre'];

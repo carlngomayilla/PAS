@@ -242,9 +242,7 @@ sequenceDiagram
     A->>UI: Saisit periode + justificatif
     UI->>S: submitWeek()
     S-->>UI: progression + statut recalcules
-
-    A->>UI: Soumettre cloture action
-    UI->>S: submitClosureForReview()
+    note over S: si toutes les periodes sont renseignees\net que la progression atteint 100%,\nbascule automatique vers le chef
     S->>N: notifyActionSubmittedToChef()
     N-->>C: Notification "Action soumise"
 

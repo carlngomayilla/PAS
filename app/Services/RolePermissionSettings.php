@@ -115,7 +115,7 @@ class RolePermissionSettings
         $role = $user->effectiveRoleCode();
 
         if (! array_key_exists($role, $this->roles())) {
-            $role = (string) $user->role;
+            $role = $this->roleRegistry->baseRole((string) $user->role);
         }
 
         return $this->forRole($role);
@@ -201,6 +201,7 @@ class RolePermissionSettings
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
                 'audit.read',
                 'messagerie.read',
             ],
@@ -221,6 +222,7 @@ class RolePermissionSettings
                 'users.manage',
                 'users.manage_roles',
                 'delegations.manage',
+                'audit.read',
                 'messagerie.read',
             ],
             // A37 — SCIQ : retire `scope.global.write` (trop large) ; conserve
@@ -242,6 +244,7 @@ class RolePermissionSettings
                 'planning.write.direction',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
                 'messagerie.read',
             ],
             User::ROLE_SERVICE => [
@@ -249,6 +252,7 @@ class RolePermissionSettings
                 'planning.write.service',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
                 'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE => [
@@ -256,10 +260,13 @@ class RolePermissionSettings
                 'planning.write.service',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
                 'messagerie.read',
             ],
             User::ROLE_AGENT => [
+                'planning.read',
                 'reporting.read',
+                'alerts.read',
                 'messagerie.read',
             ],
             // A06 — Cabinet et Collaborateurs voient tout mais ne pilotent plus
@@ -270,6 +277,7 @@ class RolePermissionSettings
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
                 'audit.read',
                 'messagerie.read',
             ],
@@ -284,7 +292,9 @@ class RolePermissionSettings
 
             // Profils ajoutés (Lot 2) — alignement organisation ANBG.
 
-            // Admin métier (gestion paramétrage, sans pouvoirs techniques type api_docs/retention).
+            // Admin métier (gestion paramétrage complet hors paramétrage profond
+            // réservé au super_admin). A accès rétention et API docs pour gérer
+            // la gouvernance applicative en l'absence du super_admin.
             User::ROLE_ADMIN_FONCTIONNEL => [
                 'scope.global.read',
                 'scope.global.write',
@@ -296,7 +306,12 @@ class RolePermissionSettings
                 'referentiel.read',
                 'referentiel.write',
                 'users.manage',
+                'users.manage_roles',
                 'delegations.manage',
+                'retention.read',
+                'retention.manage',
+                'api_docs.read',
+                'audit.read',
                 'messagerie.read',
             ],
 
@@ -341,16 +356,17 @@ class RolePermissionSettings
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
                 'messagerie.read',
             ],
 
-            // Chef d'unité DGA — gère DGA + vue globale.
+            // Chef d'unité DGA — gère son unité (portée service, pas globale).
             User::ROLE_CHEF_UNITE_DGA => [
-                'scope.global.read',
                 'planning.read',
-                'planning.write.global',
+                'planning.write.service',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
                 'messagerie.read',
             ],
 
@@ -361,17 +377,18 @@ class RolePermissionSettings
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
                 'audit.read',
                 'messagerie.read',
             ],
 
-            // Chef d'unité Cabinet — gère Cabinet + vue globale.
+            // Chef d'unité Cabinet — gère son unité (portée service, pas globale).
             User::ROLE_CHEF_UNITE_CABINET => [
-                'scope.global.read',
                 'planning.read',
-                'planning.write.global',
+                'planning.write.service',
                 'reporting.read',
                 'alerts.read',
+                'referentiel.read',
                 'messagerie.read',
             ],
 
@@ -384,16 +401,19 @@ class RolePermissionSettings
                 'messagerie.read',
             ],
 
-            // Auditeur — lecture seule sur audit et reporting.
+            // UCAS — lecture pilotage + alertes.
             User::ROLE_UCAS => [
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
                 'messagerie.read',
             ],
+            // Auditeur — lecture globale pour audit + reporting + alertes.
             User::ROLE_AUDITEUR => [
+                'scope.global.read',
                 'planning.read',
                 'reporting.read',
+                'alerts.read',
                 'audit.read',
                 'messagerie.read',
             ],

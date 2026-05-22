@@ -8,7 +8,7 @@
         <x-slot:actions>{{ $actions }}</x-slot:actions>
     @endisset
 
-    <div class="app-table-wrapper">
+    <div class="app-table-wrapper overflow-x-auto">
         {{ $slot }}
     </div>
 </x-ui.section-card>

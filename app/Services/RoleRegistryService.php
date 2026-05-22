@@ -25,14 +25,26 @@ class RoleRegistryService
     public function systemRoles(): array
     {
         return [
+            // Rôles transverses (toute direction ou aucune).
             User::ROLE_SUPER_ADMIN => ['label' => 'Super Admin', 'base_role' => User::ROLE_SUPER_ADMIN, 'system' => true],
             User::ROLE_ADMIN_FONCTIONNEL => ['label' => 'Administrateur fonctionnel', 'base_role' => User::ROLE_ADMIN_FONCTIONNEL, 'system' => true],
+            User::ROLE_AUDITEUR => ['label' => 'Auditeur', 'base_role' => User::ROLE_AUDITEUR, 'system' => true],
+
+            // Rôles attachés à la Direction Générale (DG).
             User::ROLE_DG => ['label' => 'Directeur Général', 'base_role' => User::ROLE_DG, 'system' => true],
             User::ROLE_PLANIFICATION => ['label' => 'Planification', 'base_role' => User::ROLE_PLANIFICATION, 'system' => true],
+            User::ROLE_CABINET => ['label' => 'Cabinet DG', 'base_role' => User::ROLE_CABINET, 'system' => true],
+            User::ROLE_CHEF_UNITE_CABINET => ['label' => "Chef d'unité Cabinet", 'base_role' => User::ROLE_CHEF_UNITE_CABINET, 'system' => true],
+            User::ROLE_DGA_SUPERVISION => ['label' => 'Supervision DGA', 'base_role' => User::ROLE_DGA_SUPERVISION, 'system' => true],
+            User::ROLE_CHEF_UNITE_UCAS => ['label' => "Chef d'unité UCAS", 'base_role' => User::ROLE_CHEF_UNITE_UCAS, 'system' => true],
+            User::ROLE_UCAS => ['label' => 'UCAS', 'base_role' => User::ROLE_UCAS, 'system' => true],
+            User::ROLE_SCIQ => ['label' => 'SCIQ', 'base_role' => User::ROLE_SCIQ, 'system' => true],
+            User::ROLE_CHEF_UNITE_SCIQ => ['label' => "Chef d'unité SCIQ", 'base_role' => User::ROLE_CHEF_UNITE_SCIQ, 'system' => true],
+
+            // Rôles opérationnels (DAF, DS, DSIC et autres directions métier).
             User::ROLE_DIRECTION => ['label' => 'Directeur de direction', 'base_role' => User::ROLE_DIRECTION, 'system' => true],
             User::ROLE_SERVICE => ['label' => 'Chef de service', 'base_role' => User::ROLE_SERVICE, 'system' => true],
             User::ROLE_AGENT => ['label' => 'Agent', 'base_role' => User::ROLE_AGENT, 'system' => true],
-            User::ROLE_AUDITEUR => ['label' => 'Auditeur', 'base_role' => User::ROLE_AUDITEUR, 'system' => true],
         ];
     }
 
@@ -42,19 +54,19 @@ class RoleRegistryService
     public function deprecatedRoleMap(): array
     {
         return [
+            // Fusion avec admin_fonctionnel / super_admin.
             User::ROLE_ADMIN => User::ROLE_ADMIN_FONCTIONNEL,
-            User::ROLE_CABINET => User::ROLE_DG,
-            User::ROLE_CABINET_SUPERVISION => User::ROLE_DG,
-            User::ROLE_CHEF_UNITE_CABINET => User::ROLE_DG,
-            User::ROLE_COLLABORATEUR => User::ROLE_DG,
-            User::ROLE_DGA_SUPERVISION => User::ROLE_DG,
-            User::ROLE_CHEF_UNITE_DGA => User::ROLE_DG,
-            User::ROLE_SCIQ => User::ROLE_PLANIFICATION,
-            User::ROLE_SCIQ_SUIVI_GLOBAL => User::ROLE_PLANIFICATION,
-            User::ROLE_CHEF_UNITE_SCIQ => User::ROLE_PLANIFICATION,
-            User::ROLE_CHEF_UNITE => User::ROLE_DG,
-            User::ROLE_CHEF_UNITE_UCAS => User::ROLE_DG,
-            User::ROLE_UCAS => User::ROLE_DG,
+            // Cabinet : on garde le rôle cabinet ; les supervisions s'y rattachent.
+            User::ROLE_CABINET_SUPERVISION => User::ROLE_CABINET,
+            // chef_unite générique → chef_unite_cabinet (entité Cabinet par défaut).
+            User::ROLE_CHEF_UNITE => User::ROLE_CHEF_UNITE_CABINET,
+            // chef_unite_dga : DGA n'est plus une unité distincte → rattaché au superviseur DGA.
+            User::ROLE_CHEF_UNITE_DGA => User::ROLE_DGA_SUPERVISION,
+            // collaborateur générique → agent par défaut.
+            User::ROLE_COLLABORATEUR => User::ROLE_AGENT,
+            // sciq_suivi_global → fusionné avec sciq.
+            User::ROLE_SCIQ_SUIVI_GLOBAL => User::ROLE_SCIQ,
+            // invité lecture → auditeur.
             User::ROLE_INVITE_LECTURE => User::ROLE_AUDITEUR,
         ];
     }

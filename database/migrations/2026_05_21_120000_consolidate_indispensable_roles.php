@@ -89,6 +89,22 @@ return new class extends Migration
                 'unite_dg_id' => null,
                 'is_agent' => false,
             ]);
+
+        if (Schema::hasTable('platform_settings')) {
+            DB::table('platform_settings')->where('group', 'role_permissions')
+                ->whereNotIn('key', array_map(
+                    static fn (string $role): string => 'role_permissions_'.$role,
+                    $this->indispensableRoles()
+                ))
+                ->delete();
+
+            foreach ($this->defaultPermissions() as $role => $permissions) {
+                DB::table('platform_settings')->updateOrInsert(
+                    ['group' => 'role_permissions', 'key' => 'role_permissions_'.$role],
+                    ['value' => json_encode($permissions, JSON_UNESCAPED_SLASHES), 'updated_at' => now()]
+                );
+            }
+        }
     }
 
     public function down(): void
@@ -119,6 +135,73 @@ return new class extends Migration
      */
     private function operationalDirectionCodes(): array
     {
-        return ['DAF', 'DS', 'DSIC', 'DSIQ'];
+        return ['DAF', 'DSIC', 'DS'];
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function defaultPermissions(): array
+    {
+        $all = [
+            'scope.global.read',
+            'scope.global.write',
+            'planning.read',
+            'planning.write.global',
+            'planning.write.direction',
+            'planning.write.service',
+            'planning.strategic.manage',
+            'reporting.read',
+            'alerts.read',
+            'referentiel.read',
+            'referentiel.write',
+            'users.manage',
+            'users.manage_roles',
+            'delegations.manage',
+            'retention.read',
+            'retention.manage',
+            'api_docs.read',
+            'audit.read',
+            'messagerie.read',
+        ];
+
+        return [
+            User::ROLE_SUPER_ADMIN => $all,
+            User::ROLE_ADMIN_FONCTIONNEL => [
+                'scope.global.read',
+                'scope.global.write',
+                'planning.read',
+                'planning.write.global',
+                'planning.strategic.manage',
+                'reporting.read',
+                'alerts.read',
+                'referentiel.read',
+                'referentiel.write',
+                'users.manage',
+                'users.manage_roles',
+                'delegations.manage',
+                'audit.read',
+                'messagerie.read',
+            ],
+            User::ROLE_DG => ['scope.global.read', 'planning.read', 'reporting.read', 'alerts.read', 'audit.read', 'messagerie.read'],
+            User::ROLE_PLANIFICATION => [
+                'scope.global.read',
+                'planning.read',
+                'planning.write.global',
+                'planning.strategic.manage',
+                'reporting.read',
+                'alerts.read',
+                'referentiel.read',
+                'referentiel.write',
+                'users.manage',
+                'users.manage_roles',
+                'delegations.manage',
+                'messagerie.read',
+            ],
+            User::ROLE_DIRECTION => ['planning.read', 'planning.write.direction', 'reporting.read', 'alerts.read', 'messagerie.read'],
+            User::ROLE_SERVICE => ['planning.read', 'planning.write.service', 'reporting.read', 'alerts.read', 'messagerie.read'],
+            User::ROLE_AGENT => ['reporting.read', 'messagerie.read'],
+            User::ROLE_AUDITEUR => ['planning.read', 'reporting.read', 'audit.read', 'messagerie.read'],
+        ];
     }
 };

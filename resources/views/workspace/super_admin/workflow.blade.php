@@ -140,7 +140,7 @@
 
     <section class="ui-card">
         <h2>Résolution appliquée</h2>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead>
                     <tr>

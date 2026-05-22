@@ -15,8 +15,8 @@
     // Variables profileRoleLabel / profileScope / profileDirectionLabel / profileServiceLabel
     // ont été retirées après suppression du bandeau profil redondant en haut du dashboard
     // (le périmètre est désormais affiché par le chip de la navbar).
-    $operationalGlobalScores = $analytics['operational_global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'global' => 0, 'progression' => 0];
-    $globalScores = $analytics['global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'qualite' => 0, 'global' => 0, 'progression' => 0];
+    $operationalGlobalScores = $analytics['operational_global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'global' => 0, 'progression' => 0];
+    $globalScores = $analytics['global_scores'] ?? ['delai' => 0, 'performance' => 0, 'conformite' => 0, 'global' => 0, 'progression' => 0];
     $operationalStatusCards = $analytics['operational_status_cards'] ?? [];
     $officialStatusCards = $analytics['official_status_cards'] ?? [];
     $operationalMonthly = $analytics['operational_monthly'] ?? [];
@@ -321,7 +321,7 @@
             'rows' => [
                 ['cells' => ['Délai', $fmtPct($globalScores['delai'] ?? 0), 'Temps']],
                 ['cells' => ['Perf.', $fmtPct($globalScores['performance'] ?? 0), 'Exéc.']],
-                ['cells' => ['Qual.', $fmtPct($globalScores['qualite'] ?? 0), 'Qualité']],
+                ['cells' => ['Conf.', $fmtPct($globalScores['conformite'] ?? 0), 'Conformité']],
             ],
         ],
         [

@@ -319,7 +319,7 @@
                             <th>Action</th>
                             <th>RMO</th>
                             <th>Performance d'exécution (%)</th>
-                            <th>Qualité / conformité (%)</th>
+                            <th>Conformité (%)</th>
                             <th>Indicateur délai (%)</th>
                             <th>Avancement réel (%)</th>
                         </tr>
@@ -330,7 +330,7 @@
                                 <td>{{ $row['action'] ?? '-' }}</td>
                                 <td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td>
                                 <td>{{ $row['kpi_performance'] ?? '0.00' }}</td>
-                                <td>{{ $row['kpi_qualite'] ?? '0.00' }}</td>
+                                <td>{{ $row['kpi_conformite'] ?? '0.00' }}</td>
                                 <td>{{ $row['kpi_delai'] ?? '0.00' }}</td>
                                 <td>{{ $row['progression_reelle'] ?? $row['taux'] ?? '0.00' }}</td>
                             </tr>

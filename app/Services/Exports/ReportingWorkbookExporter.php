@@ -247,7 +247,7 @@ class ReportingWorkbookExporter
             ],
             [
                 ['Performance execution', (int) round((float) ($kpiSummary['performance'] ?? 0)), 13, 14],
-                ['Qualite', (int) round((float) ($kpiSummary['qualite'] ?? 0)), 15, 16],
+                ['Conformite', (int) round((float) ($kpiSummary['conformite'] ?? 0)), 15, 16],
                 ['Avancement reel', (int) round((float) ($kpiSummary['progression'] ?? 0)), 17, 18],
                 ['Delai', (int) round((float) ($kpiSummary['delai'] ?? 0)), 19, 20],
             ],
@@ -543,7 +543,7 @@ class ReportingWorkbookExporter
             'Indicateurs',
             'Indicateurs',
             $this->standardReportMetaRows($payload, 'Tableau 4 : Indicateurs par action'),
-            ['Direction', 'Service', 'Action', 'RMO', 'Performance d execution (%)', 'Qualite / conformite (%)', 'Delai (%)', 'Avancement reel (%)'],
+            ['Direction', 'Service', 'Action', 'RMO', 'Performance d execution (%)', 'Conformite (%)', 'Delai (%)', 'Avancement reel (%)'],
             ['string', 'string', 'string', 'string', 'percent', 'percent', 'percent', 'percent'],
             $this->kpiFinalSheetRows($payload),
             [1 => 36, 2 => 36, 3 => 42, 4 => 26, 5 => 24, 6 => 22, 7 => 18, 8 => 20]
@@ -810,7 +810,7 @@ class ReportingWorkbookExporter
                 (string) ($row['action'] ?? '-'),
                 (string) ($row['rmo'] ?? $row['responsable'] ?? '-'),
                 (float) ($row['kpi_performance_value'] ?? 0),
-                (float) ($row['kpi_qualite_value'] ?? 0),
+                (float) ($row['kpi_conformite_value'] ?? 0),
                 (float) ($row['kpi_delai_value'] ?? 0),
                 (float) ($row['progression_value'] ?? 0),
             ])
@@ -1231,12 +1231,12 @@ class ReportingWorkbookExporter
 
         $sections[] = [
             'title' => 'Synthese des indicateurs',
-            'headers' => ['Delai', 'Performance d execution', 'Qualite / conformite', 'Avancement moyen reel'],
+            'headers' => ['Delai', 'Performance d execution', 'Conformite', 'Avancement moyen reel'],
             'types' => ['decimal', 'decimal', 'decimal', 'percent'],
             'rows' => [[
                 (float) ($payload['kpiSummary']['delai'] ?? 0),
                 (float) ($payload['kpiSummary']['performance'] ?? 0),
-                (float) ($payload['kpiSummary']['qualite'] ?? 0),
+                (float) ($payload['kpiSummary']['conformite'] ?? 0),
                 (float) ($payload['kpiSummary']['progression'] ?? 0),
             ]],
         ];
@@ -1256,9 +1256,9 @@ class ReportingWorkbookExporter
         ];
         $sections[] = [
             'title' => 'Details - Actions en retard',
-            'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable', 'Performance d execution', 'Qualite / conformite'],
+            'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable', 'Performance d execution', 'Conformite'],
             'types' => ['integer', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal'],
-            'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_performance ?? 0), (float) ($action->actionKpi?->kpi_qualite ?? 0)])->all(),
+            'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_performance ?? 0), (float) ($action->actionKpi?->kpi_conformite ?? 0)])->all(),
         ];
 
         $sections[] = [

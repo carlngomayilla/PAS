@@ -115,7 +115,7 @@ class SessionController extends Controller
                 'login_identifier' => $identifier,
             ]);
         }
-        if ($user instanceof User && $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN)) {
+        if ($user instanceof User && $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL)) {
             $defaultRoute = route('admin.dashboard');
         }
 

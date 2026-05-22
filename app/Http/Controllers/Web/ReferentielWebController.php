@@ -609,7 +609,7 @@ class ReferentielWebController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', $emailRule],
-            'role' => ['required', Rule::in($this->roleOptions($actor, $utilisateur))],
+            'role' => ['required', Rule::in($this->acceptedRoleOptions($actor, $utilisateur))],
             'is_active' => ['nullable', 'boolean'],
             'agent_matricule' => ['nullable', 'string', 'max:80'],
             'agent_fonction' => ['nullable', 'string', 'max:120'],
@@ -709,7 +709,8 @@ class ReferentielWebController extends Controller
      */
     private function applyRoleScopeRules(array &$validated): void
     {
-        $role = (string) $validated['role'];
+        $role = $this->roleRegistry->baseRole((string) $validated['role']);
+        $validated['role'] = $role;
         $directionId = isset($validated['direction_id']) ? (int) $validated['direction_id'] : null;
         $serviceId = isset($validated['service_id']) ? (int) $validated['service_id'] : null;
 
@@ -789,7 +790,7 @@ class ReferentielWebController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'direction_id' => 'Les profils direction, service et agent sont reserves aux directions DAF, DSIQ/DSIC et DS.',
+            'direction_id' => 'Les profils direction, service et agent sont reserves aux directions DAF, DSIC et DS.',
         ]);
     }
 
@@ -798,7 +799,7 @@ class ReferentielWebController extends Controller
      */
     private function operationalDirectionCodes(): array
     {
-        return ['DAF', 'DSIQ', 'DSIC', 'DS'];
+        return ['DAF', 'DSIC', 'DS'];
     }
 
     private function authUser(Request $request): User
@@ -915,6 +916,17 @@ class ReferentielWebController extends Controller
         }
 
         return [User::ROLE_AGENT];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function acceptedRoleOptions(?User $actor = null, ?User $subject = null): array
+    {
+        return array_values(array_unique([
+            ...$this->roleOptions($actor, $subject),
+            ...array_keys($this->roleRegistry->deprecatedRoleMap()),
+        ]));
     }
 
     private function denyUnlessManagedUserAccessible(User $actor, User $target): void

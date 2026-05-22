@@ -15,6 +15,7 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\ActionCalculationSettings;
+use App\Services\Actions\ActionStatusService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Analytics\AnalyticsCacheVersionService;
@@ -46,7 +47,8 @@ class DashboardController extends Controller
         private readonly DashboardProfileSettings $dashboardProfileSettings,
         private readonly WorkflowSettings $workflowSettings,
         private readonly AnalyticsCacheVersionService $cacheVersionService,
-        private readonly ExerciceContext $exerciceContext
+        private readonly ExerciceContext $exerciceContext,
+        private readonly ActionStatusService $actionStatusService
     ) {
     }
 
@@ -152,7 +154,7 @@ class DashboardController extends Controller
                 'sousActions.agent:id,name,service_id',
                 'sousActions.justificatifs:id,sous_action_id,nom_original,description,ajoute_par,created_at',
                 'sousActions.justificatifs.ajoutePar:id,name',
-                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_global,progression_reelle,progression_theorique',
+                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_global,progression_reelle,progression_theorique',
             ])
             ->orderByDesc('date_echeance')
             ->get();
@@ -310,7 +312,6 @@ class DashboardController extends Controller
                 'delai' => (float) ($globalScores['delai'] ?? 0),
                 'performance' => (float) ($globalScores['performance'] ?? 0),
                 'conformite' => (float) ($globalScores['conformite'] ?? 0),
-                'qualite' => (float) ($globalScores['qualite'] ?? 0),
                 'global' => (float) ($globalScores['global'] ?? 0),
             ],
             'managedKpis' => [],
@@ -550,7 +551,11 @@ class DashboardController extends Controller
         }
 
         if ($user->isAgent()) {
-            $query->where('responsable_id', (int) $user->id);
+            $query->where(function (Builder $agentQuery) use ($user): void {
+                $agentQuery->where('responsable_id', (int) $user->id)
+                    ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
+                    ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
+            });
             return;
         }
 
@@ -578,7 +583,11 @@ class DashboardController extends Controller
         }
 
         if ($user->isAgent()) {
-            $query->whereHas('action', fn (Builder $q) => $q->where('responsable_id', (int) $user->id));
+            $query->whereHas('action', function (Builder $actionQuery) use ($user): void {
+                $actionQuery->where('responsable_id', (int) $user->id)
+                    ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
+                    ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
+            });
             return;
         }
 
@@ -606,7 +615,11 @@ class DashboardController extends Controller
         }
 
         if ($user->isAgent()) {
-            $query->whereHas('kpi.action', fn (Builder $q) => $q->where('responsable_id', (int) $user->id));
+            $query->whereHas('kpi.action', function (Builder $actionQuery) use ($user): void {
+                $actionQuery->where('responsable_id', (int) $user->id)
+                    ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
+                    ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
+            });
             return;
         }
 
@@ -1072,6 +1085,7 @@ class DashboardController extends Controller
         $personalActions = $actionSets['personal'];
         $actions = $actionSets['dashboard'];
         $validatedActions = $this->validatedActions($actions);
+        $officialActions = $validatedActions;
         $dashboardRole = $this->resolveDashboardRole($user);
         $currentYear = (int) ($this->exerciceContext->selectedYear() ?? now()->year);
         $unitMeta = $this->resolveUnitMeta($user);
@@ -1102,7 +1116,7 @@ class DashboardController extends Controller
         $performanceGaugeRows = $this->buildPerformanceGaugeRows($user, $actions);
         $interannual = $this->buildInterannualComparison($user);
         $statusCards = $this->buildStatusCards($actions);
-        $officialStatusCards = $this->buildStatusCards($validatedActions);
+        $officialStatusCards = $this->buildStatusCards($officialActions);
         $alerts = $this->buildDashboardAlertRows($actions);
         $roleDashboard = $this->buildRoleDashboard($user, $actions, $validatedActions);
 
@@ -1115,15 +1129,15 @@ class DashboardController extends Controller
         };
 
         $operationalGlobalScores = $this->buildGlobalScoreSummary($actions, $avg);
-        $globalScores = $this->buildGlobalScoreSummary($actions, $avg);
+        $globalScores = $this->buildGlobalScoreSummary($officialActions, $avg);
         $operationalMonthly = $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false);
-        $monthly = $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false);
+        $monthly = $this->buildMonthlyScoreRows($officialActions, $currentYear, $avg, true);
 
         $actionRows = $actions
             ->sortByDesc(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0))
             ->take(12)
             ->map(function (Action $action): array {
-                $statusKey = $this->normalizeStatus((string) ($action->statut_dynamique ?? ''));
+                $statusKey = $this->dashboardStatus($action);
                 $target = max(0.0, (float) ($action->quantite_cible ?? 0));
                 $realized = max(0.0, (float) ($action->quantite_realisee ?? 0));
                 $targetRate = $target > 0.0
@@ -1146,7 +1160,6 @@ class DashboardController extends Controller
                     'kpi_delai' => round((float) ($action->actionKpi?->kpi_delai ?? 0), 2),
                     'kpi_performance' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
                     'kpi_conformite' => round((float) ($action->actionKpi?->kpi_conformite ?? 0), 2),
-                    'kpi_qualite' => round((float) ($action->actionKpi?->kpi_qualite ?? 0), 2),
                     'date_debut' => $action->date_debut instanceof Carbon ? $action->date_debut->format('d/m/Y') : '-',
                     'date_fin' => $action->date_fin instanceof Carbon ? $action->date_fin->format('d/m/Y') : '-',
                     'mode_evaluation' => $action->resolvedEvaluationMode(),
@@ -1168,7 +1181,7 @@ class DashboardController extends Controller
             ->sortBy(fn (Action $action): string => $action->date_debut instanceof Carbon ? $action->date_debut->toDateString() : '')
             ->take(10)
             ->map(function (Action $action): array {
-                $statusKey = $this->normalizeStatus((string) ($action->statut_dynamique ?? ''));
+                $statusKey = $this->dashboardStatus($action);
 
                 return [
                     'id' => (int) $action->id,
@@ -1347,6 +1360,26 @@ class DashboardController extends Controller
             return 'dg';
         }
 
+        if ($user->hasRole(User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_PLANIFICATION)) {
+            return 'planification';
+        }
+
+        if ($user->hasRole(User::ROLE_AUDITEUR)) {
+            return 'global';
+        }
+
+        if ($user->isAgent()) {
+            return 'agent';
+        }
+
+        if ($user->hasRole(User::ROLE_SERVICE)) {
+            return 'service';
+        }
+
+        if ($user->hasRole(User::ROLE_DIRECTION)) {
+            return 'direction';
+        }
+
         // Cabinet, supervision Cabinet, supervision DGA — vue d'ensemble lecture
         if ($user->hasRole(
             User::ROLE_CABINET,
@@ -1435,7 +1468,7 @@ class DashboardController extends Controller
         ];
 
         foreach ($actions as $action) {
-            $status = $this->normalizeStatus((string) ($action->statut_dynamique ?? ''));
+            $status = $this->dashboardStatus($action);
             $counts[$status] = ($counts[$status] ?? 0) + 1;
         }
 
@@ -1697,7 +1730,6 @@ class DashboardController extends Controller
             'delai' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
             'performance' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
             'conformite' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
-            'qualite' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
             'global' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
             'progression' => $avg($actions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
         ];
@@ -1735,7 +1767,6 @@ class DashboardController extends Controller
                 'delai' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
                 'performance' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
                 'conformite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
-                'qualite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
                 'global' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
             ];
         })->all();
@@ -2455,7 +2486,7 @@ class DashboardController extends Controller
         ];
 
         foreach ($actions as $action) {
-            $status = $this->normalizeStatus((string) ($action->statut_dynamique ?? ''));
+            $status = $this->dashboardStatus($action);
             if (! array_key_exists($status, $rows)) {
                 continue;
             }
@@ -2526,7 +2557,6 @@ class DashboardController extends Controller
                     'kpi_delai' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)), 2),
                     'kpi_performance' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)), 2),
                     'kpi_conformite' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)), 2),
-                    'kpi_qualite' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)), 2),
                     'alertes' => $alerts,
                     'validation_pct' => round(($validated / $total) * 100, 2),
                 ];
@@ -3565,6 +3595,17 @@ class DashboardController extends Controller
             $agents = $agents->push($action->responsable);
         }
 
+        if ($action->relationLoaded('sousActions')) {
+            $agents = $agents->concat(
+                $action->sousActions
+                    ->filter(fn ($subAction): bool => (int) ($subAction->agent_id ?? 0) > 0)
+                    ->map(fn ($subAction) => $subAction->agent ?? (object) [
+                        'id' => (int) $subAction->agent_id,
+                        'name' => 'Agent #'.(int) $subAction->agent_id,
+                    ])
+            );
+        }
+
         if ($agents->isEmpty()) {
             return collect([(object) ['id' => 0, 'name' => 'Non assigne']]);
         }
@@ -3705,7 +3746,7 @@ class DashboardController extends Controller
             $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
             $status = (string) ($action->statut_dynamique ?? '');
             $globalKpi = (float) ($action->actionKpi?->kpi_global ?? 0);
-            $qualityKpi = (float) ($action->actionKpi?->kpi_qualite ?? 0);
+            $conformiteKpi = (float) ($action->actionKpi?->kpi_conformite ?? 0);
             $gap = max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
 
             if ($deadline instanceof Carbon && $deadline->lt($today) && ! in_array($status, [ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, ActionTrackingService::STATUS_ACHEVE_HORS_DELAI], true)) {
@@ -3720,7 +3761,7 @@ class DashboardController extends Controller
                     'action' => (string) $action->libelle,
                     'details' => $daysLate.'j',
                     'kpi' => round($globalKpi, 2),
-                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_conformite' => round($conformiteKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -3733,7 +3774,7 @@ class DashboardController extends Controller
                     'action' => (string) $action->libelle,
                     'details' => number_format($globalKpi, 0).' / 100',
                     'kpi' => round($globalKpi, 2),
-                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_conformite' => round($conformiteKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -3753,7 +3794,7 @@ class DashboardController extends Controller
                     'action' => (string) $action->libelle,
                     'details' => 'Escalade DG',
                     'kpi' => round($globalKpi, 2),
-                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_conformite' => round($conformiteKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -3766,7 +3807,7 @@ class DashboardController extends Controller
                     'action' => (string) $action->libelle,
                     'details' => number_format($gap, 0).' pts',
                     'kpi' => round($globalKpi, 2),
-                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_conformite' => round($conformiteKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
                 ];
             }
@@ -3783,7 +3824,7 @@ class DashboardController extends Controller
                     'action' => (string) $action->libelle,
                     'details' => $action->soumise_le->diffInDays($today).'j',
                     'kpi' => round($globalKpi, 2),
-                    'kpi_qualite' => round($qualityKpi, 2),
+                    'kpi_conformite' => round($conformiteKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-validation',
                 ];
             }
@@ -3921,9 +3962,7 @@ class DashboardController extends Controller
      */
     private function validatedActions(Collection $actions): Collection
     {
-        return $actions
-            ->filter(fn (Action $action): bool => in_array($this->normalizeStatus((string) ($action->statut_dynamique ?? '')), ['acheve'], true))
-            ->values();
+        return $this->officialActions($actions);
     }
 
     /**
@@ -3931,7 +3970,7 @@ class DashboardController extends Controller
      */
     private function validatedActionFilters(array $filters = []): array
     {
-        return array_merge(['statut' => 'achevees'], $filters);
+        return array_merge($this->actionCalculationSettings->officialRouteFilters(), $filters);
     }
 
     private function validatedActionIndexRoute(array $filters = []): string
@@ -3968,6 +4007,11 @@ class DashboardController extends Controller
             ActionTrackingService::STATUS_NON_DEMARRE => 'non_demarre',
             default => 'en_cours',
         };
+    }
+
+    private function dashboardStatus(Action $action): string
+    {
+        return $this->actionStatusService->dashboardStatus($action);
     }
 
     private function statusLabel(string $status): string

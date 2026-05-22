@@ -156,6 +156,7 @@
             $returnedCount = \App\Models\Action::query()
                 ->whereIn('statut_validation', [
                     \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_CHEF,
+                    \App\Services\Actions\ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
                     \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
                 ])
                 ->where(static fn ($q) => $q

@@ -17,15 +17,23 @@ class SuperAdminKpiSettingsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed();
     }
 
     public function test_super_admin_can_update_managed_kpis_and_reporting_reflects_them(): void
     {
         $superAdmin = $this->createSuperAdminUser();
         $admin = $this->createAdminUser();
-        $direction = Direction::query()->firstOrFail();
-        $service = Service::query()->where('direction_id', $direction->id)->firstOrFail();
+        $direction = Direction::query()->create([
+            'code' => 'DIR-KPI',
+            'libelle' => 'Direction KPI',
+            'actif' => true,
+        ]);
+        $service = Service::query()->create([
+            'direction_id' => $direction->id,
+            'code' => 'SRV-KPI',
+            'libelle' => 'Service KPI',
+            'actif' => true,
+        ]);
 
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.kpis.edit'))
@@ -38,7 +46,6 @@ class SuperAdminKpiSettingsTest extends TestCase
             $formulaMode = match ($code) {
                 'global' => 'weighted_average',
                 'conformite' => 'gap_to_target',
-                'qualite' => 'minimum',
                 'progression' => 'maximum',
                 default => 'direct',
             };
@@ -54,14 +61,12 @@ class SuperAdminKpiSettingsTest extends TestCase
                     'delai' => 'performance',
                     'global' => 'global',
                     'conformite' => 'conformite',
-                    'qualite' => 'qualite',
                     'progression' => 'progression',
                     default => 'performance',
                 },
                 'formula_mode' => $formulaMode,
                 'secondary_metric' => match ($code) {
                     'global' => 'performance',
-                    'qualite' => 'progression',
                     'progression' => 'global',
                     default => '',
                 },
@@ -101,7 +106,6 @@ class SuperAdminKpiSettingsTest extends TestCase
             'delai' => 75,
             'performance' => 88,
             'conformite' => 92,
-            'qualite' => 81,
             'global' => 84,
             'progression' => 66,
         ], [
@@ -113,7 +117,6 @@ class SuperAdminKpiSettingsTest extends TestCase
         $this->assertTrue(collect($runtimeMetrics)->contains(fn (array $metric): bool => $metric['label'] === 'GLOBAL'));
         $this->assertSame(85.65, collect($runtimeMetrics)->firstWhere('code', 'global')['value']);
         $this->assertSame(97.0, collect($runtimeMetrics)->firstWhere('code', 'conformite')['value']);
-        $this->assertSame(66.0, collect($runtimeMetrics)->firstWhere('code', 'qualite')['value']);
         $this->assertSame(84.0, collect($runtimeMetrics)->firstWhere('code', 'progression')['value']);
         $this->assertSame('Cible 95', collect($runtimeMetrics)->firstWhere('code', 'conformite')['formula_summary']);
     }

@@ -57,7 +57,7 @@ class OfficialOrganizationScopeTest extends TestCase
         $this->assertTrue($scope['has_dual_interface']);
     }
 
-    public function test_sciq_collaborateur_and_ucas_interfaces_follow_business_rules(): void
+    public function test_sciq_cabinet_and_ucas_interfaces_follow_business_rules(): void
     {
         $this->seed(ProductionSafeSeeder::class);
 
@@ -73,7 +73,7 @@ class OfficialOrganizationScopeTest extends TestCase
         $this->assertTrue($scopeService->scopeFor($sciq)['has_dual_interface']);
         $this->assertTrue($scopeService->scopeFor($sciq)['can_control_global']);
 
-        $this->assertSame(User::ROLE_COLLABORATEUR, $collaborateur->role);
+        $this->assertSame(User::ROLE_CABINET, $collaborateur->role);
         $this->assertSame('COLLAB', $collaborateur->service?->code);
         $this->assertTrue($scopeService->scopeFor($collaborateur)['has_dual_interface']);
         $this->assertFalse($scopeService->scopeFor($collaborateur)['can_write_global']);

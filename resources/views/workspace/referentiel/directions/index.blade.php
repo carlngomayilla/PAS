@@ -64,7 +64,7 @@
 
     <section class="showcase-panel mb-4 app-screen-block">
         <h2>Liste des directions</h2>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead>
                     <tr>

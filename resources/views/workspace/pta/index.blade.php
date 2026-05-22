@@ -117,7 +117,7 @@
             </div>
             <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead>
                     <tr>

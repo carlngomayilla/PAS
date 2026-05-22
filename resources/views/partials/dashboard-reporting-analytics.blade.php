@@ -224,7 +224,7 @@
                     <h2 class="showcase-panel-title">Consolidation PAS</h2>
                 </div>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table dashboard-table-compact">
                     <thead>
                         <tr>
@@ -300,7 +300,7 @@
                     <h2 class="showcase-panel-title">Comparaison interannuelle détaillée</h2>
                 </div>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table dashboard-table-compact">
                     <thead>
                         <tr>

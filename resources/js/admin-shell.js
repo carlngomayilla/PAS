@@ -371,7 +371,6 @@
         var summary = payload && payload.kpi_summary ? payload.kpi_summary : {};
         var cards = [
             ['Global', summary.global],
-            ['Qualité', summary.qualite],
             ['Progression', summary.progression],
         ].filter(function (row) {
             return typeof row[1] !== 'undefined';
@@ -407,7 +406,7 @@
             var metrics = item.metrics || {};
             var metricChips = [
                 ['Global', metrics.kpi_global],
-                ['Qualité', metrics.kpi_qualite],
+                ['Conformité', metrics.kpi_conformite],
                 ['Performance', metrics.kpi_performance],
             ].filter(function (row) {
                 return typeof row[1] !== 'undefined';

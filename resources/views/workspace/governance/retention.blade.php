@@ -54,7 +54,7 @@
 
     <section class="ui-card">
         <h2>Dernieres archives</h2>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead>
                     <tr>

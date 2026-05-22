@@ -64,7 +64,7 @@
                         </div>
                     </div>
 
-                    <div class="app-table-wrapper mt-4">
+                    <div class="app-table-wrapper overflow-x-auto mt-4">
                         <table class="app-table data-table">
                             <thead><tr><th>Carte</th><th>Visible</th><th>Ordre</th><th>Taille</th><th>Ton</th><th>Redirection</th><th>Filtres</th></tr></thead>
                             <tbody>

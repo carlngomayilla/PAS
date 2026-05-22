@@ -122,7 +122,7 @@ class ReportingAnalyticsService
 
         $validatedActions = (clone $actionsStatistics)
             ->with([
-                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,kpi_global',
+                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_global',
             ])
             ->get();
 
@@ -171,7 +171,7 @@ class ReportingAnalyticsService
                 ->with([
                     'pta:id,titre,direction_id,service_id',
                     'responsable:id,name,email',
-                    'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
+                    'actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
                 ])
                 ->orderBy('date_echeance')
                 ->limit($lateActionsLimit)
@@ -217,7 +217,7 @@ class ReportingAnalyticsService
                     'pta.pao:id,titre',
                     'responsable:id,name,email',
                     'kpis:id,action_id,libelle',
-                    'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
+                    'actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
                 ])
                 ->orderByDesc('id')
                 ->limit($structureLimit)
@@ -271,7 +271,6 @@ class ReportingAnalyticsService
                         'etat_realisation' => (string) $action->statut_dynamique,
                         'progression' => number_format((float) ($action->progression_reelle ?? 0), 2, '.', '').'%',
                         'kpi_global' => round((float) ($action->actionKpi?->kpi_global ?? 0), 2),
-                        'kpi_qualite' => round((float) ($action->actionKpi?->kpi_qualite ?? 0), 2),
                         'ressources_requises' => implode(' | ', $ressources),
                         'indicateurs_performance' => (string) $indicateurs,
                     ];
@@ -415,7 +414,7 @@ class ReportingAnalyticsService
                 'responsable:id,name,email',
                 'kpis:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'kpis.mesures:id,kpi_id,periode,valeur,commentaire',
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_qualite,kpi_conformite',
+                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite',
                 'justificatifs:id,justifiable_type,justifiable_id,categorie,nom_original,description,created_at,ajoute_par',
                 'justificatifs.ajoutePar:id,name',
             ])
@@ -622,13 +621,11 @@ class ReportingAnalyticsService
             'kpi_global' => number_format($kpiGlobal, 2, '.', ''),
             'kpi_delai' => number_format((float) ($action->actionKpi?->kpi_delai ?? 0), 2, '.', ''),
             'kpi_performance' => number_format((float) ($action->actionKpi?->kpi_performance ?? 0), 2, '.', ''),
-            'kpi_qualite' => number_format((float) ($action->actionKpi?->kpi_qualite ?? 0), 2, '.', ''),
             'kpi_conformite' => number_format($kpiConformite, 2, '.', ''),
             'progression_value' => $progression,
             'kpi_global_value' => $kpiGlobal,
             'kpi_delai_value' => (float) ($action->actionKpi?->kpi_delai ?? 0),
             'kpi_performance_value' => (float) ($action->actionKpi?->kpi_performance ?? 0),
-            'kpi_qualite_value' => (float) ($action->actionKpi?->kpi_qualite ?? 0),
             'kpi_conformite_value' => $kpiConformite,
             'ressources_requises' => $this->reportActionResourcesLabel($action),
             'justificatif' => $this->reportActionJustificatifLabel($justificatifs),
@@ -892,6 +889,15 @@ class ReportingAnalyticsService
             return;
         }
 
+        if ($user->isAgent()) {
+            $query->where(function (Builder $agentQuery) use ($user): void {
+                $agentQuery->where('responsable_id', (int) $user->id)
+                    ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
+                    ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
+            });
+            return;
+        }
+
         $query->whereHas('pta', function (Builder $ptaQuery) use ($user): void {
             $this->scopeByUserDirection($ptaQuery, $user, 'direction_id', 'service_id');
         });
@@ -907,6 +913,15 @@ class ReportingAnalyticsService
         $this->exerciceContext->applyToMesure($query);
 
         if ($user->hasGlobalReadAccess()) {
+            return;
+        }
+
+        if ($user->isAgent()) {
+            $query->whereHas('kpi.action', function (Builder $actionQuery) use ($user): void {
+                $actionQuery->where('responsable_id', (int) $user->id)
+                    ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
+                    ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
+            });
             return;
         }
 

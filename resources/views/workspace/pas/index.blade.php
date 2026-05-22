@@ -78,7 +78,7 @@
             </div>
             <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead>
                     <tr>
@@ -135,19 +135,19 @@
                                                 <button class="btn btn-primary" type="submit">Soumettre</button>
                                             </form>
                                         @endif
-                                        @if ($row->statut === 'soumis' && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_DG))
+                                        @if ($row->statut === 'soumis' && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG))
                                             <form method="POST" action="{{ route('workspace.pas.approve', $row) }}">
                                                 @csrf
                                                 <button class="btn btn-success" type="submit">Valider</button>
                                             </form>
                                         @endif
-                                        @if ($row->statut === 'valide' && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_DG))
+                                        @if ($row->statut === 'valide' && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG))
                                             <form method="POST" action="{{ route('workspace.pas.lock', $row) }}" data-confirm-message="Verrouiller ce PAS ?" data-confirm-tone="warning" data-confirm-label="Verrouiller">
                                                 @csrf
                                                 <button class="btn btn-primary" type="submit">Verrouiller</button>
                                             </form>
                                         @endif
-                                        @if (in_array($row->statut, ['soumis', 'valide'], true) && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_DG))
+                                        @if (in_array($row->statut, ['soumis', 'valide'], true) && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG))
                                             <form method="POST" action="{{ route('workspace.pas.reopen', $row) }}" data-prompt-title="Retour brouillon" data-prompt-message="Saisir le motif de retour brouillon (PAS)." data-prompt-label="Motif de retour" data-prompt-placeholder="Minimum 5 caracteres" data-prompt-target="motif_retour" data-prompt-minlength="5" data-prompt-confirm="Confirmer">
                                                 @csrf
                                                 <input type="hidden" name="motif_retour" value="">

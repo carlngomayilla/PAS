@@ -72,6 +72,7 @@
         $storedSubActions = $row->relationLoaded('sousActions')
             ? $row->sousActions->map(fn ($subAction) => [
                 'id' => $subAction->id,
+                'agent_id' => $subAction->agent_id,
                 'libelle' => $subAction->libelle,
                 'date_debut' => optional($subAction->date_debut)->format('Y-m-d'),
                 'date_fin' => optional($subAction->date_fin)->format('Y-m-d'),
@@ -294,7 +295,7 @@
 
                         {{-- Libellé de l'action --}}
                         <div class="md:col-span-2">
-                            <label for="libelle">Titre de l'action <span class="text-red-500">*</span></label>
+                            <label for="libelle">Intitule / titre de l'action <span class="text-red-500">*</span></label>
                             <input id="libelle" name="libelle" type="text" value="{{ old('libelle', $row->libelle) }}" required>
                             @error('libelle') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
@@ -408,6 +409,15 @@
                                             <input name="sous_actions[{{ $subIndex }}][libelle]" type="text" value="{{ $subAction['libelle'] ?? '' }}">
                                         </div>
                                         <div>
+                                            <label>RMO en charge</label>
+                                            <select name="sous_actions[{{ $subIndex }}][agent_id]" data-sub-action-agent-select>
+                                                <option value="">RMO principal</option>
+                                                @foreach ($responsableOptions as $user)
+                                                    <option value="{{ $user->id }}" @selected((int) ($subAction['agent_id'] ?? 0) === (int) $user->id)>{{ $user->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div>
                                             <label>Date de début</label>
                                             <input name="sous_actions[{{ $subIndex }}][date_debut]" type="date" value="{{ $subAction['date_debut'] ?? old('date_debut', optional($row->date_debut)->format('Y-m-d')) }}">
                                         </div>
@@ -481,13 +491,31 @@
                             <label for="montant_estime">Montant estimé</label>
                             <input id="montant_estime" name="montant_estime" type="number" step="0.01" min="0"
                                 value="{{ old('montant_estime', $row->montant_estime) }}">
+                            @error('montant_estime') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
                     <div id="finance_fields" class="conditional-block mt-3 {{ $financementRequis === 1 ? '' : 'hidden' }}">
-                        <div>
+                        <div class="form-grid">
+                            <div>
+                                <label for="nature_financement">Nature du financement</label>
+                                <input id="nature_financement" name="nature_financement" type="text"
+                                    value="{{ old('nature_financement', $row->nature_financement) }}"
+                                    placeholder="Ex. fonctionnement, investissement, mission">
+                                @error('nature_financement') <p class="field-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="source_financement">Source de financement</label>
+                                <input id="source_financement" name="source_financement" type="text"
+                                    value="{{ old('source_financement', $row->source_financement) }}"
+                                    placeholder="Ex. budget ANBG, partenaire, projet">
+                                @error('source_financement') <p class="field-error">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+                        <div class="mt-3">
                             <label for="description_financement">Description du besoin de financement</label>
                             <textarea id="description_financement" name="description_financement">{{ old('description_financement', $row->description_financement) }}</textarea>
+                            @error('description_financement') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
                         <div class="mt-3">
                             <label for="justificatif_financement">Pièce justificative</label>
@@ -552,6 +580,15 @@
                 <div class="md:col-span-2">
                     <label>Libellé</label>
                     <input name="sous_actions[__INDEX__][libelle]" type="text" value="">
+                </div>
+                <div>
+                    <label>RMO en charge</label>
+                    <select name="sous_actions[__INDEX__][agent_id]" data-sub-action-agent-select>
+                        <option value="">RMO principal</option>
+                        @foreach ($responsableOptions as $user)
+                            <option value="{{ $user->id }}">{{ $user->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div>
                     <label>Date de début</label>
@@ -723,6 +760,39 @@
             var remove = row.querySelector('[data-remove-sub-action]');
             if (remove) remove.classList.toggle('hidden', index === 0);
         });
+        syncSubActionAgentOptions();
+    }
+
+    function selectedRmoIds() {
+        return rmoSelects()
+            .map(function (select) { return select.value; })
+            .filter(function (value, index, values) { return value && values.indexOf(value) === index; });
+    }
+
+    function syncSubActionAgentOptions() {
+        var allowed = selectedRmoIds();
+        if (!subActionsList || !allowed.length) return;
+
+        subActionsList.querySelectorAll('[data-sub-action-agent-select]').forEach(function (select, index) {
+            var current = select.value;
+            Array.prototype.forEach.call(select.options, function (option, index) {
+                if (index === 0) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    return;
+                }
+
+                var visible = allowed.indexOf(option.value) !== -1;
+                option.hidden = !visible;
+                option.disabled = !visible;
+            });
+
+            if (current && allowed.indexOf(current) === -1) {
+                select.value = allowed[0] || '';
+            } else if (!current) {
+                select.value = allowed[index % allowed.length] || '';
+            }
+        });
     }
 
     function addSubActionRow() {
@@ -746,6 +816,7 @@
         }
 
         refreshSubActionRows();
+        syncSubActionAgentOptions();
     }
 
     function syncThresholdMode() {
@@ -857,14 +928,23 @@
         if (kpiRmoLabel) {
             kpiRmoLabel.textContent = first ? first.textContent.trim() : 'Aucun agent sélectionné';
         }
+
+        syncSubActionAgentOptions();
     }
 
     function syncFinanceFields() {
         if (!financementSelect || !financeFields) return;
         var show_finance = financementSelect.value === '1';
+        var amountField = document.getElementById('montant_estime');
+        if (amountField) {
+            amountField.required = show_finance;
+        }
         financeFields.classList.toggle('hidden', !show_finance);
         financeFields.querySelectorAll('input, textarea').forEach(function (f) {
             if (f.type !== 'hidden') f.disabled = !show_finance;
+            if (f.id === 'nature_financement') {
+                f.required = show_finance;
+            }
         });
     }
 
@@ -896,6 +976,22 @@
                 refreshSubActionRows();
             }
         }
+    }
+
+    function revealValidationErrors() {
+        var errors = document.querySelectorAll('.field-error');
+        if (!errors.length) return;
+
+        show(actionSection);
+        show(resourcesSection);
+        show(formActions);
+
+        errors.forEach(function (error) {
+            var hiddenParent = error.closest('.hidden');
+            if (hiddenParent) {
+                hiddenParent.classList.remove('hidden');
+            }
+        });
     }
 
     // ── Écouteurs ────────────────────────────────────────────────────────────
@@ -945,6 +1041,7 @@
     syncAutresRessources();
     syncThresholdMode();
     syncTargetType();
+    revealValidationErrors();
 })();
 </script>
 @endpush

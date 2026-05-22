@@ -102,15 +102,6 @@
                 'badge_tone' => 'success',
             ],
             [
-                'label' => 'Qualité',
-                'value' => number_format((float) ($kpiSummary['qualite'] ?? 0), 1, ',', ' '),
-                'meta' => null,
-                'href' => route('workspace.actions.index', ['sort' => 'kpi_qualite_desc']),
-                'valueClass' => 'showcase-kpi-number text-[#8fc043]',
-                'badge' => null,
-                'badge_tone' => 'success',
-            ],
-            [
                 'label' => 'Progression',
                 'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 1, ',', ' '),
                 'meta' => null,
@@ -280,7 +271,7 @@
                             <div class="mt-3 flex flex-wrap items-center gap-2">
                                 @foreach ([
                                     'kpi_performance' => "Performance d'exécution",
-                                    'kpi_qualite' => 'Qualité',
+                                    'kpi_conformite' => 'Conformité',
                                 ] as $metricKey => $metricLabel)
                                     @php
                                         $metricValue = (float) ($alert['metrics'][$metricKey] ?? 0);

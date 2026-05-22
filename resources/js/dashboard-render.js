@@ -424,10 +424,6 @@ function bootDashboardRender(force = false) {
       return 'kpi_conformite_desc';
     }
 
-    if (normalized.includes('qualite') || normalized.includes('qual')) {
-      return 'kpi_qualite_desc';
-    }
-
     if (normalized.includes('global')) {
       return 'kpi_global_desc';
     }
@@ -1398,7 +1394,6 @@ function bootDashboardRender(force = false) {
       { label: 'Délai',       key: 'delai',       color: '#3996D3' },
       { label: 'Performance', key: 'performance', color: '#16A34A' },
       { label: 'Conformité',  key: 'conformite',  color: '#D97706' },
-      { label: 'Qualité',     key: 'qualite',     color: '#F97316' },
       { label: 'Global',      key: 'global',      color: '#7C3AED' },
     ];
 
@@ -1463,7 +1458,6 @@ function bootDashboardRender(force = false) {
       ['delai', 'Délai'],
       ['performance', 'Performance'],
       ['conformite', 'Conformité'],
-      ['qualite', 'Qualité'],
     ];
 
     definitions.forEach(([key, label]) => {
@@ -1807,9 +1801,84 @@ function bootDashboardRender(force = false) {
     }, 90);
   }
 
+  function bindSynthesisSelectors() {
+    const selectors = Array.from(document.querySelectorAll('[data-dashboard-synthesis-selector]'));
+
+    if (selectors.length === 0) {
+      return;
+    }
+
+    const closeAll = (except = null) => {
+      selectors.forEach((details) => {
+        if (!(details instanceof HTMLDetailsElement) || details === except) {
+          return;
+        }
+
+        details.open = false;
+        const summary = details.querySelector('summary');
+        if (summary instanceof HTMLElement) {
+          summary.setAttribute('aria-expanded', 'false');
+        }
+      });
+    };
+
+    selectors.forEach((details) => {
+      if (!(details instanceof HTMLDetailsElement) || details.dataset.synthesisBound === '1') {
+        return;
+      }
+
+      details.dataset.synthesisBound = '1';
+      const summary = details.querySelector('summary');
+
+      if (summary instanceof HTMLElement) {
+        summary.setAttribute('aria-haspopup', 'menu');
+        summary.setAttribute('aria-expanded', details.open ? 'true' : 'false');
+
+        summary.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const shouldOpen = !details.open;
+          closeAll(details);
+          details.open = shouldOpen;
+          summary.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+        });
+      }
+
+      details.querySelectorAll('a').forEach((link) => {
+        link.addEventListener('click', () => {
+          details.open = false;
+          if (summary instanceof HTMLElement) {
+            summary.setAttribute('aria-expanded', 'false');
+          }
+        });
+      });
+    });
+
+    if (document.body.dataset.dashboardSynthesisOutsideBound !== '1') {
+      document.body.dataset.dashboardSynthesisOutsideBound = '1';
+
+      document.addEventListener('click', (event) => {
+        if (event.target instanceof Element && event.target.closest('[data-dashboard-synthesis-selector]')) {
+          return;
+        }
+
+        closeAll();
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          closeAll();
+        }
+      });
+    }
+  }
+
   const tabsRoot = document.querySelector('[data-dashboard-tabs]');
 
   if (tabsRoot) {
+    bindSynthesisSelectors();
+
     tabsRoot.querySelectorAll('[data-dashboard-tab]').forEach((button) => {
       button.addEventListener('click', (event) => {
         const targetKey = panelAliases[button.getAttribute('data-dashboard-tab')] || button.getAttribute('data-dashboard-tab');

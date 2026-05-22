@@ -306,7 +306,7 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="app-table-wrapper">
+                        <div class="app-table-wrapper overflow-x-auto">
                             <table id="{{ $synthesisTableId }}" class="app-table data-table dashboard-synthesis-table">
                                 <thead>
                                     <tr>

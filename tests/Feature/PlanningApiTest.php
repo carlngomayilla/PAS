@@ -483,7 +483,6 @@ class PlanningApiTest extends TestCase
                     'delai',
                     'performance',
                     'conformite',
-                    'qualite',
                     'global',
                     'progression',
                 ],
@@ -491,7 +490,7 @@ class PlanningApiTest extends TestCase
                 'alertes',
             ]);
 
-        $reportingResponse->assertJsonPath('kpi_summary.qualite', fn ($value) => is_numeric($value));
+        $reportingResponse->assertJsonPath('kpi_summary.conformite', fn ($value) => is_numeric($value));
 
         $auditResponse = $this->withHeader('Authorization', "Bearer {$token}")
             ->getJson('/api/v1/journal-audit');

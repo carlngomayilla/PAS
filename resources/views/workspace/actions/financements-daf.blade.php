@@ -93,7 +93,7 @@
                 <span class="anbg-badge anbg-badge-info px-3 py-1 text-xs">{{ $rows->total() }} demande(s)</span>
             </div>
 
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead>
                         <tr>

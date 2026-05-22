@@ -319,14 +319,13 @@ class WebWorkspaceTest extends TestCase
                     'delai',
                     'performance',
                     'conformite',
-                    'qualite',
                     'global',
                     'progression',
                 ],
                 'items',
                 'center_url',
             ])
-            ->assertJsonPath('kpi_summary.qualite', fn ($value) => is_numeric($value));
+            ->assertJsonPath('kpi_summary.conformite', fn ($value) => is_numeric($value));
 
         $response->assertJsonPath('summary.total', (int) ($expectedSummary['total'] ?? 0));
         $response->assertJsonPath('summary.unread', (int) ($expectedSummary['unread'] ?? 0));
@@ -619,7 +618,7 @@ class WebWorkspaceTest extends TestCase
         $html = view('workspace.monitoring.reporting-pdf', $payload)->render();
 
         $this->assertStringContainsString("Performance d'exécution (%)", $html);
-        $this->assertStringContainsString('Qualité / conformité (%)', $html);
+        $this->assertStringContainsString('Conformité (%)', $html);
         $this->assertStringContainsString('Avancement réel (%)', $html);
         $this->assertStringNotContainsString('Indicateur risque (%)', $html);
         $this->assertStringNotContainsString('Indicateur global (%)', $html);

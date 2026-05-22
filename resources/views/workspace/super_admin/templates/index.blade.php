@@ -48,7 +48,7 @@
     </section>
 
     <section class="showcase-panel mb-4">
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead><tr><th>Nom</th><th>Format</th><th>Module</th><th>Profil</th><th>Niveau</th><th>Statut</th><th>Affectations</th><th>Versions</th><th>Actions</th></tr></thead>
                 <tbody>

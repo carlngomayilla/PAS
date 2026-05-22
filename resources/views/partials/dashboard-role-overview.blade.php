@@ -187,7 +187,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead><tr><th>Action</th><th>PTA</th><th>Échéance</th><th>Statut</th><th>Progression</th><th>Validation</th></tr></thead>
                     <tbody>
@@ -217,7 +217,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead><tr><th>Action</th><th>Agent</th><th>Date soumission</th><th>Statut</th><th>Progression</th><th>Retard</th></tr></thead>
                     <tbody>
@@ -247,7 +247,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} services</span>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead><tr><th>Service</th><th>Actions</th><th>Achevées</th><th>Retard</th><th>Validées</th><th>Score</th></tr></thead>
                     <tbody>
@@ -277,7 +277,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} directions</span>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead><tr><th>Direction</th><th>Actions</th><th>Validées</th><th>Exéc.</th><th>Taux validation</th><th>Retards</th><th>Score</th></tr></thead>
                     <tbody>
@@ -308,7 +308,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} directions</span>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead><tr><th>Direction</th><th>Actions</th><th>Achevées</th><th>Retard</th><th>Validées</th><th>Score</th></tr></thead>
                     <tbody>
@@ -338,7 +338,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Responsable</th><th>Validation</th><th>Soumise le</th></tr></thead>
                     <tbody>
@@ -376,7 +376,7 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead><tr><th>Action</th><th>Échéance</th><th>Retard</th><th>Progression</th><th>Validation</th><th>Accès</th></tr></thead>
                 <tbody>
@@ -406,7 +406,7 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} agents</span>
         </div>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead><tr><th>Agent</th><th>Actions</th><th>Achevées</th><th>Retard</th><th>Taux exécution</th></tr></thead>
                 <tbody>
@@ -435,7 +435,7 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead><tr><th>Action</th><th>Service</th><th>Responsable</th><th>Retard</th><th>Validation</th><th>Performance d'exécution</th><th>Accès</th></tr></thead>
                 <tbody>
@@ -466,7 +466,7 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead><tr><th>Direction</th><th>Service critique</th><th>Retard</th><th>Taux validation</th><th>Score</th></tr></thead>
                 <tbody>
@@ -495,7 +495,7 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Performance d'exécution</th></tr></thead>
                 <tbody>
@@ -525,7 +525,7 @@
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Retard</th><th>Validation</th><th>Performance d'exécution</th><th>Accès</th></tr></thead>
                 <tbody>

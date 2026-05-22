@@ -35,10 +35,9 @@ final class UiLabel
         return match ($key) {
             'delai' => 'Délai',
             'performance' => "Performance d'exécution",
-            'conformite' => 'Qualité / conformité',
-            'qualite' => 'Qualité / conformité',
+            'conformite' => 'Conformité',
             'risque' => 'Point de vigilance',
-            'global' => "Performance d'exécution",
+            'global' => "Performance d'execution",
             'moyen' => 'Score de suivi moyen',
             default => trim(self::object('kpi') . ' ' . str_replace('_', ' ', $key)),
         };
@@ -88,6 +87,7 @@ final class UiLabel
             'non_soumise' => 'Non soumise',
             'soumise_chef' => 'Soumise service',
             'rejetee_chef' => 'Rejetée service',
+            'correction_demandee' => 'Correction demandée',
             'validee_chef' => 'Validée service',
             'rejetee_direction' => 'Rejetée direction',
             'validee_direction' => 'Validée',

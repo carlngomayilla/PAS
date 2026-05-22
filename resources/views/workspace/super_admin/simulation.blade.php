@@ -86,7 +86,7 @@
 
         <section class="ui-card">
             <h2>Comparaison détaillée</h2>
-            <div class="app-table-wrapper mt-4">
+            <div class="app-table-wrapper overflow-x-auto mt-4">
                 <table class="app-table data-table">
                     <thead>
                         <tr>
@@ -126,7 +126,7 @@
             </article>
             <article class="ui-card !mb-0">
                 <h2>Aperçu exports</h2>
-                <div class="app-table-wrapper mt-4">
+                <div class="app-table-wrapper overflow-x-auto mt-4">
                     <table class="app-table data-table">
                         <thead><tr><th>Format</th><th>Template</th><th>Niveau</th><th>Meta</th></tr></thead>
                         <tbody>

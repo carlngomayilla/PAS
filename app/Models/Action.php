@@ -175,6 +175,7 @@ class Action extends Model
             'soumise_le' => 'datetime',
             'evalue_le' => 'datetime',
             'evaluation_note' => 'decimal:2',
+            'taux_valide_chef' => 'decimal:2',
             'direction_valide_le' => 'datetime',
             'direction_evaluation_note' => 'decimal:2',
             'cloture_le' => 'datetime',
@@ -466,9 +467,9 @@ class Action extends Model
      *   - taux_global                : alias historique = progression_reelle
      *   - taux_atteinte_cible        : taux quantitatif quantite_realisee/cible
      *   - avancement_operationnel    : taux sous-actions completees / total
-     *   - taux_performance           : KPI execution (different : pondere delai/qualite)
+     *   - taux_performance           : KPI execution (different : pondere delai/conformite)
      *   - taux_delai                 : KPI delai pur
-     *   - taux_conformite            : KPI qualite (alias)
+     *   - taux_conformite            : KPI conformite
      *
      * **Le code metier doit consommer authoritativeProgress() ci-dessous** :
      * en cas de drift entre les colonnes (race condition, recalcul partiel), on

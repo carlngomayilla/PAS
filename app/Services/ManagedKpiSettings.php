@@ -113,26 +113,6 @@ class ManagedKpiSettings
                 'target_service_ids' => [],
             ],
             [
-                'code' => 'qualite',
-                'label' => 'Qualité',
-                'description' => 'Qualité moyenne des livrables et de l’exécution.',
-                'weight' => 15,
-                'green_threshold' => 85,
-                'orange_threshold' => 65,
-                'visible' => true,
-                'source_metric' => 'qualite',
-                'formula_mode' => 'direct',
-                'secondary_metric' => null,
-                'tertiary_metric' => null,
-                'secondary_weight' => 0,
-                'tertiary_weight' => 0,
-                'target_value' => null,
-                'adjustment' => 0,
-                'target_profiles' => [],
-                'target_direction_ids' => [],
-                'target_service_ids' => [],
-            ],
-            [
                 'code' => 'global',
                 'label' => 'Score de suivi',
                 'description' => 'Synthese composite du portefeuille statistique.',
@@ -295,7 +275,6 @@ class ManagedKpiSettings
             'delai' => 'Délai',
             'performance' => 'Performance d execution',
             'conformite' => 'Conformité',
-            'qualite' => 'Qualité',
             'global' => 'Score de suivi',
             'progression' => 'Progression',
         ];
@@ -372,7 +351,7 @@ class ManagedKpiSettings
      */
     private function sanitizeDefinitions(iterable $rows): array
     {
-        $allowedCodes = ['delai', 'performance', 'conformite', 'qualite', 'global', 'progression'];
+        $allowedCodes = ['delai', 'performance', 'conformite', 'global', 'progression'];
         $allowedProfiles = array_values(array_filter([
             User::ROLE_AGENT,
             User::ROLE_SERVICE,

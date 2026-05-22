@@ -4,20 +4,25 @@ namespace App\Services;
 
 use App\Models\Action;
 use App\Models\SousAction;
+use App\Services\Actions\ActionStatusService;
 use App\Services\Actions\ActionTrackingService;
 use Illuminate\Support\Carbon;
 
 class ActionPerformanceService
 {
+    public function __construct(
+        private readonly ActionStatusService $actionStatusService
+    ) {
+    }
+
     /**
      * @return array<string, int>
      */
     public function officialWeights(): array
     {
         return [
-            'real_progress' => 70,
+            'real_progress' => 80,
             'delay' => 20,
-            'quality' => 10,
         ];
     }
 
@@ -81,25 +86,43 @@ class ActionPerformanceService
 
     public function calculateQualityScore(Action $action): float
     {
-        if (! $this->hasQualityEvidence($action)) {
+        return $this->calculateConformityScore($action);
+    }
+
+    /**
+     * KPI Conformité = note brute /100 attribuée par le chef de service
+     * (ou par la direction lors de la validation finale).
+     *
+     * - Rejet chef ou direction => 0 (l'action n'est pas conforme).
+     * - Validation chef/direction => note brute du validateur (0-100).
+     * - Soumise au chef, en attente d'évaluation => 0 (pas encore noté).
+     * - Sinon => 0.
+     *
+     * L'UI applique un badge 3 niveaux (Faible / Moyen / Élevé) via
+     * {@see \App\Support\KpiLevel}.
+     */
+    public function calculateConformityScore(Action $action): float
+    {
+        $validationStatus = (string) ($action->statut_validation ?? '');
+
+        if (in_array($validationStatus, [
+            ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+        ], true)) {
             return 0.0;
         }
 
-        $note = $action->direction_evaluation_note ?? $action->evaluation_note;
-        if ($note !== null) {
-            return $this->qualityScoreFromNote((float) $note);
+        if (in_array($validationStatus, [
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
+            $note = $action->direction_evaluation_note ?? $action->evaluation_note;
+
+            return $note !== null ? $this->boundRate((float) $note) : 0.0;
         }
 
-        if ((bool) $action->validation_sans_correction) {
-            return 100.0;
-        }
-
-        return match ($this->normalizeStatus($action)) {
-            'validee', 'cloturee' => 100.0,
-            'en_attente_validation' => 80.0,
-            'rejetee' => 40.0,
-            default => 0.0,
-        };
+        return 0.0;
     }
 
     public function calculateExecutionPerformance(Action $action, ?Carbon $referenceDate = null): float
@@ -111,9 +134,8 @@ class ActionPerformanceService
         }
 
         $delayScore = $this->calculateDelayScore($action, $referenceDate);
-        $qualityScore = $this->calculateQualityScore($action);
 
-        $performance = ($progress * 0.70) + ($delayScore * 0.20) + ($qualityScore * 0.10);
+        $performance = ($progress * 0.80) + ($delayScore * 0.20);
 
         return round($this->boundRate($performance), 2);
     }
@@ -128,6 +150,7 @@ class ActionPerformanceService
         if (in_array($validationStatus, [
             ActionTrackingService::VALIDATION_REJETEE_CHEF,
             ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
         ], true)) {
             return 'rejetee';
         }
@@ -222,47 +245,7 @@ class ActionPerformanceService
 
     private function hasRealExecution(Action $action): bool
     {
-        return $this->realizedQuantity($action) > 0.0
-            || $this->subActions($action)->contains(fn (SousAction $subAction): bool => $this->isCompletedSubAction($subAction));
-    }
-
-    private function hasQualityEvidence(Action $action): bool
-    {
-        if ($this->calculateRealProgress($action) > 0.0) {
-            return true;
-        }
-
-        if (in_array((string) ($action->statut_validation ?? ''), [
-            ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
-        ], true)) {
-            return true;
-        }
-
-        if ($action->relationLoaded('justificatifs') && $action->justificatifs->isNotEmpty()) {
-            return true;
-        }
-
-        if ($action->relationLoaded('sousActions')) {
-            return $action->sousActions
-                ->contains(fn (SousAction $subAction): bool => $subAction->relationLoaded('justificatifs') && $subAction->justificatifs->isNotEmpty());
-        }
-
-        return false;
-    }
-
-    private function qualityScoreFromNote(float $note): float
-    {
-        $note = $this->boundRate($note);
-
-        return match (true) {
-            $note >= 90.0 => 100.0,
-            $note >= 75.0 => 80.0,
-            $note >= 50.0 => 60.0,
-            $note > 0.0 => 40.0,
-            default => 0.0,
-        };
+        return $this->actionStatusService->isStarted($action);
     }
 
     public function boundRate(float $value): float

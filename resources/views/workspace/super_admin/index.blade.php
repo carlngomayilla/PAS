@@ -70,7 +70,7 @@
 
     <section class="showcase-panel mb-4">
         <h2>Historique récent</h2>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead><tr><th class="px-3 py-2 text-left">Date</th><th class="px-3 py-2 text-left">Utilisateur</th><th class="px-3 py-2 text-left">Module</th><th class="px-3 py-2 text-left">Action</th></tr></thead>
                 <tbody>

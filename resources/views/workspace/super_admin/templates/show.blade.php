@@ -72,7 +72,7 @@
     <section class="grid gap-3 lg:grid-cols-2 mb-3.5">
         <article class="ui-card !mb-0">
             <div class="flex items-center justify-between gap-3"><h2>Affectations</h2><span class="text-sm text-slate-500">{{ $template->assignments->count() }} affectation(s)</span></div>
-            <div class="app-table-wrapper mt-4">
+            <div class="app-table-wrapper overflow-x-auto mt-4">
                 <table class="app-table data-table">
                     <thead><tr><th>Profil</th><th>Niveau</th><th>Périmètre</th><th>État</th><th>Action</th></tr></thead>
                     <tbody>
@@ -121,7 +121,7 @@
 
     <section class="showcase-panel mb-4">
         <h2>Versions</h2>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead><tr><th>Version</th><th>Statut</th><th>Note</th><th>Auteur</th><th>Date</th><th>Snapshot</th><th>Action</th></tr></thead>
                 <tbody>

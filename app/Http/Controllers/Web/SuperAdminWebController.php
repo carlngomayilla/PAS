@@ -15,6 +15,7 @@ use App\Models\Service;
 use App\Models\User;
 use App\Services\AppearanceSettings;
 use App\Services\ActionCalculationSettings;
+use App\Services\Actions\ActionTrackingService;
 use App\Services\ActionManagementSettings;
 use App\Services\DashboardProfileSettings;
 use App\Services\DocumentPolicySettings;
@@ -2197,9 +2198,25 @@ class SuperAdminWebController extends Controller
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
 
+        /** @var array{actions_official_validation_status:string} $validated */
+        $validated = $request->validate([
+            'actions_official_validation_status' => [
+                'required',
+                Rule::in(array_merge(
+                    array_keys($this->actionCalculationSettings->officialValidationStatusOptions()),
+                    [
+                        ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                        ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                        ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+                    ]
+                )),
+            ],
+        ]);
+
         $before = $this->actionCalculationSettings->all();
         $after = $this->actionCalculationSettings->updateStatisticalPolicy([
-            'actions_statistical_scope' => ActionCalculationSettings::STATISTICAL_SCOPE_ALL_VISIBLE,
+            ActionCalculationSettings::SETTING_ACTIONS_STATISTICAL_SCOPE => $validated['actions_official_validation_status'],
+            ActionCalculationSettings::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => $validated['actions_official_validation_status'],
         ], $user);
         $auditTarget = PlatformSetting::query()
             ->where('group', 'action_calculation')
@@ -2799,7 +2816,7 @@ class SuperAdminWebController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'direction_id' => 'Les profils direction, service et agent sont reserves aux directions DAF, DSIQ/DSIC et DS.',
+            'direction_id' => 'Les profils direction, service et agent sont reserves aux directions DAF, DSIC et DS.',
         ]);
     }
 
@@ -2808,7 +2825,7 @@ class SuperAdminWebController extends Controller
      */
     private function operationalDirectionCodes(): array
     {
-        return ['DAF', 'DSIQ', 'DSIC', 'DS'];
+        return ['DAF', 'DSIC', 'DS'];
     }
 
     /**

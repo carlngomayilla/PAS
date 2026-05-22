@@ -115,7 +115,7 @@
             </div>
             <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead>
                     <tr>
@@ -147,12 +147,12 @@
                                     || ($currentUser->hasRole(\App\Models\User::ROLE_DIRECTION)
                                         && (int) $currentUser->direction_id === (int) $row->direction_id));
                             $canApprove = $row->statut === 'soumis'
-                                && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_DG);
+                                && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG);
                             $canLock = $row->statut === 'valide'
-                                && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_DG);
+                                && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG);
                             $canReopen = in_array($row->statut, ['soumis', 'valide'], true)
                                 && (
-                                    $currentUser->hasRole(\App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_DG)
+                                    $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG)
                                     || ($row->statut === 'soumis'
                                         && ($currentUser->hasGlobalWriteAccess()
                                             || ($currentUser->hasRole(\App\Models\User::ROLE_DIRECTION)

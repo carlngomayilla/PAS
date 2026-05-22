@@ -967,7 +967,7 @@ class PtaWebController extends Controller
             return;
         }
 
-        foreach ($subActionsPayload as $subActionPayload) {
+        foreach ($subActionsPayload as $subActionIndex => $subActionPayload) {
             if (! is_array($subActionPayload)) {
                 continue;
             }
@@ -988,7 +988,7 @@ class PtaWebController extends Controller
                 : null;
 
             $payload = [
-                'agent_id' => (int) ($subAction?->agent_id ?: $defaultAgentId),
+                'agent_id' => $this->resolveSubActionAgentId($subActionPayload, $subAction, $rmoIds, (int) $defaultAgentId, (int) $subActionIndex),
                 'libelle' => $label,
                 'description' => ($value = trim((string) ($subActionPayload['description'] ?? ''))) !== '' ? $value : null,
                 'resultat_attendu' => ($value = trim((string) ($subActionPayload['resultat_attendu'] ?? ''))) !== '' ? $value : null,
@@ -1020,6 +1020,35 @@ class PtaWebController extends Controller
     private function nullableFloat(mixed $value): ?float
     {
         return $value === null || $value === '' ? null : (float) $value;
+    }
+
+    /**
+     * @param array<string, mixed> $subActionPayload
+     * @param list<int> $rmoIds
+     */
+    private function resolveSubActionAgentId(array $subActionPayload, ?SousAction $subAction, array $rmoIds, int $defaultAgentId, int $subActionIndex = 0): int
+    {
+        $allowedAgentIds = collect($rmoIds)
+            ->push($defaultAgentId)
+            ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        $submittedAgentId = isset($subActionPayload['agent_id']) && is_numeric($subActionPayload['agent_id'])
+            ? (int) $subActionPayload['agent_id']
+            : 0;
+
+        if ($submittedAgentId > 0 && $allowedAgentIds->contains($submittedAgentId)) {
+            return $submittedAgentId;
+        }
+
+        $existingAgentId = (int) ($subAction?->agent_id ?? 0);
+        if ($existingAgentId > 0 && $allowedAgentIds->contains($existingAgentId)) {
+            return $existingAgentId;
+        }
+
+        return (int) ($allowedAgentIds->get($subActionIndex % max(1, $allowedAgentIds->count())) ?: $defaultAgentId);
     }
 
     /**
@@ -1209,4 +1238,3 @@ class PtaWebController extends Controller
         return app(WorkflowSettings::class)->planningWorkflowSummary('pta');
     }
 }
-

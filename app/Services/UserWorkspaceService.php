@@ -30,8 +30,8 @@ class UserWorkspaceService
             || $hasDelegatedPlanningWrite;
         $canWriteService = ($user->hasRole(User::ROLE_SERVICE) && $user->hasPermission('planning.write.service'))
             || $hasDelegatedPlanningWrite;
-        $isAgent = $user->isAgent() || $user->hasRole(User::ROLE_UCAS);
-        $hasOwnExecutionSpace = $isAgent || $user->hasRole(User::ROLE_SCIQ, User::ROLE_COLLABORATEUR, User::ROLE_CABINET);
+        $isAgent = $user->isAgent();
+        $hasOwnExecutionSpace = $isAgent || $user->hasRole(User::ROLE_PLANIFICATION, User::ROLE_DG);
         $canWriteOperational = $canWriteGlobal || $canWriteDirection || $canWriteService;
         $canManageActions = $canWriteOperational && ! $isAgent;
         $canReadReferentiel = $user->hasAnyPermission('referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles');
@@ -45,25 +45,19 @@ class UserWorkspaceService
         $canReadReporting = ($canReadPlanning || $isAgent) && $user->hasPermission('reporting.read');
         $canReadAlerts = $canReadPlanning && $user->hasPermission('alerts.read');
         $canUseMessaging = $user->hasPermission('messagerie.read');
-        $isTechnicalAdmin = $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN);
+        $isTechnicalAdmin = $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL);
         // Admin fonctionnel et SCIQ suivi global ont un rôle proche de Planification
         // pour la gestion des référentiels métier.
-        $isPlanification = $user->hasRole(
-            User::ROLE_PLANIFICATION,
-            User::ROLE_SCIQ,
-            User::ROLE_ADMIN_FONCTIONNEL,
-            User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_UNITE_SCIQ,
-        );
-        // Cabinet et ses variantes (supervision DGA/Cabinet, auditeur) peuvent voir l'audit.
-        $isCabinet = $user->hasRole(
-            User::ROLE_CABINET,
-            User::ROLE_COLLABORATEUR,
-            User::ROLE_CABINET_SUPERVISION,
-            User::ROLE_DGA_SUPERVISION,
-            User::ROLE_CHEF_UNITE_DGA,
-            User::ROLE_CHEF_UNITE_CABINET,
+        $isPlanification = $user->hasRole(User::ROLE_PLANIFICATION, User::ROLE_ADMIN_FONCTIONNEL);
+        // Auditeurs et superviseurs (Cabinet, DG, DGA) peuvent consulter l'audit
+        // dès lors qu'ils ont la permission `audit.read`. On garde un fallback
+        // role-based pour la rétrocompatibilité, mais la permission prime.
+        $isAuditor = $user->hasRole(
             User::ROLE_AUDITEUR,
+            User::ROLE_DG,
+            User::ROLE_CABINET,
+            User::ROLE_CABINET_SUPERVISION,
+            User::ROLE_DGA_SUPERVISION
         );
 
         $modules = [[
@@ -87,9 +81,9 @@ class UserWorkspaceService
         }
 
         $isServiceOnly = $user->hasRole(User::ROLE_SERVICE)
-            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_CABINET, User::ROLE_COLLABORATEUR);
+            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_DG, User::ROLE_PLANIFICATION);
         $isDirectionOnly = $user->hasRole(User::ROLE_DIRECTION)
-            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_CABINET, User::ROLE_COLLABORATEUR);
+            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_DG, User::ROLE_PLANIFICATION);
 
         if ($canReadPlanning && ! $isServiceOnly && ! $isDirectionOnly) {
             $modules[] = [
@@ -180,7 +174,11 @@ class UserWorkspaceService
             ];
         }
 
-        if ($canReadReferentiel && ($isTechnicalAdmin || $isPlanification)) {
+        // Le module Référentiel devient permission-based : tout profil ayant
+        // au moins une permission `referentiel.*` ou `users.*` y a accès. Le
+        // niveau d'écriture est ensuite gradué par `canWriteReferentiel` /
+        // `canManageUsers`.
+        if ($canReadReferentiel) {
             $modules[] = [
                 'code' => 'referentiel',
                 'label' => 'Référentiels',
@@ -193,7 +191,11 @@ class UserWorkspaceService
             ];
         }
 
-        if ($canReadAudit && ($isTechnicalAdmin || $isCabinet)) {
+        // Le module Audit devient permission-based : la permission
+        // `audit.read` suffit. Le filtre isAuditor reste comme garde-fou
+        // organisationnel pour les profils qui auraient la permission par
+        // erreur de configuration (sécurité en profondeur).
+        if ($canReadAudit) {
             $modules[] = [
                 'code' => 'audit',
                 'label' => 'Journal Audit',
@@ -226,7 +228,10 @@ class UserWorkspaceService
             ];
         }
 
-        if ($canManageDelegations && ($isTechnicalAdmin || $isPlanification || $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE))) {
+        // Délégations : la permission `delegations.manage` suffit. Le filtre
+        // role précédent excluait SCIQ et chef_unite_sciq qui ont pourtant
+        // cette permission dans la matrice (rôles métier de pilotage).
+        if ($canManageDelegations) {
             $modules[] = [
                 'code' => 'delegations',
                 'label' => 'Délégations',

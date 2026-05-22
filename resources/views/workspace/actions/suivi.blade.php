@@ -7,6 +7,16 @@
         $validationStatusLabel = static fn (string $status): string => \App\Support\UiLabel::validationStatus($status);
         $kpi = $action->actionKpi;
         $status = $action->statut_dynamique ?: 'non_demarre';
+        $conformiteEvaluated = in_array((string) ($action->statut_validation ?? ''), [
+            \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+        ], true);
+        $conformiteBadge = \App\Support\KpiLevel::conformiteLevel(
+            $kpi?->kpi_conformite !== null ? (float) $kpi->kpi_conformite : null,
+            $conformiteEvaluated
+        );
         $pta = $action->pta;
         $pao = $action->pao ?: $pta?->pao;
         $pas = $pao?->pas;
@@ -63,10 +73,12 @@
         ];
         $agentLocked = auth()->check()
             && (int) auth()->id() === (int) $action->responsable_id
-            && !in_array($validationStatus, ['non_soumise', 'rejetee_chef', 'rejetee_direction'], true);
+            && !in_array($validationStatus, ['non_soumise', 'correction_demandee', 'rejetee_chef', 'rejetee_direction'], true);
         $isAwaitingChef = $workflow['service_enabled'] && $validationStatus === 'soumise_chef';
-        $isAwaitingDirection = false;
-        $isValidatedDirection = $validationStatus === 'validee_direction';
+        // L'etape « validation direction » a ete supprimee du circuit metier.
+        // Les statuts `validee_direction` / `rejetee_direction` ne sont
+        // conserves qu'en lecture historique (actions cloturees avant la
+        // suppression). Voir routes/web.php pour les stubs 410.
         $ressources = $action->resourceLabels();
         $financingJustificatif = $action->justificatifs->firstWhere('categorie', 'financement');
         $rmoNames = $action->relationLoaded('responsables')
@@ -106,6 +118,7 @@
             'non_soumise' => 'anbg-badge anbg-badge-neutral',
             'soumise_chef' => 'anbg-badge anbg-badge-warning',
             'rejetee_chef' => 'anbg-badge anbg-badge-danger',
+            'correction_demandee' => 'anbg-badge anbg-badge-warning',
             'validee_chef' => 'anbg-badge anbg-badge-info',
             'rejetee_direction' => 'anbg-badge anbg-badge-danger',
             'validee_direction' => 'anbg-badge anbg-badge-success',
@@ -225,7 +238,13 @@
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Performance d'exécution</p>
             <p class="showcase-kpi-number">{{ number_format((float) ($kpi?->kpi_performance ?? 0), 1) }}%</p>
-            <p class="showcase-kpi-meta">Délai {{ number_format((float) ($kpi?->kpi_delai ?? 0), 1) }} | Qualité / conformité {{ number_format((float) ($kpi?->kpi_qualite ?? 0), 1) }}</p>
+            <p class="showcase-kpi-meta">
+                Délai {{ number_format((float) ($kpi?->kpi_delai ?? 0), 1) }} |
+                Conformité
+                <span class="anbg-badge anbg-badge-{{ $conformiteBadge['tone'] }} ml-1 px-2 py-0.5 text-[11px]">
+                    {{ $conformiteBadge['label'] }} ({{ number_format($conformiteBadge['score'], 1) }})
+                </span>
+            </p>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Sous-actions suivies</p>
@@ -240,7 +259,7 @@
             <article class="showcase-inline-stat action-detail-card">
                 <h3 class="form-section-title">Étape 1 — Soumission agent</h3>
                 <p class="mt-2 text-slate-600 flex flex-wrap items-center gap-2">Statut :
-                    @if (in_array($validationStatus, ['non_soumise', 'rejetee_chef', 'rejetee_direction'], true))
+                    @if (in_array($validationStatus, ['non_soumise', 'correction_demandee', 'rejetee_chef', 'rejetee_direction'], true))
                         <span class="anbg-badge anbg-badge-warning px-3">À corriger</span>
                     @else
                         <span class="anbg-badge anbg-badge-success px-3">Effectuée</span>
@@ -263,6 +282,48 @@
             <p class="mt-2 text-sm text-[#f9b13c]">Motif rejet chef : <strong>{{ $action->evaluation_commentaire ?: '-' }}</strong></p>
         @elseif ($validationStatus === 'rejetee_direction')
             <p class="mt-2 text-sm text-[#f9b13c]">Motif rejet direction : <strong>{{ $action->direction_evaluation_commentaire ?: '-' }}</strong></p>
+        @endif
+
+        @php
+            $closureResubmitStates = ['non_soumise', 'correction_demandee', 'rejetee_chef', 'rejetee_direction'];
+            $isResponsible = auth()->check() && (int) auth()->id() === (int) $action->responsable_id;
+            $canRequestClosure = auth()->check()
+                && ($isResponsible || (! auth()->user()?->isAgent() && ($canManageAction ?? false)))
+                && in_array($validationStatus, $closureResubmitStates, true)
+                && in_array((string) $action->statut, ['en_cours', 'termine'], true)
+                && ($action->pta?->statut !== 'verrouille');
+            $closureButtonLabel = in_array($validationStatus, ['rejetee_chef', 'rejetee_direction', 'correction_demandee'], true)
+                ? 'Re-soumettre au chef de service'
+                : 'Demander la cloture au chef de service';
+        @endphp
+        @if ($canRequestClosure)
+            <div id="action-submit-closure" class="mt-4 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm">
+                <h3 class="form-section-title">Demande de cloture</h3>
+                <p class="mb-2 text-sm text-slate-600">
+                    Quand votre travail est abouti, soumettez l'action au chef de service. Vous pouvez
+                    joindre un rapport final synthetique et la date de fin reelle si differente de celle
+                    planifiee. Les deux champs sont optionnels.
+                </p>
+                <form method="POST" action="{{ route('workspace.actions.submit-closure', $action) }}">
+                    @csrf
+                    <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+                        <div>
+                            <label for="date_fin_reelle">Date de fin reelle (optionnel)</label>
+                            <input id="date_fin_reelle" name="date_fin_reelle" type="date"
+                                value="{{ old('date_fin_reelle', optional($action->date_fin_reelle)->format('Y-m-d')) }}">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label for="rapport_final">Rapport final synthetique (optionnel)</label>
+                        <textarea id="rapport_final" name="rapport_final" rows="3"
+                            placeholder="Resume des resultats, ecarts notables, decisions prises...">{{ old('rapport_final', $action->rapport_final) }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3"
+                        onclick="return confirm('Confirmer la soumission de cette action au chef de service ?');">
+                        {{ $closureButtonLabel }}
+                    </button>
+                </form>
+            </div>
         @endif
     </section>
 
@@ -507,10 +568,6 @@
                 <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_performance ?? 0), 1, ',', ' ') }}%</p>
             </article>
             <article class="showcase-inline-stat">
-                <strong>{{ $metricLabel('qualite') }}</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_conformite ?? 0), 1, ',', ' ') }}%</p>
-            </article>
-            <article class="showcase-inline-stat">
                 <strong>Validation</strong>
                 <p class="mt-2 dd-badges"><span class="{{ $validationClass }}">{{ $validationLabel }}</span></p>
             </article>
@@ -630,13 +687,23 @@
             <p class="action-section-note mb-3">Cette action est suivie en mode quantitatif. La saisie se fait dans le bloc « Quantité réalisée ».</p>
         @endif
         @if ($usesStructuredProgress)
+        @php
+            $viewerId = (int) auth()->id();
+            $viewerIsAgent = auth()->user()?->isAgent() ?? false;
+        @endphp
         <div class="mb-4 space-y-3">
             @forelse ($action->sousActions as $sousAction)
-                <article class="action-week-card">
+                @php
+                    $isOtherRmo = $viewerIsAgent && (int) $sousAction->agent_id !== $viewerId;
+                @endphp
+                <article class="action-week-card {{ $isOtherRmo ? 'is-other-rmo opacity-60' : '' }}" @if ($isOtherRmo) aria-label="Sous-action d'un autre RMO" @endif>
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <div>
                             <strong>{{ $sousAction->libelle }}</strong>
                             <span class="ml-2 rounded-full bg-[#3996d3]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3996d3]">Sous-action planifiée</span>
+                            @if ($isOtherRmo)
+                                <span class="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600" title="Cette sous-action est rattachée à un autre RMO. Lecture seule.">RMO différent</span>
+                            @endif
                             <p class="text-slate-600">{{ optional($sousAction->date_debut)->format('d/m/Y') }} → {{ optional($sousAction->date_fin)->format('d/m/Y') }}</p>
                             <p class="text-slate-600">Agent : <strong>{{ $sousAction->agent?->name ?? '-' }}</strong></p>
                             <p class="text-slate-600">Statut : <strong>{{ $sousAction->est_effectuee ? 'Effectuée' : 'À faire' }}</strong> | Exécution : <strong>{{ number_format((float) ($sousAction->taux_execution ?? 0), 1, ',', ' ') }}%</strong></p>
@@ -829,74 +896,56 @@
     </section>
     @endif
 
-    @if ($canSubmitClosure)
-        <section id="action-cloture" class="showcase-panel mb-4">
-            <h2 class="showcase-panel-title">Soumission de clôture (Agent)</h2>
-            <form method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.close', $action) }}">
-                @csrf
-                <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                    <div>
-                        <label for="date_fin_reelle">Date de fin réelle</label>
-                        <input id="date_fin_reelle" name="date_fin_reelle" type="date" value="{{ old('date_fin_reelle', optional($action->date_fin_reelle)->format('Y-m-d')) }}" required>
-                    </div>
-                </div>
-                <div>
-                    <label for="rapport_final">Rapport final</label>
-                    <textarea id="rapport_final" name="rapport_final" required>{{ old('rapport_final', $action->rapport_final) }}</textarea>
-                </div>
-                <button class="btn btn-primary mt-2.5" type="submit">
-                    {{ $workflow['submission_button_label'] }}
-                </button>
-            </form>
-        </section>
-    @endif
-
     @if ($canReviewClosure)
         <section id="action-review-chef" class="showcase-panel mb-4">
             <h2 class="showcase-panel-title">Evaluation chef de service</h2>
             @if ($isAwaitingChef)
-                <form method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.review', $action) }}">
+                <form method="POST" action="{{ route('workspace.actions.review', $action) }}">
                     @csrf
                     <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
                         <div>
                             <label for="decision_validation">Decision</label>
                             <select id="decision_validation" name="decision_validation" required>
                                 <option value="valider" @selected(old('decision_validation') === 'valider')>Valider</option>
+                                <option value="demander_correction" @selected(old('decision_validation') === 'demander_correction')>Demander correction</option>
                                 <option value="rejeter" @selected(old('decision_validation') === 'rejeter')>Rejeter</option>
                             </select>
                         </div>
                         <div>
-                            <label for="evaluation_note">Note sur 100</label>
+                            <label for="evaluation_note">Note (%)</label>
                             <input id="evaluation_note" name="evaluation_note" type="number" step="0.01" min="0" max="100" value="{{ old('evaluation_note') }}" required>
-                        </div>
-                        <div>
-                            <label for="validation_sans_correction">Validation sans correction (optionnel)</label>
-                            <select id="validation_sans_correction" name="validation_sans_correction">
-                                <option value="">Non defini</option>
-                                <option value="1" @selected(old('validation_sans_correction') === '1')>Oui</option>
-                                <option value="0" @selected(old('validation_sans_correction') === '0')>Non</option>
-                            </select>
-                        </div>
-                        <div>
-                        <label for="justificatif_evaluation">Justificatif evaluation chef (optionnel)</label>
-                            <input id="justificatif_evaluation" name="justificatif_evaluation" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
                         </div>
                     </div>
                     <div>
-                        <label for="evaluation_commentaire">Commentaire d'evaluation{{ $workflow['rejection_comment_required'] ? ' (obligatoire au rejet)' : '' }}</label>
-                        <textarea id="evaluation_commentaire" name="evaluation_commentaire">{{ old('evaluation_commentaire') }}</textarea>
+                        <label for="evaluation_commentaire">Observation{{ $workflow['rejection_comment_required'] ? ' (obligatoire au rejet ou correction)' : '' }}</label>
+                        <textarea id="evaluation_commentaire" name="evaluation_commentaire" rows="4">{{ old('evaluation_commentaire') }}</textarea>
                     </div>
                     <button class="btn btn-primary mt-2.5" type="submit">
                         {{ $workflow['service_review_button_label'] }}
                     </button>
                 </form>
             @else
-                <x-ui.empty-state
-                    title="Aucune action en attente"
-                    message="Aucune action n'est en attente de revue chef pour le moment."
-                    icon="check"
-                    tone="success"
-                />
+                @if ($canRequestClosure ?? false)
+                    <div class="rounded-2xl border border-[#f9b13c]/40 bg-[#fff7e6] p-4">
+                        <h3 class="form-section-title">L'action n'a pas encore ete soumise</h3>
+                        <p class="mt-1 text-sm text-slate-700">
+                            Statut de validation actuel :
+                            <strong>{{ $validationStatusLabel($validationStatus) }}</strong>.
+                            Vous pouvez forcer la soumission au chef de service (vous-meme) depuis le panneau
+                            <a class="text-[#3996d3] underline" href="#action-submit-closure">« Demande de cloture »</a>
+                            ci-dessus. L'action passera alors en
+                            <strong>« Soumise service »</strong> et ce formulaire d'evaluation deviendra disponible
+                            apres rechargement.
+                        </p>
+                    </div>
+                @else
+                    <x-ui.empty-state
+                        title="Aucune action en attente"
+                        message="Aucune action n'est en attente de revue chef pour le moment."
+                        icon="check"
+                        tone="success"
+                    />
+                @endif
             @endif
         </section>
     @endif
@@ -956,7 +1005,7 @@
         var submitBtn = document.getElementById('discussion-submit');
         var sendingLabel = document.getElementById('discussion-sending');
         var lastLogId = {{ $discussionEntries->last()?->id ?? 0 }};
-        var validTypes = ['commentaire','action_soumise_validation','action_validee_chef','action_rejetee_chef',
+        var validTypes = ['commentaire','action_soumise_validation','action_validee_chef','action_rejetee_chef','action_correction_demandee',
                           'action_validee_direction','action_rejetee_direction','financement_demande',
                           'financement_valide_daf','financement_rejete_daf','financement_accord_dg','financement_refus_dg'];
 
@@ -1103,7 +1152,7 @@
 
     <section id="action-logs" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Journal d'alertes et événements</h2>
-        <div class="app-table-wrapper">
+        <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead>
                     <tr>

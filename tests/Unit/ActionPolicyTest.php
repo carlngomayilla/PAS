@@ -38,7 +38,6 @@ class ActionPolicyTest extends TestCase
         $this->assertTrue($this->policy->viewAny($agent));
         $this->assertTrue($this->policy->view($agent, $action));
         $this->assertTrue($this->policy->submitWeek($agent, $action));
-        $this->assertTrue($this->policy->submitClosure($agent, $action));
         $this->assertTrue($this->policy->comment($agent, $action));
 
         $this->assertFalse($this->policy->update($agent, $action));

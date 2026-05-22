@@ -17,25 +17,18 @@ use App\Services\Analytics\ReportingAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/**
- * Couvre A10 : par defaut la politique de calcul est SCOPE_EXCLUDE_REJECTED.
- * Les actions `rejetee_chef` / `rejetee_direction` doivent etre exclues des
- * agregats consolides (KPI, reporting). Le super-admin peut basculer sur
- * STATISTICAL_SCOPE_ALL_VISIBLE pour retrouver l ancien comportement.
- */
 class KpiExcludeRejectedActionsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_default_policy_is_exclude_rejected(): void
+    public function test_default_policy_requires_direction_validation(): void
     {
         /** @var ActionCalculationSettings $settings */
         $settings = app(ActionCalculationSettings::class);
 
-        $this->assertSame(ActionCalculationSettings::SCOPE_EXCLUDE_REJECTED, $settings->statisticalScope());
-        $this->assertNotEmpty($settings->rejectedValidationStatuses());
-        $this->assertContains(ActionTrackingService::VALIDATION_REJETEE_CHEF, $settings->rejectedValidationStatuses());
-        $this->assertContains(ActionTrackingService::VALIDATION_REJETEE_DIRECTION, $settings->rejectedValidationStatuses());
+        $this->assertSame(ActionCalculationSettings::LEVEL_VALIDATION_DIRECTION, $settings->statisticalScope());
+        $this->assertSame([ActionTrackingService::VALIDATION_VALIDEE_DIRECTION], $settings->statisticalValidationStatuses());
+        $this->assertSame([], $settings->rejectedValidationStatuses());
     }
 
     public function test_rejected_actions_are_excluded_from_consolidated_kpis(): void
@@ -122,7 +115,7 @@ class KpiExcludeRejectedActionsTest extends TestCase
         $this->assertCount(2, $settings->filterStatistical($items));
     }
 
-    public function test_filter_statistical_excludes_rejected_by_default(): void
+    public function test_filter_statistical_keeps_only_direction_validated_by_default(): void
     {
         /** @var ActionCalculationSettings $settings */
         $settings = app(ActionCalculationSettings::class);
@@ -135,9 +128,8 @@ class KpiExcludeRejectedActionsTest extends TestCase
         ]);
 
         $kept = $settings->filterStatistical($items);
-        $this->assertCount(2, $kept);
+        $this->assertCount(1, $kept);
         $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, $kept[0]->statut_validation);
-        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $kept[1]->statut_validation);
     }
 
     /**

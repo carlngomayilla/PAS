@@ -43,7 +43,7 @@ class ActionController extends Controller
             ->with([
                 'pta:id,pao_id,direction_id,service_id,titre,statut',
                 'responsable:id,name,email',
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,progression_reelle,progression_theorique,statut_calcule',
+                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,progression_reelle,progression_theorique,statut_calcule',
             ])
             ->withCount([
                 'kpis',
@@ -238,7 +238,7 @@ class ActionController extends Controller
                 'kpis:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'weeks' => fn ($q) => $q->orderBy('numero_semaine'),
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,progression_reelle,progression_theorique,statut_calcule',
+                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,progression_reelle,progression_theorique,statut_calcule',
                 'actionLogs' => fn ($q) => $q->latest()->limit(50),
                 'justificatifs' => fn ($q) => $q->latest(),
             ]),
@@ -393,7 +393,7 @@ class ActionController extends Controller
             'responsable:id,name,email',
             'weeks:id,action_id,numero_semaine,date_debut,date_fin,est_renseignee',
             'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
-            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite,progression_reelle,progression_theorique,statut_calcule',
+            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,progression_reelle,progression_theorique,statut_calcule',
         ];
 
         if (Schema::hasTable('action_responsables')) {

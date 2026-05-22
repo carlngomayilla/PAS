@@ -431,7 +431,7 @@ class PasWebController extends Controller
         // A06 — DG est en lecture seule pure : il consulte le PAS mais ne le
         // valide / verrouille pas. La validation finale revient aux profils
         // SUPER_ADMIN et ADMIN (operations) uniquement.
-        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN);
+        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL);
     }
 
     /**

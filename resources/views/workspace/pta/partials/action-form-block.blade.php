@@ -28,9 +28,26 @@
         $subActionRows = collect([[]]);
     }
     $showSubActionForm = $modeEvaluation === \App\Models\Action::MODE_SOUS_ACTIONS;
+    $errorBag = $errors->getBag('default');
+    $errorKeys = collect($errorBag->keys());
+    $hasActionErrors = ! $isTemplate && $errorKeys->contains(fn (string $key): bool => str_starts_with($key, "actions.$index."));
+    $hasAssignmentErrors = ! $isTemplate && $errors->has("actions.$index.rmo_ids");
+    $hasPlanningErrors = ! $isTemplate && ($errors->has("actions.$index.date_debut") || $errors->has("actions.$index.date_fin"));
+    $hasTargetErrors = ! $isTemplate && (
+        $errors->has("actions.$index.quantite_cible")
+        || $errors->has("actions.$index.unite_cible")
+        || $errors->has("actions.$index.seuil_minimum")
+    );
+    $hasFinancingErrors = ! $isTemplate && (
+        $errors->has("actions.$index.montant_estime")
+        || $errors->has("actions.$index.nature_financement")
+        || $errors->has("actions.$index.source_financement")
+        || $errors->has("actions.$index.commentaire_financement")
+        || $errors->has("actions.$index.justificatif_financement")
+    );
 @endphp
 
-<details class="pta-action-block rounded-lg border border-[#d8ecf8] bg-white shadow-sm" data-action-block data-action-index="{{ $index }}" {{ !$isTemplate && (int) $index === 0 ? 'open' : '' }}>
+<details class="pta-action-block rounded-lg border border-[#d8ecf8] bg-white shadow-sm" data-action-block data-action-index="{{ $index }}" {{ !$isTemplate && ((int) $index === 0 || $hasActionErrors) ? 'open' : '' }}>
     <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
         <span class="min-w-0">
             <span class="block text-sm font-extrabold uppercase tracking-wide text-[#1c203d]" data-action-title>Action {{ $number }}</span>
@@ -53,7 +70,7 @@
             <div class="form-step-body">
             <div class="form-grid">
                 <div class="md:col-span-2">
-                    <label>Libellé de l'action</label>
+                    <label>Intitule / titre de l'action</label>
                     <input name="actions[{{ $index }}][libelle]" type="text" value="{{ $rowData['libelle'] ?? '' }}" required>
                     @error("actions.$index.libelle") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
@@ -82,7 +99,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion">
+        <details class="form-step-accordion" {{ $hasAssignmentErrors ? 'open' : '' }}>
             <summary>2. Responsable / affectation</summary>
             <div class="form-step-body">
             <div class="form-grid">
@@ -115,7 +132,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion">
+        <details class="form-step-accordion" {{ $hasPlanningErrors ? 'open' : '' }}>
             <summary>3. Planification</summary>
             <div class="form-step-body">
             <div class="form-grid-compact">
@@ -137,7 +154,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion">
+        <details class="form-step-accordion" {{ $hasTargetErrors ? 'open' : '' }}>
             <summary>4. Cible et seuil</summary>
             <div class="form-step-body">
             <div class="form-grid">
@@ -207,6 +224,15 @@
                             <div class="md:col-span-2">
                                 <label>Libellé</label>
                                 <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][libelle]" type="text" value="{{ $subAction['libelle'] ?? '' }}">
+                            </div>
+                            <div>
+                                <label>RMO en charge</label>
+                                <select name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][agent_id]" data-sub-action-agent-select>
+                                    <option value="">RMO principal</option>
+                                    @foreach ($responsableOptions as $responsable)
+                                        <option value="{{ $responsable->id }}" @selected((int) ($subAction['agent_id'] ?? 0) === (int) $responsable->id)>{{ $responsable->name }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                             <div>
                                 <label>Date de début</label>
@@ -286,7 +312,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion">
+        <details class="form-step-accordion" {{ $financementRequis || $hasFinancingErrors ? 'open' : '' }}>
             <summary>8. Financement</summary>
             <div class="form-step-body">
             <div class="form-grid">
@@ -303,6 +329,21 @@
                     <label>Montant</label>
                     <input name="actions[{{ $index }}][montant_estime]" type="number" step="0.01" min="0" value="{{ $rowData['montant_estime'] ?? '' }}">
                     @error("actions.$index.montant_estime") <p class="field-error">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label>Nature du financement</label>
+                    <input name="actions[{{ $index }}][nature_financement]" type="text" value="{{ $rowData['nature_financement'] ?? '' }}" placeholder="Ex. fonctionnement, investissement, mission">
+                    @error("actions.$index.nature_financement") <p class="field-error">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label>Source de financement</label>
+                    <input name="actions[{{ $index }}][source_financement]" type="text" value="{{ $rowData['source_financement'] ?? '' }}" placeholder="Ex. budget ANBG, partenaire, projet">
+                    @error("actions.$index.source_financement") <p class="field-error">{{ $message }}</p> @enderror
+                </div>
+                <div class="md:col-span-2">
+                    <label>Commentaire financement</label>
+                    <textarea name="actions[{{ $index }}][commentaire_financement]">{{ $rowData['commentaire_financement'] ?? '' }}</textarea>
+                    @error("actions.$index.commentaire_financement") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label>Pièce justificative</label>

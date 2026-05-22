@@ -48,6 +48,7 @@
                     'sous_actions' => $action->relationLoaded('sousActions')
                         ? $action->sousActions->map(fn ($sousAction): array => [
                             'id' => $sousAction->id,
+                            'agent_id' => $sousAction->agent_id,
                             'libelle' => $sousAction->libelle,
                             'description' => $sousAction->description,
                             'resultat_attendu' => $sousAction->resultat_attendu,
@@ -264,7 +265,7 @@
         @if ($isEdit)
             <section class="showcase-panel mb-4 app-screen-block">
                 <h2 class="showcase-panel-title">Timeline validation</h2>
-                <div class="app-table-wrapper">
+                <div class="app-table-wrapper overflow-x-auto">
                     <table class="app-table data-table">
                         <thead>
                             <tr>
@@ -512,6 +513,42 @@
                         removeSubAction.classList.toggle('hidden', rowIndex === 0);
                     }
                 });
+
+                syncSubActionAgentOptions(block);
+            }
+
+            function selectedActionRmoIds(block) {
+                if (!block) return [];
+
+                return Array.prototype.slice.call(block.querySelectorAll('[data-rmo-list] select'))
+                    .map(function (select) { return select.value; })
+                    .filter(function (value, index, values) { return value && values.indexOf(value) === index; });
+            }
+
+            function syncSubActionAgentOptions(block) {
+                var allowed = selectedActionRmoIds(block);
+                if (!block || !allowed.length) return;
+
+                block.querySelectorAll('[data-sub-action-agent-select]').forEach(function (select, index) {
+                    var current = select.value;
+                    Array.prototype.forEach.call(select.options, function (option, index) {
+                        if (index === 0) {
+                            option.hidden = false;
+                            option.disabled = false;
+                            return;
+                        }
+
+                        var visible = allowed.indexOf(option.value) !== -1;
+                        option.hidden = !visible;
+                        option.disabled = !visible;
+                    });
+
+                    if (current && allowed.indexOf(current) === -1) {
+                        select.value = allowed[0] || '';
+                    } else if (!current) {
+                        select.value = allowed[index % allowed.length] || '';
+                    }
+                });
             }
 
             function addSubAction(block) {
@@ -565,9 +602,10 @@
                         if (field.name && (
                             field.name.indexOf('[montant_estime]') !== -1
                             || field.name.indexOf('[nature_financement]') !== -1
-                            || field.name.indexOf('[justificatif_financement]') !== -1
                         )) {
                             field.required = active;
+                        } else if (field.name && field.name.indexOf('[justificatif_financement]') !== -1) {
+                            field.required = false;
                         }
                         if (!active && field.type !== 'file') {
                             field.value = '';
@@ -714,6 +752,10 @@
 
                     if (target.matches('[data-financing-select]')) {
                         syncActionFinancing(target.closest('[data-action-block]'));
+                    }
+
+                    if (target.matches('[data-rmo-list] select')) {
+                        syncSubActionAgentOptions(target.closest('[data-action-block]'));
                     }
 
                     if (target.matches('input[name$="[date_fin]"]')) {

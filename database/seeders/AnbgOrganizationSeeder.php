@@ -8,6 +8,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use RuntimeException;
 use SimpleXMLElement;
 use ZipArchive;
@@ -248,63 +249,151 @@ class AnbgOrganizationSeeder extends Seeder
 
         try {
             $sharedStrings = $this->readSharedStrings($zip);
-            $sheetPath = $this->sheetPathByName($zip, 'Base_Import');
-            $sheetXml = $zip->getFromName($sheetPath);
-
-            if ($sheetXml === false) {
-                throw new RuntimeException(sprintf('Feuille Base_Import introuvable dans %s', $path));
+            $baseImportSheet = $this->sheetPathByName($zip, 'Base_Import', false);
+            if ($baseImportSheet !== null) {
+                return $this->loadUsersFromBaseImportSheet($zip, $baseImportSheet, $sharedStrings, $path);
             }
 
-            $rows = [];
-            $sheet = new SimpleXMLElement($sheetXml);
-            $sheet->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
-
-            foreach ($sheet->xpath('//x:sheetData/x:row') ?: [] as $row) {
-                $rowNumber = (int) ($row['r'] ?? 0);
-                if ($rowNumber < 5) {
-                    continue;
-                }
-
-                $cells = $this->readRowCells($row, $sharedStrings);
-                $email = strtolower($this->cell($cells, 4));
-
-                if (
-                    $email === ''
-                    || $this->cell($cells, 19) !== 'Oui'
-                    || ! $this->isReadyForImport($this->cell($cells, 18))
-                ) {
-                    continue;
-                }
-
-                $directionCode = $this->directionCodeFromWorkbook($this->cell($cells, 9));
-                $serviceCode = $this->serviceCodeFromWorkbook($this->cell($cells, 10));
-
-                $rows[] = [
-                    'matricule' => '',
-                    'name' => $this->cell($cells, 3),
-                    'email' => $email,
-                    'direction_code' => $directionCode,
-                    'service_code' => $serviceCode,
-                    'fonction' => $this->cell($cells, 7),
-                    'role' => $this->roleFromWorkbook($this->cell($cells, 14), $serviceCode),
-                ];
+            $newUsersSheet = $this->sheetPathByName($zip, 'Nouveaux_Utilisateurs', false);
+            if ($newUsersSheet !== null) {
+                return $this->loadUsersFromNewUsersSheet($zip, $newUsersSheet, $sharedStrings, $path);
             }
 
-            if ($rows === []) {
-                throw new RuntimeException(sprintf('Aucun utilisateur importable trouve dans %s', $path));
-            }
-
-            return $rows;
+            throw new RuntimeException(sprintf(
+                'Aucun onglet utilisateurs compatible trouve dans %s. Onglets attendus: Base_Import ou Nouveaux_Utilisateurs.',
+                $path
+            ));
         } finally {
             $zip->close();
         }
     }
 
+    /**
+     * @param array<int, string> $sharedStrings
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadUsersFromBaseImportSheet(ZipArchive $zip, string $sheetPath, array $sharedStrings, string $path): array
+    {
+        $sheetXml = $zip->getFromName($sheetPath);
+
+        if ($sheetXml === false) {
+            throw new RuntimeException(sprintf('Feuille Base_Import introuvable dans %s', $path));
+        }
+
+        $rows = [];
+        $sheet = new SimpleXMLElement($sheetXml);
+        $sheet->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+
+        foreach ($sheet->xpath('//x:sheetData/x:row') ?: [] as $row) {
+            $rowNumber = (int) ($row['r'] ?? 0);
+            if ($rowNumber < 5) {
+                continue;
+            }
+
+            $cells = $this->readRowCells($row, $sharedStrings);
+            $email = strtolower($this->cell($cells, 4));
+
+            if (
+                $email === ''
+                || $this->cell($cells, 19) !== 'Oui'
+                || ! $this->isReadyForImport($this->cell($cells, 18))
+            ) {
+                continue;
+            }
+
+            $fonction = $this->cell($cells, 7);
+            $directionCode = $this->directionCodeFromWorkbook($this->cell($cells, 9));
+            $serviceCode = $this->serviceCodeFromWorkbook($this->cell($cells, 10));
+
+            $rows[] = [
+                'matricule' => '',
+                'name' => $this->userNameFromWorkbook($this->cell($cells, 3), $email, $fonction),
+                'email' => $email,
+                'direction_code' => $directionCode,
+                'service_code' => $serviceCode,
+                'fonction' => $fonction,
+                'role' => $this->roleFromWorkbook($this->cell($cells, 14), $serviceCode),
+            ];
+        }
+
+        if ($rows === []) {
+            throw new RuntimeException(sprintf('Aucun utilisateur importable trouve dans %s', $path));
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param array<int, string> $sharedStrings
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadUsersFromNewUsersSheet(ZipArchive $zip, string $sheetPath, array $sharedStrings, string $path): array
+    {
+        $sheetXml = $zip->getFromName($sheetPath);
+
+        if ($sheetXml === false) {
+            throw new RuntimeException(sprintf('Feuille Nouveaux_Utilisateurs introuvable dans %s', $path));
+        }
+
+        $rows = [];
+        $sheet = new SimpleXMLElement($sheetXml);
+        $sheet->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+
+        foreach ($sheet->xpath('//x:sheetData/x:row') ?: [] as $row) {
+            $rowNumber = (int) ($row['r'] ?? 0);
+            if ($rowNumber < 5) {
+                continue;
+            }
+
+            $cells = $this->readRowCells($row, $sharedStrings);
+            $email = strtolower($this->cell($cells, 2));
+            if ($email === '') {
+                continue;
+            }
+
+            $directionLabel = $this->cell($cells, 3);
+            $serviceLabel = $this->cell($cells, 4);
+            $fonction = $this->cell($cells, 5);
+            $name = $this->userNameFromWorkbook($this->cell($cells, 1), $email, $fonction);
+            $serviceCode = $this->serviceCodeFromWorkbook($serviceLabel);
+            $directionCode = $this->directionCodeFromWorkbook($directionLabel);
+            $role = $this->roleFromWorkbook($this->cell($cells, 6), $serviceCode, $directionCode, $fonction, $directionLabel);
+
+            if ($directionCode === '' && ! in_array($role, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL], true)) {
+                continue;
+            }
+
+            $rows[] = [
+                'matricule' => '',
+                'name' => $name,
+                'email' => $email,
+                'direction_code' => $directionCode,
+                'service_code' => $serviceCode,
+                'fonction' => $fonction,
+                'role' => $role,
+            ];
+        }
+
+        if ($rows === []) {
+            throw new RuntimeException(sprintf('Aucun utilisateur importable trouve dans %s', $path));
+        }
+
+        return $rows;
+    }
+
     private function workbookPath(): string
     {
-        $path = function_exists('base_path')
-            ? base_path(self::USERS_WORKBOOK)
-            : dirname(__DIR__, 2).DIRECTORY_SEPARATOR.self::USERS_WORKBOOK;
+        $override = env('ANBG_USERS_WORKBOOK');
+        if (is_string($override) && trim($override) !== '') {
+            $override = trim($override);
+            $path = preg_match('/^[A-Za-z]:[\\\\\\/]/', $override) === 1 || str_starts_with($override, DIRECTORY_SEPARATOR)
+                ? $override
+                : (function_exists('base_path') ? base_path($override) : dirname(__DIR__, 2).DIRECTORY_SEPARATOR.$override);
+        } else {
+            $path = function_exists('base_path')
+                ? base_path(self::USERS_WORKBOOK)
+                : dirname(__DIR__, 2).DIRECTORY_SEPARATOR.self::USERS_WORKBOOK;
+        }
 
         if (! is_file($path)) {
             throw new RuntimeException(sprintf('Classeur utilisateurs introuvable: %s', $path));
@@ -328,6 +417,9 @@ class AnbgOrganizationSeeder extends Seeder
         $sharedXml->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
 
         foreach ($sharedXml->xpath('//x:si') ?: [] as $item) {
+            // Le namespace XML doit etre reenregistre sur chaque noeud enfant
+            // sinon $item->xpath('.//x:t') leve "Undefined namespace prefix".
+            $item->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
             $text = '';
             foreach ($item->xpath('.//x:t') ?: [] as $part) {
                 $text .= (string) $part;
@@ -338,7 +430,7 @@ class AnbgOrganizationSeeder extends Seeder
         return $sharedStrings;
     }
 
-    private function sheetPathByName(ZipArchive $zip, string $sheetName): string
+    private function sheetPathByName(ZipArchive $zip, string $sheetName, bool $required = true): ?string
     {
         $workbookXml = $zip->getFromName('xl/workbook.xml');
         $relsXml = $zip->getFromName('xl/_rels/workbook.xml.rels');
@@ -361,6 +453,10 @@ class AnbgOrganizationSeeder extends Seeder
         }
 
         if ($relationshipId === null) {
+            if (! $required) {
+                return null;
+            }
+
             throw new RuntimeException(sprintf('Onglet "%s" introuvable dans le classeur utilisateurs.', $sheetName));
         }
 
@@ -388,6 +484,8 @@ class AnbgOrganizationSeeder extends Seeder
         $row->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
 
         foreach ($row->xpath('x:c') ?: [] as $cell) {
+            $cell->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+
             $reference = (string) $cell['r'];
             $column = $this->columnNumber(preg_replace('/\d+/', '', $reference) ?? '');
             $type = (string) $cell['t'];
@@ -431,20 +529,22 @@ class AnbgOrganizationSeeder extends Seeder
 
     private function directionCodeFromWorkbook(string $direction): string
     {
-        return match ($direction) {
-            'Cabinet du DG' => 'DG',
-            'DAF', 'DS', 'DSIC' => $direction,
+        return match ($this->normalizeWorkbookToken($direction)) {
+            'cabinet_du_dg', 'direction_generale', 'dg', 'dga' => 'DG',
+            'daf' => 'DAF',
+            'ds' => 'DS',
+            'dsic' => 'DSIC',
             default => '',
         };
     }
 
     private function serviceCodeFromWorkbook(string $service): ?string
     {
-        return match ($service) {
-            '', 'Administration', 'Direction Générale', 'DIRECTION' => null,
-            'Collaborateurs' => 'COLLAB',
-            'Planification' => 'PLANIF',
-            default => $service,
+        return match ($this->normalizeWorkbookToken($service)) {
+            '', 'administration', 'direction_generale', 'direction', 'secdga' => null,
+            'collaborateurs', 'collaborateur' => 'COLLAB',
+            'planification' => 'PLANIF',
+            default => strtoupper(trim($service)),
         };
     }
 
@@ -454,19 +554,70 @@ class AnbgOrganizationSeeder extends Seeder
             || str_starts_with($status, 'Valide');
     }
 
-    private function roleFromWorkbook(string $roleSlug, ?string $serviceCode): string
+    private function roleFromWorkbook(
+        string $roleSlug,
+        ?string $serviceCode,
+        ?string $directionCode = null,
+        ?string $fonction = null,
+        ?string $directionLabel = null
+    ): string
     {
-        return match ($roleSlug) {
+        $role = $this->normalizeWorkbookToken($roleSlug);
+        $function = $this->normalizeWorkbookToken((string) $fonction);
+        $direction = $this->normalizeWorkbookToken((string) $directionLabel);
+
+        return match ($role) {
             'admin' => User::ROLE_ADMIN_FONCTIONNEL,
             'super_admin' => User::ROLE_SUPER_ADMIN,
             'dg' => User::ROLE_DG,
-            'directeur' => User::ROLE_DIRECTION,
-            'chef_service' => User::ROLE_SERVICE,
-            'chef_unite', 'collaborateur', 'ucas' => User::ROLE_DG,
-            'sciq' => User::ROLE_PLANIFICATION,
+            'directeur', 'direction' => $direction === 'dga' || str_contains($function, 'directeur_general_adjoint')
+                ? User::ROLE_DGA_SUPERVISION
+                : User::ROLE_DIRECTION,
+            'chef_service', 'service' => User::ROLE_SERVICE,
+            'chef_unite_sciq', 'chef_d_unite_sciq' => User::ROLE_CHEF_UNITE_SCIQ,
+            'chef_unite_ucas', 'chef_d_unite_ucas' => User::ROLE_CHEF_UNITE_UCAS,
+            'chef_unite', 'chef_d_unite' => $serviceCode === 'UCAS'
+                ? User::ROLE_CHEF_UNITE_UCAS
+                : ($serviceCode === 'SCIQ' ? User::ROLE_CHEF_UNITE_SCIQ : User::ROLE_CHEF_UNITE_CABINET),
+            'collaborateur' => $direction === 'dga' || str_contains($function, 'dga')
+                ? User::ROLE_DGA_SUPERVISION
+                : (str_contains($function, 'directeur_general') ? User::ROLE_DG : User::ROLE_CABINET),
+            'ucas' => User::ROLE_UCAS,
+            'sciq' => User::ROLE_SCIQ,
             'planification' => User::ROLE_PLANIFICATION,
             default => User::ROLE_AGENT,
         };
+    }
+
+    private function normalizeWorkbookToken(string $value): string
+    {
+        return (string) Str::of($value)
+            ->ascii()
+            ->lower()
+            ->trim()
+            ->replaceMatches('/[^a-z0-9]+/', '_')
+            ->trim('_');
+    }
+
+    private function userNameFromWorkbook(string $name, string $email, string $fonction): string
+    {
+        $candidate = trim($name);
+        if ($candidate !== '' && $this->normalizeWorkbookToken($candidate) !== 'a_completer') {
+            return $candidate;
+        }
+
+        $fallback = trim($fonction);
+        if ($fallback !== '') {
+            return $fallback;
+        }
+
+        $localPart = (string) Str::of($email)
+            ->before('@')
+            ->replaceMatches('/[^A-Za-z0-9]+/', ' ')
+            ->trim()
+            ->title();
+
+        return $localPart !== '' ? $localPart : 'Utilisateur ANBG';
     }
 
     /**

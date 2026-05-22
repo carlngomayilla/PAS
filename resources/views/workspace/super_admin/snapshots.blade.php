@@ -86,7 +86,7 @@
 
         <section class="showcase-panel mb-4">
             <h2>Differences detectees</h2>
-            <div class="app-table-wrapper mt-4">
+            <div class="app-table-wrapper overflow-x-auto mt-4">
                 <table class="app-table data-table">
                     <thead><tr><th>Groupe</th><th>Cle</th><th>Reference</th><th>Comparaison</th><th>Statut</th></tr></thead>
                     <tbody>
@@ -123,7 +123,7 @@
 
     <section class="ui-card">
         <h2>Historique des snapshots</h2>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead>
                     <tr>

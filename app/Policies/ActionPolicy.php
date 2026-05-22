@@ -88,7 +88,7 @@ class ActionPolicy
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
-            return $user->hasRole(User::ROLE_ADMIN) || $user->hasRole(User::ROLE_PLANIFICATION);
+            return $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL) || $user->hasRole(User::ROLE_PLANIFICATION);
         }
 
         return $this->canManageAction(
@@ -117,15 +117,6 @@ class ActionPolicy
     {
         return $action->isResponsible($user)
             && ($user->isAgent() || $action->isOperationalContext());
-    }
-
-    /**
-     * Peut soumettre la clôture (l'agent responsable).
-     */
-    public function submitClosure(User $user, Action $action): bool
-    {
-        return $action->isResponsible($user)
-            && ($user->hasRole(User::ROLE_AGENT) || $action->isOperationalContext());
     }
 
     /**

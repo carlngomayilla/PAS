@@ -46,6 +46,7 @@ class StoreActionRequest extends FormRequest
             'seuil_t4' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'sous_actions' => ['nullable', 'array'],
             'sous_actions.*.id' => ['nullable', 'integer', 'exists:sous_actions,id'],
+            'sous_actions.*.agent_id' => ['nullable', 'integer', 'exists:users,id'],
             'sous_actions.*.libelle' => ['nullable', 'string', 'max:255'],
             'sous_actions.*.description' => ['nullable', 'string'],
             'sous_actions.*.resultat_attendu' => ['nullable', 'string'],
@@ -82,6 +83,7 @@ class StoreActionRequest extends FormRequest
             'ressource_partenariat' => ['nullable', 'boolean'],
             'ressource_autres' => ['nullable', 'boolean'],
             'ressource_autres_details' => ['nullable', 'string'],
+            'nature_financement' => ['nullable', 'string', 'max:255'],
             'description_financement' => ['nullable', 'string'],
             'source_financement' => ['nullable', 'string', 'max:255'],
             'montant_estime' => ['nullable', 'numeric', 'min:0'],
@@ -101,8 +103,25 @@ class StoreActionRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'libelle.required' => 'Le titre de l action est obligatoire.',
             'date_fin.after_or_equal' => 'La date de fin doit etre superieure ou egale a la date de debut.',
             'date_echeance.after_or_equal' => 'La date d echeance doit etre superieure ou egale a la date de debut.',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'libelle' => 'titre de l action',
+            'financement_requis' => 'besoin de financement',
+            'montant_estime' => 'montant estime',
+            'nature_financement' => 'nature du financement',
+            'description_financement' => 'description du besoin de financement',
+            'source_financement' => 'source de financement',
+            'rmo_ids' => 'RMO',
         ];
     }
 
@@ -204,7 +223,7 @@ class StoreActionRequest extends FormRequest
         return collect($subActions)
             ->filter(fn ($subAction): bool => is_array($subAction))
             ->map(function (array $subAction): array {
-                foreach (['id', 'libelle', 'description', 'resultat_attendu', 'date_debut', 'date_fin', 'cible_prevue', 'unite', 'commentaire'] as $key) {
+                foreach (['id', 'agent_id', 'libelle', 'description', 'resultat_attendu', 'date_debut', 'date_fin', 'cible_prevue', 'unite', 'commentaire'] as $key) {
                     $subAction[$key] = $subAction[$key] ?? null;
                 }
 
@@ -252,6 +271,26 @@ class StoreActionRequest extends FormRequest
                     'kpi_seuil_alerte',
                     'Le seuil d alerte de l indicateur ne doit pas depasser sa cible.'
                 );
+            }
+
+            if ($this->boolean('financement_requis')) {
+                if ($this->input('montant_estime') === null || $this->input('montant_estime') === '') {
+                    $validator->errors()->add(
+                        'montant_estime',
+                        'Le montant estime est obligatoire lorsque le financement est requis.'
+                    );
+                }
+
+                if (trim((string) $this->input('nature_financement', '')) === '') {
+                    $validator->errors()->add(
+                        'nature_financement',
+                        'La nature du financement est obligatoire lorsque le financement est requis.'
+                    );
+                }
+            }
+
+            if ($validator->errors()->isNotEmpty()) {
+                return;
             }
 
             $pta = Pta::query()->with('objectifOperationnel:id,echeance,service_id,direction_id,pao_id')->find((int) $this->input('pta_id'));

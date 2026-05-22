@@ -81,9 +81,9 @@ class ActionTrackingWebController extends Controller
             'action' => $action,
             'canTrackWeekly' => $this->canTrackWeekly($user, $action) && $this->isExecutionEditableByAgent($action),
             'canManageAction' => $this->canManageAction($user, $action),
-            'canSubmitClosure' => $this->canSubmitClosure($user, $action) && $this->isExecutionEditableByAgent($action),
             'canReviewClosure' => $this->canReviewByChef($user, $action),
-            'canReviewDirection' => $this->canReviewByDirection($user, $action),
+            // canReviewDirection retire : l'etape de validation direction
+            // a ete supprimee du circuit. Voir WorkflowSettings.
             'canReviewFinancingByDaf' => $this->canReviewFinancingByDaf($user, $action),
             'canReviewFinancingByDg' => $this->canReviewFinancingByDg($user, $action),
             'workflowConfig' => $this->workflowSettings()->actionValidationSummary(),
@@ -232,6 +232,10 @@ class ActionTrackingWebController extends Controller
         });
 
         $trackingService->refreshActionMetrics($action);
+
+        // Si la sous-action vient d'être marquée effectuée et que cela complète
+        // la liste, on tente la bascule auto vers le chef de service.
+        $trackingService->attemptAutoSubmitClosure($action, $user);
 
         $this->recordAudit(
             $request,
@@ -383,6 +387,10 @@ class ActionTrackingWebController extends Controller
 
             $trackingService->refreshActionMetrics($action);
 
+            // Bascule auto si la dernière sous-action vient d'être marquée
+            // effectuée (mode sous_actions / mixte).
+            $trackingService->attemptAutoSubmitClosure($action, $user);
+
             $this->recordAudit(
                 $request,
                 'sous_action',
@@ -513,6 +521,9 @@ class ActionTrackingWebController extends Controller
         });
 
         $trackingService->refreshActionMetrics($action);
+
+        // Bascule auto si l'agent vient de marquer la dernière sous-action.
+        $trackingService->attemptAutoSubmitClosure($action, $user);
 
         $this->recordAudit(
             $request,
@@ -717,6 +728,10 @@ class ActionTrackingWebController extends Controller
         });
 
         $trackingService->refreshActionMetrics($action);
+
+        // Bascule auto si la dernière saisie quantitative atteint la cible.
+        $trackingService->attemptAutoSubmitClosure($action, $user);
+
         $this->recordAudit($request, 'action', 'execution_quantitative_update', $action, $before, $action->fresh()?->toArray());
         if ($request->hasFile('justificatif_quantitatif')) {
             $notificationService->notifyJustificatifAdded($action, $user, null, 'execution_quantitative');
@@ -725,132 +740,6 @@ class ActionTrackingWebController extends Controller
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', 'Progression quantitative mise a jour avec succes.');
-    }
-
-    public function closeAction(
-        Request $request,
-        Action $action,
-        ActionTrackingService $trackingService,
-        ActionManagementSettings $actionManagementSettings,
-        WorkspaceNotificationService $notificationService,
-        SecureJustificatifStorage $secureStorage
-    ): RedirectResponse {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        $action->loadMissing('pta:id,direction_id,service_id,statut,date_debut,date_fin,responsable_id');
-        if (! $this->canSubmitClosure($user, $action)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors([
-                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Soumission'),
-            ]);
-        }
-
-        $currentValidationStatus = (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE);
-        if (in_array($currentValidationStatus, [
-            ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-        ], true)) {
-            return back()->withErrors(['general' => 'Action deja soumise. En attente de validation hierarchique.']);
-        }
-
-        if (in_array($currentValidationStatus, [
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
-        ], true)) {
-            return back()->withErrors(['general' => 'Action deja validee par le chef de service.']);
-        }
-
-        $hasExecutionJustificatif = $action->justificatifs()
-            ->where('categorie', 'hebdomadaire')
-            ->exists();
-        $hasSousActionJustificatif = $action->sousActions()
-            ->whereHas('justificatifs')
-            ->exists();
-        if (! $hasExecutionJustificatif && ! $hasSousActionJustificatif) {
-            return back()->withErrors([
-                'general' => 'Soumission impossible: aucun justificatif d execution trouve dans les sous-actions ou periodes de suivi.',
-            ]);
-        }
-
-        /** @var array<string, mixed> $validated */
-        $validated = $request->validate([
-            'date_fin_reelle' => ['required', 'date'],
-            'rapport_final' => ['required', 'string'],
-            'resultat_cloture' => ['nullable', 'string', 'max:5000'],
-            'difficultes_rencontrees' => ['nullable', 'string', 'max:5000'],
-            'mesures_correctives' => ['nullable', 'string', 'max:5000'],
-            'justification_cloture' => ['nullable', 'string', 'max:5000'],
-            'justificatif_final' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
-        ]);
-
-        if ($action->date_debut !== null && (string) $validated['date_fin_reelle'] < (string) $action->date_debut) {
-            return back()->withErrors([
-                'date_fin_reelle' => 'La date de fin reelle doit etre superieure ou egale a la date de debut.',
-            ]);
-        }
-
-        $minimumProgress = $actionManagementSettings->minProgressForClosure();
-        if ((float) ($action->progression_reelle ?? 0) < $minimumProgress) {
-            return back()->withErrors([
-                'general' => 'Soumission impossible: la progression minimale de cloture est fixee a '.$minimumProgress.'%.',
-            ]);
-        }
-
-        if ($actionManagementSettings->finalJustificatifRequired()) {
-            $hasExistingFinalJustificatif = $action->justificatifs()
-                ->where('categorie', 'final')
-                ->exists();
-
-            if (! $request->hasFile('justificatif_final') && ! $hasExistingFinalJustificatif) {
-                return back()->withErrors([
-                    'justificatif_final' => 'Le justificatif final est obligatoire selon la politique metier des actions.',
-                ]);
-            }
-        }
-
-        $before = $action->toArray();
-
-        DB::transaction(function () use ($trackingService, $action, $validated, $request, $user, $secureStorage): void {
-            $trackingService->submitClosureForReview($action, $validated, $user);
-
-            if ($request->hasFile('justificatif_final')) {
-                $file = $request->file('justificatif_final');
-                $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
-                $trackingService->addActionJustificatif(
-                    $action,
-                    null,
-                    'final',
-                    $storedFile['path'],
-                    $storedFile['nom_original'],
-                    $storedFile['mime_type'],
-                    $storedFile['taille_octets'],
-                    'Justificatif final de cloture transmis pour validation',
-                    $user,
-                    $storedFile['est_chiffre']
-                );
-            }
-        });
-
-        $action->refresh();
-        $this->recordAudit($request, 'action', 'submit_for_validation', $action, $before, $action->toArray());
-        $submissionTarget = $this->workflowSettings()->actionSubmissionTarget();
-
-        if ($submissionTarget === 'service') {
-            $notificationService->notifyActionSubmittedToChef($action, $user);
-        } elseif ($submissionTarget === 'direction') {
-            $notificationService->notifyActionSubmittedToDirection($action, $user);
-        } else {
-            $notificationService->notifyActionFinalizedWithoutWorkflow($action, $user);
-        }
-
-        return redirect()
-            ->route('workspace.actions.suivi', $action)
-            ->with('success', $this->submissionSuccessMessage());
     }
 
     public function comment(
@@ -887,12 +776,86 @@ class ActionTrackingWebController extends Controller
             ->with('success', 'Commentaire enregistre.');
     }
 
+    /**
+     * Soumission explicite par l'agent (ou un gestionnaire d'action) de la
+     * demande de clôture. Bascule l'action en `soumise_chef` (ou directement à
+     * l'étape configurée par `WorkflowSettings::actionSubmissionTarget`) et
+     * notifie le chef de service.
+     */
+    public function submitClosure(
+        Request $request,
+        Action $action,
+        ActionTrackingService $trackingService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut');
+
+        // Seuls le responsable de l'action ou un gestionnaire (chef de service
+        // non-agent) peuvent forcer la soumission.
+        if (! $action->isResponsible($user) && ! $this->canManageAction($user, $action)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        if ($action->pta?->statut === 'verrouille') {
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Soumission'),
+            ]);
+        }
+
+        $current = (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE);
+        $resoumissionAutorisee = [
+            ActionTrackingService::VALIDATION_NON_SOUMISE,
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+            ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+        ];
+        if (! in_array($current, $resoumissionAutorisee, true)) {
+            return back()->withErrors([
+                'general' => 'Cette action est deja soumise ou validee.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'rapport_final' => ['nullable', 'string', 'max:5000'],
+            'date_fin_reelle' => ['nullable', 'date'],
+        ]);
+
+        $payload = [
+            'date_fin_reelle' => $validated['date_fin_reelle']
+                ?? optional($action->date_fin_reelle)->toDateString()
+                ?? now()->toDateString(),
+            'rapport_final' => $validated['rapport_final']
+                ?? $action->rapport_final
+                ?? 'Demande de cloture deposee par l agent.',
+        ];
+
+        $before = $action->toArray();
+
+        try {
+            DB::transaction(function () use ($trackingService, $action, $payload, $user): void {
+                $trackingService->submitClosureForReview($action, $payload, $user);
+            });
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withErrors(['general' => $exception->getMessage()]);
+        }
+
+        $action->refresh();
+        $this->recordAudit($request, 'action', 'submit_closure', $action, $before, $action->toArray());
+
+        return redirect()
+            ->route('workspace.actions.suivi', $action)
+            ->with('success', 'Demande de cloture envoyee au chef de service.');
+    }
+
     public function reviewClosure(
         Request $request,
         Action $action,
         ActionTrackingService $trackingService,
-        WorkspaceNotificationService $notificationService,
-        SecureJustificatifStorage $secureStorage
+        WorkspaceNotificationService $notificationService
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -914,34 +877,23 @@ class ActionTrackingWebController extends Controller
             return back()->withErrors(['general' => 'Cette action n est pas en attente de validation chef de service.']);
         }
 
-        /** @var array<string, mixed> $validated */
-        $validated = $request->validate($this->reviewValidationRules($request, true));
+        // Formulaire simplifie : 3 champs uniquement.
+        $commentRules = ['nullable', 'string', 'max:5000'];
+        if ($this->workflowSettings()->rejectionCommentRequired()
+            && in_array((string) $request->input('decision_validation'), ['rejeter', 'demander_correction'], true)) {
+            array_unshift($commentRules, 'required');
+        }
 
-        $validated['validation_sans_correction'] = $request->filled('validation_sans_correction')
-            ? (bool) $request->boolean('validation_sans_correction')
-            : null;
+        $validated = $request->validate([
+            'decision_validation' => ['required', Rule::in(['valider', 'demander_correction', 'rejeter'])],
+            'evaluation_note' => ['required', 'numeric', 'min:0', 'max:100'],
+            'evaluation_commentaire' => $commentRules,
+        ]);
 
         $before = $action->toArray();
 
-        DB::transaction(function () use ($trackingService, $action, $validated, $request, $user, $secureStorage): void {
+        DB::transaction(function () use ($trackingService, $action, $validated, $user): void {
             $trackingService->reviewClosureByChef($action, $validated, $user);
-
-            if ($request->hasFile('justificatif_evaluation')) {
-                $file = $request->file('justificatif_evaluation');
-                $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
-                $trackingService->addActionJustificatif(
-                    $action,
-                    null,
-                    'evaluation_chef',
-                    $storedFile['path'],
-                    $storedFile['nom_original'],
-                    $storedFile['mime_type'],
-                    $storedFile['taille_octets'],
-                    'Justificatif de revue chef de service',
-                    $user,
-                    $storedFile['est_chiffre']
-                );
-            }
         });
 
         $action->refresh();
@@ -956,9 +908,11 @@ class ActionTrackingWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', $decision === 'valider'
-                ? $this->workflowSettings()->actionValidationSummary()['service_review_success_text']
-                : 'Action rejetee. L agent peut mettre a jour et resoumettre.');
+            ->with('success', match ($decision) {
+                'valider' => $this->workflowSettings()->actionValidationSummary()['service_review_success_text'],
+                'demander_correction' => 'Correction demandee. L agent peut mettre a jour et resoumettre.',
+                default => 'Action rejetee. L agent peut mettre a jour et resoumettre.',
+            });
     }
 
     public function reviewClosureByDirection(
@@ -1378,12 +1332,6 @@ class ActionTrackingWebController extends Controller
             );
     }
 
-    private function canSubmitClosure(User $user, Action $action): bool
-    {
-        return $action->isResponsible($user)
-            && ($user->hasRole(User::ROLE_AGENT) || $action->isOperationalContext());
-    }
-
     private function canReviewByChef(User $user, Action $action): bool
     {
         if ($action->isResponsible($user)) {
@@ -1429,6 +1377,7 @@ class ActionTrackingWebController extends Controller
 
         return in_array($status, [
             ActionTrackingService::VALIDATION_NON_SOUMISE,
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
             ActionTrackingService::VALIDATION_REJETEE_CHEF,
             ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
         ], true);
@@ -1489,14 +1438,19 @@ class ActionTrackingWebController extends Controller
     private function reviewValidationRules(Request $request, bool $serviceStep): array
     {
         $commentRules = ['nullable', 'string'];
+        $allowedDecisions = $serviceStep ? ['valider', 'rejeter', 'demander_correction'] : ['valider', 'rejeter'];
 
-        if ($this->workflowSettings()->rejectionCommentRequired() && (string) $request->input('decision_validation') === 'rejeter') {
+        if ($this->workflowSettings()->rejectionCommentRequired()
+            && in_array((string) $request->input('decision_validation'), ['rejeter', 'demander_correction'], true)) {
             array_unshift($commentRules, 'required');
         }
 
         $rules = [
-            'decision_validation' => ['required', Rule::in(['valider', 'rejeter'])],
-            'evaluation_note' => ['required', 'numeric', 'min:0', 'max:100'],
+            'decision_validation' => ['required', Rule::in($allowedDecisions)],
+            'evaluation_note' => ['nullable', 'required_without:taux_valide_chef', 'numeric', 'min:0', 'max:100'],
+            'taux_valide_chef' => ['nullable', 'required_without:evaluation_note', 'numeric', 'min:0', 'max:100'],
+            'conformite_chef' => ['nullable', Rule::in(['conforme', 'partiellement_conforme', 'non_conforme'])],
+            'observation_qualite_chef' => ['nullable', 'string', 'max:3000'],
             'evaluation_commentaire' => $commentRules,
         ];
 

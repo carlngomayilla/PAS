@@ -62,7 +62,7 @@ class ActionWebController extends Controller
         $actionRelations = [
             'pta:id,pao_id,direction_id,service_id,titre,statut',
             'responsable:id,name,email',
-            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,kpi_qualite',
+            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite',
         ];
         if (Schema::hasTable('action_responsables')) {
             $actionRelations[] = 'responsables:id,name,email';
@@ -95,9 +95,6 @@ class ActionWebController extends Controller
             )->orderByDesc('id'),
             'kpi_global_desc' => $query->orderByDesc(
                 ActionKpi::query()->select('kpi_global')->whereColumn('action_id', 'actions.id')->limit(1)
-            )->orderByDesc('id'),
-            'kpi_qualite_desc' => $query->orderByDesc(
-                ActionKpi::query()->select('kpi_qualite')->whereColumn('action_id', 'actions.id')->limit(1)
             )->orderByDesc('id'),
             default => $query->orderByDesc('id'),
         };
@@ -661,6 +658,17 @@ class ActionWebController extends Controller
             $trackingService->syncFinancingRequest($action, $user);
             $action->refresh();
         }
+
+        // Si la mise a jour a fait passer l'action en statut metier `termine`,
+        // ou si toutes les sous-actions sont marquees effectuees, ou si la
+        // progression atteint 100 %, on tente la bascule auto vers le chef de
+        // service. Cf. ActionTrackingService::maybeAutoSubmitClosureToChef().
+        if ((string) ($action->statut ?? '') !== (string) ($before['statut'] ?? '')
+            || (string) $action->statut === 'termine') {
+            $trackingService->attemptAutoSubmitClosure($action, $user);
+            $action->refresh();
+        }
+
         $this->recordAudit($request, 'action', 'update', $action, $before, $action->toArray());
 
         $newResponsableId = (int) ($action->responsable_id ?? 0);
@@ -824,9 +832,12 @@ class ActionWebController extends Controller
         }
 
         if (! (bool) ($validated['financement_requis'] ?? false)) {
+            $validated['nature_financement'] = null;
             $validated['description_financement'] = null;
             $validated['source_financement'] = null;
             $validated['montant_estime'] = null;
+        } elseif (empty($validated['description_financement']) && ! empty($validated['nature_financement'])) {
+            $validated['description_financement'] = $validated['nature_financement'];
         }
 
         $validated['ressource_main_oeuvre'] = false;
@@ -894,7 +905,7 @@ class ActionWebController extends Controller
             return;
         }
 
-        foreach ($subActionsPayload as $subActionPayload) {
+        foreach ($subActionsPayload as $subActionIndex => $subActionPayload) {
             $label = trim((string) ($subActionPayload['libelle'] ?? ''));
             if ($label === '') {
                 continue;
@@ -911,7 +922,7 @@ class ActionWebController extends Controller
                 : null;
 
             $payload = [
-                'agent_id' => (int) ($subAction?->agent_id ?: $defaultAgentId),
+                'agent_id' => $this->resolveSubActionAgentId($subActionPayload, $subAction, $rmoIds, (int) $defaultAgentId, (int) $subActionIndex),
                 'libelle' => $label,
                 'description' => ($value = trim((string) ($subActionPayload['description'] ?? ''))) !== '' ? $value : null,
                 'resultat_attendu' => ($value = trim((string) ($subActionPayload['resultat_attendu'] ?? ''))) !== '' ? $value : null,
@@ -943,6 +954,35 @@ class ActionWebController extends Controller
     private function nullableFloat(mixed $value): ?float
     {
         return $value === null || $value === '' ? null : (float) $value;
+    }
+
+    /**
+     * @param array<string, mixed> $subActionPayload
+     * @param list<int> $rmoIds
+     */
+    private function resolveSubActionAgentId(array $subActionPayload, ?SousAction $subAction, array $rmoIds, int $defaultAgentId, int $subActionIndex = 0): int
+    {
+        $allowedAgentIds = collect($rmoIds)
+            ->push($defaultAgentId)
+            ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        $submittedAgentId = isset($subActionPayload['agent_id']) && is_numeric($subActionPayload['agent_id'])
+            ? (int) $subActionPayload['agent_id']
+            : 0;
+
+        if ($submittedAgentId > 0 && $allowedAgentIds->contains($submittedAgentId)) {
+            return $submittedAgentId;
+        }
+
+        $existingAgentId = (int) ($subAction?->agent_id ?? 0);
+        if ($existingAgentId > 0 && $allowedAgentIds->contains($existingAgentId)) {
+            return $existingAgentId;
+        }
+
+        return (int) ($allowedAgentIds->get($subActionIndex % max(1, $allowedAgentIds->count())) ?: $defaultAgentId);
     }
 
     /**
@@ -1420,7 +1460,7 @@ class ActionWebController extends Controller
             return;
         }
 
-        if ($user->isAgent() || $user->hasRole(User::ROLE_UCAS)) {
+        if ($user->isAgent()) {
             $query->where(function (Builder $agentQuery) use ($user): void {
                 $agentQuery->where('responsable_id', (int) $user->id);
 
@@ -1536,13 +1576,13 @@ class ActionWebController extends Controller
             ->join('action_kpis', 'action_kpis.action_id', '=', 'filtered_actions.id');
 
         $avgKpiGlobal = (clone $kpiBase)->avg('action_kpis.kpi_performance');
-        $avgQuality = (clone $kpiBase)->avg('action_kpis.kpi_qualite');
+        $avgConformite = (clone $kpiBase)->avg('action_kpis.kpi_conformite');
 
         return [
             'total' => (int) ($stats?->total ?? 0),
             'avg_progression' => round((float) ($stats?->avg_progression ?? 0), 2),
             'avg_kpi_global' => round((float) ($avgKpiGlobal ?? 0), 2),
-            'avg_quality' => round((float) ($avgQuality ?? 0), 2),
+            'avg_conformite' => round((float) ($avgConformite ?? 0), 2),
             'funded_count' => (int) ($stats?->funded_count ?? 0),
             'validated_count' => $validatedCount,
             'pending_validation_count' => $pendingValidationCount,
@@ -1578,7 +1618,6 @@ class ActionWebController extends Controller
             'kpi_performance_desc' => UiLabel::metric('performance').' le plus eleve',
             'kpi_conformite_desc' => UiLabel::metric('conformite').' le plus eleve',
             'kpi_global_desc' => UiLabel::metric('global').' le plus eleve',
-            'kpi_qualite_desc' => 'Qualite la plus forte',
         ];
     }
 

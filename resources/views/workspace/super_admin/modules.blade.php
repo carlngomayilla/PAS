@@ -98,7 +98,7 @@
             <div class="form-section">
                 <h2 class="form-section-title">Registre des modules</h2>
                 <p class="form-section-subtitle">Le module `Super Administration` reste toujours actif pour eviter un verrouillage de la plateforme.</p>
-                <div class="app-table-wrapper">
+                <div class="app-table-wrapper overflow-x-auto">
                     <table class="app-table data-table">
                         <thead>
                             <tr>

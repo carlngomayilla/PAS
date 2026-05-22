@@ -25,7 +25,6 @@ class KpiAggregatorService
             'delai' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
             'performance' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
             'conformite' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
-            'qualite' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_qualite ?? 0)),
             'global' => $average($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
             'progression' => $average($actions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
         ];

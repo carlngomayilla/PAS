@@ -17,8 +17,8 @@
         </div>
     @endif
 
-    <div class="app-table-wrapper border-0 shadow-none">
-        <table class="app-table data-table">
+    <div class="app-table-wrapper overflow-x-auto border-0 shadow-none">
+        <table class="app-table data-table min-w-[1200px] w-full text-sm">
             {{ $table ?? $slot }}
         </table>
     </div>

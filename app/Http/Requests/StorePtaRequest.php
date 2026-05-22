@@ -97,6 +97,7 @@ class StorePtaRequest extends FormRequest
             'actions.*.justificatif_obligatoire' => ['nullable', 'boolean'],
             'actions.*.sous_actions' => ['nullable', 'array'],
             'actions.*.sous_actions.*.id' => ['nullable', 'integer', 'exists:sous_actions,id'],
+            'actions.*.sous_actions.*.agent_id' => ['nullable', 'integer', 'exists:users,id'],
             'actions.*.sous_actions.*.libelle' => ['nullable', 'string', 'max:255'],
             'actions.*.sous_actions.*.description' => ['nullable', 'string'],
             'actions.*.sous_actions.*.resultat_attendu' => ['nullable', 'string'],
@@ -134,6 +135,25 @@ class StorePtaRequest extends FormRequest
     {
         return [
             'service_id.unique' => 'Un PTA existe deja pour ce service.',
+            'actions.*.libelle.required' => 'Le titre de l action est obligatoire.',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'actions.*.libelle' => 'titre de l action',
+            'actions.*.date_debut' => 'date de debut',
+            'actions.*.date_fin' => 'date de fin',
+            'actions.*.rmo_ids' => 'RMO',
+            'actions.*.montant_estime' => 'montant estime',
+            'actions.*.nature_financement' => 'nature du financement',
+            'actions.*.source_financement' => 'source de financement',
+            'actions.*.commentaire_financement' => 'commentaire financement',
+            'actions.*.justificatif_financement' => 'piece justificative de financement',
         ];
     }
 
@@ -246,6 +266,13 @@ class StorePtaRequest extends FormRequest
                             'Le montant est obligatoire lorsque le financement est requis.'
                         );
                     }
+
+                    if (trim((string) ($actionPayload['nature_financement'] ?? '')) === '') {
+                        $validator->errors()->add(
+                            "actions.{$index}.nature_financement",
+                            'La nature du financement est obligatoire lorsque le financement est requis.'
+                        );
+                    }
                 }
             }
         });
@@ -300,7 +327,7 @@ class StorePtaRequest extends FormRequest
                 $action['sous_actions'] = collect($action['sous_actions'] ?? [])
                     ->filter(fn ($subAction): bool => is_array($subAction))
                     ->map(function (array $subAction): array {
-                        foreach (['id', 'libelle', 'description', 'resultat_attendu', 'date_debut', 'date_fin', 'cible_prevue', 'unite', 'commentaire'] as $key) {
+                        foreach (['id', 'agent_id', 'libelle', 'description', 'resultat_attendu', 'date_debut', 'date_fin', 'cible_prevue', 'unite', 'commentaire'] as $key) {
                             $subAction[$key] = $subAction[$key] ?? null;
                         }
 

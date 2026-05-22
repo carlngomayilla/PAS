@@ -145,7 +145,7 @@ class AlertCenterService
                 'pta.direction:id,code,libelle',
                 'pta.service:id,code,libelle',
                 'responsable:id,name',
-                'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
+                'actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
             ])
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', $today)
@@ -196,7 +196,7 @@ class AlertCenterService
             ->with([
                 'kpi:id,action_id,libelle,seuil_alerte,periodicite',
                 'kpi.action:id,pta_id,libelle,responsable_id',
-                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
+                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'kpi.action.pta.direction:id,code,libelle',
                 'kpi.action.pta.service:id,code,libelle',
@@ -215,7 +215,7 @@ class AlertCenterService
         $query = ActionLog::query()
             ->with([
                 'action:id,pta_id,libelle,statut_dynamique',
-                'action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
+                'action.actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
                 'action.pta:id,direction_id,service_id,titre',
                 'action.pta.direction:id,code,libelle',
                 'action.pta.service:id,code,libelle',
@@ -374,7 +374,7 @@ class AlertCenterService
                 'pta.direction:id,code,libelle',
                 'pta.service:id,code,libelle',
                 'responsable:id,name',
-                'actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
+                'actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
             ])
             ->whereKey($id)
             ->whereNotNull('date_echeance')
@@ -417,7 +417,7 @@ class AlertCenterService
             ->with([
                 'kpi:id,action_id,libelle,seuil_alerte,periodicite',
                 'kpi.action:id,pta_id,libelle,responsable_id',
-                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
+                'kpi.action.actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
                 'kpi.action.pta:id,direction_id,service_id,titre',
                 'kpi.action.pta.direction:id,code,libelle',
                 'kpi.action.pta.service:id,code,libelle',
@@ -435,7 +435,7 @@ class AlertCenterService
         $query = ActionLog::query()
             ->with([
                 'action:id,pta_id,libelle,statut_dynamique',
-                'action.actionKpi:id,action_id,kpi_global,kpi_qualite,kpi_performance',
+                'action.actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
                 'action.pta:id,direction_id,service_id,titre',
                 'action.pta.direction:id,code,libelle',
                 'action.pta.service:id,code,libelle',
@@ -871,7 +871,7 @@ class AlertCenterService
 
         return [
             'kpi_global' => round((float) ($action->actionKpi?->kpi_global ?? 0), 2),
-            'kpi_qualite' => round((float) ($action->actionKpi?->kpi_qualite ?? 0), 2),
+            'kpi_conformite' => round((float) ($action->actionKpi?->kpi_conformite ?? 0), 2),
             'kpi_performance' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
         ];
     }

@@ -34,7 +34,9 @@ class ActionTrackingService
         private readonly ActionManagementSettings $actionManagementSettings,
         private readonly NotificationPolicySettings $notificationPolicySettings,
         private readonly ActionProgressService $actionProgressService,
-        private readonly ActionPerformanceService $actionPerformanceService
+        private readonly ActionPerformanceService $actionPerformanceService,
+        private readonly ActionStatusService $actionStatusService,
+        private readonly WorkspaceNotificationService $notificationService
     ) {
     }
 
@@ -68,6 +70,7 @@ class ActionTrackingService
     public const VALIDATION_NON_SOUMISE = 'non_soumise';
     public const VALIDATION_SOUMISE_CHEF = 'soumise_chef';
     public const VALIDATION_REJETEE_CHEF = 'rejetee_chef';
+    public const VALIDATION_CORRECTION_DEMANDEE = 'correction_demandee';
     public const VALIDATION_VALIDEE_CHEF = 'validee_chef';
     public const VALIDATION_REJETEE_DIRECTION = 'rejetee_direction';
     public const VALIDATION_VALIDEE_DIRECTION = 'validee_direction';
@@ -177,6 +180,7 @@ class ActionTrackingService
             self::VALIDATION_NON_SOUMISE,
             self::VALIDATION_SOUMISE_CHEF,
             self::VALIDATION_REJETEE_CHEF,
+            self::VALIDATION_CORRECTION_DEMANDEE,
             self::VALIDATION_VALIDEE_CHEF,
             self::VALIDATION_REJETEE_DIRECTION,
             self::VALIDATION_VALIDEE_DIRECTION,
@@ -339,7 +343,129 @@ class ActionTrackingService
 
         $this->refreshActionMetrics($action);
 
+        $this->maybeAutoSubmitClosureToChef($action->fresh(), $actor);
+
         return $week->fresh();
+    }
+
+    /**
+     * Bascule automatique vers le chef de service.
+     *
+     * L'ancien formulaire agent « Soumission de clôture » a été supprimé : la
+     * bascule se produit donc dès qu'une des conditions suivantes est remplie,
+     * à partir du moment où l'action est démarrée et n'est pas déjà soumise ou
+     * validée :
+     *
+     *   1. Toutes les périodes de suivi sont renseignées ET la progression
+     *      réelle atteint 100 % (cas nominal d'une action quantitative menée
+     *      au bout). C'est le déclencheur historique.
+     *   2. Le statut métier passe à `termine` (l'agent a explicitement marqué
+     *      l'action achevée via le bouton « statut rapide »).
+     *   3. L'action est suivie en mode sous-actions / mixte et toutes ses
+     *      sous-actions sont marquées « effectuée ».
+     *
+     * Cette logique cohabite avec le nouveau bouton « Demander la clôture »
+     * (route `workspace.actions.submit-closure`), qui force explicitement la
+     * soumission quand l'agent considère son travail abouti.
+     */
+    private function maybeAutoSubmitClosureToChef(?Action $action, ?User $actor): void
+    {
+        if (! $action instanceof Action) {
+            return;
+        }
+
+        $current = (string) ($action->statut_validation ?? self::VALIDATION_NON_SOUMISE);
+        if (in_array($current, [
+            self::VALIDATION_SOUMISE_CHEF,
+            self::VALIDATION_VALIDEE_CHEF,
+            self::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
+            return;
+        }
+
+        // L'action doit avoir été demarree. Sans cette garde, soumettre une
+        // action `non_demarre` leverait une exception dans
+        // submitClosureForReview.
+        if (! $this->actionStatusService->isStarted($action)) {
+            return;
+        }
+
+        // Forcer le chargement des relations dont depend
+        // ActionPerformanceService::calculateRealProgress (semaines et
+        // sous-actions). Sans cela les sommes hebdomadaires retomberaient a 0
+        // et la bascule n'aboutirait jamais.
+        $action->loadMissing(['weeks', 'sousActions']);
+
+        if (! $this->shouldAutoSubmitClosure($action)) {
+            return;
+        }
+
+        $payload = [
+            'date_fin_reelle' => optional($action->date_fin_reelle)->toDateString() ?: now()->toDateString(),
+            'rapport_final' => (string) ($action->rapport_final ?? 'Soumission automatique : conditions de cloture atteintes.'),
+        ];
+
+        $this->submitClosureForReview($action, $payload, $actor);
+
+        $action->refresh()->loadMissing('pta:id,direction_id,service_id');
+        $submissionTarget = $this->workflowSettings->actionSubmissionTarget();
+
+        if ($submissionTarget === 'service') {
+            $this->notificationService->notifyActionSubmittedToChef($action, $actor);
+        } elseif ($submissionTarget === 'direction') {
+            $this->notificationService->notifyActionSubmittedToDirection($action, $actor);
+        } else {
+            $this->notificationService->notifyActionFinalizedWithoutWorkflow($action, $actor);
+        }
+    }
+
+    /**
+     * Point d'entrée public pour redéclencher la bascule automatique vers le
+     * chef de service depuis l'extérieur du service (typiquement après une
+     * modification de l'action qui peut changer le statut métier à `termine`,
+     * ou après synchronisation de sous-actions).
+     */
+    public function attemptAutoSubmitClosure(Action $action, ?User $actor = null): void
+    {
+        $this->maybeAutoSubmitClosureToChef($action->fresh(), $actor);
+    }
+
+    /**
+     * Détermine si l'action remplit l'une des conditions de bascule
+     * automatique vers le chef de service. Voir
+     * {@see self::maybeAutoSubmitClosureToChef()} pour le détail métier.
+     *
+     * Hypothèse d'appel : `$action` a déjà été vérifiée comme démarrée et ses
+     * relations `weeks` et `sousActions` sont chargées.
+     */
+    private function shouldAutoSubmitClosure(Action $action): bool
+    {
+        // Cas 1 — statut métier explicitement marqué « terminé » par l'agent.
+        if ((string) $action->statut === 'termine') {
+            return true;
+        }
+
+        // Cas 2 — mode sous-actions / mixte avec toutes les sous-actions
+        // marquées effectuées (et au moins une définie).
+        if ($action->usesSubTasksProgress()) {
+            $sousActions = $action->sousActions;
+            if ($sousActions->isNotEmpty()
+                && $sousActions->every(fn ($sa) => (bool) $sa->est_effectuee === true)
+            ) {
+                return true;
+            }
+        }
+
+        // Cas 3 (historique) — toutes les périodes renseignées + 100 % réel.
+        $weeks = $action->weeks;
+        if ($weeks->isNotEmpty()
+            && ! $weeks->contains(fn (ActionWeek $week): bool => ! (bool) $week->est_renseignee)
+            && $this->actionPerformanceService->calculateRealProgress($action) >= 100.0
+        ) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -353,7 +479,7 @@ class ActionTrackingService
      */
     public function submitClosureForReview(Action $action, array $payload, ?User $actor = null): Action
     {
-        if ($action->statut_dynamique === self::STATUS_NON_DEMARRE) {
+        if (! $this->actionStatusService->isStarted($action)) {
             throw new \InvalidArgumentException('Une action non démarrée ne peut pas être soumise à validation.');
         }
 
@@ -450,33 +576,68 @@ class ActionTrackingService
     {
         $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
         $isApproved = $decision === 'valider';
+        $isCorrectionRequested = $decision === 'demander_correction';
         $directionEnabled = $this->workflowSettings->directionValidationEnabled();
+        $oldStatus = (string) ($action->statut_validation ?? self::VALIDATION_NON_SOUMISE);
+        $validatedRate = $payload['taux_valide_chef'] ?? $payload['evaluation_note'] ?? null;
 
-        $action->forceFill([
-            'statut_validation' => $isApproved
-                ? self::VALIDATION_VALIDEE_CHEF
-                : self::VALIDATION_REJETEE_CHEF,
+        $updates = [
+            'statut_validation' => match (true) {
+                $isApproved => self::VALIDATION_VALIDEE_CHEF,
+                $isCorrectionRequested => self::VALIDATION_CORRECTION_DEMANDEE,
+                default => self::VALIDATION_REJETEE_CHEF,
+            },
             'validation_hierarchique' => $isApproved,
             'validation_sans_correction' => $isApproved
                 ? ($payload['validation_sans_correction'] ?? $action->validation_sans_correction)
                 : null,
             'evalue_par' => $actor?->id,
             'evalue_le' => now(),
-            'evaluation_note' => $payload['evaluation_note'] ?? null,
+            'evaluation_note' => $validatedRate,
             'evaluation_commentaire' => $payload['evaluation_commentaire'] ?? null,
-        ])->save();
+        ];
+
+        if (! $isApproved) {
+            $updates['statut_dynamique'] = self::STATUS_A_CORRIGER;
+            $updates['statut'] = $this->mapLegacyStatus(self::STATUS_A_CORRIGER);
+        }
+
+        foreach ([
+            'taux_valide_chef' => $validatedRate,
+            'conformite_chef' => $payload['conformite_chef'] ?? null,
+            'observation_qualite_chef' => $payload['observation_qualite_chef'] ?? null,
+        ] as $column => $value) {
+            if (Schema::hasColumn($action->getTable(), $column)) {
+                $updates[$column] = $value;
+            }
+        }
+
+        $action->forceFill($updates)->save();
+
+        $eventType = match (true) {
+            $isApproved => 'action_validee_chef',
+            $isCorrectionRequested => 'action_correction_demandee',
+            default => 'action_rejetee_chef',
+        };
 
         $this->createLogIfMissingToday(
             $action,
-            $isApproved ? 'action_validee_chef' : 'action_rejetee_chef',
+            $eventType,
             $isApproved ? 'info' : 'warning',
-            $isApproved
-                ? ($directionEnabled
-                    ? 'Action validee par le chef de service. Validation finale du circuit.'
-                    : 'Action validee par le chef de service. Validation finale du circuit.')
-                : 'Action rejetee par le chef de service.',
+            match (true) {
+                $isApproved && $directionEnabled => 'Action validee par le chef de service. En attente de validation direction.',
+                $isApproved => 'Action validee par le chef de service. Validation finale du circuit.',
+                $isCorrectionRequested => 'Correction demandee par le chef de service.',
+                default => 'Action rejetee par le chef de service.',
+            },
             [
                 'evaluation_note' => $action->evaluation_note,
+                'taux_valide_chef' => $validatedRate,
+                'conformite_chef' => $payload['conformite_chef'] ?? null,
+                'observation_qualite_chef' => $payload['observation_qualite_chef'] ?? null,
+                'decision' => $decision,
+                'ancien_statut' => $oldStatus,
+                'nouveau_statut' => $action->statut_validation,
                 'statut_validation' => $action->statut_validation,
                 'workflow_final_stage' => 'service',
             ],
@@ -488,11 +649,17 @@ class ActionTrackingService
             $action,
             (string) ($payload['evaluation_commentaire'] ?? ($isApproved
                 ? 'Validation finale chef de service.'
-                : 'Rejet chef de service.')),
-            $isApproved ? 'action_validee_chef' : 'action_rejetee_chef',
+                : ($isCorrectionRequested ? 'Correction demandee par le chef de service.' : 'Rejet chef de service.'))),
+            $eventType,
             $isApproved ? 'info' : 'warning',
             [
                 'evaluation_note' => $action->evaluation_note,
+                'taux_valide_chef' => $validatedRate,
+                'conformite_chef' => $payload['conformite_chef'] ?? null,
+                'observation_qualite_chef' => $payload['observation_qualite_chef'] ?? null,
+                'decision' => $decision,
+                'ancien_statut' => $oldStatus,
+                'nouveau_statut' => $action->statut_validation,
                 'statut_validation' => $action->statut_validation,
                 'validation_sans_correction' => $action->validation_sans_correction,
                 'workflow_final_stage' => 'service',
@@ -511,6 +678,7 @@ class ActionTrackingService
     {
         $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
         $isApproved = $decision === 'valider';
+        $oldStatus = (string) ($action->statut_validation ?? self::VALIDATION_NON_SOUMISE);
 
         $action->forceFill([
             'statut_validation' => $isApproved ? self::VALIDATION_VALIDEE_DIRECTION : self::VALIDATION_REJETEE_DIRECTION,
@@ -530,6 +698,9 @@ class ActionTrackingService
                 ? 'Action validee par le directeur.'
                 : 'Action rejetee par le directeur.',
             [
+                'decision' => $decision,
+                'ancien_statut' => $oldStatus,
+                'nouveau_statut' => $action->statut_validation,
                 'evaluation_note' => $action->direction_evaluation_note,
                 'statut_validation' => $action->statut_validation,
             ],
@@ -545,6 +716,9 @@ class ActionTrackingService
             $isApproved ? 'action_validee_direction' : 'action_rejetee_direction',
             $isApproved ? 'info' : 'warning',
             [
+                'decision' => $decision,
+                'ancien_statut' => $oldStatus,
+                'nouveau_statut' => $action->statut_validation,
                 'evaluation_note' => $action->direction_evaluation_note,
                 'statut_validation' => $action->statut_validation,
             ],
@@ -552,14 +726,6 @@ class ActionTrackingService
         );
 
         return $this->refreshActionMetrics($action);
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     */
-    public function closeAction(Action $action, array $payload, ?User $actor = null): Action
-    {
-        return $this->submitClosureForReview($action, $payload, $actor);
     }
 
     // ── FINANCEMENT ───────────────────────────────────────────────────────────
@@ -838,7 +1004,6 @@ class ActionTrackingService
                 'kpi_delai' => 0.0,
                 'kpi_performance' => 0.0,
                 'kpi_conformite' => 0.0,
-                'kpi_qualite' => 0.0,
                 'kpi_global' => 0.0,
             ];
         } else {
@@ -981,7 +1146,6 @@ class ActionTrackingService
                 'kpi_delai' => 0.0,
                 'kpi_performance' => 0.0,
                 'kpi_conformite' => 0.0,
-                'kpi_qualite' => 0.0,
                 'kpi_global' => 0.0,
             ],
             default => $this->calculateActionKpis($action, $realProgress, $theoreticalProgress, $quantitativeBase, $referenceDate),
@@ -1124,6 +1288,14 @@ class ActionTrackingService
             return self::STATUS_SUSPENDU;
         }
 
+        if (in_array((string) ($action->statut_validation ?? ''), [
+            self::VALIDATION_REJETEE_CHEF,
+            self::VALIDATION_CORRECTION_DEMANDEE,
+            self::VALIDATION_REJETEE_DIRECTION,
+        ], true)) {
+            return self::STATUS_A_CORRIGER;
+        }
+
         $startDate = $action->date_debut !== null ? Carbon::parse($action->date_debut)->startOfDay() : null;
         $endDate = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
         $actualEnd = $action->date_fin_reelle !== null ? Carbon::parse($action->date_fin_reelle)->endOfDay() : null;
@@ -1140,8 +1312,12 @@ class ActionTrackingService
             return self::STATUS_ACHEVE_HORS_DELAI;
         }
 
-        if ($startDate !== null && $referenceDate->lt($startDate)) {
+        if ($realProgress <= 0.0 && ! $this->actionStatusService->isStarted($action)) {
             return self::STATUS_NON_DEMARRE;
+        }
+
+        if ($startDate !== null && $referenceDate->lt($startDate)) {
+            return self::STATUS_EN_COURS;
         }
 
         if ($endDate !== null && $referenceDate->gt($endDate)) {
@@ -1159,7 +1335,7 @@ class ActionTrackingService
     }
 
     /**
-     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_global: float}|null
+     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float}|null
      */
     private function frozenActionKpis(Action $action): ?array
     {
@@ -1175,7 +1351,6 @@ class ActionTrackingService
             'kpi_delai' => (float) $existingKpi->kpi_delai,
             'kpi_performance' => (float) $existingKpi->kpi_performance,
             'kpi_conformite' => (float) $existingKpi->kpi_conformite,
-            'kpi_qualite' => (float) $existingKpi->kpi_qualite,
             // Lecture de la valeur réellement stockée (gel des KPI).
             // L'ancien code écrasait kpi_global avec kpi_performance, ce qui faisait
             // perdre la valeur figée pour les actions suspendues.
@@ -1184,7 +1359,7 @@ class ActionTrackingService
     }
 
     /**
-     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_global: float}
+     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float}
      */
     private function calculateActionKpis(
         Action $action,
@@ -1195,23 +1370,21 @@ class ActionTrackingService
     ): array {
         $realProgress = $this->actionPerformanceService->calculateRealProgress($action);
         $delayKpi = $this->actionPerformanceService->calculateDelayScore($action, $referenceDate);
-        $qualityKpi = $this->actionPerformanceService->calculateQualityScore($action);
+        $conformiteKpi = $this->actionPerformanceService->calculateConformityScore($action);
         $performanceKpi = $this->actionPerformanceService->calculateExecutionPerformance($action, $referenceDate);
-        $conformiteKpi = $qualityKpi;
         $globalKpi = $performanceKpi;
 
         return [
             'kpi_delai' => $delayKpi,
             'kpi_performance' => $performanceKpi,
             'kpi_conformite' => $conformiteKpi,
-            'kpi_qualite' => $qualityKpi,
             'kpi_global' => $globalKpi,
         ];
     }
 
     /**
      * @param \Illuminate\Support\Collection<int, ActionWeek> $weeks
-     * @param array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_qualite: float, kpi_global: float} $kpis
+     * @param array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float} $kpis
      */
     private function generateAutomaticAlerts(
         Action $action,

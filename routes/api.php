@@ -63,12 +63,15 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
             ->name('actions.weeks');
         Route::post('actions/{action}/weeks/{actionWeek}/submit', [ActionWeekController::class, 'submitWeek'])
             ->name('actions.weeks.submit');
-        Route::post('actions/{action}/close', [ActionValidationController::class, 'close'])
-            ->name('actions.close');
         Route::post('actions/{action}/review', [ActionValidationController::class, 'review'])
             ->name('actions.review');
-        Route::post('actions/{action}/review-direction', [ActionValidationController::class, 'reviewDirection'])
-            ->name('actions.review-direction');
+        // Etape « validation direction » supprimee — stub 403 pour les anciens
+        // consommateurs API. Cf. routes/web.php.
+        Route::post('actions/{action}/review-direction', static function () {
+            return response()->json([
+                'message' => "L'etape de validation direction a ete supprimee. Le circuit se termine au chef de service.",
+            ], 403);
+        })->name('actions.review-direction');
         Route::post('actions/{action}/comments', [ActionCommentController::class, 'comment'])
             ->name('actions.comments');
         Route::get('actions/{action}/logs', [ActionCommentController::class, 'logs'])

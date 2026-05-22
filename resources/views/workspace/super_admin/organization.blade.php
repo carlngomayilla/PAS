@@ -303,7 +303,7 @@
             </div>
             <span class="showcase-chip">{{ count($directionRows) }} lignes</span>
         </div>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead><tr><th>Direction</th><th>État</th><th>Services</th><th>Utilisateurs</th><th>Actions</th></tr></thead>
                 <tbody>
@@ -337,7 +337,7 @@
             </div>
             <span class="showcase-chip">{{ count($serviceRows) }} lignes</span>
         </div>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead><tr><th>Service</th><th>État</th><th>Utilisateurs</th><th>PTA</th><th>Actions</th></tr></thead>
                 <tbody>
@@ -422,7 +422,7 @@
             <div class="mb-3 flex flex-wrap gap-2">
                 <button class="btn btn-primary" type="submit">Appliquer aux lignes cochées</button>
             </div>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead><tr><th><input type="checkbox" data-check-all-users></th><th>Utilisateur</th><th>Rôle</th><th>Portée</th><th>État</th><th>Suspension</th><th>Sessions</th><th>Dernière activité</th><th>Opérations</th></tr></thead>
                 <tbody>
@@ -503,7 +503,7 @@
                 <span class="showcase-chip">{{ $loginHistory->count() }} événements</span>
             </div>
         </div>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>IP</th><th>Agent</th></tr></thead>
                 <tbody>
@@ -636,7 +636,7 @@
             </div>
             <span class="showcase-chip">{{ count($orgHistory ?? []) }} opérations</span>
         </div>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Entité</th></tr></thead>
                 <tbody>

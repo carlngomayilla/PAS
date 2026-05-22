@@ -7,6 +7,7 @@ use App\Services\Security\PasswordPolicyService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
 {
@@ -62,9 +63,12 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
             ])
             ->all();
 
+        $syncedEmails = [];
+
         foreach ($this->users() as $index => $rawUser) {
             $user = $this->normalizeUserOrganization($rawUser);
             $email = strtolower((string) $user['email']);
+            $syncedEmails[] = $email;
             $directionId = $directionIds[$user['direction_code']] ?? null;
             $serviceId = null;
 
@@ -93,6 +97,22 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
                 'service_id' => $serviceId,
                 'updated_at' => $now,
             ];
+
+            if (Schema::hasColumn('users', 'custom_role_code')) {
+                $payload['custom_role_code'] = null;
+            }
+
+            if (Schema::hasColumn('users', 'is_active')) {
+                $payload['is_active'] = true;
+            }
+
+            if (Schema::hasColumn('users', 'deleted_at')) {
+                $payload['deleted_at'] = null;
+            }
+
+            if (Schema::hasColumn('users', 'unite_dg_id')) {
+                $payload['unite_dg_id'] = null;
+            }
 
             if ($existingUser !== null) {
                 $payload['email_verified_at'] = $existingUser->email_verified_at ?? $now;
@@ -126,22 +146,29 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
                 ];
             }
 
-            DB::table('users')->insert([
-                'name' => $user['name'],
+            DB::table('users')->insert(array_merge($payload, [
                 'email' => $email,
                 'password' => Hash::make($temporaryPassword),
-                'role' => $user['role'],
-                'is_agent' => $user['role'] === User::ROLE_AGENT,
-                'agent_matricule' => $matricule,
-                'agent_fonction' => $user['fonction'],
-                'agent_telephone' => null,
-                'direction_id' => $directionId,
-                'service_id' => $serviceId,
                 'email_verified_at' => $now,
                 'password_changed_at' => $passwordChangedAt,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]);
+            ]));
+        }
+
+        if (Schema::hasColumn('users', 'is_active') && $syncedEmails !== []) {
+            DB::table('users')
+                ->where(function ($query): void {
+                    $query->where('email', 'like', '%@anbg.ga')
+                        ->orWhere('email', 'like', '%@anbg.test');
+                })
+                ->whereNotIn('email', $syncedEmails)
+                ->update([
+                    'is_active' => false,
+                    'updated_at' => $now,
+                ]);
+
+            $this->deleteInactiveOrganizationUsers($now);
         }
 
         $this->deleteLegacyOrganizationEntries($now);
@@ -178,5 +205,151 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
                 $this->generatedCredentialsForNewUsers
             )
         );
+    }
+
+    private function deleteInactiveOrganizationUsers(mixed $now): void
+    {
+        if (! Schema::hasColumn('users', 'is_active')) {
+            return;
+        }
+
+        $query = DB::table('users')
+            ->where('is_active', false)
+            ->where(function ($query): void {
+                $query->where('email', 'like', '%@anbg.ga')
+                    ->orWhere('email', 'like', '%@anbg.test');
+            });
+
+        if (Schema::hasColumn('users', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        $deleted = 0;
+        $skipped = 0;
+
+        $query->orderBy('id')
+            ->get(['id', 'service_id', 'direction_id', 'email'])
+            ->each(function ($inactiveUser) use ($now, &$deleted, &$skipped): void {
+                $replacementUserId = $this->replacementActiveUserId($inactiveUser);
+
+                if ($replacementUserId === null) {
+                    $skipped++;
+
+                    return;
+                }
+
+                $this->transferUserActions((int) $inactiveUser->id, $replacementUserId, $now);
+                $this->deleteInactiveUser((int) $inactiveUser->id, $now);
+                $deleted++;
+            });
+
+        if ($deleted > 0) {
+            $this->command?->info("Comptes inactifs supprimes: {$deleted}. Actions transferees vers un compte actif du meme service.");
+        }
+
+        if ($skipped > 0) {
+            $this->command?->warn("Comptes inactifs conserves faute de compte actif dans le meme service: {$skipped}.");
+        }
+    }
+
+    private function replacementActiveUserId(object $inactiveUser): ?int
+    {
+        if ($inactiveUser->service_id === null) {
+            return null;
+        }
+
+        $query = DB::table('users')
+            ->where('id', '!=', (int) $inactiveUser->id)
+            ->where('service_id', (int) $inactiveUser->service_id)
+            ->where('is_active', true);
+
+        if (Schema::hasColumn('users', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        $replacementId = $query
+            ->orderByRaw(
+                "CASE WHEN role = ? THEN 0 WHEN role = ? THEN 1 ELSE 2 END",
+                [User::ROLE_AGENT, User::ROLE_SERVICE]
+            )
+            ->orderBy('id')
+            ->value('id');
+
+        return $replacementId !== null ? (int) $replacementId : null;
+    }
+
+    private function transferUserActions(int $fromUserId, int $toUserId, mixed $now): void
+    {
+        if (Schema::hasTable('actions')) {
+            DB::table('actions')
+                ->where('responsable_id', $fromUserId)
+                ->update([
+                    'responsable_id' => $toUserId,
+                    'updated_at' => $now,
+                ]);
+        }
+
+        if (Schema::hasTable('action_responsables')) {
+            DB::table('action_responsables')
+                ->where('user_id', $fromUserId)
+                ->orderBy('id')
+                ->get(['id', 'action_id', 'is_primary'])
+                ->each(function ($assignment) use ($toUserId, $now): void {
+                    $existing = DB::table('action_responsables')
+                        ->where('action_id', (int) $assignment->action_id)
+                        ->where('user_id', $toUserId)
+                        ->first(['id', 'is_primary']);
+
+                    if ($existing !== null) {
+                        if ((bool) $assignment->is_primary && ! (bool) $existing->is_primary) {
+                            DB::table('action_responsables')
+                                ->where('id', (int) $existing->id)
+                                ->update([
+                                    'is_primary' => true,
+                                    'updated_at' => $now,
+                                ]);
+                        }
+
+                        DB::table('action_responsables')
+                            ->where('id', (int) $assignment->id)
+                            ->delete();
+
+                        return;
+                    }
+
+                    DB::table('action_responsables')
+                        ->where('id', (int) $assignment->id)
+                        ->update([
+                            'user_id' => $toUserId,
+                            'updated_at' => $now,
+                        ]);
+                });
+        }
+
+        if (Schema::hasTable('sous_actions') && Schema::hasColumn('sous_actions', 'agent_id')) {
+            DB::table('sous_actions')
+                ->where('agent_id', $fromUserId)
+                ->update([
+                    'agent_id' => $toUserId,
+                    'updated_at' => $now,
+                ]);
+        }
+    }
+
+    private function deleteInactiveUser(int $userId, mixed $now): void
+    {
+        if (Schema::hasColumn('users', 'deleted_at')) {
+            DB::table('users')
+                ->where('id', $userId)
+                ->update([
+                    'is_active' => false,
+                    'deleted_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+            return;
+        }
+
+        DB::table('users')->where('id', $userId)->delete();
     }
 }

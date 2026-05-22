@@ -13,12 +13,13 @@ class ActionCalculationSettings
 {
     public const OFFICIAL_SCOPE_ALL_VISIBLE = 'all_visible';
     public const STATISTICAL_SCOPE_ALL_VISIBLE = self::OFFICIAL_SCOPE_ALL_VISIBLE;
-
-    // A10 — Politique par defaut : exclut les actions rejetees du calcul des
-    // KPI consolides. Les rejetees restent visibles dans le workflow mais ne
-    // gonflent plus les statistiques officielles. Le super-admin peut basculer
-    // sur STATISTICAL_SCOPE_ALL_VISIBLE pour retrouver l ancien comportement.
     public const SCOPE_EXCLUDE_REJECTED = 'exclude_rejected';
+
+    public const LEVEL_VALIDATION_AGENT = 'validation_agent';
+    public const LEVEL_VALIDATION_CHEF = 'validation_chef';
+    public const LEVEL_VALIDATION_DIRECTION = 'validation_direction';
+    public const LEVEL_VALIDATION_SCIQ = 'validation_sciq';
+    public const LEVEL_VALIDATION_DG = 'validation_dg';
 
     public const SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS = 'actions_official_validation_status';
     public const SETTING_ACTIONS_STATISTICAL_SCOPE = 'actions_statistical_scope';
@@ -65,19 +66,21 @@ class ActionCalculationSettings
     public function defaults(): array
     {
         return [
-            // A10 — Defaut institutionnel : exclure les actions rejetees.
-            self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => self::SCOPE_EXCLUDE_REJECTED,
-            self::SETTING_ACTIONS_STATISTICAL_SCOPE => self::SCOPE_EXCLUDE_REJECTED,
+            self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => self::LEVEL_VALIDATION_DIRECTION,
+            self::SETTING_ACTIONS_STATISTICAL_SCOPE => self::LEVEL_VALIDATION_DIRECTION,
         ];
     }
 
     public function statisticalScope(): string
     {
-        $value = (string) ($this->get(self::SETTING_ACTIONS_STATISTICAL_SCOPE, self::SCOPE_EXCLUDE_REJECTED) ?? self::SCOPE_EXCLUDE_REJECTED);
+        $value = $this->normalizeScope((string) ($this->get(
+            self::SETTING_ACTIONS_STATISTICAL_SCOPE,
+            self::LEVEL_VALIDATION_DIRECTION
+        ) ?? self::LEVEL_VALIDATION_DIRECTION));
 
         return array_key_exists($value, $this->statisticalScopeOptions())
             ? $value
-            : self::SCOPE_EXCLUDE_REJECTED;
+            : self::LEVEL_VALIDATION_DIRECTION;
     }
 
     /**
@@ -86,8 +89,13 @@ class ActionCalculationSettings
     public function statisticalScopeOptions(): array
     {
         return [
-            self::SCOPE_EXCLUDE_REJECTED => 'Toutes les actions visibles, sauf les rejetées (recommandé)',
-            self::STATISTICAL_SCOPE_ALL_VISIBLE => 'Toutes les actions visibles (y compris rejetées)',
+            self::LEVEL_VALIDATION_DIRECTION => 'Validation direction (statistiques officielles)',
+            self::LEVEL_VALIDATION_CHEF => 'Validation chef ou direction',
+            self::LEVEL_VALIDATION_AGENT => 'Soumission agent ou validation hierarchique',
+            self::LEVEL_VALIDATION_SCIQ => 'Validation SCIQ (niveau direction)',
+            self::LEVEL_VALIDATION_DG => 'Validation DG (niveau direction)',
+            self::SCOPE_EXCLUDE_REJECTED => 'Ancienne regle : visibles hors rejetees',
+            self::STATISTICAL_SCOPE_ALL_VISIBLE => 'Toutes les actions visibles',
         ];
     }
 
@@ -104,39 +112,43 @@ class ActionCalculationSettings
      */
     public function validationStatusesFrom(string $status): array
     {
-        return match ($status) {
+        return match ($this->normalizeScope($status)) {
             self::OFFICIAL_SCOPE_ALL_VISIBLE => [
                 ActionTrackingService::VALIDATION_NON_SOUMISE,
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_REJETEE_CHEF,
+                ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
                 ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
-            // A10 — Statuts comptes dans les KPI quand on exclut les rejetees.
             self::SCOPE_EXCLUDE_REJECTED => [
                 ActionTrackingService::VALIDATION_NON_SOUMISE,
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
-            ActionTrackingService::VALIDATION_SOUMISE_CHEF => [
+            self::LEVEL_VALIDATION_AGENT => [
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF => [
+            self::LEVEL_VALIDATION_CHEF => [
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ],
+            self::LEVEL_VALIDATION_DIRECTION,
+            self::LEVEL_VALIDATION_SCIQ,
+            self::LEVEL_VALIDATION_DG => [
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
             default => [
-                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
         };
     }
 
     /**
-     * Statuts de validation que la politique courante REJETTE explicitement
-     * des agregats (KPI consolides, reporting officiel).
-     *
      * @return list<string>
      */
     public function rejectedValidationStatuses(): array
@@ -144,6 +156,7 @@ class ActionCalculationSettings
         return match ($this->statisticalScope()) {
             self::SCOPE_EXCLUDE_REJECTED => [
                 ActionTrackingService::VALIDATION_REJETEE_CHEF,
+                ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
                 ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
             ],
             default => [],
@@ -153,21 +166,33 @@ class ActionCalculationSettings
     public function statisticalScopeLabel(): string
     {
         return $this->statisticalScopeOptions()[$this->statisticalScope()]
-            ?? 'Toutes les actions visibles';
+            ?? 'Validation direction';
     }
 
     public function statisticalScopeSummary(): string
     {
-        return $this->statisticalScope() === self::SCOPE_EXCLUDE_REJECTED
-            ? 'Les statistiques et les KPI excluent les actions rejetees (par le chef ou la direction). Les autres validations restent comptees.'
-            : 'Les statistiques et les KPI sont calcules sur toutes les actions visibles. Les validations chef et direction restent purement workflow.';
+        return match ($this->statisticalScope()) {
+            self::LEVEL_VALIDATION_DIRECTION,
+            self::LEVEL_VALIDATION_SCIQ,
+            self::LEVEL_VALIDATION_DG => 'Les statistiques officielles integrent uniquement les actions validees par la direction.',
+            self::LEVEL_VALIDATION_CHEF => 'Les statistiques officielles integrent les actions validees par le chef ou par la direction.',
+            self::LEVEL_VALIDATION_AGENT => 'Les statistiques officielles integrent les actions soumises par les agents et les actions deja validees.',
+            self::SCOPE_EXCLUDE_REJECTED => 'Ancienne regle : les statistiques excluent les actions rejetees ou en correction.',
+            default => 'Les statistiques et les KPI sont calcules sur toutes les actions visibles.',
+        };
     }
 
     public function statisticalAverageSummary(): string
     {
-        return $this->statisticalScope() === self::SCOPE_EXCLUDE_REJECTED
-            ? 'Moyenne calculee sur toutes les actions visibles, hors actions rejetees.'
-            : 'Moyenne calculee sur toutes les actions visibles.';
+        return match ($this->statisticalScope()) {
+            self::LEVEL_VALIDATION_DIRECTION,
+            self::LEVEL_VALIDATION_SCIQ,
+            self::LEVEL_VALIDATION_DG => 'Moyenne calculee sur les actions validees par la direction.',
+            self::LEVEL_VALIDATION_CHEF => 'Moyenne calculee sur les actions validees par le chef ou la direction.',
+            self::LEVEL_VALIDATION_AGENT => 'Moyenne calculee sur les actions soumises ou deja validees.',
+            self::SCOPE_EXCLUDE_REJECTED => 'Moyenne calculee sur toutes les actions visibles, hors actions rejetees ou en correction.',
+            default => 'Moyenne calculee sur toutes les actions visibles.',
+        };
     }
 
     /**
@@ -175,20 +200,28 @@ class ActionCalculationSettings
      */
     public function statisticalRouteFilters(): array
     {
-        return [];
+        return match ($this->statisticalScope()) {
+            self::LEVEL_VALIDATION_DIRECTION,
+            self::LEVEL_VALIDATION_SCIQ,
+            self::LEVEL_VALIDATION_DG => ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION],
+            self::LEVEL_VALIDATION_CHEF => ['statut_validation_min' => ActionTrackingService::VALIDATION_VALIDEE_CHEF],
+            self::LEVEL_VALIDATION_AGENT => ['statut_validation_min' => ActionTrackingService::VALIDATION_SOUMISE_CHEF],
+            default => [],
+        };
     }
 
     public function applyStatisticalScope(Builder $query, string $column = 'statut_validation'): void
     {
-        // A10 — Filtre SQL pour exclure les statuts rejetes des agregats
-        // officiels. Si la politique active autorise tous les statuts
-        // (OFFICIAL_SCOPE_ALL_VISIBLE), aucun filtre n est applique.
-        $rejected = $this->rejectedValidationStatuses();
-        if ($rejected === []) {
+        $allowed = $this->statisticalValidationStatuses();
+        if ($allowed !== []) {
+            $query->whereIn($column, $allowed);
             return;
         }
 
-        $query->whereNotIn($column, $rejected);
+        $rejected = $this->rejectedValidationStatuses();
+        if ($rejected !== []) {
+            $query->whereNotIn($column, $rejected);
+        }
     }
 
     /**
@@ -197,9 +230,13 @@ class ActionCalculationSettings
      */
     public function filterStatistical(Collection $items, string $field = 'statut_validation'): Collection
     {
-        // A10 — Pendant in-memory du filtre SQL : exclut les actions rejetees
-        // des collections agregees cote PHP. Aucun filtre si la politique active
-        // autorise tous les statuts.
+        $allowed = $this->statisticalValidationStatuses();
+        if ($allowed !== []) {
+            return $items
+                ->filter(fn ($item): bool => in_array((string) data_get($item, $field, ''), $allowed, true))
+                ->values();
+        }
+
         $rejected = $this->rejectedValidationStatuses();
         if ($rejected === []) {
             return $items->values();
@@ -216,12 +253,12 @@ class ActionCalculationSettings
      */
     public function updateStatisticalPolicy(array $payload, ?User $actor = null): array
     {
-        $status = (string) ($payload[self::SETTING_ACTIONS_STATISTICAL_SCOPE]
+        $status = $this->normalizeScope((string) ($payload[self::SETTING_ACTIONS_STATISTICAL_SCOPE]
             ?? $payload[self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS]
-            ?? self::SCOPE_EXCLUDE_REJECTED);
+            ?? self::LEVEL_VALIDATION_DIRECTION));
 
         if (! array_key_exists($status, $this->statisticalScopeOptions())) {
-            $status = self::SCOPE_EXCLUDE_REJECTED;
+            $status = self::LEVEL_VALIDATION_DIRECTION;
         }
 
         foreach ([self::SETTING_ACTIONS_STATISTICAL_SCOPE, self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS] as $key) {
@@ -308,6 +345,7 @@ class ActionCalculationSettings
         $this->resolved = null;
         $this->tableAvailable = null;
     }
+
     private function hasSettingsTable(): bool
     {
         if ($this->tableAvailable !== null) {
@@ -319,5 +357,15 @@ class ActionCalculationSettings
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }
+    }
+
+    private function normalizeScope(string $scope): string
+    {
+        return match ($scope) {
+            ActionTrackingService::VALIDATION_SOUMISE_CHEF => self::LEVEL_VALIDATION_AGENT,
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF => self::LEVEL_VALIDATION_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION => self::LEVEL_VALIDATION_DIRECTION,
+            default => $scope,
+        };
     }
 }

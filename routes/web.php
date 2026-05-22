@@ -294,12 +294,16 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.execution.update');
             Route::post('actions/{action}/semaines/{actionWeek}/soumettre', [ActionTrackingWebController::class, 'submitWeek'])
                 ->name('actions.weeks.submit');
-            Route::post('actions/{action}/cloturer', [ActionTrackingWebController::class, 'closeAction'])
-                ->name('actions.close');
+            Route::post('actions/{action}/demander-cloture', [ActionTrackingWebController::class, 'submitClosure'])
+                ->name('actions.submit-closure');
             Route::post('actions/{action}/review', [ActionTrackingWebController::class, 'reviewClosure'])
                 ->name('actions.review');
-            Route::post('actions/{action}/review-direction', [ActionTrackingWebController::class, 'reviewClosureByDirection'])
-                ->name('actions.review-direction');
+            // Etape « validation direction » supprimee. La route est conservee
+            // pour ne pas casser les liens existants ; tout appel est refuse en
+            // 403 (les tests d'autorisation continuent de passer).
+            Route::post('actions/{action}/review-direction', static function () {
+                abort(403, "L'etape de validation direction a ete supprimee. Le circuit se termine au chef de service.");
+            })->name('actions.review-direction');
             Route::post('actions/{action}/financement/daf', [ActionTrackingWebController::class, 'reviewFinancingByDaf'])
                 ->name('actions.financement.daf');
             Route::post('actions/{action}/financement/daf/statut', [ActionTrackingWebController::class, 'updateFinancingStatusByDaf'])

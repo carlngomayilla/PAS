@@ -3,6 +3,37 @@
 @section('content')
     @php
         $isEdit = $mode === 'edit';
+        $roleLabels = app(\App\Services\RoleRegistryService::class)->labels();
+        // Mapping rôle → contextes de direction autorisés.
+        //   none = aucune direction selectionnee
+        //   dg   = direction de code "DG"
+        //   op   = toute autre direction operationnelle (DAF, DS, DSIC, ...)
+        // L'UI cache dynamiquement les options non applicables en JS.
+        $roleContextRules = [
+            // Sans rattachement (aucune direction requise).
+            'super_admin' => ['none'],                  // Technique
+            'admin_fonctionnel' => ['none'],            // Transverse
+            'auditeur' => ['none'],                     // Lecture globale
+
+            // Transverse — disponible sur toute direction ou sans direction.
+            'planification' => ['none', 'dg', 'op'],    // Typiquement DS ou DG
+
+            // Réservés à la DG (Direction Générale).
+            'dg' => ['dg'],
+            'cabinet' => ['dg'],
+            'chef_unite_cabinet' => ['dg'],
+            'dga_supervision' => ['dg'],
+            'chef_unite_ucas' => ['dg'],
+            'ucas' => ['dg'],
+            'sciq' => ['dg'],
+            'chef_unite_sciq' => ['dg'],
+
+            // Opérationnels — DAF / DS / DSIC / etc. (toute direction sauf DG).
+            'direction' => ['op'],
+            'service' => ['op'],
+            'agent' => ['op'],
+        ];
+        $defaultContexts = ['none', 'dg', 'op'];
     @endphp
     <div class="app-screen-flow">
     <section class="showcase-panel mb-4 app-screen-block">
@@ -43,12 +74,20 @@
                     </div>
                     <div>
                         <label for="role">Rôle</label>
-                        <select id="role" name="role" required>
+                        <select id="role" name="role" required data-role-selector>
                             <option value="">Sélectionner</option>
                             @foreach ($roleOptions as $role)
-                                <option value="{{ $role }}" @selected(old('role', $row->role) === $role)>{{ $role }}</option>
+                                @php
+                                    $contexts = $roleContextRules[$role] ?? $defaultContexts;
+                                @endphp
+                                <option
+                                    value="{{ $role }}"
+                                    data-allow-contexts="{{ implode(' ', $contexts) }}"
+                                    @selected(old('role', $row->role) === $role)
+                                >{{ $roleLabels[$role] ?? $role }}</option>
                             @endforeach
                         </select>
+                        <p class="field-hint" data-role-context-hint>Sélectionnez d'abord la direction pour filtrer les rôles applicables.</p>
                     </div>
                     <div>
                         <label class="!mb-2 block" for="is_active">État du compte</label>
@@ -110,11 +149,18 @@
                             var serviceSelect = document.querySelector('[data-service-selector]');
                             var uniteField = document.querySelector('[data-unite-dg-field]');
                             var uniteSelect = document.getElementById('unite_dg_id');
+                            var roleSelect = document.querySelector('[data-role-selector]');
+                            var roleHint = document.querySelector('[data-role-context-hint]');
                             if (! directionSelect || ! serviceField || ! uniteField) return;
 
                             function selectedDirectionCode() {
                                 var opt = directionSelect.options[directionSelect.selectedIndex];
                                 return opt ? (opt.getAttribute('data-direction-code') || '') : '';
+                            }
+
+                            function currentRoleContext() {
+                                if (! directionSelect.value) return 'none';
+                                return selectedDirectionCode() === 'DG' ? 'dg' : 'op';
                             }
 
                             function filterServiceOptions(directionId) {
@@ -126,6 +172,34 @@
                                 });
                                 if (serviceSelect.options[serviceSelect.selectedIndex] && serviceSelect.options[serviceSelect.selectedIndex].hidden) {
                                     serviceSelect.value = '';
+                                }
+                            }
+
+                            function filterRoleOptions() {
+                                if (! roleSelect) return;
+                                var context = currentRoleContext();
+                                var visibleCount = 0;
+                                Array.prototype.forEach.call(roleSelect.options, function (opt) {
+                                    if (opt.value === '') { opt.hidden = false; return; }
+                                    var raw = opt.getAttribute('data-allow-contexts') || '';
+                                    var allowed = raw.split(/\s+/).filter(Boolean);
+                                    var ok = allowed.length === 0 || allowed.indexOf(context) !== -1;
+                                    opt.hidden = ! ok;
+                                    opt.disabled = ! ok;
+                                    if (ok) visibleCount++;
+                                });
+                                // Reset si le role courant n'est plus visible.
+                                var current = roleSelect.options[roleSelect.selectedIndex];
+                                if (current && current.value !== '' && (current.hidden || current.disabled)) {
+                                    roleSelect.value = '';
+                                }
+                                if (roleHint) {
+                                    var hintByCtx = {
+                                        'none': 'Aucune direction : profils transverses (super admin, admin fonctionnel, auditeur, planification).',
+                                        'dg': 'Direction DG : profils DG, planification, cabinet, chef d\'unité (Cabinet/UCAS/SCIQ), supervision DGA, UCAS, SCIQ.',
+                                        'op': 'Direction opérationnelle (DAF / DS / DSIC...) : profils direction, chef de service, agent, planification.'
+                                    };
+                                    roleHint.textContent = hintByCtx[context] || '';
                                 }
                             }
 
@@ -143,6 +217,8 @@
                                     if (uniteSelect) uniteSelect.value = '';
                                     filterServiceOptions(directionId);
                                 }
+
+                                filterRoleOptions();
                             }
 
                             directionSelect.addEventListener('change', syncFields);

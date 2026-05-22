@@ -180,29 +180,11 @@ class ActionWorkflowSecurityTest extends TestCase
         $agent = $fixture['agent'];
         $serviceUser = $fixture['service_user'];
         $directionUser = $fixture['direction_user'];
-        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
 
-        $this->actingAs($agent)
-            ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
-                'quantite_realisee' => 100,
-                'commentaire' => 'Execution complete',
-                'difficultes' => 'Aucune',
-                'mesures_correctives' => 'RAS',
-                'justificatif' => UploadedFile::fake()->create('preuve.pdf', 64, 'application/pdf'),
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
+        $this->completeAllWeeksAsResponsable($action, $agent);
 
         $action->refresh();
         $this->assertSame('100.00', (string) $action->progression_reelle);
-
-        $this->actingAs($agent)
-            ->post(route('workspace.actions.close', $action), [
-                'date_fin_reelle' => '2026-01-07',
-                'rapport_final' => 'Travail termine',
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $action->refresh();
         $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
 
         $this->actingAs($serviceUser)
@@ -238,6 +220,45 @@ class ActionWorkflowSecurityTest extends TestCase
         ]);
     }
 
+    public function test_chef_can_request_correction_and_agent_can_resume_execution(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+        $serviceUser = $fixture['service_user'];
+
+        $this->completeAllWeeksAsResponsable($action, $agent);
+
+        $action->refresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.actions.review', $action), [
+                'decision_validation' => 'demander_correction',
+                'evaluation_note' => 45,
+                'conformite_chef' => 'partiellement_conforme',
+                'observation_qualite_chef' => 'Pieces a completer',
+                'evaluation_commentaire' => 'Merci de completer les preuves.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+
+        $this->assertSame(ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::STATUS_A_CORRIGER, $action->statut_dynamique);
+        $this->assertDatabaseHas('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'action_correction_demandee',
+        ]);
+
+        $this->actingAs($agent)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('Correction demandee');
+    }
+
     public function test_delegated_service_user_can_review_submitted_action(): void
     {
         Storage::fake('local');
@@ -247,7 +268,6 @@ class ActionWorkflowSecurityTest extends TestCase
         $agent = $fixture['agent'];
         $serviceUser = $fixture['service_user'];
         $delegateServiceUser = $fixture['delegate_service_user'];
-        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
 
         Delegation::query()->create([
             'delegant_id' => $serviceUser->id,
@@ -262,22 +282,7 @@ class ActionWorkflowSecurityTest extends TestCase
             'statut' => 'active',
         ]);
 
-        $this->actingAs($agent)
-            ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
-                'quantite_realisee' => 100,
-                'commentaire' => 'Execution complete',
-                'difficultes' => 'Aucune',
-                'mesures_correctives' => 'RAS',
-                'justificatif' => UploadedFile::fake()->create('preuve.pdf', 64, 'application/pdf'),
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $this->actingAs($agent)
-            ->post(route('workspace.actions.close', $action), [
-                'date_fin_reelle' => '2026-01-07',
-                'rapport_final' => 'Travail termine',
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
+        $this->completeAllWeeksAsResponsable($action, $agent);
 
         $this->actingAs($delegateServiceUser)
             ->get(route('workspace.actions.index'))
@@ -343,7 +348,6 @@ class ActionWorkflowSecurityTest extends TestCase
         $fixture = $this->createActionFixture();
         $action = $fixture['action'];
         $directionUser = $fixture['direction_user'];
-        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
 
         $action->forceFill([
             'responsable_id' => $directionUser->id,
@@ -351,22 +355,7 @@ class ActionWorkflowSecurityTest extends TestCase
             'origine_action' => Action::ORIGIN_INTERNE,
         ])->save();
 
-        $this->actingAs($directionUser)
-            ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
-                'quantite_realisee' => 100,
-                'commentaire' => 'Execution propre direction',
-                'difficultes' => 'Aucune',
-                'mesures_correctives' => 'RAS',
-                'justificatif' => UploadedFile::fake()->create('preuve-direction.pdf', 64, 'application/pdf'),
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $this->actingAs($directionUser)
-            ->post(route('workspace.actions.close', $action), [
-                'date_fin_reelle' => '2026-01-07',
-                'rapport_final' => 'Action operationnelle direction terminee',
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
+        $this->completeAllWeeksAsResponsable($action->fresh(), $directionUser);
 
         $action->refresh();
         $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
@@ -408,24 +397,8 @@ class ActionWorkflowSecurityTest extends TestCase
         $agent = $fixture['agent'];
         $serviceUser = $fixture['service_user'];
         $directionUser = $fixture['direction_user'];
-        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
 
-        $this->actingAs($agent)
-            ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
-                'quantite_realisee' => 100,
-                'commentaire' => 'Execution complete',
-                'difficultes' => 'Aucune',
-                'mesures_correctives' => 'RAS',
-                'justificatif' => UploadedFile::fake()->create('preuve.pdf', 64, 'application/pdf'),
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $this->actingAs($agent)
-            ->post(route('workspace.actions.close', $action), [
-                'date_fin_reelle' => '2026-01-07',
-                'rapport_final' => 'Travail termine',
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
+        $this->completeAllWeeksAsResponsable($action, $agent);
 
         $action->refresh();
         self::assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
@@ -467,24 +440,8 @@ class ActionWorkflowSecurityTest extends TestCase
         $agent = $fixture['agent'];
         $serviceUser = $fixture['service_user'];
         $directionUser = $fixture['direction_user'];
-        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
 
-        $this->actingAs($agent)
-            ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
-                'quantite_realisee' => 100,
-                'commentaire' => 'Execution complete',
-                'difficultes' => 'Aucune',
-                'mesures_correctives' => 'RAS',
-                'justificatif' => UploadedFile::fake()->create('preuve.pdf', 64, 'application/pdf'),
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $this->actingAs($agent)
-            ->post(route('workspace.actions.close', $action), [
-                'date_fin_reelle' => '2026-01-07',
-                'rapport_final' => 'Travail termine',
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
+        $this->completeAllWeeksAsResponsable($action, $agent);
 
         $action->refresh();
         self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
@@ -509,6 +466,28 @@ class ActionWorkflowSecurityTest extends TestCase
 
         $action->refresh();
         self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
+    }
+
+    /**
+     * Soumet toutes les périodes hebdomadaires d'une action avec une quantité
+     * réalisée de 100 sur la première période, déclenchant ainsi la bascule
+     * automatique vers le chef de service en fin de planning.
+     */
+    private function completeAllWeeksAsResponsable(Action $action, User $responsable): void
+    {
+        $weeks = $action->weeks()->orderBy('numero_semaine')->get();
+
+        foreach ($weeks as $index => $week) {
+            $this->actingAs($responsable)
+                ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
+                    'quantite_realisee' => $index === 0 ? 100 : 0,
+                    'commentaire' => 'Periode '.($index + 1).' renseignee',
+                    'difficultes' => 'Aucune',
+                    'mesures_correctives' => 'RAS',
+                    'justificatif' => UploadedFile::fake()->create('preuve-w'.($index + 1).'.pdf', 64, 'application/pdf'),
+                ])
+                ->assertRedirect(route('workspace.actions.suivi', $action));
+        }
     }
 
     /**

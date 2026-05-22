@@ -29,7 +29,7 @@
 
     <section class="showcase-panel mb-4">
         <h2>Contrôle de cohérence</h2>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead>
                     <tr>
@@ -57,7 +57,7 @@
 
     <section class="ui-card">
         <h2>Dernières opérations sensibles</h2>
-        <div class="app-table-wrapper mt-4">
+        <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
                 <thead>
                     <tr>

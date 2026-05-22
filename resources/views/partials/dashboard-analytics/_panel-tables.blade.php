@@ -15,7 +15,7 @@
                 <div><h2 class="showcase-panel-title">Tableau de synthèse par {{ strtolower($unitModeLabel) }}</h2></div>
                 <span class="showcase-chip">{{ count($unitRows) }} lignes</span>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead><tr><th>{{ $unitModeLabel }}</th><th>Actions</th><th>Progression</th><th>Indicateur moyen</th><th>Alertes</th><th>Validation</th></tr></thead>
                     <tbody>
@@ -47,9 +47,9 @@
 
         <article class="showcase-panel">
             <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Actions prioritaires</h2></div><span class="showcase-chip">{{ count($priorityActionRows) }} lignes</span></div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
-                    <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Délai</th><th>Conf.</th><th>Qual.</th></tr></thead>
+                    <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Délai</th><th>Conformité</th></tr></thead>
                     <tbody>
                         @forelse ($priorityActionRows as $row)
                             @php
@@ -62,14 +62,14 @@
                                 <td>{{ $row['direction'] }}</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}"><span class="h-2 w-2 rounded-full" style="background: {{ $statusColor }};"></span>{{ $actionStatusLabel($row['statut']) }}</span></td>
                                 <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 1) }}%</span></div></td>
-                                @foreach (['kpi_performance', 'kpi_delai', 'kpi_conformite', 'kpi_qualite'] as $metricKey)
+                                @foreach (['kpi_performance', 'kpi_delai', 'kpi_conformite'] as $metricKey)
                                     @php $metricValue = (float) ($row[$metricKey] ?? 0); @endphp
                                     <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($metricValue)) }}">{{ number_format($metricValue, 1) }}</span></td>
                                 @endforeach
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8">
+                                <td colspan="7">
                                     <x-ui.empty-state title="Aucune action" message="Aucune action disponible sur ce périmètre." icon="filter" />
                                 </td>
                             </tr>
@@ -84,10 +84,10 @@
                 <div><h2 class="showcase-panel-title">Alertes actives</h2></div>
                 <span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span>
             </div>
-            <div class="app-table-wrapper">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead>
-                        <tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Détail</th><th>{{ $metricLabel('global') }}</th><th>Qual.</th><th>Accès</th></tr>
+                        <tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Détail</th><th>{{ $metricLabel('global') }}</th><th>Conformité</th><th>Accès</th></tr>
                     </thead>
                     <tbody>
                         @forelse ($alertRows as $row)
@@ -97,9 +97,9 @@
                                 <td>{{ $row['action'] }}</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars(in_array($row['niveau'], ['Critique', 'Urgence'], true) ? 'danger' : 'warning') }}">{{ $row['niveau'] }}</span></td>
                                 <td>{{ $row['details'] }}</td>
-                                @php $kpiValue = (float) ($row['kpi'] ?? 0); $qualityValue = (float) ($row['kpi_qualite'] ?? 0); @endphp
+                                @php $kpiValue = (float) ($row['kpi'] ?? 0); $conformiteValue = (float) ($row['kpi_conformite'] ?? 0); @endphp
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($kpiValue)) }}">{{ number_format($kpiValue, 1) }}</span></td>
-                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($qualityValue)) }}">{{ number_format($qualityValue, 1) }}</span></td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($conformiteValue)) }}">{{ number_format($conformiteValue, 1) }}</span></td>
                                 <td><a href="{{ $row['url'] }}" class="btn btn-primary btn-sm rounded-xl">Voir</a></td>
                             </tr>
                         @empty
