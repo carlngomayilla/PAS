@@ -280,8 +280,6 @@
         </div>
         @if ($validationStatus === 'rejetee_chef')
             <p class="mt-2 text-sm text-[#f9b13c]">Motif rejet chef : <strong>{{ $action->evaluation_commentaire ?: '-' }}</strong></p>
-        @elseif ($validationStatus === 'rejetee_direction')
-            <p class="mt-2 text-sm text-[#f9b13c]">Motif rejet direction : <strong>{{ $action->direction_evaluation_commentaire ?: '-' }}</strong></p>
         @endif
 
         @php
@@ -440,7 +438,6 @@
                 <dl class="action-fiche-dl mt-2">
                     <dt>Rapport final</dt><dd>{{ $action->rapport_final ?: '-' }}</dd>
                     <dt>Commentaire chef</dt><dd>{{ $action->evaluation_commentaire ?: '-' }}</dd>
-                    <dt>Commentaire direction</dt><dd>{{ $action->direction_evaluation_commentaire ?: '-' }}</dd>
                     <dt>Validation hiérarchique</dt><dd>{{ $action->validation_hierarchique ? 'Oui' : 'Non' }}</dd>
                 </dl>
             </article>

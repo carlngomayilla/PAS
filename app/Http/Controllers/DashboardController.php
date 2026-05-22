@@ -147,7 +147,7 @@ class DashboardController extends Controller
                 'pta.service:id,code,libelle',
                 'responsable:id,name',
                 'responsables:id,name,service_id',
-                'directionValidePar:id,name',
+                // directionValidePar supprime avec la migration de purge direction.
                 'justificatifs:id,justifiable_type,justifiable_id,sous_action_id,nom_original,description,ajoute_par,created_at',
                 'justificatifs.ajoutePar:id,name',
                 'sousActions:id,action_id,agent_id,libelle,statut,est_effectuee,taux_execution,date_fin',
@@ -2894,8 +2894,10 @@ class DashboardController extends Controller
                         ? ($proofs->count().' preuve(s)'.($firstProof?->nom_original ? ' - '.$firstProof->nom_original : ''))
                         : 'Aucune preuve',
                     'statut_preuve' => $proofs->isNotEmpty() ? 'Deposee' : 'Manquante',
-                    'validateur' => (string) ($action->directionValidePar?->name ?? '-'),
-                    'observation' => (string) ($action->direction_evaluation_commentaire ?: $action->evaluation_commentaire ?: '-'),
+                    // L'etape de validation direction a ete supprimee : on
+                    // utilise desormais le chef de service comme validateur.
+                    'validateur' => (string) ($action->evaluePar?->name ?? '-'),
+                    'observation' => (string) ($action->evaluation_commentaire ?: '-'),
                 ];
             })
             ->values()
@@ -3248,7 +3250,7 @@ class DashboardController extends Controller
                     'date_realisation' => $date instanceof Carbon ? $date->format('d/m/Y') : '-',
                     'justificatif' => $subAction->relationLoaded('justificatifs') && $subAction->justificatifs->isNotEmpty() ? 'Oui' : 'Non',
                     'commentaire' => (string) ($subAction->commentaire ?? '-'),
-                    'controle' => (string) ($action->direction_evaluation_commentaire ?: $action->evaluation_commentaire ?: '-'),
+                    'controle' => (string) ($action->evaluation_commentaire ?: '-'),
                     'statut' => (string) ($subAction->statut ?? ((bool) ($subAction->est_effectuee ?? false) ? 'Effectuee' : 'En cours')),
                     'url' => route('workspace.actions.suivi', $action),
                 ];
@@ -3434,7 +3436,7 @@ class DashboardController extends Controller
         $latest = null;
 
         foreach ($actions as $action) {
-            foreach ([$action->updated_at, $action->created_at, $action->soumise_le, $action->direction_valide_le, $action->evalue_le] as $date) {
+            foreach ([$action->updated_at, $action->created_at, $action->soumise_le, $action->evalue_le] as $date) {
                 if ($date instanceof Carbon && ($latest === null || $date->gt($latest))) {
                     $latest = $date;
                 }

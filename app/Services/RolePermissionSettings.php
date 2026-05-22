@@ -245,6 +245,7 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
+                'delegations.manage',
                 'messagerie.read',
             ],
             User::ROLE_SERVICE => [
@@ -253,6 +254,7 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
+                'delegations.manage',
                 'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE => [

@@ -3210,8 +3210,13 @@ class SuperAdminWebController extends Controller
         $permissions = $this->rolePermissionSettings->forRole($role);
         $baseRole = $this->roleRegistry->baseRole($role);
         $isTechnicalAdmin = in_array($baseRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL], true);
-        $isPlanification = $baseRole === User::ROLE_PLANIFICATION;
-        $isAuditor = $baseRole === User::ROLE_AUDITEUR;
+        $canSeeAuditModule = in_array($baseRole, [
+            User::ROLE_SUPER_ADMIN,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_DG,
+            User::ROLE_CABINET,
+            User::ROLE_AUDITEUR,
+        ], true);
 
         return collect($this->workspaceModuleSettings->configuredModules())
             ->sortBy('order')
@@ -3223,16 +3228,21 @@ class SuperAdminWebController extends Controller
                 return match ((string) ($module['code'] ?? '')) {
                     'super_admin' => $baseRole === User::ROLE_SUPER_ADMIN,
                     'messagerie' => in_array('messagerie.read', $permissions, true),
-                    'pas', 'pao', 'pta' => in_array('planning.read', $permissions, true),
+                    'pas' => in_array('planning.read', $permissions, true)
+                        && ! in_array($baseRole, [User::ROLE_DIRECTION, User::ROLE_SERVICE], true),
+                    'pao' => in_array('planning.read', $permissions, true)
+                        && $baseRole !== User::ROLE_SERVICE,
+                    'pta' => in_array('planning.read', $permissions, true),
                     'execution' => in_array('planning.read', $permissions, true) || $baseRole === User::ROLE_AGENT,
-                    'referentiel' => ($isTechnicalAdmin || $isPlanification) && collect(['referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles'])
+                    'reporting' => in_array('reporting.read', $permissions, true),
+                    'alertes' => in_array('alerts.read', $permissions, true),
+                    'referentiel' => collect(['referentiel.read', 'referentiel.write', 'users.manage', 'users.manage_roles'])
                         ->contains(fn (string $permission): bool => in_array($permission, $permissions, true)),
-                    'audit' => ($isTechnicalAdmin || $isAuditor || $baseRole === User::ROLE_DG) && in_array('audit.read', $permissions, true),
+                    'audit' => $canSeeAuditModule && in_array('audit.read', $permissions, true),
                     'api_docs' => $isTechnicalAdmin && in_array('api_docs.read', $permissions, true),
                     'retention' => $isTechnicalAdmin && collect(['retention.read', 'retention.manage'])
                         ->contains(fn (string $permission): bool => in_array($permission, $permissions, true)),
-                    'delegations' => ($isTechnicalAdmin || $isPlanification || in_array($baseRole, [User::ROLE_DIRECTION, User::ROLE_SERVICE], true))
-                        && in_array('delegations.manage', $permissions, true),
+                    'delegations' => in_array('delegations.manage', $permissions, true),
                     default => false,
                 };
             })

@@ -72,7 +72,15 @@ class ActionTrackingService
     public const VALIDATION_REJETEE_CHEF = 'rejetee_chef';
     public const VALIDATION_CORRECTION_DEMANDEE = 'correction_demandee';
     public const VALIDATION_VALIDEE_CHEF = 'validee_chef';
+    /**
+     * @deprecated L'etape de validation direction a ete supprimee du circuit.
+     * Ces constantes sont conservees pour la retro-compatibilite des chemins
+     * de lecture (dashboards, policies, KPI) jusqu'a leur purge complete.
+     * Les enregistrements historiques sont backfilles vers leurs equivalents
+     * chef par la migration de purge.
+     */
     public const VALIDATION_REJETEE_DIRECTION = 'rejetee_direction';
+    /** @deprecated Voir VALIDATION_REJETEE_DIRECTION. */
     public const VALIDATION_VALIDEE_DIRECTION = 'validee_direction';
 
     // ── CONSTANTES DE FINANCEMENT ─────────────────────────────────────────────
@@ -182,8 +190,6 @@ class ActionTrackingService
             self::VALIDATION_REJETEE_CHEF,
             self::VALIDATION_CORRECTION_DEMANDEE,
             self::VALIDATION_VALIDEE_CHEF,
-            self::VALIDATION_REJETEE_DIRECTION,
-            self::VALIDATION_VALIDEE_DIRECTION,
         ];
     }
 
@@ -378,7 +384,6 @@ class ActionTrackingService
         if (in_array($current, [
             self::VALIDATION_SOUMISE_CHEF,
             self::VALIDATION_VALIDEE_CHEF,
-            self::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
             return;
         }
@@ -412,9 +417,9 @@ class ActionTrackingService
 
         if ($submissionTarget === 'service') {
             $this->notificationService->notifyActionSubmittedToChef($action, $actor);
-        } elseif ($submissionTarget === 'direction') {
-            $this->notificationService->notifyActionSubmittedToDirection($action, $actor);
         } else {
+            // 'final' : circuit hierarchique desactive, l'action est cloturee
+            // sans validation chef (cf. WorkflowSettings::actionSubmissionTarget).
             $this->notificationService->notifyActionFinalizedWithoutWorkflow($action, $actor);
         }
     }
@@ -507,10 +512,7 @@ class ActionTrackingService
             'evalue_le' => null,
             'evaluation_note' => null,
             'evaluation_commentaire' => null,
-            'direction_valide_par' => null,
-            'direction_valide_le' => null,
-            'direction_evaluation_note' => null,
-            'direction_evaluation_commentaire' => null,
+            // Colonnes direction_* supprimees : voir migration de purge.
         ];
 
         foreach (['resultat_cloture', 'difficultes_rencontrees', 'mesures_correctives', 'justification_cloture'] as $field) {
@@ -577,7 +579,6 @@ class ActionTrackingService
         $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
         $isApproved = $decision === 'valider';
         $isCorrectionRequested = $decision === 'demander_correction';
-        $directionEnabled = $this->workflowSettings->directionValidationEnabled();
         $oldStatus = (string) ($action->statut_validation ?? self::VALIDATION_NON_SOUMISE);
         $validatedRate = $payload['taux_valide_chef'] ?? $payload['evaluation_note'] ?? null;
 
@@ -625,7 +626,6 @@ class ActionTrackingService
             $eventType,
             $isApproved ? 'info' : 'warning',
             match (true) {
-                $isApproved && $directionEnabled => 'Action validee par le chef de service. En attente de validation direction.',
                 $isApproved => 'Action validee par le chef de service. Validation finale du circuit.',
                 $isCorrectionRequested => 'Correction demandee par le chef de service.',
                 default => 'Action rejetee par le chef de service.',
@@ -670,63 +670,10 @@ class ActionTrackingService
         return $this->refreshActionMetrics($action);
     }
 
-    /**
-     * @param array<string, mixed> $payload
-     */
-    /** La direction approuve ou rejette la clôture déjà validée par le chef de service. */
-    public function reviewClosureByDirection(Action $action, array $payload, ?User $actor = null): Action
-    {
-        $decision = (string) ($payload['decision_validation'] ?? 'rejeter');
-        $isApproved = $decision === 'valider';
-        $oldStatus = (string) ($action->statut_validation ?? self::VALIDATION_NON_SOUMISE);
-
-        $action->forceFill([
-            'statut_validation' => $isApproved ? self::VALIDATION_VALIDEE_DIRECTION : self::VALIDATION_REJETEE_DIRECTION,
-            'validation_hierarchique' => $isApproved,
-            'direction_valide_par' => $actor?->id,
-            'direction_valide_le' => now(),
-            'direction_evaluation_note' => $payload['evaluation_note'] ?? null,
-            'direction_evaluation_commentaire' => $payload['evaluation_commentaire'] ?? null,
-        ]);
-        $action->save();
-
-        $this->createLogIfMissingToday(
-            $action,
-            $isApproved ? 'action_validee_direction' : 'action_rejetee_direction',
-            $isApproved ? 'info' : 'warning',
-            $isApproved
-                ? 'Action validee par le directeur.'
-                : 'Action rejetee par le directeur.',
-            [
-                'decision' => $decision,
-                'ancien_statut' => $oldStatus,
-                'nouveau_statut' => $action->statut_validation,
-                'evaluation_note' => $action->direction_evaluation_note,
-                'statut_validation' => $action->statut_validation,
-            ],
-            'responsable',
-            $actor?->id
-        );
-
-        $this->addDiscussionEntry(
-            $action,
-            (string) ($payload['evaluation_commentaire'] ?? ($isApproved
-                ? 'Validation direction.'
-                : 'Rejet direction.')),
-            $isApproved ? 'action_validee_direction' : 'action_rejetee_direction',
-            $isApproved ? 'info' : 'warning',
-            [
-                'decision' => $decision,
-                'ancien_statut' => $oldStatus,
-                'nouveau_statut' => $action->statut_validation,
-                'evaluation_note' => $action->direction_evaluation_note,
-                'statut_validation' => $action->statut_validation,
-            ],
-            $actor
-        );
-
-        return $this->refreshActionMetrics($action);
-    }
+    // reviewClosureByDirection : methode supprimee.
+    // L'etape de validation direction a ete retiree du circuit metier.
+    // Les colonnes direction_* (direction_valide_par/le/note/commentaire)
+    // sont conservees pour l'historique mais ne sont plus alimentees.
 
     // ── FINANCEMENT ───────────────────────────────────────────────────────────
 
@@ -1291,7 +1238,6 @@ class ActionTrackingService
         if (in_array((string) ($action->statut_validation ?? ''), [
             self::VALIDATION_REJETEE_CHEF,
             self::VALIDATION_CORRECTION_DEMANDEE,
-            self::VALIDATION_REJETEE_DIRECTION,
         ], true)) {
             return self::STATUS_A_CORRIGER;
         }

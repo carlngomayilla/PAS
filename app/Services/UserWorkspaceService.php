@@ -18,6 +18,7 @@ class UserWorkspaceService
      */
     public function modulesFor(User $user): array
     {
+        $matrixRole = $this->matrixRole($user);
         $hasDelegatedPlanningRead = $user->hasDelegatedPermission('planning_read')
             || $user->hasDelegatedPermission('planning_write');
         $hasDelegatedPlanningWrite = $user->hasDelegatedPermission('planning_write');
@@ -26,9 +27,9 @@ class UserWorkspaceService
         $canReadPlanning = $user->hasPermission('planning.read')
             || $hasDelegatedPlanningRead;
         $canWriteGlobal = $user->hasPermission('planning.write.global');
-        $canWriteDirection = ($user->hasRole(User::ROLE_DIRECTION) && $user->hasPermission('planning.write.direction'))
+        $canWriteDirection = $user->hasPermission('planning.write.direction')
             || $hasDelegatedPlanningWrite;
-        $canWriteService = ($user->hasRole(User::ROLE_SERVICE) && $user->hasPermission('planning.write.service'))
+        $canWriteService = $user->hasPermission('planning.write.service')
             || $hasDelegatedPlanningWrite;
         $isAgent = $user->isAgent();
         $hasOwnExecutionSpace = $isAgent || $user->hasRole(User::ROLE_PLANIFICATION, User::ROLE_DG);
@@ -45,7 +46,7 @@ class UserWorkspaceService
         $canReadReporting = ($canReadPlanning || $isAgent) && $user->hasPermission('reporting.read');
         $canReadAlerts = $canReadPlanning && $user->hasPermission('alerts.read');
         $canUseMessaging = $user->hasPermission('messagerie.read');
-        $isTechnicalAdmin = $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL);
+        $isTechnicalAdmin = in_array($matrixRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL], true);
         // Admin fonctionnel et SCIQ suivi global ont un rôle proche de Planification
         // pour la gestion des référentiels métier.
         $isPlanification = $user->hasRole(User::ROLE_PLANIFICATION, User::ROLE_ADMIN_FONCTIONNEL);
@@ -59,6 +60,13 @@ class UserWorkspaceService
             User::ROLE_CABINET_SUPERVISION,
             User::ROLE_DGA_SUPERVISION
         );
+        $canSeeAuditModule = $canReadAudit && in_array($matrixRole, [
+            User::ROLE_SUPER_ADMIN,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_DG,
+            User::ROLE_CABINET,
+            User::ROLE_AUDITEUR,
+        ], true);
 
         $modules = [[
             'code' => 'pilotage',
@@ -80,10 +88,8 @@ class UserWorkspaceService
             ];
         }
 
-        $isServiceOnly = $user->hasRole(User::ROLE_SERVICE)
-            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_DG, User::ROLE_PLANIFICATION);
-        $isDirectionOnly = $user->hasRole(User::ROLE_DIRECTION)
-            && ! $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_DG, User::ROLE_PLANIFICATION);
+        $isServiceOnly = $matrixRole === User::ROLE_SERVICE;
+        $isDirectionOnly = $matrixRole === User::ROLE_DIRECTION;
 
         if ($canReadPlanning && ! $isServiceOnly && ! $isDirectionOnly) {
             $modules[] = [
@@ -163,7 +169,7 @@ class UserWorkspaceService
             ];
         }
 
-        if ($user->isSuperAdmin()) {
+        if ($matrixRole === User::ROLE_SUPER_ADMIN) {
             $modules[] = [
                 'code' => 'super_admin',
                 'label' => 'Super Administration',
@@ -195,7 +201,7 @@ class UserWorkspaceService
         // `audit.read` suffit. Le filtre isAuditor reste comme garde-fou
         // organisationnel pour les profils qui auraient la permission par
         // erreur de configuration (sécurité en profondeur).
-        if ($canReadAudit) {
+        if ($canSeeAuditModule) {
             $modules[] = [
                 'code' => 'audit',
                 'label' => 'Journal Audit',
@@ -243,5 +249,17 @@ class UserWorkspaceService
         }
 
         return $this->workspaceModuleSettings->applyToModules($modules);
+    }
+
+    private function matrixRole(User $user): string
+    {
+        $registry = app(RoleRegistryService::class);
+        $role = $user->effectiveRoleCode();
+
+        if (array_key_exists($role, $registry->labels())) {
+            return $registry->baseRole($role);
+        }
+
+        return $registry->baseRole((string) $user->role);
     }
 }

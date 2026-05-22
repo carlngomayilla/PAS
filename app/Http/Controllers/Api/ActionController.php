@@ -234,7 +234,7 @@ class ActionController extends Controller
                 'responsable:id,name,email,agent_matricule,agent_fonction,agent_telephone',
                 'soumisPar:id,name,email',
                 'evaluePar:id,name,email',
-                'directionValidePar:id,name,email',
+                // directionValidePar supprime avec la migration de purge direction.
                 'kpis:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'weeks' => fn ($q) => $q->orderBy('numero_semaine'),

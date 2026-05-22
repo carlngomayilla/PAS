@@ -115,9 +115,10 @@ class ActionPerformanceService
 
         if (in_array($validationStatus, [
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            // VALIDATION_VALIDEE_DIRECTION : historique, valeurs backfillees
+            // vers VALIDATION_VALIDEE_CHEF par la migration de purge.
         ], true)) {
-            $note = $action->direction_evaluation_note ?? $action->evaluation_note;
+            $note = $action->evaluation_note;
 
             return $note !== null ? $this->boundRate((float) $note) : 0.0;
         }

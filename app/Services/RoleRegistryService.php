@@ -36,6 +36,7 @@ class RoleRegistryService
             User::ROLE_CABINET => ['label' => 'Cabinet DG', 'base_role' => User::ROLE_CABINET, 'system' => true],
             User::ROLE_CHEF_UNITE_CABINET => ['label' => "Chef d'unité Cabinet", 'base_role' => User::ROLE_CHEF_UNITE_CABINET, 'system' => true],
             User::ROLE_DGA_SUPERVISION => ['label' => 'Supervision DGA', 'base_role' => User::ROLE_DGA_SUPERVISION, 'system' => true],
+            User::ROLE_CHEF_UNITE_DGA => ['label' => "Chef d'unite DGA", 'base_role' => User::ROLE_CHEF_UNITE_DGA, 'system' => true],
             User::ROLE_CHEF_UNITE_UCAS => ['label' => "Chef d'unité UCAS", 'base_role' => User::ROLE_CHEF_UNITE_UCAS, 'system' => true],
             User::ROLE_UCAS => ['label' => 'UCAS', 'base_role' => User::ROLE_UCAS, 'system' => true],
             User::ROLE_SCIQ => ['label' => 'SCIQ', 'base_role' => User::ROLE_SCIQ, 'system' => true],
@@ -61,7 +62,6 @@ class RoleRegistryService
             // chef_unite générique → chef_unite_cabinet (entité Cabinet par défaut).
             User::ROLE_CHEF_UNITE => User::ROLE_CHEF_UNITE_CABINET,
             // chef_unite_dga : DGA n'est plus une unité distincte → rattaché au superviseur DGA.
-            User::ROLE_CHEF_UNITE_DGA => User::ROLE_DGA_SUPERVISION,
             // collaborateur générique → agent par défaut.
             User::ROLE_COLLABORATEUR => User::ROLE_AGENT,
             // sciq_suivi_global → fusionné avec sciq.

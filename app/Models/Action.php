@@ -176,8 +176,8 @@ class Action extends Model
             'evalue_le' => 'datetime',
             'evaluation_note' => 'decimal:2',
             'taux_valide_chef' => 'decimal:2',
-            'direction_valide_le' => 'datetime',
-            'direction_evaluation_note' => 'decimal:2',
+            // Casts direction_* retires : colonnes supprimees par la migration
+            // 2026_05_22_100000_drop_direction_validation_columns.
             'cloture_le' => 'datetime',
             'taux_performance' => 'decimal:2',
             'taux_conformite' => 'decimal:2',
@@ -431,10 +431,8 @@ class Action extends Model
         return $this->belongsTo(User::class, 'evalue_par');
     }
 
-    public function directionValidePar(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'direction_valide_par');
-    }
+    // Relation directionValidePar retiree : colonne direction_valide_par
+    // supprimee par la migration de purge de la validation direction.
 
     public function financementDafPar(): BelongsTo
     {

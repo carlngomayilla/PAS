@@ -60,7 +60,8 @@ class ActionTrackingWebController extends Controller
             'responsables:id,name,email,agent_matricule,agent_fonction,agent_telephone',
             'soumisPar:id,name,email',
             'evaluePar:id,name,email',
-            'directionValidePar:id,name,email',
+            // 'directionValidePar' supprime : relation Eloquent retiree avec la
+            // colonne `direction_valide_par` (cf. migration de purge direction).
             'financementDafPar:id,name,email',
             'financementDgPar:id,name,email',
             'weeks' => fn ($q) => $q->with('saisiPar:id,name,email')->orderBy('numero_semaine'),
@@ -915,71 +916,9 @@ class ActionTrackingWebController extends Controller
             });
     }
 
-    public function reviewClosureByDirection(
-        Request $request,
-        Action $action,
-        ActionTrackingService $trackingService,
-        WorkspaceNotificationService $notificationService,
-        SecureJustificatifStorage $secureStorage
-    ): RedirectResponse {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        $action->loadMissing('pta:id,direction_id,service_id,statut,date_debut,date_fin');
-        if (! $this->canReviewByDirection($user, $action)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors([
-                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Validation'),
-            ]);
-        }
-
-        if ((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE) !== ActionTrackingService::VALIDATION_VALIDEE_CHEF) {
-            return back()->withErrors(['general' => 'Cette action n est pas en attente de validation direction.']);
-        }
-
-        /** @var array<string, mixed> $validated */
-        $validated = $request->validate($this->reviewValidationRules($request, false));
-
-        $before = $action->toArray();
-
-        DB::transaction(function () use ($trackingService, $action, $validated, $request, $user, $secureStorage): void {
-            $trackingService->reviewClosureByDirection($action, $validated, $user);
-
-            if ($request->hasFile('justificatif_evaluation_direction')) {
-                $file = $request->file('justificatif_evaluation_direction');
-                $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
-                $trackingService->addActionJustificatif(
-                    $action,
-                    null,
-                    'evaluation_direction',
-                    $storedFile['path'],
-                    $storedFile['nom_original'],
-                    $storedFile['mime_type'],
-                    $storedFile['taille_octets'],
-                    'Justificatif de revue direction',
-                    $user,
-                    $storedFile['est_chiffre']
-                );
-            }
-        });
-
-        $action->refresh();
-        $this->recordAudit($request, 'action', 'review_direction', $action, $before, $action->toArray());
-
-        $decision = (string) ($validated['decision_validation'] ?? 'rejeter');
-        $notificationService->notifyActionReviewedByDirection($action, $decision === 'valider', $user);
-
-        return redirect()
-            ->route('workspace.actions.suivi', $action)
-            ->with('success', $decision === 'valider'
-                ? 'Action validee par la direction. Elle est maintenant prise en compte dans les statistiques.'
-                : 'Action rejetee par la direction. Retour au chef de service.');
-    }
+    // reviewClosureByDirection : methode supprimee.
+    // L'etape de validation direction a ete retiree du circuit metier.
+    // La route correspondante renvoie desormais 403 (cf. routes/web.php).
 
     public function reviewFinancingByDaf(
         Request $request,
@@ -1351,25 +1290,8 @@ class ActionTrackingWebController extends Controller
             );
     }
 
-    private function canReviewByDirection(User $user, Action $action): bool
-    {
-        if ($action->isResponsible($user)) {
-            return false;
-        }
-
-        if (! $this->workflowSettings()->directionValidationEnabled()) {
-            return false;
-        }
-
-        if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            return (int) $user->direction_id === (int) $action->pta?->direction_id;
-        }
-
-        return app(DelegationService::class)->canReviewDirectionAction(
-            $user,
-            (int) $action->pta?->direction_id
-        );
-    }
+    // canReviewByDirection : helper supprime — l'etape de validation direction
+    // n'existe plus dans le circuit metier.
 
     private function isExecutionEditableByAgent(Action $action): bool
     {

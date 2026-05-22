@@ -25,7 +25,7 @@ class ActionObserver
         'financement_statut', 'financement_requis',
         'progression_reelle', 'type_cible',
         'seuil_minimum', 'seuil_mode', 'seuil_t1', 'seuil_t2', 'seuil_t3', 'seuil_t4',
-        'evaluation_note', 'direction_evaluation_note',
+        'evaluation_note',
         'taux_realisation_global', 'taux_global', 'taux_atteinte_cible',
         'quantite_cible', 'mode_evaluation',
     ];

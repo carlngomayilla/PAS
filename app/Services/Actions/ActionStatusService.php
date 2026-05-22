@@ -13,13 +13,19 @@ class ActionStatusService
     /**
      * @var list<string>
      */
+    // Valeurs en dur (string) plutôt que via les constantes
+    // ActionTrackingService::VALIDATION_* pour éviter toute dépendance de
+    // chargement entre classes (la définition de const arrays est évaluée à
+    // la première utilisation de la classe). Les valeurs `*_direction` sont
+    // conservees pour reconnaitre les actions historiques avant la migration
+    // de purge.
     private const STARTED_VALIDATION_STATUSES = [
-        ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-        ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
-        ActionTrackingService::VALIDATION_REJETEE_CHEF,
-        ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-        ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
-        ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        'soumise_chef',
+        'correction_demandee',
+        'rejetee_chef',
+        'validee_chef',
+        'rejetee_direction',
+        'validee_direction',
         'en_validation_chef',
         'soumise_direction',
         'en_validation_direction',
@@ -173,7 +179,6 @@ class ActionStatusService
             || $action->soumise_le !== null
             || $action->soumise_par !== null
             || $action->evalue_le !== null
-            || $action->direction_valide_le !== null
             || $action->cloture_le !== null
             || $action->date_fin_reelle !== null;
     }
@@ -198,7 +203,6 @@ class ActionStatusService
             'mesures_correctives',
             'justification_cloture',
             'evaluation_commentaire',
-            'direction_evaluation_commentaire',
         ] as $field) {
             if (trim((string) ($action->{$field} ?? '')) !== '') {
                 return true;

@@ -63,7 +63,12 @@ class AccessScopeService
         }
 
         // 2) Chef d'unité UCAS — limité à son unité DG.
-        if ($user->hasRole(User::ROLE_CHEF_UNITE, User::ROLE_CHEF_UNITE_UCAS) && ($user->unite_dg_id !== null || $user->service_id !== null)) {
+        if ($user->hasRole(
+            User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_UNITE_CABINET,
+            User::ROLE_CHEF_UNITE_DGA,
+            User::ROLE_CHEF_UNITE_UCAS
+        ) && ($user->unite_dg_id !== null || $user->service_id !== null)) {
             return $this->finalize([
                 'scope_type' => self::TYPE_UNITE,
                 'direction_id' => $user->direction_id !== null ? (int) $user->direction_id : null,
@@ -243,8 +248,6 @@ class AccessScopeService
                 User::ROLE_SCIQ,
                 User::ROLE_SCIQ_SUIVI_GLOBAL,
                 User::ROLE_CHEF_UNITE_SCIQ,
-                User::ROLE_DGA_SUPERVISION,
-                User::ROLE_CHEF_UNITE_DGA,
             );
     }
 
