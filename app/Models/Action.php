@@ -99,7 +99,6 @@ class Action extends Model
         'livrable_attendu',
         'date_debut',
         'date_fin',
-        'frequence_execution',
         'date_echeance',
         'responsable_id',
         'contexte_action',
@@ -246,9 +245,11 @@ class Action extends Model
         return $this->morphMany(Justificatif::class, 'justifiable');
     }
 
-    public function weeks(): HasMany
+    // Relation weeks() supprimee : le suivi hebdomadaire n'existe plus.
+    // Stub retournant une collection vide via Builder pour compatibilite.
+    public function weeks(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(ActionWeek::class, 'action_id');
+        return $this->hasMany(Action::class, 'id', 'id')->whereRaw('1 = 0');
     }
 
     public function sousActions(): HasMany

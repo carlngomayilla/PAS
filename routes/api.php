@@ -3,7 +3,6 @@
 use App\Http\Controllers\Api\ActionController;
 use App\Http\Controllers\Api\ActionCommentController;
 use App\Http\Controllers\Api\ActionValidationController;
-use App\Http\Controllers\Api\ActionWeekController;
 use App\Http\Controllers\Api\AlerteController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\JournalAuditController;
@@ -59,10 +58,13 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
         Route::apiResource('actions', ActionController::class)
             ->except(['store'])
             ->parameters(['actions' => 'action']);
-        Route::get('actions/{action}/weeks', [ActionWeekController::class, 'weeks'])
-            ->name('actions.weeks');
-        Route::post('actions/{action}/weeks/{actionWeek}/submit', [ActionWeekController::class, 'submitWeek'])
-            ->name('actions.weeks.submit');
+        // Routes actions.weeks supprimees : le suivi hebdomadaire n'existe plus.
+        Route::get('actions/{action}/weeks', static function () {
+            return response()->json(['message' => 'Le suivi hebdomadaire a ete supprime.'], 410);
+        })->name('actions.weeks');
+        Route::post('actions/{action}/weeks/{week}/submit', static function () {
+            return response()->json(['message' => 'Le suivi hebdomadaire a ete supprime.'], 410);
+        })->name('actions.weeks.submit');
         Route::post('actions/{action}/review', [ActionValidationController::class, 'review'])
             ->name('actions.review');
         // Etape « validation direction » supprimee — stub 403 pour les anciens

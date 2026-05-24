@@ -8,7 +8,6 @@ use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Models\Action;
 use App\Models\ActionLog;
-use App\Models\ActionWeek;
 use App\Models\Justificatif;
 use App\Models\SousAction;
 use App\Models\User;
@@ -23,6 +22,7 @@ use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -64,7 +64,7 @@ class ActionTrackingWebController extends Controller
             // colonne `direction_valide_par` (cf. migration de purge direction).
             'financementDafPar:id,name,email',
             'financementDgPar:id,name,email',
-            'weeks' => fn ($q) => $q->with('saisiPar:id,name,email')->orderBy('numero_semaine'),
+            // 'weeks' supprime : le suivi hebdomadaire n'existe plus.
             'sousActions' => fn ($q) => $q->with([
                 'agent:id,name,email',
                 'justificatifs' => fn ($docQuery) => $docQuery->with('ajoutePar:id,name,email')->latest(),
@@ -153,13 +153,17 @@ class ActionTrackingWebController extends Controller
             ]);
         }
 
-        if ($action->date_debut !== null && (string) $validated['date_debut'] < (string) $action->date_debut) {
+        if ($action->date_debut !== null
+            && Carbon::parse((string) $validated['date_debut'])->startOfDay()->lt(Carbon::parse($action->date_debut)->startOfDay())
+        ) {
             return back()->withErrors([
                 'date_debut' => 'La date de debut de la sous-action doit rester dans la periode de l action.',
             ])->withInput();
         }
 
-        if ($action->date_fin !== null && (string) $validated['date_fin'] > (string) $action->date_fin) {
+        if ($action->date_fin !== null
+            && Carbon::parse((string) $validated['date_fin'])->startOfDay()->gt(Carbon::parse($action->date_fin)->startOfDay())
+        ) {
             return back()->withErrors([
                 'date_fin' => 'La date de fin de la sous-action ne doit pas depasser l echeance de l action.',
             ])->withInput();
@@ -442,13 +446,17 @@ class ActionTrackingWebController extends Controller
             ]);
         }
 
-        if ($action->date_debut !== null && (string) $validated['date_debut'] < (string) $action->date_debut) {
+        if ($action->date_debut !== null
+            && Carbon::parse((string) $validated['date_debut'])->startOfDay()->lt(Carbon::parse($action->date_debut)->startOfDay())
+        ) {
             return back()->withInput()->withErrors([
                 'date_debut' => 'La date de debut de la sous-action doit rester dans la periode de l action.',
             ]);
         }
 
-        if ($action->date_fin !== null && (string) $validated['date_fin'] > (string) $action->date_fin) {
+        if ($action->date_fin !== null
+            && Carbon::parse((string) $validated['date_fin'])->startOfDay()->gt(Carbon::parse($action->date_fin)->startOfDay())
+        ) {
             return back()->withInput()->withErrors([
                 'date_fin' => 'La date de fin de la sous-action ne doit pas depasser l echeance de l action.',
             ]);
@@ -548,97 +556,10 @@ class ActionTrackingWebController extends Controller
             ->with('success', $isDone ? 'Sous-action marquee comme realisee.' : 'Sous-action mise a jour avec succes.');
     }
 
-    public function submitWeek(
-        Request $request,
-        Action $action,
-        ActionWeek $actionWeek,
-        ActionTrackingService $trackingService,
-        SecureJustificatifStorage $secureStorage,
-        WorkspaceNotificationService $notificationService
-    ): RedirectResponse {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
-        if (! $this->canTrackWeekly($user, $action)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if ($action->usesStructuredProgressTracking()) {
-            return back()->withErrors([
-                'general' => 'Le suivi periodique n est plus disponible pour cette action. Utilisez les sous-actions ou la quantite realisee.',
-            ]);
-        }
-
-        if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors([
-                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Saisie'),
-            ]);
-        }
-
-        if (! $this->isExecutionEditableByAgent($action)) {
-            return back()->withErrors([
-                'general' => 'Saisie gelee: action en cours de validation. Modifications autorisees uniquement apres rejet motive.',
-            ]);
-        }
-
-        if ((int) $actionWeek->action_id !== (int) $action->id) {
-            abort(404);
-        }
-
-        $rules = [
-            'commentaire' => ['nullable', 'string'],
-            'difficultes' => ['required', 'string'],
-            'mesures_correctives' => ['required', 'string'],
-            'justificatif' => ['required', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
-        ];
-
-        if ($action->type_cible === 'quantitative') {
-            $rules['quantite_realisee'] = ['required', 'numeric', 'min:0'];
-        } else {
-            $rules['taches_realisees'] = ['required', 'string'];
-            $rules['avancement_estime'] = ['required', 'numeric', 'min:0', 'max:100'];
-        }
-
-        /** @var array<string, mixed> $validated */
-        $validated = $request->validate($rules);
-
-        DB::transaction(function () use ($trackingService, $actionWeek, $validated, $request, $action, $user, $secureStorage): void {
-            $trackingService->submitWeek($actionWeek, $validated, $user);
-
-            $file = $request->file('justificatif');
-            $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
-            $trackingService->addActionJustificatif(
-                $action,
-                $actionWeek,
-                'hebdomadaire',
-                $storedFile['path'],
-                $storedFile['nom_original'],
-                $storedFile['mime_type'],
-                $storedFile['taille_octets'],
-                'Justificatif hebdomadaire',
-                $user,
-                $storedFile['est_chiffre']
-            );
-        });
-
-        $this->recordAudit(
-            $request,
-            'action_week',
-            'submit',
-            $actionWeek,
-            null,
-            $actionWeek->fresh()?->toArray()
-        );
-
-        $notificationService->notifyJustificatifAdded($action, $user, null, 'hebdomadaire');
-
-        return redirect()
-            ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Semaine renseignee avec succes.');
-    }
+    // submitWeek : methode supprimee.
+    // Le suivi hebdomadaire des actions a ete retire du modele metier.
+    // Le suivi se fait desormais via updateQuantitativeProgress et les
+    // sous-actions (storeSubAction / updateSubAction).
 
     public function updateQuantitativeProgress(
         Request $request,

@@ -349,18 +349,9 @@
                             </div>
                         </div>
 
-                        {{-- Fréquence --}}
-                        <div>
-                            <label for="frequence_execution">Fréquence de suivi</label>
-                            @php $frequence = old('frequence_execution', $row->frequence_execution ?: 'hebdomadaire'); @endphp
-                            <select id="frequence_execution" name="frequence_execution" required>
-                                <option value="instantanee"   @selected($frequence === 'instantanee')>Instantanée</option>
-                                <option value="journaliere"   @selected($frequence === 'journaliere')>Journalière</option>
-                                <option value="hebdomadaire"  @selected($frequence === 'hebdomadaire')>Hebdomadaire</option>
-                                <option value="mensuelle"     @selected($frequence === 'mensuelle')>Mensuelle</option>
-                                <option value="annuelle"      @selected($frequence === 'annuelle')>Annuelle</option>
-                            </select>
-                        </div>
+                        {{-- Frequence de suivi supprimee : le suivi hebdomadaire
+                             n'existe plus. Le suivi se fait via sous-actions ou
+                             saisie quantitative globale. --}}
 
                         {{-- Date début --}}
                         <div>

@@ -31,7 +31,7 @@
         </x-slot:actions>
     </x-ui.page-title>
 
-    <section class="showcase-summary-grid mb-4 app-screen-kpis">
+    <section class="showcase-summary-grid pta-summary-row mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
             <x-stat-card-link
                 :href="$card['href']"

@@ -11,7 +11,7 @@
                 'href'    => route('workspace.actions.index'),
             ],
             [
-                'label'   => 'KPI global',
+                'label'   => 'Indicateur global',
                 'value'   => number_format((float) ($globalScores['global'] ?? 0), 1, ',', ' ') . '%',
                 'accent'  => '#178f5f',
                 'icon'    => '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
@@ -58,41 +58,47 @@
             ]);
         }
     @endphp
-    <div class="mb-5 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,175px),1fr))]">
+    {{-- Cartes statistiques : memes dimensions et structure que <x-ui.stat-card>
+         utilisee dans les autres pages (min-w-[150px] max-w-[220px], px-4 py-3,
+         label en haut, valeur en bas, badge tendance optionnel). --}}
+    <div class="mx-auto mb-3 flex w-full max-w-5xl flex-wrap justify-center gap-2">
         @foreach ($kpiStatCards as $ksc)
             @php
                 $trendUp   = ($ksc['trend'] ?? null) === 'up';
                 $trendDown = ($ksc['trend'] ?? null) === 'down';
-                $trendNeutral = ($ksc['trend'] ?? null) === 'neutral';
             @endphp
-            <a href="{{ $ksc['href'] }}" class="no-kpi-band anbg-kpi-stat-card group">
-                <div class="anbg-kpi-stat-icon" style="color:{{ $ksc['accent'] }};">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                         stroke-linejoin="round" aria-hidden="true">{!! $ksc['icon'] !!}</svg>
+            <a href="{{ $ksc['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border border-[#3996d3]/30 bg-white px-4 py-3 text-center shadow-sm transition hover:shadow-md">
+                <div class="flex min-h-[4.5rem] flex-col items-center justify-center gap-2">
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef6fc]" style="color:{{ $ksc['accent'] }};">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">{!! $ksc['icon'] !!}</svg>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="truncate text-center text-[11px] font-bold uppercase tracking-wide text-[#667085]">{{ $ksc['label'] }}</p>
+                        <p class="mt-1 text-center text-xl font-extrabold" style="color:{{ $ksc['accent'] }};">{{ $ksc['value'] }}</p>
+                    </div>
                 </div>
-                <div class="anbg-kpi-stat-body">
-                    <p class="anbg-kpi-stat-label">{{ $ksc['label'] }}</p>
-                    <p class="anbg-kpi-stat-value" style="color:{{ $ksc['accent'] }};">{{ $ksc['value'] }}</p>
-                    @if (!is_null($ksc['trend'] ?? null))
-                        <div class="anbg-kpi-stat-trend @if($trendUp) anbg-trend-up @elseif($trendDown) anbg-trend-down @else anbg-trend-neutral @endif">
+                @if (!is_null($ksc['trend'] ?? null))
+                    <div class="mt-2 flex justify-center">
+                        <span class="app-badge app-badge-{{ $trendUp ? 'success' : ($trendDown ? 'danger' : 'neutral') }}">
                             @if ($trendUp)
-                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
                             @elseif ($trendDown)
-                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
                             @else
-                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                             @endif
-                            <span>{{ $ksc['trendLabel'] ?? '' }}</span>
-                        </div>
-                    @endif
-                </div>
+                            <span class="ml-1">{{ $ksc['trendLabel'] ?? '' }}</span>
+                        </span>
+                    </div>
+                @endif
             </a>
         @endforeach
     </div>
 
     @if (!in_array($dashboardRole, ['agent'], true))
-    <div class="mb-4 space-y-3">
+    <div class="mb-4 w-full space-y-3">
         @php
             $planningHierarchyRows = [
                 [
@@ -216,26 +222,29 @@
                 ];
             })->all();
         @endphp
-        @foreach ($planningHierarchyRows as $row)
-            <div class="grid gap-2 md:grid-cols-[92px_minmax(0,1fr)]">
-                <div class="flex items-center justify-center rounded-[1rem] border border-[#3996d3]/18 bg-[#e8f3fb] px-3 py-2 text-xs font-black uppercase text-[#17324a]">
-                    {{ $row['group'] }}
-                </div>
-                <div class="flex gap-3 overflow-x-auto pb-1">
-                    @foreach ($row['cards'] as $card)
-                        @php $progress = max(0, min(100, (float) ($card['progress'] ?? 0))); @endphp
-                        <a href="{{ $card['href'] }}" class="no-kpi-band dashboard-module-progress-card min-w-[220px] flex-1 rounded-[1rem] border p-3 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.28)]">
-                            <span class="text-[0.66rem] font-semibold uppercase text-[#667085]">{{ $card['label'] }}</span>
-                            <strong class="mt-1.5 block text-[1.45rem] font-black leading-none" style="color: {{ $card['accent'] }};">{{ $card['value'] }}</strong>
-                            <span class="mt-1 block text-xs font-semibold text-[#667085]">{{ $card['meta'] ?? '' }}</span>
-                            <span class="mt-3 block h-2 overflow-hidden rounded-full bg-slate-200/80">
+        {{-- 4 cartes PAS / PAO / PTA / ACTION : memes dimensions que les cartes
+             statistiques du haut et que <x-ui.stat-card> dans les autres pages. --}}
+        <div class="mx-auto flex w-full max-w-5xl flex-wrap justify-center gap-2">
+            @foreach ($planningHierarchyRows as $row)
+                @php $card = $row['cards'][0] ?? null; @endphp
+                @if ($card)
+                    @php $progress = max(0, min(100, (float) ($card['progress'] ?? 0))); @endphp
+                    <a href="{{ $card['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border bg-white px-4 py-3 text-center shadow-sm transition hover:shadow-md" style="border-color: {{ $card['accent'] }}33;">
+                        <div class="flex min-h-[4.5rem] flex-col items-center justify-center gap-1">
+                            <p class="truncate text-center text-[11px] font-bold uppercase tracking-wide text-[#667085]">{{ $row['group'] }}</p>
+                            <p class="text-xl font-extrabold leading-none" style="color: {{ $card['accent'] }};">{{ $card['value'] }}</p>
+                            <p class="truncate text-center text-[10px] font-semibold text-[#94A3B8]">{{ $card['label'] }}</p>
+                        </div>
+                        <div class="mt-2">
+                            <span class="block h-1.5 overflow-hidden rounded-full bg-slate-200/80">
                                 <span class="block h-full rounded-full" style="width: {{ $progress }}%; background: {{ $card['accent'] }};"></span>
                             </span>
-                        </a>
-                    @endforeach
-                </div>
-            </div>
-        @endforeach
+                            <p class="mt-1 truncate text-center text-[10px] font-semibold text-[#667085]">{{ $card['meta'] ?? '' }}</p>
+                        </div>
+                    </a>
+                @endif
+            @endforeach
+        </div>
     </div>
     @endif
 
@@ -283,32 +292,38 @@
         </section>
         @endif
 
-        <section class="mb-4">
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <section class="mb-3">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <h2 class="showcase-panel-title">Tableaux de décision</h2>
                 <span class="showcase-chip">Performance et alertes</span>
             </div>
-            <div class="space-y-4">
+            <div class="space-y-2">
                 @foreach ($directionSynthesisTables as $synthesisTable)
                     @php
                         $synthesisTableId = 'dashboard-synthesis-table-'.$loop->index;
                         $synthesisExportName = \Illuminate\Support\Str::slug((string) ($synthesisTable['title'] ?? 'tableau')).'-'.now()->format('Ymd-His');
+                        $synthesisRowCount = is_array($synthesisTable['rows'] ?? null) ? count($synthesisTable['rows']) : 0;
                     @endphp
-                    <article class="showcase-panel dashboard-synthesis-card w-full overflow-hidden p-0">
-                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 px-3 py-2">
-                            <h3 class="text-sm font-black text-[#17324a]">{{ $synthesisTable['title'] }}</h3>
+                    <details class="showcase-panel dashboard-synthesis-card w-full overflow-hidden p-0" {{ $loop->first ? 'open' : '' }}>
+                        <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 px-3 py-2 list-none">
+                            <h3 class="text-sm font-black text-[#17324a]">
+                                <span class="inline-block w-3 text-[#3996d3]">▸</span>
+                                {{ $synthesisTable['title'] }}
+                            </h3>
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="showcase-chip">{{ $synthesisTable['chip'] }}</span>
+                                <span class="text-[11px] font-semibold text-[#667085]">{{ $synthesisRowCount }} ligne(s)</span>
                                 <button type="button" class="btn btn-primary btn-sm rounded-xl"
                                     data-dashboard-export-table="{{ $synthesisTableId }}"
-                                    data-dashboard-export-name="{{ $synthesisExportName }}">
+                                    data-dashboard-export-name="{{ $synthesisExportName }}"
+                                    onclick="event.stopPropagation();">
                                     Export Excel
                                 </button>
                             </div>
-                        </div>
-                        <div class="app-table-wrapper overflow-x-auto">
+                        </summary>
+                        <div class="app-table-wrapper max-h-[60vh] overflow-auto">
                             <table id="{{ $synthesisTableId }}" class="app-table data-table dashboard-synthesis-table">
-                                <thead>
+                                <thead class="sticky top-0 z-10 bg-white">
                                     <tr>
                                         @foreach ($synthesisTable['headers'] as $header)
                                             <th>{{ $header }}</th>
@@ -347,7 +362,7 @@
                                 </tbody>
                             </table>
                         </div>
-                    </article>
+                    </details>
                 @endforeach
             </div>
         </section>

@@ -2,79 +2,57 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Collection;
 
-class ActionWeek extends Model
+/**
+ * @deprecated Le suivi hebdomadaire des actions a ete supprime.
+ *
+ * Stub conserve pour ne pas casser l'autoload PSR-4 des anciens appels.
+ * Toute requete sur ce modele renvoie une collection vide sans toucher la DB.
+ */
+final class ActionWeek
 {
-    use HasFactory;
-
-    /**
-     * @var list<string>
-     */
-    protected $fillable = [
-        'action_id',
-        'numero_semaine',
-        'libelle_sous_action',
-        'date_debut',
-        'date_fin',
-        'est_renseignee',
-        'est_creee_par_agent',
-        'quantite_realisee',
-        'quantite_cumulee',
-        'taches_realisees',
-        'resultat_attendu',
-        'avancement_estime',
-        'commentaire',
-        'difficultes',
-        'mesures_correctives',
-        'progression_reelle',
-        'progression_theorique',
-        'ecart_progression',
-        'saisi_par',
-        'saisi_le',
-    ];
-
-    /**
-     * @return array<string, string>
-     */
-    protected function casts(): array
+    public static function query(): self
     {
-        return [
-            'date_debut' => 'date',
-            'date_fin' => 'date',
-            'est_renseignee' => 'boolean',
-            'est_creee_par_agent' => 'boolean',
-            'quantite_realisee' => 'decimal:4',
-            'quantite_cumulee' => 'decimal:4',
-            'avancement_estime' => 'decimal:2',
-            'progression_reelle' => 'decimal:2',
-            'progression_theorique' => 'decimal:2',
-            'ecart_progression' => 'decimal:2',
-            'saisi_le' => 'datetime',
-        ];
+        return new self();
     }
 
-    public function action(): BelongsTo
+    public function __call(string $name, array $arguments): self
     {
-        return $this->belongsTo(Action::class, 'action_id');
+        // Toutes les methodes chainables retournent l'instance pour permettre
+        // les chaines fluides (->where(...)->orderBy(...)->get()).
+        return $this;
     }
 
-    public function saisiPar(): BelongsTo
+    public static function __callStatic(string $name, array $arguments): self
     {
-        return $this->belongsTo(User::class, 'saisi_par');
+        return new self();
     }
 
-    public function justificatifs(): HasMany
+    public function get(): Collection
     {
-        return $this->hasMany(Justificatif::class, 'action_week_id')
-            ->where('justifiable_type', Action::class);
+        return new Collection();
     }
 
-    public function logs(): HasMany
+    public function count(): int
     {
-        return $this->hasMany(ActionLog::class, 'action_week_id');
+        return 0;
+    }
+
+    public function first()
+    {
+        return null;
+    }
+
+    public function exists(): bool
+    {
+        return false;
+    }
+
+    public function pluck($column)
+    {
+        return new Collection();
     }
 }

@@ -150,6 +150,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.referentiel.utilisateurs.destroy');
 
         // ── GOUVERNANCE (Documentation API, Rétention, Délégations) ──────────────
+        // Analyse canonique du modele PAS (kit IDE/dark, vue statique).
+        Route::get('/workspace/analyses/model', fn () => view('analyses.model'))
+            ->name('workspace.analyses.model');
+
         Route::get('/workspace/documentation-api', [GovernanceWebController::class, 'apiDocumentation'])
             ->name('workspace.api-docs.index');
         Route::get('/workspace/documentation-api/openapi.yaml', [GovernanceWebController::class, 'apiSpec'])
@@ -292,8 +296,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.sub-actions.update');
             Route::post('actions/{action}/execution', [ActionTrackingWebController::class, 'updateQuantitativeProgress'])
                 ->name('actions.execution.update');
-            Route::post('actions/{action}/semaines/{actionWeek}/soumettre', [ActionTrackingWebController::class, 'submitWeek'])
-                ->name('actions.weeks.submit');
+            // Route actions.weeks.submit supprimee : le suivi hebdomadaire n'existe plus.
+            Route::post('actions/{action}/semaines/{week}/soumettre', static function () {
+                abort(410, 'Le suivi hebdomadaire a ete supprime du circuit metier.');
+            })->name('actions.weeks.submit');
             Route::post('actions/{action}/demander-cloture', [ActionTrackingWebController::class, 'submitClosure'])
                 ->name('actions.submit-closure');
             Route::post('actions/{action}/review', [ActionTrackingWebController::class, 'reviewClosure'])

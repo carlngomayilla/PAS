@@ -113,20 +113,9 @@
         }
     @endphp
 
-    <div class="app-screen-flow">
-        <section class="showcase-hero mb-4 app-screen-block">
-            <div class="showcase-hero-body">
-                <div>
-                    <span class="showcase-eyebrow">PTA</span>
-                    <h1 class="showcase-title">{{ $isEdit ? 'Modifier le PTA du service' : 'Enregistrer le PTA du service' }}</h1>
-                </div>
-                <div class="showcase-action-row">
-                    <a class="btn btn-secondary" href="{{ route('workspace.pta.index') }}">Retour liste</a>
-                </div>
-            </div>
-        </section>
-<section class="showcase-panel mb-4 app-screen-block">
-            <form method="POST" enctype="multipart/form-data" class="form-shell" action="{{ $isEdit ? route('workspace.pta.update', $row) : route('workspace.pta.store') }}">
+    <div class="app-screen-flow pta-registration-screen">
+        <section class="showcase-panel pta-form-panel mb-4 app-screen-block">
+            <form method="POST" enctype="multipart/form-data" class="form-shell pta-form-shell" action="{{ $isEdit ? route('workspace.pta.update', $row) : route('workspace.pta.store') }}">
                 @csrf
                 @if ($isEdit)
                     @method('PUT')
@@ -134,7 +123,7 @@
 
                 <input id="titre" name="titre" type="hidden" value="{{ $defaultTitle }}">
 
-                <div class="form-section">
+                <div class="form-section pta-scope-section">
                     <h2 class="form-section-title">Périmètre</h2>
                     <div class="form-grid">
                         <div class="md:col-span-2">
@@ -215,14 +204,14 @@
                     </div>
                 </div>
 
-                <div class="form-section">
-                    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="form-section pta-actions-section">
+                    <div class="pta-actions-header mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 class="form-section-title mb-0">Actions liées à l'objectif opérationnel</h2>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="anbg-badge anbg-badge-info px-3"><span id="pta-action-count">{{ $actionRows->count() }}</span> action(s)</span>
-                            <button id="add-action-button" class="btn btn-secondary" type="button">+ Ajouter une autre action</button>
+                            <span class="pta-action-count-badge anbg-badge anbg-badge-info px-3"><span id="pta-action-count">{{ $actionRows->count() }}</span> action(s)</span>
+                            <button id="add-action-button" class="btn btn-primary" type="button">+ Ajouter une autre action</button>
                         </div>
                     </div>
 
@@ -460,10 +449,9 @@
 
                 targetWrappers.forEach(function (wrapper) {
                     var input = wrapper.querySelector('input:not([type="hidden"]), select, textarea');
-                    var active = mode === 'quantitatif';
-                    wrapper.classList.toggle('hidden', !active);
+                    wrapper.classList.toggle('hidden', false);
                     if (input) {
-                        input.required = active && !wrapper.hasAttribute('data-target-optional');
+                        input.required = mode === 'quantitatif' && !wrapper.hasAttribute('data-target-optional');
                     }
                 });
 

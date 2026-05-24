@@ -21,29 +21,10 @@
         $pao = $action->pao ?: $pta?->pao;
         $pas = $pao?->pas;
         $objectifOperationnel = $action->objectifOperationnel;
-        $frequenceExecution = (string) ($action->frequence_execution ?: 'hebdomadaire');
-        $frequenceLabels = [
-            'instantanee' => 'Instantanée',
-            'journaliere' => 'Journalière',
-            'hebdomadaire' => 'Hebdomadaire',
-            'mensuelle' => 'Mensuelle',
-            'annuelle' => 'Annuelle',
-        ];
-        $frequenceLabel = $frequenceLabels[$frequenceExecution] ?? $frequenceExecution;
-        $periodeLabelSingulier = match ($frequenceExecution) {
-            'instantanee' => 'Étape',
-            'journaliere' => 'Jour',
-            'mensuelle' => 'Mois',
-            'annuelle' => 'Année',
-            default => 'Semaine',
-        };
-        $periodeLabelPluriel = match ($frequenceExecution) {
-            'instantanee' => 'étapes',
-            'journaliere' => 'jours',
-            'mensuelle' => 'mois',
-            'annuelle' => 'années',
-            default => 'semaines',
-        };
+        // Suivi hebdomadaire supprime : labels de frequence/periode retires.
+        $frequenceLabel = '-';
+        $periodeLabelSingulier = 'Periode';
+        $periodeLabelPluriel = 'periodes';
         $validationStatus = (string) ($action->statut_validation ?: 'non_soumise');
         $validationStatusLabels = is_array($validationStatusLabels ?? null) ? $validationStatusLabels : [];
         $justificatifCategoryLabels = is_array($justificatifCategoryLabels ?? null) ? $justificatifCategoryLabels : [];
@@ -74,6 +55,9 @@
         $agentLocked = auth()->check()
             && (int) auth()->id() === (int) $action->responsable_id
             && !in_array($validationStatus, ['non_soumise', 'correction_demandee', 'rejetee_chef', 'rejetee_direction'], true);
+        $canCreateSubActionFromSuivi = ($canTrackWeekly ?? false)
+            && $usesStructuredProgress
+            && ! $agentLocked;
         $isAwaitingChef = $workflow['service_enabled'] && $validationStatus === 'soumise_chef';
         // L'etape « validation direction » a ete supprimee du circuit metier.
         // Les statuts `validee_direction` / `rejetee_direction` ne sont
@@ -612,7 +596,7 @@
         @if ($agentLocked)
             <p class="action-section-note mb-3">Saisie gelée : action soumise. Modifications possibles uniquement après rejet motivé.</p>
         @endif
-        @if (false && $canTrackWeekly && $usesStructuredProgress)
+        @if ($canCreateSubActionFromSuivi)
             <form class="mb-4 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.sub-actions.store', $action) }}">
                 @csrf
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -677,7 +661,7 @@
                 <button class="btn btn-secondary mt-3" type="submit">+ Ajouter une sous-action</button>
             </form>
         @endif
-        @if ($canTrackWeekly && $usesStructuredProgress && $action->sousActions->isEmpty())
+        @if (! $canCreateSubActionFromSuivi && $canTrackWeekly && $usesStructuredProgress && $action->sousActions->isEmpty())
             <p class="action-section-note mb-3">Aucune sous-action planifiée. Les sous-actions doivent être ajoutées depuis la fiche action ou le PTA par le responsable habilité.</p>
         @endif
         @if (false)
@@ -809,87 +793,8 @@
 
         @endif
 
-        @if ($usesHistoricalProgress)
-        <h3 class="mb-2 text-center text-lg font-bold text-[#1c203d]">Suivi périodique (historique)</h3>
-        @forelse ($action->weeks as $week)
-            <article id="action-week-{{ $week->id }}" class="action-week-card mb-3">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                        <strong>{{ $week->libelle_sous_action ?: $periodeLabelSingulier.' '.$week->numero_semaine }}</strong>
-                        @if ($week->est_creee_par_agent)
-                            <span class="ml-2 rounded-full bg-[#3996d3]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3996d3]">Sous-action agent</span>
-                        @endif
-                        <p class="text-slate-600">{{ optional($week->date_debut)->format('d/m/Y') }} → {{ optional($week->date_fin)->format('d/m/Y') }}</p>
-                        @if ($week->resultat_attendu)
-                            <p class="text-slate-600">Résultat attendu : <strong>{{ $week->resultat_attendu }}</strong></p>
-                        @endif
-                        <p class="text-slate-600">
-                            État : <strong>{{ $week->est_renseignee ? 'Renseignée' : 'Non renseignée' }}</strong> |
-                            Réelle : <strong>{{ number_format((float) ($week->progression_reelle ?? 0), 1, ',', ' ') }}%</strong> |
-                            Théo : <strong>{{ number_format((float) ($week->progression_theorique ?? 0), 1, ',', ' ') }}%</strong>
-                        </p>
-                    </div>
-                    @if ($week->saisiPar)
-                        <p class="text-sm text-slate-500">Saisi par {{ $week->saisiPar->name }} le {{ optional($week->saisi_le)->format('d/m/Y H:i') }}</p>
-                    @endif
-                </div>
-
-                @if ($canTrackWeekly)
-                    <form class="mt-2.5" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.weeks.submit', [$action, $week]) }}">
-                        @csrf
-                        @if ($action->type_cible === 'quantitative')
-                            <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                                <div>
-                                    <label for="quantite_realisee_{{ $week->id }}">Quantité réalisée</label>
-                                    <input id="quantite_realisee_{{ $week->id }}" name="quantite_realisee" type="number" step="0.0001" min="0" value="{{ old('quantite_realisee', $week->quantite_realisee) }}">
-                                </div>
-                                <div>
-                                    <label for="commentaire_{{ $week->id }}">Commentaire</label>
-                                    <textarea id="commentaire_{{ $week->id }}" name="commentaire">{{ old('commentaire', $week->commentaire) }}</textarea>
-                                </div>
-                            </div>
-                        @else
-                            <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                                <div>
-                                    <label for="taches_realisees_{{ $week->id }}">Exécution de la sous-action</label>
-                                    <textarea id="taches_realisees_{{ $week->id }}" name="taches_realisees">{{ old('taches_realisees', $week->taches_realisees) }}</textarea>
-                                </div>
-                                <div>
-                                    <label for="avancement_estime_{{ $week->id }}">Niveau d'avancement estimé (%)</label>
-                                    <input id="avancement_estime_{{ $week->id }}" name="avancement_estime" type="number" step="0.01" min="0" max="100" value="{{ old('avancement_estime', $week->avancement_estime) }}">
-                                </div>
-                            </div>
-                        @endif
-
-                        <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                            <div>
-                                <label for="difficultes_{{ $week->id }}">Difficultés rencontrées</label>
-                                <textarea id="difficultes_{{ $week->id }}" name="difficultes">{{ old('difficultes', $week->difficultes) }}</textarea>
-                            </div>
-                            <div>
-                                <label for="mesures_correctives_{{ $week->id }}">Mesures correctives</label>
-                                <textarea id="mesures_correctives_{{ $week->id }}" name="mesures_correctives">{{ old('mesures_correctives', $week->mesures_correctives) }}</textarea>
-                            </div>
-                            <div>
-                                <label for="justificatif_{{ $week->id }}">Pièce justificative</label>
-                                <input id="justificatif_{{ $week->id }}" name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}" required>
-                            </div>
-                        </div>
-                        <button class="btn btn-success" type="submit">
-                            {{ $week->est_renseignee ? 'Mettre à jour' : 'Valider la sous-action' }}
-                        </button>
-                    </form>
-                @endif
-            </article>
-        @empty
-            <x-ui.empty-state
-                title="Aucune période générée"
-                message="Le suivi périodique n'a pas encore généré de période pour cette action. Vérifiez la planification (dates de début/fin) et la fréquence d'exécution."
-                icon="clock"
-                tone="neutral"
-            />
-        @endforelse
-        @endif
+        {{-- Suivi periodique (semaines) supprime. Le suivi se fait desormais
+             via les sous-actions et la saisie quantitative globale. --}}
     </section>
     @endif
 

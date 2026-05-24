@@ -237,7 +237,7 @@ class ActionController extends Controller
                 // directionValidePar supprime avec la migration de purge direction.
                 'kpis:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
-                'weeks' => fn ($q) => $q->orderBy('numero_semaine'),
+                // 'weeks' supprime : le suivi hebdomadaire n'existe plus.
                 'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,progression_reelle,progression_theorique,statut_calcule',
                 'actionLogs' => fn ($q) => $q->latest()->limit(50),
                 'justificatifs' => fn ($q) => $q->latest(),

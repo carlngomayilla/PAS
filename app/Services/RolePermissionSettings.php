@@ -74,7 +74,7 @@ class RolePermissionSettings
                 ->pluck('value', 'key')
                 ->all();
 
-            foreach ($this->roles() as $role => $label) {
+            foreach ($this->knownRoleCodes() as $role) {
                 if ($role === User::ROLE_SUPER_ADMIN) {
                     $settings[$role] = array_keys($this->permissions());
                     continue;
@@ -113,12 +113,18 @@ class RolePermissionSettings
     public function forUser(User $user): array
     {
         $role = $user->effectiveRoleCode();
+        $all = $this->all();
 
-        if (! array_key_exists($role, $this->roles())) {
-            $role = $this->roleRegistry->baseRole((string) $user->role);
+        if (array_key_exists($role, $all)) {
+            return $all[$role];
         }
 
-        return $this->forRole($role);
+        $baseRole = $this->roleRegistry->baseRole($role);
+        if (array_key_exists($baseRole, $all)) {
+            return $all[$baseRole];
+        }
+
+        return [];
     }
 
     public function has(User $user, string $permission): bool
@@ -132,10 +138,23 @@ class RolePermissionSettings
      */
     public function update(array $payload, ?User $actor = null): array
     {
-        foreach ($this->roles() as $role => $label) {
+        $visibleRoleCodes = array_keys($this->roles());
+        $roleCodes = array_values(array_unique(array_merge(
+            $visibleRoleCodes,
+            array_values(array_filter(
+                array_map('strval', array_keys($payload)),
+                fn (string $role): bool => in_array($role, $this->knownRoleCodes(), true)
+            ))
+        )));
+
+        foreach ($roleCodes as $role) {
+            $submittedPermissions = array_key_exists($role, $payload)
+                ? $payload[$role]
+                : (in_array($role, $visibleRoleCodes, true) ? [] : $this->forRole($role));
+
             $permissions = $role === User::ROLE_SUPER_ADMIN
                 ? array_keys($this->permissions())
-                : $this->sanitizePermissionList($payload[$role] ?? []);
+                : $this->sanitizePermissionList($submittedPermissions);
 
             PlatformSetting::query()->updateOrCreate(
                 ['group' => 'role_permissions', 'key' => 'role_permissions_'.$role],
@@ -467,6 +486,18 @@ class RolePermissionSettings
             ->values()
             ->all();
     }
+
+    /**
+     * @return array<int, string>
+     */
+    private function knownRoleCodes(): array
+    {
+        return array_values(array_unique(array_merge(
+            array_keys($this->defaults()),
+            array_keys($this->roles())
+        )));
+    }
+
     private function hasSettingsTable(): bool
     {
         if ($this->tableAvailable !== null) {

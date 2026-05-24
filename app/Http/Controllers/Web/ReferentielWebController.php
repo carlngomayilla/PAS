@@ -853,8 +853,7 @@ class ReferentielWebController extends Controller
 
     private function canManageUsers(User $user): bool
     {
-        return $user->hasAnyPermission('users.manage', 'users.manage_roles')
-            || $user->hasRole(User::ROLE_PLANIFICATION);
+        return $user->hasAnyPermission('users.manage', 'users.manage_roles');
     }
 
     private function canManageRoles(User $user): bool

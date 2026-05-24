@@ -589,7 +589,12 @@ class SuperAdminWebController extends Controller
 
         $permissionCodes = array_keys($this->rolePermissionSettings->permissions());
         $rules = ['permissions' => ['required', 'array']];
-        foreach (array_keys($this->rolePermissionSettings->roles()) as $role) {
+        $roleCodes = array_values(array_unique(array_merge(
+            array_keys($this->rolePermissionSettings->roles()),
+            array_keys($this->rolePermissionSettings->defaults())
+        )));
+
+        foreach ($roleCodes as $role) {
             $rules['permissions.'.$role] = ['nullable', 'array'];
             $rules['permissions.'.$role.'.*'] = ['string', Rule::in($permissionCodes)];
         }
@@ -3220,7 +3225,7 @@ class SuperAdminWebController extends Controller
 
         return collect($this->workspaceModuleSettings->configuredModules())
             ->sortBy('order')
-            ->filter(function (array $module) use ($permissions, $baseRole, $isTechnicalAdmin, $isPlanification, $isAuditor): bool {
+            ->filter(function (array $module) use ($permissions, $baseRole, $isTechnicalAdmin, $canSeeAuditModule): bool {
                 if (! ($module['enabled'] ?? false) && ($module['code'] ?? null) !== 'super_admin') {
                     return false;
                 }

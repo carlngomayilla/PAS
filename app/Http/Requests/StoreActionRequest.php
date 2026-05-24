@@ -61,7 +61,7 @@ class StoreActionRequest extends FormRequest
 
             'date_debut' => ['nullable', 'date', 'date_format:Y-m-d'],
             'date_fin' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_debut'],
-            'frequence_execution' => ['required', Rule::in(ActionTrackingService::executionFrequencyOptions())],
+            'frequence_execution' => ['nullable'], // champ supprime, garde nullable pour compat
             'date_echeance' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_debut'],
             'responsable_id' => ['required', 'integer', 'exists:users,id'],
             'rmo_ids' => ['nullable', 'array'],

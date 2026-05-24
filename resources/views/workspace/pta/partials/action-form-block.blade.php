@@ -47,8 +47,8 @@
     );
 @endphp
 
-<details class="pta-action-block rounded-lg border border-[#d8ecf8] bg-white shadow-sm" data-action-block data-action-index="{{ $index }}" {{ !$isTemplate && ((int) $index === 0 || $hasActionErrors) ? 'open' : '' }}>
-    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+<section class="pta-action-block rounded-lg border border-[#d8ecf8] bg-white shadow-sm" data-action-block data-action-index="{{ $index }}">
+    <div class="pta-action-heading flex list-none items-center justify-between gap-3 px-4 py-3">
         <span class="min-w-0">
             <span class="block text-sm font-extrabold uppercase tracking-wide text-[#1c203d]" data-action-title>Action {{ $number }}</span>
             <span class="block truncate text-xs font-semibold text-slate-500" data-action-summary>{{ $rowData['libelle'] ?? 'Nouvelle action' }}</span>
@@ -59,8 +59,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
         </span>
-    </summary>
-<div class="border-t border-[#d8ecf8] p-4">
+    </div>
+<div class="pta-action-body border-t border-[#d8ecf8] p-4">
 
     <input type="hidden" name="actions[{{ $index }}][id]" value="{{ $rowData['id'] ?? '' }}">
 
@@ -70,7 +70,7 @@
             <div class="form-step-body">
             <div class="form-grid">
                 <div class="md:col-span-2">
-                    <label>Intitule / titre de l'action</label>
+                    <label>Libellé de l'action</label>
                     <input name="actions[{{ $index }}][libelle]" type="text" value="{{ $rowData['libelle'] ?? '' }}" required>
                     @error("actions.$index.libelle") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
@@ -99,7 +99,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion" {{ $hasAssignmentErrors ? 'open' : '' }}>
+        <details class="form-step-accordion" open>
             <summary>2. Responsable / affectation</summary>
             <div class="form-step-body">
             <div class="form-grid">
@@ -132,7 +132,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion" {{ $hasPlanningErrors ? 'open' : '' }}>
+        <details class="form-step-accordion" open>
             <summary>3. Planification</summary>
             <div class="form-step-body">
             <div class="form-grid-compact">
@@ -154,7 +154,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion" {{ $hasTargetErrors ? 'open' : '' }}>
+        <details class="form-step-accordion" open>
             <summary>4. Cible et seuil</summary>
             <div class="form-step-body">
             <div class="form-grid">
@@ -205,7 +205,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion {{ $showSubActionForm ? '' : 'hidden' }}" data-sub-actions-section>
+        <details class="form-step-accordion {{ $showSubActionForm ? '' : 'hidden' }}" data-sub-actions-section open>
             <summary>5. Sous-actions prévues</summary>
             <div class="form-step-body">
             <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -257,10 +257,10 @@
             </div>
         </details>
 
-        <details class="form-step-accordion">
+        <details class="form-step-accordion" open>
             <summary>6. Ressources nécessaires</summary>
             <div class="form-step-body">
-            <div class="form-grid-compact">
+            <div class="form-grid-compact pta-resource-grid">
                 @foreach ($resourceOptions as $resourceCode => $resourceLabel)
                     <label class="checkbox-pill">
                         <input
@@ -282,7 +282,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion">
+        <details class="form-step-accordion" open>
             <summary>7. Risques</summary>
             <div class="form-step-body">
             <div class="form-grid">
@@ -312,7 +312,7 @@
             </div>
         </details>
 
-        <details class="form-step-accordion" {{ $financementRequis || $hasFinancingErrors ? 'open' : '' }}>
+        <details class="form-step-accordion" open>
             <summary>8. Financement</summary>
             <div class="form-step-body">
             <div class="form-grid">
@@ -356,4 +356,4 @@
 
     </div>
 </div>
-</details>
+</section>

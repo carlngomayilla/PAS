@@ -46,10 +46,10 @@
     $ptaServiceActionRows = $analytics['pta_service_action_rows'] ?? [];
     $agentActionRows = $analytics['agent_action_rows'] ?? [];
     $subActionRows = $analytics['sub_action_rows'] ?? [];
-    $priorityActionRows = collect($actionRows)->take(8)->all();
+    $priorityActionRows = collect($actionRows)->values()->all();
     $quantitativeTargetRows = collect($actionRows)
         ->filter(fn (array $row): bool => (bool) ($row['has_quantitative_target'] ?? false))
-        ->take(10)
+        
         ->values()
         ->all();
     $ganttRows = $analytics['gantt_rows'] ?? [];
@@ -187,7 +187,7 @@
             })
             ->implode(' ');
     };
-    $unitFallbackRows = collect($unitRows)->take(6)->values();
+    $unitFallbackRows = collect($unitRows)->values();
     $actionStatusCounts = (array) ($metrics['status_breakdown']['actions'] ?? []);
     $actionValidationCounts = (array) ($metrics['status_breakdown']['actions_validation'] ?? []);
     $statusCount = static fn (string $key): int => (int) ($actionStatusCounts[$key] ?? 0);
@@ -233,21 +233,21 @@
             'title' => 'Obj. strat.',
             'chip' => count($synthesisObjectiveRows),
             'headers' => ['Objectif', 'Act.', 'Score'],
-            'rows' => collect($synthesisObjectiveRows)->take(6)->map(fn (array $row): array => ['cells' => [$shortText($row['objectif'] ?? '-', 34), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['score'] ?? 0)]])->all(),
+            'rows' => collect($synthesisObjectiveRows)->map(fn (array $row): array => ['cells' => [$shortText($row['objectif'] ?? '-', 34), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['score'] ?? 0)]])->all(),
             'empty' => 'Aucun objectif.',
         ],
         [
             'title' => 'PAO',
             'chip' => $fmtCount($metrics['totals']['paos_total'] ?? 0),
             'headers' => ['PAO', 'Act.', 'Prog.'],
-            'rows' => collect($synthesisPaoRows)->take(6)->map(fn (array $row): array => ['cells' => [$shortText($row['pao'] ?? '-', 34), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['progression'] ?? 0)]])->prepend(['cells' => ['Actifs', $fmtCount($metrics['totals']['paos_actifs'] ?? 0), 'PAO']])->all(),
+            'rows' => collect($synthesisPaoRows)->map(fn (array $row): array => ['cells' => [$shortText($row['pao'] ?? '-', 34), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['progression'] ?? 0)]])->prepend(['cells' => ['Actifs', $fmtCount($metrics['totals']['paos_actifs'] ?? 0), 'PAO']])->all(),
             'empty' => 'Aucun PAO.',
         ],
         [
             'title' => 'PTA',
             'chip' => $fmtCount($metrics['totals']['ptas_total'] ?? 0),
             'headers' => ['PTA', 'Act.', 'Prog.'],
-            'rows' => collect($synthesisPtaRows)->take(6)->map(fn (array $row): array => ['cells' => [$shortText($row['pta'] ?? '-', 34), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['progression'] ?? 0)]])->prepend(['cells' => ['Actifs', $fmtCount($metrics['totals']['ptas_actifs'] ?? 0), 'PTA']])->all(),
+            'rows' => collect($synthesisPtaRows)->map(fn (array $row): array => ['cells' => [$shortText($row['pta'] ?? '-', 34), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['progression'] ?? 0)]])->prepend(['cells' => ['Actifs', $fmtCount($metrics['totals']['ptas_actifs'] ?? 0), 'PTA']])->all(),
             'empty' => 'Aucun PTA.',
         ],
         [
@@ -265,7 +265,7 @@
             'title' => 'Retards',
             'chip' => $fmtCount($metrics['alerts']['actions_en_retard'] ?? 0),
             'headers' => ['Action', 'J', 'Prog.'],
-            'rows' => collect($synthesisLateRows)->take(6)->map(fn (array $row): array => ['cells' => [$shortText($row['libelle'] ?? '-', 34), $fmtCount($row['retard_jours'] ?? 0), $fmtPct($row['progression'] ?? 0)]])->all(),
+            'rows' => collect($synthesisLateRows)->map(fn (array $row): array => ['cells' => [$shortText($row['libelle'] ?? '-', 34), $fmtCount($row['retard_jours'] ?? 0), $fmtPct($row['progression'] ?? 0)]])->all(),
             'empty' => 'Aucun retard.',
         ],
         [
@@ -291,14 +291,14 @@
             'title' => 'Services',
             'chip' => count($synthesisServiceRows),
             'headers' => ['Service', 'Act.', 'Score'],
-            'rows' => collect($synthesisServiceRows)->take(6)->map(fn (array $row): array => ['cells' => [$shortText($row['label'] ?? '-', 28), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['kpi_global'] ?? 0)]])->all(),
+            'rows' => collect($synthesisServiceRows)->map(fn (array $row): array => ['cells' => [$shortText($row['label'] ?? '-', 28), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['kpi_global'] ?? 0)]])->all(),
             'empty' => 'Aucun service.',
         ],
         [
             'title' => 'Agents',
             'chip' => count($synthesisAgentRows),
             'headers' => ['Agent', 'Act.', 'Tx'],
-            'rows' => collect($synthesisAgentRows)->take(6)->map(fn (array $row): array => ['cells' => [$shortText($row['agent'] ?? '-', 28), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['taux_execution'] ?? 0)]])->all(),
+            'rows' => collect($synthesisAgentRows)->map(fn (array $row): array => ['cells' => [$shortText($row['agent'] ?? '-', 28), $fmtCount($row['actions_total'] ?? 0), $fmtPct($row['taux_execution'] ?? 0)]])->all(),
             'empty' => 'Aucun agent.',
         ],
         [
@@ -311,13 +311,13 @@
             'title' => 'Alertes',
             'chip' => count($alertRows),
             'headers' => ['Alerte', 'Niv.', 'Détail'],
-            'rows' => collect($alertRows)->take(6)->map(fn (array $row): array => ['cells' => [$shortText($row['titre'] ?? '-', 30), $shortText($row['niveau'] ?? '-', 14), $shortText($row['details'] ?? '-', 18)]])->all(),
+            'rows' => collect($alertRows)->map(fn (array $row): array => ['cells' => [$shortText($row['titre'] ?? '-', 30), $shortText($row['niveau'] ?? '-', 14), $shortText($row['details'] ?? '-', 18)]])->all(),
             'empty' => 'Aucune alerte.',
         ],
         [
-            'title' => 'KPI',
+            'title' => 'Indicateurs',
             'chip' => $fmtPct($globalScores['global'] ?? 0),
-            'headers' => ['KPI', 'Score', 'Note'],
+            'headers' => ['Indicateur', 'Score', 'Note'],
             'rows' => [
                 ['cells' => ['Délai', $fmtPct($globalScores['delai'] ?? 0), 'Temps']],
                 ['cells' => ['Perf.', $fmtPct($globalScores['performance'] ?? 0), 'Exéc.']],
@@ -335,7 +335,7 @@
             'chip' => $fmtCount($metrics['alerts']['mesures_kpi_sous_seuil'] ?? 0),
             'headers' => ['Point', 'Nb', 'Note'],
             'rows' => [
-                ['cells' => ['Ind.', $fmtCount($metrics['totals']['kpis_total'] ?? 0), 'KPI']],
+                ['cells' => ['Ind.', $fmtCount($metrics['totals']['kpis_total'] ?? 0), 'Indicateur']],
                 ['cells' => ['Mesures', $fmtCount($metrics['totals']['kpi_mesures_total'] ?? 0), 'Suivi']],
                 ['cells' => ['Sous seuil', $fmtCount($metrics['alerts']['mesures_kpi_sous_seuil'] ?? 0), 'Alerte']],
             ],
@@ -358,7 +358,7 @@
             'title' => 'Performance des services',
             'chip' => count($synthesisServiceRows).' services',
             'headers' => ['Service', 'Actions', 'Progression', 'Score', 'Alertes'],
-            'rows' => collect($synthesisServiceRows)->take(8)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($synthesisServiceRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['label'] ?? '-', 38),
                 $fmtCount($row['actions_total'] ?? 0),
                 $fmtPct($row['progression_moyenne'] ?? 0),
@@ -371,7 +371,7 @@
             'title' => 'Performance des agents',
             'chip' => count($synthesisAgentRows).' agents',
             'headers' => ['Agent', 'Actions affectées', 'Terminées', 'En retard', 'Taux exécution'],
-            'rows' => collect($synthesisAgentRows)->take(8)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($synthesisAgentRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['agent'] ?? '-', 38),
                 $fmtCount($row['actions_total'] ?? 0),
                 $fmtCount($row['achevees'] ?? 0),
@@ -384,7 +384,7 @@
             'title' => 'Actions prioritaires',
             'chip' => count($priorityActionRows).' actions',
             'headers' => ['Action', 'Service', 'Responsable', 'Statut', 'Progression'],
-            'rows' => collect($priorityActionRows)->take(8)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($priorityActionRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['libelle'] ?? '-', 42),
                 $shortText($row['service'] ?? '-', 24),
                 $shortText($row['responsable'] ?? '-', 28),
@@ -397,7 +397,7 @@
             'title' => 'Actions en retard',
             'chip' => $fmtCount($metrics['alerts']['actions_en_retard'] ?? 0).' retards',
             'headers' => ['Action', 'Échéance', 'Jours de retard', 'Progression', 'Validation'],
-            'rows' => collect($synthesisLateRows)->take(8)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($synthesisLateRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['libelle'] ?? '-', 42),
                 (string) ($row['echeance'] ?? '-'),
                 $fmtCount($row['retard_jours'] ?? 0),
@@ -421,7 +421,7 @@
             'title' => 'Alertes et anomalies',
             'chip' => count($alertRows).' alertes',
             'headers' => ['Alerte', 'Niveau', 'Action concernée', 'Détail'],
-            'rows' => collect($alertRows)->take(8)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($alertRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['titre'] ?? '-', 34),
                 $shortText($row['niveau'] ?? '-', 18),
                 $shortText($row['action'] ?? '-', 36),
@@ -442,7 +442,7 @@
             'title' => 'Chaîne PAS PAO PTA Actions',
             'chip' => $fmtPct($decisionCounts['taux_alignement'] ?? 0),
             'headers' => ['PAS', 'Objectif stratégique', 'PAO', 'Objectif opérationnel', 'PTA', 'Actions', 'État'],
-            'rows' => collect($decisionChainRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionChainRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['pas'] ?? 'PAS', 22),
                 $shortText($row['objectif_strategique'] ?? '-', 34),
                 $shortText($row['pao'] ?? 'PAO', 22),
@@ -457,7 +457,7 @@
             'title' => 'Performance par service',
             'chip' => count($decisionServiceRows).' services',
             'headers' => ['Service', 'PTA', 'Actions', 'Terminées', 'En cours', 'Retard', 'Taux', 'Score'],
-            'rows' => collect($decisionServiceRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionServiceRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['service'] ?? '-', 32),
                 $fmtCount($row['pta'] ?? 0),
                 $fmtCount($row['actions'] ?? 0),
@@ -473,7 +473,7 @@
             'title' => 'Actions prioritaires',
             'chip' => count($decisionPriorityRows).' actions',
             'headers' => ['Action', 'Service', 'Responsable', 'Date fin', 'Statut', 'Progression', 'Validation'],
-            'rows' => collect($decisionPriorityRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionPriorityRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 38),
                 $shortText($row['service'] ?? '-', 24),
                 $shortText($row['responsable'] ?? '-', 28),
@@ -488,7 +488,7 @@
             'title' => 'Actions en retard',
             'chip' => count($decisionLateRows).' retards',
             'headers' => ['Action', 'Responsable', 'Service', 'Date fin', 'Jours retard', 'Progression', 'Motif'],
-            'rows' => collect($decisionLateRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionLateRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 34),
                 $shortText($row['responsable'] ?? '-', 24),
                 $shortText($row['service'] ?? '-', 22),
@@ -503,7 +503,7 @@
             'title' => 'Performance des agents',
             'chip' => count($decisionAgentRows).' agents',
             'headers' => ['Agent', 'Service', 'Actions affectées', 'Terminées', 'En retard', 'Sous-actions', 'Score'],
-            'rows' => collect($decisionAgentRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionAgentRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['agent'] ?? '-', 30),
                 $shortText($row['service'] ?? '-', 22),
                 $fmtCount($row['actions_affectees'] ?? 0),
@@ -518,7 +518,7 @@
             'title' => 'Validations en attente',
             'chip' => count($decisionPendingValidationRows).' attente',
             'headers' => ['Élément', 'Service', 'Responsable', 'Niveau', 'Statut', 'Depuis', 'Action'],
-            'rows' => collect($decisionPendingValidationRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionPendingValidationRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['element'] ?? '-', 34),
                 $shortText($row['service'] ?? '-', 22),
                 $shortText($row['responsable'] ?? '-', 24),
@@ -533,7 +533,7 @@
             'title' => 'Justificatifs et preuves',
             'chip' => $fmtCount($decisionCounts['justificatifs_total'] ?? 0).' preuves',
             'headers' => ['Action', 'Agent', 'Justificatif', 'Statut preuve', 'Validateur', 'Observation'],
-            'rows' => collect($decisionProofRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionProofRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 32),
                 $shortText($row['agent'] ?? '-', 22),
                 $shortText($row['justificatif'] ?? '-', 30),
@@ -547,7 +547,7 @@
             'title' => 'Alertes et anomalies',
             'chip' => count($decisionAnomalyRows).' points',
             'headers' => ['Type', 'Élément', 'Service', 'Gravité', 'Détail', 'Action corrective'],
-            'rows' => collect($decisionAnomalyRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionAnomalyRows)->map(fn (array $row): array => ['cells' => [
                 $row['type'] ?? '-',
                 $shortText($row['element'] ?? '-', 30),
                 $shortText($row['service'] ?? '-', 22),
@@ -577,7 +577,7 @@
             'title' => 'Performance des directions',
             'chip' => count($directionPerformanceRows).' directions',
             'headers' => ['Direction', 'PAO créé', 'Objectifs opérationnels', 'Services', 'PTA créés', 'Actions', 'Non démarrées', 'En cours', 'Réalisées', 'Validées', 'Retards', 'Hors délai', 'Taux d\'exécution', 'Taux de réalisation', 'Performance', 'Statut', 'Dernière activité'],
-            'rows' => collect($directionPerformanceRows)->take(12)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($directionPerformanceRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['direction'] ?? '-', 28),
                 $row['pao_cree'] ?? '-',
                 $fmtCount($row['objectifs_operationnels'] ?? 0),
@@ -602,7 +602,7 @@
             'title' => 'Déclinaison du PAS par direction',
             'chip' => count($pasDirectionRows).' lignes',
             'headers' => ['Direction', 'Axes concernés', 'Objectifs stratégiques', 'PAO créé', 'Objectifs opérationnels', 'Taux de déclinaison', 'Statut', 'Dernière mise à jour'],
-            'rows' => collect($pasDirectionRows)->take(12)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($pasDirectionRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['direction'] ?? '-', 28),
                 $fmtCount($row['axes'] ?? 0),
                 $fmtCount($row['objectifs_strategiques'] ?? 0),
@@ -618,7 +618,7 @@
             'title' => 'PAO par direction',
             'chip' => count($paoDirectionRows).' objectifs',
             'headers' => ['Direction', 'Objectif stratégique', 'Objectif opérationnel', 'Service', 'Échéance', 'PTA créé', 'Actions créées', 'Actions affectées', 'En cours', 'Réalisées', 'Retards', 'Taux d\'exécution', 'Statut'],
-            'rows' => collect($paoDirectionRows)->take(15)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($paoDirectionRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['direction'] ?? '-', 20),
                 $shortText($row['objectif_strategique'] ?? '-', 34),
                 $shortText($row['objectif_operationnel'] ?? '-', 34),
@@ -639,7 +639,7 @@
             'title' => 'Services de la direction',
             'chip' => count($decisionServiceRows).' services',
             'headers' => ['Service', 'PTA', 'Actions', 'Terminées', 'En cours', 'Retard', 'Taux d\'exécution', 'Score'],
-            'rows' => collect($decisionServiceRows)->take(12)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionServiceRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['service'] ?? '-', 32),
                 $fmtCount($row['pta'] ?? 0),
                 $fmtCount($row['actions'] ?? 0),
@@ -655,7 +655,7 @@
             'title' => 'PTA par service',
             'chip' => count($ptaServiceActionRows).' actions',
             'headers' => ['Service', 'Objectif opérationnel', 'Action', 'Responsable', 'Début', 'Échéance', 'Cible', 'Réalisé', 'Reste', 'Taux de réalisation', 'Progression technique', 'Statut d\'évolution', 'Statut délai', 'Justificatifs', 'Performance'],
-            'rows' => collect($ptaServiceActionRows)->take(15)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($ptaServiceActionRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['service'] ?? '-', 24),
                 $shortText($row['objectif_operationnel'] ?? '-', 34),
                 $shortText($row['action'] ?? '-', 36),
@@ -678,7 +678,7 @@
             'title' => 'Agents par service',
             'chip' => count($decisionAgentRows).' agents',
             'headers' => ['Agent', 'Service', 'Actions affectées', 'Terminées', 'En retard', 'Sous-actions', 'Score'],
-            'rows' => collect($decisionAgentRows)->take(12)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionAgentRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['agent'] ?? '-', 30),
                 $shortText($row['service'] ?? '-', 22),
                 $fmtCount($row['actions_affectees'] ?? 0),
@@ -693,7 +693,7 @@
             'title' => 'Actions des agents',
             'chip' => count($agentActionRows).' lignes',
             'headers' => ['Agent', 'Action', 'Objectif opérationnel', 'PTA', 'Direction', 'Service', 'Échéance', 'Cible', 'Réalisé', 'Reste', 'Sous-actions', 'Progression', 'Taux de réalisation', 'Statut', 'Délai', 'Performance', 'Justificatifs', 'Commentaires', 'Dernière activité'],
-            'rows' => collect($agentActionRows)->take(18)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($agentActionRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['agent'] ?? '-', 24),
                 $shortText($row['action'] ?? '-', 32),
                 $shortText($row['objectif_operationnel'] ?? '-', 32),
@@ -720,7 +720,7 @@
             'title' => 'Sous-actions et preuves',
             'chip' => count($subActionRows).' sous-actions',
             'headers' => ['Action', 'Sous-action', 'Description', 'Cible prévue', 'Quantité réalisée', 'Unité', 'Taux', 'Résultat obtenu', 'Effectuée', 'Date de réalisation', 'Justificatif', 'Commentaire agent', 'Contrôle supérieur', 'Statut'],
-            'rows' => collect($subActionRows)->take(18)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($subActionRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 28),
                 $shortText($row['sous_action'] ?? '-', 28),
                 $shortText($row['description'] ?? '-', 32),
@@ -742,7 +742,7 @@
             'title' => 'Chaîne PAS PAO PTA Actions',
             'chip' => $fmtPct($decisionCounts['taux_alignement'] ?? 0),
             'headers' => ['PAS', 'Objectif stratégique', 'PAO', 'Objectif opérationnel', 'PTA', 'Actions', 'État'],
-            'rows' => collect($decisionChainRows)->take(12)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionChainRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['pas'] ?? 'PAS', 22),
                 $shortText($row['objectif_strategique'] ?? '-', 34),
                 $shortText($row['pao'] ?? 'PAO', 22),
@@ -757,7 +757,7 @@
             'title' => 'Actions prioritaires',
             'chip' => count($decisionPriorityRows).' actions',
             'headers' => ['Action', 'Service', 'Responsable', 'Date fin', 'Statut', 'Progression', 'Validation'],
-            'rows' => collect($decisionPriorityRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionPriorityRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 38),
                 $shortText($row['service'] ?? '-', 24),
                 $shortText($row['responsable'] ?? '-', 28),
@@ -772,7 +772,7 @@
             'title' => 'Actions en retard',
             'chip' => count($decisionLateRows).' retards',
             'headers' => ['Action', 'Responsable', 'Service', 'Date fin', 'Jours retard', 'Progression', 'Motif'],
-            'rows' => collect($decisionLateRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionLateRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 34),
                 $shortText($row['responsable'] ?? '-', 24),
                 $shortText($row['service'] ?? '-', 22),
@@ -787,7 +787,7 @@
             'title' => 'Validations en attente',
             'chip' => count($decisionPendingValidationRows).' attente',
             'headers' => ['Élément', 'Service', 'Responsable', 'Niveau', 'Statut', 'Depuis', 'Action'],
-            'rows' => collect($decisionPendingValidationRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionPendingValidationRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['element'] ?? '-', 34),
                 $shortText($row['service'] ?? '-', 22),
                 $shortText($row['responsable'] ?? '-', 24),
@@ -802,7 +802,7 @@
             'title' => 'Justificatifs et preuves',
             'chip' => $fmtCount($decisionCounts['justificatifs_total'] ?? 0).' preuves',
             'headers' => ['Action', 'Agent', 'Justificatif', 'Statut preuve', 'Validateur', 'Observation'],
-            'rows' => collect($decisionProofRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionProofRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 32),
                 $shortText($row['agent'] ?? '-', 22),
                 $shortText($row['justificatif'] ?? '-', 30),
@@ -816,7 +816,7 @@
             'title' => 'Alertes et anomalies',
             'chip' => count($decisionAnomalyRows).' points',
             'headers' => ['Type', 'Élément', 'Service', 'Gravité', 'Détail', 'Action corrective'],
-            'rows' => collect($decisionAnomalyRows)->take(10)->map(fn (array $row): array => ['cells' => [
+            'rows' => collect($decisionAnomalyRows)->map(fn (array $row): array => ['cells' => [
                 $row['type'] ?? '-',
                 $shortText($row['element'] ?? '-', 30),
                 $shortText($row['service'] ?? '-', 22),

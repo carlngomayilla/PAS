@@ -5,7 +5,6 @@ namespace App\Services\Actions;
 use App\Models\Action;
 use App\Models\ActionKpi;
 use App\Models\ActionLog;
-use App\Models\ActionWeek;
 use App\Models\Justificatif;
 use App\Models\User;
 use App\Services\ActionManagementSettings;
@@ -201,19 +200,15 @@ class ActionTrackingService
      */
     public function initializeActionTracking(Action $action, ?User $actor = null): void
     {
-        if ($action->usesStructuredProgressTracking()) {
-            $action->weeks()->delete();
-            $this->refreshActionMetrics($action);
-        } else {
-            $this->regenerateWeeks($action);
-            $this->refreshActionMetrics($action);
-        }
+        // Le suivi hebdomadaire a ete supprime. L'initialisation se limite a
+        // recalculer les metriques (statut dynamique, progression).
+        $this->refreshActionMetrics($action);
 
         $this->createLogIfMissingToday(
             $action,
             'action_initialisee',
             'info',
-            $action->usesStructuredProgressTracking() ? 'Action initialisee avec suivi structure.' : 'Action initialisee avec suivi periodique automatique.',
+            'Action initialisee. Suivi par sous-actions ou progression quantitative.',
             [
                 'type_cible' => $action->type_cible,
                 'mode_evaluation' => $action->resolvedEvaluationMode(),
@@ -225,134 +220,20 @@ class ActionTrackingService
         );
     }
 
+    // canRegenerateWeeks / regenerateWeeks : methodes supprimees.
+    // Le suivi hebdomadaire n'existe plus dans la spec canonique.
+    // Conserve un stub neutre pour les anciens appels eventuels.
     public function canRegenerateWeeks(Action $action): bool
     {
-        if ($action->usesStructuredProgressTracking()) {
-            return true;
-        }
-
-        return ! $action->weeks()
-            ->where('est_renseignee', true)
-            ->exists();
+        return false;
     }
 
     public function regenerateWeeks(Action $action): void
     {
-        $action->refresh();
-
-        if ($action->usesStructuredProgressTracking()) {
-            $action->weeks()->delete();
-            return;
-        }
-
-        $start = $action->date_debut !== null ? Carbon::parse($action->date_debut)->startOfDay() : null;
-        $end = $action->date_fin !== null ? Carbon::parse($action->date_fin)->startOfDay() : null;
-        $frequence = (string) ($action->frequence_execution ?? self::FREQUENCE_HEBDOMADAIRE);
-        if (! in_array($frequence, self::executionFrequencyOptions(), true)) {
-            $frequence = self::FREQUENCE_HEBDOMADAIRE;
-        }
-
-        if ($start === null || $end === null || $start->gt($end)) {
-            return;
-        }
-
-        $action->weeks()->delete();
-
-        $rows = [];
-        $periodNumber = 1;
-        $currentStart = $start->copy();
-
-        if ($frequence === self::FREQUENCE_INSTANTANEE) {
-            $rows[] = [
-                'numero_semaine' => 1,
-                'date_debut' => $currentStart->toDateString(),
-                'date_fin' => $end->copy()->toDateString(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        } else {
-            while ($currentStart->lte($end)) {
-                $currentEnd = match ($frequence) {
-                    self::FREQUENCE_JOURNALIERE => $currentStart->copy(),
-                    self::FREQUENCE_MENSUELLE => $currentStart->copy()->endOfMonth(),
-                    self::FREQUENCE_ANNUELLE => $currentStart->copy()->endOfYear(),
-                    default => $currentStart->copy()->addDays(6),
-                };
-
-                if ($currentEnd->gt($end)) {
-                    $currentEnd = $end->copy();
-                }
-
-                $rows[] = [
-                    'numero_semaine' => $periodNumber,
-                    'date_debut' => $currentStart->toDateString(),
-                    'date_fin' => $currentEnd->toDateString(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-
-                $periodNumber++;
-                $currentStart = $currentEnd->copy()->addDay();
-            }
-        }
-
-        if ($rows !== []) {
-            $action->weeks()->createMany($rows);
-        }
+        // no-op : plus de generation de semaines.
     }
 
-    /**
-     * @param array<string, mixed> $payload
-     */
-    /** Enregistre le rapport de progression d'une semaine d'exécution. */
-    public function submitWeek(ActionWeek $week, array $payload, ?User $actor = null): ActionWeek
-    {
-        $week->loadMissing('action');
-        $action = $week->action;
-
-        if (! $action instanceof Action) {
-            throw new \RuntimeException('Action introuvable pour la semaine.');
-        }
-
-        $updates = [
-            'commentaire' => $payload['commentaire'] ?? null,
-            'difficultes' => $payload['difficultes'] ?? null,
-            'mesures_correctives' => $payload['mesures_correctives'] ?? null,
-            'est_renseignee' => true,
-            'saisi_le' => now(),
-            'saisi_par' => $actor?->id,
-        ];
-
-        if ($action->type_cible === 'quantitative') {
-            $updates['quantite_realisee'] = $payload['quantite_realisee'] ?? 0;
-            $updates['taches_realisees'] = null;
-            $updates['avancement_estime'] = null;
-        } else {
-            $updates['quantite_realisee'] = null;
-            $updates['taches_realisees'] = $payload['taches_realisees'] ?? null;
-            $updates['avancement_estime'] = $payload['avancement_estime'] ?? 0;
-        }
-
-        $week->fill($updates);
-        $week->save();
-
-        $this->createLogIfMissingToday(
-            $action,
-            'semaine_renseignee',
-            'info',
-            sprintf('Periode %d renseignee.', (int) $week->numero_semaine),
-            ['numero_semaine' => (int) $week->numero_semaine],
-            'responsable',
-            $actor?->id,
-            $week
-        );
-
-        $this->refreshActionMetrics($action);
-
-        $this->maybeAutoSubmitClosureToChef($action->fresh(), $actor);
-
-        return $week->fresh();
-    }
+    // submitWeek : methode supprimee. Le suivi hebdomadaire n'existe plus.
 
     /**
      * Bascule automatique vers le chef de service.
@@ -399,7 +280,7 @@ class ActionTrackingService
         // ActionPerformanceService::calculateRealProgress (semaines et
         // sous-actions). Sans cela les sommes hebdomadaires retomberaient a 0
         // et la bascule n'aboutirait jamais.
-        $action->loadMissing(['weeks', 'sousActions']);
+        $action->loadMissing(['sousActions']);
 
         if (! $this->shouldAutoSubmitClosure($action)) {
             return;
@@ -461,12 +342,10 @@ class ActionTrackingService
             }
         }
 
-        // Cas 3 (historique) — toutes les périodes renseignées + 100 % réel.
-        $weeks = $action->weeks;
-        if ($weeks->isNotEmpty()
-            && ! $weeks->contains(fn (ActionWeek $week): bool => ! (bool) $week->est_renseignee)
-            && $this->actionPerformanceService->calculateRealProgress($action) >= 100.0
-        ) {
+        // Cas 3 — progression reelle atteint 100 % (calcul quantitatif ou
+        // pourcentage agent). Le suivi hebdomadaire ayant ete supprime, on
+        // garde uniquement la verification du taux global.
+        if ($this->actionPerformanceService->calculateRealProgress($action) >= 100.0) {
             return true;
         }
 
@@ -873,47 +752,15 @@ class ActionTrackingService
     private function refreshActionMetricsInternal(Action $action, ?Carbon $referenceDate): Action
     {
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
-        $action->loadMissing('weeks', 'sousActions.justificatifs', 'actionKpi');
+        $action->loadMissing('sousActions.justificatifs', 'actionKpi');
 
         if ($action->usesStructuredProgressTracking()) {
             return $this->refreshStructuredActionMetrics($action, $referenceDate);
         }
 
-        $weeks = $action->weeks()
-            ->orderBy('numero_semaine')
-            ->get();
-
-        $targetQuantity = (float) ($action->quantite_cible ?? 0);
-        $cumulativeQuantity = 0.0;
-
-        foreach ($weeks as $week) {
-            if ($action->type_cible === 'quantitative') {
-                $weeklyDone = $week->est_renseignee ? max(0.0, (float) ($week->quantite_realisee ?? 0)) : 0.0;
-                $cumulativeQuantity += $weeklyDone;
-                $weeklyRealProgress = $targetQuantity > 0
-                    ? min(100.0, round(($cumulativeQuantity / $targetQuantity) * 100, 2))
-                    : 0.0;
-            } else {
-                $weeklyRealProgress = $week->est_renseignee
-                    ? min(100.0, max(0.0, (float) ($week->avancement_estime ?? 0)))
-                    : 0.0;
-            }
-
-            $weeklyTheoreticalProgress = $this->calculateTheoreticalProgress(
-                $action,
-                Carbon::parse($week->date_fin)->endOfDay()
-            );
-            $weeklyGap = round($weeklyRealProgress - $weeklyTheoreticalProgress, 2);
-
-            $week->fill([
-                'quantite_cumulee' => round($cumulativeQuantity, 4),
-                'progression_reelle' => $weeklyRealProgress,
-                'progression_theorique' => $weeklyTheoreticalProgress,
-                'ecart_progression' => $weeklyGap,
-            ]);
-            $week->save();
-        }
-
+        // Suivi hebdomadaire supprime. La progression est calculee directement
+        // a partir de quantite_realisee (mode quantitatif) ou de l'avancement
+        // declare via les sous-actions et le mode quantitatif global.
         $realProgress = $this->actionPerformanceService->calculateRealProgress($action);
         $cumulativeQuantity = $this->actionPerformanceService->realizedQuantity($action);
 
@@ -1023,10 +870,11 @@ class ActionTrackingService
         }
 
         if (! in_array($status, [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)) {
-            $this->generateAutomaticAlerts($action, $weeks, $realProgress, $theoreticalProgress, $kpis, $referenceDate);
+            $emptyWeeks = collect();
+            $this->generateAutomaticAlerts($action, $emptyWeeks, $realProgress, $theoreticalProgress, $kpis, $referenceDate);
         }
 
-        return $action->fresh(['actionKpi', 'weeks', 'sousActions.justificatifs']);
+        return $action->fresh(['actionKpi', 'sousActions.justificatifs']);
     }
 
     private function refreshStructuredActionMetrics(Action $action, Carbon $referenceDate): Action
@@ -1159,10 +1007,8 @@ class ActionTrackingService
         }
 
         if (! in_array($status, [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)) {
-            $weeks = $action->weeks()
-                ->orderBy('numero_semaine')
-                ->get();
-            $this->generateAutomaticAlerts($action, $weeks, $realProgress, $theoreticalProgress, $kpis, $referenceDate);
+            $emptyWeeks = collect();
+            $this->generateAutomaticAlerts($action, $emptyWeeks, $realProgress, $theoreticalProgress, $kpis, $referenceDate);
         }
 
         return $action->fresh(['actionKpi', 'sousActions.justificatifs']);
@@ -1172,7 +1018,7 @@ class ActionTrackingService
     /** Attache un fichier justificatif (PDF, image...) à une action. */
     public function addActionJustificatif(
         Action $action,
-        ?ActionWeek $week,
+        $week, // parametre conserve pour compatibilite, ignore (action_week_id supprime)
         string $categorie,
         string $path,
         string $originalName,
@@ -1185,7 +1031,6 @@ class ActionTrackingService
         return Justificatif::query()->create([
             'justifiable_type' => Action::class,
             'justifiable_id' => $action->id,
-            'action_week_id' => $week?->id,
             'categorie' => $categorie,
             'nom_original' => $originalName,
             'chemin_stockage' => $path,
@@ -1329,7 +1174,7 @@ class ActionTrackingService
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, ActionWeek> $weeks
+     * @param \Illuminate\Support\Collection $weeks parametre conserve mais ignore (suivi hebdomadaire supprime)
      * @param array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float} $kpis
      */
     private function generateAutomaticAlerts(
@@ -1340,41 +1185,8 @@ class ActionTrackingService
         array $kpis,
         Carbon $referenceDate
     ): void {
-        $reference = $referenceDate->copy()->endOfDay();
-
-        $overdueWeeks = $weeks->filter(function (ActionWeek $week) use ($reference): bool {
-            return ! $week->est_renseignee
-                && Carbon::parse($week->date_fin)->endOfDay()->lt($reference);
-        })->values();
-
-        foreach ($overdueWeeks as $index => $week) {
-            $cible = $this->escalationRoleForMissingWeek($index + 1);
-            $this->createLogIfMissingToday(
-                $action,
-                'semaine_non_renseignee',
-                'warning',
-                sprintf('Periode %d non renseignee apres echeance.', (int) $week->numero_semaine),
-                ['numero_semaine' => (int) $week->numero_semaine],
-                $cible,
-                null,
-                $week
-            );
-        }
-
-        if ($overdueWeeks->isNotEmpty()) {
-            $this->createLogIfMissingToday(
-                $action,
-                'conformite_incomplete',
-                'warning',
-                'Conformite insuffisante: des periodes attendues ne sont pas renseignees.',
-                [
-                    'periodes_manquantes' => $overdueWeeks->count(),
-                    'progression_reelle' => $realProgress,
-                    'progression_theorique' => $theoreticalProgress,
-                ],
-                'chef_service'
-            );
-        }
+        // Alertes de periodes non renseignees supprimees (plus de semaines).
+        // Conserve l'alerte sur l'ecart progression reelle vs theorique.
 
         $gap = round($theoreticalProgress - $realProgress, 2);
         $gapThreshold = (float) ($action->seuil_alerte_progression ?? 10);
@@ -1556,13 +1368,8 @@ class ActionTrackingService
             $score -= 10.0;
         }
 
-        $dueWeeks = $action->weeks()
-            ->whereDate('date_fin', '<=', $referenceDate->toDateString())
-            ->get();
-
-        if ($dueWeeks->isNotEmpty() && $dueWeeks->contains(fn (ActionWeek $week): bool => ! $week->est_renseignee)) {
-            $score -= 30.0;
-        }
+        // Penalite « semaines non renseignees » supprimee : le suivi
+        // hebdomadaire n'existe plus.
 
         $hasExecutionJustificatif = $action->justificatifs()
             ->whereIn('categorie', ['hebdomadaire', 'final', 'execution_quantitative', 'execution_mixte'])
@@ -1601,18 +1408,12 @@ class ActionTrackingService
         array $details = [],
         ?string $targetRole = null,
         ?int $userId = null,
-        ?ActionWeek $week = null
+        $week = null // parametre conserve pour compatibilite, ignore
     ): ?ActionLog {
         $query = ActionLog::query()
             ->where('action_id', $action->id)
             ->where('type_evenement', $type)
             ->whereDate('created_at', today()->toDateString());
-
-        if ($week !== null) {
-            $query->where('action_week_id', $week->id);
-        } else {
-            $query->whereNull('action_week_id');
-        }
 
         if ($query->exists()) {
             return null;
@@ -1620,7 +1421,6 @@ class ActionTrackingService
 
         $log = ActionLog::query()->create([
             'action_id' => $action->id,
-            'action_week_id' => $week?->id,
             'niveau' => $level,
             'type_evenement' => $type,
             'message' => $message,
@@ -1653,7 +1453,6 @@ class ActionTrackingService
     ): ActionLog {
         return ActionLog::query()->create([
             'action_id' => $action->id,
-            'action_week_id' => null,
             'niveau' => $level,
             'type_evenement' => $type,
             'message' => trim($message) !== '' ? trim($message) : 'Commentaire',

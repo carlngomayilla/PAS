@@ -1,5 +1,5 @@
 <section class="dashboard-tab-panel active" data-dashboard-panel="overview-tables">
-    <div class="space-y-4">
+    <div class="space-y-2">
         @if ($showRoleOverview)
             @include('partials.dashboard-role-overview', [
                 'roleDashboard' => $roleDashboard,
@@ -10,14 +10,17 @@
             ])
         @endif
 
-        <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div><h2 class="showcase-panel-title">Tableau de synthèse par {{ strtolower($unitModeLabel) }}</h2></div>
+        <details class="showcase-panel overflow-hidden p-0" open>
+            <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-slate-200/80 px-3 py-2 list-none">
+                <div class="flex items-center gap-2">
+                    <span class="inline-block w-3 text-[#3996d3]">▸</span>
+                    <h2 class="showcase-panel-title">Tableau de synthèse par {{ strtolower($unitModeLabel) }}</h2>
+                </div>
                 <span class="showcase-chip">{{ count($unitRows) }} lignes</span>
-            </div>
-            <div class="app-table-wrapper overflow-x-auto">
+            </summary>
+            <div class="app-table-wrapper max-h-[60vh] overflow-auto">
                 <table class="app-table data-table">
-                    <thead><tr><th>{{ $unitModeLabel }}</th><th>Actions</th><th>Progression</th><th>Indicateur moyen</th><th>Alertes</th><th>Validation</th></tr></thead>
+                    <thead class="sticky top-0 z-10 bg-white"><tr><th>{{ $unitModeLabel }}</th><th>Actions</th><th>Progression</th><th>Indicateur moyen</th><th>Alertes</th><th>Validation</th></tr></thead>
                     <tbody>
                         @forelse ($unitRows as $row)
                             @php
@@ -43,13 +46,19 @@
                     </tbody>
                 </table>
             </div>
-        </article>
+        </details>
 
-        <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3"><div><h2 class="showcase-panel-title">Actions prioritaires</h2></div><span class="showcase-chip">{{ count($priorityActionRows) }} lignes</span></div>
-            <div class="app-table-wrapper overflow-x-auto">
+        <details class="showcase-panel overflow-hidden p-0">
+            <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-slate-200/80 px-3 py-2 list-none">
+                <div class="flex items-center gap-2">
+                    <span class="inline-block w-3 text-[#3996d3]">▸</span>
+                    <h2 class="showcase-panel-title">Actions prioritaires</h2>
+                </div>
+                <span class="showcase-chip">{{ count($priorityActionRows) }} lignes</span>
+            </summary>
+            <div class="app-table-wrapper max-h-[60vh] overflow-auto">
                 <table class="app-table data-table">
-                    <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Délai</th><th>Conformité</th></tr></thead>
+                    <thead class="sticky top-0 z-10 bg-white"><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Délai</th><th>Conformité</th></tr></thead>
                     <tbody>
                         @forelse ($priorityActionRows as $row)
                             @php
@@ -77,16 +86,19 @@
                     </tbody>
                 </table>
             </div>
-        </article>
+        </details>
 
-        <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div><h2 class="showcase-panel-title">Alertes actives</h2></div>
+        <details class="showcase-panel overflow-hidden p-0">
+            <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-slate-200/80 px-3 py-2 list-none">
+                <div class="flex items-center gap-2">
+                    <span class="inline-block w-3 text-[#3996d3]">▸</span>
+                    <h2 class="showcase-panel-title">Alertes actives</h2>
+                </div>
                 <span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span>
-            </div>
-            <div class="app-table-wrapper overflow-x-auto">
+            </summary>
+            <div class="app-table-wrapper max-h-[60vh] overflow-auto">
                 <table class="app-table data-table">
-                    <thead>
+                    <thead class="sticky top-0 z-10 bg-white">
                         <tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Détail</th><th>{{ $metricLabel('global') }}</th><th>Conformité</th><th>Accès</th></tr>
                     </thead>
                     <tbody>
@@ -112,7 +124,7 @@
                     </tbody>
                 </table>
             </div>
-        </article>
+        </details>
 
         @if ($showDashboardAnalyticalTables)
             <section>
