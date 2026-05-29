@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Models\Action;
 use App\Models\ActionWeek;
 use App\Models\Direction;
+use App\Models\Justificatif;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
@@ -27,17 +28,8 @@ class ActionTrackingServiceTest extends TestCase
 
     public function test_refresh_metrics_computes_completed_action_kpis_and_status(): void
     {
-        $action = $this->createQuantitativeAction();
-
-        ActionWeek::query()->create([
-            'action_id' => $action->id,
-            'numero_semaine' => 1,
-            'date_debut' => '2026-01-01',
-            'date_fin' => '2026-01-07',
-            'est_renseignee' => true,
+        $action = $this->createQuantitativeAction([
             'quantite_realisee' => 100,
-            'saisi_par' => $action->responsable_id,
-            'saisi_le' => now(),
         ]);
 
         $action->update([
@@ -60,17 +52,8 @@ class ActionTrackingServiceTest extends TestCase
 
     public function test_refresh_metrics_marks_action_late_when_deadline_passes_without_completion(): void
     {
-        $action = $this->createQuantitativeAction();
-
-        ActionWeek::query()->create([
-            'action_id' => $action->id,
-            'numero_semaine' => 1,
-            'date_debut' => '2026-01-01',
-            'date_fin' => '2026-01-07',
-            'est_renseignee' => true,
+        $action = $this->createQuantitativeAction([
             'quantite_realisee' => 10,
-            'saisi_par' => $action->responsable_id,
-            'saisi_le' => now(),
         ]);
 
         app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-02-01'));
@@ -290,26 +273,20 @@ class ActionTrackingServiceTest extends TestCase
         ]);
     }
 
-    public function test_refresh_metrics_penalizes_conformity_and_logs_warning_when_due_weeks_are_missing(): void
+    public function test_refresh_metrics_logs_progress_warning_when_real_progress_is_under_expected_threshold(): void
     {
-        $action = $this->createQuantitativeAction();
-
-        ActionWeek::query()->create([
-            'action_id' => $action->id,
-            'numero_semaine' => 1,
-            'date_debut' => '2026-01-01',
-            'date_fin' => '2026-01-07',
-            'est_renseignee' => false,
+        $action = $this->createQuantitativeAction([
+            'quantite_realisee' => 10,
         ]);
 
         app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
 
         $action->refresh()->load('actionKpi');
 
-        $this->assertLessThan(85.0, (float) ($action->actionKpi?->kpi_conformite ?? 100.0));
+        $this->assertSame('10.00', (string) $action->progression_reelle);
         $this->assertDatabaseHas('action_logs', [
             'action_id' => $action->id,
-            'type_evenement' => 'conformite_incomplete',
+            'type_evenement' => 'progression_sous_seuil',
             'niveau' => 'warning',
         ]);
     }
@@ -389,7 +366,6 @@ class ActionTrackingServiceTest extends TestCase
             'quantite_realisee' => 0,
             'date_fin' => '2026-06-30',
             'date_echeance' => '2026-06-30',
-            'evaluation_note' => 80,
         ]);
 
         app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
@@ -399,6 +375,62 @@ class ActionTrackingServiceTest extends TestCase
         $this->assertSame('0.00', (string) $action->progression_reelle);
         $this->assertSame('0.00', (string) ($action->actionKpi?->kpi_performance ?? 0));
         $this->assertSame('0.00', (string) ($action->actionKpi?->kpi_global ?? 0));
+    }
+
+    public function test_unstarted_structured_action_does_not_raise_execution_or_kpi_alerts_before_real_tracking(): void
+    {
+        $action = $this->createQuantitativeAction([
+            'quantite_cible' => 500,
+            'quantite_realisee' => 0,
+            'date_fin' => '2026-01-31',
+            'date_echeance' => '2026-01-31',
+        ]);
+
+        app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
+
+        $action->refresh();
+
+        $this->assertSame(ActionTrackingService::STATUS_NON_DEMARRE, $action->statut_dynamique);
+        $this->assertDatabaseMissing('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'justificatif_absent',
+        ]);
+        $this->assertDatabaseMissing('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'kpi_global_sous_seuil',
+        ]);
+    }
+
+    public function test_financing_justificatif_does_not_start_action_or_trigger_execution_alert(): void
+    {
+        $action = $this->createQuantitativeAction([
+            'financement_requis' => true,
+            'financement_statut' => Action::FINANCEMENT_PRE_SIGNALE_DAF,
+            'date_fin' => '2026-01-31',
+            'date_echeance' => '2026-01-31',
+        ]);
+
+        Justificatif::query()->create([
+            'justifiable_type' => Action::class,
+            'justifiable_id' => $action->id,
+            'categorie' => 'financement',
+            'nom_original' => 'devis.pdf',
+            'chemin_stockage' => 'justificatifs/devis.pdf',
+            'mime_type' => 'application/pdf',
+            'taille_octets' => 128,
+            'description' => 'Piece de financement',
+            'ajoute_par' => $action->responsable_id,
+        ]);
+
+        app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
+
+        $action->refresh();
+
+        $this->assertSame(ActionTrackingService::STATUS_NON_DEMARRE, $action->statut_dynamique);
+        $this->assertDatabaseMissing('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'justificatif_absent',
+        ]);
     }
 
     public function test_started_quantitative_action_uses_real_progress_delay_and_performance_without_risk(): void
@@ -416,20 +448,18 @@ class ActionTrackingServiceTest extends TestCase
 
         $this->assertSame('60.00', (string) $action->progression_reelle);
         $this->assertSame('100.00', (string) ($action->actionKpi?->kpi_delai ?? 0));
-        // Conformité = 0 tant que le chef n'a pas validé/noté l'action.
-        $this->assertSame('0.00', (string) ($action->actionKpi?->kpi_conformite ?? 0));
-        // Performance = progression × 0.80 + délai × 0.20 = 60 × 0.80 + 100 × 0.20 = 68.
-        $this->assertSame('68.00', (string) ($action->actionKpi?->kpi_performance ?? 0));
+        // Spec v2 (28/05/2026) : KPI conformite supprime ; on ne l asserte plus.
+        // Performance operationnelle brute = progression reelle ; le delai pese dans le KPI global mixte.
+        $this->assertSame('60.00', (string) ($action->actionKpi?->kpi_performance ?? 0));
     }
 
-    public function test_chef_evaluation_note_drives_kpi_conformite_raw_value(): void
+    public function test_completed_validation_keeps_global_score_aligned_with_performance_and_delay(): void
     {
         $action = $this->createQuantitativeAction([
             'quantite_cible' => 500,
             'quantite_realisee' => 500,
             'date_fin' => '2026-01-10',
             'date_echeance' => '2026-01-10',
-            'evaluation_note' => 80,
             'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ]);
 
@@ -437,10 +467,11 @@ class ActionTrackingServiceTest extends TestCase
 
         $action->refresh()->load('actionKpi');
 
-        $this->assertSame('80.00', (string) ($action->actionKpi?->kpi_conformite ?? 0));
+        // Spec v2 (28/05/2026) : KPI conformite supprime ; on n asserte que Global.
+        $this->assertSame('100.00', (string) ($action->actionKpi?->kpi_global ?? 0));
     }
 
-    public function test_sub_action_progress_uses_completed_sub_actions_ratio(): void
+    public function test_sub_action_progress_counts_submitted_unquantified_sub_actions_before_chef_validation(): void
     {
         $action = $this->createQuantitativeAction([
             'type_cible' => 'qualitative',
@@ -457,11 +488,20 @@ class ActionTrackingServiceTest extends TestCase
                 'libelle' => 'Sous-action '.$index,
                 'date_debut' => '2026-01-01',
                 'date_fin' => '2026-01-31',
-                'statut' => $index === 1 ? 'terminee' : 'a_faire',
+                'statut' => $index === 1 ? 'en_attente_validation_chef' : 'non_demarre',
                 'est_effectuee' => $index === 1,
                 'taux_execution' => $index === 1 ? 100 : 0,
             ]);
         }
+
+        app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
+
+        $action->refresh();
+
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
+        $this->assertSame('25.00', (string) $action->progression_reelle);
+
+        $action->sousActions()->where('statut', 'en_attente_validation_chef')->update(['statut' => 'validee_chef']);
 
         app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
 
@@ -478,7 +518,6 @@ class ActionTrackingServiceTest extends TestCase
             'date_fin' => '2026-01-31',
             'date_echeance' => '2026-01-31',
             'date_fin_reelle' => '2026-01-20',
-            'evaluation_note' => 100,
             'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ]);
 
@@ -498,7 +537,6 @@ class ActionTrackingServiceTest extends TestCase
             'quantite_cible' => 0,
             'date_fin' => '2026-01-31',
             'date_echeance' => '2026-01-31',
-            'evaluation_note' => 100,
         ]);
 
         app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
@@ -582,7 +620,6 @@ class ActionTrackingServiceTest extends TestCase
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-10',
             'date_echeance' => '2026-01-10',
-            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
             'responsable_id' => $responsable->id,
             'statut' => 'non_demarre',
             'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,

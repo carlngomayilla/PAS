@@ -35,8 +35,8 @@ class SuperAdminSimulationTest extends TestCase
                 'actions_min_progress_for_closure' => '70',
             ])
             ->assertOk()
-            ->assertSee('Toutes les actions visibles')
-            ->assertSee('Agent -> cloture directe')
+            ->assertSee('Validation chef de service')
+            ->assertSee('Agent -> Chef de service')
             ->assertSee('Vigilances de simulation')
             ->assertSee('Aperçu dashboard')
             ->assertSee('Aperçu exports');

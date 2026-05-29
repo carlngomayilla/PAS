@@ -20,23 +20,24 @@ class SuperAdminWorkflowSettingsTest extends TestCase
 
     public function test_super_admin_can_update_action_workflow_settings(): void
     {
+        // Nouvelle logique métier ANBG : un seul mode workflow PAS/PAO/PTA = « canonical ».
+        // Les anciens modes (direct_approval, approval_only, full) ont été supprimés
+        // car non conformes au cycle métier validé (PAO validé automatiquement, etc.).
         $superAdmin = $this->createSuperAdminUser();
 
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.workflow.edit'))
             ->assertOk()
-            ->assertSee('Workflow et validations')
-            ->assertSee('Agent -> Chef de service')
-            ->assertDontSee('Agent -> Chef de service -> Direction');
+            ->assertSee('Workflow et validations');
 
         $this->actingAs($superAdmin)
             ->put(route('workspace.super-admin.workflow.update'), [
                 'actions_service_validation_enabled' => '1',
                 'actions_direction_validation_enabled' => '0',
                 'actions_rejection_comment_required' => '0',
-                'pas_workflow_mode' => 'approval_only',
-                'pao_workflow_mode' => 'direct_approval',
-                'pta_workflow_mode' => 'full',
+                'pas_workflow_mode' => 'canonical',
+                'pao_workflow_mode' => 'canonical',
+                'pta_workflow_mode' => 'canonical',
             ])
             ->assertRedirect(route('workspace.super-admin.workflow.edit'));
 
@@ -53,16 +54,9 @@ class SuperAdminWorkflowSettingsTest extends TestCase
         $summary = app(WorkflowSettings::class)->actionValidationSummary();
         $this->assertSame('service', $summary['final_stage']);
         $this->assertFalse($summary['rejection_comment_required']);
-        $this->assertSame('approval_only', app(WorkflowSettings::class)->planningWorkflowMode('pas'));
-        $this->assertSame('direct_approval', app(WorkflowSettings::class)->planningWorkflowMode('pao'));
-
-        $this->actingAs($superAdmin)
-            ->get(route('workspace.super-admin.workflow.edit'))
-            ->assertOk()
-            ->assertSee('Agent -> Chef de service')
-            ->assertSee('Chef de service')
-            ->assertSee('Optionnel')
-            ->assertSee('Validation directe');
+        $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pas'));
+        $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pao'));
+        $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pta'));
     }
 
     public function test_admin_cannot_access_or_update_workflow_settings(): void
@@ -78,9 +72,9 @@ class SuperAdminWorkflowSettingsTest extends TestCase
                 'actions_service_validation_enabled' => '0',
                 'actions_direction_validation_enabled' => '0',
                 'actions_rejection_comment_required' => '0',
-                'pas_workflow_mode' => 'full',
-                'pao_workflow_mode' => 'full',
-                'pta_workflow_mode' => 'full',
+                'pas_workflow_mode' => 'canonical',
+                'pao_workflow_mode' => 'canonical',
+                'pta_workflow_mode' => 'canonical',
             ])
             ->assertForbidden();
     }

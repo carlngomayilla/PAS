@@ -14,10 +14,14 @@
         ->all();
     $financementRequis = filter_var($rowData['financement_requis'] ?? false, FILTER_VALIDATE_BOOL);
     $justificatifObligatoire = filter_var($rowData['justificatif_obligatoire'] ?? false, FILTER_VALIDATE_BOOL);
-    $modeEvaluation = $rowData['mode_evaluation'] ?? \App\Models\Action::MODE_SOUS_ACTIONS;
+    $modeEvaluation = $rowData['mode_evaluation'] ?? \App\Models\Action::MODE_SANS_QUANTITE;
     if ($modeEvaluation === \App\Models\Action::MODE_MIXTE) {
         $modeEvaluation = \App\Models\Action::MODE_QUANTITATIF;
     }
+    if (! array_key_exists($modeEvaluation, \App\Models\Action::evaluationModeOptions())) {
+        $modeEvaluation = \App\Models\Action::MODE_SANS_QUANTITE;
+    }
+    $showTargetFields = $modeEvaluation === \App\Models\Action::MODE_QUANTITATIF;
     $thresholdMode = in_array(($rowData['seuil_mode'] ?? 'unique'), ['unique', 'trimestriel'], true)
         ? (string) $rowData['seuil_mode']
         : 'unique';
@@ -41,29 +45,66 @@
     $hasFinancingErrors = ! $isTemplate && (
         $errors->has("actions.$index.montant_estime")
         || $errors->has("actions.$index.nature_financement")
-        || $errors->has("actions.$index.source_financement")
-        || $errors->has("actions.$index.commentaire_financement")
         || $errors->has("actions.$index.justificatif_financement")
     );
 @endphp
 
-<section class="pta-action-block rounded-lg border border-[#d8ecf8] bg-white shadow-sm" data-action-block data-action-index="{{ $index }}">
-    <div class="pta-action-heading flex list-none items-center justify-between gap-3 px-4 py-3">
+@php
+    // Action existante (deja persistee) → accordeon ferme par defaut : on voit
+    // uniquement le nom et les 3 boutons. L'utilisateur clique pour derouler.
+    // Action nouvelle (creation, template, ou block sans id) → accordeon ouvert.
+    $hasPersistedId = ! $isTemplate && ! empty($rowData['id']);
+    $blockHasErrors = $hasActionErrors || $hasAssignmentErrors || $hasPlanningErrors || $hasTargetErrors || $hasFinancingErrors;
+    $accordionOpen = ! $hasPersistedId || $blockHasErrors;
+
+    // Etat de "gel apres enregistrement" (regle metier 2026-05-29) :
+    // une action parametree ET non deverrouillee se fige en lecture seule
+    // jusqu'a ce que le DG approuve une demande de modification.
+    $viewer = auth()->user();
+    $viewerCanBypassFreeze = $viewer && ($viewer->isSuperAdmin() || $viewer->hasRole(\App\Models\User::ROLE_DG, \App\Models\User::ROLE_PLANIFICATION, \App\Models\User::ROLE_SCIQ));
+    $isParametre = ($rowData['statut_parametrage'] ?? null) === 'parametre';
+    $hasOpenUnlock = ! empty($rowData['modification_unlocked_at']) && (empty($rowData['modification_unlock_expires_at']) || strtotime($rowData['modification_unlock_expires_at']) > time());
+    $isFrozen = $hasPersistedId && $isParametre && ! empty($rowData['modification_locked_at']) && ! $hasOpenUnlock && ! $viewerCanBypassFreeze;
+@endphp
+<details @if ($hasPersistedId) id="action-{{ $rowData['id'] }}" @endif class="pta-action-block rounded-lg border border-[#d8ecf8] bg-white shadow-sm @if ($isFrozen) is-frozen @endif" data-action-block data-action-index="{{ $index }}" data-action-id="{{ $rowData['id'] ?? '' }}" data-action-frozen="{{ $isFrozen ? '1' : '0' }}" @if ($accordionOpen) open @endif>
+    <summary class="pta-action-heading flex list-none items-center justify-between gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors">
         <span class="min-w-0">
-            <span class="block text-sm font-extrabold uppercase tracking-wide text-[#1c203d]" data-action-title>Action {{ $number }}</span>
+            <span class="block text-sm font-extrabold uppercase tracking-wide text-[#1c203d]" data-action-title>
+                Action {{ $number }}
+                @if ($isFrozen)
+                    <span class="ml-2 anbg-badge anbg-badge-info px-2 py-0.5 text-[10px]" title="Action enregistree et figee. Demandez une modification au DG pour la modifier.">🔒 Enregistree</span>
+                @endif
+            </span>
             <span class="block truncate text-xs font-semibold text-slate-500" data-action-summary>{{ $rowData['libelle'] ?? 'Nouvelle action' }}</span>
         </span>
         <span class="flex shrink-0 items-center gap-2">
-            <button class="btn btn-danger {{ !$isTemplate && (int) $index === 0 ? 'hidden' : '' }}" type="button" data-remove-action>Supprimer</button>
+            {{-- Boutons par action : Enregistrer / Modifier / Supprimer. --}}
+            {{-- onclick stopPropagation pour ne pas declencher le toggle de l'accordeon. --}}
+            @if ($isFrozen)
+                {{-- Action figee : remplacer Enregistrer par Demande de modification (workflow DG/Planification). --}}
+                <button class="btn btn-warning btn-sm" type="button" data-request-modification onclick="event.preventDefault(); event.stopPropagation();" title="Demander au DG l'autorisation de modifier cette action">Demande de modification</button>
+            @else
+                <button class="btn btn-success btn-sm" type="button" data-save-action onclick="event.preventDefault(); event.stopPropagation();" title="Enregistrer cette action seule">Enregistrer</button>
+            @endif
+            <button class="btn btn-warning btn-sm @if ($accordionOpen) hidden @endif" type="button" data-edit-action onclick="event.preventDefault(); event.stopPropagation();" title="Ouvrir l'action pour modification">Modifier</button>
+            <button class="btn btn-danger btn-sm {{ !$isTemplate && (int) $index === 0 && ! $hasPersistedId ? 'hidden' : '' }}" type="button" data-remove-action onclick="event.preventDefault(); event.stopPropagation();" title="Supprimer cette action">Supprimer</button>
             <svg class="app-collapsible-chevron h-4 w-4 text-[#3996d3] transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
         </span>
-    </div>
+    </summary>
 <div class="pta-action-body border-t border-[#d8ecf8] p-4">
 
+    {{-- Hidden input id : reste actif (hors fieldset disabled) pour etre soumis. --}}
     <input type="hidden" name="actions[{{ $index }}][id]" value="{{ $rowData['id'] ?? '' }}">
 
+    @if ($isFrozen)
+        <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+            <strong>Action enregistree et figee.</strong> Les champs sont en lecture seule. Pour les modifier, utilisez le bouton <em>Demande de modification</em> ci-dessus — la demande sera transmise au DG (et au service Planification).
+        </div>
+    @endif
+
+    <fieldset @if ($isFrozen) disabled class="pta-action-fieldset-frozen opacity-70" @endif>
     <div class="space-y-4">
         <details class="form-step-accordion" open>
             <summary>1. Identification de l'action</summary>
@@ -142,7 +183,7 @@
                     @error("actions.$index.date_debut") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label>Date fin</label>
+                    <label>Date de fin</label>
                     <input name="actions[{{ $index }}][date_fin]" type="date" value="{{ $rowData['date_fin'] ?? '' }}" data-date-fin-input>
                     @error("actions.$index.date_fin") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
@@ -159,20 +200,21 @@
             <div class="form-step-body">
             <div class="form-grid">
                 <div>
-                    <label>Type de cible</label>
+                    <label>Mode de suivi</label>
                     <select name="actions[{{ $index }}][mode_evaluation]" data-mode-select>
                         <option value="quantitatif" @selected($modeEvaluation === 'quantitatif')>Cible quantitative</option>
+                        <option value="sans_quantite" @selected($modeEvaluation === 'sans_quantite')>Sans quantite</option>
                         <option value="sous_actions" @selected($modeEvaluation === 'sous_actions')>Cible par sous-action</option>
                     </select>
                 </div>
-                <div data-target-wrapper>
+                <div class="{{ $showTargetFields ? '' : 'hidden' }}" data-target-wrapper>
                     <label>Valeur cible</label>
-                    <input name="actions[{{ $index }}][quantite_cible]" data-target-input type="number" step="0.0001" min="0" value="{{ $rowData['quantite_cible'] ?? '' }}">
+                    <input name="actions[{{ $index }}][quantite_cible]" data-target-input type="number" step="0.0001" min="0" value="{{ $rowData['quantite_cible'] ?? '' }}" @disabled(! $showTargetFields)>
                     @error("actions.$index.quantite_cible") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
-                <div data-target-wrapper>
+                <div class="{{ $showTargetFields ? '' : 'hidden' }}" data-target-wrapper>
                     <label>Unité de mesure</label>
-                    <input name="actions[{{ $index }}][unite_cible]" data-unit-input type="text" value="{{ $rowData['unite_cible'] ?? '' }}">
+                    <input name="actions[{{ $index }}][unite_cible]" data-unit-input type="text" value="{{ $rowData['unite_cible'] ?? '' }}" @disabled(! $showTargetFields)>
                     @error("actions.$index.unite_cible") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div>
@@ -304,7 +346,7 @@
                     @error("actions.$index.niveau_risque") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div class="md:col-span-2">
-                    <label>Mesures preventives</label>
+                    <label>Mesures préventives</label>
                     <textarea name="actions[{{ $index }}][mesures_preventives]">{{ $rowData['mesures_preventives'] ?? '' }}</textarea>
                     @error("actions.$index.mesures_preventives") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
@@ -336,18 +378,8 @@
                     @error("actions.$index.nature_financement") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label>Source de financement</label>
-                    <input name="actions[{{ $index }}][source_financement]" type="text" value="{{ $rowData['source_financement'] ?? '' }}" placeholder="Ex. budget ANBG, partenaire, projet">
-                    @error("actions.$index.source_financement") <p class="field-error">{{ $message }}</p> @enderror
-                </div>
-                <div class="md:col-span-2">
-                    <label>Commentaire financement</label>
-                    <textarea name="actions[{{ $index }}][commentaire_financement]">{{ $rowData['commentaire_financement'] ?? '' }}</textarea>
-                    @error("actions.$index.commentaire_financement") <p class="field-error">{{ $message }}</p> @enderror
-                </div>
-                <div>
                     <label>Pièce justificative</label>
-                    <input name="actions[{{ $index }}][justificatif_financement]" type="file" accept="{{ app(\App\Services\DocumentPolicySettings::class)->acceptAttribute() }}">
+                    <input name="actions[{{ $index }}][justificatif_financement]" type="file" accept="{{ app(\App\Services\DocumentPolicySettings::class)->acceptAttribute() }}" @if($financementRequis) required @endif>
                     @error("actions.$index.justificatif_financement") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
             </div>
@@ -355,5 +387,6 @@
         </details>
 
     </div>
+    </fieldset>
 </div>
-</section>
+</details>

@@ -15,6 +15,9 @@ use App\Http\Controllers\Web\MessagingWebController;
 use App\Http\Controllers\Web\NotificationWebController;
 use App\Http\Controllers\Web\PaoWebController;
 use App\Http\Controllers\Web\PasWebController;
+use App\Http\Controllers\Web\PersonalTaskWebController;
+use App\Http\Controllers\Web\PlanningImportWebController;
+use App\Http\Controllers\Web\PlanningUnlockWebController;
 use App\Http\Controllers\Web\ProfileWebController;
 use App\Http\Controllers\Web\PtaWebController;
 use App\Http\Controllers\Web\ReferentielWebController;
@@ -103,10 +106,14 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.messaging.attachment.download');
         Route::post('/workspace/messagerie/conversations/{conversation}/favorite', [MessagingWebController::class, 'toggleFavorite'])
             ->name('workspace.messaging.favorite');
+        Route::get('/workspace/notifications', [NotificationWebController::class, 'index'])
+            ->name('workspace.notifications.index');
         Route::get('/workspace/notifications/{notification}/read', [NotificationWebController::class, 'read'])
             ->name('workspace.notifications.read');
         Route::post('/workspace/notifications/read-all', [NotificationWebController::class, 'readAll'])
             ->name('workspace.notifications.read_all');
+        Route::get('/workspace/mes-taches', [PersonalTaskWebController::class, 'index'])
+            ->name('workspace.tasks.index');
 
         // ── RÉFÉRENTIEL (Directions, Services, Utilisateurs) ──────────────────────
         // Gestion des structures organisationnelles accessibles aux administrateurs.
@@ -146,6 +153,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.referentiel.utilisateurs.edit');
         Route::put('/workspace/referentiel/utilisateurs/{utilisateur}', [ReferentielWebController::class, 'utilisateursUpdate'])
             ->name('workspace.referentiel.utilisateurs.update');
+        Route::post('/workspace/referentiel/utilisateurs/{utilisateur}/demande-suppression', [ReferentielWebController::class, 'utilisateursDeletionRequestStore'])
+            ->name('workspace.referentiel.utilisateurs.deletion-requests.store');
         Route::delete('/workspace/referentiel/utilisateurs/{utilisateur}', [ReferentielWebController::class, 'utilisateursDestroy'])
             ->name('workspace.referentiel.utilisateurs.destroy');
 
@@ -182,45 +191,59 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::get('ajax/ptas', [DependentSelectController::class, 'ptas'])->name('ajax.ptas');
             Route::get('ajax/actions', [DependentSelectController::class, 'actions'])->name('ajax.actions');
 
+            Route::get('imports-excel', [PlanningImportWebController::class, 'index'])->name('imports.index');
+            Route::get('imports-excel/nouveau', [PlanningImportWebController::class, 'create'])->name('imports.create');
+            Route::post('imports-excel/preview', [PlanningImportWebController::class, 'preview'])->name('imports.preview');
+            Route::get('imports-excel/modele', [PlanningImportWebController::class, 'template'])->name('imports.template');
+            Route::get('imports-excel/{import}', [PlanningImportWebController::class, 'show'])->name('imports.show');
+            Route::post('imports-excel/{import}/colonnes', [PlanningImportWebController::class, 'mapping'])->name('imports.mapping');
+            Route::post('imports-excel/{import}/confirmer', [PlanningImportWebController::class, 'confirm'])->name('imports.confirm');
+            Route::get('imports-excel/{import}/resultat', [PlanningImportWebController::class, 'result'])->name('imports.result');
+            Route::get('imports-excel/{import}/erreurs', [PlanningImportWebController::class, 'errors'])->name('imports.errors');
+            Route::get('imports-excel/{import}/rapport-erreurs', [PlanningImportWebController::class, 'errorReport'])->name('imports.error-report');
+
+            Route::get('demandes-deverrouillage', [PlanningUnlockWebController::class, 'index'])
+                ->name('planning-unlocks.index');
+
             // ── PAS — Plan d'Actions Stratégique ──────────────────────────────────
             // Document pluriannuel institutionnel : axes et objectifs stratégiques.
+            // Note (2026-05-29) : routes legacy (submit/approve/lock/reopen,
+            // pas-axes.legacy, pas-objectifs.legacy) SUPPRIMEES — n'etaient que
+            // des stubs no-op retournant une erreur. Le cycle reel est actif →
+            // cloture → archive via cloturer/archiver.
             Route::resource('pas', PasWebController::class)
                 ->except(['show'])
                 ->parameters(['pas' => 'pas']);
-            Route::post('pas/{pas}/submit', [PasWebController::class, 'submit'])->name('pas.submit');
-            Route::post('pas/{pas}/approve', [PasWebController::class, 'approve'])->name('pas.approve');
-            Route::post('pas/{pas}/lock', [PasWebController::class, 'lock'])->name('pas.lock');
-            Route::post('pas/{pas}/reopen', [PasWebController::class, 'reopen'])->name('pas.reopen');
-
-            // Les anciens sous-CRUD PAS ne sont plus exposes : toute lecture legacy
-            // revient vers le wizard PAS unique.
-            Route::get('pas-axes/{legacy?}', static function () {
-                return redirect()->route('workspace.pas.index');
-            })->where('legacy', '.*')->name('pas-axes.legacy');
-
-            Route::get('pas-objectifs/{legacy?}', static function () {
-                return redirect()->route('workspace.pas.index');
-            })->where('legacy', '.*')->name('pas-objectifs.legacy');
+            Route::post('pas/{pas}/cloturer', [PasWebController::class, 'close'])->name('pas.close');
+            Route::post('pas/{pas}/archiver', [PasWebController::class, 'archive'])->name('pas.archive');
+            Route::post('pas/{pas}/demandes-deverrouillage', [PlanningUnlockWebController::class, 'storePas'])
+                ->name('pas.unlock-requests.store');
 
             // ── PAO — Plan d'Actions Opérationnel ─────────────────────────────────
             // Déclinaison annuelle du PAS par direction, avec objectifs opérationnels.
+            // Routes legacy (submit/approve/lock/reopen) SUPPRIMEES (2026-05-29).
             Route::resource('pao', PaoWebController::class)
                 ->except(['show'])
                 ->parameters(['pao' => 'pao']);
-            Route::post('pao/{pao}/submit', [PaoWebController::class, 'submit'])->name('pao.submit');
-            Route::post('pao/{pao}/approve', [PaoWebController::class, 'approve'])->name('pao.approve');
-            Route::post('pao/{pao}/lock', [PaoWebController::class, 'lock'])->name('pao.lock');
-            Route::post('pao/{pao}/reopen', [PaoWebController::class, 'reopen'])->name('pao.reopen');
+            Route::post('pao/{pao}/cloturer', [PaoWebController::class, 'close'])->name('pao.close');
+            Route::post('pao/{pao}/archiver', [PaoWebController::class, 'archive'])->name('pao.archive');
 
             // ── PTA — Plan de Travail Annuel ───────────────────────────────────────
             // Organisation des actions d'un service pour l'année, rattaché à un PAO.
+            // Routes legacy (submit/approve/lock/reopen) SUPPRIMEES (2026-05-29).
             Route::resource('pta', PtaWebController::class)
                 ->except(['show'])
                 ->parameters(['pta' => 'pta']);
-            Route::post('pta/{pta}/submit', [PtaWebController::class, 'submit'])->name('pta.submit');
-            Route::post('pta/{pta}/approve', [PtaWebController::class, 'approve'])->name('pta.approve');
-            Route::post('pta/{pta}/lock', [PtaWebController::class, 'lock'])->name('pta.lock');
-            Route::post('pta/{pta}/reopen', [PtaWebController::class, 'reopen'])->name('pta.reopen');
+            Route::post('pta/{pta}/cloturer', [PtaWebController::class, 'close'])->name('pta.close');
+            Route::post('pta/{pta}/archiver', [PtaWebController::class, 'archive'])->name('pta.archive');
+            Route::post('pta/{pta}/demandes-deverrouillage', [PlanningUnlockWebController::class, 'storePta'])
+                ->name('pta.unlock-requests.store');
+
+            // Sauvegarde inline d'une seule action depuis le formulaire PTA (AJAX).
+            // Recoit le payload d'une action structuree comme dans le formulaire global
+            // (mais pour une seule action). Cree si pas d'id, met a jour sinon.
+            Route::post('pta/{pta}/actions/upsert-inline', [PtaWebController::class, 'upsertActionInline'])
+                ->name('pta.actions.upsert-inline');
 
             // ── ACTIONS ────────────────────────────────────────────────────────────
             // Tâches concrètes rattachées à un PTA : suivi, validation, clôture, KPI.
@@ -229,6 +252,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
 
             Route::patch('actions/{action}/quick-statut', [ActionWebController::class, 'quickStatus'])
                 ->name('actions.quick-status');
+            Route::post('actions/{action}/demandes-deverrouillage', [PlanningUnlockWebController::class, 'storeAction'])
+                ->name('actions.unlock-requests.store');
+            Route::post('demandes-deverrouillage/{planningUnlockRequest}/dg', [PlanningUnlockWebController::class, 'reviewByDg'])
+                ->name('planning-unlocks.dg');
 
             Route::get('actions/create', static function () {
                 return redirect()
@@ -290,20 +317,24 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('kpi-mesures.destroy');
             Route::get('actions/{action}/suivi', [ActionTrackingWebController::class, 'show'])
                 ->name('actions.suivi');
-            Route::post('actions/{action}/sous-actions', [ActionTrackingWebController::class, 'storeSubAction'])
-                ->name('actions.sub-actions.store');
             Route::put('actions/{action}/sous-actions/{sousAction}', [ActionTrackingWebController::class, 'updateSubAction'])
                 ->name('actions.sub-actions.update');
+            Route::post('actions/{action}/sous-actions/{sousAction}/review', [ActionTrackingWebController::class, 'reviewSubAction'])
+                ->name('actions.sub-actions.review');
             Route::post('actions/{action}/execution', [ActionTrackingWebController::class, 'updateQuantitativeProgress'])
                 ->name('actions.execution.update');
             // Route actions.weeks.submit supprimee : le suivi hebdomadaire n'existe plus.
             Route::post('actions/{action}/semaines/{week}/soumettre', static function () {
                 abort(410, 'Le suivi hebdomadaire a ete supprime du circuit metier.');
             })->name('actions.weeks.submit');
-            Route::post('actions/{action}/demander-cloture', [ActionTrackingWebController::class, 'submitClosure'])
-                ->name('actions.submit-closure');
             Route::post('actions/{action}/review', [ActionTrackingWebController::class, 'reviewClosure'])
                 ->name('actions.review');
+            Route::post('actions/{action}/reports-echeance', [ActionTrackingWebController::class, 'storeDeadlineExtensionRequest'])
+                ->name('actions.deadline-extension.store');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/sciq', [ActionTrackingWebController::class, 'reviewDeadlineExtensionBySciq'])
+                ->name('deadline-extension.sciq');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/dg', [ActionTrackingWebController::class, 'reviewDeadlineExtensionByDg'])
+                ->name('deadline-extension.dg');
             // Etape « validation direction » supprimee. La route est conservee
             // pour ne pas casser les liens existants ; tout appel est refuse en
             // 403 (les tests d'autorisation continuent de passer).
@@ -318,6 +349,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.financement.dg');
             Route::post('actions/{action}/commentaires', [ActionTrackingWebController::class, 'comment'])
                 ->name('actions.comment');
+            Route::post('actions/{action}/anomalies', [ActionTrackingWebController::class, 'signalAnomaly'])
+                ->name('actions.anomalies.signal');
+            Route::post('actions/{action}/anomalies/{log}/resolve', [ActionTrackingWebController::class, 'resolveAnomaly'])
+                ->name('actions.anomalies.resolve');
             Route::get('actions/{action}/justificatifs/{justificatif}/download', [ActionTrackingWebController::class, 'downloadJustificatif'])
                 ->name('actions.justificatifs.download');
             Route::get('actions/{action}/justificatifs/{justificatif}/preview', [ActionTrackingWebController::class, 'previewJustificatif'])
@@ -352,6 +387,18 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         Route::get('/workspace/alertes/{type}/{id}/read', [MonitoringWebController::class, 'readAlerte'])
             ->whereNumber('id')
             ->name('workspace.alertes.read');
+        Route::get('/workspace/{module}', [WorkspaceController::class, 'module'])
+            ->whereIn('module', [
+                'corrections',
+                'agents',
+                'controle',
+                'synthese-agence',
+                'arbitrages',
+                'financements-critiques',
+                'rapports-consolides',
+                'supervision',
+            ])
+            ->name('workspace.module');
 
         // ── JOURNAL D'AUDIT ────────────────────────────────────────────────────────
         // Historique de toutes les actions sensibles réalisées dans l'application.
@@ -396,6 +443,12 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::post('/organisation-utilisateurs/utilisateurs/{managedUser}/revoke-sessions', [SuperAdminWebController::class, 'organizationUserRevokeSessions'])->name('organization.users.revoke-sessions');
             Route::post('/organisation-utilisateurs/utilisateurs/import', [SuperAdminWebController::class, 'organizationUsersImport'])->name('organization.users.import');
             Route::post('/organisation-utilisateurs/utilisateurs/bulk', [SuperAdminWebController::class, 'organizationUsersBulk'])->name('organization.users.bulk');
+            Route::post('/organisation-utilisateurs/demandes-suppression/{deletionRequest}/decision', [SuperAdminWebController::class, 'organizationDeletionRequestDecision'])->name('organization.deletion-requests.decision');
+            Route::get('/exercices-periodes', [SuperAdminWebController::class, 'exercisesIndex'])->name('exercises.index');
+            Route::post('/exercices-periodes', [SuperAdminWebController::class, 'exercisesStore'])->name('exercises.store');
+            Route::put('/exercices-periodes/archivage-automatique', [SuperAdminWebController::class, 'exercisesArchiveSettingsUpdate'])->name('exercises.archive-settings.update');
+            Route::put('/exercices-periodes/{exercice}', [SuperAdminWebController::class, 'exercisesUpdate'])->name('exercises.update');
+            Route::post('/exercices-periodes/{exercice}/activer', [SuperAdminWebController::class, 'exercisesActivate'])->name('exercises.activate');
             Route::get('/dashboards-profils', [SuperAdminWebController::class, 'dashboardProfilesEdit'])->name('dashboard-profiles.edit');
             Route::put('/dashboards-profils', [SuperAdminWebController::class, 'dashboardProfilesUpdate'])->name('dashboard-profiles.update');
             Route::get('/referentiels-dynamiques', [SuperAdminWebController::class, 'referentialsEdit'])->name('referentials.edit');

@@ -313,13 +313,13 @@
                     'generatedAtLabel' => $generatedAtLabel,
                 ])
 
+                {{-- Colonne Conformité retiree (2026-05-28) du tableau reporting service. --}}
                 <table class="compact">
                     <thead>
                         <tr>
                             <th>Action</th>
                             <th>RMO</th>
                             <th>Performance d'exécution (%)</th>
-                            <th>Conformité (%)</th>
                             <th>Indicateur délai (%)</th>
                             <th>Avancement réel (%)</th>
                         </tr>
@@ -330,12 +330,11 @@
                                 <td>{{ $row['action'] ?? '-' }}</td>
                                 <td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td>
                                 <td>{{ $row['kpi_performance'] ?? '0.00' }}</td>
-                                <td>{{ $row['kpi_conformite'] ?? '0.00' }}</td>
                                 <td>{{ $row['kpi_delai'] ?? '0.00' }}</td>
                                 <td>{{ $row['progression_reelle'] ?? $row['taux'] ?? '0.00' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="muted">Aucun Indicateur de performance disponible pour ce service.</td></tr>
+                            <tr><td colspan="5" class="muted">Aucun Indicateur de performance disponible pour ce service.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

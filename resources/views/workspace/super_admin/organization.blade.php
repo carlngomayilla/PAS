@@ -280,6 +280,24 @@
                     <label for="managed_suspension_reason">Motif de suspension</label>
                     <input id="managed_suspension_reason" name="suspension_reason" type="text" value="{{ old('suspension_reason', $editingUser?->suspension_reason) }}" placeholder="Motif interne optionnel">
                 </div>
+                @if ($editingUser)
+                    <div>
+                        <label for="managed_transfer_to_user_id">Repreneur taches ouvertes</label>
+                        <select id="managed_transfer_to_user_id" name="transfer_to_user_id">
+                            <option value="">Auto si meme perimetre</option>
+                            @foreach ($transferUserOptions as $candidate)
+                                @continue((int) $candidate->id === (int) $editingUser->id)
+                                <option value="{{ $candidate->id }}" @selected((int) old('transfer_to_user_id') === (int) $candidate->id)>
+                                    {{ $candidate->name }} - {{ $candidate->service?->code ?? $candidate->direction?->code ?? 'global' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="managed_motif">Motif gouvernance</label>
+                        <input id="managed_motif" name="motif" type="text" value="{{ old('motif') }}" placeholder="Obligatoire si role, direction, service ou etat change">
+                    </div>
+                @endif
                 <div class="md:col-span-2 flex flex-wrap items-end gap-3">
                     <label class="checkbox-pill !mb-0">
                         <input name="is_active" type="checkbox" value="1" @checked(old('is_active', $editingUser?->is_active ?? true))>
@@ -411,12 +429,27 @@
                     </select>
                 </div>
                 <div>
+                    <label for="bulk_transfer_to_user_id">Repreneur taches</label>
+                    <select id="bulk_transfer_to_user_id" name="bulk_transfer_to_user_id">
+                        <option value="">Automatique</option>
+                        @foreach ($transferUserOptions as $candidate)
+                            @if ($candidate->is_active)
+                                <option value="{{ $candidate->id }}">{{ $candidate->name }} - {{ $candidate->service?->code ?? $candidate->direction?->code ?? 'global' }}</option>
+                            @endif
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label for="bulk_suspended_until">Suspendre jusqu au</label>
                     <input id="bulk_suspended_until" name="bulk_suspended_until" type="date">
                 </div>
                 <div>
                     <label for="bulk_suspension_reason">Motif suspension</label>
                     <input id="bulk_suspension_reason" name="bulk_suspension_reason" type="text" placeholder="Facultatif">
+                </div>
+                <div class="md:col-span-2">
+                    <label for="bulk_motif">Motif gouvernance</label>
+                    <input id="bulk_motif" name="bulk_motif" type="text" placeholder="Obligatoire pour les actions sensibles, sinon motif automatique">
                 </div>
             </div>
             <div class="mb-3 flex flex-wrap gap-2">
@@ -460,6 +493,7 @@
                                     <a class="btn btn-secondary btn-sm rounded-xl" href="{{ route('workspace.super-admin.organization.index', ['edit_user' => $row->id]) }}">Editer</a>
                                     <form method="POST" action="{{ route('workspace.super-admin.organization.users.toggle', $row) }}">
                                         @csrf
+                                        <input type="hidden" name="motif" value="{{ $row->is_active ? 'Desactivation via bascule Super Admin' : 'Reactivation via bascule Super Admin' }}">
                                         <button class="btn {{ $row->is_active ? 'btn-danger' : 'btn-success' }} btn-sm rounded-xl" type="submit">{{ $row->is_active ? 'Desactiver' : 'Activer' }}</button>
                                     </form>
                                     <form method="POST" action="{{ route('workspace.super-admin.organization.users.revoke-sessions', $row) }}">
@@ -626,6 +660,82 @@
                 @endif
             @endif
         </article>
+    </section>
+
+    <section id="deletion-requests" class="ui-card mt-3.5">
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <h2>Demandes de suppression</h2>
+                <p class="text-slate-600">Demandes motivees avec analyse d impact avant decision Super Admin.</p>
+            </div>
+            <span class="showcase-chip">{{ count($deletionRequests ?? []) }} ouvertes</span>
+        </div>
+        <div class="app-table-wrapper overflow-x-auto mt-4">
+            <table class="app-table data-table">
+                <thead><tr><th>Date</th><th>Demandeur</th><th>Cible</th><th>Impact</th><th>Decision</th></tr></thead>
+                <tbody>
+                    @forelse (($deletionRequests ?? []) as $row)
+                        @php
+                            $impact = is_array($row->impact_summary ?? null) ? $row->impact_summary : [];
+                            $openAssignments = (int) data_get($impact, 'open_assignments.total', 0);
+                            $totalImpact = (int) data_get($impact, 'total', 0);
+                            $blockingImpact = (int) data_get($impact, 'blocking_total', $totalImpact);
+                        @endphp
+                        <tr>
+                            <td>{{ $row->created_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                            <td>
+                                <p class="font-medium text-slate-900">{{ $row->requester?->name ?? 'Systeme' }}</p>
+                                <p class="text-xs text-slate-600">{{ $row->requester?->email ?? '-' }}</p>
+                            </td>
+                            <td>
+                                <p class="font-medium text-slate-900">{{ $row->entity_label ?? ('Element #'.$row->entity_id) }}</p>
+                                <p class="text-xs text-slate-600">{{ $row->reason }}</p>
+                            </td>
+                            <td>
+                                <span class="anbg-badge {{ $blockingImpact > 0 ? 'anbg-badge-danger' : 'anbg-badge-success' }} px-3">
+                                    {{ $blockingImpact }} bloquant(s)
+                                </span>
+                                <p class="mt-1 text-xs text-slate-600">{{ $totalImpact }} lien(s) analyses</p>
+                                <p class="mt-1 text-xs text-slate-600">{{ $openAssignments }} tache(s) ouverte(s)</p>
+                            </td>
+                            <td>
+                                <form method="POST" action="{{ route('workspace.super-admin.organization.deletion-requests.decision', $row) }}" class="grid min-w-[22rem] gap-2">
+                                    @csrf
+                                    <select name="decision" required>
+                                        <option value="request_complement">Demander complement</option>
+                                        <option value="reject">Refuser</option>
+                                        <option value="disable">Desactiver</option>
+                                        <option value="delete">Supprimer si impact metier nul</option>
+                                        <option value="archive">Archiver la demande</option>
+                                        <option value="correct">Marquer corrige</option>
+                                    </select>
+                                    <select name="transfer_to_user_id">
+                                        <option value="">Repreneur si desactivation</option>
+                                        @foreach ($transferUserOptions as $candidate)
+                                            <option value="{{ $candidate->id }}">{{ $candidate->name }} - {{ $candidate->service?->code ?? $candidate->direction?->code ?? 'global' }}</option>
+                                        @endforeach
+                                    </select>
+                                    <input name="reviewer_note" type="text" placeholder="Motif de decision" required>
+                                    <button class="btn btn-primary" type="submit">Enregistrer</button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5">
+                                <x-ui.empty-state
+                                    title="Aucune demande ouverte"
+                                    message="Les demandes de suppression motivees apparaitront ici."
+                                    icon="shield"
+                                    tone="info"
+                                    class="my-4"
+                                />
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </section>
 
     <section class="ui-card mt-3.5">

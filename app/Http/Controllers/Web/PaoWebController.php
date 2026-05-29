@@ -17,6 +17,7 @@ use App\Models\PasObjectif;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\PlanningClosureReportService;
 use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
 use App\Services\ExerciceContext;
@@ -31,7 +32,7 @@ use Illuminate\View\View;
  *
  * Un PAO est la déclinaison annuelle du PAS pour une direction. Il est rattaché à un
  * objectif stratégique du PAS et contient les PTA des services de cette direction.
- * Workflow : brouillon → soumis → validé (DG/Admin) → verrouillé.
+ * Workflow : en cours -> valide automatiquement -> cloture -> archive.
  */
 class PaoWebController extends Controller
 {
@@ -48,6 +49,9 @@ class PaoWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        if ($user->isAgent()) {
+            abort(403, 'Acces non autorise.');
+        }
 
         $query = Pao::query();
 
@@ -86,11 +90,7 @@ class PaoWebController extends Controller
         );
         $statusFilter = trim((string) $request->string('statut'));
         if ($statusFilter !== '') {
-            if ($statusFilter === 'valide_ou_verrouille') {
-                $query->whereIn('statut', ['valide', 'verrouille']);
-            } else {
-                $query->where('statut', $statusFilter);
-            }
+            $query->where('statut', $statusFilter);
         }
         $query->when(
             $request->boolean('without_pta'),
@@ -124,8 +124,10 @@ class PaoWebController extends Controller
             ->pluck('cnt', 'statut');
         $paoStats = [
             'total'      => (int) $byStatus->sum(),
-            'actifs'     => (int) (($byStatus['valide'] ?? 0) + ($byStatus['verrouille'] ?? 0)),
-            'brouillons' => (int) ($byStatus['brouillon'] ?? 0),
+            'en_cours'   => (int) ($byStatus[Pao::STATUS_EN_COURS] ?? 0),
+            'valides'    => (int) ($byStatus[Pao::STATUS_VALIDE] ?? 0),
+            'clotures'   => (int) ($byStatus[Pao::STATUS_CLOTURE] ?? 0),
+            'archives'   => (int) ($byStatus[Pao::STATUS_ARCHIVE] ?? 0),
             'avec_pta'   => (clone $statsBase)->has('ptas')->count(),
             'sans_pta'   => (clone $statsBase)->doesntHave('ptas')->count(),
             'directions' => (clone $statsBase)->distinct()->count('direction_id'),
@@ -155,7 +157,7 @@ class PaoWebController extends Controller
             'objectifOptions' => $this->objectifOptions($user),
             'directionOptions' => $this->directionOptions($user),
             'serviceOptions' => $this->serviceOptions($user),
-            'statusOptions' => array_merge($this->statusOptions($user), ['valide_ou_verrouille']),
+            'statusOptions' => $this->statusOptions($user),
             'canWrite' => $this->canWrite($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
@@ -219,7 +221,7 @@ class PaoWebController extends Controller
         }
 
         $validated = $request->validated();
-        $statut = 'brouillon';
+        $statut = Pao::STATUS_VALIDE;
 
         $this->denyUnlessManagePao($user, (int) $validated['direction_id']);
 
@@ -286,12 +288,14 @@ class PaoWebController extends Controller
             abort(401);
         }
 
-        if ($pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedStateMessage('PAO', 'plus etre modifie')]);
+        if ($pao->statut === Pao::STATUS_ARCHIVE) {
+            return back()->withErrors(['general' => 'Impossible de modifier un PAO archive.']);
         }
 
         $validated = $request->validated();
-        $statut = (string) ($pao->statut ?: 'brouillon');
+        $statut = in_array((string) $pao->statut, [Pao::STATUS_CLOTURE, Pao::STATUS_ARCHIVE], true)
+            ? (string) $pao->statut
+            : Pao::STATUS_VALIDE;
 
         $this->denyUnlessManagePao($user, (int) $pao->direction_id);
         $this->denyUnlessManagePao($user, (int) $validated['direction_id']);
@@ -341,7 +345,7 @@ class PaoWebController extends Controller
             ->with('success', $this->entityUpdatedMessage(UiLabel::object('pao')).' Objectifs operationnels synchronises.');
     }
 
-    /** Supprime un PAO (uniquement si en brouillon). */
+    /** Supprime un PAO si aucun impact metier ne bloque l'operation. */
     public function destroy(Request $request, Pao $pao): RedirectResponse
     {
         $user = $request->user();
@@ -349,186 +353,122 @@ class PaoWebController extends Controller
             abort(401);
         }
 
-        if ($pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedStateMessage('PAO', 'etre supprime')]);
+        if ($pao->statut === Pao::STATUS_ARCHIVE) {
+            return back()->withErrors(['general' => 'Impossible de supprimer directement un PAO archive.']);
         }
 
         $this->denyUnlessManagePao($user, (int) $pao->direction_id);
 
-        $before = $pao->toArray();
-        $pao->delete();
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+        $deletionRequests = app(\App\Services\DeletionRequestService::class);
+        // Super Admin et DG peuvent supprimer directement avec cascade (PTAs, OOs,
+        // Actions). Les autres roles passent par le workflow de demande validee.
+        $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
+        if (! $canDeleteDirectly) {
+            $deletionRequest = $deletionRequests->requestBusinessDeletion($pao, $user, (string) $validated['motif'], 'pao');
+            $this->recordAudit($request, 'pao', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
 
-        $this->recordAudit($request, 'pao', 'delete', $pao, $before, null);
+            return redirect()
+                ->route('workspace.pao.index')
+                ->with('success', 'Demande de suppression PAO transmise au Super Admin.');
+        }
+
+        $before = $pao->toArray();
+        $impact = $deletionRequests->impactForEntity($pao);
+        $deletionRequests->deleteBusinessTarget($pao);
+
+        $this->recordAudit($request, 'pao', 'delete', $pao, [
+            ...$before,
+            'deletion_reason' => (string) $validated['motif'],
+            'impact' => $impact,
+        ], null);
 
         return redirect()
             ->route('workspace.pao.index')
             ->with('success', $this->entityDeletedMessage(UiLabel::object('pao')));
     }
 
-    /** Soumet le PAO pour validation par le DG ou un administrateur. */
-    public function submit(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
+    public function close(Request $request, Pao $pao, PlanningClosureReportService $closureReportService): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
         }
 
-        if ($pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedStateMessage('PAO', 'etre soumis')]);
-        }
+        $this->denyUnlessManagePao($user, (int) $pao->direction_id);
 
-        if ($pao->statut !== 'brouillon') {
-            return back()->withErrors(['general' => $this->requiredStateMessage('PAO', 'brouillon', 'soumis')]);
-        }
-
-        $this->denyUnlessWriteDirection($user, (int) $pao->direction_id);
-        $workflow = $this->planningWorkflowSummary();
-        if (! $workflow['submit_enabled']) {
-            return back()->withErrors(['general' => 'La soumission est desactivee pour le workflow PAO actif.']);
-        }
-
-        $before = $pao->toArray();
-        $targetStatus = (string) $workflow['submit_target_status'];
-        $pao->forceFill([
-            'statut' => $targetStatus,
-            'valide_le' => in_array($targetStatus, ['valide', 'verrouille'], true) ? now() : null,
-            'valide_par' => in_array($targetStatus, ['valide', 'verrouille'], true) ? $user->id : null,
-        ])->save();
-
-        $this->recordAudit($request, 'pao', 'submit', $pao, $before, $pao->toArray());
-        $notificationService->notifyPaoStatus($pao, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
-
-        return redirect()
-            ->route('workspace.pao.index')
-            ->with('success', $targetStatus === 'soumis'
-                ? 'PAO soumis pour validation.'
-                : 'PAO valide directement selon le workflow configure.');
-    }
-
-    /** Valide un PAO soumis (rôle DG ou admin). */
-    public function approve(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $this->canApprove($user)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        $workflow = $this->planningWorkflowSummary();
-        if (! $workflow['approve_enabled']) {
-            return back()->withErrors(['general' => 'La validation intermediaire est desactivee pour le workflow PAO actif.']);
-        }
-
-        if ($pao->statut !== 'soumis') {
-            return back()->withErrors(['general' => $this->requiredStateMessage('PAO', 'soumis', 'valide')]);
-        }
-
-        $before = $pao->toArray();
-        $pao->forceFill([
-            'statut' => 'valide',
-            'valide_le' => now(),
-            'valide_par' => $user->id,
-        ])->save();
-
-        $this->recordAudit($request, 'pao', 'approve', $pao, $before, $pao->toArray());
-        $notificationService->notifyPaoStatus($pao, 'approved', $user);
-
-        return redirect()
-            ->route('workspace.pao.index')
-            ->with('success', $this->transitionedStateMessage('PAO', 'valide'));
-    }
-
-    /** Verrouille un PAO validé : plus aucune modification, les PTA peuvent être créés dessus. */
-    public function lock(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $this->canApprove($user)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        $workflow = $this->planningWorkflowSummary();
-        if (! $workflow['lock_enabled']) {
-            return back()->withErrors(['general' => 'Le verrouillage final est desactive pour le workflow PAO actif.']);
-        }
-
-        if ($pao->statut !== 'valide') {
-            return back()->withErrors(['general' => $this->requiredStateMessage('PAO', 'valide', 'verrouille')]);
-        }
-
-        $before = $pao->toArray();
-        $pao->forceFill([
-            'statut' => 'verrouille',
-            'valide_le' => now(),
-            'valide_par' => $user->id,
-        ])->save();
-
-        $this->recordAudit($request, 'pao', 'lock', $pao, $before, $pao->toArray());
-        $notificationService->notifyPaoStatus($pao, 'locked', $user);
-
-        return redirect()
-            ->route('workspace.pao.index')
-            ->with('success', $this->transitionedStateMessage('PAO', 'verrouille'));
-    }
-
-    /** Retourne un PAO en brouillon avec un motif obligatoire. */
-    public function reopen(Request $request, Pao $pao, WorkspaceNotificationService $notificationService): RedirectResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if ($pao->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedCannotBeReopenedMessage('PAO')]);
-        }
-
-        $workflow = $this->planningWorkflowSummary();
-        $allowedStatuses = $workflow['reopen_allowed_statuses'];
-
-        if (! in_array($pao->statut, $allowedStatuses, true)) {
-            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage($allowedStatuses)]);
-        }
-
-        if ($pao->statut === 'valide'
-            && $workflow['approve_enabled']
-            && ! $this->canApprove($user)
-        ) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if ($pao->statut === 'soumis'
-            && ! ($this->canApprove($user) || $this->canWriteDirection($user, (int) $pao->direction_id))
-        ) {
-            abort(403, 'Acces non autorise.');
+        if ((string) $pao->statut === Pao::STATUS_ARCHIVE) {
+            return back()->withErrors(['general' => 'Impossible de cloturer un PAO archive.']);
         }
 
         $validated = $request->validate([
-            'motif_retour' => ['required', 'string', 'min:5', 'max:2000'],
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+            'force_close' => ['nullable', 'boolean'],
         ]);
 
-        $motifRetour = trim((string) $validated['motif_retour']);
+        $report = $closureReportService->forPao($pao);
+        $forceClose = $request->boolean('force_close');
+
+        if ($closureReportService->hasAnomalies($report) && ! $forceClose) {
+            return back()
+                ->withInput()
+                ->with('closure_report', $report)
+                ->withErrors(['general' => $this->closureReportErrorMessage($report)]);
+        }
 
         $before = $pao->toArray();
         $pao->forceFill([
-            'statut' => 'brouillon',
-            'valide_le' => null,
-            'valide_par' => null,
+            'statut' => Pao::STATUS_CLOTURE,
+            'valide_le' => now(),
+            'valide_par' => $user->id,
         ])->save();
 
-        $after = array_merge($pao->toArray(), ['motif_retour' => $motifRetour]);
-        $this->recordAudit($request, 'pao', 'reopen', $pao, $before, $after);
-        $notificationService->notifyPaoStatus($pao, 'reopened', $user);
+        $this->recordAudit($request, 'pao', 'close', $pao, $before, [
+            ...$pao->toArray(),
+            'motif' => (string) $validated['motif'],
+            'closure_report' => $report,
+            'forced_with_anomalies' => $forceClose,
+        ]);
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', $this->reopenedStateMessage('PAO'));
+            ->with('success', 'PAO cloture avec rapport d anomalies trace.');
+    }
+
+    public function archive(Request $request, Pao $pao): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->denyUnlessManagePao($user, (int) $pao->direction_id);
+
+        if ((string) $pao->statut !== Pao::STATUS_CLOTURE) {
+            return back()->withErrors(['general' => 'Le PAO doit etre cloture avant archivage.']);
+        }
+
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $before = $pao->toArray();
+        $pao->forceFill([
+            'statut' => Pao::STATUS_ARCHIVE,
+            'valide_le' => now(),
+            'valide_par' => $user->id,
+        ])->save();
+
+        $this->recordAudit($request, 'pao', 'archive', $pao, $before, [
+            ...$pao->toArray(),
+            'motif' => (string) $validated['motif'],
+        ]);
+
+        return redirect()
+            ->route('workspace.pao.index')
+            ->with('success', 'PAO archive.');
     }
 
     private function canWrite(User $user): bool
@@ -536,12 +476,16 @@ class PaoWebController extends Controller
         return $user->hasGlobalWriteAccess() || $user->hasRole(User::ROLE_DIRECTION);
     }
 
-    private function canApprove(User $user): bool
+    /**
+     * @param array<string, mixed> $report
+     */
+    private function closureReportErrorMessage(array $report): string
     {
-        // A06 — DG est en lecture seule pure : il consulte le PAO mais ne le
-        // valide / verrouille pas. La validation finale revient aux profils
-        // SUPER_ADMIN et ADMIN uniquement.
-        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_ADMIN_FONCTIONNEL);
+        $labels = collect($report['issues'] ?? [])
+            ->map(fn (array $issue): string => $issue['label'].' ('.$issue['count'].')')
+            ->implode(', ');
+
+        return 'Rapport d anomalies obligatoire : '.$labels.'. Ajoutez une justification et cochez la cloture avec anomalies pour continuer.';
     }
 
     /**
@@ -554,7 +498,7 @@ class PaoWebController extends Controller
             ->where('module', 'pao')
             ->where('entite_type', $pao::class)
             ->where('entite_id', (int) $pao->id)
-            ->whereIn('action', ['create', 'submit', 'approve', 'lock', 'reopen', 'update'])
+            ->whereIn('action', ['create', 'update', 'close', 'archive'])
             ->orderByDesc('id')
             ->limit(50)
             ->get()
@@ -576,10 +520,8 @@ class PaoWebController extends Controller
 
                 $label = match ($log->action) {
                     'create' => 'Creation',
-                    'submit' => 'Soumission',
-                    'approve' => 'Validation',
-                    'lock' => 'Verrouillage',
-                    'reopen' => 'Retour brouillon',
+                    'close' => 'Cloture',
+                    'archive' => 'Archivage',
                     'update' => 'Changement statut',
                     default => ucfirst((string) $log->action),
                 };
@@ -778,7 +720,7 @@ class PaoWebController extends Controller
             'pas_id' => (int) $objectif->pasAxe->pas_id,
             'pas_objectif_id' => (int) $objectif->id,
             'direction_id' => (int) $validated['direction_id'],
-            'service_id' => (int) $operationalObjective['service_id'],
+            'service_id' => null,
             'annee' => (int) $validated['annee'],
             'titre' => $this->generatedPaoTitle(
                 (int) $validated['direction_id'],

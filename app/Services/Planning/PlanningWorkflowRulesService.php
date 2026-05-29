@@ -20,16 +20,16 @@ class PlanningWorkflowRulesService
      * @var list<string>
      */
     public const ACTION_STATUSES = [
-        'brouillon',
-        'en_attente_validation',
-        'validee',
+        'non_demarre',
         'en_cours',
-        'realisee_dans_delais',
-        'realisee_hors_delai',
+        'realisee',
+        'en_attente_validation',
+        'validee_chef',
+        'en_attente_directeur',
+        'validee_direction',
         'en_retard',
         'bloquee',
-        'a_corriger',
-        'rejetee',
+        'rejetee_a_corriger',
         'cloturee',
     ];
 

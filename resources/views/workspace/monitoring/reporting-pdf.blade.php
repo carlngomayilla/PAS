@@ -10,10 +10,23 @@
 <body>
     @php
         $exportTemplate = $exportTemplate ?? null;
+        $reportContext = (array) ($report_context ?? []);
+        $reportType = (string) ($reportContext['type'] ?? 'consolide_dg');
+        $isConsolidatedReport = $reportType === '' || $reportType === 'consolide_dg';
+        $tocEntries = match ($reportType) {
+            'pas' => ['Plan PAS', 'Axes et objectifs strategiques'],
+            'pao' => ['Objectifs operationnels', 'Services concernes'],
+            'pta' => ['Synthese PTA', 'Actions par service ou unite'],
+            'actions' => ['Actions detaillees'],
+            'kpi' => ['Indicateurs par action', 'Performance par RMO'],
+            'anomalies' => ['Anomalies et blocages', 'Alertes sous seuil'],
+            'financement' => ['Financements DAF / DG'],
+            default => ['Axes et objectifs strategiques', 'Objectifs operationnels et actions', 'Actions detaillees', 'Indicateurs execution par action', 'Reporting synthetique, alertes, RMO et justificatifs', 'Page de signature et page de fin'],
+        };
         $templateLayout = $exportTemplate?->layout_config ?? [];
         $templateBlocks = $exportTemplate?->blocks_config ?? [];
-        $templateTitle = $exportTemplate?->documentTitle() ?? 'Reporting ANBG';
-        $templateSubtitle = $exportTemplate?->documentSubtitle();
+        $templateTitle = (string) ($reportContext['title'] ?? $exportTemplate?->documentTitle() ?? 'Reporting ANBG');
+        $templateSubtitle = (string) ($reportContext['description'] ?? $exportTemplate?->documentSubtitle() ?? '');
         $templateHeader = trim((string) ($templateLayout['header_text'] ?? ''));
         $templateFooter = trim((string) ($templateLayout['footer_text'] ?? ''));
         $templateWatermark = trim((string) ($templateLayout['watermark_text'] ?? ''));
@@ -34,6 +47,8 @@
         $alertRows = collect($details['kpi_sous_seuil'] ?? [])->map(fn ($mesure): array => ['action' => (string) ($mesure->kpi?->action?->libelle ?? '-'), 'indicateur' => trim(str_ireplace('KPI', 'Indicateur', (string) ($mesure->kpi?->libelle ?? '-'))) ?: '-', 'valeur' => (float) ($mesure->valeur ?? 0), 'seuil' => (float) ($mesure->kpi?->seuil_alerte ?? 0), 'statut' => 'Alerte', 'correctif' => "Vérifier la mesure, documenter l'écart et proposer une action corrective."])->merge(collect($details['actions_retard'] ?? [])->map(fn ($action): array => ['action' => (string) ($action->libelle ?? '-'), 'indicateur' => 'Retard action', 'valeur' => (float) ($action->progression_reelle ?? 0), 'seuil' => 100, 'statut' => 'En retard', 'correctif' => 'Replanifier, lever les blocages et mettre à jour la progression.']))->values();
         $rmoRows = $actionRows->groupBy(fn (array $row): string => implode('|', [(string) ($row['direction_label'] ?? '-'), (string) ($row['service_label'] ?? '-'), (string) ($row['rmo'] ?? $row['responsable'] ?? 'Non renseigné')]))->map(function ($rows, string $key): array { [$direction, $service, $rmo] = array_pad(explode('|', $key, 3), 3, 'Non renseigné'); return ['direction' => $direction ?: '-', 'service' => $service ?: '-', 'rmo' => $rmo ?: 'Non renseigné', 'total' => $rows->count(), 'performance' => round((float) $rows->avg(fn (array $row): float => (float) ($row['kpi_performance_value'] ?? 0)), 2)]; })->sortBy(fn (array $row): string => $row['direction'].'|'.$row['service'].'|'.sprintf('%09.2f', 10000 - (float) $row['performance']))->values();
         $justificatifRows = $actionRows->flatMap(function (array $row): array { $justificatifs = (array) ($row['justificatifs'] ?? []); if ($justificatifs === []) { return [['direction' => (string) ($row['direction_label'] ?? '-'), 'service' => (string) ($row['service_label'] ?? '-'), 'action' => (string) ($row['action'] ?? '-'), 'rmo' => (string) ($row['rmo'] ?? $row['responsable'] ?? '-'), 'justificatif' => '-', 'statut' => (string) ($row['statut_validation'] ?? '-'), 'date' => '']]; } return collect($justificatifs)->map(fn (array $justificatif): array => ['direction' => (string) ($row['direction_label'] ?? '-'), 'service' => (string) ($row['service_label'] ?? '-'), 'action' => (string) ($row['action'] ?? '-'), 'rmo' => (string) ($row['rmo'] ?? $row['responsable'] ?? '-'), 'justificatif' => (string) ($justificatif['nom'] ?? '-'), 'statut' => (string) ($row['statut_validation'] ?? '-'), 'date' => (string) ($justificatif['date'] ?? '')])->all(); })->values();
+        $anomalyRows = $actionRows->flatMap(function (array $row): array { return collect($row['anomalies'] ?? [])->map(fn (array $anomaly): array => ['direction' => (string) ($row['direction_label'] ?? '-'), 'service' => (string) ($row['service_label'] ?? '-'), 'action' => (string) ($row['action'] ?? '-'), 'type' => (string) ($anomaly['type'] ?? '-'), 'niveau' => (string) ($anomaly['niveau'] ?? '-'), 'responsable' => (string) ($anomaly['responsable'] ?? '-'), 'blocage' => (string) ($anomaly['blocage'] ?? '-'), 'correction' => (string) ($anomaly['correction_attendue'] ?? '-'), 'message' => (string) ($anomaly['message'] ?? '-'), 'signale_par' => (string) ($anomaly['signale_par'] ?? '-'), 'date' => (string) ($anomaly['date'] ?? '')])->all(); })->values();
+        $financingRows = $actionRows->filter(fn (array $row): bool => (bool) ($row['financement_requis'] ?? false))->values();
         $allActionDates = $actionRows->flatMap(fn (array $row): array => [$row['debut'] ?? '', $row['fin'] ?? '', $row['echeance_strategique'] ?? ''])->map(fn ($v): string => trim((string) $v))->filter(fn ($v): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) === 1)->sort()->values();
         $planPeriodStart = $allActionDates->first() !== null ? substr((string) $allActionDates->first(), 0, 4) : $generatedYear;
         $planPeriodEnd = $allActionDates->last() !== null ? substr((string) $allActionDates->last(), 0, 4) : $generatedYear;
@@ -62,13 +77,21 @@
     @endif
 
     @if (($templateBlocks['include_summary'] ?? true))
-        <div class="toc"><h2>Sommaire</h2><table class="toc-table"><tr><td class="toc-index">01</td><td>Axes & Objectifs stratégiques</td></tr><tr><td class="toc-index">02</td><td>Objectifs opérationnels & Actions</td></tr><tr><td class="toc-index">03</td><td>Actions détaillées</td></tr><tr><td class="toc-index">04</td><td>Indicateurs d'exécution par action</td></tr><tr><td class="toc-index">05</td><td>Reporting synthétique, alertes, RMO et justificatifs</td></tr><tr><td class="toc-index">06</td><td>Page de signature et page de fin</td></tr></table></div>
+        <div class="toc">
+            <h2>Sommaire</h2>
+            <table class="toc-table">
+                @foreach ($tocEntries as $index => $entry)
+                    <tr><td class="toc-index">{{ str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) }}</td><td>{{ $entry }}</td></tr>
+                @endforeach
+            </table>
+        </div>
     @endif
 
-    @if (($templateBlocks['include_summary'] ?? true))
+    @if (($templateBlocks['include_summary'] ?? true) && $isConsolidatedReport)
         <div class="section page-break-section"><span class="section-kicker">Synthèse</span><h2>Reporting synthétique</h2><table class="cards-grid"><tr><td><div class="metric-card"><div class="metric-label">Actions</div><div class="metric-value">{{ $global['actions_total'] ?? 0 }}</div></div></td><td><div class="metric-card"><div class="metric-label">Terminées</div><div class="metric-value">{{ $global['actions_achevees'] ?? 0 }}</div></div></td><td><div class="metric-card"><div class="metric-label">En retard</div><div class="metric-value">{{ $alertes['actions_en_retard'] ?? 0 }}</div></div></td><td><div class="metric-card"><div class="metric-label">Alertes</div><div class="metric-value">{{ ($alertes['actions_en_retard'] ?? 0) + ($alertes['mesures_kpi_sous_seuil'] ?? 0) }}</div></div></td></tr></table><p class="meta">{{ $officialBaseText }}</p></div>
     @endif
 
+    @if ($isConsolidatedReport)
     <div class="section page-break-section">
         <span class="section-kicker">Plan d'actions</span>
         <h2>Tableau de pilotage consolidé</h2>
@@ -103,14 +126,179 @@
             </tbody>
         </table>
     </div>
+    @endif
 
-    @include('workspace.monitoring.partials.reporting-direction-service-sections', [
-        'variant' => 'pdf',
-        'directionServiceReport' => $directionServiceReport,
-        'strategyRows' => $strategyRows,
-        'templateBlocks' => $templateBlocks,
-        'alertRows' => $alertRows,
-    ])
+    @if ($isConsolidatedReport)
+        @include('workspace.monitoring.partials.reporting-direction-service-sections', [
+            'variant' => 'pdf',
+            'directionServiceReport' => $directionServiceReport,
+            'strategyRows' => $strategyRows,
+            'templateBlocks' => $templateBlocks,
+            'alertRows' => $alertRows,
+        ])
+    @endif
+
+    @if ($reportType === 'pas')
+        <div class="section page-break-section">
+            <span class="section-kicker">PAS</span>
+            <h2>Axes et objectifs stratégiques</h2>
+            <table class="compact">
+                <thead><tr><th>Axe</th><th>N° objectif</th><th>Objectif stratégique</th><th>Échéance</th></tr></thead>
+                <tbody>
+                    @forelse ($strategyRows as $row)
+                        <tr><td>{{ $row['axe'] ?? '-' }}</td><td>{{ $row['objectif_numero'] ?? '-' }}</td><td>{{ $row['objectif'] ?? '-' }}</td><td class="nowrap">{{ $row['echeance'] ?? '-' }}</td></tr>
+                    @empty
+                        <tr><td colspan="4">Aucun axe ou objectif stratégique disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    @if ($reportType === 'pao')
+        <div class="section page-break-section">
+            <span class="section-kicker">PAO</span>
+            <h2>Objectifs opérationnels et services</h2>
+            <table class="compact">
+                <thead><tr><th>Direction</th><th>Service</th><th>Axe</th><th>Objectif stratégique</th><th>Objectif opérationnel</th><th>Action</th><th>Responsable</th><th>Échéance</th></tr></thead>
+                <tbody>
+                    @forelse ($actionRows as $row)
+                        <tr><td>{{ $row['direction_label'] ?? '-' }}</td><td>{{ $row['service_label'] ?? '-' }}</td><td>{{ $row['axe_strategique'] ?? $row['axe'] ?? '-' }}</td><td>{{ $row['objectif_strategique'] ?? $row['objectif'] ?? '-' }}</td><td>{{ $row['objectif_operationnel'] ?? '-' }}</td><td>{{ $row['action'] ?? '-' }}</td><td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td><td class="nowrap">{{ $row['echeance'] ?? $row['fin'] ?? '-' }}</td></tr>
+                    @empty
+                        <tr><td colspan="8">Aucun objectif opérationnel disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    @if ($reportType === 'pta')
+        <div class="section page-break-section">
+            <span class="section-kicker">PTA</span>
+            <h2>Synthese PTA par service ou unite</h2>
+            <table class="compact">
+                <thead><tr><th>Direction</th><th>Service / unite</th><th>Actions</th><th>Terminees</th><th>En cours</th><th>En retard</th><th>Taux realisation (%)</th></tr></thead>
+                <tbody>
+                    @forelse ($summaryRows as $row)
+                        <tr><td>{{ $row['direction'] ?? '-' }}</td><td>{{ $row['service'] ?? '-' }}</td><td>{{ $row['summary']['actions_total'] ?? 0 }}</td><td>{{ $row['summary']['actions_terminees'] ?? 0 }}</td><td>{{ $row['summary']['actions_en_cours'] ?? 0 }}</td><td>{{ $row['summary']['actions_retard'] ?? 0 }}</td><td>{{ $row['summary']['taux_realisation'] ?? 0 }}</td></tr>
+                    @empty
+                        <tr><td colspan="7">Aucun PTA disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        <div class="section page-break-section">
+            <span class="section-kicker">PTA</span>
+            <h2>Actions du PTA</h2>
+            <table class="compact">
+                <thead><tr><th>Direction</th><th>Service</th><th>Objectif operationnel</th><th>Action</th><th>RMO</th><th>Debut</th><th>Fin</th><th>Cible</th><th>Ressources</th><th>Risque</th><th>Statut</th><th>Avancement (%)</th></tr></thead>
+                <tbody>
+                    @forelse ($actionRows as $row)
+                        <tr><td>{{ $row['direction_label'] ?? '-' }}</td><td>{{ $row['service_label'] ?? '-' }}</td><td>{{ $row['objectif_operationnel'] ?? '-' }}</td><td>{{ $row['description_action'] ?? $row['action'] ?? '-' }}</td><td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td><td>{{ $row['debut'] ?? '-' }}</td><td>{{ $row['fin'] ?? '-' }}</td><td>{{ $row['cible'] ?? '-' }}</td><td>{{ $row['ressources_requises'] ?? '-' }}</td><td>{{ $row['risque_resume'] ?? '-' }}</td><td>{{ $row['statut'] ?? '-' }}</td><td>{{ $row['progression'] ?? $row['progression_value'] ?? 0 }}</td></tr>
+                    @empty
+                        <tr><td colspan="12">Aucune action PTA disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    @if ($reportType === 'actions')
+        <div class="section page-break-section">
+            <span class="section-kicker">Actions</span>
+            <h2>Actions detaillees</h2>
+            <table class="compact">
+                <thead><tr><th>Direction</th><th>Service</th><th>Objectif operationnel</th><th>Description action</th><th>RMO</th><th>Debut</th><th>Fin</th><th>Mode execution</th><th>Cible</th><th>Avancement reel (%)</th><th>Financement</th><th>Risque</th><th>Ressources</th><th>KPI global (%)</th></tr></thead>
+                <tbody>
+                    @forelse ($actionRows as $row)
+                        <tr><td>{{ $row['direction_label'] ?? '-' }}</td><td>{{ $row['service_label'] ?? '-' }}</td><td>{{ $row['objectif_operationnel'] ?? '-' }}</td><td>{{ $row['description_action'] ?? $row['action'] ?? '-' }}</td><td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td><td>{{ $row['debut'] ?? '-' }}</td><td>{{ $row['fin'] ?? '-' }}</td><td>{{ $row['mode_execution'] ?? '-' }}</td><td>{{ $row['cible'] ?? '-' }}</td><td>{{ $row['progression'] ?? $row['progression_value'] ?? 0 }}</td><td>{{ $row['financement_resume'] ?? '-' }}</td><td>{{ $row['risque_resume'] ?? '-' }}</td><td>{{ $row['ressources_requises'] ?? '-' }}</td><td>{{ $row['kpi_global'] ?? $row['kpi_global_value'] ?? 0 }}</td></tr>
+                    @empty
+                        <tr><td colspan="14">Aucune action disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    @if ($reportType === 'kpi')
+        <div class="section page-break-section">
+            <span class="section-kicker">KPI</span>
+            <h2>Indicateurs par action</h2>
+            <table class="compact">
+                {{-- Colonne Conformite retiree (2026-05-28) du reporting PDF KPI. --}}
+                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>RMO</th><th>Performance (%)</th><th>Delai (%)</th><th>Avancement reel (%)</th><th>KPI global (%)</th></tr></thead>
+                <tbody>
+                    @forelse ($actionRows as $row)
+                        <tr><td>{{ $row['direction_label'] ?? '-' }}</td><td>{{ $row['service_label'] ?? '-' }}</td><td>{{ $row['action'] ?? '-' }}</td><td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td><td>{{ $row['kpi_performance'] ?? $row['kpi_performance_value'] ?? 0 }}</td><td>{{ $row['kpi_delai'] ?? $row['kpi_delai_value'] ?? 0 }}</td><td>{{ $row['progression'] ?? $row['progression_value'] ?? 0 }}</td><td>{{ $row['kpi_global'] ?? $row['kpi_global_value'] ?? 0 }}</td></tr>
+                    @empty
+                        <tr><td colspan="8">Aucun KPI disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        <div class="section page-break-section">
+            <span class="section-kicker">KPI</span>
+            <h2>Performance par RMO</h2>
+            <table class="compact">
+                <thead><tr><th>Direction</th><th>Service</th><th>RMO</th><th>Actions</th><th>Performance moyenne (%)</th></tr></thead>
+                <tbody>
+                    @forelse ($rmoRows as $row)
+                        <tr><td>{{ $row['direction'] ?? '-' }}</td><td>{{ $row['service'] ?? '-' }}</td><td>{{ $row['rmo'] ?? '-' }}</td><td>{{ $row['total'] ?? 0 }}</td><td>{{ $row['performance'] ?? 0 }}</td></tr>
+                    @empty
+                        <tr><td colspan="5">Aucune performance RMO disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    @if ($reportType === 'anomalies')
+        <div class="section page-break-section">
+            <span class="section-kicker">Anomalies</span>
+            <h2>Anomalies et blocages</h2>
+            <table class="compact">
+                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>Type</th><th>Niveau</th><th>Responsable</th><th>Blocage</th><th>Correction attendue</th><th>Message</th><th>Signale par</th><th>Date</th></tr></thead>
+                <tbody>
+                    @forelse ($anomalyRows as $row)
+                        <tr><td>{{ $row['direction'] ?? '-' }}</td><td>{{ $row['service'] ?? '-' }}</td><td>{{ $row['action'] ?? '-' }}</td><td>{{ $row['type'] ?? '-' }}</td><td>{{ $row['niveau'] ?? '-' }}</td><td>{{ $row['responsable'] ?? '-' }}</td><td>{{ $row['blocage'] ?? '-' }}</td><td>{{ $row['correction'] ?? '-' }}</td><td>{{ $row['message'] ?? '-' }}</td><td>{{ $row['signale_par'] ?? '-' }}</td><td>{{ $row['date'] ?? '-' }}</td></tr>
+                    @empty
+                        <tr><td colspan="11">Aucune anomalie disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        <div class="section page-break-section">
+            <span class="section-kicker">Alertes</span>
+            <h2>Alertes sous seuil</h2>
+            <table class="compact">
+                <thead><tr><th>Action</th><th>Indicateur</th><th>Valeur</th><th>Seuil</th><th>Statut</th><th>Correctif attendu</th></tr></thead>
+                <tbody>
+                    @forelse ($alertRows as $row)
+                        <tr><td>{{ $row['action'] ?? '-' }}</td><td>{{ $row['indicateur'] ?? '-' }}</td><td>{{ $row['valeur'] ?? 0 }}</td><td>{{ $row['seuil'] ?? 0 }}</td><td>{{ $row['statut'] ?? '-' }}</td><td>{{ $row['correctif'] ?? '-' }}</td></tr>
+                    @empty
+                        <tr><td colspan="6">Aucune alerte disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    @if ($reportType === 'financement')
+        <div class="section page-break-section">
+            <span class="section-kicker">Financement</span>
+            <h2>Financements DAF / DG</h2>
+            <table class="compact">
+                <thead><tr><th>Direction</th><th>Service</th><th>Action</th><th>RMO</th><th>Nature</th><th>Montant estime</th><th>Source</th><th>Statut DAF / DG</th><th>Observation</th><th>Avancement (%)</th><th>KPI global (%)</th></tr></thead>
+                <tbody>
+                    @forelse ($financingRows as $row)
+                        <tr><td>{{ $row['direction_label'] ?? '-' }}</td><td>{{ $row['service_label'] ?? '-' }}</td><td>{{ $row['action'] ?? '-' }}</td><td>{{ $row['rmo'] ?? $row['responsable'] ?? '-' }}</td><td>{{ $row['financement_nature'] ?? '-' }}</td><td>{{ number_format((float) ($row['financement_montant'] ?? 0), 0, ',', ' ') }}</td><td>{{ $row['financement_source'] ?? '-' }}</td><td>{{ $row['financement_statut_label'] ?? $row['financement_statut'] ?? '-' }}</td><td>{{ $row['financement_observation'] ?? '' }}</td><td>{{ $row['progression'] ?? $row['progression_value'] ?? 0 }}</td><td>{{ $row['kpi_global'] ?? $row['kpi_global_value'] ?? 0 }}</td></tr>
+                    @empty
+                        <tr><td colspan="11">Aucun financement disponible.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    @endif
 
     @if (($templateBlocks['include_signatures'] ?? false) === true)
         <div class="section page-break-section">

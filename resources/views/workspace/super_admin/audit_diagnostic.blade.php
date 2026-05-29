@@ -25,6 +25,9 @@
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Changements sensibles</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['sensitive_changes'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Actions organisation</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['organization_actions'] }}</p></article>
         <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Modules touchés</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['modules_touched'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Sensibles sans auteur</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['sensitive_without_actor'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Sensibles sans valeurs</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['sensitive_without_values'] }}</p></article>
+        <article class="ui-card !mb-0"><p class="text-sm text-slate-500">Sensibles sans motif</p><p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['sensitive_without_reason'] }}</p></article>
     </section>
 
     <section class="showcase-panel mb-4">

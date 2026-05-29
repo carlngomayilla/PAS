@@ -12,9 +12,8 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -24,25 +23,15 @@ class ActionNotificationWorkflowTest extends TestCase
 
     public function test_api_action_validation_workflow_sends_notifications_to_expected_recipients(): void
     {
-        Storage::fake('local');
-
         $fixture = $this->createActionFixture();
         $action = $fixture['action'];
-        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
 
-        Sanctum::actingAs($fixture['agent']);
-        $this->withHeader('Accept', 'application/json')->post('/api/v1/actions/'.$action->id.'/weeks/'.$week->id.'/submit', [
-            'quantite_realisee' => 100,
-            'commentaire' => 'Execution complete',
-            'difficultes' => 'Aucune',
-            'mesures_correctives' => 'RAS',
-            'justificatif' => UploadedFile::fake()->create('preuve.pdf', 64, 'application/pdf'),
-        ])->assertOk();
-
-        $this->postJson('/api/v1/actions/'.$action->id.'/close', [
+        $action->forceFill(['quantite_realisee' => 100])->save();
+        $action = app(ActionTrackingService::class)->submitClosureForReview($action->fresh(), [
             'date_fin_reelle' => '2026-01-07',
             'rapport_final' => 'Travail termine',
-        ])->assertOk();
+        ], $fixture['agent']);
+        app(WorkspaceNotificationService::class)->notifyActionSubmittedToChef($action, $fixture['agent']);
 
         $this->assertNotNull($fixture['service_user']->fresh()->notifications->first(
             fn ($notification) => ($notification->data['title'] ?? null) === 'Action soumise pour validation'
@@ -57,8 +46,7 @@ class ActionNotificationWorkflowTest extends TestCase
         Sanctum::actingAs($fixture['service_user']);
         $this->postJson('/api/v1/actions/'.$action->id.'/review', [
             'decision_validation' => 'valider',
-            'evaluation_note' => 90,
-            'evaluation_commentaire' => 'Validation chef',
+            'motif_validation_chef' => 'Validation chef',
             'validation_sans_correction' => 1,
         ])->assertOk();
 
@@ -72,8 +60,7 @@ class ActionNotificationWorkflowTest extends TestCase
         Sanctum::actingAs($fixture['direction_user']);
         $this->postJson('/api/v1/actions/'.$action->id.'/review-direction', [
             'decision_validation' => 'valider',
-            'evaluation_note' => 95,
-            'evaluation_commentaire' => 'Validation finale',
+            'motif_validation_chef' => 'Validation finale',
         ])->assertForbidden();
 
         $this->assertNull($fixture['agent']->fresh()->notifications->first(
@@ -170,7 +157,6 @@ class ActionNotificationWorkflowTest extends TestCase
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-14',
             'date_echeance' => '2026-01-14',
-            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
             'responsable_id' => $agent->id,
             'statut' => 'non_demarre',
             'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,

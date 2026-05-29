@@ -92,7 +92,11 @@ class UpdatePtaRequest extends FormRequest
             'actions.*.resultat_attendu' => ['nullable', 'string'],
             'actions.*.date_debut' => ['required_with:actions', 'date', 'date_format:Y-m-d'],
             'actions.*.date_fin' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:actions.*.date_debut'],
-            'actions.*.mode_evaluation' => ['required_with:actions', Rule::in([Action::MODE_QUANTITATIF, Action::MODE_SOUS_ACTIONS, Action::MODE_MIXTE])],
+            'actions.*.mode_evaluation' => ['required_with:actions', Rule::in([
+                Action::MODE_QUANTITATIF,
+                Action::MODE_SANS_QUANTITE,
+                Action::MODE_SOUS_ACTIONS,
+            ])],
             'actions.*.priorite' => ['nullable', 'string', 'max:50'],
             'actions.*.quantite_cible' => ['nullable', 'numeric', 'min:0.0001'],
             'actions.*.unite_cible' => ['nullable', 'string', 'max:100'],
@@ -154,14 +158,14 @@ class UpdatePtaRequest extends FormRequest
     {
         return [
             'actions.*.libelle' => 'titre de l action',
-            'actions.*.date_debut' => 'date de debut',
+            'actions.*.date_debut' => 'date de début',
             'actions.*.date_fin' => 'date de fin',
             'actions.*.rmo_ids' => 'RMO',
-            'actions.*.montant_estime' => 'montant estime',
+            'actions.*.montant_estime' => 'montant estimé',
             'actions.*.nature_financement' => 'nature du financement',
             'actions.*.source_financement' => 'source de financement',
             'actions.*.commentaire_financement' => 'commentaire financement',
-            'actions.*.justificatif_financement' => 'piece justificative de financement',
+            'actions.*.justificatif_financement' => 'pièce justificative de financement',
         ];
     }
 
@@ -234,8 +238,39 @@ class UpdatePtaRequest extends FormRequest
                 if ($dateFin !== '' && $objectifEcheance !== null && $dateFin > $objectifEcheance->format('Y-m-d')) {
                     $validator->errors()->add(
                         "actions.{$index}.date_fin",
-                        'La date de fin de l action ne peut pas depasser l echeance de l objectif operationnel.'
+                        'La date de fin de l action ne peut pas dépasser l échéance de l objectif opérationnel.'
                     );
+                }
+
+                $subActions = is_array($actionPayload['sous_actions'] ?? null) ? $actionPayload['sous_actions'] : [];
+                foreach ($subActions as $subIndex => $subActionPayload) {
+                    if (! is_array($subActionPayload)) {
+                        continue;
+                    }
+
+                    $subDateDebut = (string) ($subActionPayload['date_debut'] ?? '');
+                    $subDateFin = (string) ($subActionPayload['date_fin'] ?? '');
+
+                    if ($subDateDebut !== '' && $subDateFin !== '' && $subDateFin < $subDateDebut) {
+                        $validator->errors()->add(
+                            "actions.{$index}.sous_actions.{$subIndex}.date_fin",
+                            'La date de fin de la sous-action doit être après sa date de début.'
+                        );
+                    }
+
+                    if ($subDateFin !== '' && $dateFin !== '' && $subDateFin > $dateFin) {
+                        $validator->errors()->add(
+                            "actions.{$index}.sous_actions.{$subIndex}.date_fin",
+                            'La date de fin de la sous-action ne peut pas dépasser la date de fin de l action.'
+                        );
+                    }
+
+                    if ($subDateFin !== '' && $objectifEcheance !== null && $subDateFin > $objectifEcheance->format('Y-m-d')) {
+                        $validator->errors()->add(
+                            "actions.{$index}.sous_actions.{$subIndex}.date_fin",
+                            'La date de fin de la sous-action ne peut pas dépasser l échéance de l objectif opérationnel.'
+                        );
+                    }
                 }
 
                 if (! empty($actionPayload['id'])) {
@@ -263,23 +298,23 @@ class UpdatePtaRequest extends FormRequest
                 foreach ($rmoIds as $rmoId) {
                     $rmo = $rmos->get($rmoId);
                     if ($rmo === null || ! (bool) ($rmo->is_active ?? true)) {
-                        $validator->errors()->add("actions.{$index}.rmo_ids", 'Chaque RMO doit etre un utilisateur actif.');
+                        $validator->errors()->add("actions.{$index}.rmo_ids", 'Chaque RMO doit être un utilisateur actif.');
                         break;
                     }
 
                     if ($directionId !== null && $rmo->direction_id !== null && (int) $rmo->direction_id !== (int) $directionId) {
-                        $validator->errors()->add("actions.{$index}.rmo_ids", 'Chaque RMO doit appartenir a la direction de l objectif operationnel.');
+                        $validator->errors()->add("actions.{$index}.rmo_ids", 'Chaque RMO doit appartenir à la direction de l objectif opérationnel.');
                         break;
                     }
 
                     if ($serviceId !== null && $rmo->service_id !== null && (int) $rmo->service_id !== (int) $serviceId) {
-                        $validator->errors()->add("actions.{$index}.rmo_ids", 'Chaque RMO doit appartenir au service destinataire de l objectif operationnel.');
+                        $validator->errors()->add("actions.{$index}.rmo_ids", 'Chaque RMO doit appartenir au service destinataire de l objectif opérationnel.');
                         break;
                     }
                 }
 
-                $modeEvaluation = (string) ($actionPayload['mode_evaluation'] ?? Action::MODE_SOUS_ACTIONS);
-                if (in_array($modeEvaluation, [Action::MODE_QUANTITATIF, Action::MODE_MIXTE], true)) {
+                $modeEvaluation = (string) ($actionPayload['mode_evaluation'] ?? Action::MODE_SANS_QUANTITE);
+                if ($modeEvaluation === Action::MODE_QUANTITATIF) {
                     $quantiteCible = $actionPayload['quantite_cible'] ?? null;
                     if ($quantiteCible === null || $quantiteCible === '' || (float) $quantiteCible <= 0) {
                         $validator->errors()->add(
@@ -311,9 +346,40 @@ class UpdatePtaRequest extends FormRequest
                             'La nature du financement est obligatoire lorsque le financement est requis.'
                         );
                     }
+
+                    if (! $this->hasFile("actions.{$index}.justificatif_financement") && ! $this->hasExistingFinancingJustificatif($actionPayload)) {
+                        $validator->errors()->add(
+                            "actions.{$index}.justificatif_financement",
+                            'La piece justificative du financement est obligatoire.'
+                        );
+                    }
                 }
             }
         });
+    }
+
+    /**
+     * @param array<string, mixed> $actionPayload
+     */
+    private function hasExistingFinancingJustificatif(array $actionPayload): bool
+    {
+        $actionId = is_numeric($actionPayload['id'] ?? null) ? (int) $actionPayload['id'] : 0;
+        if ($actionId <= 0) {
+            return false;
+        }
+
+        $action = Action::query()->find($actionId);
+        if (! $action instanceof Action) {
+            return false;
+        }
+
+        if (trim((string) ($action->justificatif_financement_path ?? '')) !== '') {
+            return true;
+        }
+
+        return $action->justificatifs()
+            ->where('categorie', 'financement')
+            ->exists();
     }
 
     private function resolveCurrentPtaId(): ?int
@@ -355,13 +421,21 @@ class UpdatePtaRequest extends FormRequest
                     && (float) $action['quantite_cible'] > 0;
 
                 $mode = trim((string) ($action['mode_evaluation'] ?? ''));
-                $hasExplicitMode = in_array($mode, [Action::MODE_QUANTITATIF, Action::MODE_SOUS_ACTIONS, Action::MODE_MIXTE], true);
-                if (! $hasExplicitMode) {
+                if ($mode === Action::MODE_MIXTE) {
                     $mode = $targetProvided ? Action::MODE_QUANTITATIF : Action::MODE_SOUS_ACTIONS;
                 }
 
-                if (! $targetProvided && ! in_array($mode, [Action::MODE_QUANTITATIF, Action::MODE_MIXTE], true)) {
-                    $mode = Action::MODE_SOUS_ACTIONS;
+                $hasExplicitMode = in_array($mode, [
+                    Action::MODE_QUANTITATIF,
+                    Action::MODE_SANS_QUANTITE,
+                    Action::MODE_SOUS_ACTIONS,
+                ], true);
+                if (! $hasExplicitMode) {
+                    $mode = $targetProvided ? Action::MODE_QUANTITATIF : Action::MODE_SANS_QUANTITE;
+                }
+
+                if ($mode !== Action::MODE_QUANTITATIF) {
+                    $action['quantite_cible'] = null;
                     $action['unite_cible'] = null;
                 }
 

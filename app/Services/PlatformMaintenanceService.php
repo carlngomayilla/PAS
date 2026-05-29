@@ -46,6 +46,7 @@ class PlatformMaintenanceService
             'clear_cache' => Artisan::call('optimize:clear'),
             'clear_views' => Artisan::call('view:clear'),
             'cache_views' => Artisan::call('view:cache'),
+            'planning_auto_archive' => Artisan::call('anbg:planning-auto-archive', ['--execute' => true]),
             'maintenance_on' => Artisan::call('down', ['--refresh' => 60, '--retry' => 60, '--secret' => self::MAINTENANCE_SECRET]),
             'maintenance_off' => Artisan::call('up'),
         };
@@ -69,6 +70,7 @@ class PlatformMaintenanceService
             'clear_cache' => 'Vider le cache applicatif',
             'clear_views' => 'Vider le cache des vues',
             'cache_views' => 'Regenerer le cache des vues',
+            'planning_auto_archive' => 'Archiver PAO/PTA clotures eligibles',
             'maintenance_on' => 'Activer le mode maintenance',
             'maintenance_off' => 'Desactiver le mode maintenance',
         ];

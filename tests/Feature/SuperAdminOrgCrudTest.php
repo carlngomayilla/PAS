@@ -2,10 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Models\Action;
 use App\Models\Direction;
+use App\Models\JournalAudit;
+use App\Models\Pao;
+use App\Models\Pas;
+use App\Models\Pta;
 use App\Models\Service;
+use App\Models\SousAction;
 use App\Models\User;
+use App\Models\UserAssignmentHistory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\Concerns\CreatesAdminUser;
 use Tests\TestCase;
@@ -147,8 +155,8 @@ class SuperAdminOrgCrudTest extends TestCase
     public function test_super_admin_can_create_update_and_toggle_a_user(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $direction  = Direction::query()->firstOrFail();
-        $service    = Service::query()->where('direction_id', $direction->id)->firstOrFail();
+        $direction = Direction::query()->whereIn('code', ['DAF', 'DSIC', 'DS'])->firstOrFail();
+        $service = Service::query()->where('direction_id', $direction->id)->firstOrFail();
 
         // Create
         $this->actingAs($superAdmin)
@@ -210,6 +218,292 @@ class SuperAdminOrgCrudTest extends TestCase
             ->assertSessionHasErrors('general');
 
         $this->assertTrue((bool) $superAdmin->fresh()->is_active);
+    }
+
+    public function test_super_admin_deactivation_transfers_open_assignments_and_audits_governance_metadata(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        [$direction, $service] = $this->makeOrganizationScope('LIFE');
+
+        $target = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'is_agent' => true,
+            'is_active' => true,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'password_changed_at' => now(),
+        ]);
+        $replacement = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'is_agent' => true,
+            'is_active' => true,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'password_changed_at' => now(),
+        ]);
+
+        $pta = $this->makePtaForScope($direction, $service, 'PTA transfert utilisateur');
+        $action = Action::query()->create([
+            'pta_id' => $pta->id,
+            'pao_id' => $pta->pao_id,
+            'libelle' => 'Action ouverte a transferer',
+            'description' => 'Action test lifecycle.',
+            'date_debut' => now()->subWeek()->toDateString(),
+            'date_fin' => now()->addWeek()->toDateString(),
+            'date_echeance' => now()->addWeek()->toDateString(),
+            'responsable_id' => $target->id,
+            'statut' => 'en_cours',
+            'statut_dynamique' => 'en_cours',
+            'financement_requis' => false,
+        ]);
+
+        DB::table('action_responsables')->updateOrInsert(
+            ['action_id' => $action->id, 'user_id' => $target->id],
+            ['is_primary' => true, 'created_at' => now(), 'updated_at' => now()]
+        );
+
+        $sousAction = SousAction::query()->create([
+            'action_id' => $action->id,
+            'agent_id' => $target->id,
+            'libelle' => 'Sous-action ouverte a transferer',
+            'date_debut' => now()->subWeek()->toDateString(),
+            'date_fin' => now()->addWeek()->toDateString(),
+            'statut' => 'en_cours',
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->post(route('workspace.super-admin.organization.users.toggle', $target), [
+                'transfer_to_user_id' => $replacement->id,
+                'motif' => 'Depart de service avec transfert des taches ouvertes.',
+            ])
+            ->assertRedirect(route('workspace.super-admin.organization.index'));
+
+        $target->refresh();
+        $this->assertFalse((bool) $target->is_active);
+        $this->assertNotNull($target->deactivated_at);
+        $this->assertSame((int) $superAdmin->id, (int) $target->deactivated_by);
+        $this->assertSame((int) $replacement->id, (int) $target->tasks_transferred_to);
+
+        $this->assertDatabaseHas('actions', [
+            'id' => $action->id,
+            'responsable_id' => $replacement->id,
+        ]);
+        $this->assertDatabaseMissing('action_responsables', [
+            'action_id' => $action->id,
+            'user_id' => $target->id,
+        ]);
+        $this->assertDatabaseHas('action_responsables', [
+            'action_id' => $action->id,
+            'user_id' => $replacement->id,
+            'is_primary' => true,
+        ]);
+        $this->assertDatabaseHas('sous_actions', [
+            'id' => $sousAction->id,
+            'agent_id' => $replacement->id,
+        ]);
+
+        $audit = JournalAudit::query()
+            ->where('module', 'super_admin')
+            ->where('action', 'organization_user_toggle')
+            ->where('entite_id', $target->id)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame($replacement->id, $audit->nouvelle_valeur['lifecycle']['replacement_user_id'] ?? null);
+        $this->assertSame(1, $audit->nouvelle_valeur['lifecycle']['transfers']['actions_responsable'] ?? null);
+        $this->assertSame(1, $audit->nouvelle_valeur['lifecycle']['transfers']['sous_actions'] ?? null);
+    }
+
+    public function test_deactivation_with_open_tasks_is_blocked_without_active_replacement(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        [$direction, $service] = $this->makeOrganizationScope('NOREP');
+
+        $target = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'is_agent' => true,
+            'is_active' => true,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'password_changed_at' => now(),
+        ]);
+
+        $pta = $this->makePtaForScope($direction, $service, 'PTA sans repreneur');
+        Action::query()->create([
+            'pta_id' => $pta->id,
+            'pao_id' => $pta->pao_id,
+            'libelle' => 'Action bloquante sans repreneur',
+            'date_debut' => now()->subWeek()->toDateString(),
+            'date_fin' => now()->addWeek()->toDateString(),
+            'responsable_id' => $target->id,
+            'statut' => 'en_cours',
+            'statut_dynamique' => 'en_cours',
+            'financement_requis' => false,
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->post(route('workspace.super-admin.organization.users.toggle', $target), [
+                'motif' => 'Tentative sans repreneur.',
+            ])
+            ->assertSessionHasErrors('transfer_to_user_id');
+
+        $this->assertTrue((bool) $target->fresh()->is_active);
+    }
+
+    public function test_service_change_transfers_open_assignments_and_records_assignment_history(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $direction = Direction::query()->where('code', 'DSIC')->firstOrFail();
+        $oldService = Service::query()->create([
+            'direction_id' => $direction->id,
+            'code' => 'TRH-OLD',
+            'libelle' => 'Service historique ancien',
+            'actif' => true,
+        ]);
+        $newService = Service::query()->create([
+            'direction_id' => $direction->id,
+            'code' => 'TRH-NEW',
+            'libelle' => 'Service historique nouveau',
+            'actif' => true,
+        ]);
+
+        $target = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'is_agent' => true,
+            'is_active' => true,
+            'direction_id' => $direction->id,
+            'service_id' => $oldService->id,
+            'password_changed_at' => now(),
+        ]);
+        $replacement = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'is_agent' => true,
+            'is_active' => true,
+            'direction_id' => $direction->id,
+            'service_id' => $oldService->id,
+            'password_changed_at' => now(),
+        ]);
+
+        $pta = $this->makePtaForScope($direction, $oldService, 'PTA historique rattachement');
+        $action = Action::query()->create([
+            'pta_id' => $pta->id,
+            'pao_id' => $pta->pao_id,
+            'libelle' => 'Action ouverte avant changement',
+            'description' => 'Action test changement de service.',
+            'date_debut' => now()->subWeek()->toDateString(),
+            'date_fin' => now()->addWeek()->toDateString(),
+            'date_echeance' => now()->addWeek()->toDateString(),
+            'responsable_id' => $target->id,
+            'statut' => 'en_cours',
+            'statut_dynamique' => 'en_cours',
+            'financement_requis' => false,
+        ]);
+        DB::table('action_responsables')->updateOrInsert(
+            ['action_id' => $action->id, 'user_id' => $target->id],
+            ['is_primary' => true, 'created_at' => now(), 'updated_at' => now()]
+        );
+
+        $this->actingAs($superAdmin)
+            ->put(route('workspace.super-admin.organization.users.update', $target), [
+                'name' => $target->name,
+                'email' => $target->email,
+                'role' => User::ROLE_AGENT,
+                'direction_id' => $direction->id,
+                'service_id' => $newService->id,
+                'is_active' => '1',
+                'is_agent' => '1',
+                'transfer_to_user_id' => $replacement->id,
+                'motif' => 'Mutation de service avec reprise des taches ouvertes.',
+            ])
+            ->assertRedirect(route('workspace.super-admin.organization.index'));
+
+        $target->refresh();
+        $this->assertSame((int) $newService->id, (int) $target->service_id);
+        $this->assertDatabaseHas('actions', [
+            'id' => $action->id,
+            'responsable_id' => $replacement->id,
+        ]);
+        $this->assertDatabaseMissing('action_responsables', [
+            'action_id' => $action->id,
+            'user_id' => $target->id,
+        ]);
+
+        $history = UserAssignmentHistory::query()->where('user_id', $target->id)->latest('id')->firstOrFail();
+        $this->assertSame((int) $oldService->id, (int) $history->previous_service_id);
+        $this->assertSame((int) $newService->id, (int) $history->new_service_id);
+        $this->assertSame((int) $replacement->id, (int) $history->transfer_to_user_id);
+        $this->assertSame(1, $history->transfer_summary['actions_responsable'] ?? null);
+        $this->assertSame(1, $history->transfer_summary['actions_rmo'] ?? null);
+
+        $audit = JournalAudit::query()
+            ->where('module', 'super_admin')
+            ->where('action', 'organization_user_update')
+            ->where('entite_id', $target->id)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame($history->id, $audit->nouvelle_valeur['assignment_change']['history_id'] ?? null);
+        $this->assertSame($replacement->id, $audit->nouvelle_valeur['assignment_change']['replacement_user_id'] ?? null);
+    }
+
+    public function test_service_change_with_open_assignments_is_blocked_without_replacement(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $direction = Direction::query()->where('code', 'DSIC')->firstOrFail();
+        $oldService = Service::query()->create([
+            'direction_id' => $direction->id,
+            'code' => 'BLK-OLD',
+            'libelle' => 'Service blocage ancien',
+            'actif' => true,
+        ]);
+        $newService = Service::query()->create([
+            'direction_id' => $direction->id,
+            'code' => 'BLK-NEW',
+            'libelle' => 'Service blocage nouveau',
+            'actif' => true,
+        ]);
+
+        $target = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'is_agent' => true,
+            'is_active' => true,
+            'direction_id' => $direction->id,
+            'service_id' => $oldService->id,
+            'password_changed_at' => now(),
+        ]);
+
+        $pta = $this->makePtaForScope($direction, $oldService, 'PTA blocage rattachement');
+        $action = Action::query()->create([
+            'pta_id' => $pta->id,
+            'pao_id' => $pta->pao_id,
+            'libelle' => 'Action bloquante avant changement',
+            'date_debut' => now()->subWeek()->toDateString(),
+            'date_fin' => now()->addWeek()->toDateString(),
+            'responsable_id' => $target->id,
+            'statut' => 'en_cours',
+            'statut_dynamique' => 'en_cours',
+            'financement_requis' => false,
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->put(route('workspace.super-admin.organization.users.update', $target), [
+                'name' => $target->name,
+                'email' => $target->email,
+                'role' => User::ROLE_AGENT,
+                'direction_id' => $direction->id,
+                'service_id' => $newService->id,
+                'is_active' => '1',
+                'is_agent' => '1',
+                'motif' => 'Tentative de mutation sans repreneur.',
+            ])
+            ->assertSessionHasErrors('transfer_to_user_id');
+
+        $this->assertSame((int) $oldService->id, (int) $target->fresh()->service_id);
+        $this->assertDatabaseHas('actions', [
+            'id' => $action->id,
+            'responsable_id' => $target->id,
+        ]);
+        $this->assertDatabaseCount('user_assignment_histories', 0);
     }
 
     public function test_super_admin_cannot_remove_own_super_admin_role(): void
@@ -297,5 +591,50 @@ class SuperAdminOrgCrudTest extends TestCase
                 'users_file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('too-large.csv', $csv),
             ])
             ->assertSessionHasErrors('users_file');
+    }
+
+    /**
+     * @return array{0:Direction,1:Service}
+     */
+    private function makeOrganizationScope(string $suffix): array
+    {
+        $direction = Direction::query()->create([
+            'code' => 'DIR-'.$suffix,
+            'libelle' => 'Direction '.$suffix,
+            'actif' => true,
+        ]);
+        $service = Service::query()->create([
+            'direction_id' => $direction->id,
+            'code' => 'SER-'.$suffix,
+            'libelle' => 'Service '.$suffix,
+            'actif' => true,
+        ]);
+
+        return [$direction, $service];
+    }
+
+    private function makePtaForScope(Direction $direction, Service $service, string $title): Pta
+    {
+        $pas = Pas::query()->create([
+            'titre' => 'PAS '.$title,
+            'periode_debut' => 2026,
+            'periode_fin' => 2028,
+            'statut' => 'valide',
+        ]);
+        $pao = Pao::query()->create([
+            'pas_id' => $pas->id,
+            'direction_id' => $direction->id,
+            'annee' => 2026,
+            'titre' => 'PAO '.$title,
+            'statut' => 'valide',
+        ]);
+
+        return Pta::query()->create([
+            'pao_id' => $pao->id,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'titre' => $title,
+            'statut' => 'en_cours',
+        ]);
     }
 }

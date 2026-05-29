@@ -3,6 +3,7 @@
 @section('content')
     @php
         $currentUser = auth()->user();
+        $lockService = app(\App\Services\PlanningModificationLockService::class);
         $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
         $ps = is_array($ptaStats ?? null) ? $ptaStats : [];
         $directionOptions = collect($serviceOptions ?? [])
@@ -13,8 +14,8 @@
             ->values();
         $summaryCards = [
             ['label' => 'Total PTA',            'value' => $ps['total'] ?? $rows->total(),   'meta' => null, 'href' => route('workspace.pta.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Actifs',               'value' => $ps['actifs'] ?? 0,               'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Brouillons',           'value' => $ps['brouillons'] ?? 0,           'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'brouillon']),  'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'En cours',             'value' => $ps['en_cours'] ?? 0,             'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'en_cours']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Clotures',             'value' => $ps['clotures'] ?? 0,             'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'cloture']),  'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Sans action',          'value' => $ps['sans_action'] ?? 0,          'meta' => null, 'href' => route('workspace.pta.index', ['without_action' => 1]),    'badge' => null, 'badge_tone' => ($ps['sans_action'] ?? 0) > 0 ? 'warning' : 'neutral'],
         ];
     @endphp
@@ -58,7 +59,7 @@
                         <option value="">Tous</option>
                         @foreach ($paoOptions as $pao)
                             <option value="{{ $pao->id }}" @selected($filters['pao_id'] === $pao->id)>
-                                #{{ $pao->id }} - {{ $pao->titre }}
+                                {{ $pao->titre }}
                             </option>
                         @endforeach
                     </select>
@@ -122,10 +123,13 @@
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>Code</th>
                         <th>Titre</th>
                         <th>PAO</th>
+                        <th>Objectif opérationnel</th>
                         <th>Direction</th>
                         <th>Service</th>
+                        <th>Échéance OO</th>
                         <th>Statut</th>
                         <th>Nb actions</th>
                         <th>Validateur</th>
@@ -139,76 +143,75 @@
                         @php
                             $statusClasses = match ((string) $row->statut) {
                                 'brouillon' => 'anbg-badge anbg-badge-neutral',
-                                'soumis' => 'anbg-badge anbg-badge-warning',
-                                'valide' => 'anbg-badge anbg-badge-success',
-                                'verrouille' => 'anbg-badge anbg-badge-info',
+                                'en_cours' => 'anbg-badge anbg-badge-warning',
+                                'cloture' => 'anbg-badge anbg-badge-info',
+                                'archive' => 'anbg-badge anbg-badge-neutral',
                                 default => 'anbg-badge anbg-badge-neutral',
                             };
-                            $canSubmit = $row->statut === 'brouillon'
-                                && ($currentUser->hasGlobalWriteAccess()
-                                    || ($currentUser->hasRole(\App\Models\User::ROLE_DIRECTION)
-                                        && (int) $currentUser->direction_id === (int) $row->direction_id)
-                                    || ($currentUser->hasRole(\App\Models\User::ROLE_SERVICE)
-                                        && (int) $currentUser->direction_id === (int) $row->direction_id
-                                        && (int) $currentUser->service_id === (int) $row->service_id));
-                            $canApprove = $row->statut === 'soumis'
-                                && ($currentUser->hasGlobalWriteAccess()
-                                    || ($currentUser->hasRole(\App\Models\User::ROLE_DIRECTION)
-                                        && (int) $currentUser->direction_id === (int) $row->direction_id));
-                            $canLock = $row->statut === 'valide'
-                                && $currentUser->hasGlobalWriteAccess();
-                            $canReopen = in_array($row->statut, ['soumis', 'valide'], true)
-                                && ($canApprove || ($row->statut === 'soumis' && $canSubmit));
+                            // Pas de cloture possible tant que le PTA est en brouillon (toutes
+                            // les actions doivent etre parametrees avant la cloture).
+                            $canClose = $row->statut === 'en_cours';
+                            $canArchive = $row->statut === 'cloture';
+                            $isModificationLocked = $lockService->isLocked($row);
+                            $canRequestUnlock = $currentUser && $lockService->canRequestUnlock($currentUser, $row);
                         @endphp
                         <tr>
-                            <td>#{{ $row->id }}</td>
-                            <td>
-                                <div class="font-semibold text-slate-900">{{ $row->titre }}</div>
-                            </td>
+                            <td class="font-mono text-xs text-slate-600">{{ $row->id }}</td>
+                            <td class="font-mono text-xs font-semibold text-slate-800">{{ $row->code ?? '-' }}</td>
+                            <td class="font-semibold text-slate-900">{{ $row->titre }}</td>
                             <td>{{ $row->pao?->titre ?? '-' }}</td>
+                            <td class="min-w-[220px]">
+                                @if ($row->objectifOperationnel)
+                                    <div class="text-sm text-slate-800">{{ $row->objectifOperationnel->libelle }}</div>
+                                @else
+                                    -
+                                @endif
+                            </td>
                             <td>{{ $row->direction?->code }} {{ $row->direction?->libelle ? '- '.$row->direction->libelle : '' }}</td>
                             <td>{{ $row->service?->code }} {{ $row->service?->libelle ? '- '.$row->service->libelle : '' }}</td>
+                            <td class="whitespace-nowrap text-xs text-slate-700">{{ $row->objectifOperationnel?->echeance ?? '-' }}</td>
                             <td>
                                 <span class="{{ $statusClasses }}">
                                     {{ $workflowStatusLabel($row->statut) }}
                                 </span>
+                                @if ($isModificationLocked)
+                                    <p class="mt-2"><span class="anbg-badge anbg-badge-warning px-2 py-0.5 text-xs">Modification verrouillee</span></p>
+                                @endif
                             </td>
-                            <td>{{ $row->actions_count }}</td>
+                            <td class="text-center"><span class="anbg-badge anbg-badge-info px-3">{{ $row->actions_count }}</span></td>
                             <td>{{ $row->validateur?->name ?? '-' }}</td>
                             @if ($canWrite)
                                 <td>
                                     <div class="row-actions">
-                                        <a class="btn btn-warning" href="{{ route('workspace.pta.edit', $row) }}">Modifier</a>
-                                        @if ($canSubmit)
-                                            <form method="POST" action="{{ route('workspace.pta.submit', $row) }}">
+                                        @if (! $isModificationLocked)
+                                            <a class="btn btn-warning" href="{{ route('workspace.pta.edit', $row) }}">Modifier</a>
+                                        @elseif ($canRequestUnlock)
+                                            @include('workspace.planning-unlocks._request-inline', [
+                                                'target' => $row,
+                                                'route' => route('workspace.pta.unlock-requests.store', $row),
+                                                'context' => 'Modification PTA demandee par '.$currentUser->name,
+                                            ])
+                                        @endif
+                                        @if ($canClose)
+                                            <form method="POST" action="{{ route('workspace.pta.close', $row) }}" data-confirm-message="Cloturer ce PTA apres controle des anomalies ?" data-confirm-tone="warning" data-confirm-label="Cloturer">
                                                 @csrf
-                                                <button class="btn btn-primary" type="submit">Soumettre</button>
+                                                <input type="hidden" name="motif" value="Cloture PTA demandee depuis la liste">
+                                                <button class="btn btn-primary" type="submit">Cloturer</button>
                                             </form>
                                         @endif
-                                        @if ($canApprove)
-                                            <form method="POST" action="{{ route('workspace.pta.approve', $row) }}">
+                                        @if ($canArchive)
+                                            <form method="POST" action="{{ route('workspace.pta.archive', $row) }}" data-confirm-message="Archiver ce PTA cloture ?" data-confirm-tone="warning" data-confirm-label="Archiver">
                                                 @csrf
-                                                <button class="btn btn-success" type="submit">Valider</button>
+                                                <input type="hidden" name="motif" value="Archivage PTA cloture depuis la liste">
+                                                <button class="btn btn-secondary" type="submit">Archiver</button>
                                             </form>
                                         @endif
-                                        @if ($canLock)
-                                            <form method="POST" action="{{ route('workspace.pta.lock', $row) }}" data-confirm-message="Verrouiller ce PTA ?" data-confirm-tone="warning" data-confirm-label="Verrouiller">
+                                            <form method="POST" action="{{ route('workspace.pta.destroy', $row) }}" data-confirm-message="Supprimer ce PTA ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                                 @csrf
-                                                <button class="btn btn-primary" type="submit">Verrouiller</button>
+                                                @method('DELETE')
+                                                <input type="hidden" name="motif" value="Demande de suppression PTA depuis le module PTA">
+                                                <button class="btn btn-danger" type="submit">Supprimer</button>
                                             </form>
-                                        @endif
-                                        @if ($canReopen)
-                                            <form method="POST" action="{{ route('workspace.pta.reopen', $row) }}" data-prompt-title="Retour brouillon" data-prompt-message="Saisir le motif de retour brouillon (PTA)." data-prompt-label="Motif de retour" data-prompt-placeholder="Minimum 5 caracteres" data-prompt-target="motif_retour" data-prompt-minlength="5" data-prompt-confirm="Confirmer">
-                                                @csrf
-                                                <input type="hidden" name="motif_retour" value="">
-                                                <button class="btn btn-warning" type="submit">Retour brouillon</button>
-                                            </form>
-                                        @endif
-                                        <form method="POST" action="{{ route('workspace.pta.destroy', $row) }}" data-confirm-message="Supprimer ce PTA ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="btn btn-danger" type="submit">Supprimer</button>
-                                        </form>
                                     </div>
                                 </td>
                             @endif

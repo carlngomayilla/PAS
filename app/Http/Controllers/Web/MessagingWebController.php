@@ -45,13 +45,6 @@ class MessagingWebController extends Controller
             'role' => (string) $request->query('contact_role', ''),
         ];
 
-        $orgFilters = [
-            'search' => (string) $request->query('org_search', ''),
-            'direction_id' => $request->integer('org_direction_id'),
-            'service_id' => $request->integer('org_service_id'),
-            'role' => (string) $request->query('org_role', ''),
-        ];
-
         $conversations = $this->messagingService->conversationSummaries($user, $conversationFilters);
         $conversationId = $request->integer('conversation');
         if ($conversationId < 1 && $conversations->isNotEmpty()) {
@@ -88,7 +81,6 @@ class MessagingWebController extends Controller
         }
 
         $contactCard = $this->resolveContactCard($user, $selectedUser);
-        $orgChart = $this->directoryService->orgChart($user, $orgFilters);
         $filterOptions = $this->filterOptions($user);
 
         return view('workspace.messaging.index', [
@@ -98,11 +90,9 @@ class MessagingWebController extends Controller
             'activeConversation' => $activeConversation,
             'directoryUsers' => $directoryUsers,
             'contactCard' => $contactCard,
-            'orgChart' => $orgChart,
             'filterOptions' => $filterOptions,
             'conversationFilters' => $conversationFilters,
             'directoryFilters' => $directoryFilters,
-            'orgFilters' => $orgFilters,
         ]);
     }
 

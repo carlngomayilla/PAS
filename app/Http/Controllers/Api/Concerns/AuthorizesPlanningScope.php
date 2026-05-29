@@ -98,7 +98,7 @@ trait AuthorizesPlanningScope
             $user->delegatedServiceScopes('planning_read'),
             $user->delegatedServiceScopes('planning_write')
         );
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->direction_id !== null && $user->service_id !== null) {
+        if ($this->hasOwnServicePlanningScope($user)) {
             $serviceScopes[] = [
                 'direction_id' => (int) $user->direction_id,
                 'service_id' => (int) $user->service_id,
@@ -131,6 +131,19 @@ trait AuthorizesPlanningScope
                             });
                         }
                     });
+
+                    if (method_exists($query->getModel(), 'objectifsOperationnels')) {
+                        $scopedQuery->orWhereHas('objectifsOperationnels', function (Builder $objectiveQuery) use ($uniqueServiceScopes): void {
+                            $objectiveQuery->where(function (Builder $inner) use ($uniqueServiceScopes): void {
+                                foreach ($uniqueServiceScopes as $scope) {
+                                    $inner->orWhere(function (Builder $pair) use ($scope): void {
+                                        $pair->where('direction_id', (int) $scope['direction_id'])
+                                            ->where('service_id', (int) $scope['service_id']);
+                                    });
+                                }
+                            });
+                        });
+                    }
                 } elseif (method_exists($query->getModel(), 'ptas')) {
                     $scopedQuery->orWhereHas('ptas', function (Builder $ptaQuery) use ($uniqueServiceScopes): void {
                         $ptaQuery->where(function (Builder $inner) use ($uniqueServiceScopes): void {
@@ -161,7 +174,7 @@ trait AuthorizesPlanningScope
             return false;
         }
 
-        if ($user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE)) {
+        if ($user->hasRole(User::ROLE_DIRECTION) || $this->hasOwnServicePlanningScope($user)) {
             return (int) $user->direction_id === $directionId;
         }
 
@@ -190,7 +203,7 @@ trait AuthorizesPlanningScope
             return (int) $user->direction_id === $directionId;
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE)) {
+        if ($this->hasOwnServicePlanningScope($user)) {
             return (int) $user->direction_id === $directionId
                 && (int) $user->service_id === $serviceId;
         }
@@ -259,7 +272,7 @@ trait AuthorizesPlanningScope
             return false;
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->hasPermission('planning.write.service')) {
+        if ($user->hasPermission('planning.write.service')) {
             return (int) $user->direction_id === $directionId
                 && (int) $user->service_id === $serviceId;
         }
@@ -277,7 +290,7 @@ trait AuthorizesPlanningScope
             return false;
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->hasPermission('planning.write.service')) {
+        if ($user->hasPermission('planning.write.service')) {
             return (int) $user->direction_id === $directionId
                 && (int) $user->service_id === $serviceId;
         }
@@ -293,13 +306,76 @@ trait AuthorizesPlanningScope
         return false;
     }
 
+    /**
+     * Restreint la liste des PAS au perimetre de l'utilisateur :
+     *   - lecteurs globaux (super admin, DG, planification, SCIQ, cabinet...) :
+     *     visibilite totale
+     *   - directeurs (ROLE_DIRECTION) : PAS contenant au moins un PAO de leur direction
+     *   - chefs de service / agents avec perimetre service : PAS contenant au moins
+     *     un PTA ou un objectif operationnel de leur service
+     *   - utilisateurs avec delegation : meme logique sur les directions/services delegues
+     *   - aucun perimetre = aucun PAS visible
+     */
     protected function scopePasByUser(Builder|Relation $query, User $user): void
     {
-        if ($this->canReadPlanningScope($user)) {
+        if (! $this->canReadPlanningScope($user)) {
+            $query->whereRaw('1 = 0');
+
             return;
         }
 
-        $query->whereRaw('1 = 0');
+        if ($this->canReadAllPlanning($user)) {
+            return;
+        }
+
+        $directionIds = array_values(array_unique(array_filter(array_merge(
+            $user->delegatedDirectionIds('planning_read'),
+            $user->delegatedDirectionIds('planning_write'),
+            $user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null
+                ? [(int) $user->direction_id]
+                : []
+        ), static fn ($id): bool => (int) $id > 0)));
+
+        $serviceScopes = array_merge(
+            $user->delegatedServiceScopes('planning_read'),
+            $user->delegatedServiceScopes('planning_write')
+        );
+        if ($this->hasOwnServicePlanningScope($user)) {
+            $serviceScopes[] = [
+                'direction_id' => (int) $user->direction_id,
+                'service_id' => (int) $user->service_id,
+            ];
+        }
+
+        if ($directionIds === [] && $serviceScopes === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $uniqueServiceScopes = collect($serviceScopes)
+            ->unique(fn (array $s): string => $s['direction_id'].'-'.$s['service_id'])
+            ->values()
+            ->all();
+
+        $query->where(function (Builder $pasQuery) use ($directionIds, $uniqueServiceScopes): void {
+            if (! empty($directionIds)) {
+                $pasQuery->orWhereHas('paos', fn (Builder $paoQuery) => $paoQuery->whereIn('direction_id', $directionIds));
+            }
+
+            foreach ($uniqueServiceScopes as $scope) {
+                $pasQuery->orWhereHas('paos', function (Builder $paoQuery) use ($scope): void {
+                    $paoQuery->where('direction_id', (int) $scope['direction_id'])
+                        ->where(function (Builder $inner) use ($scope): void {
+                            // PAO directement rattache au service de l'utilisateur,
+                            // OU contenant un PTA / objectif operationnel du service.
+                            $inner->where('service_id', (int) $scope['service_id'])
+                                ->orWhereHas('ptas', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', (int) $scope['service_id']))
+                                ->orWhereHas('objectifsOperationnels', fn (Builder $ooQuery) => $ooQuery->where('service_id', (int) $scope['service_id']));
+                        });
+                });
+            }
+        });
     }
 
     protected function canReadPas(User $user, ?int $pasId): bool
@@ -308,7 +384,14 @@ trait AuthorizesPlanningScope
             return false;
         }
 
-        return $pasId !== null && Pas::query()->whereKey((int) $pasId)->exists();
+        if ($pasId === null) {
+            return false;
+        }
+
+        $query = Pas::query()->whereKey((int) $pasId);
+        $this->scopePasByUser($query, $user);
+
+        return $query->exists();
     }
 
     protected function canReadPao(User $user, ?int $paoId, ?int $directionId): bool
@@ -329,11 +412,12 @@ trait AuthorizesPlanningScope
             return $directionId !== null && (int) $user->direction_id === (int) $directionId;
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
+        if ($this->hasOwnServicePlanningScope($user)) {
             return Pao::query()
                 ->whereKey((int) $paoId)
                 ->where(function (Builder $query) use ($user): void {
                     $query->where('service_id', (int) $user->service_id)
+                        ->orWhereHas('objectifsOperationnels', fn (Builder $q) => $q->where('service_id', (int) $user->service_id))
                         ->orWhereHas('ptas', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
                 })
                 ->exists();
@@ -353,6 +437,7 @@ trait AuthorizesPlanningScope
                     ->whereKey((int) $paoId)
                     ->where(function (Builder $query) use ($scope): void {
                         $query->where('service_id', (int) $scope['service_id'])
+                            ->orWhereHas('objectifsOperationnels', fn (Builder $q) => $q->where('service_id', (int) $scope['service_id']))
                             ->orWhereHas('ptas', fn (Builder $q) => $q->where('service_id', (int) $scope['service_id']));
                     })
                     ->exists();
@@ -415,5 +500,26 @@ trait AuthorizesPlanningScope
     protected function canWriteAllPlanning(User $user): bool
     {
         return $user->hasPermission('planning.write.global');
+    }
+
+    protected function hasOwnServicePlanningScope(User $user): bool
+    {
+        if ($user->direction_id === null || $user->service_id === null) {
+            return false;
+        }
+
+        if ($user->hasGlobalReadAccess()) {
+            return false;
+        }
+
+        return $user->hasPermission('planning.write.service')
+            || $user->hasRole(
+                User::ROLE_SERVICE,
+                User::ROLE_CHEF_UNITE,
+                User::ROLE_CHEF_UNITE_DGA,
+                User::ROLE_CHEF_UNITE_CABINET,
+                User::ROLE_CHEF_UNITE_UCAS,
+                User::ROLE_UCAS
+            );
     }
 }

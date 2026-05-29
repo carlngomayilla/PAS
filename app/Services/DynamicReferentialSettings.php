@@ -69,6 +69,7 @@ class DynamicReferentialSettings
             [
                 'hebdomadaire' => 'Justificatif hebdomadaire',
                 'final' => 'Justificatif final',
+                'execution_non_quantitative' => 'Justificatif execution',
                 'evaluation_chef' => 'Evaluation chef',
                 'evaluation_direction' => 'Evaluation direction',
                 'financement' => 'Piece financement',
@@ -135,6 +136,7 @@ class DynamicReferentialSettings
             'justificatif_category_labels' => [
                 'hebdomadaire' => 'Justificatif hebdomadaire',
                 'final' => 'Justificatif final',
+                'execution_non_quantitative' => 'Justificatif execution',
                 'evaluation_chef' => 'Evaluation chef',
                 'evaluation_direction' => 'Evaluation direction',
                 'financement' => 'Piece financement',
@@ -316,6 +318,7 @@ class DynamicReferentialSettings
             'justificatif_category_labels' => $this->sanitizeKeyValueLabels([
                 'hebdomadaire' => Arr::get($payload, 'justificatif_category_label_hebdomadaire'),
                 'final' => Arr::get($payload, 'justificatif_category_label_final'),
+                'execution_non_quantitative' => Arr::get($payload, 'justificatif_category_label_execution_non_quantitative'),
                 'evaluation_chef' => Arr::get($payload, 'justificatif_category_label_evaluation_chef'),
                 'evaluation_direction' => Arr::get($payload, 'justificatif_category_label_evaluation_direction'),
                 'financement' => Arr::get($payload, 'justificatif_category_label_financement'),
@@ -427,5 +430,4 @@ class DynamicReferentialSettings
         }
     }
 }
-
 

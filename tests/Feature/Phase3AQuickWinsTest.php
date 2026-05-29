@@ -16,7 +16,8 @@ use Tests\TestCase;
  * Couvre la sous-phase 3.A :
  *   - A34 : la vue preview templates retire les balises interactives.
  *   - A37 : scope.global.write est restreint aux profils admin purs.
- *   - A38 : ActionObserver invalide le cache sur seuil_minimum / evaluation_note.
+ *   - A38 : ActionObserver invalide le cache sur seuil_minimum / taux_realisation_global
+ *           (evaluation_note retire par la spec v2 du 28/05/2026).
  *   - A39 : AnalyticsCacheVersionService expose bumpAlerts().
  *   - A40 : pas_directions impose UNIQUE (pas_id, direction_id).
  */
@@ -54,16 +55,21 @@ class Phase3AQuickWinsTest extends TestCase
         $this->assertNotContains('scope.global.write', $registry->forRole(User::ROLE_SCIQ));
         $this->assertNotContains('scope.global.write', $registry->forRole(User::ROLE_SCIQ_SUIVI_GLOBAL));
         $this->assertNotContains('scope.global.write', $registry->forRole(User::ROLE_CHEF_UNITE_SCIQ));
-        // DG aussi (cf. A06).
-        $this->assertNotContains('scope.global.write', $registry->forRole(User::ROLE_DG));
+        // Note : DG dispose desormais de scope.global.write (regle metier ANBG
+        // 2026-05-28). Le DG pilote l'agence avec droit d'ecriture / suppression
+        // global sur PAS / PAO / PTA / Actions, c'est volontaire et controle.
+        $this->assertContains('scope.global.write', $registry->forRole(User::ROLE_DG));
     }
 
-    public function test_a38_action_observer_bumps_cache_on_evaluation_note(): void
+    public function test_a38_action_observer_bumps_cache_on_seuil_minimum(): void
     {
-        // Verification par lecture du code (champ documente dans REPORTING_FIELDS).
+        // Spec v2 (2026-05-28) : evaluation_note retire de REPORTING_FIELDS apres
+        // la suppression de la note du chef. On valide que les autres champs
+        // sensibles (seuil_minimum, taux_realisation_global) sont toujours suivis.
         $observerCode = file_get_contents(base_path('app/Observers/ActionObserver.php'));
-        $this->assertStringContainsString("'evaluation_note'", $observerCode);
         $this->assertStringContainsString("'seuil_minimum'", $observerCode);
+        $this->assertStringContainsString("'taux_realisation_global'", $observerCode);
+        $this->assertStringNotContainsString("'evaluation_note'", $observerCode);
     }
 
     public function test_a39_analytics_cache_exposes_bump_alerts(): void

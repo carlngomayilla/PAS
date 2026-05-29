@@ -157,14 +157,17 @@ class NotificationPolicySettings
             'pao_transmitted_to_service' => ['group' => 'Planification', 'label' => 'PAO transmis au service', 'description' => 'Notification métier envoyée aux chefs de service concernés lorsqu’un PAO leur est transmis.'],
             'pao_updated_for_service' => ['group' => 'Planification', 'label' => 'PAO modifié pour service', 'description' => 'Notification métier envoyée aux chefs de service lorsqu’un objectif opérationnel de leur périmètre est modifié.'],
             'pta_created_to_direction' => ['group' => 'Planification', 'label' => 'PTA créé vers direction', 'description' => 'Notification envoyée à la direction lorsqu’un service ou une unité DG crée son PTA.'],
-            'pta_submitted_for_validation' => ['group' => 'Planification', 'label' => 'PTA soumis pour validation', 'description' => 'Notification de validation envoyée à la direction et aux profils de contrôle selon le workflow.'],
+            'pta_submitted_for_validation' => ['group' => 'Planification', 'label' => 'PTA créé ou actualisé', 'description' => 'Notification de suivi envoyee a la direction et aux profils de controle. Le PTA ne possede pas de statut valide.'],
             'pta_reviewed_by_direction' => ['group' => 'Planification', 'label' => 'Décision direction sur PTA', 'description' => 'Notification envoyée au chef de service après validation ou retour du PTA.'],
             'sub_action_created' => ['group' => 'Actions', 'label' => 'Sous-action créée', 'description' => 'Notification envoyée au chef hiérarchique lorsqu’un agent crée une sous-action.'],
             'sub_action_completed' => ['group' => 'Actions', 'label' => 'Sous-action effectuée', 'description' => 'Notification de contrôle envoyée au chef hiérarchique lorsqu’un agent termine une sous-action.'],
             'justificatif_added' => ['group' => 'Actions', 'label' => 'Justificatif ajouté', 'description' => 'Notification envoyée au chef hiérarchique lorsqu’un agent ajoute une pièce justificative.'],
-            'pas_status' => ['group' => 'Planification', 'label' => 'Statuts PAS', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PAS.'],
-            'pao_status' => ['group' => 'Planification', 'label' => 'Statuts PAO', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PAO.'],
-            'pta_status' => ['group' => 'Planification', 'label' => 'Statuts PTA', 'description' => 'Notifications de soumission, validation, verrouillage et retour brouillon des PTA.'],
+            'deadline_extension_requested' => ['group' => 'Reports échéance', 'label' => 'Demande de report', 'description' => 'Notification envoyée à SCIQ / Planification lorsqu’un chef demande un report d’échéance.'],
+            'deadline_extension_sciq_reviewed' => ['group' => 'Reports échéance', 'label' => 'Avis SCIQ / Planification', 'description' => 'Notification après avis SCIQ / Planification sur une demande de report.'],
+            'deadline_extension_dg_decided' => ['group' => 'Reports échéance', 'label' => 'Décision DG report', 'description' => 'Notification après décision DG et application éventuelle de la nouvelle échéance.'],
+            'pas_status' => ['group' => 'Planification', 'label' => 'Cycle PAS', 'description' => 'Notifications de cloture et archivage des PAS.'],
+            'pao_status' => ['group' => 'Planification', 'label' => 'Cycle PAO', 'description' => 'Notifications de validation automatique, cloture et archivage des PAO.'],
+            'pta_status' => ['group' => 'Planification', 'label' => 'Cycle PTA', 'description' => 'Notifications de creation, cloture et archivage des PTA.'],
             'delegation_created' => ['group' => 'Gouvernance', 'label' => 'Nouvelle délégation', 'description' => 'Notification envoyée au délégué lors de la création d’une délégation.'],
 
             // A21 — Nouveaux événements de conformité institutionnelle.
@@ -228,6 +231,7 @@ class NotificationPolicySettings
         return [
             'in_app' => 'Notification applicative',
             'audit' => 'Trace audit supplémentaire',
+            'email' => 'Email Brevo (canal complémentaire)',
         ];
     }
 
@@ -493,25 +497,30 @@ class NotificationPolicySettings
     private function eventTemplateDefaults(): array
     {
         return [
-            'action_assigned' => ['title' => 'Nouvelle action attribuée', 'message' => 'L’action \"{action_label}\" vous a été attribuée.', 'channels' => ['in_app']],
-            'action_submitted_to_chef' => ['title' => 'Action soumise pour validation', 'message' => 'L’action \"{action_label}\" attend votre évaluation.', 'channels' => ['in_app']],
+            // Canal "email" ajouté sur les 10 événements clés v1.1 (Brevo).
+            // L'envoi effectif est gouverné par services.brevo.enabled (fail-safe).
+            'action_assigned' => ['title' => 'Nouvelle action attribuée', 'message' => 'L’action \"{action_label}\" vous a été attribuée.', 'channels' => ['in_app', 'email']],
+            'action_submitted_to_chef' => ['title' => 'Action soumise pour validation', 'message' => 'L’action \"{action_label}\" attend votre évaluation.', 'channels' => ['in_app', 'email']],
             'action_submitted_to_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'action_reviewed_by_chef' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'action_reviewed_by_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'action_finalized_by_chef' => ['title' => 'Action validée par le chef', 'message' => 'L’action \"{action_label}\" est finalisée sans étape direction supplémentaire.', 'channels' => ['in_app']],
             'action_finalized_without_workflow' => ['title' => 'Action clôturée', 'message' => 'L’action \"{action_label}\" a été clôturée sans circuit de validation supplémentaire.', 'channels' => ['in_app']],
-            'action_alert_escalation' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit']],
-            'action_financing_requested' => ['title' => 'Financement à traiter', 'message' => 'L’action \"{action_label}\" nécessite un financement estimé à {montant_estime}. Traitement DAF requis.', 'channels' => ['in_app', 'audit']],
-            'action_financing_reviewed_by_daf' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit']],
-            'action_financing_reviewed_by_dg' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit']],
+            'action_alert_escalation' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit', 'email']],
+            'action_financing_requested' => ['title' => 'Financement à traiter', 'message' => 'L’action \"{action_label}\" nécessite un financement estimé à {montant_estime}. Traitement DAF requis.', 'channels' => ['in_app', 'audit', 'email']],
+            'action_financing_reviewed_by_daf' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit', 'email']],
+            'action_financing_reviewed_by_dg' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit', 'email']],
             'pao_transmitted_to_service' => ['title' => 'Nouveau PAO reçu', 'message' => 'Un nouveau PAO a été transmis à votre service pour l’exercice {year}.', 'channels' => ['in_app']],
             'pao_updated_for_service' => ['title' => 'PAO mis à jour', 'message' => 'Un objectif opérationnel de votre service a été modifié par votre direction.', 'channels' => ['in_app']],
             'pta_created_to_direction' => ['title' => 'Nouveau PTA créé', 'message' => 'Le service {service_label} a créé son PTA pour l’exercice {year}.', 'channels' => ['in_app']],
-            'pta_submitted_for_validation' => ['title' => 'PTA soumis pour validation', 'message' => 'Le service {service_label} a soumis son PTA à la direction.', 'channels' => ['in_app']],
+            'pta_submitted_for_validation' => ['title' => 'PTA actualisé', 'message' => 'Le service {service_label} a actualise son PTA.', 'channels' => ['in_app']],
             'pta_reviewed_by_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
-            'sub_action_created' => ['title' => 'Nouvelle sous-action créée', 'message' => '{actor_name} a créé une sous-action dans l’action \"{action_label}\".', 'channels' => ['in_app']],
+            'sub_action_created' => ['title' => 'Nouvelle sous-action créée', 'message' => '{actor_name} a créé une sous-action dans l’action \"{action_label}\".', 'channels' => ['in_app', 'email']],
             'sub_action_completed' => ['title' => 'Action soumise pour vérification', 'message' => '{actor_name} a marqué une action ou sous-action comme effectuée.', 'channels' => ['in_app']],
             'justificatif_added' => ['title' => 'Justificatif ajouté', 'message' => '{actor_name} a ajouté une pièce justificative sur l’action \"{action_label}\".', 'channels' => ['in_app']],
+            'deadline_extension_requested' => ['title' => 'Demande de report d’échéance', 'message' => '{actor_name} demande un report pour l’action \"{action_label}\".', 'channels' => ['in_app', 'audit', 'email']],
+            'deadline_extension_sciq_reviewed' => ['title' => 'Avis SCIQ / Planification', 'message' => 'Avis {avis} sur le report de l’action \"{action_label}\".', 'channels' => ['in_app', 'audit', 'email']],
+            'deadline_extension_dg_decided' => ['title' => 'Décision DG sur report', 'message' => 'Décision {decision} sur le report de l’action \"{action_label}\".', 'channels' => ['in_app', 'audit', 'email']],
             'pas_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'pao_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'pta_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],

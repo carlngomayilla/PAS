@@ -16,10 +16,11 @@ class StorePasRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'titre' => ['nullable', 'string', 'max:255'],
+            'titre' => ['required', 'string', 'max:255'],
             'periode_debut' => ['required', 'integer', 'digits:4', 'min:2000'],
             'periode_fin' => ['required', 'integer', 'digits:4', 'gte:periode_debut'],
             'axes' => ['required', 'array', 'min:1'],
+            'axes.*.id' => ['nullable', 'integer'],
             'axes.*.code' => ['nullable', 'string', 'max:30'],
             'axes.*.libelle' => ['required', 'string', 'max:255'],
             'axes.*.periode_debut' => ['nullable', 'date_format:Y-m-d'],
@@ -27,8 +28,10 @@ class StorePasRequest extends FormRequest
             'axes.*.description' => ['nullable', 'string'],
             'axes.*.ordre' => ['nullable', 'integer', 'min:1'],
             'axes.*.objectifs' => ['required', 'array', 'min:1'],
+            'axes.*.objectifs.*.id' => ['nullable', 'integer'],
             'axes.*.objectifs.*.code' => ['nullable', 'string', 'max:30'],
             'axes.*.objectifs.*.libelle' => ['required', 'string', 'max:255'],
+            'axes.*.objectifs.*.date_echeance' => ['required', 'date_format:Y-m-d'],
             'axes.*.objectifs.*.description' => ['nullable', 'string'],
             'axes.*.objectifs.*.ordre' => ['nullable', 'integer', 'min:1'],
             'axes.*.objectifs.*.indicateur_global' => ['nullable', 'string', 'max:255'],
@@ -104,6 +107,17 @@ class StorePasRequest extends FormRequest
 
                 $codesObjectif = [];
                 foreach ($objectifs as $objIndex => $objectif) {
+                    $echeance = isset($objectif['date_echeance']) ? strtotime((string) $objectif['date_echeance']) : false;
+                    if ($echeance !== false) {
+                        $year = (int) date('Y', $echeance);
+                        if ($year < (int) $this->input('periode_debut') || $year > (int) $this->input('periode_fin')) {
+                            $validator->errors()->add(
+                                "axes.{$axeIndex}.objectifs.{$objIndex}.date_echeance",
+                                'La date d echeance de l objectif doit rester dans la periode du PAS.'
+                            );
+                        }
+                    }
+
                     $objCode = trim((string) ($objectif['code'] ?? ''));
                     if ($objCode === '') {
                         continue;

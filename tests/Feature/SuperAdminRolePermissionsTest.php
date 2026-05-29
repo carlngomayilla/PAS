@@ -115,13 +115,17 @@ class SuperAdminRolePermissionsTest extends TestCase
 
     public function test_admin_loses_user_management_route_when_permissions_are_revoked(): void
     {
+        // Note (2026-05-29) : la lecture de la liste utilisateurs est accordee
+        // a tout role disposant de referentiel.read (cf. ReferentielWebController::
+        // utilisateursIndex). Pour bloquer l'admin il faut donc retirer aussi
+        // referentiel.read en plus de users.manage / users.manage_roles.
         $superAdmin = $this->createSuperAdminUser();
         $admin = $this->createAdminUser();
 
         $payload = app(RolePermissionSettings::class)->all();
         $payload[User::ROLE_ADMIN] = array_values(array_diff(
             $payload[User::ROLE_ADMIN],
-            ['users.manage', 'users.manage_roles']
+            ['users.manage', 'users.manage_roles', 'referentiel.read', 'referentiel.write']
         ));
 
         $this->actingAs($superAdmin)

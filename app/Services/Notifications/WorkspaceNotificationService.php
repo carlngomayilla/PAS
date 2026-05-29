@@ -5,6 +5,7 @@ namespace App\Services\Notifications;
 use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\Delegation;
+use App\Models\DeadlineExtensionRequest;
 use App\Models\JournalAudit;
 use App\Models\Pao;
 use App\Models\Pas;
@@ -29,7 +30,8 @@ class WorkspaceNotificationService
     public function __construct(
         private readonly DelegationService $delegationService,
         private readonly AlertRoutingService $alertRoutingService,
-        private readonly NotificationPolicySettings $notificationPolicySettings
+        private readonly NotificationPolicySettings $notificationPolicySettings,
+        private readonly BrevoMailService $brevoMailService
     ) {
     }
 
@@ -433,12 +435,12 @@ class WorkspaceNotificationService
             return;
         }
 
-        if (! in_array((string) $log->niveau, ['warning', 'critical', 'urgence'], true)) {
+        if (! in_array((string) $log->niveau, ['info', 'warning', 'critical', 'urgence'], true)) {
             return;
         }
 
         $log->loadMissing(
-            'action:id,pta_id,libelle',
+            'action:id,pta_id,libelle,responsable_id',
             'action.pta:id,direction_id,service_id',
             'week:id,action_id,numero_semaine'
         );
@@ -453,6 +455,7 @@ class WorkspaceNotificationService
         $level = match ($rawLevel) {
             'urgence' => 'urgence',
             'critical' => 'critical',
+            'info' => 'info',
             default => 'warning',
         };
 
@@ -467,6 +470,7 @@ class WorkspaceNotificationService
                 'title' => match ($level) {
                     'urgence' => 'Urgence action',
                     'critical' => 'Alerte critique action',
+                    'info' => 'Information action',
                     default => 'Alerte action',
                 },
                 'message' => $this->notificationPolicySettings->renderActionAlertMessage($log),
@@ -474,8 +478,8 @@ class WorkspaceNotificationService
                 'entity_type' => 'action_log',
                 'entity_id' => $log->id,
                 'url' => $this->resolveActionAlertUrl($log),
-                'icon' => $level === 'warning' ? 'alert-triangle' : 'alert-octagon',
-                'status' => $level === 'warning' ? 'warning' : 'critical',
+                'icon' => $level === 'info' ? 'info' : ($level === 'warning' ? 'alert-triangle' : 'alert-octagon'),
+                'status' => $level === 'info' ? 'info' : ($level === 'warning' ? 'warning' : 'critical'),
                 'priority' => $level === 'urgence' ? 'urgent' : ($level === 'critical' ? 'high' : 'normal'),
                 'meta' => [
                     'event' => 'action_alert',
@@ -567,6 +571,44 @@ class WorkspaceNotificationService
                 'decision' => $approved ? 'valide_daf' : 'rejete_daf',
                 'actor_name' => (string) ($actor?->name ?? ''),
                 'montant_valide' => (string) ($action->financement_montant_valide ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyActionFinancingComplementRequested(Action $action, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_financing_reviewed_by_daf')) {
+            return;
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id');
+        $directionId = (int) ($action->pta?->direction_id ?? 0);
+        $serviceId = (int) ($action->pta?->service_id ?? 0);
+
+        $targets = $this->mergeRecipients($this->agentRecipient($action), $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]));
+        $targets = $this->mergeRecipients($targets, $this->directionUsers($directionId, [User::ROLE_DIRECTION]));
+        $targets = $this->mergeRecipients($targets, $this->globalUsers([User::ROLE_PLANIFICATION]));
+
+        $this->dispatchEvent(
+            'action_financing_reviewed_by_daf',
+            $targets,
+            [
+                'title' => 'Complement demande par la DAF',
+                'message' => sprintf('La DAF demande un complement sur le financement de "%s".', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action).'#action-financement',
+                'icon' => 'alert-circle',
+                'status' => 'warning',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'decision' => 'complement_demande',
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'commentaire' => (string) ($action->financement_daf_commentaire ?? ''),
             ],
             $actor?->id
         );
@@ -796,18 +838,18 @@ class WorkspaceNotificationService
             'pta_submitted_for_validation',
             $targets,
             [
-                'title' => 'PTA soumis pour validation',
-                'message' => sprintf('Le service %s a soumis son PTA a la direction.', $serviceLabel),
+                'title' => 'PTA actualise',
+                'message' => sprintf('Le service %s a actualise son PTA.', $serviceLabel),
                 'module' => 'pta',
                 'entity_type' => 'pta',
                 'entity_id' => $pta->id,
-                'url' => route('workspace.pta.index', ['statut' => 'soumis']),
-                'icon' => 'send',
-                'status' => 'warning',
-                'priority' => 'high',
-                'notification_type' => 'validation',
-                'categorie' => 'validation',
-                'niveau' => 'warning',
+                'url' => route('workspace.pta.index', ['statut' => 'en_cours']),
+                'icon' => 'clipboard-list',
+                'status' => 'info',
+                'priority' => 'normal',
+                'notification_type' => 'information',
+                'categorie' => 'suivi',
+                'niveau' => 'info',
                 'user_id_declencheur' => $actor?->id,
                 'direction_id' => $pta->direction_id,
                 'service_id' => $pta->service_id,
@@ -978,6 +1020,108 @@ class WorkspaceNotificationService
                 'justificatif_category' => $category,
                 'sous_action_label' => (string) ($sousAction?->libelle ?? ''),
             ]
+        );
+    }
+
+    public function notifyDeadlineExtensionRequested(DeadlineExtensionRequest $request, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('deadline_extension_requested')) {
+            return;
+        }
+
+        $request->loadMissing('action');
+        $action = $request->action;
+
+        $this->dispatchEvent(
+            'deadline_extension_requested',
+            $this->controlRecipients(),
+            [
+                'title' => 'Demande de report d echeance',
+                'message' => sprintf('Une demande de report est soumise pour "%s".', (string) $action->libelle),
+                'module' => 'reports_echeance',
+                'entity_type' => 'deadline_extension_request',
+                'entity_id' => $request->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'calendar-clock',
+                'status' => $request->is_critical ? 'warning' : 'info',
+                'priority' => $request->is_critical ? 'high' : 'normal',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyDeadlineExtensionSciqReviewed(DeadlineExtensionRequest $request, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('deadline_extension_sciq_reviewed')) {
+            return;
+        }
+
+        $request->loadMissing('action');
+        $action = $request->action;
+        $recipients = $request->sciq_avis === DeadlineExtensionRequest::AVIS_FAVORABLE
+            ? $this->globalUsers([User::ROLE_DG, User::ROLE_SUPER_ADMIN])
+            : $this->actionSupervisorRecipients($action);
+
+        $this->dispatchEvent(
+            'deadline_extension_sciq_reviewed',
+            $recipients,
+            [
+                'title' => 'Avis SCIQ / Planification',
+                'message' => sprintf('Avis %s sur le report de "%s".', (string) $request->sciq_avis, (string) $action->libelle),
+                'module' => 'reports_echeance',
+                'entity_type' => 'deadline_extension_request',
+                'entity_id' => $request->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'send',
+                'status' => $request->sciq_avis === DeadlineExtensionRequest::AVIS_FAVORABLE ? 'info' : 'warning',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'avis' => (string) $request->sciq_avis,
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyDeadlineExtensionDgDecided(DeadlineExtensionRequest $request, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('deadline_extension_dg_decided')) {
+            return;
+        }
+
+        $request->loadMissing('action');
+        $action = $request->action;
+        $recipients = $this->mergeRecipients(
+            $this->mergeRecipients($this->actionSupervisorRecipients($action), $this->agentRecipient($action)),
+            $this->controlRecipients()
+        );
+
+        $this->dispatchEvent(
+            'deadline_extension_dg_decided',
+            $recipients,
+            [
+                'title' => 'Decision DG sur report',
+                'message' => sprintf('Decision DG "%s" pour le report de "%s".', (string) $request->dg_decision, (string) $action->libelle),
+                'module' => 'reports_echeance',
+                'entity_type' => 'deadline_extension_request',
+                'entity_id' => $request->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'calendar-check',
+                'status' => $request->dg_decision === DeadlineExtensionRequest::DECISION_APPROUVER ? 'success' : 'warning',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'decision' => (string) $request->dg_decision,
+            ],
+            $actor?->id
         );
     }
 
@@ -1160,8 +1304,8 @@ class WorkspaceNotificationService
     {
         return match ($event) {
             'submitted' => [
-                sprintf('%s soumis', $moduleLabel),
-                sprintf('%s "%s" a ete soumis pour validation.', $moduleLabel, $titleValue),
+                sprintf('%s actualise', $moduleLabel),
+                sprintf('%s "%s" a ete actualise.', $moduleLabel, $titleValue),
                 'info',
             ],
             'approved' => [
@@ -1170,13 +1314,13 @@ class WorkspaceNotificationService
                 'success',
             ],
             'locked' => [
-                sprintf('%s verrouille', $moduleLabel),
-                sprintf('%s "%s" a ete verrouille.', $moduleLabel, $titleValue),
+                sprintf('%s archive', $moduleLabel),
+                sprintf('%s "%s" a ete archive.', $moduleLabel, $titleValue),
                 'info',
             ],
             'reopened' => [
-                sprintf('%s remis en brouillon', $moduleLabel),
-                sprintf('%s "%s" a ete remis en brouillon.', $moduleLabel, $titleValue),
+                sprintf('%s remis en cours', $moduleLabel),
+                sprintf('%s "%s" a ete remis en cours.', $moduleLabel, $titleValue),
                 'warning',
             ],
             default => [
@@ -1200,6 +1344,10 @@ class WorkspaceNotificationService
 
         if (Str::startsWith((string) $log->type_evenement, 'alerte_temporelle_')) {
             return route('workspace.actions.suivi', $action).'#action-status';
+        }
+
+        if (Str::startsWith((string) $log->type_evenement, 'anomalie_')) {
+            return route('workspace.actions.suivi', $action).'#action-controle';
         }
 
         return match ((string) $log->type_evenement) {
@@ -1593,13 +1741,60 @@ class WorkspaceNotificationService
             $this->dispatchAuditTrace($event, $users, $rendered, $excludeUserId);
         }
 
+        // Canal email Brevo : COMPLÉMENTAIRE, non bloquant. Toujours déclenché
+        // APRÈS la notification interne (best-effort fail-safe).
+        // L'envoi effectif est conditionné par services.brevo.enabled.
+        $shouldEmail = in_array('email', $channels, true);
+
         if (! in_array('in_app', $channels, true)) {
+            if ($shouldEmail) {
+                $this->dispatchEmail($event, $users, $rendered, $excludeUserId);
+            }
+
             return;
         }
 
         unset($rendered['channels']);
 
         $this->dispatch($users, $rendered, $excludeUserId);
+
+        if ($shouldEmail) {
+            // On réinjecte le payload sans la clé channels pour le canal email.
+            $this->dispatchEmail($event, $users, $rendered, $excludeUserId);
+        }
+    }
+
+    /**
+     * Délégation vers BrevoMailService — fail-safe absolu (try/catch global).
+     *
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $users
+     * @param  array<string, mixed>  $payload
+     */
+    private function dispatchEmail(
+        string $event,
+        Collection|EloquentCollection $users,
+        array $payload,
+        ?int $excludeUserId = null
+    ): void {
+        try {
+            $targets = $users;
+
+            if ($excludeUserId !== null) {
+                $targets = $users
+                    ->reject(static fn ($user): bool => $user instanceof User
+                        && (int) $user->id === (int) $excludeUserId
+                    )
+                    ->values();
+            }
+
+            $this->brevoMailService->dispatch($event, $targets, $payload);
+        } catch (Throwable $exception) {
+            // FAIL-SAFE : un échec du canal email ne doit jamais casser le métier.
+            Log::warning('Brevo email channel dispatch failed (non-blocking).', [
+                'event' => $event,
+                'exception' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**

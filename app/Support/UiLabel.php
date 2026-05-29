@@ -88,9 +88,9 @@ final class UiLabel
             'soumise_chef' => 'Soumise service',
             'rejetee_chef' => 'Rejetée service',
             'correction_demandee' => 'Correction demandée',
-            'validee_chef' => 'Validée service',
+            'validee_chef' => 'Validée',
             'rejetee_direction' => 'Rejetée direction',
-            'validee_direction' => 'Validée',
+            'validee_direction' => 'Validée (ancienne direction)',
             default => ucfirst(str_replace('_', ' ', (string) $status)),
         };
     }
@@ -98,12 +98,16 @@ final class UiLabel
     public static function workflowStatus(string|null $status): string
     {
         return match ((string) $status) {
+            'actif' => 'Actif',
+            'en_cours' => 'En cours',
+            'cloture' => 'Clôturé',
+            'archive' => 'Archivé',
             'brouillon' => 'Brouillon',
             'soumis' => 'Soumis',
             'valide' => 'Validé',
             'verrouille' => 'Verrouillé',
             'fin' => 'Fin',
-            'valide_ou_verrouille' => 'Validé ou verrouillé',
+            'valide_ou_verrouille' => 'Ancien statut validé ou verrouillé',
             default => ucfirst(str_replace('_', ' ', (string) $status)),
         };
     }

@@ -24,7 +24,9 @@
         $summaryTotal = (int) ($summary['total'] ?? $rows->total());
         $avgProgression = (float) ($summary['avg_progression'] ?? ($listing->avg(fn ($item) => (float) ($item->progression_reelle ?? 0)) ?? 0));
         $avgKpi = (float) ($summary['avg_kpi_global'] ?? ($listing->avg(fn ($item) => (float) ($item->actionKpi?->kpi_performance ?? 0)) ?? 0));
-        $avgConformite = (float) ($summary['avg_conformite'] ?? ($listing->avg(fn ($item) => (float) ($item->actionKpi?->kpi_conformite ?? 0)) ?? 0));
+        // Spec v2 (28/05/2026) : KPI conformite supprime. avg_conformite reste a 0.0
+        // pour ne pas casser les bandeaux de statistiques legacy.
+        $avgConformite = (float) ($summary['avg_conformite'] ?? 0);
         $validatedCount = (int) ($summary['validated_count'] ?? 0);
         $pendingValidationCount = (int) ($summary['pending_validation_count'] ?? 0);
         $pendingJustificatifCount = (int) ($summary['pending_justificatif_count'] ?? 0);
@@ -207,7 +209,7 @@
                         <option value="">Tous</option>
                         @foreach ($ptaOptions as $pta)
                             <option value="{{ $pta->id }}" @selected($filters['pta_id'] === $pta->id)>
-                                #{{ $pta->id }} - {{ $pta->titre }}
+                                {{ $pta->titre }}
                             </option>
                         @endforeach
                     </select>
@@ -621,7 +623,10 @@
                             $semainesRenseignees = (int) ($row->semaines_renseignees ?? 0);
                             $kpiPerformance = $row->actionKpi?->kpi_performance;
                             $kpiDelay = $row->actionKpi?->kpi_delai;
-                            $kpiConformite = $row->actionKpi?->kpi_conformite;
+                            // Spec v2 (28/05/2026) : KPI conformite supprime. Variable conservee
+                            // a null pour la retrocompatibilite des composants Blade qui la lisent
+                            // encore (rendu par defaut : '0.00').
+                            $kpiConformite = null;
                             $justificatifsTotal = (int) ($row->justificatifs_total ?? 0);
                             $modeEvaluationLabel = $row->mode_evaluation_label ?? 'Par sous-actions';
                             $statusClass = $statusStyles[$row->statut_dynamique ?: 'non_demarre'] ?? $statusStyles['non_demarre'];
@@ -698,10 +703,24 @@
                                 <div class="row-actions">
                                     <a class="btn btn-follow btn-sm rounded-xl" href="{{ route('workspace.actions.suivi', $row) }}">Suivi</a>
                                     @if ($canWrite)
-                                        <a class="btn btn-warning btn-sm rounded-xl" href="{{ route('workspace.actions.edit', $row) }}">Modifier</a>
+                                        @php
+                                            $lockService = $lockService ?? app(\App\Services\PlanningModificationLockService::class);
+                                            $isModificationLocked = $lockService->isLocked($row);
+                                            $canRequestUnlock = auth()->check() && $lockService->canRequestUnlock(auth()->user(), $row);
+                                        @endphp
+                                        @if (! $isModificationLocked)
+                                            <a class="btn btn-warning btn-sm rounded-xl" href="{{ $row->pta_id ? route('workspace.pta.edit', $row->pta_id).'#action-'.$row->id : route('workspace.actions.edit', $row) }}">Modifier</a>
+                                        @elseif ($canRequestUnlock)
+                                            @include('workspace.planning-unlocks._request-inline', [
+                                                'target' => $row,
+                                                'route' => route('workspace.actions.unlock-requests.store', $row),
+                                                'context' => 'Modification action demandee depuis le module Actions',
+                                            ])
+                                        @endif
                                         <form method="POST" action="{{ route('workspace.actions.destroy', $row) }}" data-confirm-message="Supprimer cette action ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                             @csrf
                                             @method('DELETE')
+                                            <input type="hidden" name="motif" value="Demande de suppression action depuis le module Actions">
                                             <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
                                         </form>
                                     @endif

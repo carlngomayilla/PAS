@@ -3,11 +3,12 @@
 @section('content')
     @php
         $currentUser = auth()->user();
+        $lockService = app(\App\Services\PlanningModificationLockService::class);
         $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
         $ps = is_array($pasStats ?? null) ? $pasStats : [];
         $summaryCards = [
-            ['label' => 'Actifs',                   'value' => $ps['actifs'] ?? 0,                'meta' => null, 'href' => route('workspace.pas.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Brouillons',               'value' => $ps['brouillons'] ?? 0,            'meta' => null, 'href' => route('workspace.pas.index', ['statut' => 'brouillon']),  'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Actifs',                   'value' => $ps['actifs'] ?? 0,                'meta' => null, 'href' => route('workspace.pas.index', ['statut' => 'actif']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Clotures',                 'value' => $ps['clotures'] ?? 0,              'meta' => null, 'href' => route('workspace.pas.index', ['statut' => 'cloture']),  'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Objectifs stratégiques',   'value' => $ps['objectifs_total'] ?? 0,       'meta' => null, 'href' => route('workspace.pao.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Sans PAO associé',         'value' => $ps['sans_pao'] ?? 0,              'meta' => null, 'href' => route('workspace.pas.index', ['without_pao' => 1]),       'badge' => null, 'badge_tone' => ($ps['sans_pao'] ?? 0) > 0 ? 'warning' : 'neutral'],
         ];
@@ -82,11 +83,14 @@
             <table class="app-table data-table">
                 <thead>
                     <tr>
+                        <th>ID</th>
+                        <th>Code</th>
                         <th>Titre</th>
                         <th>Période</th>
                         <th>Statut</th>
-                        <th>Axes</th>
-                        <th>PAO</th>
+                        <th>Nb Axes</th>
+                        <th>Nb Obj. Strat.</th>
+                        <th>Nb PAO</th>
                         <th>Validateur</th>
                         @if ($canWrite)
                             <th>Actions</th>
@@ -97,68 +101,64 @@
                     @forelse ($rows as $row)
                         @php
                             $statusClasses = match ((string) $row->statut) {
-                                'brouillon' => 'anbg-badge anbg-badge-neutral',
-                                'soumis' => 'anbg-badge anbg-badge-warning',
-                                'valide' => 'anbg-badge anbg-badge-success',
-                                'verrouille' => 'anbg-badge anbg-badge-info',
+                                'actif' => 'anbg-badge anbg-badge-success',
+                                'cloture' => 'anbg-badge anbg-badge-info',
+                                'archive' => 'anbg-badge anbg-badge-neutral',
                                 default => 'anbg-badge anbg-badge-neutral',
                             };
+                            $isModificationLocked = $lockService->isLocked($row);
+                            $canRequestUnlock = $currentUser && $lockService->canRequestUnlock($currentUser, $row);
+                            $objectifsStrategiquesCount = $row->axes->sum(fn ($axe) => $axe->objectifs->count());
                         @endphp
                         <tr>
-                            <td>
-                                <div class="font-semibold text-slate-900">{{ $row->titre }}</div>
-                                <div class="mt-1 text-xs text-slate-500">PAS #{{ $row->id }}</div>
-                            </td>
-                            <td>{{ $row->periode_debut }} - {{ $row->periode_fin }}</td>
+                            <td class="font-mono text-xs text-slate-600">{{ $row->id }}</td>
+                            <td class="font-mono text-xs font-semibold text-slate-800">PAS-{{ $row->periode_debut }}-{{ $row->periode_fin }}</td>
+                            <td class="font-semibold text-slate-900">{{ $row->titre }}</td>
+                            <td class="whitespace-nowrap">{{ $row->periode_debut }} → {{ $row->periode_fin }}</td>
                             <td>
                                 <span class="{{ $statusClasses }}">
                                     {{ $workflowStatusLabel($row->statut) }}
                                 </span>
+                                @if ($isModificationLocked)
+                                    <p class="mt-2"><span class="anbg-badge anbg-badge-warning px-2 py-0.5 text-xs">Modification verrouillee</span></p>
+                                @endif
                             </td>
-                            <td>
-                                <span class="anbg-badge anbg-badge-neutral px-3">
-                                    {{ $row->axes_count }} axe(s)
-                                </span>
-                                <p class="mt-2 text-xs text-slate-500">
-                                    {{ $row->axes->sum(fn ($axe) => $axe->objectifs->count()) }} objectif(s) stratégique(s)
-                                </p>
-                            </td>
-                            <td>{{ $row->paos_count }}</td>
+                            <td class="text-center"><span class="anbg-badge anbg-badge-neutral px-3">{{ $row->axes_count }}</span></td>
+                            <td class="text-center"><span class="anbg-badge anbg-badge-info px-3">{{ $objectifsStrategiquesCount }}</span></td>
+                            <td class="text-center"><span class="anbg-badge anbg-badge-success px-3">{{ $row->paos_count }}</span></td>
                             <td>{{ $row->validateur?->name ?? '-' }}</td>
                             @if ($canWrite)
                                 <td>
                                     <div class="row-actions">
-                                        <a class="btn btn-warning" href="{{ route('workspace.pas.edit', $row) }}">Modifier</a>
-                                        @if ($row->statut === 'brouillon')
-                                            <form method="POST" action="{{ route('workspace.pas.submit', $row) }}">
+                                        @if (! $isModificationLocked)
+                                            <a class="btn btn-warning" href="{{ route('workspace.pas.edit', $row) }}">Modifier</a>
+                                        @elseif ($canRequestUnlock)
+                                            @include('workspace.planning-unlocks._request-inline', [
+                                                'target' => $row,
+                                                'route' => route('workspace.pas.unlock-requests.store', $row),
+                                                'context' => 'Modification PAS demandee par '.$currentUser->name,
+                                            ])
+                                        @endif
+                                        @if ($row->statut === 'actif')
+                                            <form method="POST" action="{{ route('workspace.pas.close', $row) }}" data-confirm-message="Cloturer ce PAS apres controle des anomalies ?" data-confirm-tone="warning" data-confirm-label="Cloturer">
                                                 @csrf
-                                                <button class="btn btn-primary" type="submit">Soumettre</button>
+                                                <input type="hidden" name="motif" value="Cloture PAS demandee depuis la liste">
+                                                <button class="btn btn-primary" type="submit">Cloturer</button>
                                             </form>
                                         @endif
-                                        @if ($row->statut === 'soumis' && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG))
-                                            <form method="POST" action="{{ route('workspace.pas.approve', $row) }}">
+                                        @if ($row->statut === 'cloture')
+                                            <form method="POST" action="{{ route('workspace.pas.archive', $row) }}" data-confirm-message="Archiver ce PAS cloture ?" data-confirm-tone="warning" data-confirm-label="Archiver">
                                                 @csrf
-                                                <button class="btn btn-success" type="submit">Valider</button>
+                                                <input type="hidden" name="motif" value="Archivage PAS cloture depuis la liste">
+                                                <button class="btn btn-secondary" type="submit">Archiver</button>
                                             </form>
                                         @endif
-                                        @if ($row->statut === 'valide' && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG))
-                                            <form method="POST" action="{{ route('workspace.pas.lock', $row) }}" data-confirm-message="Verrouiller ce PAS ?" data-confirm-tone="warning" data-confirm-label="Verrouiller">
+                                            <form method="POST" action="{{ route('workspace.pas.destroy', $row) }}" data-confirm-message="Supprimer ce PAS ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                                 @csrf
-                                                <button class="btn btn-primary" type="submit">Verrouiller</button>
+                                                @method('DELETE')
+                                                <input type="hidden" name="motif" value="Demande de suppression PAS depuis le module PAS">
+                                                <button class="btn btn-danger" type="submit">Supprimer</button>
                                             </form>
-                                        @endif
-                                        @if (in_array($row->statut, ['soumis', 'valide'], true) && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG))
-                                            <form method="POST" action="{{ route('workspace.pas.reopen', $row) }}" data-prompt-title="Retour brouillon" data-prompt-message="Saisir le motif de retour brouillon (PAS)." data-prompt-label="Motif de retour" data-prompt-placeholder="Minimum 5 caracteres" data-prompt-target="motif_retour" data-prompt-minlength="5" data-prompt-confirm="Confirmer">
-                                                @csrf
-                                                <input type="hidden" name="motif_retour" value="">
-                                                <button class="btn btn-warning" type="submit">Retour brouillon</button>
-                                            </form>
-                                        @endif
-                                        <form method="POST" action="{{ route('workspace.pas.destroy', $row) }}" data-confirm-message="Supprimer ce PAS ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="btn btn-danger" type="submit">Supprimer</button>
-                                        </form>
                                     </div>
                                 </td>
                             @endif

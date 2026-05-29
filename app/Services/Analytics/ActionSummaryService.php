@@ -42,7 +42,7 @@ class ActionSummaryService
             'taux_realisation' => $this->rate($completed, $total),
             'taux_retard' => $this->rate($delayed, $total),
             'kpi_global' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
-            'kpi_conformite' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)), 2),
+            'kpi_conformite' => round((float) $actions->avg(fn (Action $action): float => 0.0), 2),
         ];
     }
 

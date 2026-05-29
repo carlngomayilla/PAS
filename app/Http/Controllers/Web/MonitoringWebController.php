@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
+use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateReportJob;
 use App\Models\Action;
@@ -19,6 +20,7 @@ use App\Models\PasAxe;
 use App\Models\PaoObjectifOperationnel;
 use App\Models\PaoObjectifStrategique;
 use App\Models\Pas;
+use App\Models\PlatformSetting;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
@@ -48,6 +50,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class MonitoringWebController extends Controller
 {
     use AuthorizesPlanningScope;
+    use RecordsAuditTrail;
 
     public function __construct(
         private readonly ActionCalculationSettings $actionCalculationSettings,
@@ -124,8 +127,8 @@ class MonitoringWebController extends Controller
             'kpi_mesures_total' => (clone $mesures)->count(),
         ];
 
-        $paosValides = (clone $paos)->whereIn('statut', ['valide', 'verrouille'])->count();
-        $ptasValides = (clone $ptas)->whereIn('statut', ['valide', 'verrouille'])->count();
+        $paosValides = (clone $paos)->where('statut', 'valide')->count();
+        $ptasValides = 0;
         $actionsTerminees = (clone $actions)
             ->whereIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai'])
             ->count();
@@ -207,9 +210,11 @@ class MonitoringWebController extends Controller
             ->join('actions', 'actions.id', '=', 'action_kpis.action_id')
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id');
         $this->scopeJoinedPta($tauxKpis, $user, 'ptas.direction_id', 'ptas.service_id');
+        // Spec v2 : KPI conformite supprime. avg_conformite reste a 0.0 pour
+        // ne pas casser les vues legacy qui consomment encore la cle.
         $tauxMoyens = $tauxKpis->selectRaw('
             AVG(action_kpis.kpi_performance) as avg_performance,
-            AVG(action_kpis.kpi_conformite) as avg_conformite,
+            0.0 as avg_conformite,
             AVG(action_kpis.kpi_delai) as avg_delai,
             AVG(action_kpis.kpi_global) as avg_global
         ')->first();
@@ -424,7 +429,9 @@ class MonitoringWebController extends Controller
         $this->denyUnlessPlanningReader($user);
         $this->denyUnlessReportingReader($user);
 
+        $reportType = $this->selectedReportType($request);
         $payload = $this->reportingAnalyticsService->buildPayload($user, true, false);
+        $this->applyReportContext($payload, $reportType, $request);
         $payload['roleProfile'] = $this->buildMonitoringRoleProfile($user, 'reporting');
         $payload['dgComparison'] = ($payload['roleProfile']['role'] ?? null) === 'dg'
             ? $this->buildDgMonitoringComparison($user)
@@ -433,6 +440,9 @@ class MonitoringWebController extends Controller
             'excel' => $this->resolveReportingExportTemplate($user, 'excel')?->name,
             'pdf' => $this->resolveReportingExportTemplate($user, 'pdf')?->name,
         ];
+        $payload['reportTypes'] = $this->reportTypeDefinitions();
+        $payload['activeReportType'] = $reportType;
+        $payload['reportFilterOptions'] = $this->reportFilterOptions($user);
 
         return view('workspace.monitoring.reporting', $payload);
     }
@@ -447,22 +457,31 @@ class MonitoringWebController extends Controller
         $this->denyUnlessPlanningReader($user);
         $this->denyUnlessReportingReader($user);
 
+        $reportType = $this->selectedReportType($request);
         $payload = $this->reportingAnalyticsService->buildPayload($user, true, true);
+        $this->applyReportContext($payload, $reportType, $request);
         $template = $this->resolveReportingExportTemplate($user, 'excel');
         if ($template !== null) {
             $payload['export_template'] = [
                 'name' => $template->name,
-                'title' => $template->documentTitle(),
+                'title' => (string) ($payload['report_context']['title'] ?? $template->documentTitle()),
                 'subtitle' => $template->documentSubtitle(),
                 'filename_prefix' => $template->filenamePrefix(),
                 'layout' => $template->layout_config ?? [],
                 'blocks' => $template->blocks_config ?? [],
             ];
+        } else {
+            $payload['export_template'] = [
+                'title' => (string) ($payload['report_context']['title'] ?? 'Reporting ANBG'),
+                'subtitle' => (string) ($payload['report_context']['description'] ?? ''),
+                'filename_prefix' => 'reporting_anbg',
+            ];
         }
         $generatedAt = $payload['generatedAt'];
         $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
-        $filename = $this->institutionalReportFilename('REPORTING', $payload, 'xlsx', $filenamePrefix);
+        $filename = $this->institutionalReportFilename($this->reportTypeFilenameLabel($reportType), $payload, 'xlsx', $filenamePrefix);
         $tempPath = $this->reportingWorkbookExporter->create($payload);
+        $this->recordReportingExportAudit($request, 'export_excel', 'excel', $payload, $filename, $template);
 
         return response()->streamDownload(function () use ($tempPath): void {
             $stream = fopen($tempPath, 'rb');
@@ -498,16 +517,19 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
-        $this->denyUnlessAlertReader($user);
+        $this->denyUnlessReportingReader($user);
 
+        $reportType = $this->selectedReportType($request);
         $payload = $this->reportingAnalyticsService->buildPayload($user, true, true);
+        $this->applyReportContext($payload, $reportType, $request);
         $template = $this->resolveReportingExportTemplate($user, 'pdf');
         if ($template !== null) {
             $payload['exportTemplate'] = $template;
         }
         $generatedAt = $payload['generatedAt'];
         $filenamePrefix = $template?->filenamePrefix() ?? 'reporting_anbg';
-        $filename = $this->institutionalReportFilename('REPORTING', $payload, 'pdf', $filenamePrefix);
+        $filename = $this->institutionalReportFilename($this->reportTypeFilenameLabel($reportType), $payload, 'pdf', $filenamePrefix);
+        $this->recordReportingExportAudit($request, 'export_pdf', 'pdf', $payload, $filename, $template);
 
         @ini_set('memory_limit', '512M');
 
@@ -532,6 +554,7 @@ class MonitoringWebController extends Controller
         $this->denyUnlessReportingReader($user);
 
         GenerateReportJob::dispatch((int) $user->id, $format);
+        $this->recordReportingExportAudit($request, 'queue_export', $format);
 
         return back()->with('success', 'Export '.$format.' lance. Une notification contiendra le lien de telechargement.');
     }
@@ -573,11 +596,217 @@ class MonitoringWebController extends Controller
 
         $filename = trim((string) $request->query('name')) ?: basename($normalizedPath);
         $contentType = trim((string) $request->query('content_type')) ?: 'application/octet-stream';
+        $this->recordReportingExportAudit($request, 'download_export', pathinfo($filename, PATHINFO_EXTENSION) ?: 'unknown', [], $filename, null, $normalizedPath);
 
         return Storage::disk('local')->download($normalizedPath, $filename, [
             'Content-Type' => $contentType,
         ]);
     }
+
+    /**
+     * @return array<string, array{label: string, description: string}>
+     */
+    private function reportTypeDefinitions(): array
+    {
+        return [
+            'consolide_dg' => [
+                'label' => 'Rapport Consolidé DG',
+                'description' => 'Vue institutionnelle complète : KPI agence, directions, services, actions clés, anomalies et financements.',
+            ],
+            'pas' => [
+                'label' => 'Rapport PAS',
+                'description' => 'Informations PAS, axes stratégiques et objectifs stratégiques.',
+            ],
+            'pao' => [
+                'label' => 'Rapport PAO',
+                'description' => 'Direction, exercice, objectifs opérationnels, services concernés et échéances.',
+            ],
+            'pta' => [
+                'label' => 'Rapport PTA',
+                'description' => 'Service ou unité, objectifs opérationnels, actions, RMO, ressources, risques et avancement.',
+            ],
+            'actions' => [
+                'label' => 'Rapport Actions',
+                'description' => 'Actions, responsables, dates, mode d’exécution, cible, avancement, financement, risque, ressources et KPI.',
+            ],
+            'kpi' => [
+                'label' => 'Rapport KPI',
+                'description' => 'KPI par direction, service, agent/RMO et action, avec scores et retards.',
+            ],
+            'anomalies' => [
+                'label' => 'Rapport Anomalies',
+                'description' => 'Retards, sous-cibles, blocages, validations en attente, anomalies et corrections attendues.',
+            ],
+            'financement' => [
+                'label' => 'Rapport Financement',
+                'description' => 'Actions à financer, statuts DAF/DG, montants, compléments, rejets et transmissions.',
+            ],
+        ];
+    }
+
+    private function selectedReportType(Request $request): string
+    {
+        $type = strtolower(trim((string) $request->query('report_type', 'consolide_dg')));
+
+        return array_key_exists($type, $this->reportTypeDefinitions()) ? $type : 'consolide_dg';
+    }
+
+    private function applyReportContext(array &$payload, string $reportType, Request $request): void
+    {
+        $definition = $this->reportTypeDefinitions()[$reportType] ?? $this->reportTypeDefinitions()['consolide_dg'];
+        $payload['report_context'] = [
+            'type' => $reportType,
+            'label' => $definition['label'],
+            'title' => $definition['label'].' - PAS ANBG',
+            'description' => $definition['description'],
+            'filters' => $this->exportQueryFilters($request),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function exportQueryFilters(Request $request): array
+    {
+        return collect($request->query())
+            ->only([
+                'report_type',
+                'exercice',
+                'trimestre',
+                'direction_id',
+                'service_id',
+                'statut',
+                'type_action',
+                'responsable_id',
+                'criticite',
+                'periode_debut',
+                'periode_fin',
+            ])
+            ->filter(static fn ($value): bool => trim((string) $value) !== '' && trim((string) $value) !== 'all')
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function reportFilterOptions(User $user): array
+    {
+        $directions = Direction::query()->where('actif', true)->orderBy('code');
+        $this->scopeByUserDirection($directions, $user, 'id');
+
+        $services = Service::query()->where('actif', true)->orderBy('code');
+        $this->scopeByUserDirection($services, $user, 'direction_id', 'id');
+
+        $responsables = User::query()
+            ->where('is_active', true)
+            ->orderBy('name');
+        $this->scopePlanningUsers($responsables, $user);
+
+        return [
+            'directions' => $directions->get(['id', 'code', 'libelle'])
+                ->map(fn (Direction $direction): array => [
+                    'id' => (int) $direction->id,
+                    'label' => trim((string) ($direction->code ? $direction->code.' - ' : '').$direction->libelle),
+                ])
+                ->all(),
+            'services' => $services->get(['id', 'direction_id', 'code', 'libelle'])
+                ->map(fn (Service $service): array => [
+                    'id' => (int) $service->id,
+                    'direction_id' => (int) $service->direction_id,
+                    'label' => trim((string) ($service->code ? $service->code.' - ' : '').$service->libelle),
+                ])
+                ->all(),
+            'responsables' => $responsables->limit(200)->get(['id', 'name'])
+                ->map(fn (User $responsable): array => [
+                    'id' => (int) $responsable->id,
+                    'label' => (string) $responsable->name,
+                ])
+                ->all(),
+            'statuses' => [
+                'non_demarre' => 'Non démarrée',
+                'en_cours' => 'En cours',
+                'en_retard' => 'En retard',
+                'a_corriger' => 'À corriger',
+                'acheve_dans_delai' => 'Achevée dans délai',
+                'acheve_hors_delai' => 'Achevée hors délai',
+                'cloturee' => 'Clôturée',
+            ],
+            'types_action' => [
+                Action::MODE_QUANTITATIF => 'Quantitatif',
+                Action::MODE_SANS_QUANTITE => 'Sans quantite',
+                Action::MODE_SOUS_ACTIONS => 'Sous-actions',
+            ],
+            'criticites' => [
+                'normale' => 'Normale',
+                'importante' => 'Importante',
+                'critique' => 'Critique',
+            ],
+            'exercices' => app(ExerciceContext::class)->options(),
+            'trimestres' => app(ExerciceContext::class)->quarterOptions(),
+        ];
+    }
+
+    private function reportTypeFilenameLabel(string $reportType): string
+    {
+        return match ($reportType) {
+            'pas' => 'PAS',
+            'pao' => 'PAO',
+            'pta' => 'PTA',
+            'actions' => 'ACTIONS',
+            'kpi' => 'KPI',
+            'anomalies' => 'ANOMALIES',
+            'financement' => 'FINANCEMENT',
+            default => 'CONSOLIDE_DG',
+        };
+    }
+
+    private function recordReportingExportAudit(
+        Request $request,
+        string $action,
+        string $format,
+        array $payload = [],
+        ?string $filename = null,
+        ?ExportTemplate $template = null,
+        ?string $path = null
+    ): void {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        $scope = (array) ($payload['scope'] ?? []);
+        $exercise = (array) ($payload['exercise'] ?? []);
+        $reportContext = (array) ($payload['report_context'] ?? []);
+
+        $this->recordAudit($request, 'reporting_export', $action, $this->reportingAuditAnchor(), null, [
+            'format' => $format,
+            'report_type' => (string) ($reportContext['type'] ?? $this->selectedReportType($request)),
+            'report_label' => (string) ($reportContext['label'] ?? ''),
+            'filename' => $filename,
+            'path' => $path,
+            'template_id' => $template?->id,
+            'template_name' => $template?->name,
+            'filters' => (array) ($reportContext['filters'] ?? $this->exportQueryFilters($request)),
+            'scope' => [
+                'role' => (string) ($scope['role'] ?? $user->role),
+                'direction_id' => $scope['direction_id'] ?? $user->direction_id,
+                'service_id' => $scope['service_id'] ?? $user->service_id,
+            ],
+            'exercise' => [
+                'year' => $exercise['year'] ?? app(ExerciceContext::class)->selectedYear(),
+                'quarter' => $exercise['quarter'] ?? app(ExerciceContext::class)->selectedQuarter(),
+            ],
+        ]);
+    }
+
+    private function reportingAuditAnchor(): PlatformSetting
+    {
+        return PlatformSetting::query()->firstOrCreate(
+            ['group' => 'reporting_audit', 'key' => 'export_anchor'],
+            ['value' => 'reporting-export']
+        );
+    }
+
     private function resolveReportingExportTemplate(User $user, string $format): ?ExportTemplate
     {
         return $this->exportTemplateResolver->resolve($user, 'reporting', 'consolidated_reporting', $format, 'officiel');
@@ -803,6 +1032,14 @@ class MonitoringWebController extends Controller
     private function scopeAction(Builder|Relation $query, User $user): void
     {
         app(ExerciceContext::class)->applyToAction($query);
+
+        if ($user->isAgent()) {
+            $query->where(function (Builder $parameterQuery): void {
+                $parameterQuery
+                    ->whereNull('statut_parametrage')
+                    ->orWhere('statut_parametrage', '!=', 'a_parametrer');
+            });
+        }
 
         if ($user->hasGlobalReadAccess()) {
             return;
@@ -2233,4 +2470,3 @@ class MonitoringWebController extends Controller
         abort(403, 'Acces non autorise.');
     }
 }
-

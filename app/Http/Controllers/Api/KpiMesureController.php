@@ -78,7 +78,7 @@ class KpiMesureController extends Controller
         $validated = $request->validated();
         $kpi = Kpi::query()->with('action.pta:id,direction_id,service_id,statut')->findOrFail((int) $validated['kpi_id']);
 
-        if ($kpi->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $kpi->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Creation'),
             ], 409);
@@ -140,7 +140,7 @@ class KpiMesureController extends Controller
 
         $kpiMesure->loadMissing('kpi.action.pta:id,direction_id,service_id,statut');
 
-        if ($kpiMesure->kpi?->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $kpiMesure->kpi?->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour'),
             ], 409);
@@ -149,7 +149,7 @@ class KpiMesureController extends Controller
         $validated = $request->validated();
         $targetKpi = Kpi::query()->with('action.pta:id,direction_id,service_id,statut')->findOrFail((int) $validated['kpi_id']);
 
-        if ($targetKpi->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $targetKpi->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
             ], 409);
@@ -193,7 +193,7 @@ class KpiMesureController extends Controller
 
         $kpiMesure->loadMissing('kpi.action.pta:id,direction_id,service_id,statut');
 
-        if ($kpiMesure->kpi?->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $kpiMesure->kpi?->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Suppression'),
             ], 409);

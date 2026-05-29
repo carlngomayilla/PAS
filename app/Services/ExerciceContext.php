@@ -48,7 +48,9 @@ class ExerciceContext
             return (int) $sessionValue;
         }
 
-        return (int) now()->year;
+        $activeYear = $this->activeExerciseYear();
+
+        return $activeYear ?? (int) now()->year;
     }
 
     public function selectedQuarter(): ?int
@@ -343,9 +345,23 @@ class ExerciceContext
                 'date_debut' => Carbon::create($year, 1, 1)->toDateString(),
                 'date_fin' => Carbon::create($year, 12, 31)->toDateString(),
                 'statut' => $year < now()->year ? Exercice::STATUT_ARCHIVE : Exercice::STATUT_OUVERT,
-                'is_active' => $year === now()->year,
+                'is_active' => ! Exercice::query()->where('is_active', true)->exists() && $year === now()->year,
             ]
         );
+    }
+
+    private function activeExerciseYear(): ?int
+    {
+        if (! Schema::hasTable('exercices')) {
+            return null;
+        }
+
+        $year = Exercice::query()
+            ->where('is_active', true)
+            ->orderByDesc('annee')
+            ->value('annee');
+
+        return $year !== null ? (int) $year : null;
     }
 
     /**

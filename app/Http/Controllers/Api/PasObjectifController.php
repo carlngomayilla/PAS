@@ -73,7 +73,7 @@ class PasObjectifController extends Controller
         $validated = $request->validated();
         $pasAxe = PasAxe::query()->with('pas:id,statut')->findOrFail((int) $validated['pas_axe_id']);
 
-        if ($pasAxe->pas?->statut === 'verrouille') {
+        if ($pasAxe->pas?->statut === 'archive') {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'parent', 'Creation'),
             ], 409);
@@ -118,7 +118,7 @@ class PasObjectifController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         $pasObjectif->loadMissing('pasAxe.pas:id,statut');
-        if ($pasObjectif->pasAxe?->pas?->statut === 'verrouille') {
+        if ($pasObjectif->pasAxe?->pas?->statut === 'archive') {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'parent', 'Mise a jour'),
             ], 409);
@@ -126,7 +126,7 @@ class PasObjectifController extends Controller
 
         $validated = $request->validated();
         $targetAxe = PasAxe::query()->with('pas:id,statut')->findOrFail((int) $validated['pas_axe_id']);
-        if ($targetAxe->pas?->statut === 'verrouille') {
+        if ($targetAxe->pas?->statut === 'archive') {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'cible', 'Mise a jour'),
             ], 409);
@@ -154,7 +154,7 @@ class PasObjectifController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         $pasObjectif->loadMissing('pasAxe.pas:id,statut');
-        if ($pasObjectif->pasAxe?->pas?->statut === 'verrouille') {
+        if ($pasObjectif->pasAxe?->pas?->statut === 'archive') {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'parent', 'Suppression'),
             ], 409);
@@ -179,7 +179,15 @@ class PasObjectifController extends Controller
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('pasAxe.pas.paos.ptas', fn ($q) => $q->where('service_id', (int) $user->service_id));
+            $query->where(function ($serviceQuery) use ($user): void {
+                $serviceQuery->whereHas(
+                    'paos.objectifsOperationnels',
+                    fn ($q) => $q->where('service_id', (int) $user->service_id)
+                )->orWhereHas(
+                    'pasAxe.pas.paos.ptas',
+                    fn ($q) => $q->where('service_id', (int) $user->service_id)
+                );
+            });
             return;
         }
 

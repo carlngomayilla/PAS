@@ -9,6 +9,7 @@ use App\Models\Service;
 use App\Models\User;
 use App\Services\Governance\RetentionService;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\PlanningAutoArchiveService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -55,7 +56,7 @@ class GovernanceWebController extends Controller
         ]);
     }
 
-    public function retentionIndex(Request $request, RetentionService $retentionService): View
+    public function retentionIndex(Request $request, RetentionService $retentionService, PlanningAutoArchiveService $planningAutoArchiveService): View
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -68,11 +69,12 @@ class GovernanceWebController extends Controller
 
         return view('workspace.governance.retention', [
             'summary' => $retentionService->summary(),
+            'planningArchiveSummary' => $planningAutoArchiveService->summary(),
             'canRun' => $user->hasPermission('retention.manage'),
         ]);
     }
 
-    public function retentionRun(Request $request, RetentionService $retentionService): RedirectResponse
+    public function retentionRun(Request $request, RetentionService $retentionService, PlanningAutoArchiveService $planningAutoArchiveService): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -83,15 +85,25 @@ class GovernanceWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        /** @var array{mode:string} $validated */
+        /** @var array{mode:string,scope?:string} $validated */
         $validated = $request->validate([
             'mode' => ['required', Rule::in(['dry-run', 'execute'])],
+            'scope' => ['nullable', Rule::in(['data', 'planning'])],
         ]);
 
-        $result = $retentionService->archive($validated['mode'] === 'execute', $user);
-        $message = $validated['mode'] === 'execute'
-            ? 'Archive de retention enregistree sous le batch '.($result['batch_key'] ?? 'N/A').'.'
-            : 'Dry-run de retention effectue.';
+        $scope = (string) ($validated['scope'] ?? 'data');
+        if ($scope === 'planning') {
+            $result = $planningAutoArchiveService->run($validated['mode'] === 'execute', $user);
+            $archived = is_array($result['archived'] ?? null) ? $result['archived'] : [];
+            $message = $validated['mode'] === 'execute'
+                ? sprintf('Archivage PAO/PTA execute : %d PAO, %d PTA.', (int) ($archived['paos'] ?? 0), (int) ($archived['ptas'] ?? 0))
+                : 'Dry-run archivage PAO/PTA effectue.';
+        } else {
+            $result = $retentionService->archive($validated['mode'] === 'execute', $user);
+            $message = $validated['mode'] === 'execute'
+                ? 'Archive de retention enregistree sous le batch '.($result['batch_key'] ?? 'N/A').'.'
+                : 'Dry-run de retention effectue.';
+        }
 
         return redirect()
             ->route('workspace.retention.index')

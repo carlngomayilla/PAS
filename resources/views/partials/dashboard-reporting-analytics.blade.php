@@ -264,33 +264,7 @@
             </div>
         </article>
 
-        <article class="dashboard-advanced-card">
-            <div class="dashboard-advanced-head">
-                <div>
-                    <h2 class="showcase-panel-title">Statuts suivis</h2>
-                </div>
-            </div>
-            <div class="grid gap-3">
-                @forelse ($statusCards as $card)
-                    <div class="dashboard-status-block">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <div class="dashboard-status-block-title mb-1">{{ $card['module'] }}</div>
-                                <div class="text-sm font-semibold text-[#17324a]">{{ $card['total'] }} éléments suivis</div>
-                            </div>
-                            <span class="dashboard-pill">{{ $card['top_total'] }} x {{ $card['top_status'] }}</span>
-                        </div>
-                    </div>
-                @empty
-                    <x-ui.empty-state
-                        title="Aucune vue statutaire"
-                        message="Aucune vue statutaire disponible."
-                        icon="chart"
-                        tone="info"
-                    />
-                @endforelse
-            </div>
-        </article>
+        {{-- Bloc « Statuts suivis » retiré de la synthèse (non aligné avec la nouvelle logique métier). --}}
     </div>
 
     <div class="mt-4 space-y-4">

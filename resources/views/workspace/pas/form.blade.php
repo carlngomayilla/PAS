@@ -11,6 +11,7 @@
                 'libelle' => '',
                 'objectifs' => [[
                     'libelle' => '',
+                    'date_echeance' => '',
                 ]],
             ]];
         }
@@ -28,6 +29,12 @@
                 </div>
             </div>
         </section>
+        @if ($isEdit)
+            @include('workspace.planning-unlocks._lock-banner', [
+                'target' => $row,
+                'route' => route('workspace.pas.unlock-requests.store', $row),
+            ])
+        @endif
 <section class="showcase-panel mb-4 app-screen-block">
             <form method="POST" class="form-shell" action="{{ $isEdit ? route('workspace.pas.update', $row) : route('workspace.pas.store') }}">
                 @csrf
@@ -38,10 +45,9 @@
                 <div class="form-section">
                     <h2 class="form-section-title">Informations stratégiques</h2>
                     <div class="form-grid">
-                        <input id="titre" name="titre" type="hidden" value="{{ old('titre', $row->titre ?: 'PAS') }}">
                         <div>
-                            <label for="pas_label_preview">Libellé PAS</label>
-                            <input id="pas_label_preview" type="text" value="{{ $row->titre ?: 'PAS' }}" readonly>
+                            <label for="titre">Titre du PAS</label>
+                            <input id="titre" name="titre" type="text" value="{{ old('titre', $row->titre ?: 'PAS') }}" maxlength="255" required>
                         </div>
                         <div>
                             <label for="periode_debut">Période début</label>
@@ -55,7 +61,7 @@
                             <label for="statut" class="hidden">Statut</label>
                             <select id="statut" class="hidden" disabled>
                                 @foreach ($statusOptions as $status)
-                                    <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'brouillon') === $status)>{{ $workflowStatusLabel($status) }}</option>
+                                    <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'actif') === $status)>{{ $workflowStatusLabel($status) }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -137,31 +143,11 @@
             var axesList = document.getElementById('axes-list');
             var addAxeButton = document.getElementById('add-axe');
             var axesData = @json($initialAxes);
-            var titleInput = document.getElementById('titre');
-            var pasPreview = document.getElementById('pas_label_preview');
-            var startInput = document.getElementById('periode_debut');
-            var endInput = document.getElementById('periode_fin');
-
             if (!axesList || !addAxeButton || !Array.isArray(axesData)) {
                 return;
             }
 
             var axeCounter = 0;
-
-            function syncPasLabel() {
-                var start = startInput ? String(startInput.value || '').trim() : '';
-                var end = endInput ? String(endInput.value || '').trim() : '';
-                var label = 'PAS';
-
-                if (start && end && start !== end) {
-                    label = 'PAS ' + start + '-' + end;
-                } else if (start) {
-                    label = 'PAS ' + start;
-                }
-
-                if (titleInput) titleInput.value = label;
-                if (pasPreview) pasPreview.value = label;
-            }
 
             function escapeHtml(value) {
                 return String(value || '')
@@ -175,6 +161,8 @@
             function createObjectifHtml(axeIndex, objectifIndex, objectif) {
                 return '' +
                     '<div class="rounded-2xl border border-slate-200/85 p-3" data-objectif-index="' + objectifIndex + '">' +
+                        '<input type="hidden" name="axes[' + axeIndex + '][objectifs][' + objectifIndex + '][id]" value="' + escapeHtml(objectif.id || '') + '">' +
+                        '<input type="hidden" name="axes[' + axeIndex + '][objectifs][' + objectifIndex + '][code]" value="' + escapeHtml(objectif.code || '') + '">' +
                         '<div class="mb-2 flex items-center justify-between gap-2">' +
                             '<h4 class="text-sm font-semibold">Objectif stratégique</h4>' +
                             '<button type="button" class="remove-objectif btn btn-warning px-2 py-1 text-xs">Supprimer</button>' +
@@ -182,6 +170,10 @@
                         '<div>' +
                             '<label>Libellé objectif</label>' +
                             '<input type="text" name="axes[' + axeIndex + '][objectifs][' + objectifIndex + '][libelle]" value="' + escapeHtml(objectif.libelle || '') + '" required>' +
+                        '</div>' +
+                        '<div class="mt-3">' +
+                            '<label>Date d echeance</label>' +
+                            '<input type="date" name="axes[' + axeIndex + '][objectifs][' + objectifIndex + '][date_echeance]" value="' + escapeHtml(objectif.date_echeance || '') + '" required>' +
                         '</div>' +
                     '</div>';
             }
@@ -210,6 +202,8 @@
                 card.setAttribute('data-axe-index', String(axeIndex));
                 card.setAttribute('data-next-objectif-index', '0');
                 card.innerHTML = '' +
+                    '<input type="hidden" name="axes[' + axeIndex + '][id]" value="' + escapeHtml(payload.id || '') + '">' +
+                    '<input type="hidden" name="axes[' + axeIndex + '][code]" value="' + escapeHtml(payload.code || '') + '">' +
                     '<div class="mb-3 flex items-center justify-between gap-2">' +
                         '<h3 class="text-base font-semibold">Axe stratégique</h3>' +
                         '<button type="button" class="remove-axe btn btn-warning px-2 py-1 text-xs">Supprimer axe</button>' +
@@ -235,7 +229,7 @@
             addAxeButton.addEventListener('click', function () {
                 createAxeCard({
                     libelle: '',
-                    objectifs: [{ libelle: '' }]
+                    objectifs: [{ libelle: '', date_echeance: '' }]
                 });
             });
 
@@ -253,7 +247,7 @@
 
                 var addObjectifButton = event.target.closest('.add-objectif');
                 if (addObjectifButton) {
-                    appendObjectif(addObjectifButton.closest('[data-axe-index]'), { libelle: '' });
+                    appendObjectif(addObjectifButton.closest('[data-axe-index]'), { libelle: '', date_echeance: '' });
                     return;
                 }
 
@@ -268,10 +262,6 @@
                     removeObjectifButton.closest('[data-objectif-index]').remove();
                 }
             });
-
-            if (startInput) startInput.addEventListener('input', syncPasLabel);
-            if (endInput) endInput.addEventListener('input', syncPasLabel);
-            syncPasLabel();
 
             axesData.forEach(function (axe) {
                 createAxeCard(axe);

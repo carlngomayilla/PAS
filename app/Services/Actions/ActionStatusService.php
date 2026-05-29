@@ -54,18 +54,27 @@ class ActionStatusService
      */
     private const EXECUTION_LOG_TYPES = [
         'semaine_renseignee',
-        'sous_action_creee',
         'sous_action_mise_a_jour',
         'sous_action_effectuee',
         'execution_quantitative',
-        'justificatif_ajoute',
-        'commentaire',
         'action_soumise_validation',
         'action_validee_chef',
         'action_rejetee_chef',
         'action_correction_demandee',
         'action_validee_direction',
         'action_rejetee_direction',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const EXECUTION_JUSTIFICATIF_CATEGORIES = [
+        'hebdomadaire',
+        'final',
+        'execution_quantitative',
+        'execution_non_quantitative',
+        'execution_mixte',
+        'sous_action',
     ];
 
     public function __construct(
@@ -75,8 +84,7 @@ class ActionStatusService
 
     public function isStarted(Action $action): bool
     {
-        return $this->hasSubAction($action)
-            || $this->hasProgress($action)
+        return $this->hasProgress($action)
             || $this->hasStartedWorkflow($action)
             || $this->hasRealStartDate($action)
             || $this->hasExecutionComment($action)
@@ -141,15 +149,6 @@ class ActionStatusService
         };
     }
 
-    private function hasSubAction(Action $action): bool
-    {
-        if ($action->relationLoaded('sousActions')) {
-            return $action->sousActions->isNotEmpty();
-        }
-
-        return $action->exists && $action->sousActions()->exists();
-    }
-
     private function hasProgress(Action $action): bool
     {
         foreach ([
@@ -202,7 +201,8 @@ class ActionStatusService
             'difficultes_rencontrees',
             'mesures_correctives',
             'justification_cloture',
-            'evaluation_commentaire',
+            // evaluation_commentaire remplace par motif_validation_chef (spec v2).
+            'motif_validation_chef',
         ] as $field) {
             if (trim((string) ($action->{$field} ?? '')) !== '') {
                 return true;
@@ -214,11 +214,20 @@ class ActionStatusService
 
     private function hasProof(Action $action): bool
     {
-        if ($action->relationLoaded('justificatifs') && $action->justificatifs->isNotEmpty()) {
-            return true;
+        if ($action->relationLoaded('justificatifs')) {
+            return $action->justificatifs->contains(
+                fn ($justificatif): bool => $this->isExecutionJustificatif($justificatif)
+            );
         }
 
-        if ($action->exists && $action->justificatifs()->exists()) {
+        if ($action->exists && $action->justificatifs()
+            ->where(function ($query): void {
+                $query
+                    ->whereIn('categorie', self::EXECUTION_JUSTIFICATIF_CATEGORIES)
+                    ->orWhereNotNull('sous_action_id');
+            })
+            ->exists()
+        ) {
             return true;
         }
 
@@ -248,10 +257,19 @@ class ActionStatusService
     private function hasExecutionDiscussion(Action $action): bool
     {
         if ($action->relationLoaded('discussionEntries')) {
-            return $action->discussionEntries->isNotEmpty();
+            return $action->discussionEntries
+                ->contains(fn (ActionLog $log): bool => in_array((string) $log->type_evenement, self::EXECUTION_LOG_TYPES, true));
         }
 
         return false;
+    }
+
+    private function isExecutionJustificatif(mixed $justificatif): bool
+    {
+        $category = strtolower(trim((string) ($justificatif->categorie ?? '')));
+
+        return in_array($category, self::EXECUTION_JUSTIFICATIF_CATEGORIES, true)
+            || $justificatif->sous_action_id !== null;
     }
 
     private function isStartedSubAction(SousAction $subAction): bool
@@ -262,7 +280,7 @@ class ActionStatusService
             || $subAction->completed_at !== null
             || $subAction->date_realisation !== null
             || (float) ($subAction->taux_execution ?? $subAction->progression_reelle ?? $subAction->quantite_realisee ?? 0) > 0.0
-            || in_array($status, ['en_cours', 'effectuee', 'terminee', 'termine', 'realisee', 'realise', 'validee', 'cloturee'], true);
+            || in_array($status, ['en_cours', 'effectuee', 'terminee', 'termine', 'realisee', 'realise', 'en_attente_validation_chef', 'validee', 'validee_chef', 'rejetee_a_corriger', 'cloturee'], true);
     }
 
     /**

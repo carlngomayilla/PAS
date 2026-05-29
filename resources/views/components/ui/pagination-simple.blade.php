@@ -14,10 +14,10 @@
 
     @if ($paginator->onFirstPage())
         <span class="px-3 py-2 text-xs opacity-50">Premier</span>
-        <span class="px-3 py-2 text-xs opacity-50">Precedent</span>
+        <span class="px-3 py-2 text-xs opacity-50">Précédent</span>
     @else
         <a class="px-3 py-2 text-xs" href="{{ $paginator->url(1) }}">Premier</a>
-        <a class="px-3 py-2 text-xs" href="{{ $paginator->previousPageUrl() }}">Precedent</a>
+        <a class="px-3 py-2 text-xs" href="{{ $paginator->previousPageUrl() }}">Précédent</a>
     @endif
 
     <span class="pagination-link-current px-3 py-2 text-xs">Page {{ $paginator->currentPage() }}</span>

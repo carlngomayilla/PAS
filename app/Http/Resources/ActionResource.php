@@ -63,7 +63,7 @@ class ActionResource extends JsonResource
             'action_kpi' => $this->whenLoaded('actionKpi', fn () => [
                 'kpi_delai' => (float) ($this->actionKpi?->kpi_delai ?? 0),
                 'kpi_performance' => (float) ($this->actionKpi?->kpi_performance ?? 0),
-                'kpi_conformite' => (float) ($this->actionKpi?->kpi_conformite ?? 0),
+                'kpi_conformite' => (float) (0),
                 'kpi_global' => (float) ($this->actionKpi?->kpi_global ?? 0),
                 'progression_reelle' => (float) ($this->actionKpi?->progression_reelle ?? 0),
                 'progression_theorique' => (float) ($this->actionKpi?->progression_theorique ?? 0),

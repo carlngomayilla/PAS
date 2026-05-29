@@ -16,6 +16,7 @@ use App\Services\Actions\ActionTrackingService;
 use App\Services\WorkflowSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -40,22 +41,44 @@ class ActionWorkflowSecurityTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_agent_sees_historical_tracking_form_for_legacy_quantitative_action(): void
+    public function test_agent_sees_quantitative_tracking_form_for_legacy_quantitative_action(): void
     {
         $fixture = $this->createActionFixture();
         $action = $fixture['action'];
         $agent = $fixture['agent'];
-        $week = $action->weeks()->orderBy('numero_semaine')->firstOrFail();
 
         $this->assertNull($action->mode_evaluation);
 
         $this->actingAs($agent)
             ->get(route('workspace.actions.suivi', $action))
             ->assertOk()
-            ->assertSee('action-week-'.$week->id, false)
-            ->assertSee('quantite_realisee_'.$week->id, false)
-            ->assertSee('justificatif_'.$week->id, false)
-            ->assertSee('Valider la sous-action');
+            ->assertSee('quantite_realisee_action', false)
+            ->assertSee('commentaire_quantitatif', false)
+            ->assertSee('difficultes_quantitatives', false)
+            ->assertSee('justificatif_quantitatif', false);
+    }
+
+    public function test_action_edit_redirects_to_pta_form_with_action_anchor(): void
+    {
+        // Regle metier ANBG : le formulaire standalone d'edition d'action est desactive
+        // au profit du formulaire PTA qui expose le contexte complet (objectif operationnel,
+        // sous-actions, responsables, etc.). L'URL workspace.actions.edit doit rediriger
+        // vers workspace.pta.edit avec une ancre sur la section de l'action.
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $serviceUser = $fixture['service_user'];
+
+        $this->actingAs($serviceUser)
+            ->get(route('workspace.actions.edit', $action))
+            ->assertRedirect(route('workspace.pta.edit', $action->pta_id).'#action-'.$action->id);
+
+        // Le formulaire PTA cible doit lui-meme contenir le bloc d'edition de l'action.
+        $this->actingAs($serviceUser)
+            ->get(route('workspace.pta.edit', $action->pta_id))
+            ->assertOk()
+            ->assertSee('id="action-'.$action->id.'"', false)
+            ->assertSee("1. Identification de l'action", false)
+            ->assertSee('name="actions[0][ressources_necessaires][]"', false);
     }
 
     public function test_agent_marks_planned_sub_action_done_with_justificatif_and_optional_quantity(): void
@@ -81,7 +104,7 @@ class ActionWorkflowSecurityTest extends TestCase
             'unite' => 'dossiers',
             'quantite_realisee' => 0,
             'taux_realisation' => 0,
-            'statut' => 'a_faire',
+            'statut' => 'non_demarre',
             'est_effectuee' => false,
             'taux_execution' => 0,
         ]);
@@ -99,6 +122,8 @@ class ActionWorkflowSecurityTest extends TestCase
                 'execution_only' => '1',
                 'est_effectuee' => '1',
                 'quantite_realisee' => 12,
+                'commentaire' => 'Sous-action realisee',
+                'difficultes' => 'Aucune difficulte rencontree.',
                 'justificatif' => UploadedFile::fake()->create('preuve-sous-action.pdf', 64, 'application/pdf'),
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
@@ -113,7 +138,446 @@ class ActionWorkflowSecurityTest extends TestCase
         ]);
     }
 
-    public function test_secondary_responsable_can_execute_shared_planned_sub_action(): void
+    public function test_quantified_sub_action_submission_requires_comment(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'type_cible' => 'qualitative',
+        ])->save();
+        $action->weeks()->delete();
+
+        $sousAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Preparer le dossier de preuve',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-14',
+            'cible_prevue' => 1,
+            'unite' => 'dossier',
+            'statut' => 'non_demarre',
+            'est_effectuee' => false,
+            'taux_execution' => 0,
+        ]);
+
+        $route = route('workspace.actions.sub-actions.update', [$action, $sousAction]);
+
+        $this->actingAs($agent)
+            ->from(route('workspace.actions.suivi', $action))
+            ->post($route, [
+                '_method' => 'PUT',
+                'execution_only' => '1',
+                'est_effectuee' => '1',
+                'quantite_realisee' => 1,
+                'justificatif' => UploadedFile::fake()->create('preuve-commentaire.pdf', 64, 'application/pdf'),
+            ])
+            ->assertSessionHasErrors('commentaire');
+
+        $sousAction->refresh();
+        $this->assertFalse((bool) $sousAction->est_effectuee);
+        $this->assertSame('non_demarre', $sousAction->statut);
+    }
+
+    public function test_non_quantified_sub_action_requires_proof_but_not_quantity(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'type_cible' => 'qualitative',
+        ])->save();
+        $action->weeks()->delete();
+
+        $sousAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Rediger une note de cadrage',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-14',
+            'statut' => 'non_demarre',
+            'est_effectuee' => false,
+            'taux_execution' => 0,
+        ]);
+
+        $this->actingAs($agent)
+            ->from(route('workspace.actions.suivi', $action))
+            ->post(route('workspace.actions.sub-actions.update', [$action, $sousAction]), [
+                '_method' => 'PUT',
+                'execution_only' => '1',
+                'commentaire' => 'Note preparee.',
+                'difficultes' => 'Aucune difficulte rencontree.',
+            ])
+            ->assertSessionHasErrors('justificatif');
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.sub-actions.update', [$action, $sousAction]), [
+                '_method' => 'PUT',
+                'execution_only' => '1',
+                'commentaire' => 'Note preparee.',
+                'justificatif' => UploadedFile::fake()->create('note-cadrage.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $sousAction->refresh();
+        $action->refresh();
+
+        $this->assertTrue((bool) $sousAction->est_effectuee);
+        $this->assertSame('en_attente_validation_chef', (string) $sousAction->statut);
+        $this->assertSame('100.00', (string) $sousAction->taux_execution);
+        $this->assertSame(100.0, app(\App\Services\ActionPerformanceService::class)->calculateDeclaredProgress($action->fresh('sousActions')));
+        $this->assertSame(ActionTrackingService::VALIDATION_NON_SOUMISE, (string) $action->statut_validation);
+    }
+
+    public function test_quantified_sub_action_requires_realized_quantity(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'type_cible' => 'qualitative',
+        ])->save();
+        $action->weeks()->delete();
+
+        $sousAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Traiter les dossiers',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-14',
+            'cible_prevue' => 10,
+            'unite' => 'dossiers',
+            'statut' => 'non_demarre',
+            'est_effectuee' => false,
+            'taux_execution' => 0,
+        ]);
+
+        $this->actingAs($agent)
+            ->from(route('workspace.actions.suivi', $action))
+            ->post(route('workspace.actions.sub-actions.update', [$action, $sousAction]), [
+                '_method' => 'PUT',
+                'execution_only' => '1',
+                'commentaire' => 'Traitement commence.',
+                'difficultes' => 'Aucune difficulte rencontree.',
+                'justificatif' => UploadedFile::fake()->create('preuve.pdf', 64, 'application/pdf'),
+            ])
+            ->assertSessionHasErrors('quantite_realisee');
+
+        $sousAction->refresh();
+        $this->assertFalse((bool) $sousAction->est_effectuee);
+    }
+
+    public function test_non_quantified_action_submits_with_proof_and_declared_progress_at_100(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_SANS_QUANTITE,
+            'type_cible' => 'qualitative',
+            'quantite_cible' => null,
+            'unite_cible' => null,
+            'quantite_realisee' => 0,
+            'statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE,
+        ])->save();
+        $action->weeks()->delete();
+        $action->sousActions()->delete();
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.execution.update', $action), [
+                'commentaire_quantitatif' => 'Execution terminee avec justificatif.',
+                'justificatif_quantitatif' => UploadedFile::fake()->create('preuve-action-non-quantifiable.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+
+        $this->assertSame(100.0, app(\App\Services\ActionPerformanceService::class)->calculateDeclaredProgress($action));
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, (string) $action->statut_validation);
+        $this->assertDatabaseHas('justificatifs', [
+            'justifiable_id' => $action->id,
+            'categorie' => 'execution_non_quantitative',
+        ]);
+    }
+
+    public function test_quantified_action_requires_realized_quantity(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_QUANTITATIF,
+            'type_cible' => 'quantitative',
+            'quantite_cible' => 100,
+            'unite_cible' => 'dossiers',
+            'statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE,
+        ])->save();
+        $action->weeks()->delete();
+        $action->sousActions()->delete();
+
+        $this->actingAs($agent)
+            ->from(route('workspace.actions.suivi', $action))
+            ->post(route('workspace.actions.execution.update', $action), [
+                'commentaire_quantitatif' => 'Progression renseignee.',
+                'justificatif_quantitatif' => UploadedFile::fake()->create('preuve-action-quantitative.pdf', 64, 'application/pdf'),
+            ])
+            ->assertSessionHasErrors('quantite_realisee');
+
+        $action->refresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_NON_SOUMISE, (string) $action->statut_validation);
+    }
+
+    public function test_agent_updates_planned_sub_action_then_submit_for_chef_review(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+        $serviceUser = $fixture['service_user'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'type_cible' => 'qualitative',
+        ])->save();
+        $action->weeks()->delete();
+
+        $sousAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Collecter les pieces de preuve',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-14',
+            'statut' => 'non_demarre',
+            'est_effectuee' => false,
+            'taux_execution' => 0,
+        ]);
+
+        $this->actingAs($agent)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertDontSee('Ajouter une sous-action')
+            ->assertDontSee('action-submit-closure', false)
+            ->assertDontSee('rapport_final', false)
+            ->assertDontSee('date_fin_reelle', false)
+            ->assertDontSee('Marquer la sous-action comme effectuée')
+            ->assertSee('tracking_action', false)
+            ->assertSee('Soumettre la sous-action')
+            ->assertSee('tracking-entry-form', false)
+            ->assertSee('execution_only', false);
+
+        $this->assertSame(1, $action->sousActions()->count());
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.sub-actions.update', [$action, $sousAction]), [
+                '_method' => 'PUT',
+                'execution_only' => '1',
+                'commentaire' => 'Sous-action realisee',
+                'difficultes' => 'Aucune difficulte rencontree.',
+                'justificatif' => UploadedFile::fake()->create('preuve-suivi.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_NON_SOUMISE, $action->statut_validation);
+
+        $this->actingAs($agent)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertDontSee('commentaire_sous_action_'.$sousAction->id, false);
+
+        $this->actingAs($serviceUser)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('Controle chef de service')
+            ->assertSee('decision_sous_action', false);
+    }
+
+    public function test_action_is_not_submitted_to_chef_until_all_planned_sub_actions_are_done(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+        $serviceUser = $fixture['service_user'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'type_cible' => 'qualitative',
+        ])->save();
+        $action->weeks()->delete();
+
+        $firstSubAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Collecter les pieces',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-07',
+            'statut' => 'non_demarre',
+            'est_effectuee' => false,
+            'taux_execution' => 0,
+        ]);
+
+        $secondSubAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Verifier les pieces',
+            'date_debut' => '2026-01-08',
+            'date_fin' => '2026-01-14',
+            'statut' => 'non_demarre',
+            'est_effectuee' => false,
+            'taux_execution' => 0,
+        ]);
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.sub-actions.update', [$action, $firstSubAction]), [
+                '_method' => 'PUT',
+                'execution_only' => '1',
+                'commentaire' => 'Premiere sous-action realisee.',
+                'difficultes' => 'Aucune difficulte rencontree.',
+                'justificatif' => UploadedFile::fake()->create('preuve-premiere.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_NON_SOUMISE, (string) $action->statut_validation);
+
+        $this->actingAs($agent)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('commentaire_sous_action_'.$secondSubAction->id, false)
+            ->assertDontSee('Saisie gel');
+
+        $this->actingAs($agent)
+            ->post(route('workspace.actions.sub-actions.update', [$action, $secondSubAction]), [
+                '_method' => 'PUT',
+                'execution_only' => '1',
+                'commentaire' => 'Deuxieme sous-action realisee.',
+                'difficultes' => 'Aucune difficulte rencontree.',
+                'justificatif' => UploadedFile::fake()->create('preuve-deuxieme.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_NON_SOUMISE, (string) $action->statut_validation);
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.actions.sub-actions.review', [$action, $firstSubAction]), [
+                'decision_sous_action' => 'valider',
+                'commentaire_sous_action' => 'Premiere sous-action conforme.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_NON_SOUMISE, (string) $action->statut_validation);
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.actions.sub-actions.review', [$action, $secondSubAction]), [
+                'decision_sous_action' => 'valider',
+                'commentaire_sous_action' => 'Deuxieme sous-action conforme.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, (string) $action->statut_validation);
+    }
+
+    public function test_chef_can_validate_or_reject_pending_sub_action(): void
+    {
+        Storage::fake('local');
+
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $agent = $fixture['agent'];
+        $serviceUser = $fixture['service_user'];
+
+        $action->forceFill([
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'type_cible' => 'qualitative',
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+        ])->save();
+        $action->weeks()->delete();
+
+        $validatedSubAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Sous-action a valider',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-14',
+            'statut' => 'en_attente_validation_chef',
+            'est_effectuee' => true,
+            'date_realisation' => now(),
+            'completed_at' => now(),
+            'taux_execution' => 100,
+        ]);
+
+        $this->actingAs($serviceUser)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('Controle chef de service')
+            ->assertSee('Demander correction');
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.actions.sub-actions.review', [$action, $validatedSubAction]), [
+                'decision_sous_action' => 'valider',
+                'commentaire_sous_action' => 'Conforme.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $validatedSubAction->refresh();
+        $this->assertSame('validee_chef', (string) $validatedSubAction->statut);
+        $this->assertTrue((bool) $validatedSubAction->est_effectuee);
+
+        $rejectedSubAction = $action->sousActions()->create([
+            'agent_id' => $agent->id,
+            'libelle' => 'Sous-action a corriger',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-14',
+            'statut' => 'en_attente_validation_chef',
+            'est_effectuee' => true,
+            'date_realisation' => now(),
+            'completed_at' => now(),
+            'taux_execution' => 100,
+        ]);
+        $action->forceFill(['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF])->save();
+
+        $this->actingAs($serviceUser)
+            ->post(route('workspace.actions.sub-actions.review', [$action, $rejectedSubAction]), [
+                'decision_sous_action' => 'demander_correction',
+                'commentaire_sous_action' => 'Piece illisible, merci de corriger.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $rejectedSubAction->refresh();
+        $action->refresh();
+        $this->assertSame('rejetee_a_corriger', (string) $rejectedSubAction->statut);
+        $this->assertFalse((bool) $rejectedSubAction->est_effectuee);
+        $this->assertSame(ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE, (string) $action->statut_validation);
+        $this->assertDatabaseHas('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'sous_action_correction_demandee',
+            'utilisateur_id' => $serviceUser->id,
+        ]);
+
+        $this->actingAs($agent)
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('commentaire_sous_action_'.$rejectedSubAction->id, false);
+    }
+
+    public function test_assigned_agent_can_submit_own_sub_action_even_when_not_action_responsible(): void
     {
         Storage::fake('local');
 
@@ -133,7 +597,7 @@ class ActionWorkflowSecurityTest extends TestCase
         $action->weeks()->delete();
 
         $sousAction = $action->sousActions()->create([
-            'agent_id' => $agent->id,
+            'agent_id' => $otherAgent->id,
             'libelle' => 'Traiter le dossier commun',
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-14',
@@ -141,7 +605,7 @@ class ActionWorkflowSecurityTest extends TestCase
             'unite' => 'dossier',
             'quantite_realisee' => 0,
             'taux_realisation' => 0,
-            'statut' => 'a_faire',
+            'statut' => 'non_demarre',
             'est_effectuee' => false,
             'taux_execution' => 0,
         ]);
@@ -149,6 +613,8 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->actingAs($otherAgent)
             ->get(route('workspace.actions.suivi', $action))
             ->assertOk()
+            ->assertSee('Traiter le dossier commun')
+            ->assertDontSee('RMO diff')
             ->assertSee('tracking-entry-form', false)
             ->assertSee('quantite_realisee_sous_action_'.$sousAction->id, false);
 
@@ -158,12 +624,17 @@ class ActionWorkflowSecurityTest extends TestCase
                 'execution_only' => '1',
                 'est_effectuee' => '1',
                 'quantite_realisee' => 1,
+                'commentaire' => 'Sous-action realisee',
+                'difficultes' => 'Aucune difficulte rencontree.',
                 'justificatif' => UploadedFile::fake()->create('preuve-second-agent.pdf', 64, 'application/pdf'),
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
         $sousAction->refresh();
+        $action->refresh();
         $this->assertTrue((bool) $sousAction->est_effectuee);
+        $this->assertSame('en_attente_validation_chef', (string) $sousAction->statut);
+        $this->assertSame(ActionTrackingService::VALIDATION_NON_SOUMISE, (string) $action->statut_validation);
         $this->assertDatabaseHas('action_logs', [
             'action_id' => $action->id,
             'type_evenement' => 'sous_action_effectuee',
@@ -190,8 +661,7 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->actingAs($serviceUser)
             ->post(route('workspace.actions.review', $action), [
                 'decision_validation' => 'valider',
-                'evaluation_note' => 92,
-                'evaluation_commentaire' => 'Travail conforme',
+                'motif_validation_chef' => 'Travail conforme',
                 'validation_sans_correction' => 1,
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
@@ -208,8 +678,7 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->actingAs($directionUser)
             ->post(route('workspace.actions.review-direction', $action), [
                 'decision_validation' => 'valider',
-                'evaluation_note' => 95,
-                'evaluation_commentaire' => 'Validation finale',
+                'motif_validation_chef' => 'Validation finale',
             ])
             ->assertForbidden();
 
@@ -237,10 +706,7 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->actingAs($serviceUser)
             ->post(route('workspace.actions.review', $action), [
                 'decision_validation' => 'demander_correction',
-                'evaluation_note' => 45,
-                'conformite_chef' => 'partiellement_conforme',
-                'observation_qualite_chef' => 'Pieces a completer',
-                'evaluation_commentaire' => 'Merci de completer les preuves.',
+                'motif_validation_chef' => 'Merci de completer les preuves.',
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
@@ -292,8 +758,7 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->actingAs($delegateServiceUser)
             ->post(route('workspace.actions.review', $action), [
                 'decision_validation' => 'valider',
-                'evaluation_note' => 88,
-                'evaluation_commentaire' => 'Validation par delegation',
+                'motif_validation_chef' => 'Validation par delegation',
                 'validation_sans_correction' => 1,
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
@@ -319,8 +784,7 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->actingAs($serviceUser)
             ->post(route('workspace.actions.review', $action), [
                 'decision_validation' => 'valider',
-                'evaluation_note' => 90,
-                'evaluation_commentaire' => 'Auto validation interdite',
+                'motif_validation_chef' => 'Auto validation interdite',
                 'validation_sans_correction' => 1,
             ])
             ->assertForbidden();
@@ -335,8 +799,7 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->actingAs($directionUser)
             ->post(route('workspace.actions.review-direction', $action), [
                 'decision_validation' => 'valider',
-                'evaluation_note' => 92,
-                'evaluation_commentaire' => 'Auto validation direction interdite',
+                'motif_validation_chef' => 'Auto validation direction interdite',
             ])
             ->assertForbidden();
     }
@@ -406,8 +869,7 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->actingAs($serviceUser)
             ->post(route('workspace.actions.review', $action), [
                 'decision_validation' => 'valider',
-                'evaluation_note' => 92,
-                'evaluation_commentaire' => 'Validation finale service',
+                'motif_validation_chef' => 'Validation finale service',
                 'validation_sans_correction' => 1,
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
@@ -419,14 +881,14 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->actingAs($directionUser)
             ->post(route('workspace.actions.review-direction', $action), [
                 'decision_validation' => 'valider',
-                'evaluation_note' => 95,
-                'evaluation_commentaire' => 'Tentative hors circuit',
+                'motif_validation_chef' => 'Tentative hors circuit',
             ])
             ->assertForbidden();
     }
 
     public function test_workflow_keeps_chef_as_final_stage_even_when_direction_setting_is_requested(): void
     {
+        Mail::fake();
         Storage::fake('local');
 
         app(WorkflowSettings::class)->updateActionWorkflow([
@@ -444,23 +906,24 @@ class ActionWorkflowSecurityTest extends TestCase
         $this->completeAllWeeksAsResponsable($action, $agent);
 
         $action->refresh();
-        self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
+        self::assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
         self::assertFalse(app(WorkflowSettings::class)->directionValidationEnabled());
 
         $this->actingAs($serviceUser)
             ->post(route('workspace.actions.review', $action), [
                 'decision_validation' => 'valider',
-                'evaluation_note' => 92,
-                'evaluation_commentaire' => 'Tentative hors circuit',
+                'motif_validation_chef' => 'Tentative hors circuit',
                 'validation_sans_correction' => 1,
             ])
-            ->assertForbidden();
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        self::assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
 
         $this->actingAs($directionUser)
             ->post(route('workspace.actions.review-direction', $action), [
                 'decision_validation' => 'valider',
-                'evaluation_note' => 95,
-                'evaluation_commentaire' => 'Validation direction',
+                'motif_validation_chef' => 'Validation direction',
             ])
             ->assertForbidden();
 
@@ -475,19 +938,14 @@ class ActionWorkflowSecurityTest extends TestCase
      */
     private function completeAllWeeksAsResponsable(Action $action, User $responsable): void
     {
-        $weeks = $action->weeks()->orderBy('numero_semaine')->get();
-
-        foreach ($weeks as $index => $week) {
-            $this->actingAs($responsable)
-                ->post(route('workspace.actions.weeks.submit', [$action, $week]), [
-                    'quantite_realisee' => $index === 0 ? 100 : 0,
-                    'commentaire' => 'Periode '.($index + 1).' renseignee',
-                    'difficultes' => 'Aucune',
-                    'mesures_correctives' => 'RAS',
-                    'justificatif' => UploadedFile::fake()->create('preuve-w'.($index + 1).'.pdf', 64, 'application/pdf'),
-                ])
-                ->assertRedirect(route('workspace.actions.suivi', $action));
-        }
+        $this->actingAs($responsable)
+            ->post(route('workspace.actions.execution.update', $action), [
+                'quantite_realisee' => 100,
+                'commentaire_quantitatif' => 'Progression quantitative renseignee.',
+                'difficultes_quantitatives' => 'Aucune difficulte rencontree.',
+                'justificatif_quantitatif' => UploadedFile::fake()->create('preuve-quantitative.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
     }
 
     /**
@@ -593,7 +1051,6 @@ class ActionWorkflowSecurityTest extends TestCase
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-14',
             'date_echeance' => '2026-01-14',
-            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
             'responsable_id' => $agent->id,
             'statut' => 'non_demarre',
             'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,

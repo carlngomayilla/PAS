@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Direction;
 use App\Models\Pas;
+use App\Models\PasAxe;
+use App\Models\PasObjectif;
 use Illuminate\Support\Str;
 
 class PasStructureService
@@ -13,15 +15,8 @@ class PasStructureService
      */
     public function sync(Pas $pas, array $axes, ?int $createdBy = null): void
     {
-        $pas->axes()
-            ->with('objectifs')
-            ->get()
-            ->each(function ($axe): void {
-                $axe->objectifs()->delete();
-                $axe->delete();
-            });
-
         $usedAxeCodes = [];
+        $keptAxeIds = [];
 
         foreach (array_values($axes) as $axeIndex => $axeData) {
             $axeCode = $this->resolveUniqueCode(
@@ -31,7 +26,13 @@ class PasStructureService
                 $axeIndex + 1
             );
 
-            $axe = $pas->axes()->create([
+            $axe = $this->findReusableAxe($pas, $axeData, $axeCode) ?? new PasAxe();
+            if ($axe->trashed()) {
+                $axe->restore();
+            }
+
+            $axe->forceFill([
+                'pas_id' => (int) $pas->id,
                 'direction_id' => null,
                 'code' => $axeCode,
                 'libelle' => trim((string) ($axeData['libelle'] ?? '')),
@@ -39,10 +40,13 @@ class PasStructureService
                 'periode_fin' => $this->resolveAxisEndDate($axeData, (int) $pas->periode_fin),
                 'description' => $this->nullableString($axeData['description'] ?? null),
                 'ordre' => (int) ($axeData['ordre'] ?? ($axeIndex + 1)),
-                'created_by' => $createdBy,
-            ]);
+                'created_by' => $axe->created_by ?: $createdBy,
+            ])->save();
+
+            $keptAxeIds[] = (int) $axe->id;
 
             $usedObjectifCodes = [];
+            $keptObjectifIds = [];
             $objectifs = is_array($axeData['objectifs'] ?? null) ? $axeData['objectifs'] : [];
 
             foreach (array_values($objectifs) as $objectifIndex => $objectifData) {
@@ -55,18 +59,31 @@ class PasStructureService
 
                 $targetValues = $this->resolveTargetValues($objectifData);
 
-                $axe->objectifs()->create([
+                $objectif = $this->findReusableObjectif($axe, $objectifData, $objectifCode) ?? new PasObjectif();
+                if ($objectif->trashed()) {
+                    $objectif->restore();
+                }
+
+                $objectif->forceFill([
+                    'pas_axe_id' => (int) $axe->id,
                     'code' => $objectifCode,
                     'libelle' => trim((string) ($objectifData['libelle'] ?? '')),
+                    'date_echeance' => $this->nullableString($objectifData['date_echeance'] ?? null),
                     'description' => $this->nullableString($objectifData['description'] ?? null),
                     'ordre' => (int) ($objectifData['ordre'] ?? ($objectifIndex + 1)),
                     'indicateur_global' => $this->nullableString($objectifData['indicateur_global'] ?? null),
                     'valeur_cible' => $this->nullableString($objectifData['valeur_cible'] ?? null),
                     'valeurs_cible' => $targetValues,
-                    'created_by' => $createdBy,
-                ]);
+                    'created_by' => $objectif->created_by ?: $createdBy,
+                ])->save();
+
+                $keptObjectifIds[] = (int) $objectif->id;
             }
+
+            $this->deleteMissingObjectifs($axe, $keptObjectifIds);
         }
+
+        $this->deleteMissingAxes($pas, $keptAxeIds);
 
         $pas->directions()->sync(
             Direction::query()
@@ -75,6 +92,90 @@ class PasStructureService
                 ->map(static fn ($id): int => (int) $id)
                 ->all()
         );
+    }
+
+    /**
+     * @param array<string, mixed> $axeData
+     */
+    private function findReusableAxe(Pas $pas, array $axeData, string $code): ?PasAxe
+    {
+        $id = $this->positiveInteger($axeData['id'] ?? null);
+        if ($id !== null) {
+            $byId = PasAxe::withTrashed()
+                ->where('pas_id', (int) $pas->id)
+                ->whereKey($id)
+                ->first();
+
+            if ($byId instanceof PasAxe) {
+                return $byId;
+            }
+        }
+
+        return PasAxe::withTrashed()
+            ->where('pas_id', (int) $pas->id)
+            ->where('code', $code)
+            ->first();
+    }
+
+    /**
+     * @param array<string, mixed> $objectifData
+     */
+    private function findReusableObjectif(PasAxe $axe, array $objectifData, string $code): ?PasObjectif
+    {
+        $id = $this->positiveInteger($objectifData['id'] ?? null);
+        if ($id !== null) {
+            $byId = PasObjectif::withTrashed()
+                ->where('pas_axe_id', (int) $axe->id)
+                ->whereKey($id)
+                ->first();
+
+            if ($byId instanceof PasObjectif) {
+                return $byId;
+            }
+        }
+
+        return PasObjectif::withTrashed()
+            ->where('pas_axe_id', (int) $axe->id)
+            ->where('code', $code)
+            ->first();
+    }
+
+    /**
+     * @param list<int> $keptObjectifIds
+     */
+    private function deleteMissingObjectifs(PasAxe $axe, array $keptObjectifIds): void
+    {
+        $query = PasObjectif::withTrashed()
+            ->where('pas_axe_id', (int) $axe->id);
+
+        if ($keptObjectifIds !== []) {
+            $query->whereNotIn('id', $keptObjectifIds);
+        }
+
+        $query->get()->each(function (PasObjectif $objectif): void {
+            if (! $objectif->trashed()) {
+                $objectif->delete();
+            }
+        });
+    }
+
+    /**
+     * @param list<int> $keptAxeIds
+     */
+    private function deleteMissingAxes(Pas $pas, array $keptAxeIds): void
+    {
+        $query = PasAxe::withTrashed()
+            ->where('pas_id', (int) $pas->id);
+
+        if ($keptAxeIds !== []) {
+            $query->whereNotIn('id', $keptAxeIds);
+        }
+
+        $query->get()->each(function (PasAxe $axe): void {
+            if (! $axe->trashed()) {
+                $axe->delete();
+            }
+        });
     }
 
     /**
@@ -120,6 +221,17 @@ class PasStructureService
         }
 
         return Str::limit(strtoupper($normalized), 30, '');
+    }
+
+    private function positiveInteger(mixed $value): ?int
+    {
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        $integer = (int) $value;
+
+        return $integer > 0 ? $integer : null;
     }
 
     private function nullableString(mixed $value): ?string

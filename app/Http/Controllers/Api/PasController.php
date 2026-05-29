@@ -11,6 +11,7 @@ use App\Http\Requests\UpdatePasRequest;
 use App\Models\Pas;
 use App\Models\User;
 use App\Services\PasStructureService;
+use App\Services\PlanningModificationLockService;
 use App\Support\UiLabel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
@@ -86,8 +87,7 @@ class PasController extends Controller
         $this->authorize('create', Pas::class);
 
         $validated = $request->validated();
-        // statut / valide_* ne sont plus exposes via l API (cf. A02). Pour les
-        // transitions de workflow, utiliser les endpoints dedies submit/approve/lock.
+        // Le PAS est deja valide officiellement avant saisie : l'API l'enregistre actif.
         $payload = [
             'titre' => (string) $validated['titre'],
             'periode_debut' => (int) $validated['periode_debut'],
@@ -99,7 +99,7 @@ class PasController extends Controller
             $pas = new Pas();
             $pas->fill($payload);
             $pas->forceFill([
-                'statut' => 'brouillon',
+                'statut' => Pas::STATUS_ACTIF,
                 'valide_le' => null,
                 'valide_par' => null,
             ])->save();
@@ -111,6 +111,7 @@ class PasController extends Controller
 
             return $pas;
         });
+        app(PlanningModificationLockService::class)->lockAfterSave($pas, $user);
 
         $after = $pas->load([
             'validateur:id,name,email',
@@ -119,7 +120,7 @@ class PasController extends Controller
                 ->orderBy('ordre')
                 ->orderBy('id')
                 ->with('direction:id,code,libelle')
-                ->with('objectifs:id,pas_axe_id,code,libelle,description,indicateur_global,valeur_cible,valeurs_cible'),
+                ->with('objectifs:id,pas_axe_id,code,libelle,date_echeance,description,indicateur_global,valeur_cible,valeurs_cible'),
         ])->toArray();
         $this->recordAudit($request, 'pas', 'create', $pas, null, $after);
 
@@ -146,7 +147,7 @@ class PasController extends Controller
                     ->orderBy('ordre')
                     ->orderBy('id')
                     ->with('direction:id,code,libelle')
-                    ->with('objectifs:id,pas_axe_id,code,libelle,description,indicateur_global,valeur_cible,valeurs_cible'),
+                    ->with('objectifs:id,pas_axe_id,code,libelle,date_echeance,description,indicateur_global,valeur_cible,valeurs_cible'),
             ]),
         ]);
     }
@@ -160,10 +161,13 @@ class PasController extends Controller
 
         $this->authorize('update', $pas);
 
-        if ($pas->statut === 'verrouille') {
+        if ($pas->statut === Pas::STATUS_ARCHIVE) {
             return response()->json([
-                'message' => $this->lockedStateMessage('PAS', 'plus etre modifie'),
+                'message' => 'Impossible de modifier un PAS archive.',
             ], 409);
+        }
+        if ($message = app(PlanningModificationLockService::class)->ensureUnlocked($pas, $request->user())) {
+            return response()->json(['message' => $message], 409);
         }
 
         $validated = $request->validated();
@@ -182,7 +186,7 @@ class PasController extends Controller
                 ->orderBy('ordre')
                 ->orderBy('id')
                 ->with('direction:id,code,libelle')
-                ->with('objectifs:id,pas_axe_id,code,libelle,description,indicateur_global,valeur_cible'),
+                ->with('objectifs:id,pas_axe_id,code,libelle,date_echeance,description,indicateur_global,valeur_cible'),
         ])->toArray();
 
         DB::transaction(function () use ($pas, $payload, $validated, $user): void {
@@ -193,6 +197,7 @@ class PasController extends Controller
                 $user->id,
             );
         });
+        app(PlanningModificationLockService::class)->lockAfterSave($pas->refresh(), $user);
 
         $pas->refresh();
         $after = $pas->load([
@@ -202,7 +207,7 @@ class PasController extends Controller
                 ->orderBy('ordre')
                 ->orderBy('id')
                 ->with('direction:id,code,libelle')
-                ->with('objectifs:id,pas_axe_id,code,libelle,description,indicateur_global,valeur_cible,valeurs_cible'),
+                ->with('objectifs:id,pas_axe_id,code,libelle,date_echeance,description,indicateur_global,valeur_cible,valeurs_cible'),
         ])->toArray();
 
         $this->recordAudit($request, 'pas', 'update', $pas, $before, $after);
@@ -222,9 +227,9 @@ class PasController extends Controller
 
         $this->authorize('delete', $pas);
 
-        if ($pas->statut === 'verrouille') {
+        if ($pas->statut === Pas::STATUS_ARCHIVE) {
             return response()->json([
-                'message' => $this->lockedStateMessage('PAS', 'etre supprime'),
+                'message' => 'Impossible de supprimer directement un PAS archive.',
             ], 409);
         }
 

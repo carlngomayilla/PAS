@@ -9,4 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('alertes:notifier --refresh-metrics')->dailyAt('07:30');
+Schedule::command('anbg:planning-auto-archive --execute')->dailyAt('03:30');
 Schedule::command('anbg:retention-run --execute')->monthlyOn(1, '03:00');

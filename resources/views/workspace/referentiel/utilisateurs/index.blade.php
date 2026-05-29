@@ -103,7 +103,7 @@
                         <th>Statut</th>
                         <th>Direction</th>
                         <th>Service</th>
-                        @if ($canWrite)
+                        @if ($canWrite || ($canRequestUserDeletion ?? false))
                             <th>Opérations</th>
                         @endif
                     </tr>
@@ -146,22 +146,33 @@
                             </td>
                             <td>{{ $row->direction?->code ? $row->direction->code . ' - ' . $row->direction->libelle : '-' }}</td>
                             <td>{{ $row->service?->code ? $row->service->code . ' - ' . $row->service->libelle : '-' }}</td>
-                            @if ($canWrite)
+                            @if ($canWrite || ($canRequestUserDeletion ?? false))
                                 <td>
                                     <div class="flex flex-wrap gap-1.5">
-                                        <a class="btn btn-warning" href="{{ route('workspace.referentiel.utilisateurs.edit', $row) }}">Modifier</a>
-                                        <form method="POST" action="{{ route('workspace.referentiel.utilisateurs.destroy', $row) }}" data-confirm-message="Supprimer cet utilisateur ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="btn btn-danger" type="submit">Supprimer</button>
-                                        </form>
+                                        @if ($canWrite)
+                                            <a class="btn btn-warning" href="{{ route('workspace.referentiel.utilisateurs.edit', $row) }}">Modifier</a>
+                                        @endif
+                                        @if ($canDeleteUsers ?? false)
+                                            <form method="POST" action="{{ route('workspace.referentiel.utilisateurs.destroy', $row) }}" data-confirm-message="Supprimer cet utilisateur ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="motif" value="Suppression Super Admin depuis le referentiel utilisateurs">
+                                                <button class="btn btn-danger" type="submit">Supprimer</button>
+                                            </form>
+                                        @elseif (($canRequestUserDeletion ?? false) && (int) auth()->id() !== (int) $row->id)
+                                            <form method="POST" action="{{ route('workspace.referentiel.utilisateurs.deletion-requests.store', $row) }}" class="flex flex-wrap items-center gap-1.5">
+                                                @csrf
+                                                <input class="min-w-[12rem]" name="motif" type="text" placeholder="Motif suppression" required>
+                                                <button class="btn btn-danger" type="submit">Demander suppression</button>
+                                            </form>
+                                        @endif
                                     </div>
                                 </td>
                             @endif
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 7 : 6 }}">
+                            <td colspan="{{ ($canWrite || ($canRequestUserDeletion ?? false)) ? 7 : 6 }}">
                                 <x-ui.empty-state
                                     title="Aucun utilisateur trouvé"
                                     message="Aucun compte ne correspond aux filtres courants."

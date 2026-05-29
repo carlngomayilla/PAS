@@ -35,7 +35,7 @@ class StoreActionRequest extends FormRequest
             'libelle' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
 
-            'type_cible' => ['nullable', Rule::in(['quantitative', 'qualitative'])],
+            'type_cible' => ['nullable', Rule::in(['quantitative', 'qualitative', Action::MODE_SANS_QUANTITE])],
             'unite_cible' => ['nullable', 'string', 'max:100'],
             'quantite_cible' => ['nullable', 'numeric', 'min:0.0001'],
             'seuil_mode' => ['nullable', Rule::in(['unique', 'trimestriel'])],
@@ -285,6 +285,13 @@ class StoreActionRequest extends FormRequest
                     $validator->errors()->add(
                         'nature_financement',
                         'La nature du financement est obligatoire lorsque le financement est requis.'
+                    );
+                }
+
+                if (! $this->hasFile('justificatif_financement')) {
+                    $validator->errors()->add(
+                        'justificatif_financement',
+                        'La piece justificative du financement est obligatoire des la creation.'
                     );
                 }
             }

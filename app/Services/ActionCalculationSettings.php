@@ -66,8 +66,8 @@ class ActionCalculationSettings
     public function defaults(): array
     {
         return [
-            self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => self::LEVEL_VALIDATION_DIRECTION,
-            self::SETTING_ACTIONS_STATISTICAL_SCOPE => self::LEVEL_VALIDATION_DIRECTION,
+            self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => self::LEVEL_VALIDATION_CHEF,
+            self::SETTING_ACTIONS_STATISTICAL_SCOPE => self::LEVEL_VALIDATION_CHEF,
         ];
     }
 
@@ -75,12 +75,12 @@ class ActionCalculationSettings
     {
         $value = $this->normalizeScope((string) ($this->get(
             self::SETTING_ACTIONS_STATISTICAL_SCOPE,
-            self::LEVEL_VALIDATION_DIRECTION
-        ) ?? self::LEVEL_VALIDATION_DIRECTION));
+            self::LEVEL_VALIDATION_CHEF
+        ) ?? self::LEVEL_VALIDATION_CHEF));
 
         return array_key_exists($value, $this->statisticalScopeOptions())
             ? $value
-            : self::LEVEL_VALIDATION_DIRECTION;
+            : self::LEVEL_VALIDATION_CHEF;
     }
 
     /**
@@ -89,12 +89,12 @@ class ActionCalculationSettings
     public function statisticalScopeOptions(): array
     {
         return [
-            self::LEVEL_VALIDATION_DIRECTION => 'Validation direction (statistiques officielles)',
-            self::LEVEL_VALIDATION_CHEF => 'Validation chef ou direction',
-            self::LEVEL_VALIDATION_AGENT => 'Soumission agent ou validation hierarchique',
-            self::LEVEL_VALIDATION_SCIQ => 'Validation SCIQ (niveau direction)',
-            self::LEVEL_VALIDATION_DG => 'Validation DG (niveau direction)',
-            self::SCOPE_EXCLUDE_REJECTED => 'Ancienne regle : visibles hors rejetees',
+            self::LEVEL_VALIDATION_CHEF => 'Validation chef de service',
+            self::LEVEL_VALIDATION_DIRECTION => 'Ancienne validation direction',
+            self::LEVEL_VALIDATION_AGENT => 'Soumission agent ou validation chef',
+            self::LEVEL_VALIDATION_SCIQ => 'Validation SCIQ ancienne',
+            self::LEVEL_VALIDATION_DG => 'Validation DG ancienne',
+            self::SCOPE_EXCLUDE_REJECTED => 'Ancienne règle : visibles hors rejetées',
             self::STATISTICAL_SCOPE_ALL_VISIBLE => 'Toutes les actions visibles',
         ];
     }
@@ -166,7 +166,7 @@ class ActionCalculationSettings
     public function statisticalScopeLabel(): string
     {
         return $this->statisticalScopeOptions()[$this->statisticalScope()]
-            ?? 'Validation direction';
+            ?? 'Validation chef de service';
     }
 
     public function statisticalScopeSummary(): string
@@ -174,11 +174,11 @@ class ActionCalculationSettings
         return match ($this->statisticalScope()) {
             self::LEVEL_VALIDATION_DIRECTION,
             self::LEVEL_VALIDATION_SCIQ,
-            self::LEVEL_VALIDATION_DG => 'Les statistiques officielles integrent uniquement les actions validees par la direction.',
-            self::LEVEL_VALIDATION_CHEF => 'Les statistiques officielles integrent les actions validees par le chef ou par la direction.',
-            self::LEVEL_VALIDATION_AGENT => 'Les statistiques officielles integrent les actions soumises par les agents et les actions deja validees.',
-            self::SCOPE_EXCLUDE_REJECTED => 'Ancienne regle : les statistiques excluent les actions rejetees ou en correction.',
-            default => 'Les statistiques et les KPI sont calcules sur toutes les actions visibles.',
+            self::LEVEL_VALIDATION_DG => 'Ancienne règle : seules les actions validées par la direction sont comptées.',
+            self::LEVEL_VALIDATION_CHEF => 'Les statistiques officielles comptent les actions validées par le chef de service.',
+            self::LEVEL_VALIDATION_AGENT => 'Les statistiques officielles comptent les actions soumises par les agents et les actions déjà validées.',
+            self::SCOPE_EXCLUDE_REJECTED => 'Ancienne règle : les statistiques excluent les actions rejetées ou en correction.',
+            default => 'Les statistiques et les indicateurs sont calculés sur toutes les actions visibles.',
         };
     }
 
@@ -187,11 +187,11 @@ class ActionCalculationSettings
         return match ($this->statisticalScope()) {
             self::LEVEL_VALIDATION_DIRECTION,
             self::LEVEL_VALIDATION_SCIQ,
-            self::LEVEL_VALIDATION_DG => 'Moyenne calculee sur les actions validees par la direction.',
-            self::LEVEL_VALIDATION_CHEF => 'Moyenne calculee sur les actions validees par le chef ou la direction.',
-            self::LEVEL_VALIDATION_AGENT => 'Moyenne calculee sur les actions soumises ou deja validees.',
-            self::SCOPE_EXCLUDE_REJECTED => 'Moyenne calculee sur toutes les actions visibles, hors actions rejetees ou en correction.',
-            default => 'Moyenne calculee sur toutes les actions visibles.',
+            self::LEVEL_VALIDATION_DG => 'Moyenne calculée sur les anciennes validations direction.',
+            self::LEVEL_VALIDATION_CHEF => 'Moyenne calculée sur les actions validées par le chef de service.',
+            self::LEVEL_VALIDATION_AGENT => 'Moyenne calculée sur les actions soumises ou déjà validées.',
+            self::SCOPE_EXCLUDE_REJECTED => 'Moyenne calculée sur toutes les actions visibles, hors actions rejetées ou en correction.',
+            default => 'Moyenne calculée sur toutes les actions visibles.',
         };
     }
 
@@ -255,10 +255,10 @@ class ActionCalculationSettings
     {
         $status = $this->normalizeScope((string) ($payload[self::SETTING_ACTIONS_STATISTICAL_SCOPE]
             ?? $payload[self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS]
-            ?? self::LEVEL_VALIDATION_DIRECTION));
+            ?? self::LEVEL_VALIDATION_CHEF));
 
         if (! array_key_exists($status, $this->statisticalScopeOptions())) {
-            $status = self::LEVEL_VALIDATION_DIRECTION;
+            $status = self::LEVEL_VALIDATION_CHEF;
         }
 
         foreach ([self::SETTING_ACTIONS_STATISTICAL_SCOPE, self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS] as $key) {

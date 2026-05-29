@@ -85,10 +85,10 @@
         </section>
 
         <section class="showcase-panel mb-4">
-            <h2>Differences detectees</h2>
+            <h2>Différences détectées</h2>
             <div class="app-table-wrapper overflow-x-auto mt-4">
                 <table class="app-table data-table">
-                    <thead><tr><th>Groupe</th><th>Cle</th><th>Reference</th><th>Comparaison</th><th>Statut</th></tr></thead>
+                    <thead><tr><th>Groupe</th><th>Clé</th><th>Référence</th><th>Comparaison</th><th>Statut</th></tr></thead>
                     <tbody>
                         @forelse ($compare['changes'] as $change)
                             <tr>

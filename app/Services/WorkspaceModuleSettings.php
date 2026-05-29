@@ -210,6 +210,7 @@ class WorkspaceModuleSettings
             'pas' => ['code' => 'pas', 'label' => 'PAS', 'description' => 'Vision stratégique pluriannuelle', 'enabled' => true, 'order' => 30, 'section' => 'planification'],
             'pao' => ['code' => 'pao', 'label' => 'PAO', 'description' => 'Déclinaison annuelle par direction', 'enabled' => true, 'order' => 40, 'section' => 'planification'],
             'pta' => ['code' => 'pta', 'label' => 'PTA', 'description' => 'Planification opérationnelle par service', 'enabled' => true, 'order' => 50, 'section' => 'planification'],
+            'imports_excel' => ['code' => 'imports_excel', 'label' => 'Imports Excel', 'description' => 'Chargement Excel global PAS, PAO, PTA et actions', 'enabled' => true, 'order' => 55, 'section' => 'planification'],
             'execution' => ['code' => 'execution', 'label' => 'Actions', 'description' => 'Exécution des tâches et suivi de progression', 'enabled' => true, 'order' => 60, 'section' => 'execution'],
             'reporting' => ['code' => 'reporting', 'label' => 'Reporting', 'description' => 'Reporting consolidé, exports et diffusion', 'enabled' => true, 'order' => 70, 'section' => 'pilotage'],
             'alertes' => ['code' => 'alertes', 'label' => 'Alertes', 'description' => 'Centre des alertes et écarts de suivi', 'enabled' => true, 'order' => 75, 'section' => 'pilotage'],

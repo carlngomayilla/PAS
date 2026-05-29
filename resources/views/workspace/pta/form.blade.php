@@ -28,12 +28,10 @@
                     'date_debut' => optional($action->date_debut)->format('Y-m-d'),
                     'date_fin' => optional($action->date_fin)->format('Y-m-d'),
                     'statut' => $action->statut ?: 'non_demarre',
-                    'mode_evaluation' => $action->mode_evaluation ?: \App\Models\Action::MODE_SOUS_ACTIONS,
+                    'mode_evaluation' => $action->mode_evaluation ?: ((int) ($action->nombre_sous_actions_prevu ?? 0) > 0 ? \App\Models\Action::MODE_SOUS_ACTIONS : \App\Models\Action::MODE_SANS_QUANTITE),
                     'priorite' => $action->priorite,
                     'montant_estime' => $action->montant_estime,
                     'nature_financement' => $action->nature_financement ?: $action->description_financement,
-                    'source_financement' => $action->source_financement,
-                    'commentaire_financement' => $action->commentaire_financement,
                     'financement_requis' => (bool) $action->financement_requis,
                     'intitule_cible' => $action->intitule_cible,
                     'quantite_cible' => $action->quantite_cible,
@@ -45,7 +43,7 @@
                     'seuil_t3' => $action->seuil_t3,
                     'seuil_t4' => $action->seuil_t4,
                     'justificatif_obligatoire' => (bool) $action->justificatif_obligatoire,
-                    'sous_actions' => $action->relationLoaded('sousActions')
+                    'sous_actions' => $action->relationLoaded('sousActions') && $action->sousActions->isNotEmpty()
                         ? $action->sousActions->map(fn ($sousAction): array => [
                             'id' => $sousAction->id,
                             'agent_id' => $sousAction->agent_id,
@@ -58,7 +56,11 @@
                             'unite' => $sousAction->unite,
                             'commentaire' => $sousAction->commentaire,
                         ])->values()->all()
-                        : [],
+                        : collect(range(1, max(0, (int) ($action->nombre_sous_actions_prevu ?? 0))))->map(fn (int $number): array => [
+                            'libelle' => 'Sous-action '.$number,
+                            'date_debut' => optional($action->date_debut)->format('Y-m-d'),
+                            'date_fin' => optional($action->date_fin)->format('Y-m-d'),
+                        ])->all(),
                     'resultat_attendu' => $action->resultat_attendu,
                     'observations' => $action->observations,
                     'ressources_necessaires' => $action->ressources_necessaires ?: array_keys(array_filter([
@@ -74,6 +76,15 @@
                     'rmo_ids' => $action->relationLoaded('responsables')
                         ? $action->responsables->pluck('id')->map(fn ($id) => (int) $id)->values()->all()
                         : array_filter([(int) $action->responsable_id]),
+                    // Etat de gel pour la nouvelle UX "Demande modification" (2026-05-29) :
+                    // une action est consideree comme "enregistree et figee" si elle
+                    // est parametree ET son verrou n'a pas ete leve par le DG. Le
+                    // bypass cote service ne s'applique PAS a l'UI : seuls SA et DG
+                    // voient le bouton Enregistrer permanente.
+                    'statut_parametrage' => $action->statut_parametrage,
+                    'modification_locked_at' => optional($action->modification_locked_at)->format('Y-m-d H:i:s'),
+                    'modification_unlocked_at' => optional($action->modification_unlocked_at)->format('Y-m-d H:i:s'),
+                    'modification_unlock_expires_at' => optional($action->modification_unlock_expires_at)->format('Y-m-d H:i:s'),
                 ];
             })->values();
         } else {
@@ -83,12 +94,10 @@
                 'date_debut' => '',
                 'date_fin' => '',
                 'statut' => 'non_demarre',
-                'mode_evaluation' => \App\Models\Action::MODE_SOUS_ACTIONS,
+                'mode_evaluation' => \App\Models\Action::MODE_SANS_QUANTITE,
                 'priorite' => 'normale',
                 'montant_estime' => '',
                 'nature_financement' => '',
-                'source_financement' => '',
-                'commentaire_financement' => '',
                 'financement_requis' => false,
                 'intitule_cible' => '',
                 'quantite_cible' => '',
@@ -114,6 +123,13 @@
     @endphp
 
     <div class="app-screen-flow pta-registration-screen">
+        @if ($isEdit)
+            @include('workspace.planning-unlocks._lock-banner', [
+                'target' => $row,
+                'route' => route('workspace.pta.unlock-requests.store', $row),
+            ])
+        @endif
+
         <section class="showcase-panel pta-form-panel mb-4 app-screen-block">
             <form method="POST" enctype="multipart/form-data" class="form-shell pta-form-shell" action="{{ $isEdit ? route('workspace.pta.update', $row) : route('workspace.pta.store') }}">
                 @csrf
@@ -150,7 +166,7 @@
                                         data-echeance="{{ optional($objectif->echeance)->format('Y-m-d') }}"
                                         @selected((int) old('objectif_operationnel_id', $row->objectif_operationnel_id) === (int) $objectif->id)
                                     >
-                                        #{{ $objectif->id }} - {{ $objectif->libelle }} ({{ $objectif->direction?->code }} / {{ $objectif->service?->code }})
+                                        {{ $objectif->libelle }} ({{ $objectif->direction?->code }} / {{ $objectif->service?->code }})
                                     </option>
                                 @endforeach
                             </select>
@@ -193,7 +209,7 @@
                             <label for="statut" class="hidden">Statut</label>
                             <select id="statut" class="hidden" disabled>
                                 @foreach ($statusOptions as $status)
-                                    <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'brouillon') === $status)>{{ $workflowStatusLabel($status) }}</option>
+                                    <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'en_cours') === $status)>{{ $workflowStatusLabel($status) }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -309,12 +325,10 @@
                 'date_debut' => '',
                 'date_fin' => '',
                 'statut' => 'non_demarre',
-                'mode_evaluation' => \App\Models\Action::MODE_SOUS_ACTIONS,
+                'mode_evaluation' => \App\Models\Action::MODE_SANS_QUANTITE,
                 'priorite' => 'normale',
                 'montant_estime' => '',
                 'nature_financement' => '',
-                'source_financement' => '',
-                'commentaire_financement' => '',
                 'financement_requis' => false,
                 'intitule_cible' => '',
                 'quantite_cible' => '',
@@ -433,25 +447,19 @@
                 if (!block) return;
 
                 var modeField = block.querySelector('[data-mode-select]');
-                var mode = modeField ? modeField.value : 'sous_actions';
+                var mode = modeField ? modeField.value : 'sans_quantite';
                 var targetInput = block.querySelector('[data-target-input]');
-                var targetValue = targetInput ? targetInput.value.trim() : '';
                 var targetWrappers = block.querySelectorAll('[data-target-wrapper]');
                 var subActionsSection = block.querySelector('[data-sub-actions-section]');
+                var isQuantitative = mode === 'quantitatif';
                 var showSubActions = mode === 'sous_actions';
-
-                if (mode === 'quantitatif' && targetInput && targetInput.dataset.forceSousActions === '1' && targetValue === '') {
-                    mode = 'sous_actions';
-                    modeField.value = mode;
-                    targetInput.dataset.forceSousActions = '0';
-                    showSubActions = true;
-                }
 
                 targetWrappers.forEach(function (wrapper) {
                     var input = wrapper.querySelector('input:not([type="hidden"]), select, textarea');
-                    wrapper.classList.toggle('hidden', false);
+                    wrapper.classList.toggle('hidden', !isQuantitative);
                     if (input) {
-                        input.required = mode === 'quantitatif' && !wrapper.hasAttribute('data-target-optional');
+                        input.disabled = !isQuantitative;
+                        input.required = isQuantitative && !wrapper.hasAttribute('data-target-optional');
                     }
                 });
 
@@ -574,6 +582,7 @@
 
                 list.appendChild(clone);
                 refreshSubActionIndexes(block);
+                syncSubActionEcheances(block);
             }
 
             function syncActionFinancing(block) {
@@ -625,6 +634,28 @@
                 if (dateFin && preview) {
                     preview.value = dateFin.value;
                 }
+
+                syncSubActionEcheances(block);
+            }
+
+            function syncSubActionEcheances(block) {
+                if (!block) return;
+
+                var actionEnd = block.querySelector('input[name$="[date_fin]"]:not([name*="[sous_actions]"])');
+                var objectiveOption = objectifSelect ? objectifSelect.options[objectifSelect.selectedIndex] : null;
+                var objectiveEcheance = optionValue(objectiveOption, 'data-echeance');
+                var maxDate = actionEnd && actionEnd.value ? actionEnd.value : objectiveEcheance;
+
+                if (objectiveEcheance && maxDate && maxDate > objectiveEcheance) {
+                    maxDate = objectiveEcheance;
+                }
+
+                block.querySelectorAll('input[name*="[sous_actions]"][name$="[date_fin]"]').forEach(function (field) {
+                    field.max = maxDate || '';
+                    if (maxDate && field.value && field.value > maxDate) {
+                        field.value = maxDate;
+                    }
+                });
             }
 
             function refreshActionIndexes() {
@@ -747,7 +778,12 @@
                     }
 
                     if (target.matches('input[name$="[date_fin]"]')) {
-                        syncActionEcheance(target.closest('[data-action-block]'));
+                        var targetBlock = target.closest('[data-action-block]');
+                        if (target.name.indexOf('[sous_actions]') === -1) {
+                            syncActionEcheance(targetBlock);
+                        } else {
+                            syncSubActionEcheances(targetBlock);
+                        }
                     }
                 });
 
@@ -765,19 +801,254 @@
                     }
 
                     if (target.matches('input[name$="[date_fin]"]')) {
-                        syncActionEcheance(target.closest('[data-action-block]'));
+                        var targetBlock = target.closest('[data-action-block]');
+                        if (target.name.indexOf('[sous_actions]') === -1) {
+                            syncActionEcheance(targetBlock);
+                        } else {
+                            syncSubActionEcheances(targetBlock);
+                        }
                     }
                 });
+
+                @if ($isEdit)
+                    var inlineUpsertUrl = @json(route('workspace.pta.actions.upsert-inline', $row));
+                    var inlineDeleteUrlBase = @json(rtrim(url('workspace/actions'), '/'));
+                @else
+                    var inlineUpsertUrl = null;
+                    var inlineDeleteUrlBase = null;
+                @endif
+                var csrfToken = @json(csrf_token());
+
+                function flashActionMessage(block, isError, message) {
+                    var existing = block.querySelector('[data-action-flash]');
+                    if (existing) existing.remove();
+                    var div = document.createElement('div');
+                    div.setAttribute('data-action-flash', '');
+                    div.className = 'mt-2 rounded px-3 py-2 text-sm ' + (isError
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'bg-green-50 text-green-700 border border-green-200');
+                    div.textContent = message;
+                    var body = block.querySelector('.pta-action-body');
+                    if (body) body.insertBefore(div, body.firstChild);
+                    if (! isError) setTimeout(function () { div.remove(); }, 4000);
+                }
+
+                function collectActionPayload(block) {
+                    var index = block.getAttribute('data-action-index');
+                    var prefix = 'actions[' + index + ']';
+                    var payload = {};
+                    var fields = block.querySelectorAll('[name^="' + prefix + '"]');
+                    fields.forEach(function (field) {
+                        if (field.disabled) return;
+                        var raw = field.getAttribute('name');
+                        var key = raw.substring(prefix.length); // [libelle] | [rmo_ids][] | etc.
+                        if (key === '') return;
+                        // Strip leading '[' and trailing ']' from outermost level → libelle, rmo_ids[], etc.
+                        var path = key.replace(/^\[|\]$/g, '').split('][');
+                        var value;
+                        if (field.type === 'checkbox') {
+                            if (! field.checked) return;
+                            value = field.value || true;
+                        } else if (field.type === 'radio') {
+                            if (! field.checked) return;
+                            value = field.value;
+                        } else if (field.type === 'file') {
+                            return; // files non supportes en JSON
+                        } else {
+                            value = field.value;
+                        }
+                        // Construire la structure imbriquee
+                        var cur = payload;
+                        for (var i = 0; i < path.length - 1; i++) {
+                            var seg = path[i];
+                            if (seg === '') seg = (Object.keys(cur).length).toString();
+                            if (! (seg in cur)) cur[seg] = isNaN(parseInt(path[i+1], 10)) && path[i+1] !== '' ? {} : [];
+                            cur = cur[seg];
+                        }
+                        var last = path[path.length - 1];
+                        if (last === '') {
+                            if (! Array.isArray(cur)) cur = [];
+                            cur.push(value);
+                        } else {
+                            cur[last] = value;
+                        }
+                    });
+                    return payload;
+                }
 
                 actionsList.addEventListener('click', function (event) {
                     var target = event.target;
                     if (!(target instanceof HTMLElement)) return;
 
+                    // Bouton "Demande de modification" : POST vers la route unlock-requests.
+                    if (target.matches('[data-request-modification]')) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        var blockReq = target.closest('[data-action-block]');
+                        if (! blockReq) return;
+                        var actionId = blockReq.getAttribute('data-action-id');
+                        if (! actionId) {
+                            flashActionMessage(blockReq, true, 'Action non sauvegardee : impossible de demander une modification.');
+                            return;
+                        }
+                        var reason = window.prompt(
+                            "Motif de la demande de modification (min 5 caracteres) :\n\nLa demande sera transmise au DG. Le service Planification sera également notifié.",
+                            ''
+                        );
+                        if (reason === null) return;
+                        if (reason.trim().length < 5) {
+                            flashActionMessage(blockReq, true, 'Motif requis (5 caracteres minimum).');
+                            return;
+                        }
+                        target.disabled = true;
+                        target.textContent = 'Envoi…';
+                        var fd = new FormData();
+                        fd.append('_token', csrfToken);
+                        fd.append('reason', reason);
+                        fetch('/workspace/actions/' + actionId + '/demandes-deverrouillage', {
+                            method: 'POST',
+                            body: fd,
+                            credentials: 'same-origin',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+                        }).then(function (resp) {
+                            target.disabled = false;
+                            target.textContent = 'Demande de modification';
+                            if (resp.ok || resp.redirected) {
+                                flashActionMessage(blockReq, false, 'Demande envoyee au DG (Planification en copie).');
+                            } else {
+                                flashActionMessage(blockReq, true, 'Echec de l\'envoi (HTTP ' + resp.status + ').');
+                            }
+                        }).catch(function (err) {
+                            target.disabled = false;
+                            target.textContent = 'Demande de modification';
+                            flashActionMessage(blockReq, true, 'Erreur reseau : ' + (err && err.message ? err.message : 'inconnue'));
+                        });
+                        return;
+                    }
+
+                    // Bouton "Modifier" : ouvre l'accordeon + focus + scroll.
+                    if (target.matches('[data-edit-action]')) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        var blockEdit = target.closest('[data-action-block]');
+                        if (blockEdit instanceof HTMLDetailsElement) {
+                            blockEdit.open = true;
+                            target.classList.add('hidden');
+                            var firstInput = blockEdit.querySelector('input:not([type=hidden]), textarea, select');
+                            if (firstInput) {
+                                firstInput.focus();
+                                blockEdit.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }
+                        return;
+                    }
+
+                    // Bouton "Enregistrer" : sauvegarde AJAX inline de cette action.
+                    if (target.matches('[data-save-action]')) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        var blockSave = target.closest('[data-action-block]');
+                        if (! blockSave || ! inlineUpsertUrl) {
+                            flashActionMessage(blockSave, true, "Sauvegarde inline indisponible en creation. Utilisez 'Enregistrer le PTA' en bas.");
+                            return;
+                        }
+                        var payload = collectActionPayload(blockSave);
+                        target.disabled = true;
+                        target.textContent = 'Sauvegarde…';
+                        fetch(inlineUpsertUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: JSON.stringify(payload),
+                            credentials: 'same-origin',
+                        }).then(function (response) {
+                            return response.json().then(function (data) {
+                                return { ok: response.ok, data: data };
+                            });
+                        }).then(function (result) {
+                            target.disabled = false;
+                            target.textContent = 'Enregistrer';
+                            if (result.ok && result.data && result.data.ok) {
+                                flashActionMessage(blockSave, false, result.data.message || 'Action enregistree.');
+                                // Mettre a jour l'id de l'action (selecteur strict pour ne pas
+                                // attraper les inputs sous_actions[N][id]).
+                                if (result.data.action && result.data.action.id) {
+                                    var blockIndex = blockSave.getAttribute('data-action-index');
+                                    var actionIdInput = blockSave.querySelector('input[name="actions[' + blockIndex + '][id]"]');
+                                    if (actionIdInput) actionIdInput.value = result.data.action.id;
+                                    blockSave.setAttribute('data-action-id', result.data.action.id);
+                                    blockSave.id = 'action-' + result.data.action.id;
+                                }
+                                // Mettre a jour les ids des sous-actions (evite les doublons aux saves suivants).
+                                if (result.data.action && Array.isArray(result.data.action.sous_action_ids)) {
+                                    var blockIndex2 = blockSave.getAttribute('data-action-index');
+                                    var subIdInputs = blockSave.querySelectorAll('input[name^="actions[' + blockIndex2 + '][sous_actions]"][name$="[id]"]');
+                                    result.data.action.sous_action_ids.forEach(function (saId, idx) {
+                                        if (subIdInputs[idx]) subIdInputs[idx].value = saId;
+                                    });
+                                }
+                                // Mettre a jour le titre/summary du heading
+                                var summarySpan = blockSave.querySelector('[data-action-summary]');
+                                if (summarySpan && result.data.action) summarySpan.textContent = result.data.action.libelle;
+                            } else {
+                                var msg = (result.data && result.data.message) || 'Erreur lors de la sauvegarde.';
+                                if (result.data && result.data.errors) {
+                                    msg += ' Champs : ' + Object.keys(result.data.errors).join(', ');
+                                }
+                                flashActionMessage(blockSave, true, msg);
+                            }
+                        }).catch(function (err) {
+                            target.disabled = false;
+                            target.textContent = 'Enregistrer';
+                            flashActionMessage(blockSave, true, 'Erreur reseau : ' + (err && err.message ? err.message : 'inconnue'));
+                        });
+                        return;
+                    }
+
                     if (target.matches('[data-remove-action]')) {
                         event.preventDefault();
                         event.stopPropagation();
                         var block = target.closest('[data-action-block]');
-                        if (block && actionsList.querySelectorAll('[data-action-block]').length > 1) {
+                        if (! block) return;
+                        var actionId = block.getAttribute('data-action-id');
+                        // Si action deja persistee : DELETE AJAX.
+                        if (actionId && actionId !== '' && inlineDeleteUrlBase) {
+                            if (! window.confirm('Supprimer definitivement cette action et tout son contenu (sous-actions, semaines) ?')) return;
+                            var motif = window.prompt('Motif de suppression (min 5 caracteres) :', 'Suppression depuis le formulaire PTA');
+                            if (motif === null || motif.trim().length < 5) {
+                                flashActionMessage(block, true, 'Motif requis (5 caracteres minimum).');
+                                return;
+                            }
+                            target.disabled = true;
+                            var fd = new FormData();
+                            fd.append('_method', 'DELETE');
+                            fd.append('_token', csrfToken);
+                            fd.append('motif', motif);
+                            fetch(inlineDeleteUrlBase + '/' + actionId, {
+                                method: 'POST',
+                                body: fd,
+                                credentials: 'same-origin',
+                                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                            }).then(function (resp) {
+                                target.disabled = false;
+                                if (resp.ok || resp.redirected) {
+                                    block.remove();
+                                    refreshActionIndexes();
+                                } else {
+                                    flashActionMessage(block, true, 'Echec suppression (HTTP ' + resp.status + ').');
+                                }
+                            }).catch(function (err) {
+                                target.disabled = false;
+                                flashActionMessage(block, true, 'Erreur reseau : ' + (err && err.message ? err.message : 'inconnue'));
+                            });
+                            return;
+                        }
+                        // Action non persistee : juste retirer le bloc.
+                        if (actionsList.querySelectorAll('[data-action-block]').length > 1) {
                             block.remove();
                             refreshActionIndexes();
                         }

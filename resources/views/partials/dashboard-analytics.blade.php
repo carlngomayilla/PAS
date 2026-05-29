@@ -98,6 +98,14 @@
         ['label' => 'Non démarrées', 'value' => collect($statusCards)->firstWhere('label', 'Non demarre')['count'] ?? 0, 'accent' => '#6B7280', 'bg' => '#F1F5F9', 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'non_demarre'])],
     ];
     $personalActionsSummary = is_array($analytics['personal_actions_summary'] ?? null) ? $analytics['personal_actions_summary'] : [];
+    $personalTasksPayload = is_array($personalTasks ?? null) ? $personalTasks : [];
+    $personalTaskItems = collect($personalTasksPayload['items'] ?? [])->take(5);
+    $personalTaskSummary = is_array($personalTasksPayload['summary'] ?? null) ? $personalTasksPayload['summary'] : [
+        'total' => $personalTaskItems->count(),
+        'overdue' => $personalTaskItems->where('is_overdue', true)->count(),
+        'critical' => $personalTaskItems->where('criticality', 'critique')->count(),
+        'score' => 100,
+    ];
     if ($dashboardRole !== 'agent' && (int) ($personalActionsSummary['total'] ?? 0) > 0) {
         array_splice($summaryStrip, 1, 0, [[
             'label' => 'Mes actions',
@@ -318,10 +326,10 @@
             'title' => 'Indicateurs',
             'chip' => $fmtPct($globalScores['global'] ?? 0),
             'headers' => ['Indicateur', 'Score', 'Note'],
+            // KPI "Conformite" retire (2026-05-28). Seuls Delai et Performance restent.
             'rows' => [
                 ['cells' => ['Délai', $fmtPct($globalScores['delai'] ?? 0), 'Temps']],
                 ['cells' => ['Perf.', $fmtPct($globalScores['performance'] ?? 0), 'Exéc.']],
-                ['cells' => ['Conf.', $fmtPct($globalScores['conformite'] ?? 0), 'Conformité']],
             ],
         ],
         [
@@ -986,6 +994,9 @@
 @endif
 {{-- Badge redondant supprimé : les informations rôle/périmètre/direction/service/exercice
      sont désormais accessibles via le chip de périmètre dans la navbar (et le filtre exercice). --}}
+
+{{-- Bloc « Centre personnel » retiré du tableau de bord (Synthèse + Graphiques).
+     Les tâches personnelles restent accessibles via le module dédié « Mes tâches ». --}}
 
 @php
     $showRoleOverview = ($roleDashboard['enabled'] ?? false)

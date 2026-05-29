@@ -25,10 +25,18 @@ class ActionFinancingWorkflowTest extends TestCase
         $fixture = $this->createFixture();
         $action = $fixture['action'];
 
-        app(ActionTrackingService::class)->syncFinancingRequest($action, $fixture['service_user']);
+        $trackingService = app(ActionTrackingService::class);
+        $trackingService->syncFinancingRequest($action, $fixture['service_user']);
         app(WorkspaceNotificationService::class)->notifyActionFinancingRequested($action->fresh(), $fixture['service_user']);
 
         $this->assertNotNull($fixture['daf_director']->fresh()->notifications()->first());
+
+        $trackingService->reviewClosureByChef($action->fresh(), [
+            'decision_validation' => 'valider',
+            'motif_validation_chef' => 'Validation chef avant transmission DAF.',
+        ], $fixture['service_user']);
+        $action->refresh();
+        $this->assertSame(Action::FINANCEMENT_SOUMIS_DAF, $action->financement_statut);
 
         $this->actingAs($fixture['daf_director'])
             ->get(route('workspace.actions.suivi', $action))
@@ -45,7 +53,7 @@ class ActionFinancingWorkflowTest extends TestCase
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
         $action->refresh();
-        $this->assertSame(Action::FINANCEMENT_VALIDE_DAF, $action->financement_statut);
+        $this->assertSame(Action::FINANCEMENT_TRANSMIS_DG, $action->financement_statut);
         $this->assertSame((int) $fixture['daf_director']->id, (int) $action->financement_daf_par);
         $this->assertSame('DAF-2026-001', $action->financement_reference);
         $this->assertNotNull($fixture['dg']->fresh()->notifications()->first());
@@ -104,6 +112,47 @@ class ActionFinancingWorkflowTest extends TestCase
             ->assertSee('Action avec besoin de financement')
             ->assertSee('Budget interne')
             ->assertDontSee('Action sans financement DAF');
+    }
+
+    public function test_daf_can_request_financing_complement_without_transmitting_to_dg(): void
+    {
+        $fixture = $this->createFixture();
+        $action = $fixture['action'];
+
+        $trackingService = app(ActionTrackingService::class);
+        $trackingService->reviewClosureByChef($action->fresh(), [
+            'decision_validation' => 'valider',
+            'motif_validation_chef' => 'Validation chef avant analyse DAF.',
+        ], $fixture['service_user']);
+
+        $action->refresh();
+        $this->assertSame(Action::FINANCEMENT_SOUMIS_DAF, $action->financement_statut);
+
+        $this->actingAs($fixture['daf_director'])
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('Demander un complement');
+
+        $this->actingAs($fixture['daf_director'])
+            ->post(route('workspace.actions.financement.daf', $action), [
+                'decision_financement' => ActionTrackingService::FINANCEMENT_DECISION_COMPLEMENT,
+                'commentaire_financement' => 'Merci de joindre le devis fournisseur.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $action->refresh();
+        $this->assertSame(Action::FINANCEMENT_COMPLEMENT_DEMANDE, $action->financement_statut);
+        $this->assertSame(ActionTrackingService::FINANCEMENT_DECISION_COMPLEMENT, $action->financement_daf_decision);
+        $this->assertNull($action->financement_dg_par);
+        $this->assertNotNull($fixture['agent']->fresh()->notifications()->first());
+        $this->assertNotNull($fixture['service_user']->fresh()->notifications()->first());
+        $this->assertFalse($fixture['dg']->fresh()->notifications->contains(
+            fn ($notification): bool => ($notification->data['title'] ?? '') === 'Complement demande par la DAF'
+        ));
+        $this->assertDatabaseHas('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'financement_complement_demande',
+        ]);
     }
 
     /**
@@ -201,7 +250,6 @@ class ActionFinancingWorkflowTest extends TestCase
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-31',
             'date_echeance' => '2026-01-31',
-            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
             'responsable_id' => $agent->id,
             'statut' => 'non_demarre',
             'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,

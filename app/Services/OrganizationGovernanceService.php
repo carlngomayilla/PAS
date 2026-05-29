@@ -22,7 +22,8 @@ class OrganizationGovernanceService
             ->where('module', 'super_admin')
             ->where(function ($query): void {
                 $query->where('action', 'like', 'organization_%')
-                    ->orWhere('action', 'like', 'role_registry_%');
+                    ->orWhere('action', 'like', 'role_registry_%')
+                    ->orWhere('action', 'like', 'deletion_request_%');
             })
             ->latest('id')
             ->limit(max(1, $limit))

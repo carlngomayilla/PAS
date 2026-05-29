@@ -111,7 +111,7 @@
                             <label for="statut" class="hidden">Statut</label>
                             <select id="statut" class="hidden" disabled>
                                 @foreach ($statusOptions as $status)
-                                    <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'brouillon') === $status)>{{ $workflowStatusLabel($status) }}</option>
+                                    <option value="{{ $status }}" @selected(old('statut', $row->statut ?: 'valide') === $status)>{{ $workflowStatusLabel($status) }}</option>
                                 @endforeach
                             </select>
                         </div>

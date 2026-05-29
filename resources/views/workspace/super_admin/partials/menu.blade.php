@@ -28,6 +28,7 @@
             'description' => 'Workflow, Indicateur de performance, référentiels.',
             'links' => [
                 ['label' => 'Workflow', 'description' => 'Circuits Actions, PAS, PAO, PTA.', 'route' => route('workspace.super-admin.workflow.edit'), 'active' => request()->routeIs('workspace.super-admin.workflow.*')],
+                ['label' => 'Exercices', 'description' => 'Periodes et exercice actif.', 'route' => route('workspace.super-admin.exercises.index'), 'active' => request()->routeIs('workspace.super-admin.exercises.*')],
                 ['label' => 'Calcul', 'description' => 'Base statistique et règles.', 'route' => route('workspace.super-admin.calculation.edit'), 'active' => request()->routeIs('workspace.super-admin.calculation.*')],
                 ['label' => 'Actions', 'description' => 'Clôture et suspension.', 'route' => route('workspace.super-admin.action-policies.edit'), 'active' => request()->routeIs('workspace.super-admin.action-policies.*')],
                 ['label' => 'Référentiels', 'description' => 'Libellés, unités, priorités.', 'route' => route('workspace.super-admin.referentials.edit'), 'active' => request()->routeIs('workspace.super-admin.referentials.*')],

@@ -17,15 +17,14 @@ class ActionObserver
     // Other changes (comments, resources, risks) only invalidate the dashboard.
     //
     // A38 — Ajout des champs d evaluation/cible qui impactent les KPI consolides
-    // (seuil_minimum modifie la grille de scoring, evaluation_note influence
-    // le rapport de validation, taux_realisation_global est la projection).
+    // (seuil_minimum modifie la grille de scoring, taux_realisation_global est la projection).
+    // Spec v2 (2026-05-28) : evaluation_note retire ; le chef ne note plus.
     private const REPORTING_FIELDS = [
         'pta_id', 'date_debut', 'date_fin', 'exercice_id',
         'statut_dynamique', 'statut_validation',
         'financement_statut', 'financement_requis',
         'progression_reelle', 'type_cible',
         'seuil_minimum', 'seuil_mode', 'seuil_t1', 'seuil_t2', 'seuil_t3', 'seuil_t4',
-        'evaluation_note',
         'taux_realisation_global', 'taux_global', 'taux_atteinte_cible',
         'quantite_cible', 'mode_evaluation',
     ];

@@ -23,6 +23,7 @@ use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\DynamicReferentialSettings;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\PlanningModificationLockService;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -62,7 +63,7 @@ class ActionWebController extends Controller
         $actionRelations = [
             'pta:id,pao_id,direction_id,service_id,titre,statut',
             'responsable:id,name,email',
-            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite',
+            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance',
         ];
         if (Schema::hasTable('action_responsables')) {
             $actionRelations[] = 'responsables:id,name,email';
@@ -90,9 +91,9 @@ class ActionWebController extends Controller
             'kpi_performance_desc' => $query->orderByDesc(
                 ActionKpi::query()->select('kpi_performance')->whereColumn('action_id', 'actions.id')->limit(1)
             )->orderByDesc('id'),
-            'kpi_conformite_desc' => $query->orderByDesc(
-                ActionKpi::query()->select('kpi_conformite')->whereColumn('action_id', 'actions.id')->limit(1)
-            )->orderByDesc('id'),
+            // 'kpi_conformite_desc' supprime (spec v2 : KPI conformite retire).
+            // L'option est neutralisee : si le front envoie encore cette valeur,
+            // on retombe sur le tri par defaut.
             'kpi_global_desc' => $query->orderByDesc(
                 ActionKpi::query()->select('kpi_global')->whereColumn('action_id', 'actions.id')->limit(1)
             )->orderByDesc('id'),
@@ -149,6 +150,10 @@ class ActionWebController extends Controller
         $action->loadMissing('pta:id,direction_id,service_id,statut');
         $this->denyUnlessActionManager($user, (int) $action->pta?->direction_id, (int) $action->pta?->service_id);
 
+        if ($message = app(PlanningModificationLockService::class)->ensureUnlocked($action, $user)) {
+            return response()->json(['error' => $message], 409);
+        }
+
         $statut = $request->string('statut')->toString();
         if (! in_array($statut, [ActionTrackingService::STATUS_SUSPENDU, ActionTrackingService::STATUS_ANNULE], true)) {
             return response()->json(['error' => 'Statut non autorisé via glisser-déposer.'], 422);
@@ -173,6 +178,7 @@ class ActionWebController extends Controller
             'statut' => $statut,
             'statut_dynamique' => $statut,
         ])->save();
+        app(PlanningModificationLockService::class)->lockAfterSave($action->refresh(), $user);
 
         $this->recordAudit($request, 'action', 'quick_status', $action, $before, $action->only(['statut', 'statut_dynamique']));
 
@@ -292,73 +298,9 @@ class ActionWebController extends Controller
         ]);
     }
 
-    /** Affiche le formulaire de création d'une nouvelle action dans un PTA. */
-    public function create(Request $request): View
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $this->canManageActions($user)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        $ptaOptions = $this->ptaOptions($user);
-        $objectifOptions = $this->objectifOperationnelOptions($user);
-        $prefilledObjectifId = $request->filled('objectif_operationnel_id')
-            ? (int) $request->integer('objectif_operationnel_id')
-            : null;
-        if ($prefilledObjectifId === null && $request->filled('pta_id')) {
-            $prefilledObjectifId = Pta::query()
-                ->whereKey((int) $request->integer('pta_id'))
-                ->value('objectif_operationnel_id');
-            $prefilledObjectifId = $prefilledObjectifId !== null ? (int) $prefilledObjectifId : null;
-        }
-        if ($prefilledObjectifId === null && $request->filled('pao_id')) {
-            $prefilledObjectifId = ObjectifOperationnel::query()
-                ->where('pao_id', (int) $request->integer('pao_id'))
-                ->orderBy('id')
-                ->value('id');
-            $prefilledObjectifId = $prefilledObjectifId !== null ? (int) $prefilledObjectifId : null;
-        }
-
-        return view('workspace.actions.form', [
-            'mode' => 'create',
-            'row' => new Action([
-                'pta_id' => $request->filled('pta_id') ? (int) $request->integer('pta_id') : null,
-                'pao_id' => $request->filled('pao_id') ? (int) $request->integer('pao_id') : null,
-                'objectif_operationnel_id' => $prefilledObjectifId,
-                'type_cible' => 'quantitative',
-                'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
-                'contexte_action' => (string) $request->string('vue') === 'mes_actions'
-                    ? Action::CONTEXT_OPERATIONNEL
-                    : Action::CONTEXT_PILOTAGE,
-                'origine_action' => (string) $request->string('vue') === 'mes_actions'
-                    ? Action::ORIGIN_INTERNE
-                    : Action::ORIGIN_PTA,
-                'statut' => 'non_demarre',
-                'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
-                'financement_requis' => false,
-                'seuil_alerte_progression' => 10,
-            ]),
-            'ptaOptions' => $ptaOptions,
-            'objectifOptions' => $objectifOptions,
-            'actionOptions' => $this->actionOptions($user),
-            'paoOptions' => collect(),
-            'responsableOptions' => $this->responsableOptions($user),
-            'statusOptions' => ActionTrackingService::dynamicStatusOptions(),
-            'contextOptions' => Action::contextOptions(),
-            'originOptions' => Action::originOptions(),
-            'financingStatusOptions' => Action::financingStatusOptions(),
-            'indicatorPeriodicityOptions' => $this->indicatorPeriodicityOptions(),
-            'indicatorModeOptions' => $this->indicatorInputModeOptions(),
-            'targetTypeOptions' => $this->actionTargetTypeOptions(),
-            'actionUnitSuggestions' => $this->actionUnitSuggestions(),
-            'kpiUnitSuggestions' => app(DynamicReferentialSettings::class)->kpiUnitSuggestions(),
-            'actionManagementSettings' => app(ActionManagementSettings::class),
-        ]);
-    }
+    // Note (2026-05-29) : methode create() supprimee. La creation d'action passe
+    // exclusivement par le formulaire PTA (cf. route closure dans web.php ligne 260
+    // qui redirige /workspace/actions/create vers /workspace/pta).
 
     /** Valide et enregistre une nouvelle action en base de données. */
     public function store(
@@ -395,7 +337,7 @@ class ActionWebController extends Controller
         $validated['pta_id'] = (int) $pta->id;
         $validated['objectif_operationnel_id'] = (int) $objectifOperationnel->id;
 
-        if ($pta->statut === 'verrouille') {
+        if (in_array((string) $pta->statut, ['cloture', 'archive'], true)) {
             return back()->withInput()->withErrors([
                 'pta_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Creation'),
             ]);
@@ -414,10 +356,15 @@ class ActionWebController extends Controller
                 ->where('objectif_operationnel_id', (int) $objectifOperationnel->id)
                 ->firstOrFail()
             : null;
+        $lockService = app(PlanningModificationLockService::class);
+        if ($existingAction instanceof Action) {
+            if ($message = $lockService->ensureUnlocked($existingAction, $user)) {
+                return back()->withInput()->withErrors(['general' => $message]);
+            }
+        }
 
         $action = DB::transaction(function () use ($validated, $indicatorPayload, $request, $trackingService, $indicatorService, $user, $secureStorage, $pta, $rmoIds, $subActionsPayload, $existingAction): Action {
             $payload = $validated;
-            $payload['frequence_execution'] = $payload['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
             $payload['date_echeance'] = $payload['date_fin'];
             $payload['exercice_id'] = $pta->exercice_id;
             $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds);
@@ -473,6 +420,7 @@ class ActionWebController extends Controller
 
             return $action;
         });
+        $lockService->lockAfterSave($action->refresh(), $user);
 
         $this->recordAudit($request, 'action', $existingAction instanceof Action ? 'update' : 'create', $action, null, $action->toArray());
         $notificationService->notifyActionAssigned($action, $user);
@@ -488,51 +436,29 @@ class ActionWebController extends Controller
                 : 'Action creee avec succes et semaines generees automatiquement.');
     }
 
-    /** Affiche le formulaire de modification d'une action existante. */
-    public function edit(Request $request, Action $action): View
+    /**
+     * Redirige vers le formulaire PTA avec une ancre sur la section de l'action.
+     *
+     * Regle metier ANBG (2026-05-28) : une action est TOUJOURS rattachee a un PTA.
+     * Le formulaire standalone (workspace.actions.form.blade.php) a ete supprime
+     * (2026-05-29). Le parametrage et la modification d'une action passent
+     * exclusivement par le formulaire PTA, qui expose le contexte complet
+     * (sous-actions, objectif operationnel, responsables, etc.).
+     */
+    public function edit(Request $request, Action $action): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
         }
 
-        $editRelations = [
-            'pta:id,direction_id,service_id',
-            'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
-            'sousActions:id,action_id,agent_id,libelle,description,resultat_attendu,cible_prevue,unite,commentaire,date_debut,date_fin,quantite_realisee,resultat_obtenu,taux_realisation,statut,est_effectuee,taux_execution',
-        ];
-        if (Schema::hasTable('action_responsables')) {
-            $editRelations[] = 'responsables:id,name,email';
+        if (! $action->pta_id) {
+            abort(404, 'Action orpheline sans PTA rattache : configuration de donnee invalide.');
         }
-        $action->loadMissing($editRelations);
-        $this->denyUnlessActionManager(
-            $user,
-            (int) $action->pta?->direction_id,
-            (int) $action->pta?->service_id
+
+        return redirect()->away(
+            route('workspace.pta.edit', $action->pta_id).'#action-'.$action->id
         );
-
-        $ptaOptions = $this->ptaOptions($user);
-        $objectifOptions = $this->objectifOperationnelOptions($user, (int) $action->objectif_operationnel_id);
-
-        return view('workspace.actions.form', [
-            'mode' => 'edit',
-            'row' => $action,
-            'ptaOptions' => $ptaOptions,
-            'objectifOptions' => $objectifOptions,
-            'actionOptions' => $this->actionOptions($user, (int) $action->id),
-            'paoOptions' => collect(),
-            'responsableOptions' => $this->responsableOptions($user),
-            'statusOptions' => ActionTrackingService::dynamicStatusOptions(),
-            'contextOptions' => Action::contextOptions(),
-            'originOptions' => Action::originOptions(),
-            'financingStatusOptions' => Action::financingStatusOptions(),
-            'indicatorPeriodicityOptions' => $this->indicatorPeriodicityOptions(),
-            'indicatorModeOptions' => $this->indicatorInputModeOptions(),
-            'targetTypeOptions' => $this->actionTargetTypeOptions(),
-            'actionUnitSuggestions' => $this->actionUnitSuggestions(),
-            'kpiUnitSuggestions' => app(DynamicReferentialSettings::class)->kpiUnitSuggestions(),
-            'actionManagementSettings' => app(ActionManagementSettings::class),
-        ]);
     }
 
     /** Valide et sauvegarde les modifications apportées à une action. */
@@ -551,10 +477,14 @@ class ActionWebController extends Controller
 
         $action->loadMissing('pta:id,direction_id,service_id,statut');
 
-        if ($action->pta?->statut === 'verrouille') {
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour'),
             ]);
+        }
+        $lockService = app(PlanningModificationLockService::class);
+        if ($message = $lockService->ensureUnlocked($action, $user)) {
+            return back()->withErrors(['general' => $message]);
         }
 
         $validated = $request->validated();
@@ -571,7 +501,7 @@ class ActionWebController extends Controller
         $validated['pta_id'] = (int) $targetPta->id;
         $validated['objectif_operationnel_id'] = (int) $objectifOperationnel->id;
 
-        if ($targetPta->statut === 'verrouille') {
+        if (in_array((string) $targetPta->statut, ['cloture', 'archive'], true)) {
             return back()->withInput()->withErrors([
                 'pta_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
             ]);
@@ -590,8 +520,7 @@ class ActionWebController extends Controller
 
         $dateChanged = (string) $action->date_debut !== (string) ($validated['date_debut'] ?? null)
             || (string) $action->date_fin !== (string) ($validated['date_fin'] ?? null);
-        $frequencyChanged = (string) ($action->frequence_execution ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE)
-            !== (string) ($validated['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE);
+        $frequencyChanged = false;
         $targetTypeChanged = (string) $action->type_cible !== (string) ($validated['type_cible'] ?? '');
 
         if (($dateChanged || $frequencyChanged || $targetTypeChanged) && ! $trackingService->canRegenerateWeeks($action)) {
@@ -647,6 +576,9 @@ class ActionWebController extends Controller
         });
 
         $action->refresh();
+        $lockService->lockAfterSave($action, $user);
+        $action->refresh();
+
         if ($this->shouldResubmitFinancingRequest($before, $action)) {
             $this->resetFinancingWorkflow($action);
             $trackingService->syncFinancingRequest($action, $user);
@@ -701,27 +633,53 @@ class ActionWebController extends Controller
             (int) $action->pta?->service_id
         );
 
-        if ($action->pta?->statut === 'verrouille') {
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Suppression'),
             ]);
         }
+        if ($message = app(PlanningModificationLockService::class)->ensureUnlocked($action, $user)) {
+            return back()->withErrors(['general' => $message]);
+        }
+
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+        $deletionRequests = app(\App\Services\DeletionRequestService::class);
+        // Super Admin et DG peuvent supprimer directement avec cascade (sous-actions
+        // et semaines associees). Les autres roles passent par le workflow de demande.
+        $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
+        if (! $canDeleteDirectly) {
+            $deletionRequest = $deletionRequests->requestBusinessDeletion($action, $user, (string) $validated['motif'], 'action');
+            $this->recordAudit($request, 'action', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
+
+            return redirect()
+                ->route('workspace.actions.index')
+                ->with('success', 'Demande de suppression action transmise au Super Admin.');
+        }
 
         $before = $action->toArray();
+        $impact = $deletionRequests->impactForEntity($action);
 
-        DB::transaction(function () use ($action, $secureStorage): void {
+        DB::transaction(function () use ($action, $secureStorage, $deletionRequests): void {
             $documents = $action->justificatifs()->get(['id', 'chemin_stockage']);
             $paths = $documents->pluck('chemin_stockage')->filter()->all();
 
             $action->justificatifs()->delete();
-            $action->delete();
+            // Cascade complete : sous-actions, semaines, responsables associes
+            // (via deleteBusinessTarget) avant la suppression de l'action elle-meme.
+            $deletionRequests->deleteBusinessTarget($action);
 
             foreach ($paths as $path) {
                 $secureStorage->deleteByPath((string) $path);
             }
         });
 
-        $this->recordAudit($request, 'action', 'delete', $action, $before, null);
+        $this->recordAudit($request, 'action', 'delete', $action, [
+            ...$before,
+            'deletion_reason' => (string) $validated['motif'],
+            'impact' => $impact,
+        ], null);
 
         return redirect()
             ->route('workspace.actions.index')
@@ -765,9 +723,9 @@ class ActionWebController extends Controller
     private function resetFinancingWorkflow(Action $action): void
     {
         $action->forceFill([
-            'financement_statut' => Action::FINANCEMENT_A_TRAITER_DAF,
-            'financement_soumis_le' => now(),
-            'financement_notifie_le' => null,
+            'financement_statut' => Action::FINANCEMENT_PRE_SIGNALE_DAF,
+            'financement_soumis_le' => null,
+            'financement_notifie_le' => now(),
             'financement_daf_par' => null,
             'financement_daf_le' => null,
             'financement_daf_decision' => null,
@@ -782,8 +740,6 @@ class ActionWebController extends Controller
     }
     private function normalizeActionPayload(array $validated): array
     {
-        $validated['frequence_execution'] = $validated['frequence_execution']
-            ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
         $validated['seuil_alerte_progression'] = $validated['seuil_alerte_progression'] ?? 10;
         $validated['contexte_action'] = (string) ($validated['contexte_action'] ?? Action::CONTEXT_PILOTAGE);
         $validated['origine_action'] = (string) ($validated['origine_action'] ?? (
@@ -802,9 +758,12 @@ class ActionWebController extends Controller
             $validated['unite_cible'] = null;
             $validated['quantite_cible'] = null;
         }
-        $validated['mode_evaluation'] = $type === 'quantitative'
-            ? Action::MODE_QUANTITATIF
-            : Action::MODE_SOUS_ACTIONS;
+        $validated['mode_evaluation'] = match ($type) {
+            'quantitative' => Action::MODE_QUANTITATIF,
+            Action::MODE_SANS_QUANTITE => Action::MODE_SANS_QUANTITE,
+            default => Action::MODE_SOUS_ACTIONS,
+        };
+        $validated['type_cible'] = $type === 'quantitative' ? 'quantitative' : 'qualitative';
 
         $validated['seuil_mode'] = in_array(($validated['seuil_mode'] ?? 'unique'), ['unique', 'trimestriel'], true)
             ? (string) $validated['seuil_mode']
@@ -827,7 +786,29 @@ class ActionWebController extends Controller
                 ? trim((string) $validated['livrable_attendu'])
                 : null;
 
-        if (! (bool) ($validated['ressource_autres'] ?? false)) {
+        $resources = collect($validated['ressources_necessaires'] ?? [])
+            ->filter(fn ($value): bool => is_string($value) && array_key_exists($value, Action::resourceOptions()))
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($resources !== []) {
+            $validated['ressources_necessaires'] = $resources;
+            $validated['ressource_main_oeuvre'] = in_array('main_oeuvre', $resources, true)
+                || in_array('ressources_humaines', $resources, true);
+            $validated['ressource_equipement'] = in_array('ressources_materielles', $resources, true)
+                || in_array('ressources_informatiques', $resources, true);
+            $validated['ressource_partenariat'] = in_array('partenariat', $resources, true);
+            $validated['ressource_autres'] = in_array('autres_ressources', $resources, true);
+        }
+
+        if (array_key_exists('ressources_details', $validated)) {
+            $validated['ressource_autres_details'] = $validated['ressources_details'];
+        }
+
+        if (! (bool) ($validated['ressource_autres'] ?? false)
+            && trim((string) ($validated['ressources_details'] ?? $validated['ressource_autres_details'] ?? '')) === ''
+        ) {
             $validated['ressource_autres_details'] = null;
         }
 
@@ -840,8 +821,14 @@ class ActionWebController extends Controller
             $validated['description_financement'] = $validated['nature_financement'];
         }
 
-        $validated['ressource_main_oeuvre'] = false;
-        unset($validated['rmo_ids'], $validated['sous_actions'], $validated['existing_action_id'], $validated['statut'], $validated['statut_dynamique']);
+        unset(
+            $validated['rmo_ids'],
+            $validated['sous_actions'],
+            $validated['existing_action_id'],
+            $validated['statut'],
+            $validated['statut_dynamique'],
+            $validated['frequence_execution']
+        );
 
         return $validated;
     }
@@ -942,7 +929,7 @@ class ActionWebController extends Controller
                 'quantite_realisee' => 0,
                 'resultat_obtenu' => null,
                 'taux_realisation' => 0,
-                'statut' => 'a_faire',
+                'statut' => 'non_demarre',
                 'est_effectuee' => false,
                 'taux_execution' => 0,
             ]);
@@ -1461,6 +1448,12 @@ class ActionWebController extends Controller
         }
 
         if ($user->isAgent()) {
+            $query->where(function (Builder $parameterQuery): void {
+                $parameterQuery
+                    ->whereNull('statut_parametrage')
+                    ->orWhere('statut_parametrage', '!=', 'a_parametrer');
+            });
+
             $query->where(function (Builder $agentQuery) use ($user): void {
                 $agentQuery->where('responsable_id', (int) $user->id);
 
@@ -1576,7 +1569,9 @@ class ActionWebController extends Controller
             ->join('action_kpis', 'action_kpis.action_id', '=', 'filtered_actions.id');
 
         $avgKpiGlobal = (clone $kpiBase)->avg('action_kpis.kpi_performance');
-        $avgConformite = (clone $kpiBase)->avg('action_kpis.kpi_conformite');
+        // Spec v2 : KPI conformite supprime. La cle 'avg_conformite' reste a 0
+        // pour ne pas casser les vues frontales legacy qui la consomment encore.
+        $avgConformite = 0.0;
 
         return [
             'total' => (int) ($stats?->total ?? 0),
@@ -1600,9 +1595,8 @@ class ActionWebController extends Controller
             ActionTrackingService::VALIDATION_NON_SOUMISE,
             ActionTrackingService::VALIDATION_SOUMISE_CHEF,
             ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-            ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
-            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ];
     }
 
@@ -1616,7 +1610,6 @@ class ActionWebController extends Controller
             'progression_desc' => 'Progression la plus forte',
             'kpi_delai_desc' => UiLabel::metric('delai').' le plus eleve',
             'kpi_performance_desc' => UiLabel::metric('performance').' le plus eleve',
-            'kpi_conformite_desc' => UiLabel::metric('conformite').' le plus eleve',
             'kpi_global_desc' => UiLabel::metric('global').' le plus eleve',
         ];
     }

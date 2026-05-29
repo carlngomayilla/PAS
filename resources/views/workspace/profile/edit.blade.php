@@ -126,15 +126,30 @@
                 <div class="form-grid">
                     <div>
                         <label for="current_password">Mot de passe actuel</label>
-                        <input id="current_password" name="current_password" type="password">
+                        <div class="relative">
+                            <input id="current_password" name="current_password" type="password" @required($passwordExpired)>
+                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="current_password">
+                                Voir
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label for="password">Nouveau mot de passe</label>
-                        <input id="password" name="password" type="password">
+                        <div class="relative">
+                            <input id="password" name="password" type="password" @required($passwordExpired)>
+                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="password">
+                                Voir
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label for="password_confirmation">Confirmation</label>
-                        <input id="password_confirmation" name="password_confirmation" type="password">
+                        <div class="relative">
+                            <input id="password_confirmation" name="password_confirmation" type="password" @required($passwordExpired)>
+                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="password_confirmation">
+                                Voir
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -206,4 +221,19 @@
         </div>
     </section>
     </div>
+
+    <script>
+        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var input = document.getElementById(button.dataset.passwordToggle);
+                if (! input) {
+                    return;
+                }
+
+                var isHidden = input.type === 'password';
+                input.type = isHidden ? 'text' : 'password';
+                button.textContent = isHidden ? 'Cacher' : 'Voir';
+            });
+        });
+    </script>
 @endsection

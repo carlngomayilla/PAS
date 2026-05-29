@@ -14,6 +14,10 @@ class Pas extends Model
     use HasFactory;
     use SoftDeletes;
 
+    public const STATUS_ACTIF = 'actif';
+    public const STATUS_CLOTURE = 'cloture';
+    public const STATUS_ARCHIVE = 'archive';
+
     protected $table = 'pas';
 
     /**
@@ -38,6 +42,11 @@ class Pas extends Model
             'exercice_id' => 'integer',
             'valide_le' => 'datetime',
             'deleted_at' => 'datetime',
+            'modification_locked_at' => 'datetime',
+            'modification_locked_by' => 'integer',
+            'modification_unlocked_at' => 'datetime',
+            'modification_unlocked_by' => 'integer',
+            'modification_unlock_expires_at' => 'datetime',
         ];
     }
 

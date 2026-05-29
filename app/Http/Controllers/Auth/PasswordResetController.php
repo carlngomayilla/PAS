@@ -8,9 +8,11 @@ use App\Services\Security\PasswordPolicyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Throwable;
 
 /**
  * Flow public de réinitialisation de mot de passe :
@@ -40,7 +42,20 @@ class PasswordResetController extends Controller
             'email' => ['required', 'email', 'max:255'],
         ]);
 
-        $status = Password::sendResetLink($request->only('email'));
+        try {
+            $status = Password::sendResetLink($request->only('email'));
+        } catch (Throwable $exception) {
+            Log::warning('Password reset link could not be sent.', [
+                'email' => (string) $request->input('email'),
+                'exception' => $exception->getMessage(),
+            ]);
+
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors([
+                    'email' => "Le service d'envoi d'e-mail est indisponible. Verifiez la configuration SMTP/Brevo puis reessayez.",
+                ]);
+        }
 
         return back()->with('status', $status === Password::RESET_LINK_SENT
             ? "Si un compte existe pour cet e-mail, un lien de réinitialisation vient d'être envoyé."
@@ -78,7 +93,7 @@ class PasswordResetController extends Controller
         );
 
         if ($status === Password::PASSWORD_RESET) {
-            return redirect()->route('login')
+            return redirect()->route('login.form')
                 ->with('status', 'Votre mot de passe a été réinitialisé. Vous pouvez maintenant vous connecter.');
         }
 

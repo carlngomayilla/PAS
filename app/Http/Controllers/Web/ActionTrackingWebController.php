@@ -8,11 +8,14 @@ use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Models\Action;
 use App\Models\ActionLog;
+use App\Models\DeadlineExtensionRequest;
 use App\Models\Justificatif;
 use App\Models\SousAction;
 use App\Models\User;
 use App\Services\ActionManagementSettings;
+use App\Services\Actions\ActionBusinessRules;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\Actions\DeadlineExtensionRequestService;
 use App\Services\DocumentPolicySettings;
 use App\Services\DynamicReferentialSettings;
 use App\Services\Governance\DelegationService;
@@ -76,17 +79,29 @@ class ActionTrackingWebController extends Controller
                 'sousAction:id,libelle',
             ])->latest(),
             'actionLogs' => fn ($q) => $q->with('utilisateur:id,name,email')->latest()->limit(80),
+            'deadlineExtensionRequests' => fn ($q) => $q->with([
+                'sousAction:id,libelle',
+                'requestedBy:id,name,email',
+                'sciqReviewedBy:id,name,email',
+                'dgDecidedBy:id,name,email',
+            ])->latest(),
         ]);
 
         return view('workspace.actions.suivi', [
             'action' => $action,
             'canTrackWeekly' => $this->canTrackWeekly($user, $action) && $this->isExecutionEditableByAgent($action),
+            'canSubmitAssignedSubActions' => $this->isExecutionEditableByAgent($action),
             'canManageAction' => $this->canManageAction($user, $action),
             'canReviewClosure' => $this->canReviewByChef($user, $action),
+            'canRequestDeadlineExtension' => $this->canManageAction($user, $action),
+            'canReviewDeadlineExtensionBySciq' => $this->canReviewDeadlineExtensionBySciq($user),
+            'canReviewDeadlineExtensionByDg' => $this->canReviewDeadlineExtensionByDg($user),
             // canReviewDirection retire : l'etape de validation direction
             // a ete supprimee du circuit. Voir WorkflowSettings.
             'canReviewFinancingByDaf' => $this->canReviewFinancingByDaf($user, $action),
             'canReviewFinancingByDg' => $this->canReviewFinancingByDg($user, $action),
+            'canSignalControlAnomaly' => $this->canSignalControlAnomaly($user, $action),
+            'canResolveControlAnomaly' => $this->canResolveControlAnomaly($user, $action),
             'workflowConfig' => $this->workflowSettings()->actionValidationSummary(),
             'justificatifCategoryLabels' => app(DynamicReferentialSettings::class)->justificatifCategoryLabels(),
             'alertLevelLabels' => app(DynamicReferentialSettings::class)->alertLevelLabels(),
@@ -95,179 +110,11 @@ class ActionTrackingWebController extends Controller
         ]);
     }
 
-    public function storeSubAction(
-        Request $request,
-        Action $action,
-        ActionTrackingService $trackingService,
-        SecureJustificatifStorage $secureStorage,
-        WorkspaceNotificationService $notificationService
-    ): RedirectResponse {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        $action->loadMissing('pta:id,direction_id,service_id,statut,date_debut,date_fin,responsable_id');
-        if (! $this->canTrackWeekly($user, $action)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors([
-                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Creation de sous-action'),
-            ]);
-        }
-
-        if (! $this->isExecutionEditableByAgent($action)) {
-            return back()->withErrors([
-                'general' => 'Saisie gelee: action en cours de validation. Modifications autorisees uniquement apres rejet motive.',
-            ]);
-        }
-
-        /** @var array<string, mixed> $validated */
-        $validated = $request->validate([
-            'libelle_sous_action' => ['required', 'string', 'max:255'],
-            'description_sous_action' => ['nullable', 'string', 'max:5000'],
-            'resultat_attendu' => ['nullable', 'string', 'max:5000'],
-            'cible_prevue' => ['nullable', 'numeric', 'min:0'],
-            'quantite_realisee' => ['nullable', 'numeric', 'min:0'],
-            'unite' => ['nullable', 'string', 'max:100'],
-            'resultat_obtenu' => ['nullable', 'string', 'max:5000'],
-            'date_debut' => ['required', 'date'],
-            'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
-            'commentaire' => ['nullable', 'string', 'max:5000'],
-            'est_effectuee' => ['nullable', 'boolean'],
-            'justificatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
-        ]);
-
-        $isDone = $request->boolean('est_effectuee');
-        if ($isDone && (trim((string) ($validated['commentaire'] ?? '')) === '' || ! $request->hasFile('justificatif'))) {
-            return back()->withInput()->withErrors([
-                'general' => 'Veuillez ajouter un commentaire de realisation et un justificatif avant de marquer cette sous-action comme realisee.',
-            ]);
-        }
-
-        if ($action->usesQuantitativeProgress() && $isDone && (float) ($validated['quantite_realisee'] ?? 0) <= 0) {
-            return back()->withInput()->withErrors([
-                'quantite_realisee' => 'La quantite realisee est obligatoire pour une sous-action quantitative effectuee.',
-            ]);
-        }
-
-        if ($action->date_debut !== null
-            && Carbon::parse((string) $validated['date_debut'])->startOfDay()->lt(Carbon::parse($action->date_debut)->startOfDay())
-        ) {
-            return back()->withErrors([
-                'date_debut' => 'La date de debut de la sous-action doit rester dans la periode de l action.',
-            ])->withInput();
-        }
-
-        if ($action->date_fin !== null
-            && Carbon::parse((string) $validated['date_fin'])->startOfDay()->gt(Carbon::parse($action->date_fin)->startOfDay())
-        ) {
-            return back()->withErrors([
-                'date_fin' => 'La date de fin de la sous-action ne doit pas depasser l echeance de l action.',
-            ])->withInput();
-        }
-
-        $sousAction = DB::transaction(function () use ($action, $validated, $user, $request, $secureStorage, $isDone): SousAction {
-            $plannedTarget = $validated['cible_prevue'] ?? null;
-            $realizedValue = max(0.0, (float) ($validated['quantite_realisee'] ?? 0));
-            $plannedTargetValue = $plannedTarget === null || $plannedTarget === '' ? null : max(0.0, (float) $plannedTarget);
-            $completionRate = $plannedTargetValue !== null && $plannedTargetValue > 0.0
-                ? round(min(100.0, ($realizedValue / $plannedTargetValue) * 100), 2)
-                : ($isDone ? 100 : 0);
-
-            $sousAction = $action->sousActions()->create([
-                'agent_id' => (int) $user->id,
-                'libelle' => trim((string) $validated['libelle_sous_action']),
-                'description' => $validated['description_sous_action'] ?? null,
-                'resultat_attendu' => $validated['resultat_attendu'] ?? null,
-                'cible_prevue' => $plannedTargetValue,
-                'quantite_realisee' => $realizedValue,
-                'unite' => ($validated['unite'] ?? null) ?: $action->unite_cible,
-                'resultat_obtenu' => $validated['resultat_obtenu'] ?? null,
-                'taux_realisation' => $completionRate,
-                'commentaire' => $validated['commentaire'] ?? null,
-                'date_debut' => (string) $validated['date_debut'],
-                'date_fin' => (string) $validated['date_fin'],
-                'date_realisation' => $isDone ? now() : null,
-                'completed_at' => $isDone ? now() : null,
-                'statut' => $isDone ? 'effectuee' : 'a_faire',
-                'est_effectuee' => $isDone,
-                'taux_execution' => $completionRate,
-            ]);
-
-            if ($request->hasFile('justificatif')) {
-                $file = $request->file('justificatif');
-                $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
-
-                Justificatif::query()->create([
-                    'justifiable_type' => Action::class,
-                    'justifiable_id' => $action->id,
-                    'sous_action_id' => $sousAction->id,
-                    'categorie' => 'sous_action',
-                    'nom_original' => $storedFile['nom_original'],
-                    'chemin_stockage' => $storedFile['path'],
-                    'est_chiffre' => $storedFile['est_chiffre'],
-                    'mime_type' => $storedFile['mime_type'],
-                    'taille_octets' => $storedFile['taille_octets'],
-                    'description' => 'Justificatif de sous-action agent',
-                    'ajoute_par' => $user->id,
-                ]);
-            }
-
-            ActionLog::query()->create([
-                'action_id' => $action->id,
-                'niveau' => 'info',
-                'type_evenement' => $isDone ? 'sous_action_effectuee' : 'sous_action_creee',
-                'message' => $isDone
-                    ? 'Sous-action creee et marquee comme effectuee par l agent.'
-                    : 'Sous-action creee par l agent.',
-                'details' => [
-                    'sous_action_id' => (int) $sousAction->id,
-                    'libelle' => (string) $sousAction->libelle,
-                    'est_effectuee' => $isDone,
-                    'quantite_realisee' => $realizedValue,
-                ],
-                'cible_role' => 'chef_service',
-                'utilisateur_id' => $user->id,
-            ]);
-
-            return $sousAction;
-        });
-
-        $trackingService->refreshActionMetrics($action);
-
-        // Si la sous-action vient d'être marquée effectuée et que cela complète
-        // la liste, on tente la bascule auto vers le chef de service.
-        $trackingService->attemptAutoSubmitClosure($action, $user);
-
-        $this->recordAudit(
-            $request,
-            'sous_action',
-            'create',
-            $sousAction,
-            null,
-            $sousAction->toArray()
-        );
-
-        $notificationService->notifySubActionCreated($action, $sousAction, $user);
-        if ($isDone) {
-            $notificationService->notifySubActionCompleted($action, $sousAction, $user);
-        }
-        if ($request->hasFile('justificatif')) {
-            $notificationService->notifyJustificatifAdded($action, $user, $sousAction, 'sous_action');
-        }
-
-        return redirect()
-            ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Sous-action ajoutee avec succes.');
-    }
-
     public function updateSubAction(
         Request $request,
         Action $action,
         SousAction $sousAction,
+        ActionBusinessRules $businessRules,
         ActionTrackingService $trackingService,
         SecureJustificatifStorage $secureStorage,
         WorkspaceNotificationService $notificationService
@@ -281,16 +128,15 @@ class ActionTrackingWebController extends Controller
             abort(404);
         }
 
-        $action->loadMissing('pta:id,direction_id,service_id,statut,date_debut,date_fin,responsable_id');
-        if (! $this->canTrackWeekly($user, $action)) {
+        $action->loadMissing([
+            'pta:id,direction_id,service_id,statut,date_debut,date_fin,responsable_id',
+            'objectifOperationnel:id,echeance',
+        ]);
+        if (! $this->canUpdateSubAction($user, $action, $sousAction)) {
             abort(403, 'Acces non autorise.');
         }
 
-        if ($user->isAgent() && ! $this->canUpdateSubAction($user, $action, $sousAction)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if ($action->pta?->statut === 'verrouille') {
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Modification de sous-action'),
             ]);
@@ -309,19 +155,44 @@ class ActionTrackingWebController extends Controller
         }
 
         if ($request->boolean('execution_only')) {
+            $submissionRequirements = $businessRules->subActionSubmissionRequirements($sousAction);
+            $intent = (string) $request->input('tracking_action', 'submit') === 'save' ? 'save' : 'submit';
+            $isSubmit = $intent === 'submit';
+            $hasJustificatif = $request->hasFile('justificatif') || $sousAction->justificatifs()->exists();
+
             /** @var array<string, mixed> $validated */
             $validated = $request->validate([
-                'quantite_realisee' => ['nullable', 'numeric', 'min:0'],
-                'commentaire' => ['nullable', 'string', 'max:5000'],
+                'quantite_realisee' => [
+                    Rule::requiredIf($submissionRequirements['quantity']),
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                ],
+                'commentaire' => [
+                    Rule::requiredIf($isSubmit),
+                    'nullable',
+                    'string',
+                    'max:5000',
+                ],
                 'resultat_obtenu' => ['nullable', 'string', 'max:5000'],
-                'est_effectuee' => ['accepted'],
-                'justificatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
+                'difficultes' => [
+                    Rule::requiredIf($submissionRequirements['difficulties']),
+                    'nullable',
+                    'string',
+                    'max:5000',
+                ],
+                'justificatif' => [
+                    Rule::requiredIf($isSubmit && $submissionRequirements['proof'] && ! $hasJustificatif),
+                    'nullable',
+                    'file',
+                    'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(),
+                    app(DocumentPolicySettings::class)->mimesRule(),
+                ],
             ]);
 
-            $hasJustificatif = $request->hasFile('justificatif') || $sousAction->justificatifs()->exists();
-            if (! $hasJustificatif) {
+            if ($isSubmit && trim((string) ($validated['commentaire'] ?? '')) === '') {
                 return back()->withInput()->withErrors([
-                    'justificatif' => 'Veuillez televerser un justificatif avant de marquer cette sous-action comme realisee.',
+                    'commentaire' => 'Le commentaire est obligatoire pour soumettre une sous-action.',
                 ]);
             }
 
@@ -330,7 +201,7 @@ class ActionTrackingWebController extends Controller
                 : max(0.0, (float) $sousAction->cible_prevue);
             $realizedValue = max(0.0, (float) ($validated['quantite_realisee'] ?? $sousAction->quantite_realisee ?? 0));
 
-            if ($plannedTargetValue !== null && $plannedTargetValue > 0.0 && $realizedValue <= 0.0) {
+            if ($submissionRequirements['quantity'] && $realizedValue <= 0.0) {
                 return back()->withInput()->withErrors([
                     'quantite_realisee' => 'La quantite effectuee est obligatoire pour cette sous-action.',
                 ]);
@@ -338,7 +209,7 @@ class ActionTrackingWebController extends Controller
 
             $before = $sousAction->toArray();
 
-            DB::transaction(function () use ($sousAction, $validated, $user, $request, $secureStorage, $plannedTargetValue, $realizedValue): void {
+            DB::transaction(function () use ($sousAction, $validated, $user, $request, $secureStorage, $plannedTargetValue, $realizedValue, $intent, $isSubmit): void {
                 $completionRate = $plannedTargetValue !== null && $plannedTargetValue > 0.0
                     ? round(min(100.0, ($realizedValue / $plannedTargetValue) * 100), 2)
                     : 100;
@@ -348,10 +219,10 @@ class ActionTrackingWebController extends Controller
                     'resultat_obtenu' => $validated['resultat_obtenu'] ?? $sousAction->resultat_obtenu,
                     'taux_realisation' => $completionRate,
                     'commentaire' => $validated['commentaire'] ?? $sousAction->commentaire,
-                    'date_realisation' => $sousAction->date_realisation ?: now(),
-                    'completed_at' => $sousAction->completed_at ?: now(),
-                    'statut' => 'effectuee',
-                    'est_effectuee' => true,
+                    'date_realisation' => $isSubmit ? ($sousAction->date_realisation ?: now()) : null,
+                    'completed_at' => $isSubmit ? ($sousAction->completed_at ?: now()) : null,
+                    'statut' => $isSubmit ? 'en_attente_validation_chef' : 'en_cours',
+                    'est_effectuee' => $isSubmit,
                     'taux_execution' => $completionRate,
                 ])->save();
 
@@ -377,13 +248,18 @@ class ActionTrackingWebController extends Controller
                 ActionLog::query()->create([
                     'action_id' => $sousAction->action_id,
                     'niveau' => 'info',
-                    'type_evenement' => 'sous_action_effectuee',
-                    'message' => 'Sous-action marquee comme effectuee par l agent.',
+                    'type_evenement' => $isSubmit ? 'sous_action_effectuee' : 'sous_action_suivi_enregistre',
+                    'message' => $isSubmit
+                        ? 'Sous-action soumise au chef par l agent.'
+                        : 'Suivi de sous-action enregistre par l agent.',
                     'details' => [
+                        'tracking_action' => $intent,
                         'sous_action_id' => (int) $sousAction->id,
                         'libelle' => (string) $sousAction->libelle,
-                        'est_effectuee' => true,
+                        'est_effectuee' => $isSubmit,
                         'quantite_realisee' => $realizedValue,
+                        'performance_recalculee' => $completionRate,
+                        'difficultes' => $validated['difficultes'] ?? null,
                     ],
                     'cible_role' => 'chef_service',
                     'utilisateur_id' => $user->id,
@@ -392,9 +268,10 @@ class ActionTrackingWebController extends Controller
 
             $trackingService->refreshActionMetrics($action);
 
-            // Bascule auto si la dernière sous-action vient d'être marquée
-            // effectuée (mode sous_actions / mixte).
-            $trackingService->attemptAutoSubmitClosure($action, $user);
+            // Bascule auto si la derniÃ¨re sous-action vient d'Ãªtre marquÃ©e
+            // effectuÃ©e (mode sous_actions / mixte).
+            // Soumission parentale explicite: la sous-action part au chef,
+            // l'action globale reste a valider par le chef quand le dossier est pret.
 
             $this->recordAudit(
                 $request,
@@ -406,14 +283,22 @@ class ActionTrackingWebController extends Controller
             );
 
             $freshSubAction = $sousAction->fresh() ?? $sousAction;
-            $notificationService->notifySubActionCompleted($action, $freshSubAction, $user);
+            if ($isSubmit) {
+                $notificationService->notifySubActionCompleted($action, $freshSubAction, $user);
+            }
             if ($request->hasFile('justificatif')) {
                 $notificationService->notifyJustificatifAdded($action, $user, $freshSubAction, 'sous_action');
             }
 
+            if (! $isSubmit) {
+                return redirect()
+                    ->route('workspace.actions.suivi', $action)
+                    ->with('success', 'Suivi de sous-action enregistre.');
+            }
+
             return redirect()
                 ->route('workspace.actions.suivi', $action)
-                ->with('success', 'Sous-action marquee comme realisee.');
+                ->with('success', 'Sous-action marquÃ©e comme rÃ©alisÃ©e.');
         }
 
         /** @var array<string, mixed> $validated */
@@ -428,19 +313,25 @@ class ActionTrackingWebController extends Controller
             'date_debut' => ['required', 'date'],
             'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
             'commentaire' => ['nullable', 'string', 'max:5000'],
+            'difficultes' => ['nullable', 'string', 'max:5000'],
             'est_effectuee' => ['nullable', 'boolean'],
             'justificatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
         ]);
 
         $isDone = $request->boolean('est_effectuee');
+        $submissionRequirements = $businessRules->subActionSubmissionRequirements($sousAction);
         $hasJustificatif = $request->hasFile('justificatif') || $sousAction->justificatifs()->exists();
-        if ($isDone && (trim((string) ($validated['commentaire'] ?? '')) === '' || ! $hasJustificatif)) {
+        if ($isDone && (
+            ($submissionRequirements['comment'] && trim((string) ($validated['commentaire'] ?? '')) === '')
+            || ($submissionRequirements['difficulties'] && trim((string) ($validated['difficultes'] ?? '')) === '')
+            || ! $hasJustificatif
+        )) {
             return back()->withInput()->withErrors([
-                'general' => 'Veuillez ajouter un commentaire de realisation et un justificatif avant de marquer cette sous-action comme realisee.',
+                'general' => 'Veuillez ajouter les elements obligatoires avant de marquer cette sous-action comme realisee.',
             ]);
         }
 
-        if ($action->usesQuantitativeProgress() && $isDone && (float) ($validated['quantite_realisee'] ?? 0) <= 0) {
+        if ($submissionRequirements['quantity'] && $isDone && (float) ($validated['quantite_realisee'] ?? 0) <= 0) {
             return back()->withInput()->withErrors([
                 'quantite_realisee' => 'La quantite realisee est obligatoire pour une sous-action quantitative effectuee.',
             ]);
@@ -450,7 +341,7 @@ class ActionTrackingWebController extends Controller
             && Carbon::parse((string) $validated['date_debut'])->startOfDay()->lt(Carbon::parse($action->date_debut)->startOfDay())
         ) {
             return back()->withInput()->withErrors([
-                'date_debut' => 'La date de debut de la sous-action doit rester dans la periode de l action.',
+                'date_debut' => 'La date de dÃ©but de la sous-action doit rester dans la pÃ©riode de l action.',
             ]);
         }
 
@@ -458,7 +349,16 @@ class ActionTrackingWebController extends Controller
             && Carbon::parse((string) $validated['date_fin'])->startOfDay()->gt(Carbon::parse($action->date_fin)->startOfDay())
         ) {
             return back()->withInput()->withErrors([
-                'date_fin' => 'La date de fin de la sous-action ne doit pas depasser l echeance de l action.',
+                'date_fin' => 'La date de fin de la sous-action ne doit pas dÃ©passer l Ã©chÃ©ance de l action.',
+            ]);
+        }
+
+        $objectiveDeadline = $action->objectifOperationnel?->echeance;
+        if ($objectiveDeadline !== null
+            && Carbon::parse((string) $validated['date_fin'])->startOfDay()->gt(Carbon::parse($objectiveDeadline)->startOfDay())
+        ) {
+            return back()->withInput()->withErrors([
+                'date_fin' => 'La date de fin de la sous-action ne doit pas dÃ©passer l Ã©chÃ©ance de l objectif opÃ©rationnel.',
             ]);
         }
 
@@ -486,7 +386,7 @@ class ActionTrackingWebController extends Controller
                 'date_fin' => (string) $validated['date_fin'],
                 'date_realisation' => $isDone ? ($sousAction->date_realisation ?: now()) : null,
                 'completed_at' => $isDone ? ($sousAction->completed_at ?: now()) : null,
-                'statut' => $isDone ? 'effectuee' : 'a_faire',
+                'statut' => $isDone ? 'en_attente_validation_chef' : 'non_demarre',
                 'est_effectuee' => $isDone,
                 'taux_execution' => $completionRate,
             ]);
@@ -523,6 +423,7 @@ class ActionTrackingWebController extends Controller
                     'libelle' => (string) $sousAction->libelle,
                     'est_effectuee' => $isDone,
                     'quantite_realisee' => $realizedValue,
+                    'difficultes' => $validated['difficultes'] ?? null,
                 ],
                 'cible_role' => 'chef_service',
                 'utilisateur_id' => $user->id,
@@ -531,8 +432,8 @@ class ActionTrackingWebController extends Controller
 
         $trackingService->refreshActionMetrics($action);
 
-        // Bascule auto si l'agent vient de marquer la dernière sous-action.
-        $trackingService->attemptAutoSubmitClosure($action, $user);
+        // Bascule auto si l'agent vient de marquer la derniÃ¨re sous-action.
+        // La soumission parentale se fait via le circuit sous-actions validees.
 
         $this->recordAudit(
             $request,
@@ -553,17 +454,82 @@ class ActionTrackingWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', $isDone ? 'Sous-action marquee comme realisee.' : 'Sous-action mise a jour avec succes.');
+            ->with('success', $isDone ? 'Sous-action marquÃ©e comme rÃ©alisÃ©e.' : 'Sous-action mise Ã  jour avec succÃ¨s.');
+    }
+
+    public function reviewSubAction(
+        Request $request,
+        Action $action,
+        SousAction $sousAction,
+        ActionTrackingService $trackingService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        if ((int) $sousAction->action_id !== (int) $action->id) {
+            abort(404);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut,date_debut,date_fin');
+        if (! $this->canReviewByChef($user, $action)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
+            return back()->withErrors([
+                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Validation de sous-action'),
+            ]);
+        }
+
+        $commentRules = ['nullable', 'string', 'max:5000'];
+        if (in_array((string) $request->input('decision_sous_action'), ['rejeter', 'demander_correction'], true)) {
+            array_unshift($commentRules, 'required');
+        }
+
+        /** @var array<string, mixed> $validated */
+        $validated = $request->validate([
+            'decision_sous_action' => ['required', Rule::in(['valider', 'demander_correction', 'rejeter'])],
+            'commentaire_sous_action' => $commentRules,
+        ]);
+
+        $before = $sousAction->toArray();
+
+        try {
+            DB::transaction(function () use ($trackingService, $action, $sousAction, $validated, $user): void {
+                $trackingService->reviewSubActionByChef($action, $sousAction, $validated, $user);
+            });
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withErrors(['general' => $exception->getMessage()]);
+        }
+
+        $freshSubAction = $sousAction->fresh() ?? $sousAction;
+        $this->recordAudit(
+            $request,
+            'sous_action',
+            'review_by_chef',
+            $freshSubAction,
+            $before,
+            $freshSubAction->toArray()
+        );
+
+        return redirect()
+            ->route('workspace.actions.suivi', $action)
+            ->with('success', (string) $validated['decision_sous_action'] === 'valider'
+                ? 'Sous-action validee par le chef.'
+                : 'Sous-action renvoyee pour correction.');
     }
 
     // submitWeek : methode supprimee.
     // Le suivi hebdomadaire des actions a ete retire du modele metier.
     // Le suivi se fait desormais via updateQuantitativeProgress et les
-    // sous-actions (storeSubAction / updateSubAction).
+    // sous-actions (updateSubAction).
 
     public function updateQuantitativeProgress(
         Request $request,
         Action $action,
+        ActionBusinessRules $businessRules,
         ActionTrackingService $trackingService,
         SecureJustificatifStorage $secureStorage,
         WorkspaceNotificationService $notificationService
@@ -578,13 +544,14 @@ class ActionTrackingWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        if (! $action->usesQuantitativeProgress()) {
+        $hasSubActions = $action->sousActions()->exists();
+        if (! $action->usesQuantitativeProgress() && $hasSubActions) {
             return back()->withErrors([
-                'general' => 'Cette action ne permet pas de suivi quantitatif.',
+                'general' => 'Cette action se suit par sous-actions.',
             ]);
         }
 
-        if ($action->pta?->statut === 'verrouille') {
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour quantitative'),
             ]);
@@ -596,27 +563,96 @@ class ActionTrackingWebController extends Controller
             ]);
         }
 
+        $submissionRequirements = $businessRules->actionSubmissionRequirements($action);
+        $intent = (string) $request->input('tracking_action', 'submit') === 'save' ? 'save' : 'submit';
+        $isSubmit = $intent === 'submit';
+        $proofCategory = $submissionRequirements['quantity'] ? 'execution_quantitative' : 'execution_non_quantitative';
+        $hasExistingProof = $action->justificatifs()
+            ->whereIn('categorie', ['execution_quantitative', 'execution_non_quantitative', 'execution_mixte', 'final'])
+            ->exists();
+        $hasExistingFollowUp = ActionLog::query()
+            ->where('action_id', (int) $action->id)
+            ->where('type_evenement', 'execution_quantitative')
+            ->exists();
+
         /** @var array<string, mixed> $validated */
         $validated = $request->validate([
-            'quantite_realisee' => ['required', 'numeric', 'min:0'],
-            'commentaire_quantitatif' => ['nullable', 'string', 'max:5000'],
-            'justificatif_quantitatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
+            'quantite_realisee' => [
+                Rule::requiredIf($submissionRequirements['quantity'] && (! $isSubmit || ! $hasExistingFollowUp)),
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+            'commentaire_quantitatif' => [
+                Rule::requiredIf($isSubmit),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+            'difficultes_quantitatives' => [
+                Rule::requiredIf($submissionRequirements['difficulties']),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+            'justificatif_quantitatif' => [
+                Rule::requiredIf($isSubmit && $submissionRequirements['proof'] && ! $hasExistingProof),
+                'nullable',
+                'file',
+                'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(),
+                app(DocumentPolicySettings::class)->mimesRule(),
+            ],
         ]);
 
-        $before = $action->toArray();
+        if ($isSubmit && trim((string) ($validated['commentaire_quantitatif'] ?? '')) === '') {
+            return back()->withInput()->withErrors([
+                'commentaire_quantitatif' => 'Le commentaire est obligatoire pour soumettre au chef.',
+            ]);
+        }
 
-        DB::transaction(function () use ($action, $validated, $trackingService, $request, $user, $secureStorage): void {
-            $action->forceFill([
-                'quantite_realisee' => (float) $validated['quantite_realisee'],
-            ])->save();
+        $before = $action->toArray();
+        $oldTotal = max(0.0, (float) ($action->quantite_realisee ?? 0));
+        $enteredQuantity = $submissionRequirements['quantity']
+            ? max(0.0, (float) ($validated['quantite_realisee'] ?? 0))
+            : 0.0;
+        $realizedValue = $submissionRequirements['quantity'] ? $oldTotal + $enteredQuantity : $oldTotal;
+
+        if ($isSubmit && $submissionRequirements['quantity'] && ! $hasExistingFollowUp && $enteredQuantity <= 0.0) {
+            return back()->withInput()->withErrors([
+                'quantite_realisee' => 'Au moins un suivi quantitatif est obligatoire avant soumission.',
+            ]);
+        }
+
+        $declaredProgress = $submissionRequirements['quantity'] ? null : 100.0;
+
+        DB::transaction(function () use ($action, $validated, $trackingService, $request, $user, $secureStorage, $submissionRequirements, $realizedValue, $declaredProgress, $proofCategory, $intent, $oldTotal, $enteredQuantity): void {
+            if ($submissionRequirements['quantity']) {
+                $action->forceFill([
+                    'quantite_realisee' => $realizedValue,
+                    'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+                    'statut' => ActionTrackingService::STATUS_EN_COURS,
+                ])->save();
+            } else {
+                $action->forceFill([
+                    'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+                    'statut' => ActionTrackingService::STATUS_EN_COURS,
+                ])->save();
+            }
 
             if (trim((string) ($validated['commentaire_quantitatif'] ?? '')) !== '') {
                 $trackingService->addDiscussionEntry(
                     $action,
                     (string) $validated['commentaire_quantitatif'],
-                    'execution_quantitative',
+                    $proofCategory,
                     'info',
-                    ['quantite_realisee' => (float) $validated['quantite_realisee']],
+                    [
+                        'quantite_saisie' => $submissionRequirements['quantity'] ? $enteredQuantity : null,
+                        'ancien_total' => $submissionRequirements['quantity'] ? $oldTotal : null,
+                        'nouveau_total' => $submissionRequirements['quantity'] ? $realizedValue : null,
+                        'progression_declaree' => $declaredProgress,
+                        'difficultes' => $validated['difficultes_quantitatives'] ?? null,
+                        'tracking_action' => $intent,
+                    ],
                     $user
                 );
             }
@@ -627,12 +663,14 @@ class ActionTrackingWebController extends Controller
                 $trackingService->addActionJustificatif(
                     $action,
                     null,
-                    'execution_quantitative',
+                    $proofCategory,
                     $storedFile['path'],
                     $storedFile['nom_original'],
                     $storedFile['mime_type'],
                     $storedFile['taille_octets'],
-                    'Justificatif de progression quantitative',
+                    $submissionRequirements['quantity']
+                        ? 'Justificatif de progression quantitative'
+                        : 'Justificatif d execution non quantifiable',
                     $user,
                     $storedFile['est_chiffre']
                 );
@@ -642,8 +680,20 @@ class ActionTrackingWebController extends Controller
                 'action_id' => $action->id,
                 'niveau' => 'info',
                 'type_evenement' => 'execution_quantitative',
-                'message' => 'Progression quantitative mise a jour par l agent.',
-                'details' => ['quantite_realisee' => (float) $validated['quantite_realisee']],
+                'message' => $submissionRequirements['quantity']
+                    ? ($intent === 'submit' ? 'Progression quantitative soumise au chef par l agent.' : 'Progression quantitative enregistree par l agent.')
+                    : ($intent === 'submit' ? 'Execution non quantifiable soumise au chef par l agent.' : 'Execution non quantifiable enregistree par l agent.'),
+                'details' => [
+                    'tracking_action' => $intent,
+                    'quantite_saisie' => $submissionRequirements['quantity'] ? $enteredQuantity : null,
+                    'ancien_total' => $submissionRequirements['quantity'] ? $oldTotal : null,
+                    'nouveau_total' => $submissionRequirements['quantity'] ? $realizedValue : null,
+                    'performance_recalculee' => $submissionRequirements['quantity'] && (float) ($action->quantite_cible ?? 0) > 0
+                        ? round(min(100.0, ($realizedValue / (float) $action->quantite_cible) * 100), 2)
+                        : $declaredProgress,
+                    'progression_declaree' => $declaredProgress,
+                    'difficultes' => $validated['difficultes_quantitatives'] ?? null,
+                ],
                 'cible_role' => 'chef_service',
                 'utilisateur_id' => $user->id,
             ]);
@@ -651,17 +701,32 @@ class ActionTrackingWebController extends Controller
 
         $trackingService->refreshActionMetrics($action);
 
-        // Bascule auto si la dernière saisie quantitative atteint la cible.
+        // Bascule auto si la derniÃ¨re saisie quantitative atteint la cible.
+        if ($isSubmit) {
+            try {
+                $trackingService->submitClosureForReview($action->fresh() ?? $action, [
+                    'date_fin_reelle' => now()->toDateString(),
+                    'rapport_final' => (string) ($validated['commentaire_quantitatif'] ?? ''),
+                    'difficultes_rencontrees' => $validated['difficultes_quantitatives'] ?? null,
+                ], $user);
+            } catch (\InvalidArgumentException $exception) {
+                return back()->withErrors(['general' => $exception->getMessage()]);
+            }
+
+            $action->refresh()->loadMissing('pta:id,direction_id,service_id');
+            $notificationService->notifyActionSubmittedToChef($action, $user);
+        }
+
         $trackingService->attemptAutoSubmitClosure($action, $user);
 
         $this->recordAudit($request, 'action', 'execution_quantitative_update', $action, $before, $action->fresh()?->toArray());
         if ($request->hasFile('justificatif_quantitatif')) {
-            $notificationService->notifyJustificatifAdded($action, $user, null, 'execution_quantitative');
+            $notificationService->notifyJustificatifAdded($action, $user, null, $proofCategory);
         }
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Progression quantitative mise a jour avec succes.');
+            ->with('success', $isSubmit ? $this->submissionSuccessMessage() : 'Suivi enregistre. Vous pouvez continuer avant soumission.');
     }
 
     public function comment(
@@ -698,16 +763,10 @@ class ActionTrackingWebController extends Controller
             ->with('success', 'Commentaire enregistre.');
     }
 
-    /**
-     * Soumission explicite par l'agent (ou un gestionnaire d'action) de la
-     * demande de clôture. Bascule l'action en `soumise_chef` (ou directement à
-     * l'étape configurée par `WorkflowSettings::actionSubmissionTarget`) et
-     * notifie le chef de service.
-     */
-    public function submitClosure(
+    public function signalAnomaly(
         Request $request,
         Action $action,
-        ActionTrackingService $trackingService
+        WorkspaceNotificationService $notificationService
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -715,62 +774,94 @@ class ActionTrackingWebController extends Controller
         }
 
         $action->loadMissing('pta:id,direction_id,service_id,statut');
-
-        // Seuls le responsable de l'action ou un gestionnaire (chef de service
-        // non-agent) peuvent forcer la soumission.
-        if (! $action->isResponsible($user) && ! $this->canManageAction($user, $action)) {
+        if (! $this->canSignalControlAnomaly($user, $action)) {
             abort(403, 'Acces non autorise.');
         }
 
-        if ($action->pta?->statut === 'verrouille') {
-            return back()->withErrors([
-                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Soumission'),
-            ]);
-        }
-
-        $current = (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE);
-        $resoumissionAutorisee = [
-            ActionTrackingService::VALIDATION_NON_SOUMISE,
-            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
-            ActionTrackingService::VALIDATION_REJETEE_CHEF,
-            ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
-        ];
-        if (! in_array($current, $resoumissionAutorisee, true)) {
-            return back()->withErrors([
-                'general' => 'Cette action est deja soumise ou validee.',
-            ]);
-        }
-
+        /** @var array<string, mixed> $validated */
         $validated = $request->validate([
-            'rapport_final' => ['nullable', 'string', 'max:5000'],
-            'date_fin_reelle' => ['nullable', 'date'],
+            'type_anomalie' => ['required', Rule::in(array_keys($this->anomalyTypeOptions()))],
+            'niveau' => ['required', Rule::in(['info', 'warning', 'critical'])],
+            'cible_role' => ['required', Rule::in(['responsable', 'chef_service', 'direction', 'planification', 'dg'])],
+            'message' => ['required', 'string', 'min:5', 'max:2000'],
+            'correction_attendue' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $payload = [
-            'date_fin_reelle' => $validated['date_fin_reelle']
-                ?? optional($action->date_fin_reelle)->toDateString()
-                ?? now()->toDateString(),
-            'rapport_final' => $validated['rapport_final']
-                ?? $action->rapport_final
-                ?? 'Demande de cloture deposee par l agent.',
+        $before = $action->toArray();
+        $type = (string) $validated['type_anomalie'];
+        $details = [
+            'manual' => true,
+            'resolved' => false,
+            'anomaly_type' => $type,
+            'blocked_scope' => $this->blockedScopeForAnomaly($type),
+            'correction_attendue' => trim((string) ($validated['correction_attendue'] ?? '')),
+            'declared_by_role' => (string) $user->role,
         ];
 
-        $before = $action->toArray();
+        $log = ActionLog::query()->create([
+            'action_id' => $action->id,
+            'niveau' => (string) $validated['niveau'],
+            'type_evenement' => 'anomalie_'.$type,
+            'message' => trim((string) $validated['message']),
+            'details' => $details,
+            'cible_role' => (string) $validated['cible_role'],
+            'utilisateur_id' => $user->id,
+            'lu' => false,
+        ]);
 
-        try {
-            DB::transaction(function () use ($trackingService, $action, $payload, $user): void {
-                $trackingService->submitClosureForReview($action, $payload, $user);
-            });
-        } catch (\InvalidArgumentException $exception) {
-            return back()->withErrors(['general' => $exception->getMessage()]);
-        }
-
-        $action->refresh();
-        $this->recordAudit($request, 'action', 'submit_closure', $action, $before, $action->toArray());
+        $notificationService->notifyActionAlertEscalation($log, $user->id);
+        $this->recordAudit($request, 'action', 'signal_anomaly', $action, $before, [
+            'action_id' => (int) $action->id,
+            'action_log_id' => (int) $log->id,
+            'anomaly_type' => $type,
+            'niveau' => (string) $validated['niveau'],
+            'cible_role' => (string) $validated['cible_role'],
+            'details' => $details,
+        ]);
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Demande de cloture envoyee au chef de service.');
+            ->with('success', 'Anomalie signalee et notification envoyee.');
+    }
+
+    public function resolveAnomaly(Request $request, Action $action, ActionLog $log): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut');
+        if ((int) $log->action_id !== (int) $action->id) {
+            abort(404);
+        }
+
+        if (! $this->canResolveControlAnomaly($user, $action)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        /** @var array{commentaire_resolution?: string|null} $validated */
+        $validated = $request->validate([
+            'commentaire_resolution' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $before = $log->toArray();
+        $details = is_array($log->details) ? $log->details : [];
+        $details['resolved'] = true;
+        $details['resolved_by'] = (int) $user->id;
+        $details['resolved_at'] = now()->toIso8601String();
+        $details['resolution_comment'] = trim((string) ($validated['commentaire_resolution'] ?? ''));
+
+        $log->forceFill([
+            'details' => $details,
+            'lu' => true,
+        ])->save();
+
+        $this->recordAudit($request, 'action', 'resolve_anomaly', $action, $before, $log->toArray());
+
+        return redirect()
+            ->route('workspace.actions.suivi', $action)
+            ->with('success', 'Anomalie cloturee.');
     }
 
     public function reviewClosure(
@@ -789,7 +880,7 @@ class ActionTrackingWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        if ($action->pta?->statut === 'verrouille') {
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Validation'),
             ]);
@@ -799,6 +890,10 @@ class ActionTrackingWebController extends Controller
             return back()->withErrors(['general' => 'Cette action n est pas en attente de validation chef de service.']);
         }
 
+        if ($message = $this->activeBlockingAnomalyMessage($action, 'validation')) {
+            return back()->withErrors(['general' => $message]);
+        }
+
         // Formulaire simplifie : 3 champs uniquement.
         $commentRules = ['nullable', 'string', 'max:5000'];
         if ($this->workflowSettings()->rejectionCommentRequired()
@@ -806,17 +901,21 @@ class ActionTrackingWebController extends Controller
             array_unshift($commentRules, 'required');
         }
 
+        // Spec v2 : le chef ne note plus. Seul le motif de rejet/correction est requis.
         $validated = $request->validate([
             'decision_validation' => ['required', Rule::in(['valider', 'demander_correction', 'rejeter'])],
-            'evaluation_note' => ['required', 'numeric', 'min:0', 'max:100'],
-            'evaluation_commentaire' => $commentRules,
+            'motif_validation_chef' => $commentRules,
         ]);
 
         $before = $action->toArray();
 
-        DB::transaction(function () use ($trackingService, $action, $validated, $user): void {
-            $trackingService->reviewClosureByChef($action, $validated, $user);
-        });
+        try {
+            DB::transaction(function () use ($trackingService, $action, $validated, $user): void {
+                $trackingService->reviewClosureByChef($action, $validated, $user);
+            });
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withErrors(['general' => $exception->getMessage()]);
+        }
 
         $action->refresh();
         $this->recordAudit($request, 'action', 'review_closure', $action, $before, $action->toArray());
@@ -841,6 +940,128 @@ class ActionTrackingWebController extends Controller
     // L'etape de validation direction a ete retiree du circuit metier.
     // La route correspondante renvoie desormais 403 (cf. routes/web.php).
 
+    public function storeDeadlineExtensionRequest(
+        Request $request,
+        Action $action,
+        DeadlineExtensionRequestService $deadlineExtensionService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut', 'objectifOperationnel:id,echeance');
+        if (! $this->canManageAction($user, $action)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $sousAction = null;
+        if ($request->filled('sous_action_id')) {
+            $sousAction = $action->sousActions()->whereKey((int) $request->input('sous_action_id'))->firstOrFail();
+        }
+
+        $currentDeadline = $sousAction?->date_fin ?: $action->date_fin ?: $action->date_echeance;
+        if ($currentDeadline === null) {
+            return back()->withErrors(['general' => 'Aucune echeance actuelle n est definie.']);
+        }
+
+        $validated = $request->validate([
+            'sous_action_id' => ['nullable', 'integer'],
+            'requested_deadline' => ['required', 'date', 'after:'.Carbon::parse($currentDeadline)->toDateString()],
+            'motif' => ['required', 'string', 'max:1000'],
+            'justification' => ['required', 'string', 'max:5000'],
+            'report_attachment' => ['required', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
+        ]);
+
+        try {
+            $deadlineExtensionService->create(
+                $action,
+                $sousAction,
+                [
+                    'requested_deadline' => (string) $validated['requested_deadline'],
+                    'motif' => (string) $validated['motif'],
+                    'justification' => (string) $validated['justification'],
+                ],
+                $request->file('report_attachment'),
+                $user,
+                $request->ip()
+            );
+        } catch (\Throwable $exception) {
+            return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
+        }
+
+        return redirect()
+            ->route('workspace.actions.suivi', $action)
+            ->with('success', 'Demande de report transmise a SCIQ / Planification.');
+    }
+
+    public function reviewDeadlineExtensionBySciq(
+        Request $request,
+        DeadlineExtensionRequest $deadlineExtensionRequest,
+        DeadlineExtensionRequestService $deadlineExtensionService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+        if (! $this->canReviewDeadlineExtensionBySciq($user)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $validated = $request->validate([
+            'sciq_avis' => ['required', Rule::in([
+                DeadlineExtensionRequest::AVIS_FAVORABLE,
+                DeadlineExtensionRequest::AVIS_DEFAVORABLE,
+                DeadlineExtensionRequest::AVIS_COMPLEMENT,
+            ])],
+            'sciq_comment' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        try {
+            $deadlineExtensionService->reviewBySciq($deadlineExtensionRequest, $validated, $user, $request->ip());
+        } catch (\Throwable $exception) {
+            return back()->withErrors(['general' => $exception->getMessage()]);
+        }
+
+        return redirect()
+            ->route('workspace.actions.suivi', $deadlineExtensionRequest->action_id)
+            ->with('success', 'Avis SCIQ / Planification enregistre.');
+    }
+
+    public function reviewDeadlineExtensionByDg(
+        Request $request,
+        DeadlineExtensionRequest $deadlineExtensionRequest,
+        DeadlineExtensionRequestService $deadlineExtensionService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+        if (! $this->canReviewDeadlineExtensionByDg($user)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $validated = $request->validate([
+            'dg_decision' => ['required', Rule::in([
+                DeadlineExtensionRequest::DECISION_APPROUVER,
+                DeadlineExtensionRequest::DECISION_REJETER,
+                DeadlineExtensionRequest::DECISION_COMPLEMENT,
+            ])],
+            'approved_deadline' => ['nullable', 'date'],
+            'dg_comment' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        try {
+            $deadlineExtensionService->decideByDg($deadlineExtensionRequest, $validated, $user, $request->ip());
+        } catch (\Throwable $exception) {
+            return back()->withErrors(['general' => $exception->getMessage()]);
+        }
+
+        return redirect()
+            ->route('workspace.actions.suivi', $deadlineExtensionRequest->action_id)
+            ->with('success', 'Decision DG enregistree.');
+    }
+
     public function reviewFinancingByDaf(
         Request $request,
         Action $action,
@@ -858,7 +1079,7 @@ class ActionTrackingWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        if ($action->pta?->statut === 'verrouille') {
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Financement'),
             ]);
@@ -867,6 +1088,10 @@ class ActionTrackingWebController extends Controller
         $currentStatus = $action->financementStatus();
         if (! in_array($currentStatus, [Action::FINANCEMENT_A_TRAITER_DAF, Action::FINANCEMENT_REFUSE_DG], true)) {
             return back()->withErrors(['general' => 'Ce financement n est pas en attente de traitement DAF.']);
+        }
+
+        if ($message = $this->activeBlockingAnomalyMessage($action, 'circuit_daf')) {
+            return back()->withErrors(['general' => $message]);
         }
 
         /** @var array<string, mixed> $validated */
@@ -898,13 +1123,19 @@ class ActionTrackingWebController extends Controller
         $this->recordAudit($request, 'action', 'review_financing_daf', $action, $before, $action->toArray());
 
         $decision = (string) ($validated['decision_financement'] ?? ActionTrackingService::FINANCEMENT_DECISION_REJETER);
-        $notificationService->notifyActionFinancingReviewedByDaf($action, $decision === ActionTrackingService::FINANCEMENT_DECISION_VALIDER, $user);
+        if ($decision === ActionTrackingService::FINANCEMENT_DECISION_COMPLEMENT) {
+            $notificationService->notifyActionFinancingComplementRequested($action, $user);
+        } else {
+            $notificationService->notifyActionFinancingReviewedByDaf($action, $decision === ActionTrackingService::FINANCEMENT_DECISION_VALIDER, $user);
+        }
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', $decision === ActionTrackingService::FINANCEMENT_DECISION_VALIDER
-                ? 'Financement valide par la DAF. Accord DG requis.'
-                : 'Financement rejete par la DAF avec tracabilite complete.');
+            ->with('success', match ($decision) {
+                ActionTrackingService::FINANCEMENT_DECISION_VALIDER => 'Financement valide par la DAF. Accord DG requis.',
+                ActionTrackingService::FINANCEMENT_DECISION_COMPLEMENT => 'Complement demande par la DAF. Le responsable doit corriger le dossier.',
+                default => 'Financement rejete par la DAF avec tracabilite complete.',
+            });
     }
 
     public function reviewFinancingByDg(
@@ -924,13 +1155,13 @@ class ActionTrackingWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        if ($action->pta?->statut === 'verrouille') {
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Accord DG'),
             ]);
         }
 
-        if ($action->financementStatus() !== Action::FINANCEMENT_VALIDE_DAF) {
+        if (! in_array($action->financementStatus(), [Action::FINANCEMENT_TRANSMIS_DG, Action::FINANCEMENT_VALIDE_DAF], true)) {
             return back()->withErrors(['general' => 'Ce financement n est pas en attente d accord DG.']);
         }
 
@@ -984,7 +1215,7 @@ class ActionTrackingWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        if ($action->pta?->statut === 'verrouille') {
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Financement'),
             ]);
@@ -1092,7 +1323,7 @@ class ActionTrackingWebController extends Controller
         }
 
         return $user->hasRole(User::ROLE_DG)
-            && $action->financementStatus() === Action::FINANCEMENT_VALIDE_DAF;
+            && in_array($action->financementStatus(), [Action::FINANCEMENT_TRANSMIS_DG, Action::FINANCEMENT_VALIDE_DAF], true);
     }
 
     private function canMarkFinancingByDaf(User $user, Action $action): bool
@@ -1106,6 +1337,80 @@ class ActionTrackingWebController extends Controller
         }
 
         return $this->isDafFinanceReviewer($user);
+    }
+
+    private function canSignalControlAnomaly(User $user, Action $action): bool
+    {
+        if (! $this->canReadAction($user, $action)) {
+            return false;
+        }
+
+        return $user->hasRole(
+            User::ROLE_PLANIFICATION,
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_SUPER_ADMIN,
+            User::ROLE_ADMIN
+        );
+    }
+
+    private function canResolveControlAnomaly(User $user, Action $action): bool
+    {
+        return $this->canSignalControlAnomaly($user, $action)
+            || $this->canManageAction($user, $action);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function anomalyTypeOptions(): array
+    {
+        return [
+            'justificatif_manquant' => 'Justificatif manquant',
+            'commentaire_absent' => 'Commentaire absent',
+            'date_incoherente' => 'Date incoherente',
+            'financement_incomplet' => 'Financement incomplet',
+            'kpi_incoherent' => 'KPI incoherent',
+            'autre' => 'Autre anomalie',
+        ];
+    }
+
+    private function blockedScopeForAnomaly(string $type): string
+    {
+        return match ($type) {
+            'justificatif_manquant' => 'validation',
+            'commentaire_absent' => 'soumission',
+            'date_incoherente' => 'enregistrement',
+            'financement_incomplet' => 'circuit_daf',
+            'kpi_incoherent' => 'reporting',
+            default => 'controle',
+        };
+    }
+
+    private function activeBlockingAnomalyMessage(Action $action, string $scope): ?string
+    {
+        $log = ActionLog::query()
+            ->activeAlert()
+            ->where('action_id', (int) $action->id)
+            ->where('type_evenement', 'like', 'anomalie_%')
+            ->where('details->blocked_scope', $scope)
+            ->latest()
+            ->first();
+
+        if (! $log instanceof ActionLog) {
+            return null;
+        }
+
+        $details = is_array($log->details) ? $log->details : [];
+        $correction = trim((string) ($details['correction_attendue'] ?? ''));
+        $reason = trim((string) ($log->message ?: 'anomalie active'));
+
+        return trim(sprintf(
+            'Operation bloquee : %s%s',
+            $reason,
+            $correction !== '' ? ' Correction attendue : '.$correction : ''
+        ));
     }
 
     private function isDafFinanceReviewer(User $user): bool
@@ -1122,6 +1427,10 @@ class ActionTrackingWebController extends Controller
     }
     private function canTrackWeekly(User $user, Action $action): bool
     {
+        if ((string) ($action->statut_parametrage ?? '') === 'a_parametrer') {
+            return false;
+        }
+
         return $action->isResponsible($user)
             && ($user->isAgent() || $action->isOperationalContext());
     }
@@ -1132,15 +1441,13 @@ class ActionTrackingWebController extends Controller
             return false;
         }
 
-        if (! $this->canTrackWeekly($user, $action)) {
+        if ((int) $sousAction->agent_id !== (int) $user->id) {
             return false;
         }
 
-        if ((int) $sousAction->agent_id === (int) $user->id) {
-            return true;
-        }
-
-        return $action->isResponsible($user);
+        return $user->isAgent()
+            || $action->isOperationalContext()
+            || $action->isResponsible($user);
     }
 
     private function canReadAction(User $user, Action $action): bool
@@ -1150,7 +1457,8 @@ class ActionTrackingWebController extends Controller
         }
 
         if ($user->isAgent()) {
-            return (int) $action->responsable_id === (int) $user->id;
+            return (int) $action->responsable_id === (int) $user->id
+                || $action->sousActions()->where('agent_id', $user->id)->exists();
         }
 
         if ((bool) $action->financement_requis && ($this->isDafFinanceReviewer($user) || $user->hasRole(User::ROLE_DG))) {
@@ -1211,11 +1519,25 @@ class ActionTrackingWebController extends Controller
             );
     }
 
-    // canReviewByDirection : helper supprime — l'etape de validation direction
+    private function canReviewDeadlineExtensionBySciq(User $user): bool
+    {
+        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_SCIQ, User::ROLE_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ);
+    }
+
+    private function canReviewDeadlineExtensionByDg(User $user): bool
+    {
+        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_DG);
+    }
+
+    // canReviewByDirection : helper supprime â€” l'etape de validation direction
     // n'existe plus dans le circuit metier.
 
     private function isExecutionEditableByAgent(Action $action): bool
     {
+        if ((string) ($action->statut_parametrage ?? '') === 'a_parametrer') {
+            return false;
+        }
+
         $status = (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE);
 
         return in_array($status, [
@@ -1233,11 +1555,7 @@ class ActionTrackingWebController extends Controller
 
     private function submissionSuccessMessage(): string
     {
-        return match ($this->workflowSettings()->actionSubmissionTarget()) {
-            'direction' => 'Action soumise directement a la direction pour evaluation.',
-            'final' => 'Action cloturee sans validation supplementaire. Elle est maintenant prise en compte dans les statistiques.',
-            default => 'Action soumise au chef de service pour evaluation.',
-        };
+        return 'Action soumise au chef de service pour validation.';
     }
 
     /**
@@ -1246,12 +1564,19 @@ class ActionTrackingWebController extends Controller
     private function financeDafValidationRules(Request $request): array
     {
         $commentRules = ['nullable', 'string'];
-        if ((string) $request->input('decision_financement') === ActionTrackingService::FINANCEMENT_DECISION_REJETER) {
+        if (in_array((string) $request->input('decision_financement'), [
+            ActionTrackingService::FINANCEMENT_DECISION_REJETER,
+            ActionTrackingService::FINANCEMENT_DECISION_COMPLEMENT,
+        ], true)) {
             array_unshift($commentRules, 'required');
         }
 
         return [
-            'decision_financement' => ['required', Rule::in([ActionTrackingService::FINANCEMENT_DECISION_VALIDER, ActionTrackingService::FINANCEMENT_DECISION_REJETER])],
+            'decision_financement' => ['required', Rule::in([
+                ActionTrackingService::FINANCEMENT_DECISION_VALIDER,
+                ActionTrackingService::FINANCEMENT_DECISION_COMPLEMENT,
+                ActionTrackingService::FINANCEMENT_DECISION_REJETER,
+            ])],
             'montant_valide' => ['required_if:decision_financement,'.ActionTrackingService::FINANCEMENT_DECISION_VALIDER, 'nullable', 'numeric', 'min:0'],
             'reference_financement' => ['nullable', 'string', 'max:255'],
             'commentaire_financement' => $commentRules,
@@ -1290,11 +1615,8 @@ class ActionTrackingWebController extends Controller
 
         $rules = [
             'decision_validation' => ['required', Rule::in($allowedDecisions)],
-            'evaluation_note' => ['nullable', 'required_without:taux_valide_chef', 'numeric', 'min:0', 'max:100'],
-            'taux_valide_chef' => ['nullable', 'required_without:evaluation_note', 'numeric', 'min:0', 'max:100'],
-            'conformite_chef' => ['nullable', Rule::in(['conforme', 'partiellement_conforme', 'non_conforme'])],
-            'observation_qualite_chef' => ['nullable', 'string', 'max:3000'],
-            'evaluation_commentaire' => $commentRules,
+            // Spec v2 : motif_validation_chef remplace evaluation_commentaire.
+            'motif_validation_chef' => $commentRules,
         ];
 
         if ($serviceStep) {
@@ -1304,7 +1626,12 @@ class ActionTrackingWebController extends Controller
             return $rules;
         }
 
-        $rules['justificatif_evaluation_direction'] = ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()];
+        $rules['justificatif_evaluation_direction'] = [
+            'nullable',
+            'file',
+            'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(),
+            app(DocumentPolicySettings::class)->mimesRule(),
+        ];
 
         return $rules;
     }

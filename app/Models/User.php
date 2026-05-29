@@ -118,6 +118,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password_changed_at' => 'datetime',
             'suspended_until' => 'datetime',
+            'deactivated_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
             'is_agent' => 'boolean',
@@ -207,6 +208,11 @@ class User extends Authenticatable
     public function passwordHistories(): HasMany
     {
         return $this->hasMany(PasswordHistory::class);
+    }
+
+    public function assignmentHistories(): HasMany
+    {
+        return $this->hasMany(UserAssignmentHistory::class, 'user_id');
     }
 
     public function alertReads(): HasMany

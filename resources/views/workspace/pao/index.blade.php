@@ -6,8 +6,8 @@
         $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
         $ps = is_array($paoStats ?? null) ? $paoStats : [];
         $summaryCards = [
-            ['label' => 'Actifs',               'value' => $ps['actifs'] ?? 0,             'meta' => null, 'href' => route('workspace.pao.index', ['statut' => 'valide_ou_verrouille']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Brouillons',           'value' => $ps['brouillons'] ?? 0,         'meta' => null, 'href' => route('workspace.pao.index', ['statut' => 'brouillon']),  'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'En cours',             'value' => $ps['en_cours'] ?? 0,           'meta' => null, 'href' => route('workspace.pao.index', ['statut' => 'en_cours']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Valides',              'value' => $ps['valides'] ?? 0,            'meta' => 'Auto si complet', 'href' => route('workspace.pao.index', ['statut' => 'valide']),  'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Avec PTA',             'value' => $ps['avec_pta'] ?? 0,           'meta' => null, 'href' => route('workspace.pta.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Sans PTA',             'value' => $ps['sans_pta'] ?? 0,           'meta' => null, 'href' => route('workspace.pao.index', ['without_pta' => 1]),       'badge' => null, 'badge_tone' => ($ps['sans_pta'] ?? 0) > 0 ? 'warning' : 'neutral'],
         ];
@@ -52,7 +52,7 @@
                         <option value="">Tous</option>
                         @foreach ($pasOptions as $pas)
                             <option value="{{ $pas->id }}" @selected($filters['pas_id'] === $pas->id)>
-                                #{{ $pas->id }} - {{ $pas->titre }}
+                                {{ $pas->titre }}
                             </option>
                         @endforeach
                     </select>
@@ -119,13 +119,17 @@
             <table class="app-table data-table">
                 <thead>
                     <tr>
-                        <th>PAO</th>
+                        <th>ID</th>
+                        <th>Code</th>
+                        <th>Titre</th>
                         <th>PAS</th>
                         <th>Objectif stratégique</th>
                         <th>Direction</th>
                         <th>Année</th>
+                        <th>Échéance</th>
                         <th>Statut</th>
-                        <th>PTA</th>
+                        <th>Nb OO</th>
+                        <th>Nb PTA</th>
                         <th>Validateur</th>
                         @if ($canWrite)
                             <th>Actions</th>
@@ -136,34 +140,19 @@
                     @forelse ($rows as $row)
                         @php
                             $statusClasses = match ((string) $row->statut) {
-                                'brouillon' => 'anbg-badge anbg-badge-neutral',
-                                'soumis' => 'anbg-badge anbg-badge-warning',
+                                'en_cours' => 'anbg-badge anbg-badge-warning',
                                 'valide' => 'anbg-badge anbg-badge-success',
-                                'verrouille' => 'anbg-badge anbg-badge-info',
+                                'cloture' => 'anbg-badge anbg-badge-info',
+                                'archive' => 'anbg-badge anbg-badge-neutral',
                                 default => 'anbg-badge anbg-badge-neutral',
                             };
-                            $canSubmit = $row->statut === 'brouillon'
-                                && ($currentUser->hasGlobalWriteAccess()
-                                    || ($currentUser->hasRole(\App\Models\User::ROLE_DIRECTION)
-                                        && (int) $currentUser->direction_id === (int) $row->direction_id));
-                            $canApprove = $row->statut === 'soumis'
-                                && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG);
-                            $canLock = $row->statut === 'valide'
-                                && $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG);
-                            $canReopen = in_array($row->statut, ['soumis', 'valide'], true)
-                                && (
-                                    $currentUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL, \App\Models\User::ROLE_DG)
-                                    || ($row->statut === 'soumis'
-                                        && ($currentUser->hasGlobalWriteAccess()
-                                            || ($currentUser->hasRole(\App\Models\User::ROLE_DIRECTION)
-                                                && (int) $currentUser->direction_id === (int) $row->direction_id)))
-                                );
+                            $canClose = in_array($row->statut, ['en_cours', 'valide'], true);
+                            $canArchive = $row->statut === 'cloture';
                         @endphp
                         <tr>
-                            <td>
-                                <div class="font-semibold text-slate-900">{{ $row->titre }}</div>
-                                <div class="mt-1 text-xs text-slate-500">PAO #{{ $row->id }} · {{ $row->echeance ?? '-' }}</div>
-                            </td>
+                            <td class="font-mono text-xs text-slate-600">{{ $row->id }}</td>
+                            <td class="font-mono text-xs font-semibold text-slate-800">{{ $row->code ?? '-' }}</td>
+                            <td class="font-semibold text-slate-900">{{ $row->titre }}</td>
                             <td>{{ $row->pas?->titre ?? '-' }}</td>
                             <td class="min-w-[240px]">
                                 @if ($row->pasObjectif)
@@ -178,48 +167,40 @@
                                 @endif
                             </td>
                             <td>{{ $row->direction?->code }} {{ $row->direction?->libelle ? '- '.$row->direction->libelle : '' }}</td>
-                            <td>{{ $row->annee }}</td>
+                            <td class="text-center">{{ $row->annee }}</td>
+                            <td class="whitespace-nowrap text-xs text-slate-700">{{ $row->echeance ?? '-' }}</td>
                             <td>
                                 <span class="{{ $statusClasses }}">
                                     {{ $workflowStatusLabel($row->statut) }}
                                 </span>
                             </td>
-                            <td>{{ $row->ptas_count }}</td>
+                            <td class="text-center"><span class="anbg-badge anbg-badge-info px-3">{{ $row->objectifs_operationnels_count ?? 0 }}</span></td>
+                            <td class="text-center"><span class="anbg-badge anbg-badge-success px-3">{{ $row->ptas_count }}</span></td>
                             <td>{{ $row->validateur?->name ?? '-' }}</td>
                             @if ($canWrite)
                                 <td>
                                     <div class="row-actions">
                                         <a class="btn btn-warning" href="{{ route('workspace.pao.edit', $row) }}">Modifier</a>
-                                        @if ($canSubmit)
-                                            <form method="POST" action="{{ route('workspace.pao.submit', $row) }}">
+                                        @if ($canClose)
+                                            <form method="POST" action="{{ route('workspace.pao.close', $row) }}" data-confirm-message="Cloturer ce PAO apres controle des anomalies ?" data-confirm-tone="warning" data-confirm-label="Cloturer">
                                                 @csrf
-                                                <button class="btn btn-primary" type="submit">Soumettre</button>
+                                                <input type="hidden" name="motif" value="Cloture PAO demandee depuis la liste">
+                                                <button class="btn btn-primary" type="submit">Cloturer</button>
                                             </form>
                                         @endif
-                                        @if ($canApprove)
-                                            <form method="POST" action="{{ route('workspace.pao.approve', $row) }}">
+                                        @if ($canArchive)
+                                            <form method="POST" action="{{ route('workspace.pao.archive', $row) }}" data-confirm-message="Archiver ce PAO cloture ?" data-confirm-tone="warning" data-confirm-label="Archiver">
                                                 @csrf
-                                                <button class="btn btn-success" type="submit">Valider</button>
+                                                <input type="hidden" name="motif" value="Archivage PAO cloture depuis la liste">
+                                                <button class="btn btn-secondary" type="submit">Archiver</button>
                                             </form>
                                         @endif
-                                        @if ($canLock)
-                                            <form method="POST" action="{{ route('workspace.pao.lock', $row) }}" data-confirm-message="Verrouiller ce PAO ?" data-confirm-tone="warning" data-confirm-label="Verrouiller">
+                                            <form method="POST" action="{{ route('workspace.pao.destroy', $row) }}" data-confirm-message="Supprimer ce PAO ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
                                                 @csrf
-                                                <button class="btn btn-primary" type="submit">Verrouiller</button>
+                                                @method('DELETE')
+                                                <input type="hidden" name="motif" value="Demande de suppression PAO depuis le module PAO">
+                                                <button class="btn btn-danger" type="submit">Supprimer</button>
                                             </form>
-                                        @endif
-                                        @if ($canReopen)
-                                            <form method="POST" action="{{ route('workspace.pao.reopen', $row) }}" data-prompt-title="Retour brouillon" data-prompt-message="Saisir le motif de retour brouillon (PAO)." data-prompt-label="Motif de retour" data-prompt-placeholder="Minimum 5 caracteres" data-prompt-target="motif_retour" data-prompt-minlength="5" data-prompt-confirm="Confirmer">
-                                                @csrf
-                                                <input type="hidden" name="motif_retour" value="">
-                                                <button class="btn btn-warning" type="submit">Retour brouillon</button>
-                                            </form>
-                                        @endif
-                                        <form method="POST" action="{{ route('workspace.pao.destroy', $row) }}" data-confirm-message="Supprimer ce PAO ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="btn btn-danger" type="submit">Supprimer</button>
-                                        </form>
                                     </div>
                                 </td>
                             @endif

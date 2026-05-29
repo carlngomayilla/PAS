@@ -452,15 +452,16 @@ Exemple :
 | Lot | Périmètre | Statut |
 | --- | --- | --- |
 | 1 | RBAC + sidebars + routes protégées | À faire |
-| 2 | PAO directionnel + PTA service/unité (correction modèle) | À faire |
-| 3 | Actions + sous-actions + suivi agent | En cours (suivi hebdo supprimé ✓) |
-| 4 | Validations + tâches + délais 48h | À faire |
-| 5 | KPI 50/25/15/10 + scores personnels | À faire |
-| 6 | Financement DAF/DG (9 statuts) | Partiel (déjà 7 statuts) |
-| 7 | Alertes + notifications | À faire |
-| 8 | Rapports PDF/Excel (8 rapports) | Partiel |
+| 2 | PAO directionnel + PTA service/unité (correction modèle) | Stabilisé (tests verts) |
+| 3 | Actions + sous-actions + suivi agent | Stabilisé (RMO lecture seule + démarrage réel strict + validation sous-action chef) |
+| 4 | Validations + tâches + délais 48h | En cours (chef, sous-action chef, DAF 3 jours, DG 48h couverts par tests) |
+| 5 | KPI 50/25/15/10 + scores personnels | Stabilisé (KPI mixte + financement + sous-actions non quantifiées comptées après validation chef) |
+| 6 | Financement DAF/DG (9 statuts) | Partiel (10 statuts présents + complément DAF branché) |
+| 7 | Alertes + notifications | En cours (anomalies bloquantes + alertes KPI/justificatif limitées au suivi réel) |
+| 8 | Rapports PDF/Excel (8 rapports) | En cours (catalogue canonique + exports Excel/PDF ciblés Actions/PTA/Anomalies/Financement) |
 | 9 | Audit + suppression + archivage | Partiel |
 | 10 | Tests et contrôle final | À faire |
+| 11 | Notifications internes + emails Brevo SMTP | File d'attente (dernier lot) - voir `docs/backlog-lot-11-notifications-brevo.md` |
 
 ---
 

@@ -105,7 +105,7 @@
     <div class="messaging-empty-state">
         <x-ui.empty-state
             title="Aucun collaborateur sélectionné"
-            message="Sélectionnez un contact dans l'organigramme pour afficher sa fiche détaillée et lancer un échange."
+            message="Sélectionnez un contact dans l'annuaire pour afficher sa fiche détaillée et lancer un échange."
             icon="users"
             tone="info"
         />

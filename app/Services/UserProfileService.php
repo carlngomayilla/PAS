@@ -29,7 +29,7 @@ class UserProfileService
             User::ROLE_ADMIN_FONCTIONNEL => [
                 [
                     'module'     => 'Gouvernance PAS/PAO/PTA',
-                    'operations' => ['Créer', 'Modifier', 'Supprimer', 'Valider', 'Verrouiller', 'Consulter'],
+                    'operations' => ['Creer', 'Modifier', 'Supprimer', 'Cloturer', 'Archiver', 'Consulter'],
                     'portee'     => 'Toutes les directions et services',
                 ],
                 [
@@ -46,7 +46,7 @@ class UserProfileService
             User::ROLE_DG => [
                 [
                     'module'     => 'PAS',
-                    'operations' => ['Valider', 'Verrouiller', 'Consulter'],
+                    'operations' => ['Consulter', 'Arbitrer exceptions'],
                     'portee'     => 'Globale',
                 ],
                 [
@@ -63,7 +63,7 @@ class UserProfileService
             User::ROLE_PLANIFICATION => [
                 [
                     'module'     => 'Structuration PAS/PAO/PTA',
-                    'operations' => ['Créer', 'Modifier', 'Soumettre', 'Consulter'],
+                    'operations' => ['Creer', 'Modifier', 'Cloturer', 'Consulter'],
                     'portee'     => 'Globale',
                 ],
                 [
@@ -80,7 +80,7 @@ class UserProfileService
             User::ROLE_DIRECTION => [
                 [
                     'module'     => 'PAO de la direction',
-                    'operations' => ['Créer', 'Modifier', 'Suivre', 'Soumettre'],
+                    'operations' => ['Creer', 'Modifier', 'Suivre'],
                     'portee'     => 'Direction rattachee',
                 ],
                 [
@@ -131,7 +131,7 @@ class UserProfileService
                 ...$items,
                 [
                     'module'     => 'Messagerie interne',
-                    'operations' => ['Consulter annuaire', 'Envoyer messages directs', 'Parcourir l organigramme'],
+                    'operations' => ['Consulter annuaire', 'Envoyer messages directs'],
                     'portee'     => $user->profileScopeLabel(),
                 ],
             ],

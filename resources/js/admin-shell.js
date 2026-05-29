@@ -404,9 +404,9 @@
 
         notificationsAlertsItems.innerHTML = items.map(function (item) {
             var metrics = item.metrics || {};
+            // KPI "Conformité" retire (2026-05-28) des chips metric inline.
             var metricChips = [
                 ['Global', metrics.kpi_global],
-                ['Conformité', metrics.kpi_conformite],
                 ['Performance', metrics.kpi_performance],
             ].filter(function (row) {
                 return typeof row[1] !== 'undefined';

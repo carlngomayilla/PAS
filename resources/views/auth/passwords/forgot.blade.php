@@ -83,7 +83,7 @@
         </form>
 
         <div class="links">
-            <a href="{{ route('login') }}">← Retour à la connexion</a>
+            <a href="{{ route('login.form') }}">← Retour à la connexion</a>
         </div>
         <p class="footer"><strong>ANBG Pilotage</strong> · PAS / PAO / PTA</p>
     </main>

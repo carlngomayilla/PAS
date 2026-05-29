@@ -90,7 +90,7 @@
                 <table class="app-table data-table">
                     <thead>
                         <tr>
-                            <th class="px-3 py-2 text-left">Critere</th>
+                            <th class="px-3 py-2 text-left">Critère</th>
                             <th class="px-3 py-2 text-left">Actuel</th>
                             <th class="px-3 py-2 text-left">Simule</th>
                         </tr>

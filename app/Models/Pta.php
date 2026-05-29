@@ -13,6 +13,15 @@ class Pta extends Model
 {
     use HasFactory, SoftDeletes;
 
+    // STATUS_BROUILLON : etat initial apres import Excel ou creation. Le PTA
+    // existe en BDD mais ses actions doivent etre parametrees individuellement
+    // par le chef de service avant que le PTA soit considere comme "enregistre"
+    // (transition automatique vers STATUS_EN_COURS quand toutes les actions ont
+    // statut_parametrage = 'parametre').
+    public const STATUS_BROUILLON = 'brouillon';
+    public const STATUS_EN_COURS = 'en_cours';
+    public const STATUS_CLOTURE = 'cloture';
+    public const STATUS_ARCHIVE = 'archive';
     public const STATUS_VALIDE = 'valide';
     public const STATUS_VERROUILLE = 'verrouille';
 
@@ -21,6 +30,7 @@ class Pta extends Model
      */
     protected $fillable = [
         'exercice_id',
+        'code',
         'pao_id',
         'objectif_operationnel_id',
         'direction_id',
@@ -37,6 +47,11 @@ class Pta extends Model
         return [
             'exercice_id' => 'integer',
             'valide_le' => 'datetime',
+            'modification_locked_at' => 'datetime',
+            'modification_locked_by' => 'integer',
+            'modification_unlocked_at' => 'datetime',
+            'modification_unlocked_by' => 'integer',
+            'modification_unlock_expires_at' => 'datetime',
         ];
     }
 

@@ -22,6 +22,7 @@ class ObjectifOperationnel extends Model
      */
     protected $fillable = [
         'pao_id',
+        'code',
         'pas_id',
         'pas_axe_id',
         'pas_objectif_id',
@@ -32,6 +33,7 @@ class ObjectifOperationnel extends Model
         'echeance',
         'indicateurs',
         'statut',
+        'import_ordre',
     ];
 
     /**
@@ -41,6 +43,7 @@ class ObjectifOperationnel extends Model
     {
         return [
             'echeance' => 'date',
+            'import_ordre' => 'integer',
             'deleted_at' => 'datetime',
         ];
     }

@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    // Canal email Brevo (complémentaire aux notifications internes).
+    // BREVO_ENABLED=false par défaut : aucun envoi tant que l'admin n'a pas branché
+    // ses credentials et activé explicitement le canal. Aucune incidence sur le métier.
+    'brevo' => [
+        'enabled' => filter_var(env('BREVO_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'mailer' => env('BREVO_MAILER', 'brevo'),
+        'from' => [
+            'address' => env('BREVO_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', 'no-reply@anbg.ga')),
+            'name' => env('BREVO_FROM_NAME', env('MAIL_FROM_NAME', 'ANBG · e-Pilotage PAS')),
+        ],
+    ],
+
 ];

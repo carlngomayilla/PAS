@@ -69,7 +69,6 @@ class Phase3CRbacConsolidationTest extends TestCase
                 'date_debut' => '2026-01-01',
                 'date_fin' => '2026-01-10',
                 'date_echeance' => '2026-01-10',
-                'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
                 'responsable_id' => $admin->id,
                 'statut' => 'en_cours',
                 'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,

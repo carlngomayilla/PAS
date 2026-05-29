@@ -47,6 +47,15 @@ class PlatformDiagnosticService
             'modules_touched' => JournalAudit::query()
                 ->distinct('module')
                 ->count('module'),
+            'sensitive_without_actor' => $this->sensitiveAuditRows()
+                ->whereNull('user_id')
+                ->count(),
+            'sensitive_without_values' => $this->sensitiveAuditRows()
+                ->filter(fn (JournalAudit $audit): bool => $this->missingExpectedBeforeAfter($audit))
+                ->count(),
+            'sensitive_without_reason' => $this->sensitiveAuditRows()
+                ->filter(fn (JournalAudit $audit): bool => $this->requiresReason($audit) && ! $this->hasReasonPayload($audit))
+                ->count(),
         ];
     }
 
@@ -143,6 +152,28 @@ class PlatformDiagnosticService
                     }, 'duplicates')
                     ->count(),
                 'Une meme resolution d export ne doit avoir qu un seul template par defaut actif.'
+            ),
+            $this->makeCheck(
+                'sensitive_audits_without_actor',
+                'Audit sensible sans auteur',
+                $this->sensitiveAuditRows()->whereNull('user_id')->count(),
+                'Chaque action sensible doit porter l utilisateur declencheur.'
+            ),
+            $this->makeCheck(
+                'sensitive_audits_without_values',
+                'Audit sensible sans ancienne/nouvelle valeur',
+                $this->sensitiveAuditRows()
+                    ->filter(fn (JournalAudit $audit): bool => $this->missingExpectedBeforeAfter($audit))
+                    ->count(),
+                'Les creations doivent avoir une nouvelle valeur, les suppressions une ancienne valeur, les modifications les deux.'
+            ),
+            $this->makeCheck(
+                'sensitive_audits_without_reason',
+                'Audit sensible sans motif',
+                $this->sensitiveAuditRows()
+                    ->filter(fn (JournalAudit $audit): bool => $this->requiresReason($audit) && ! $this->hasReasonPayload($audit))
+                    ->count(),
+                'Les rejets, suppressions, blocages, changements de rattachement et decisions sensibles doivent porter un motif.'
             ),
             [
                 'code' => 'disabled_modules',
@@ -249,5 +280,117 @@ class PlatformDiagnosticService
             'status' => $count > 0 ? 'warning' : 'ok',
             'recommendation' => $recommendation,
         ];
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, JournalAudit>
+     */
+    private function sensitiveAuditRows()
+    {
+        return JournalAudit::query()
+            ->where(function ($query): void {
+                $query->where('module', 'super_admin')
+                    ->orWhereIn('module', ['pas', 'pao', 'pta', 'action', 'referentiel_utilisateur'])
+                    ->orWhere('action', 'like', '%delete%')
+                    ->orWhere('action', 'like', '%deletion%')
+                    ->orWhere('action', 'like', '%reject%')
+                    ->orWhere('action', 'like', '%rejet%')
+                    ->orWhere('action', 'like', '%correction%')
+                    ->orWhere('action', 'like', '%block%')
+                    ->orWhere('action', 'like', '%blocage%')
+                    ->orWhere('action', 'like', '%workflow%')
+                    ->orWhere('action', 'like', '%permission%');
+            })
+            ->latest('id')
+            ->limit(1000)
+            ->get(['id', 'user_id', 'module', 'action', 'ancienne_valeur', 'nouvelle_valeur']);
+    }
+
+    private function missingExpectedBeforeAfter(JournalAudit $audit): bool
+    {
+        $action = strtolower((string) $audit->action);
+        $old = $audit->ancienne_valeur;
+        $new = $audit->nouvelle_valeur;
+
+        if (str_contains($action, 'create')) {
+            return ! is_array($new) || $new === [];
+        }
+
+        if (str_contains($action, 'delete')) {
+            return ! is_array($old) || $old === [];
+        }
+
+        if (str_contains($action, 'notification_')) {
+            return false;
+        }
+
+        return (! is_array($old) || $old === []) || (! is_array($new) || $new === []);
+    }
+
+    private function requiresReason(JournalAudit $audit): bool
+    {
+        $action = strtolower((string) $audit->action);
+
+        foreach ([
+            'delete',
+            'deletion',
+            'reject',
+            'rejet',
+            'correction',
+            'block',
+            'blocage',
+            'unblock',
+            'levee',
+            'lifecycle',
+            'deactivation',
+            'assignment',
+            'archive',
+            'close',
+            'cloture',
+            'financement',
+            'criticality',
+            'criticite',
+            'settings',
+            'maintenance',
+        ] as $needle) {
+            if (str_contains($action, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasReasonPayload(JournalAudit $audit): bool
+    {
+        return $this->arrayContainsReason((array) ($audit->ancienne_valeur ?? []))
+            || $this->arrayContainsReason((array) ($audit->nouvelle_valeur ?? []));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function arrayContainsReason(array $payload): bool
+    {
+        foreach ($payload as $key => $value) {
+            $normalizedKey = strtolower((string) $key);
+            if (in_array($normalizedKey, [
+                'motif',
+                'reason',
+                'deletion_reason',
+                'deactivation_reason',
+                'reviewer_note',
+                'justification',
+                'commentaire',
+            ], true) && trim((string) $value) !== '') {
+                return true;
+            }
+
+            if (is_array($value) && $this->arrayContainsReason($value)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -34,7 +34,8 @@ class FormRequestAgentBlockedTest extends TestCase
                         'code' => 'AXE',
                         'libelle' => 'Test axe',
                         'objectifs' => [
-                            ['code' => 'OS', 'libelle' => 'OS test'],
+                            // date_echeance obligatoire selon la nouvelle logique métier
+                            ['code' => 'OS', 'libelle' => 'OS test', 'date_echeance' => '2027-12-31'],
                         ],
                     ],
                 ],

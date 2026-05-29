@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
 use App\Models\Direction;
+use App\Models\DeletionRequest;
+use App\Models\Exercice;
 use App\Models\ExportTemplate;
 use App\Models\ExportTemplateAssignment;
 use App\Models\ExportTemplateVersion;
@@ -18,6 +20,7 @@ use App\Services\ActionCalculationSettings;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\ActionManagementSettings;
 use App\Services\DashboardProfileSettings;
+use App\Services\DeletionRequestService;
 use App\Services\DocumentPolicySettings;
 use App\Services\DynamicReferentialSettings;
 use App\Services\Exports\ExportTemplatePublisher;
@@ -31,7 +34,10 @@ use App\Services\PlatformSettings;
 use App\Services\PlatformMaintenanceService;
 use App\Services\RoleRegistryService;
 use App\Services\RolePermissionSettings;
+use App\Services\PlanningArchiveSettings;
+use App\Services\PlanningAutoArchiveService;
 use App\Services\Security\PasswordPolicyService;
+use App\Services\UserLifecycleService;
 use App\Services\WorkflowSettings;
 use App\Services\WorkspaceModuleSettings;
 use Illuminate\Database\Eloquent\Builder;
@@ -66,6 +72,7 @@ class SuperAdminWebController extends Controller
         private readonly DynamicReferentialSettings $dynamicReferentialSettings,
         private readonly ManagedKpiSettings $managedKpiSettings,
         private readonly NotificationPolicySettings $notificationPolicySettings,
+        private readonly DeletionRequestService $deletionRequestService,
         private readonly OrganizationGovernanceService $organizationGovernanceService,
         private readonly PlatformDiagnosticService $platformDiagnosticService,
         private readonly PlatformSimulationService $platformSimulationService,
@@ -73,6 +80,7 @@ class SuperAdminWebController extends Controller
         private readonly PasswordPolicyService $passwordPolicy,
         private readonly RoleRegistryService $roleRegistry,
         private readonly RolePermissionSettings $rolePermissionSettings,
+        private readonly UserLifecycleService $userLifecycleService,
         private readonly WorkflowSettings $workflowSettings,
         private readonly WorkspaceModuleSettings $workspaceModuleSettings,
         private readonly \App\Services\ChefUniteSyncService $chefUniteSync
@@ -802,6 +810,13 @@ class SuperAdminWebController extends Controller
             'directionOptions' => Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
+            'transferUserOptions' => User::query()
+                ->with(['direction:id,code', 'service:id,code'])
+                ->where('is_active', true)
+                ->whereNull('deleted_at')
+                ->orderBy('name')
+                ->limit(500)
+                ->get(['id', 'name', 'direction_id', 'service_id', 'is_active']),
             'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'roleOptions' => $this->profileOptions(),
             'roleLabels' => $this->profileLabels(),
@@ -819,6 +834,12 @@ class SuperAdminWebController extends Controller
             'editingDirection' => $editingDirection,
             'editingService' => $editingService,
             'editingUser' => $editingUser,
+            'deletionRequests' => DeletionRequest::query()
+                ->with(['requester:id,name,email', 'reviewer:id,name,email'])
+                ->whereIn('status', [DeletionRequest::STATUS_PENDING, DeletionRequest::STATUS_COMPLEMENT_REQUESTED])
+                ->latest('id')
+                ->limit(20)
+                ->get(),
             'orgHistory' => $this->organizationGovernanceService->recentHistory(),
             'mergeSimulation' => $mergeSimulation,
             'transferSimulation' => $transferSimulation,
@@ -834,6 +855,135 @@ class SuperAdminWebController extends Controller
                 'auth_date_to' => (string) $request->string('auth_date_to'),
             ],
         ]);
+    }
+
+    public function exercisesIndex(Request $request): View
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessSuperAdmin($user);
+
+        return view('workspace.super_admin.exercices', [
+            'exerciseRows' => Exercice::query()
+                ->orderByDesc('annee')
+                ->get(),
+            'activeExercise' => Exercice::query()
+                ->where('is_active', true)
+                ->orderByDesc('annee')
+                ->first(),
+            'statusOptions' => $this->exerciseStatusOptions(),
+            'archiveSettings' => app(PlanningArchiveSettings::class)->all(),
+            'archiveSummary' => app(PlanningAutoArchiveService::class)->summary(),
+        ]);
+    }
+
+    public function exercisesStore(Request $request): RedirectResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessSuperAdmin($user);
+
+        $validated = $this->validateExercisePayload($request);
+        $motif = (string) $validated['motif'];
+        $payload = Arr::except($validated, ['motif']);
+
+        $exercise = Exercice::query()->create($payload);
+
+        $this->recordAudit($request, 'super_admin', 'exercise_create', $exercise, null, [
+            ...$exercise->toArray(),
+            'motif' => $motif,
+        ]);
+
+        return redirect()
+            ->route('workspace.super-admin.exercises.index')
+            ->with('success', 'Exercice cree avec succes.');
+    }
+
+    public function exercisesUpdate(Request $request, Exercice $exercice): RedirectResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessSuperAdmin($user);
+
+        $validated = $this->validateExercisePayload($request, $exercice);
+        $motif = (string) $validated['motif'];
+        $before = $exercice->toArray();
+
+        if ((bool) $exercice->is_active && (string) $validated['statut'] === Exercice::STATUT_ARCHIVE) {
+            throw ValidationException::withMessages([
+                'statut' => 'Impossible d archiver l exercice actif. Activez d abord un autre exercice.',
+            ]);
+        }
+
+        $exercice->update(Arr::except($validated, ['motif']));
+
+        $this->recordAudit($request, 'super_admin', 'exercise_update', $exercice, $before, [
+            ...$exercice->fresh()->toArray(),
+            'motif' => $motif,
+        ]);
+
+        return redirect()
+            ->route('workspace.super-admin.exercises.index')
+            ->with('success', 'Exercice mis a jour.');
+    }
+
+    public function exercisesActivate(Request $request, Exercice $exercice): RedirectResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessSuperAdmin($user);
+
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        if ((string) $exercice->statut === Exercice::STATUT_ARCHIVE) {
+            throw ValidationException::withMessages([
+                'statut' => 'Impossible de definir un exercice archive comme exercice actif.',
+            ]);
+        }
+
+        $before = [
+            'active_exercise_ids' => Exercice::query()->where('is_active', true)->pluck('id')->all(),
+            'target' => $exercice->toArray(),
+        ];
+
+        DB::transaction(function () use ($exercice): void {
+            Exercice::query()->where('is_active', true)->update(['is_active' => false]);
+            $exercice->forceFill(['is_active' => true])->save();
+        });
+
+        $this->recordAudit($request, 'super_admin', 'exercise_activate', $exercice, $before, [
+            'active_exercise_id' => (int) $exercice->id,
+            'active_year' => (int) $exercice->annee,
+            'motif' => (string) $validated['motif'],
+        ]);
+
+        return redirect()
+            ->route('workspace.super-admin.exercises.index')
+            ->with('success', 'Exercice actif mis a jour.');
+    }
+
+    public function exercisesArchiveSettingsUpdate(Request $request): RedirectResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessSuperAdmin($user);
+
+        $validated = $request->validate([
+            'planning_auto_archive_enabled' => ['nullable', 'in:0,1'],
+            'planning_pao_archive_after_days' => ['required', 'integer', 'min:1', 'max:3650'],
+            'planning_pta_archive_after_days' => ['required', 'integer', 'min:1', 'max:3650'],
+        ]);
+
+        $settings = app(PlanningArchiveSettings::class);
+        $before = $settings->all();
+        $after = $settings->update([
+            ...$validated,
+            'planning_auto_archive_enabled' => $request->boolean('planning_auto_archive_enabled') ? '1' : '0',
+        ], $user);
+        $auditTarget = $this->auditAnchor('planning_archive', 'planning_archive_settings', json_encode($after, JSON_UNESCAPED_SLASHES));
+
+        $this->recordAudit($request, 'super_admin', 'planning_archive_settings_update', $auditTarget, $before, $after);
+
+        return redirect()
+            ->route('workspace.super-admin.exercises.index')
+            ->with('success', 'Parametres d archivage automatique mis a jour.');
     }
 
     public function organizationDirectionStore(Request $request): RedirectResponse
@@ -949,14 +1099,46 @@ class SuperAdminWebController extends Controller
         }
 
         $before = Arr::except($managedUser->toArray(), ['password']);
+        $wasActive = (bool) ($managedUser->is_active ?? true);
+        $lifecycleStats = null;
+        $assignmentStats = null;
 
-        DB::transaction(function () use ($managedUser, $validated, $request): void {
+        DB::transaction(function () use ($managedUser, $validated, $request, $user, $wasActive, &$lifecycleStats, &$assignmentStats): void {
             $payload = $this->normalizeManagedUserPayload($validated, $request, $managedUser);
             $plainPassword = isset($validated['password']) && is_string($validated['password']) && $validated['password'] !== ''
                 ? (string) $validated['password']
                 : null;
+            $willBeActive = (bool) ($payload['is_active'] ?? true);
 
-            $managedUser->forceFill($payload)->save();
+            if ($wasActive && ! $willBeActive) {
+                $lifecycleStats = $this->userLifecycleService->deactivate(
+                    $managedUser,
+                    $user,
+                    isset($validated['transfer_to_user_id']) ? (int) $validated['transfer_to_user_id'] : null,
+                    (string) ($validated['motif'] ?? 'Desactivation via modification du compte.')
+                );
+                $managedUser->refresh();
+                $managedUser->forceFill($payload)->save();
+                $this->revokeSessionsForUser($managedUser);
+            } else {
+                $assignmentStats = $this->userLifecycleService->recordAssignmentChange(
+                    $managedUser,
+                    $user,
+                    $payload,
+                    isset($validated['transfer_to_user_id']) ? (int) $validated['transfer_to_user_id'] : null,
+                    $validated['motif'] ?? null
+                );
+
+                $managedUser->forceFill($payload)->save();
+
+                if (! $wasActive && $willBeActive) {
+                    $lifecycleStats = $this->userLifecycleService->activate(
+                        $managedUser,
+                        $user,
+                        (string) ($validated['motif'] ?? 'Reactivation via modification du compte.')
+                    );
+                }
+            }
 
             if ($plainPassword !== null) {
                 $this->passwordPolicy->validateNotReused($managedUser, $plainPassword);
@@ -970,7 +1152,15 @@ class SuperAdminWebController extends Controller
 
         $this->chefUniteSync->sync($managedUser);
 
-        $this->recordAudit($request, 'super_admin', 'organization_user_update', $managedUser, $before, Arr::except($managedUser->toArray(), ['password']));
+        $after = Arr::except($managedUser->toArray(), ['password']);
+        if ($lifecycleStats !== null) {
+            $after['lifecycle'] = $lifecycleStats;
+        }
+        if ($assignmentStats !== null) {
+            $after['assignment_change'] = $assignmentStats;
+        }
+
+        $this->recordAudit($request, 'super_admin', 'organization_user_update', $managedUser, $before, $after);
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
@@ -1012,22 +1202,40 @@ class SuperAdminWebController extends Controller
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
 
+        $validated = $request->validate([
+            'transfer_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'motif' => ['nullable', 'string', 'max:500'],
+        ]);
+
         if ((int) $managedUser->id === (int) $user->id && (bool) $managedUser->is_active) {
             return back()->withErrors(['general' => 'Vous ne pouvez pas desactiver votre propre compte.']);
         }
 
-        $before = $managedUser->toArray();
-        // is_active n est plus mass-assignable (cf. A02) : forceFill pour la bascule admin.
-        $managedUser->forceFill(['is_active' => ! $managedUser->is_active])->save();
-
         $sessionCount = 0;
-        if (! $managedUser->is_active) {
+        $before = Arr::except($managedUser->toArray(), ['password']);
+
+        if ((bool) $managedUser->is_active) {
+            $lifecycleStats = $this->userLifecycleService->deactivate(
+                $managedUser,
+                $user,
+                isset($validated['transfer_to_user_id']) ? (int) $validated['transfer_to_user_id'] : null,
+                (string) ($validated['motif'] ?? 'Desactivation du compte par Super Admin.')
+            );
             $sessionCount = $this->revokeSessionsForUser($managedUser);
+        } else {
+            $lifecycleStats = $this->userLifecycleService->activate(
+                $managedUser,
+                $user,
+                (string) ($validated['motif'] ?? 'Reactivation du compte par Super Admin.')
+            );
         }
 
+        $managedUser->refresh();
+
         $this->recordAudit($request, 'super_admin', 'organization_user_toggle', $managedUser, $before, [
-            ...$managedUser->toArray(),
+            ...Arr::except($managedUser->toArray(), ['password']),
             'revoked_sessions' => $sessionCount,
+            'lifecycle' => $lifecycleStats,
         ]);
 
         return redirect()
@@ -1208,8 +1416,10 @@ class SuperAdminWebController extends Controller
             'bulk_role' => ['nullable', Rule::in($this->profileOptions())],
             'bulk_direction_id' => ['nullable', 'integer', 'exists:directions,id'],
             'bulk_service_id' => ['nullable', 'integer', 'exists:services,id'],
+            'bulk_transfer_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'bulk_suspended_until' => ['nullable', 'date'],
             'bulk_suspension_reason' => ['nullable', 'string', 'max:255'],
+            'bulk_motif' => ['nullable', 'string', 'max:500'],
         ]);
 
         $users = User::query()
@@ -1233,13 +1443,28 @@ class SuperAdminWebController extends Controller
                 }
 
                 $before = Arr::except($managedUser->toArray(), ['password']);
+                $lifecycleStats = null;
 
                 switch ((string) $validated['bulk_action']) {
                     case 'activate':
-                        $managedUser->forceFill(['is_active' => true])->save();
+                        $lifecycleStats = $this->userLifecycleService->activate(
+                            $managedUser,
+                            $user,
+                            (string) ($validated['bulk_motif'] ?? 'Reactivation de masse par Super Admin.')
+                        );
                         break;
                     case 'deactivate':
-                        $managedUser->forceFill(['is_active' => false])->save();
+                        try {
+                            $lifecycleStats = $this->userLifecycleService->deactivate(
+                                $managedUser,
+                                $user,
+                                isset($validated['bulk_transfer_to_user_id']) ? (int) $validated['bulk_transfer_to_user_id'] : null,
+                                (string) ($validated['bulk_motif'] ?? 'Desactivation de masse par Super Admin.')
+                            );
+                        } catch (ValidationException) {
+                            $skipped++;
+                            continue 2;
+                        }
                         $this->revokeSessionsForUser($managedUser);
                         break;
                     case 'suspend':
@@ -1314,13 +1539,18 @@ class SuperAdminWebController extends Controller
                 }
 
                 $processed++;
+                $after = Arr::except($managedUser->fresh()->toArray(), ['password']);
+                if ($lifecycleStats !== null) {
+                    $after['lifecycle'] = $lifecycleStats;
+                }
+
                 $this->recordAudit(
                     $request,
                     'super_admin',
                     'organization_user_bulk_'.(string) $validated['bulk_action'],
                     $managedUser,
                     $before,
-                    Arr::except($managedUser->fresh()->toArray(), ['password'])
+                    $after
                 );
             }
         });
@@ -1338,6 +1568,44 @@ class SuperAdminWebController extends Controller
         }
 
         return $redirect;
+    }
+
+    public function organizationDeletionRequestDecision(Request $request, DeletionRequest $deletionRequest): RedirectResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessSuperAdmin($user);
+
+        $validated = $request->validate([
+            'decision' => ['required', Rule::in([
+                DeletionRequest::DECISION_DELETE,
+                DeletionRequest::DECISION_DISABLE,
+                DeletionRequest::DECISION_ARCHIVE,
+                DeletionRequest::DECISION_REJECT,
+                DeletionRequest::DECISION_REQUEST_COMPLEMENT,
+                DeletionRequest::DECISION_CORRECT,
+            ])],
+            'reviewer_note' => ['required', 'string', 'min:5', 'max:1000'],
+            'transfer_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $before = $deletionRequest->toArray();
+        $execution = $this->deletionRequestService->decide(
+            $deletionRequest,
+            $user,
+            (string) $validated['decision'],
+            (string) $validated['reviewer_note'],
+            isset($validated['transfer_to_user_id']) ? (int) $validated['transfer_to_user_id'] : null
+        );
+
+        $deletionRequest->refresh();
+        $this->recordAudit($request, 'super_admin', 'deletion_request_decision', $deletionRequest, $before, [
+            ...$deletionRequest->toArray(),
+            'execution' => $execution,
+        ]);
+
+        return redirect()
+            ->route('workspace.super-admin.organization.index')
+            ->with('success', 'Decision de suppression enregistree.');
     }
 
     public function dashboardProfilesEdit(Request $request): View
@@ -2634,6 +2902,47 @@ class SuperAdminWebController extends Controller
     }
 
     /**
+     * @return array{annee:int,libelle:string,date_debut:string,date_fin:string,statut:string,motif:string}
+     */
+    private function validateExercisePayload(Request $request, ?Exercice $exercice = null): array
+    {
+        $yearRule = Rule::unique('exercices', 'annee');
+        if ($exercice instanceof Exercice) {
+            $yearRule = $yearRule->ignore($exercice->id);
+        }
+
+        $validated = $request->validate([
+            'annee' => ['required', 'integer', 'min:2000', 'max:2100', $yearRule],
+            'libelle' => ['required', 'string', 'max:120'],
+            'date_debut' => ['required', 'date'],
+            'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
+            'statut' => ['required', Rule::in(array_keys($this->exerciseStatusOptions()))],
+            'motif' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        return [
+            'annee' => (int) $validated['annee'],
+            'libelle' => trim((string) $validated['libelle']),
+            'date_debut' => (string) $validated['date_debut'],
+            'date_fin' => (string) $validated['date_fin'],
+            'statut' => (string) $validated['statut'],
+            'motif' => trim((string) $validated['motif']),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function exerciseStatusOptions(): array
+    {
+        return [
+            Exercice::STATUT_OUVERT => 'Ouvert',
+            Exercice::STATUT_CLOS => 'Clos',
+            Exercice::STATUT_ARCHIVE => 'Archive',
+        ];
+    }
+
+    /**
      * @return array{code:string,libelle:string,actif:bool}
      */
     private function validateDirectionPayload(Request $request, ?Direction $direction = null): array
@@ -2712,6 +3021,8 @@ class SuperAdminWebController extends Controller
             'agent_telephone' => ['nullable', 'string', 'max:80'],
             'suspended_until' => ['nullable', 'date'],
             'suspension_reason' => ['nullable', 'string', 'max:255'],
+            'transfer_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'motif' => ['nullable', 'string', 'max:500'],
             'password' => $creating
                 ? ['required', 'string', $this->passwordPolicy->rule(), 'confirmed']
                 : ['nullable', 'string', $this->passwordPolicy->rule(false), 'confirmed'],

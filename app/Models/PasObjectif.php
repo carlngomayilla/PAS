@@ -22,8 +22,10 @@ class PasObjectif extends Model
         'pas_axe_id',
         'code',
         'libelle',
+        'date_echeance',
         'description',
         'ordre',
+        'import_ordre',
         'indicateur_global',
         'valeur_cible',
         'valeurs_cible',
@@ -37,6 +39,7 @@ class PasObjectif extends Model
     {
         return [
             'ordre' => 'integer',
+            'date_echeance' => 'date',
             'valeurs_cible' => 'array',
             'deleted_at' => 'datetime',
         ];

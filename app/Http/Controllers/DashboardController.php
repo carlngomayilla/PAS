@@ -21,6 +21,7 @@ use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Services\DashboardProfileSettings;
 use App\Services\ExerciceContext;
+use App\Services\PersonalTaskService;
 use App\Services\WorkflowSettings;
 use App\Support\SafeSql;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,7 +49,8 @@ class DashboardController extends Controller
         private readonly WorkflowSettings $workflowSettings,
         private readonly AnalyticsCacheVersionService $cacheVersionService,
         private readonly ExerciceContext $exerciceContext,
-        private readonly ActionStatusService $actionStatusService
+        private readonly ActionStatusService $actionStatusService,
+        private readonly PersonalTaskService $personalTaskService
     ) {
     }
 
@@ -82,6 +84,7 @@ class DashboardController extends Controller
             'reportingClientAnalytics' => $payload['reportingClientAnalytics'],
             'dgPayload' => $payload['dgPayload'],
             'chartPayload' => $payload['chartPayload'],
+            'personalTasks' => $this->personalTaskService->forUser($user, 5),
         ]);
     }
 
@@ -154,7 +157,7 @@ class DashboardController extends Controller
                 'sousActions.agent:id,name,service_id',
                 'sousActions.justificatifs:id,sous_action_id,nom_original,description,ajoute_par,created_at',
                 'sousActions.justificatifs.ajoutePar:id,name',
-                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_global,progression_reelle,progression_theorique',
+                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_global,progression_reelle,progression_theorique',
             ])
             ->orderByDesc('date_echeance')
             ->get();
@@ -167,11 +170,11 @@ class DashboardController extends Controller
 
         $totals = [
             'pas_total'          => (clone $pas)->count(),
-            'pas_actifs'         => (clone $pas)->whereIn('statut', ['valide', 'verrouille'])->count(),
+            'pas_actifs'         => (clone $pas)->where('statut', 'actif')->count(),
             'paos_total'         => (clone $paos)->count(),
-            'paos_actifs'        => (clone $paos)->whereIn('statut', ['valide', 'verrouille'])->count(),
+            'paos_actifs'        => (clone $paos)->whereIn('statut', ['en_cours', 'valide'])->count(),
             'ptas_total'         => (clone $ptas)->count(),
-            'ptas_actifs'        => (clone $ptas)->whereIn('statut', ['valide', 'verrouille'])->count(),
+            'ptas_actifs'        => (clone $ptas)->where('statut', 'en_cours')->count(),
             'actions_total'      => $dashboardActions->count(),
             'actions_validees'   => $dashboardValidatedActions->count(),
             'kpis_total'         => (clone $kpis)->count(),
@@ -1159,7 +1162,7 @@ class DashboardController extends Controller
                     'kpi_global' => round((float) ($action->actionKpi?->kpi_global ?? 0), 2),
                     'kpi_delai' => round((float) ($action->actionKpi?->kpi_delai ?? 0), 2),
                     'kpi_performance' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
-                    'kpi_conformite' => round((float) ($action->actionKpi?->kpi_conformite ?? 0), 2),
+                    'kpi_conformite' => round(0.0, 2),
                     'date_debut' => $action->date_debut instanceof Carbon ? $action->date_debut->format('d/m/Y') : '-',
                     'date_fin' => $action->date_fin instanceof Carbon ? $action->date_fin->format('d/m/Y') : '-',
                     'mode_evaluation' => $action->resolvedEvaluationMode(),
@@ -1220,7 +1223,7 @@ class DashboardController extends Controller
                 return [
                     'label' => (string) $action->id,
                     'x' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
-                    'y' => round((float) ($action->actionKpi?->kpi_conformite ?? 0), 2),
+                    'y' => round(0.0, 2),
                     'r' => max(5, min(12, (int) round($global / 10))),
                     'color' => $global >= 80 ? '#8FC043' : ($global >= 60 ? '#3996D3' : '#F9B13C'),
                     'title' => (string) $action->libelle,
@@ -1729,7 +1732,7 @@ class DashboardController extends Controller
         return [
             'delai' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
             'performance' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
-            'conformite' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
+            'conformite' => $avg($actions, fn (Action $action): float => 0.0),
             'global' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
             'progression' => $avg($actions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
         ];
@@ -1766,7 +1769,7 @@ class DashboardController extends Controller
                 'url' => $this->actionIndexRoute($url),
                 'delai' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)),
                 'performance' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
-                'conformite' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)),
+                'conformite' => $avg($monthActions, fn (Action $action): float => 0.0),
                 'global' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
             ];
         })->all();
@@ -2556,7 +2559,7 @@ class DashboardController extends Controller
                     'kpi_global' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
                     'kpi_delai' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_delai ?? 0)), 2),
                     'kpi_performance' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)), 2),
-                    'kpi_conformite' => round((float) $items->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_conformite ?? 0)), 2),
+                    'kpi_conformite' => round((float) $items->avg(fn (Action $action): float => 0.0), 2),
                     'alertes' => $alerts,
                     'validation_pct' => round(($validated / $total) * 100, 2),
                 ];
@@ -2897,7 +2900,7 @@ class DashboardController extends Controller
                     // L'etape de validation direction a ete supprimee : on
                     // utilise desormais le chef de service comme validateur.
                     'validateur' => (string) ($action->evaluePar?->name ?? '-'),
-                    'observation' => (string) ($action->evaluation_commentaire ?: '-'),
+                    'observation' => (string) ($action->motif_validation_chef ?: '-'),
                 ];
             })
             ->values()
@@ -3250,7 +3253,7 @@ class DashboardController extends Controller
                     'date_realisation' => $date instanceof Carbon ? $date->format('d/m/Y') : '-',
                     'justificatif' => $subAction->relationLoaded('justificatifs') && $subAction->justificatifs->isNotEmpty() ? 'Oui' : 'Non',
                     'commentaire' => (string) ($subAction->commentaire ?? '-'),
-                    'controle' => (string) ($action->evaluation_commentaire ?: '-'),
+                    'controle' => (string) ($action->motif_validation_chef ?: '-'),
                     'statut' => (string) ($subAction->statut ?? ((bool) ($subAction->est_effectuee ?? false) ? 'Effectuee' : 'En cours')),
                     'url' => route('workspace.actions.suivi', $action),
                 ];
@@ -3748,7 +3751,7 @@ class DashboardController extends Controller
             $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
             $status = (string) ($action->statut_dynamique ?? '');
             $globalKpi = (float) ($action->actionKpi?->kpi_global ?? 0);
-            $conformiteKpi = (float) ($action->actionKpi?->kpi_conformite ?? 0);
+            $conformiteKpi = 0.0;
             $gap = max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
 
             if ($deadline instanceof Carbon && $deadline->lt($today) && ! in_array($status, [ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, ActionTrackingService::STATUS_ACHEVE_HORS_DELAI], true)) {

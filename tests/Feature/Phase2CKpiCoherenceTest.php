@@ -92,7 +92,6 @@ class Phase2CKpiCoherenceTest extends TestCase
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-10',
             'date_echeance' => '2026-01-10',
-            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
             'responsable_id' => $admin->id,
         ]);
 
@@ -109,6 +108,111 @@ class Phase2CKpiCoherenceTest extends TestCase
         // Au moins une requete doit avoir tourne avec transactionLevel >= 1.
         $this->assertNotEmpty($depths);
         $this->assertGreaterThanOrEqual(1, max($depths));
+    }
+
+    public function test_global_kpi_uses_performance_and_delay_without_validation_component(): void
+    {
+        [$admin, $pta] = $this->createPlanningFixture();
+
+        $action = Action::query()->create([
+            'pta_id' => $pta->id,
+            'libelle' => 'KPI validation action',
+            'type_cible' => 'quantitative',
+            'unite_cible' => 'dossiers',
+            'quantite_cible' => 10,
+            'quantite_realisee' => 10,
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-10',
+            'date_echeance' => '2026-01-10',
+            'responsable_id' => $admin->id,
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE,
+        ]);
+
+        $service = app(ActionPerformanceService::class);
+        $referenceDate = \Illuminate\Support\Carbon::parse('2026-01-05');
+
+        $this->assertSame(100.0, $service->calculateRealProgress($action));
+        $this->assertSame(0.0, $service->calculateValidationScore($action));
+        $this->assertSame(100.0, $service->calculateGlobalKpi($action, $referenceDate));
+
+        $action->forceFill([
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ])->save();
+
+        $this->assertSame(0.0, $service->calculateValidationScore($action->fresh()));
+        $this->assertSame(100.0, $service->calculateGlobalKpi($action->fresh(), $referenceDate));
+    }
+
+    public function test_financed_action_global_kpi_does_not_depend_on_validation_or_financing_component(): void
+    {
+        [$admin, $pta] = $this->createPlanningFixture();
+
+        $action = Action::query()->create([
+            'pta_id' => $pta->id,
+            'libelle' => 'KPI financement validation',
+            'type_cible' => 'quantitative',
+            'unite_cible' => 'dossiers',
+            'quantite_cible' => 10,
+            'quantite_realisee' => 10,
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-10',
+            'date_echeance' => '2026-01-10',
+            'responsable_id' => $admin->id,
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'financement_requis' => true,
+            'financement_statut' => Action::FINANCEMENT_SOUMIS_DAF,
+        ]);
+
+        $service = app(ActionPerformanceService::class);
+        $referenceDate = \Illuminate\Support\Carbon::parse('2026-01-05');
+
+        $this->assertSame(0.0, $service->calculateValidationScore($action));
+        $this->assertSame(100.0, $service->calculateGlobalKpi($action, $referenceDate));
+
+        $action->forceFill(['financement_statut' => Action::FINANCEMENT_TRANSMIS_DG])->save();
+
+        $this->assertSame(0.0, $service->calculateValidationScore($action->fresh()));
+        $this->assertSame(100.0, $service->calculateGlobalKpi($action->fresh(), $referenceDate));
+
+        $action->forceFill(['financement_statut' => Action::FINANCEMENT_VALIDE_DG])->save();
+
+        $this->assertSame(0.0, $service->calculateValidationScore($action->fresh()));
+        $this->assertSame(100.0, $service->calculateGlobalKpi($action->fresh(), $referenceDate));
+    }
+
+    public function test_sub_action_without_quantity_counts_progress_once_submitted_to_chef(): void
+    {
+        [$admin, $pta] = $this->createPlanningFixture();
+
+        $action = Action::query()->create([
+            'pta_id' => $pta->id,
+            'libelle' => 'Sous-action validation KPI',
+            'type_cible' => 'qualitative',
+            'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-10',
+            'responsable_id' => $admin->id,
+        ]);
+
+        $subAction = $action->sousActions()->create([
+            'agent_id' => $admin->id,
+            'libelle' => 'Deposer le dossier',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-01-10',
+            'statut' => 'en_attente_validation_chef',
+            'est_effectuee' => true,
+            'taux_execution' => 100,
+        ]);
+
+        $service = app(ActionPerformanceService::class);
+
+        $this->assertSame(100.0, $service->calculateRealProgress($action->fresh('sousActions')));
+
+        $subAction->forceFill(['statut' => 'validee_chef'])->save();
+
+        $this->assertSame(100.0, $service->calculateRealProgress($action->fresh('sousActions')));
     }
 
     /**

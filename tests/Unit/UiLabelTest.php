@@ -13,15 +13,15 @@ class UiLabelTest extends TestCase
     {
         self::assertSame('En cours', UiLabel::actionStatus('en_cours'));
         self::assertSame('Achevé hors délai', UiLabel::actionStatus('acheve_hors_delai'));
-        self::assertSame('Validée service', UiLabel::validationStatus('validee_chef'));
-        self::assertSame('Validée', UiLabel::validationStatus('validee_direction'));
+        self::assertSame('Validée', UiLabel::validationStatus('validee_chef'));
+        self::assertSame('Validée (ancienne direction)', UiLabel::validationStatus('validee_direction'));
     }
 
     #[Test]
     public function it_maps_workflow_and_delegation_statuses_to_secondary_screen_labels(): void
     {
         self::assertSame('Brouillon', UiLabel::workflowStatus('brouillon'));
-        self::assertSame('Validé ou verrouillé', UiLabel::workflowStatus('valide_ou_verrouille'));
+        self::assertSame('Ancien statut validé ou verrouillé', UiLabel::workflowStatus('valide_ou_verrouille'));
         self::assertSame('Active', UiLabel::delegationStatus('active'));
         self::assertSame('Expirée', UiLabel::delegationStatus('expired'));
     }

@@ -23,6 +23,18 @@
                         <input type="hidden" name="mode" value="execute">
                         <button class="btn btn-primary" type="submit">Exécuter l'archivage</button>
                     </form>
+                    <form method="POST" action="{{ route('workspace.retention.run') }}">
+                        @csrf
+                        <input type="hidden" name="scope" value="planning">
+                        <input type="hidden" name="mode" value="dry-run">
+                        <button class="btn btn-secondary" type="submit">Dry-run PAO/PTA</button>
+                    </form>
+                    <form method="POST" action="{{ route('workspace.retention.run') }}" data-confirm-message="Archiver automatiquement les PAO/PTA clotures eligibles maintenant ?" data-confirm-tone="warning" data-confirm-label="Archiver">
+                        @csrf
+                        <input type="hidden" name="scope" value="planning">
+                        <input type="hidden" name="mode" value="execute">
+                        <button class="btn btn-primary" type="submit">Archiver PAO/PTA</button>
+                    </form>
                 </div>
             @endif
         </div>
@@ -49,6 +61,32 @@
                     <p class="mt-2 text-2xl font-semibold">{{ $value }}</p>
                 </article>
             @endforeach
+        </div>
+    </section>
+
+    <section class="showcase-panel mb-4">
+        <h2>Archivage automatique PAO / PTA</h2>
+        <div class="mt-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+            <article class="rounded-xl border border-slate-200/85 p-4">
+                <strong>Statut</strong>
+                <p class="mt-2 text-2xl font-semibold">{{ data_get($planningArchiveSummary, 'settings.enabled') ? 'Actif' : 'Inactif' }}</p>
+            </article>
+            <article class="rounded-xl border border-slate-200/85 p-4">
+                <strong>Delai PAO</strong>
+                <p class="mt-2 text-2xl font-semibold">{{ (int) data_get($planningArchiveSummary, 'settings.pao_archive_after_days', 30) }} jours</p>
+            </article>
+            <article class="rounded-xl border border-slate-200/85 p-4">
+                <strong>Delai PTA</strong>
+                <p class="mt-2 text-2xl font-semibold">{{ (int) data_get($planningArchiveSummary, 'settings.pta_archive_after_days', 30) }} jours</p>
+            </article>
+            <article class="rounded-xl border border-slate-200/85 p-4">
+                <strong>PAO eligibles</strong>
+                <p class="mt-2 text-2xl font-semibold">{{ (int) data_get($planningArchiveSummary, 'counts.paos', 0) }}</p>
+            </article>
+            <article class="rounded-xl border border-slate-200/85 p-4">
+                <strong>PTA eligibles</strong>
+                <p class="mt-2 text-2xl font-semibold">{{ (int) data_get($planningArchiveSummary, 'counts.ptas', 0) }}</p>
+            </article>
         </div>
     </section>
 

@@ -49,6 +49,20 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
+        // Mailer dédié pour Brevo (SMTP relais brevo).
+        // Activé seulement si BREVO_ENABLED=true (sinon les envois sont silencieusement
+        // sautés — fail-safe). Les credentials viennent du tableau de bord Brevo.
+        'brevo' => [
+            'transport' => 'smtp',
+            'scheme' => env('BREVO_SCHEME', 'smtp'),
+            'host' => env('BREVO_HOST', 'smtp-relay.brevo.com'),
+            'port' => (int) env('BREVO_PORT', 587),
+            'username' => env('BREVO_USERNAME'),
+            'password' => env('BREVO_PASSWORD'),
+            'timeout' => 10,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
         'ses' => [
             'transport' => 'ses',
         ],

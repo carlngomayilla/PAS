@@ -17,6 +17,7 @@ class Justificatif extends Model
         'hebdomadaire',
         'final',
         'execution_quantitative',
+        'execution_non_quantitative',
         'execution_mixte',
         'sous_action',
     ];

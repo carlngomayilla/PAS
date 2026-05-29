@@ -20,26 +20,25 @@ class ReportingAnalyticsServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_consolidation_progression_uses_direction_validated_actions_by_default(): void
+    public function test_consolidation_progression_uses_service_chief_validated_actions_by_default(): void
     {
         [$admin, $pta] = $this->createPlanningFixture();
 
         Action::query()->create([
             'pta_id' => $pta->id,
             'libelle' => 'Action validee',
-            'description' => 'Action validee direction',
+            'description' => 'Action validee chef',
             'type_cible' => 'qualitative',
             'resultat_attendu' => 'Livrer',
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-10',
             'date_echeance' => '2026-01-10',
-            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
             'responsable_id' => $admin->id,
             'statut' => 'en_cours',
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
             'progression_reelle' => 80,
             'progression_theorique' => 80,
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ]);
 
         Action::query()->create([
@@ -51,7 +50,6 @@ class ReportingAnalyticsServiceTest extends TestCase
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-10',
             'date_echeance' => '2026-01-10',
-            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
             'responsable_id' => $admin->id,
             'statut' => 'en_cours',
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,

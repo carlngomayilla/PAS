@@ -14,13 +14,13 @@ class ProductionSafeSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_production_safe_seeder_populates_org_platform_and_two_actions_per_service_user(): void
+    public function test_production_safe_seeder_populates_only_org_and_platform_without_pas_demo_data(): void
     {
         $this->seed(ProductionSafeSeeder::class);
 
         $this->assertSame(4, DB::table('directions')->where('actif', true)->count());
         $this->assertSame(12, DB::table('services')->where('actif', true)->count());
-        $this->assertSame(82, DB::table('users')->count());
+        $this->assertSame(83, DB::table('users')->count());
         $this->assertEqualsCanonicalizing(
             ['DAF', 'DG', 'DS', 'DSIC'],
             DB::table('directions')->where('actif', true)->pluck('code')->all()
@@ -40,37 +40,14 @@ class ProductionSafeSeederTest extends TestCase
         $this->assertGreaterThan(0, DB::table('platform_settings')->count());
         $this->assertSame(2, DB::table('export_templates')->count());
 
-        $activeServiceUserIds = DB::table('users')
-            ->where('is_active', true)
-            ->whereNull('deleted_at')
-            ->whereNotNull('service_id')
-            ->pluck('id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all();
-
-        $this->assertNotEmpty($activeServiceUserIds);
-
-        $expectedActionCount = count($activeServiceUserIds) * 2;
-        $this->assertSame(1, DB::table('pas')->count());
-        $this->assertSame(4, DB::table('pas_axes')->count());
-        $this->assertSame(4, DB::table('pas_objectifs')->count());
-        $this->assertSame(12, DB::table('paos')->count());
-        $this->assertSame(12, DB::table('ptas')->count());
-        $this->assertSame(12, DB::table('objectifs_operationnels')->count());
-        $this->assertSame($expectedActionCount, DB::table('actions')->whereNull('deleted_at')->count());
-        $this->assertSame($expectedActionCount, DB::table('action_kpis')->count());
-
-        $actionCountsByUser = DB::table('actions')
-            ->whereNull('deleted_at')
-            ->whereIn('responsable_id', $activeServiceUserIds)
-            ->select('responsable_id', DB::raw('COUNT(*) as total'))
-            ->groupBy('responsable_id')
-            ->pluck('total', 'responsable_id');
-
-        foreach ($activeServiceUserIds as $userId) {
-            $this->assertSame(2, (int) $actionCountsByUser->get($userId, 0));
-        }
-
+        $this->assertSame(0, DB::table('pas')->count());
+        $this->assertSame(0, DB::table('pas_axes')->count());
+        $this->assertSame(0, DB::table('pas_objectifs')->count());
+        $this->assertSame(0, DB::table('paos')->count());
+        $this->assertSame(0, DB::table('ptas')->count());
+        $this->assertSame(0, DB::table('objectifs_operationnels')->count());
+        $this->assertSame(0, DB::table('actions')->whereNull('deleted_at')->count());
+        $this->assertSame(0, DB::table('action_kpis')->count());
         $this->assertSame(0, DB::table('pao_axes')->count());
         $this->assertSame(0, DB::table('pao_objectifs_strategiques')->count());
         $this->assertSame(0, DB::table('pao_objectifs_operationnels')->count());
@@ -132,16 +109,12 @@ class ProductionSafeSeederTest extends TestCase
             ->orderBy('id')
             ->value('id');
 
-        $pta = DB::table('ptas')
-            ->where('service_id', (int) $inactiveUser->service_id)
-            ->first();
-
-        $this->assertNotNull($pta);
+        $pta = $this->createPtaForServiceUser($serviceUser);
 
         $actionId = DB::table('actions')->insertGetId([
             'pta_id' => (int) $pta->id,
             'pao_id' => (int) $pta->pao_id,
-            'objectif_operationnel_id' => (int) $pta->objectif_operationnel_id,
+            'objectif_operationnel_id' => $pta->objectif_operationnel_id !== null ? (int) $pta->objectif_operationnel_id : null,
             'responsable_id' => (int) $inactiveUser->id,
             'libelle' => 'Action compte inactif a transferer',
             'description' => 'Action de test pour transfert avant suppression.',
@@ -195,5 +168,42 @@ class ProductionSafeSeederTest extends TestCase
             'id' => $subActionId,
             'agent_id' => $replacementUserId,
         ]);
+    }
+
+    private function createPtaForServiceUser(User $serviceUser): object
+    {
+        $now = now();
+
+        $pasId = DB::table('pas')->insertGetId([
+            'titre' => 'PAS test transfert inactif',
+            'periode_debut' => (int) $now->year,
+            'periode_fin' => (int) $now->year,
+            'statut' => 'actif',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $paoId = DB::table('paos')->insertGetId([
+            'pas_id' => $pasId,
+            'direction_id' => (int) $serviceUser->direction_id,
+            'service_id' => null,
+            'annee' => (int) $now->year,
+            'titre' => 'PAO test transfert inactif',
+            'statut' => 'valide',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $ptaId = DB::table('ptas')->insertGetId([
+            'pao_id' => $paoId,
+            'direction_id' => (int) $serviceUser->direction_id,
+            'service_id' => (int) $serviceUser->service_id,
+            'titre' => 'PTA test transfert inactif',
+            'statut' => 'en_cours',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        return DB::table('ptas')->where('id', $ptaId)->first();
     }
 }

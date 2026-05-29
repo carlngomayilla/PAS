@@ -16,6 +16,7 @@ use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\ExerciceContext;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\PlanningModificationLockService;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class ActionController extends Controller
             ->with([
                 'pta:id,pao_id,direction_id,service_id,titre,statut',
                 'responsable:id,name,email',
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,progression_reelle,progression_theorique,statut_calcule',
+                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,progression_reelle,progression_theorique,statut_calcule',
             ])
             ->withCount([
                 'kpis',
@@ -165,7 +166,7 @@ class ActionController extends Controller
             };
             $payload['progression_reelle'] = 0;
             $payload['progression_theorique'] = 0;
-            $payload['frequence_execution'] = $payload['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
+            unset($payload['frequence_execution']);
             $payload['seuil_alerte_progression'] = $payload['seuil_alerte_progression'] ?? 10;
             $payload['date_echeance'] = $payload['date_fin'];
             $payload['exercice_id'] = $pta->exercice_id;
@@ -200,6 +201,7 @@ class ActionController extends Controller
 
             return $action;
         });
+        app(PlanningModificationLockService::class)->lockAfterSave($action, $user);
 
         $this->recordAudit($request, 'action', 'create', $action, null, $action->toArray());
         $notificationService->notifyActionAssigned($action, $user);
@@ -238,7 +240,7 @@ class ActionController extends Controller
                 'kpis:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 // 'weeks' supprime : le suivi hebdomadaire n'existe plus.
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,progression_reelle,progression_theorique,statut_calcule',
+                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,progression_reelle,progression_theorique,statut_calcule',
                 'actionLogs' => fn ($q) => $q->latest()->limit(50),
                 'justificatifs' => fn ($q) => $q->latest(),
             ]),
@@ -262,6 +264,9 @@ class ActionController extends Controller
         if ($locked = $this->assertPtaNotLocked($action->pta)) {
             return $locked;
         }
+        if ($message = app(PlanningModificationLockService::class)->ensureUnlocked($action, $request->user())) {
+            return response()->json(['message' => $message], 409);
+        }
 
         $this->authorize('update', $action);
 
@@ -277,8 +282,7 @@ class ActionController extends Controller
 
         $dateChanged = (string) $action->date_debut !== (string) ($validated['date_debut'] ?? null)
             || (string) $action->date_fin !== (string) ($validated['date_fin'] ?? null);
-        $frequencyChanged = (string) ($action->frequence_execution ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE)
-            !== (string) ($validated['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE);
+        $frequencyChanged = false;
         $targetTypeChanged = (string) $action->type_cible !== (string) ($validated['type_cible'] ?? '');
 
         if (($dateChanged || $frequencyChanged || $targetTypeChanged) && ! $trackingService->canRegenerateWeeks($action)) {
@@ -301,7 +305,7 @@ class ActionController extends Controller
             );
             $payload['date_echeance'] = $payload['date_fin'];
             $payload['seuil_alerte_progression'] = $payload['seuil_alerte_progression'] ?? 10;
-            $payload['frequence_execution'] = $payload['frequence_execution'] ?? ActionTrackingService::FREQUENCE_HEBDOMADAIRE;
+            unset($payload['frequence_execution']);
             $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds) ?? $action->unite_dg_id;
 
             // L update API n autorise pas l ecriture des champs workflow (cf. A02).
@@ -339,6 +343,8 @@ class ActionController extends Controller
         });
 
         $action->refresh();
+        app(PlanningModificationLockService::class)->lockAfterSave($action, $user);
+        $action->refresh();
         $this->recordAudit($request, 'action', 'update', $action, $before, $action->toArray());
 
         return response()->json([
@@ -361,6 +367,9 @@ class ActionController extends Controller
 
         if ($locked = $this->assertPtaNotLocked($action->pta)) {
             return $locked;
+        }
+        if ($message = app(PlanningModificationLockService::class)->ensureUnlocked($action, $request->user())) {
+            return response()->json(['message' => $message], 409);
         }
 
         $this->authorize('delete', $action);
@@ -393,7 +402,7 @@ class ActionController extends Controller
             'responsable:id,name,email',
             'weeks:id,action_id,numero_semaine,date_debut,date_fin,est_renseignee',
             'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
-            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite,progression_reelle,progression_theorique,statut_calcule',
+            'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,progression_reelle,progression_theorique,statut_calcule',
         ];
 
         if (Schema::hasTable('action_responsables')) {

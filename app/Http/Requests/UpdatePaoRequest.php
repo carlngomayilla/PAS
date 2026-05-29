@@ -165,6 +165,17 @@ class UpdatePaoRequest extends FormRequest
                         );
                     }
                 }
+
+                if ($objectif?->date_echeance !== null && $echeance !== null) {
+                    $objectiveDeadline = strtotime((string) $objectif->date_echeance);
+                    $operationalDeadline = strtotime((string) $echeance);
+                    if ($objectiveDeadline !== false && $operationalDeadline !== false && $operationalDeadline > $objectiveDeadline) {
+                        $validator->errors()->add(
+                            "objectifs_operationnels.{$index}.echeance",
+                            'L echeance de l objectif operationnel ne doit pas depasser celle de l objectif strategique.'
+                        );
+                    }
+                }
             }
 
             $seenKeys = [];

@@ -31,7 +31,7 @@
                         <select id="pta_id" name="pta_id">
                             <option value="">Tous</option>
                             @foreach ($ptaOptions as $pta)
-                                <option value="{{ $pta->id }}" @selected((int) ($filters['pta_id'] ?? 0) === (int) $pta->id)>#{{ $pta->id }} - {{ $pta->titre }}</option>
+                                <option value="{{ $pta->id }}" @selected((int) ($filters['pta_id'] ?? 0) === (int) $pta->id)>{{ $pta->titre }}</option>
                             @endforeach
                         </select>
                     </div>

@@ -82,7 +82,7 @@ class KpiController extends Controller
         $validated['est_a_renseigner'] = $request->boolean('est_a_renseigner', true);
         $action = Action::query()->with('pta:id,direction_id,service_id,statut')->findOrFail((int) $validated['action_id']);
 
-        if ($action->pta?->statut === 'verrouille') {
+        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Creation'),
             ], 409);
@@ -137,7 +137,7 @@ class KpiController extends Controller
 
         $kpi->loadMissing('action.pta:id,direction_id,service_id,statut');
 
-        if ($kpi->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $kpi->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour'),
             ], 409);
@@ -147,7 +147,7 @@ class KpiController extends Controller
         $validated['est_a_renseigner'] = $request->boolean('est_a_renseigner', true);
         $targetAction = Action::query()->with('pta:id,direction_id,service_id,statut')->findOrFail((int) $validated['action_id']);
 
-        if ($targetAction->pta?->statut === 'verrouille') {
+        if (in_array((string) $targetAction->pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
             ], 409);
@@ -189,7 +189,7 @@ class KpiController extends Controller
 
         $kpi->loadMissing('action.pta:id,direction_id,service_id,statut');
 
-        if ($kpi->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $kpi->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Suppression'),
             ], 409);

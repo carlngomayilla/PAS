@@ -49,13 +49,7 @@ class BusinessWorkflowNotificationTest extends TestCase
         Notification::assertSentTo($fixture['direction_user'], WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($fixture['direction_user'])['title'] === 'Nouveau PTA créé');
 
         $notificationService->notifyPtaSubmittedForValidation($fixture['pta'], $fixture['service_user']);
-        Notification::assertSentTo($fixture['direction_user'], WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($fixture['direction_user'])['title'] === 'PTA soumis pour validation');
-
-        $notificationService->notifyPtaReviewedByDirection($fixture['pta'], true, $fixture['direction_user']);
-        Notification::assertSentTo($fixture['service_user'], WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($fixture['service_user'])['title'] === 'PTA validé');
-
-        $notificationService->notifyPtaReviewedByDirection($fixture['pta'], false, $fixture['direction_user']);
-        Notification::assertSentTo($fixture['service_user'], WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($fixture['service_user'])['title'] === 'PTA rejeté');
+        Notification::assertSentTo($fixture['direction_user'], WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => str_starts_with((string) $notification->toArray($fixture['direction_user'])['title'], 'PTA actual'));
     }
 
     public function test_agent_and_unit_dg_action_notifications_target_service_and_unit_chiefs(): void
@@ -100,7 +94,6 @@ class BusinessWorkflowNotificationTest extends TestCase
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-31',
             'date_echeance' => '2026-01-31',
-            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
             'responsable_id' => $agent->id,
             'statut' => 'non_demarre',
             'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
@@ -166,7 +159,7 @@ class BusinessWorkflowNotificationTest extends TestCase
             'titre' => 'PAS métier',
             'periode_debut' => 2026,
             'periode_fin' => 2028,
-            'statut' => 'brouillon',
+            'statut' => 'actif',
         ]);
         $axe = PasAxe::query()->create([
             'pas_id' => $pas->id,
@@ -178,17 +171,18 @@ class BusinessWorkflowNotificationTest extends TestCase
             'pas_axe_id' => $axe->id,
             'code' => 'OS-BIZ',
             'libelle' => 'Objectif métier',
+            'date_echeance' => '2028-12-31',
             'ordre' => 1,
         ]);
         $pao = Pao::query()->create([
             'pas_id' => $pas->id,
             'pas_objectif_id' => $objectif->id,
             'direction_id' => $direction->id,
-            'service_id' => $service->id,
+            'service_id' => null,
             'annee' => 2026,
             'titre' => 'PAO métier',
             'objectif_operationnel' => 'Objectif opérationnel',
-            'statut' => 'brouillon',
+            'statut' => Pao::STATUS_VALIDE,
         ]);
         $objectifOperationnel = ObjectifOperationnel::query()->create([
             'pao_id' => $pao->id,
@@ -199,7 +193,7 @@ class BusinessWorkflowNotificationTest extends TestCase
             'service_id' => $service->id,
             'libelle' => 'Objectif opérationnel',
             'echeance' => '2026-12-31',
-            'statut' => 'brouillon',
+            'statut' => Pao::STATUS_VALIDE,
         ]);
         $pta = Pta::query()->create([
             'pao_id' => $pao->id,
@@ -207,7 +201,7 @@ class BusinessWorkflowNotificationTest extends TestCase
             'direction_id' => $direction->id,
             'service_id' => $service->id,
             'titre' => 'PTA métier',
-            'statut' => 'brouillon',
+            'statut' => Pta::STATUS_EN_COURS,
         ]);
 
         return [

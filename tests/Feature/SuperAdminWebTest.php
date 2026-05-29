@@ -240,8 +240,8 @@ class SuperAdminWebTest extends TestCase
         $this->assertNotFalse($sheetFourXml);
         $this->assertNotFalse($sheetSevenXml);
         $this->assertNotFalse($coreXml);
-        // sheet1 = PAS PLAN — carries template title & subtitle via standardReportMetaRows
-        $this->assertStringContainsString('Reporting DG Excel', (string) $sheetOneXml);
+        // sheet1 = PAS PLAN — carries the active report title and the template subtitle.
+        $this->assertStringContainsString('Rapport Consolidé DG - PAS ANBG', (string) $sheetOneXml);
         $this->assertStringContainsString('Classeur synthese sans graphiques', (string) $sheetOneXml);
         $this->assertStringContainsString('PAS PLAN', (string) $workbookXml);
         $this->assertStringContainsString('STRATEGIE', (string) $workbookXml);
@@ -258,7 +258,7 @@ class SuperAdminWebTest extends TestCase
         // sheet7 = ALERTES (Tableau 6)
         $this->assertStringContainsString('Tableau 6 : Alertes indicateurs sous seuil', (string) $sheetSevenXml);
         $this->assertStringContainsString('Action corrective', (string) $sheetSevenXml);
-        $this->assertStringContainsString('Reporting DG Excel', (string) $coreXml);
+        $this->assertStringContainsString('Rapport Consolidé DG - PAS ANBG', (string) $coreXml);
         $this->assertStringNotContainsString('Synthese graphique', (string) $workbookXml);
     }
 

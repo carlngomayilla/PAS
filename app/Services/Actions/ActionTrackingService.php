@@ -6,6 +6,7 @@ use App\Models\Action;
 use App\Models\ActionKpi;
 use App\Models\ActionLog;
 use App\Models\Justificatif;
+use App\Models\SousAction;
 use App\Models\User;
 use App\Services\ActionManagementSettings;
 use App\Services\ActionPerformanceService;
@@ -86,6 +87,7 @@ class ActionTrackingService
     // Décisions possibles sur une demande de financement d'action.
     public const FINANCEMENT_DECISION_VALIDER = 'valider';   // DAF : dossier complet, transmis au DG
     public const FINANCEMENT_DECISION_REJETER = 'rejeter';   // DAF : dossier incomplet, retour agent
+    public const FINANCEMENT_DECISION_COMPLEMENT = 'demander_complement'; // DAF : dossier a completer
     public const FINANCEMENT_DECISION_ACCORDER = 'accorder'; // DG  : financement accordé
     public const FINANCEMENT_DECISION_REFUSER = 'refuser';   // DG  : financement refusé
 
@@ -251,9 +253,8 @@ class ActionTrackingService
      *   3. L'action est suivie en mode sous-actions / mixte et toutes ses
      *      sous-actions sont marquées « effectuée ».
      *
-     * Cette logique cohabite avec le nouveau bouton « Demander la clôture »
-     * (route `workspace.actions.submit-closure`), qui force explicitement la
-     * soumission quand l'agent considère son travail abouti.
+     * Il n'existe plus de soumission manuelle separee : le bouton `Soumettre`
+     * de la sous-action declenche ce circuit.
      */
     private function maybeAutoSubmitClosureToChef(?Action $action, ?User $actor): void
     {
@@ -294,15 +295,7 @@ class ActionTrackingService
         $this->submitClosureForReview($action, $payload, $actor);
 
         $action->refresh()->loadMissing('pta:id,direction_id,service_id');
-        $submissionTarget = $this->workflowSettings->actionSubmissionTarget();
-
-        if ($submissionTarget === 'service') {
-            $this->notificationService->notifyActionSubmittedToChef($action, $actor);
-        } else {
-            // 'final' : circuit hierarchique desactive, l'action est cloturee
-            // sans validation chef (cf. WorkflowSettings::actionSubmissionTarget).
-            $this->notificationService->notifyActionFinalizedWithoutWorkflow($action, $actor);
-        }
+        $this->notificationService->notifyActionSubmittedToChef($action, $actor);
     }
 
     /**
@@ -313,7 +306,10 @@ class ActionTrackingService
      */
     public function attemptAutoSubmitClosure(Action $action, ?User $actor = null): void
     {
-        $this->maybeAutoSubmitClosureToChef($action->fresh(), $actor);
+        // La soumission officielle est volontairement explicite: le bouton
+        // "Enregistrer" garde le suivi chez l'agent, seul "Soumettre au chef"
+        // declenche le circuit de validation.
+        return;
     }
 
     /**
@@ -345,7 +341,7 @@ class ActionTrackingService
         // Cas 3 — progression reelle atteint 100 % (calcul quantitatif ou
         // pourcentage agent). Le suivi hebdomadaire ayant ete supprime, on
         // garde uniquement la verification du taux global.
-        if ($this->actionPerformanceService->calculateRealProgress($action) >= 100.0) {
+        if ($this->actionPerformanceService->calculateDeclaredProgress($action) >= 100.0) {
             return true;
         }
 
@@ -367,17 +363,9 @@ class ActionTrackingService
             throw new \InvalidArgumentException('Une action non démarrée ne peut pas être soumise à validation.');
         }
 
-        $submissionTarget = $this->workflowSettings->actionSubmissionTarget();
-        $status = match ($submissionTarget) {
-            'direction' => self::VALIDATION_VALIDEE_CHEF,
-            'final' => self::VALIDATION_VALIDEE_CHEF,
-            default => self::VALIDATION_SOUMISE_CHEF,
-        };
-        $message = match ($submissionTarget) {
-            'direction' => 'Action soumise directement a la direction.',
-            'final' => 'Action cloturee sans circuit de validation supplementaire.',
-            default => 'Action soumise au chef de service pour evaluation.',
-        };
+        $submissionTarget = 'service';
+        $status = self::VALIDATION_SOUMISE_CHEF;
+        $message = 'Action soumise au chef de service pour validation.';
 
         $closureData = [
             'date_fin_reelle' => $payload['date_fin_reelle'] ?? $action->date_fin_reelle,
@@ -389,9 +377,9 @@ class ActionTrackingService
             'soumise_le' => now(),
             'evalue_par' => null,
             'evalue_le' => null,
-            'evaluation_note' => null,
-            'evaluation_commentaire' => null,
-            // Colonnes direction_* supprimees : voir migration de purge.
+            // Colonnes evaluation_* et direction_* supprimees : voir migrations
+            // 2026_05_28_120000_drop_chef_quality_note_and_conformite_kpi et
+            // 2026_05_22_100000_drop_direction_validation_columns.
         ];
 
         foreach (['resultat_cloture', 'difficultes_rencontrees', 'mesures_correctives', 'justification_cloture'] as $field) {
@@ -406,6 +394,15 @@ class ActionTrackingService
             $closureData['cloture_le'] = now();
         }
 
+        if ((bool) $action->financement_requis
+            && in_array($action->financementStatus(), [
+                Action::FINANCEMENT_PRE_SIGNALE_DAF,
+                Action::FINANCEMENT_NON_REQUIS,
+            ], true)
+        ) {
+            $closureData['financement_statut'] = Action::FINANCEMENT_EN_ATTENTE_VALIDATION_CHEF;
+        }
+
         $action->forceFill($closureData)->save();
 
         $this->createLogIfMissingToday(
@@ -417,11 +414,7 @@ class ActionTrackingService
                 'date_fin_reelle' => optional($action->date_fin_reelle)->toDateString(),
                 'workflow_target' => $submissionTarget,
             ],
-            match ($submissionTarget) {
-                'direction' => 'direction',
-                'final' => 'responsable',
-                default => 'chef_service',
-            },
+            'chef_service',
             $actor?->id
         );
 
@@ -459,7 +452,17 @@ class ActionTrackingService
         $isApproved = $decision === 'valider';
         $isCorrectionRequested = $decision === 'demander_correction';
         $oldStatus = (string) ($action->statut_validation ?? self::VALIDATION_NON_SOUMISE);
-        $validatedRate = $payload['taux_valide_chef'] ?? $payload['evaluation_note'] ?? null;
+        // Spec v2 : le chef ne note plus. Seul le motif (obligatoire si rejet ou
+        // demande de correction) est conserve via motif_validation_chef.
+        $comment = trim((string) (
+            $payload['motif_validation_chef']
+                ?? $payload['evaluation_commentaire']    // compat retro pour les anciens clients API.
+                ?? ''
+        ));
+
+        if (! $isApproved && $comment === '') {
+            throw new \InvalidArgumentException('Le motif est obligatoire pour rejeter ou demander correction.');
+        }
 
         $updates = [
             'statut_validation' => match (true) {
@@ -473,8 +476,7 @@ class ActionTrackingService
                 : null,
             'evalue_par' => $actor?->id,
             'evalue_le' => now(),
-            'evaluation_note' => $validatedRate,
-            'evaluation_commentaire' => $payload['evaluation_commentaire'] ?? null,
+            'motif_validation_chef' => $comment !== '' ? $comment : null,
         ];
 
         if (! $isApproved) {
@@ -482,17 +484,35 @@ class ActionTrackingService
             $updates['statut'] = $this->mapLegacyStatus(self::STATUS_A_CORRIGER);
         }
 
-        foreach ([
-            'taux_valide_chef' => $validatedRate,
-            'conformite_chef' => $payload['conformite_chef'] ?? null,
-            'observation_qualite_chef' => $payload['observation_qualite_chef'] ?? null,
-        ] as $column => $value) {
-            if (Schema::hasColumn($action->getTable(), $column)) {
-                $updates[$column] = $value;
-            }
+        if ((bool) $action->financement_requis) {
+            $updates['financement_statut'] = $isApproved
+                ? Action::FINANCEMENT_SOUMIS_DAF
+                : Action::FINANCEMENT_EN_ATTENTE_VALIDATION_CHEF;
+            $updates['financement_soumis_le'] = $isApproved ? now() : null;
         }
 
+        // Colonnes evaluation_* / taux_valide_chef / conformite_chef /
+        // observation_qualite_chef supprimees par la migration spec v2
+        // 2026_05_28_120000_drop_chef_quality_note_and_conformite_kpi.
+
         $action->forceFill($updates)->save();
+
+        $pendingSubActions = $action->sousActions()
+            ->whereIn('statut', ['en_attente_validation_chef', 'realisee', 'effectuee']);
+
+        if ($isApproved) {
+            $pendingSubActions->update([
+                'statut' => 'validee_chef',
+                'est_effectuee' => true,
+            ]);
+        } else {
+            $pendingSubActions->update([
+                'statut' => 'rejetee_a_corriger',
+                'est_effectuee' => false,
+                'completed_at' => null,
+                'date_realisation' => null,
+            ]);
+        }
 
         $eventType = match (true) {
             $isApproved => 'action_validee_chef',
@@ -510,11 +530,8 @@ class ActionTrackingService
                 default => 'Action rejetee par le chef de service.',
             },
             [
-                'evaluation_note' => $action->evaluation_note,
-                'taux_valide_chef' => $validatedRate,
-                'conformite_chef' => $payload['conformite_chef'] ?? null,
-                'observation_qualite_chef' => $payload['observation_qualite_chef'] ?? null,
                 'decision' => $decision,
+                'motif' => $comment,
                 'ancien_statut' => $oldStatus,
                 'nouveau_statut' => $action->statut_validation,
                 'statut_validation' => $action->statut_validation,
@@ -526,17 +543,14 @@ class ActionTrackingService
 
         $this->addDiscussionEntry(
             $action,
-            (string) ($payload['evaluation_commentaire'] ?? ($isApproved
+            (string) ($comment !== '' ? $comment : ($isApproved
                 ? 'Validation finale chef de service.'
                 : ($isCorrectionRequested ? 'Correction demandee par le chef de service.' : 'Rejet chef de service.'))),
             $eventType,
             $isApproved ? 'info' : 'warning',
             [
-                'evaluation_note' => $action->evaluation_note,
-                'taux_valide_chef' => $validatedRate,
-                'conformite_chef' => $payload['conformite_chef'] ?? null,
-                'observation_qualite_chef' => $payload['observation_qualite_chef'] ?? null,
                 'decision' => $decision,
+                'motif' => $comment,
                 'ancien_statut' => $oldStatus,
                 'nouveau_statut' => $action->statut_validation,
                 'statut_validation' => $action->statut_validation,
@@ -547,6 +561,146 @@ class ActionTrackingService
         );
 
         return $this->refreshActionMetrics($action);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function reviewSubActionByChef(Action $action, SousAction $sousAction, array $payload, ?User $actor = null): SousAction
+    {
+        if ((int) $sousAction->action_id !== (int) $action->id) {
+            throw new \InvalidArgumentException('Cette sous-action ne correspond pas a l action demandee.');
+        }
+
+        if ((string) ($sousAction->statut ?? '') !== 'en_attente_validation_chef') {
+            throw new \InvalidArgumentException('Cette sous-action n est pas en attente de validation chef.');
+        }
+
+        $decision = (string) ($payload['decision_sous_action'] ?? 'rejeter');
+        $isApproved = $decision === 'valider';
+        $isCorrectionRequested = $decision === 'demander_correction';
+        $comment = trim((string) ($payload['commentaire_sous_action'] ?? ''));
+
+        if (! $isApproved && $comment === '') {
+            throw new \InvalidArgumentException('Le motif est obligatoire pour rejeter ou demander correction.');
+        }
+
+        if ($isApproved) {
+            $sousAction->forceFill([
+                'statut' => 'validee_chef',
+                'est_effectuee' => true,
+                'date_realisation' => $sousAction->date_realisation ?: now(),
+                'completed_at' => $sousAction->completed_at ?: now(),
+            ])->save();
+
+            $this->markParentReadyForGlobalChefReviewWhenAllSubActionsValidated($action, $actor);
+        } else {
+            $sousAction->forceFill([
+                'statut' => 'rejetee_a_corriger',
+                'est_effectuee' => false,
+                'date_realisation' => null,
+                'completed_at' => null,
+            ])->save();
+
+            $action->forceFill([
+                'statut_validation' => self::VALIDATION_CORRECTION_DEMANDEE,
+                'validation_hierarchique' => false,
+                'evalue_par' => $actor?->id,
+                'evalue_le' => now(),
+                'motif_validation_chef' => $comment,
+                'statut_dynamique' => self::STATUS_A_CORRIGER,
+                'statut' => $this->mapLegacyStatus(self::STATUS_A_CORRIGER),
+            ])->save();
+        }
+
+        ActionLog::query()->create([
+            'action_id' => $action->id,
+            'niveau' => $isApproved ? 'info' : 'warning',
+            'type_evenement' => match (true) {
+                $isApproved => 'sous_action_validee_chef',
+                $isCorrectionRequested => 'sous_action_correction_demandee',
+                default => 'sous_action_rejetee_chef',
+            },
+            'message' => match (true) {
+                $isApproved => 'Sous-action validee par le chef de service.',
+                $isCorrectionRequested => 'Correction demandee sur la sous-action par le chef de service.',
+                default => 'Sous-action rejetee par le chef de service.',
+            },
+            'details' => [
+                'sous_action_id' => (int) $sousAction->id,
+                'libelle' => (string) $sousAction->libelle,
+                'decision' => $decision,
+                'commentaire' => $comment,
+                'ancien_statut' => 'en_attente_validation_chef',
+                'nouveau_statut' => (string) $sousAction->statut,
+            ],
+            'cible_role' => 'responsable',
+            'utilisateur_id' => $actor?->id,
+        ]);
+
+        $this->refreshActionMetrics($action);
+
+        return $sousAction->fresh() ?? $sousAction;
+    }
+
+    private function markParentReadyForGlobalChefReviewWhenAllSubActionsValidated(Action $action, ?User $actor = null): void
+    {
+        if (! $action->usesSubTasksProgress()) {
+            return;
+        }
+
+        $currentValidationStatus = (string) ($action->statut_validation ?? self::VALIDATION_NON_SOUMISE);
+        if (in_array($currentValidationStatus, [
+            self::VALIDATION_SOUMISE_CHEF,
+            self::VALIDATION_VALIDEE_CHEF,
+        ], true)) {
+            return;
+        }
+
+        $subActions = $action->sousActions()
+            ->get(['id', 'statut', 'completed_at', 'date_realisation']);
+
+        if ($subActions->isEmpty()) {
+            return;
+        }
+
+        if (! $subActions->every(fn (SousAction $subAction): bool => (string) $subAction->statut === 'validee_chef')) {
+            return;
+        }
+
+        $submittedAt = $subActions
+            ->map(fn (SousAction $subAction) => $subAction->completed_at ?: $subAction->date_realisation)
+            ->filter()
+            ->map(fn ($date): Carbon => $date instanceof Carbon ? $date : Carbon::parse($date))
+            ->sort()
+            ->last() ?? now();
+
+        $action->forceFill([
+            'statut_validation' => self::VALIDATION_SOUMISE_CHEF,
+            'validation_hierarchique' => false,
+            'validation_sans_correction' => null,
+            'soumise_par' => $action->responsable_id,
+            'soumise_le' => $submittedAt,
+            'evalue_par' => null,
+            'evalue_le' => null,
+            // motif_validation_chef remis a null : nouvelle soumission, l'historique
+            // est conserve dans journal_audit et dans les action_logs.
+            'motif_validation_chef' => null,
+        ])->save();
+
+        ActionLog::query()->create([
+            'action_id' => $action->id,
+            'niveau' => 'info',
+            'type_evenement' => 'action_soumise_validation',
+            'message' => 'Toutes les sous-actions sont validees. Action globale disponible pour validation chef.',
+            'details' => [
+                'source' => 'sous_actions_validees',
+                'sous_actions_validees' => $subActions->count(),
+                'date_soumission_reference' => $submittedAt->toDateTimeString(),
+            ],
+            'cible_role' => 'chef_service',
+            'utilisateur_id' => $actor?->id,
+        ]);
     }
 
     // reviewClosureByDirection : methode supprimee.
@@ -576,11 +730,12 @@ class ActionTrackingService
             Action::FINANCEMENT_REJETE_DAF,
             Action::FINANCEMENT_REFUSE_DG,
         ], true)) {
-            $action->financement_statut = Action::FINANCEMENT_A_TRAITER_DAF;
+            $action->financement_statut = Action::FINANCEMENT_PRE_SIGNALE_DAF;
+            $action->financement_soumis_le = null;
         }
 
-        if ($action->financement_soumis_le === null) {
-            $action->financement_soumis_le = now();
+        if ($action->financement_notifie_le === null) {
+            $action->financement_notifie_le = now();
         }
 
         $action->save();
@@ -617,9 +772,14 @@ class ActionTrackingService
     {
         $decision = (string) ($payload['decision_financement'] ?? self::FINANCEMENT_DECISION_REJETER);
         $approved = $decision === self::FINANCEMENT_DECISION_VALIDER;
+        $requiresComplement = $decision === self::FINANCEMENT_DECISION_COMPLEMENT;
 
         $action->forceFill([
-            'financement_statut' => $approved ? Action::FINANCEMENT_VALIDE_DAF : Action::FINANCEMENT_REJETE_DAF,
+            'financement_statut' => match (true) {
+                $approved => Action::FINANCEMENT_TRANSMIS_DG,
+                $requiresComplement => Action::FINANCEMENT_COMPLEMENT_DEMANDE,
+                default => Action::FINANCEMENT_REJETE_DAF,
+            },
             'financement_daf_par' => $actor->id,
             'financement_daf_le' => now(),
             'financement_daf_decision' => $decision,
@@ -639,18 +799,28 @@ class ActionTrackingService
 
         $this->createLogIfMissingToday(
             $action,
-            $approved ? 'financement_valide_daf' : 'financement_rejete_daf',
+            match (true) {
+                $approved => 'financement_valide_daf',
+                $requiresComplement => 'financement_complement_demande',
+                default => 'financement_rejete_daf',
+            },
             $approved ? 'info' : 'warning',
-            $approved
-                ? 'Financement valide par la DAF. Accord DG requis.'
-                : 'Financement rejete par la DAF.',
+            match (true) {
+                $approved => 'Financement valide par la DAF. Accord DG requis.',
+                $requiresComplement => 'Complement demande par la DAF.',
+                default => 'Financement rejete par la DAF.',
+            },
             [
                 'decision' => $decision,
                 'montant_valide' => $action->financement_montant_valide,
                 'reference' => $action->financement_reference,
                 'commentaire' => $action->financement_daf_commentaire,
             ],
-            $approved ? 'dg' : 'direction',
+            match (true) {
+                $approved => 'dg',
+                $requiresComplement => 'responsable',
+                default => 'direction',
+            },
             $actor->id
         );
 
@@ -658,8 +828,14 @@ class ActionTrackingService
             $action,
             (string) ($payload['commentaire_financement'] ?? ($approved
                 ? 'Validation DAF du besoin de financement. Accord DG attendu.'
-                : 'Rejet DAF du besoin de financement.')),
-            $approved ? 'financement_valide_daf' : 'financement_rejete_daf',
+                : ($requiresComplement
+                    ? 'Complement demande par la DAF.'
+                    : 'Rejet DAF du besoin de financement.'))),
+            match (true) {
+                $approved => 'financement_valide_daf',
+                $requiresComplement => 'financement_complement_demande',
+                default => 'financement_rejete_daf',
+            },
             $approved ? 'info' : 'warning',
             [
                 'decision' => $decision,
@@ -752,7 +928,7 @@ class ActionTrackingService
     private function refreshActionMetricsInternal(Action $action, ?Carbon $referenceDate): Action
     {
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
-        $action->loadMissing('sousActions.justificatifs', 'actionKpi');
+        $action->load('sousActions.justificatifs', 'actionKpi');
 
         if ($action->usesStructuredProgressTracking()) {
             return $this->refreshStructuredActionMetrics($action, $referenceDate);
@@ -797,7 +973,6 @@ class ActionTrackingService
             $kpis = [
                 'kpi_delai' => 0.0,
                 'kpi_performance' => 0.0,
-                'kpi_conformite' => 0.0,
                 'kpi_global' => 0.0,
             ];
         } else {
@@ -826,7 +1001,7 @@ class ActionTrackingService
         $tauxRealisation = round(max(0.0, min(100.0, (float) ($kpis['kpi_performance'] ?? 0))), 2);
         $action->forceFill([
             'taux_performance' => $kpis['kpi_performance'] ?? null,
-            'taux_conformite' => $kpis['kpi_conformite'] ?? null,
+            // taux_conformite supprime par la migration spec v2.
             'taux_delai' => $kpis['kpi_delai'] ?? null,
             'taux_realisation_global' => $tauxRealisation,
         ])->save();
@@ -940,7 +1115,6 @@ class ActionTrackingService
             self::STATUS_ANNULE => [
                 'kpi_delai' => 0.0,
                 'kpi_performance' => 0.0,
-                'kpi_conformite' => 0.0,
                 'kpi_global' => 0.0,
             ],
             default => $this->calculateActionKpis($action, $realProgress, $theoreticalProgress, $quantitativeBase, $referenceDate),
@@ -963,7 +1137,7 @@ class ActionTrackingService
 
         $action->forceFill([
             'taux_performance' => $kpis['kpi_performance'] ?? null,
-            'taux_conformite' => $kpis['kpi_conformite'] ?? null,
+            // taux_conformite supprime par la migration spec v2.
             'taux_delai' => $kpis['kpi_delai'] ?? null,
             'taux_realisation_global' => $tauxRealisation,
         ])->save();
@@ -1126,7 +1300,9 @@ class ActionTrackingService
     }
 
     /**
-     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float}|null
+     * Spec v2 : KPI conformite supprime. Seuls Performance, Delai et Global subsistent.
+     *
+     * @return array{kpi_delai: float, kpi_performance: float, kpi_global: float}|null
      */
     private function frozenActionKpis(Action $action): ?array
     {
@@ -1141,7 +1317,6 @@ class ActionTrackingService
         return [
             'kpi_delai' => (float) $existingKpi->kpi_delai,
             'kpi_performance' => (float) $existingKpi->kpi_performance,
-            'kpi_conformite' => (float) $existingKpi->kpi_conformite,
             // Lecture de la valeur réellement stockée (gel des KPI).
             // L'ancien code écrasait kpi_global avec kpi_performance, ce qui faisait
             // perdre la valeur figée pour les actions suspendues.
@@ -1150,7 +1325,10 @@ class ActionTrackingService
     }
 
     /**
-     * @return array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float}
+     * Spec v2 : KPI conformite supprime. Le KPI global pondere Performance et Delai
+     * (voir ActionPerformanceService::calculateGlobalKpi).
+     *
+     * @return array{kpi_delai: float, kpi_performance: float, kpi_global: float}
      */
     private function calculateActionKpis(
         Action $action,
@@ -1161,21 +1339,19 @@ class ActionTrackingService
     ): array {
         $realProgress = $this->actionPerformanceService->calculateRealProgress($action);
         $delayKpi = $this->actionPerformanceService->calculateDelayScore($action, $referenceDate);
-        $conformiteKpi = $this->actionPerformanceService->calculateConformityScore($action);
-        $performanceKpi = $this->actionPerformanceService->calculateExecutionPerformance($action, $referenceDate);
-        $globalKpi = $performanceKpi;
+        $performanceKpi = $realProgress;
+        $globalKpi = $this->actionPerformanceService->calculateGlobalKpi($action, $referenceDate);
 
         return [
             'kpi_delai' => $delayKpi,
             'kpi_performance' => $performanceKpi,
-            'kpi_conformite' => $conformiteKpi,
             'kpi_global' => $globalKpi,
         ];
     }
 
     /**
      * @param \Illuminate\Support\Collection $weeks parametre conserve mais ignore (suivi hebdomadaire supprime)
-     * @param array{kpi_delai: float, kpi_performance: float, kpi_conformite: float, kpi_global: float} $kpis
+     * @param array{kpi_delai: float, kpi_performance: float, kpi_global: float} $kpis
      */
     private function generateAutomaticAlerts(
         Action $action,
@@ -1252,11 +1428,16 @@ class ActionTrackingService
         }
 
         $hasExecutionJustificatif = $action->justificatifs()
-            ->whereIn('categorie', ['hebdomadaire', 'final', 'execution_quantitative', 'execution_mixte'])
+            ->whereIn('categorie', ['hebdomadaire', 'final', 'execution_quantitative', 'execution_non_quantitative', 'execution_mixte'])
             ->exists();
         $hasSousActionJustificatif = $action->sousActions()->whereHas('justificatifs')->exists();
 
-        if (($overdueWeeks->isNotEmpty() || $action->date_fin_reelle !== null || $action->usesStructuredProgressTracking()) && ! $hasExecutionJustificatif && ! $hasSousActionJustificatif) {
+        $hasTrackedExecution = $weeks->isNotEmpty()
+            || $realProgress > 0.0
+            || $action->date_fin_reelle !== null
+            || $this->actionStatusService->isStarted($action);
+
+        if ($hasTrackedExecution && ! $hasExecutionJustificatif && ! $hasSousActionJustificatif) {
             $this->createLogIfMissingToday(
                 $action,
                 'justificatif_absent',
@@ -1272,7 +1453,9 @@ class ActionTrackingService
 
         $globalKpi = (float) ($kpis['kpi_global'] ?? 0);
 
-        if ($globalKpi < 40) {
+        $hasKpiAlertBasis = $this->actionStatusService->isStarted($action);
+
+        if ($hasKpiAlertBasis && $globalKpi < 40) {
             $this->createLogIfMissingToday(
                 $action,
                 'kpi_global_sous_seuil',
@@ -1281,7 +1464,7 @@ class ActionTrackingService
                 ['kpi_global' => $globalKpi],
                 'direction'
             );
-        } elseif ($globalKpi < 60) {
+        } elseif ($hasKpiAlertBasis && $globalKpi < 60) {
             $this->createLogIfMissingToday(
                 $action,
                 'kpi_global_sous_seuil',
@@ -1372,7 +1555,7 @@ class ActionTrackingService
         // hebdomadaire n'existe plus.
 
         $hasExecutionJustificatif = $action->justificatifs()
-            ->whereIn('categorie', ['hebdomadaire', 'final', 'execution_quantitative', 'execution_mixte'])
+            ->whereIn('categorie', ['hebdomadaire', 'final', 'execution_quantitative', 'execution_non_quantitative', 'execution_mixte'])
             ->exists();
         $hasSousActionJustificatif = $action->sousActions()->whereHas('justificatifs')->exists();
 

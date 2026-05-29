@@ -104,6 +104,7 @@ class ReportingAnalyticsService
         $this->scopeAction($actions, $user);
         $this->scopeMesure($mesures, $user);
         $this->scopeObjectifOperationnel($objectifsOperationnels, $user);
+        $this->applyReportingFilters($paos, $ptas, $actions, $mesures, $objectifsOperationnels, $user);
         $actionsStatistics = (clone $actions);
         $this->scopeActionStatistics($actionsStatistics);
 
@@ -122,7 +123,7 @@ class ReportingAnalyticsService
 
         $validatedActions = (clone $actionsStatistics)
             ->with([
-                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_conformite,kpi_global',
+                'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_global',
             ])
             ->get();
 
@@ -171,7 +172,7 @@ class ReportingAnalyticsService
                 ->with([
                     'pta:id,titre,direction_id,service_id',
                     'responsable:id,name,email',
-                    'actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
+                    'actionKpi:id,action_id,kpi_global,kpi_performance',
                 ])
                 ->orderBy('date_echeance')
                 ->limit($lateActionsLimit)
@@ -217,7 +218,7 @@ class ReportingAnalyticsService
                     'pta.pao:id,titre',
                     'responsable:id,name,email',
                     'kpis:id,action_id,libelle',
-                    'actionKpi:id,action_id,kpi_global,kpi_conformite,kpi_performance',
+                    'actionKpi:id,action_id,kpi_global,kpi_performance',
                 ])
                 ->orderByDesc('id')
                 ->limit($structureLimit)
@@ -300,6 +301,7 @@ class ReportingAnalyticsService
                 'quarter' => $this->exerciceContext->selectedQuarter(),
                 'quarter_label' => $this->exerciceContext->activeQuarterLabel(),
             ],
+            'reportFilters' => $this->currentReportingFilters(),
             'statisticalPolicy' => [
                 'scope_status' => $this->actionCalculationSettings->statisticalScope(),
                 'scope_label' => $this->actionCalculationSettings->statisticalScopeLabel(),
@@ -366,6 +368,7 @@ class ReportingAnalyticsService
             ]);
 
         $this->scopeReportingServices($servicesQuery, $user);
+        $this->applyServiceReportFilters($servicesQuery, $user);
 
         $services = $servicesQuery
             ->orderBy('direction_id')
@@ -412,17 +415,21 @@ class ReportingAnalyticsService
                 'pta.pao.pasObjectif:id,pas_axe_id,code,libelle',
                 'pta.pao.pasObjectif.pasAxe:id,code,libelle,periode_fin',
                 'responsable:id,name,email',
+                'responsables:id,name',
                 'kpis:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
                 'kpis.mesures:id,kpi_id,periode,valeur,commentaire',
-                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,kpi_conformite',
+                'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance',
                 'justificatifs:id,justifiable_type,justifiable_id,categorie,nom_original,description,created_at,ajoute_par',
                 'justificatifs.ajoutePar:id,name',
+                'actionLogs:id,action_id,niveau,type_evenement,message,details,cible_role,created_at,utilisateur_id',
+                'actionLogs.utilisateur:id,name',
             ])
             ->whereHas('pta', function (Builder $ptaQuery) use ($serviceIds): void {
                 $ptaQuery->whereIn('service_id', $serviceIds);
             });
 
         $this->scopeAction($actionsQuery, $user);
+        $this->applyActionReportingFilters($actionsQuery, $user);
 
         $actionsByService = $actionsQuery
             ->orderBy('id')
@@ -516,6 +523,193 @@ class ReportingAnalyticsService
         });
     }
 
+    private function applyReportingFilters(
+        Builder $paos,
+        Builder $ptas,
+        Builder $actions,
+        Builder $mesures,
+        Builder $objectifsOperationnels,
+        User $user
+    ): void {
+        $filters = $this->currentReportingFilters();
+        $directionId = (int) ($filters['direction_id'] ?? 0);
+        $serviceId = (int) ($filters['service_id'] ?? 0);
+
+        if ($directionId > 0 && $this->canReadDirection($user, $directionId)) {
+            $paos->where('direction_id', $directionId);
+            $ptas->where('direction_id', $directionId);
+            $actions->whereHas('pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', $directionId));
+            $mesures->whereHas('kpi.action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', $directionId));
+            $objectifsOperationnels->whereHas('objectifStrategique.paoAxe.pao', fn (Builder $paoQuery) => $paoQuery->where('direction_id', $directionId));
+        }
+
+        if ($serviceId > 0) {
+            $service = Service::query()->find($serviceId);
+            if ($service instanceof Service && $this->canReadService($user, (int) $service->direction_id, (int) $service->id)) {
+                $ptas->where('service_id', $serviceId);
+                $paos->where(function (Builder $paoQuery) use ($serviceId): void {
+                    $paoQuery
+                        ->where('service_id', $serviceId)
+                        ->orWhereHas('ptas', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId))
+                        ->orWhereHas('objectifsOperationnels', fn (Builder $objectiveQuery) => $objectiveQuery->where('service_id', $serviceId));
+                });
+                $actions->whereHas('pta', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
+                $mesures->whereHas('kpi.action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
+                $objectifsOperationnels->where('service_id', $serviceId);
+            }
+        }
+
+        $this->applyActionReportingFilters($actions, $user, $filters);
+        $this->applyMesureReportingFilters($mesures, $user, $filters);
+    }
+
+    private function applyServiceReportFilters(Builder $servicesQuery, User $user): void
+    {
+        $filters = $this->currentReportingFilters();
+        $directionId = (int) ($filters['direction_id'] ?? 0);
+        $serviceId = (int) ($filters['service_id'] ?? 0);
+
+        if ($directionId > 0 && $this->canReadDirection($user, $directionId)) {
+            $servicesQuery->where('direction_id', $directionId);
+        }
+
+        if ($serviceId > 0) {
+            $service = Service::query()->find($serviceId);
+            if ($service instanceof Service && $this->canReadService($user, (int) $service->direction_id, (int) $service->id)) {
+                $servicesQuery->whereKey($serviceId);
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed>|null $filters
+     */
+    private function applyActionReportingFilters(Builder $query, User $user, ?array $filters = null): void
+    {
+        $filters ??= $this->currentReportingFilters();
+
+        $status = (string) ($filters['statut'] ?? '');
+        if ($status !== '') {
+            $query->where('statut_dynamique', $status);
+        }
+
+        $mode = (string) ($filters['type_action'] ?? '');
+        if ($mode !== '') {
+            $query->where(function (Builder $modeQuery) use ($mode): void {
+                $modeQuery
+                    ->where('mode_evaluation', $mode)
+                    ->orWhere('type_cible', $mode);
+            });
+        }
+
+        $responsableId = (int) ($filters['responsable_id'] ?? 0);
+        if ($responsableId > 0) {
+            $query->where(function (Builder $responsableQuery) use ($responsableId): void {
+                $responsableQuery
+                    ->where('responsable_id', $responsableId)
+                    ->orWhereHas('responsables', fn (Builder $responsables) => $responsables->whereKey($responsableId))
+                    ->orWhereHas('sousActions', fn (Builder $sousActions) => $sousActions->where('agent_id', $responsableId));
+            });
+        }
+
+        $criticality = (string) ($filters['criticite'] ?? '');
+        if ($criticality !== '') {
+            $this->applyCriticalityFilter($query, $criticality);
+        }
+
+        $start = (string) ($filters['periode_debut'] ?? '');
+        $end = (string) ($filters['periode_fin'] ?? '');
+        if ($start !== '' || $end !== '') {
+            $query->where(function (Builder $dateQuery) use ($start, $end): void {
+                foreach (['date_debut', 'date_fin', 'date_echeance', 'created_at'] as $column) {
+                    $dateQuery->orWhere(function (Builder $columnQuery) use ($column, $start, $end): void {
+                        if ($start !== '') {
+                            $columnQuery->whereDate($column, '>=', $start);
+                        }
+                        if ($end !== '') {
+                            $columnQuery->whereDate($column, '<=', $end);
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     */
+    private function applyMesureReportingFilters(Builder $query, User $user, array $filters): void
+    {
+        $actionFilters = array_intersect_key($filters, array_flip([
+            'statut',
+            'type_action',
+            'responsable_id',
+            'criticite',
+            'periode_debut',
+            'periode_fin',
+        ]));
+
+        if ($actionFilters === []) {
+            return;
+        }
+
+        $query->whereHas('kpi.action', function (Builder $actionQuery) use ($user, $actionFilters): void {
+            $this->scopeAction($actionQuery, $user);
+            $this->applyActionReportingFilters($actionQuery, $user, $actionFilters);
+        });
+    }
+
+    private function applyCriticalityFilter(Builder $query, string $criticality): void
+    {
+        $values = match ($criticality) {
+            'critique' => ['critique', 'critical', 'haute', 'elevee', 'élevée'],
+            'importante' => ['importante', 'important', 'moyenne', 'medium'],
+            'normale' => ['normale', 'normal', 'basse', 'faible'],
+            default => [$criticality],
+        };
+
+        $query->where(function (Builder $criticalityQuery) use ($values): void {
+            if (\App\Support\SchemaIntrospectionCache::hasColumn('actions', 'priorite')) {
+                $criticalityQuery->orWhereIn('priorite', $values);
+            }
+            if (\App\Support\SchemaIntrospectionCache::hasColumn('actions', 'niveau_risque')) {
+                $criticalityQuery->orWhereIn('niveau_risque', $values);
+            }
+        });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function currentReportingFilters(): array
+    {
+        $request = request();
+        $filters = [];
+
+        foreach (['direction_id', 'service_id', 'responsable_id'] as $key) {
+            $value = (int) $request->integer($key);
+            if ($value > 0) {
+                $filters[$key] = $value;
+            }
+        }
+
+        foreach (['statut', 'type_action', 'criticite'] as $key) {
+            $value = trim((string) $request->query($key, ''));
+            if ($value !== '' && $value !== 'all') {
+                $filters[$key] = $value;
+            }
+        }
+
+        foreach (['periode_debut', 'periode_fin'] as $key) {
+            $value = trim((string) $request->query($key, ''));
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+                $filters[$key] = $value;
+            }
+        }
+
+        return $filters;
+    }
+
     /**
      * @param Collection<int, Action> $actions
      * @return array<string, int|float>
@@ -571,7 +765,7 @@ class ReportingAnalyticsService
     {
         $progression = (float) ($action->progression_reelle ?? 0);
         $kpiGlobal = (float) ($action->actionKpi?->kpi_global ?? 0);
-        $kpiConformite = (float) ($action->actionKpi?->kpi_conformite ?? 0);
+        $kpiConformite = 0.0;
         $statut = $this->reportActionStatusLabel($action);
         $validationStatus = (string) ($action->statut_validation ?? '');
         $isCompleted = in_array((string) $action->statut_dynamique, $this->completedActionStatuses(), true)
@@ -591,6 +785,9 @@ class ReportingAnalyticsService
         $pasObjectif = $action->pta?->pao?->pasObjectif;
         $pao = $action->pta?->pao;
         $justificatifs = $this->reportActionJustificatifs($action);
+        $financementStatus = $action->financementStatus();
+        $responsables = $this->reportActionResponsibleLabel($action);
+        $financingLabel = (string) ($action->financement_status_label ?? Action::financingStatusOptions()[$financementStatus] ?? $financementStatus);
 
         return [
             'axe_id' => (int) ($pasAxe?->id ?? 0),
@@ -607,8 +804,9 @@ class ReportingAnalyticsService
             'echeance' => $action->date_echeance?->format('Y-m-d') ?? $action->date_fin?->format('Y-m-d') ?? '',
             'action' => (string) ($action->libelle ?? '-'),
             'description_action' => trim((string) ($action->description ?? '')) ?: (string) ($action->libelle ?? '-'),
-            'responsable' => (string) ($action->responsable?->name ?? '-'),
-            'rmo' => (string) ($action->responsable?->name ?? '-'),
+            'responsable' => $responsables,
+            'rmo' => $responsables,
+            'mode_execution' => (string) $action->mode_evaluation_label,
             'cible' => $this->reportActionTargetLabel($action) ?: '-',
             'kpi' => $this->reportActionKpiLabel($action),
             'prevu' => $this->reportActionPlannedLabel($action),
@@ -630,6 +828,16 @@ class ReportingAnalyticsService
             'ressources_requises' => $this->reportActionResourcesLabel($action),
             'justificatif' => $this->reportActionJustificatifLabel($justificatifs),
             'justificatifs' => $justificatifs,
+            'financement_requis' => (bool) $action->financement_requis,
+            'financement_nature' => (string) ($action->nature_financement ?: $action->description_financement ?: '-'),
+            'financement_montant' => (float) ($action->montant_estime ?? 0),
+            'financement_source' => (string) ($action->source_financement ?: '-'),
+            'financement_statut' => $financementStatus,
+            'financement_statut_label' => $financingLabel,
+            'financement_resume' => $this->reportActionFinancingSummary($action, $financingLabel),
+            'financement_observation' => (string) ($action->observation_financement ?: $action->commentaire_financement ?: ''),
+            'risque_resume' => $this->reportActionRiskSummary($action),
+            'anomalies' => $this->reportActionAnomalies($action),
             'kpi_rows' => $this->reportActionKpiRows($action),
             'est_validee' => in_array($validationStatus, [
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
@@ -638,6 +846,77 @@ class ReportingAnalyticsService
             'est_terminee' => $isCompleted,
             'est_en_retard' => $isDelayed,
         ];
+    }
+
+    private function reportActionResponsibleLabel(Action $action): string
+    {
+        $names = collect();
+
+        if ($action->relationLoaded('responsables')) {
+            $names = $names->merge(
+                $action->responsables
+                    ->pluck('name')
+                    ->filter(fn ($name): bool => trim((string) $name) !== '')
+            );
+        }
+
+        if ($action->responsable?->name !== null) {
+            $names->push((string) $action->responsable->name);
+        }
+
+        $label = $names
+            ->map(fn ($name): string => trim((string) $name))
+            ->filter()
+            ->unique()
+            ->values()
+            ->implode(' | ');
+
+        return $label !== '' ? $label : '-';
+    }
+
+    private function reportActionFinancingSummary(Action $action, string $statusLabel): string
+    {
+        if (! (bool) $action->financement_requis) {
+            return 'Non requis';
+        }
+
+        $parts = [$statusLabel];
+        $nature = trim((string) ($action->nature_financement ?: $action->description_financement ?: ''));
+        $source = trim((string) ($action->source_financement ?? ''));
+        $amount = (float) ($action->montant_estime ?? 0);
+
+        if ($nature !== '') {
+            $parts[] = 'Nature: '.$nature;
+        }
+        if ($amount > 0) {
+            $parts[] = 'Montant: '.number_format($amount, 2, '.', ' ');
+        }
+        if ($source !== '') {
+            $parts[] = 'Source: '.$source;
+        }
+
+        return implode(' | ', $parts);
+    }
+
+    private function reportActionRiskSummary(Action $action): string
+    {
+        $parts = [];
+
+        foreach ([
+            'niveau_risque' => 'Niveau',
+            'risque_lie' => 'Risque',
+            'risques' => 'Risques',
+            'risque_potentiel' => 'Potentiel',
+            'mesures_preventives' => 'Mesures preventives',
+            'mesures_correctives' => 'Mesures correctives',
+        ] as $field => $label) {
+            $value = trim((string) ($action->{$field} ?? ''));
+            if ($value !== '') {
+                $parts[] = $label.': '.$value;
+            }
+        }
+
+        return $parts !== [] ? implode(' | ', $parts) : 'Non signale';
     }
 
     private function reportActionKpiLabel(Action $action): string
@@ -800,6 +1079,42 @@ class ReportingAnalyticsService
     }
 
     /**
+     * @return array<int, array<string, string>>
+     */
+    private function reportActionAnomalies(Action $action): array
+    {
+        return $action->actionLogs
+            ->filter(function (ActionLog $log): bool {
+                $details = is_array($log->details) ? $log->details : [];
+                $level = (string) $log->niveau;
+                $isVisibleAlert = in_array($level, ['warning', 'critical', 'urgence'], true)
+                    || ($level === 'info' && ($details['manual'] ?? false) === true);
+
+                return $isVisibleAlert
+                    && (($details['resolved'] ?? false) !== true)
+                    && (str_starts_with((string) $log->type_evenement, 'anomalie_')
+                        || in_array((string) $log->type_evenement, ['progression_sous_seuil', 'kpi_global_sous_seuil'], true));
+            })
+            ->sortByDesc('created_at')
+            ->map(function (ActionLog $log): array {
+                $details = is_array($log->details) ? $log->details : [];
+
+                return [
+                    'type' => (string) $log->type_evenement,
+                    'niveau' => (string) $log->niveau,
+                    'message' => (string) $log->message,
+                    'responsable' => (string) ($log->cible_role ?: '-'),
+                    'correction_attendue' => (string) ($details['correction_attendue'] ?? ''),
+                    'blocage' => (string) ($details['blocked_scope'] ?? ''),
+                    'signale_par' => (string) ($log->utilisateur?->name ?? '-'),
+                    'date' => $log->created_at?->format('Y-m-d H:i') ?? '',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function reportActionKpiRows(Action $action): array
@@ -856,6 +1171,7 @@ class ReportingAnalyticsService
             'statistical_scope' => $this->actionCalculationSettings->statisticalScope(),
             'exercice' => $this->exerciceContext->selectedYear(),
             'trimestre' => $this->exerciceContext->selectedQuarter(),
+            'filters' => $this->currentReportingFilters(),
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -1264,8 +1580,10 @@ class ReportingAnalyticsService
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
             ->whereNotNull('action_weeks.date_debut')
             ->orderBy('action_weeks.date_debut');
-        $this->scopeActionStatistics($progressRows, 'actions.statut_validation');
-        $this->scopeJoinedPta($progressRows, $user, 'ptas.direction_id', 'ptas.service_id');
+        if ($progressRows instanceof Builder) {
+            $this->scopeActionStatistics($progressRows, 'actions.statut_validation');
+            $this->scopeJoinedPta($progressRows, $user, 'ptas.direction_id', 'ptas.service_id');
+        }
 
         $progressBuckets = [];
         foreach ($progressRows->get() as $row) {

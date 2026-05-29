@@ -69,18 +69,25 @@ class MessagingWebTest extends TestCase
 
     public function test_service_user_sees_only_allowed_contacts_in_messaging_directory(): void
     {
+        // Verifie le scope de l'annuaire pour un chef de service (SFC, dir DAF).
+        // Avec la limite par defaut (18 contacts), il doit voir au moins son
+        // directeur DAF et le DG, et ne JAMAIS voir un utilisateur d'une autre
+        // direction (DSIC). NB : depuis le retrait de l'organigramme, seuls les
+        // 18 premiers alphabetiques apparaissent — MATTEYA passe au-dela.
         $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
 
         $response = $this->actingAs($serviceUser)->get('/workspace/messagerie');
 
         $response->assertOk();
-        $response->assertSee('MATTEYA Aicha');
+        $response->assertSee('Directeur DAF');
         $response->assertSee('Ingrid');
         $response->assertDontSee('Arnold MINDZELI');
     }
 
-    public function test_messaging_org_tree_displays_clickable_profile_nodes(): void
+    public function test_messaging_page_loads_without_orgchart_section_after_removal(): void
     {
+        // L'organigramme a ete entierement retire (2026-05-29). La page messagerie
+        // ne doit plus exposer ses marqueurs HTML/JS, ni la section associee.
         $admin = $this->createAdminUser([
             'email' => 'admin.orgtree@anbg.test',
         ]);
@@ -90,25 +97,11 @@ class MessagingWebTest extends TestCase
             ->get(route('workspace.messaging.index', ['contact' => $target->id]));
 
         $response->assertOk();
-        $response->assertSee('data-org-tree="1"', false);
-        $response->assertSee('Liste arborescente');
-        $response->assertSee('Tout déplier');
-        $response->assertSee('Directions');
-        $response->assertSee('Services');
-        $response->assertSee('Agents');
-        $response->assertSee("Réinitialiser l'arbre", false);
-        $response->assertSee('data-org-quick-search', false);
-        $response->assertSee('data-org-clear-search', false);
-        $response->assertSee('profil(s) visible(s)');
-        $response->assertDontSee('data-org-layout-toggle', false);
-        $response->assertDontSee('Vue organigramme');
-        $response->assertDontSee('Arbre compact');
-        $response->assertDontSee('data-org-zoom-in', false);
-        $response->assertSee('data-org-recenter', false);
-        $response->assertSee(route('workspace.messaging.index', ['contact' => $target->id]).'#messaging-profile-card', false);
-        $response->assertSee('DAF');
-        $response->assertSee('messaging-org-tree-manager-link level-direction', false);
-        $response->assertSee('messaging-org-tree-node is-user level-agent', false);
+        $response->assertDontSee('data-org-tree="1"', false);
+        $response->assertDontSee('Organigramme interactif');
+        $response->assertDontSee('messaging-org-tree-shell', false);
+        $response->assertDontSee('Recherche organigramme');
+        // Mais la fiche profil et la messagerie restent accessibles.
         $response->assertSee($target->name);
         $response->assertSee('Envoyer un message');
     }

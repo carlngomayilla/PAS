@@ -14,6 +14,9 @@ class Pao extends Model
     use HasFactory, SoftDeletes;
 
     public const STATUS_VALIDE = 'valide';
+    public const STATUS_EN_COURS = 'en_cours';
+    public const STATUS_CLOTURE = 'cloture';
+    public const STATUS_ARCHIVE = 'archive';
     public const STATUS_VERROUILLE = 'verrouille';
 
     protected $table = 'paos';
@@ -23,6 +26,7 @@ class Pao extends Model
      */
     protected $fillable = [
         'exercice_id',
+        'code',
         'pas_id',
         'pas_objectif_id',
         'direction_id',

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Action;
 use App\Models\SousAction;
+use App\Services\Actions\ActionBusinessRules;
 use App\Services\Actions\ActionStatusService;
 use App\Services\Actions\ActionTrackingService;
 use Illuminate\Support\Carbon;
@@ -11,7 +12,8 @@ use Illuminate\Support\Carbon;
 class ActionPerformanceService
 {
     public function __construct(
-        private readonly ActionStatusService $actionStatusService
+        private readonly ActionStatusService $actionStatusService,
+        private readonly ActionBusinessRules $businessRules
     ) {
     }
 
@@ -21,8 +23,8 @@ class ActionPerformanceService
     public function officialWeights(): array
     {
         return [
-            'real_progress' => 80,
-            'delay' => 20,
+            'performance' => 70,
+            'delay' => 30,
         ];
     }
 
@@ -30,58 +32,161 @@ class ActionPerformanceService
     {
         $target = max(0.0, (float) ($action->quantite_cible ?? 0));
 
-        if ($target > 0.0) {
+        if ($this->businessRules->isActionQuantifiable($action) && $target > 0.0) {
             return $this->boundRate(($this->realizedQuantity($action) / $target) * 100);
         }
 
         $totalSubActions = $this->subActions($action)->count();
 
         if ($totalSubActions > 0) {
-            $completedSubActions = $this->subActions($action)
-                ->filter(fn (SousAction $subAction): bool => $this->isCompletedSubAction($subAction))
-                ->count();
+            $subActions = $this->subActions($action);
+            $subActionTarget = $subActions
+                ->filter(fn (SousAction $subAction): bool => $this->businessRules->isSubActionQuantifiable($subAction))
+                ->sum(fn (SousAction $subAction): float => max(0.0, (float) ($subAction->cible_prevue ?? 0)));
 
-            return $this->boundRate(($completedSubActions / $totalSubActions) * 100);
+            $hasQuantifiedSubActions = $subActionTarget > 0.0;
+            $hasNonQuantifiedSubActions = $subActions->contains(
+                fn (SousAction $subAction): bool => ! $this->businessRules->isSubActionQuantifiable($subAction)
+            );
+
+            if ($hasQuantifiedSubActions && ! $hasNonQuantifiedSubActions) {
+                $declaredQuantity = $subActions
+                    ->sum(fn (SousAction $subAction): float => max(0.0, (float) ($subAction->quantite_realisee ?? 0)));
+
+                return $this->boundRate(($declaredQuantity / $subActionTarget) * 100);
+            }
+
+            $weight = 100.0 / max(1, $totalSubActions);
+            $progress = $subActions->sum(function (SousAction $subAction) use ($weight): float {
+                return ($this->businessRules->declaredSubActionProgress($subAction) / 100) * $weight;
+            });
+
+            return $this->boundRate((float) $progress);
+        }
+
+        if ($this->isDeclaredNonQuantifiableActionCompleted($action)) {
+            return 100.0;
         }
 
         return 0.0;
     }
 
+    public function calculateDeclaredProgress(Action $action): float
+    {
+        $target = max(0.0, (float) ($action->quantite_cible ?? 0));
+
+        if ($this->businessRules->isActionQuantifiable($action) && $target > 0.0) {
+            return $this->boundRate(($this->realizedQuantity($action) / $target) * 100);
+        }
+
+        $subActions = $this->subActions($action);
+        $totalSubActions = $subActions->count();
+
+        if ($totalSubActions > 0) {
+            $subActionTarget = $subActions
+                ->filter(fn (SousAction $subAction): bool => $this->businessRules->isSubActionQuantifiable($subAction))
+                ->sum(fn (SousAction $subAction): float => max(0.0, (float) ($subAction->cible_prevue ?? 0)));
+
+            $hasQuantifiedSubActions = $subActionTarget > 0.0;
+            $hasNonQuantifiedSubActions = $subActions->contains(
+                fn (SousAction $subAction): bool => ! $this->businessRules->isSubActionQuantifiable($subAction)
+            );
+
+            if ($hasQuantifiedSubActions && ! $hasNonQuantifiedSubActions) {
+                $declaredQuantity = $subActions
+                    ->sum(fn (SousAction $subAction): float => max(0.0, (float) ($subAction->quantite_realisee ?? 0)));
+
+                return $this->boundRate(($declaredQuantity / $subActionTarget) * 100);
+            }
+
+            $weight = 100.0 / max(1, $totalSubActions);
+            $progress = $subActions->sum(function (SousAction $subAction) use ($weight): float {
+                return ($this->businessRules->declaredSubActionProgress($subAction) / 100) * $weight;
+            });
+
+            return $this->boundRate((float) $progress);
+        }
+
+        if ($this->isDeclaredNonQuantifiableActionCompleted($action)) {
+            return 100.0;
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * KPI Delai (spec v2 PAS ANBG, 28/05/2026).
+     *
+     * Mode 'graduated' (par defaut, config kpis.delay.mode) :
+     *     KPI_delai = max(0, 100 - (retard_jours / duree_prevue * 100))
+     * Soumis a temps      -> 100.
+     * Soumis en retard    -> dégradation progressive proportionnelle a la duree prevue.
+     * Jamais soumis et echue -> 0.
+     * Pas encore echue    -> 100 (non penalise).
+     *
+     * Mode 'binary' (rollback) : ancien comportement 100 ou 0 selon respect de l'echeance.
+     */
     public function calculateDelayScore(Action $action, ?Carbon $referenceDate = null): float
     {
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
-        $progress = $this->calculateRealProgress($action);
-        $status = $this->normalizeStatus($action);
         $deadline = $action->date_echeance ?? $action->date_fin;
 
-        if ($status === 'non_demarre') {
-            return 0.0;
-        }
-
         if ($deadline === null) {
-            return $progress > 0.0 ? 100.0 : 0.0;
+            return 100.0;
         }
 
         $deadline = Carbon::parse($deadline)->endOfDay();
-        $completedAt = $action->date_fin_reelle ?? $action->cloture_le;
+        $mode = (string) config('kpis.delay.mode', 'graduated');
 
-        if ($completedAt !== null || $progress >= 100.0) {
-            $realEnd = $completedAt !== null
-                ? Carbon::parse($completedAt)->endOfDay()
-                : $referenceDate->copy()->endOfDay();
+        if ($action->soumise_le !== null) {
+            $submittedAt = Carbon::parse($action->soumise_le)->endOfDay();
 
-            return $realEnd->lte($deadline) ? 100.0 : 40.0;
+            if ($submittedAt->lte($deadline)) {
+                return 100.0;
+            }
+
+            if ($mode === 'binary') {
+                return 0.0;
+            }
+
+            return $this->graduatedDelayScore($action, $deadline, $submittedAt);
         }
 
         if ($referenceDate->copy()->endOfDay()->gt($deadline)) {
-            return $progress <= 0.0 ? 0.0 : 40.0;
+            return 0.0;
         }
 
-        $daysLeft = $referenceDate->copy()->startOfDay()->diffInDays($deadline->copy()->startOfDay(), false);
+        return 100.0;
+    }
 
-        return $daysLeft >= 0 && $daysLeft <= ActionTrackingService::RISK_ALERT_THRESHOLD_DAYS
-            ? 70.0
-            : 100.0;
+    /**
+     * Formule graduee : penalite proportionnelle a la duree prevue de l'action.
+     * Fallback : penalite forfaitaire par jour quand date_debut manque.
+     */
+    private function graduatedDelayScore(Action $action, Carbon $deadline, Carbon $submittedAt): float
+    {
+        $retardJours = (float) $deadline->diffInDays($submittedAt, false);
+        if ($retardJours <= 0.0) {
+            return 100.0;
+        }
+
+        $start = $action->date_debut;
+        if ($start !== null) {
+            $start = Carbon::parse($start)->startOfDay();
+            $dureePrevueJours = (float) $start->diffInDays($deadline->copy()->startOfDay(), false);
+
+            if ($dureePrevueJours > 0.0) {
+                $ratio = ($retardJours / $dureePrevueJours) * 100.0;
+
+                return round($this->boundRate(100.0 - $ratio), 2);
+            }
+        }
+
+        // Pas de date_debut OU duree calculee <= 0 : fallback forfaitaire.
+        $dailyPenalty = (float) config('kpis.delay.fallback_daily_penalty', 5.0);
+        $score = 100.0 - ($retardJours * $dailyPenalty);
+
+        return round($this->boundRate($score), 2);
     }
 
     public function calculateQualityScore(Action $action): float
@@ -89,40 +194,38 @@ class ActionPerformanceService
         return $this->calculateConformityScore($action);
     }
 
-    /**
-     * KPI Conformité = note brute /100 attribuée par le chef de service
-     * (ou par la direction lors de la validation finale).
-     *
-     * - Rejet chef ou direction => 0 (l'action n'est pas conforme).
-     * - Validation chef/direction => note brute du validateur (0-100).
-     * - Soumise au chef, en attente d'évaluation => 0 (pas encore noté).
-     * - Sinon => 0.
-     *
-     * L'UI applique un badge 3 niveaux (Faible / Moyen / Élevé) via
-     * {@see \App\Support\KpiLevel}.
-     */
-    public function calculateConformityScore(Action $action): float
+    public function calculateValidationScore(Action $action): float
     {
-        $validationStatus = (string) ($action->statut_validation ?? '');
+        return 0.0;
+    }
 
-        if (in_array($validationStatus, [
-            ActionTrackingService::VALIDATION_REJETEE_CHEF,
-            ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
-            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
-        ], true)) {
+    public function calculateTargetScore(Action $action): float
+    {
+        return $this->calculateRealProgress($action) >= 100.0 ? 100.0 : 0.0;
+    }
+
+    public function calculateGlobalKpi(Action $action, ?Carbon $referenceDate = null): float
+    {
+        $weights = $this->officialWeights();
+        $progress = $this->calculateRealProgress($action);
+        $delay = $this->calculateDelayScore($action, $referenceDate);
+
+        if ($progress <= 0.0 && $action->soumise_le === null) {
             return 0.0;
         }
 
-        if (in_array($validationStatus, [
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-            // VALIDATION_VALIDEE_DIRECTION : historique, valeurs backfillees
-            // vers VALIDATION_VALIDEE_CHEF par la migration de purge.
-        ], true)) {
-            $note = $action->evaluation_note;
+        $score = ($progress * ($weights['performance'] / 100))
+            + ($delay * ($weights['delay'] / 100));
 
-            return $note !== null ? $this->boundRate((float) $note) : 0.0;
-        }
+        return round($this->boundRate($score), 2);
+    }
 
+    /**
+     * KPI conformité supprimé de la règle métier active.
+     * La méthode reste neutre pour compatibilité avec les colonnes historiques.
+     */
+    public function calculateConformityScore(Action $action): float
+    {
         return 0.0;
     }
 
@@ -136,7 +239,7 @@ class ActionPerformanceService
 
         $delayScore = $this->calculateDelayScore($action, $referenceDate);
 
-        $performance = ($progress * 0.80) + ($delayScore * 0.20);
+        $performance = ($progress * 0.70) + ($delayScore * 0.30);
 
         return round($this->boundRate($performance), 2);
     }
@@ -210,7 +313,7 @@ class ActionPerformanceService
         return (bool) $subAction->est_effectuee
             || $subAction->completed_at !== null
             || $subAction->date_realisation !== null
-            || in_array($status, ['effectuee', 'terminee', 'termine', 'realisee', 'realise', 'validee', 'cloturee'], true);
+            || in_array($status, ['effectuee', 'terminee', 'termine', 'realisee', 'realise', 'en_attente_validation_chef', 'validee', 'validee_chef', 'cloturee'], true);
     }
 
     /**
@@ -229,7 +332,7 @@ class ActionPerformanceService
     {
         $status = strtolower(trim((string) ($subAction->statut ?? '')));
 
-        if (in_array($status, ['validee', 'cloturee'], true)) {
+        if (in_array($status, ['validee', 'validee_chef', 'cloturee'], true)) {
             return true;
         }
 
@@ -247,6 +350,52 @@ class ActionPerformanceService
     private function hasRealExecution(Action $action): bool
     {
         return $this->actionStatusService->isStarted($action);
+    }
+
+    private function isDeclaredNonQuantifiableActionCompleted(Action $action): bool
+    {
+        if ($this->businessRules->isActionQuantifiable($action)) {
+            return false;
+        }
+
+        $validationStatus = (string) ($action->statut_validation ?? '');
+        if (in_array($validationStatus, [
+            ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+        ], true)) {
+            return false;
+        }
+
+        return $this->hasActionExecutionProof($action)
+            || $action->date_fin_reelle !== null
+            || $action->cloture_le !== null
+            || in_array($validationStatus, [
+                ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ], true)
+            || in_array(strtolower(trim((string) ($action->statut ?? ''))), ['termine', 'terminee', 'acheve', 'achevee'], true);
+    }
+
+    private function hasActionExecutionProof(Action $action): bool
+    {
+        $proofCategories = [
+            'execution_quantitative',
+            'execution_non_quantitative',
+            'execution_mixte',
+            'final',
+        ];
+
+        if ($action->relationLoaded('justificatifs')) {
+            return $action->justificatifs
+                ->contains(fn ($justificatif): bool => in_array((string) ($justificatif->categorie ?? ''), $proofCategories, true));
+        }
+
+        return $action->exists
+            && $action->justificatifs()
+                ->whereIn('categorie', $proofCategories)
+                ->exists();
     }
 
     public function boundRate(float $value): float

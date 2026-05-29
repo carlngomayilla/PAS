@@ -5,11 +5,10 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
-use App\Models\Action;
 use App\Models\Direction;
-use App\Models\PaoObjectifOperationnel;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\DeletionRequestService;
 use App\Services\Security\AntivirusScanner;
 use App\Services\Security\MalwareScanException;
 use App\Services\Security\PasswordPolicyService;
@@ -30,6 +29,7 @@ class ReferentielWebController extends Controller
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy,
         private readonly AntivirusScanner $scanner,
+        private readonly DeletionRequestService $deletionRequestService,
         private readonly \App\Services\ChefUniteSyncService $chefUniteSync,
         private readonly \App\Services\RoleRegistryService $roleRegistry
     ) {
@@ -339,7 +339,11 @@ class ReferentielWebController extends Controller
     public function utilisateursIndex(Request $request): View
     {
         $user = $this->authUser($request);
-        $this->denyUnlessUserManager($user);
+        // Lecture autorisee aux roles avec referentiel.read (Direction, Chef de service,
+        // DG, Planification, etc.) afin que le module sidebar "Agents / RMO" soit
+        // operationnel. Les operations d'ecriture (create/update/destroy) restent
+        // protegees par denyUnlessUserManager dans les methodes correspondantes.
+        $this->denyUnlessReferentielReader($user);
 
         $query = User::query()
             ->with([
@@ -409,6 +413,8 @@ class ReferentielWebController extends Controller
                 'services_total' => (clone $userSummaryBase)->whereNotNull('service_id')->distinct()->count('service_id'),
             ],
             'canWrite' => $this->canManageUsers($user),
+            'canDeleteUsers' => $user->isSuperAdmin(),
+            'canRequestUserDeletion' => $this->canRequestAnyUserDeletion($user),
             'canManageRoles' => $this->canManageRoles($user),
             'directionOptions' => $this->activeDirectionOptions(),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
@@ -558,6 +564,31 @@ class ReferentielWebController extends Controller
             ->with('success', 'Utilisateur mis a jour avec succes.');
     }
 
+    public function utilisateursDeletionRequestStore(Request $request, User $utilisateur): RedirectResponse
+    {
+        $user = $this->authUser($request);
+
+        if (! $this->deletionRequestService->canRequestUserDeletion($user, $utilisateur)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $deletionRequest = $this->deletionRequestService->requestUserDeletion(
+            $utilisateur,
+            $user,
+            (string) $validated['motif']
+        );
+
+        $this->recordAudit($request, 'referentiel_utilisateur', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
+
+        return redirect()
+            ->route('workspace.referentiel.utilisateurs.index')
+            ->with('success', 'Demande de suppression transmise au Super Admin.');
+    }
+
     public function utilisateursDestroy(Request $request, User $utilisateur): RedirectResponse
     {
         $user = $this->authUser($request);
@@ -565,18 +596,22 @@ class ReferentielWebController extends Controller
         $this->denyUnlessManagedUserAccessible($user, $utilisateur);
         $this->denyIfSuperAdminTargetIsLocked($user, $utilisateur);
 
+        if (! $user->isSuperAdmin()) {
+            return back()->withErrors([
+                'general' => 'Suppression definitive reservee au Super Admin. Utilisez la desactivation ou transmettez une demande motivee.',
+            ]);
+        }
+
         if ((int) $utilisateur->id === (int) $user->id) {
             return back()->withErrors(['general' => 'Vous ne pouvez pas supprimer votre propre compte.']);
         }
 
-        $usedAsResponsable = PaoObjectifOperationnel::query()
-            ->where('responsable_id', (int) $utilisateur->id)
-            ->exists();
-        $usedAsActionResponsable = Action::query()
-            ->where('responsable_id', (int) $utilisateur->id)
-            ->exists();
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
 
-        if ($usedAsResponsable || $usedAsActionResponsable) {
+        $impact = $this->deletionRequestService->impactForUser($utilisateur);
+        if ((int) ($impact['total'] ?? 0) > 0) {
             return back()->withErrors([
                 'general' => 'Suppression impossible : l\'utilisateur est déjà responsable d\'actions ou d\'objectifs opérationnels.',
             ]);
@@ -587,9 +622,14 @@ class ReferentielWebController extends Controller
         }
 
         $before = $utilisateur->toArray();
+        $reason = trim((string) $validated['motif']);
         $utilisateur->delete();
 
-        $this->recordAudit($request, 'referentiel_utilisateur', 'delete', $utilisateur, $before, null);
+        $this->recordAudit($request, 'referentiel_utilisateur', 'delete', $utilisateur, [
+            ...$before,
+            'deletion_reason' => $reason,
+            'impact' => $impact,
+        ], null);
 
         return redirect()
             ->route('workspace.referentiel.utilisateurs.index')
@@ -859,6 +899,25 @@ class ReferentielWebController extends Controller
     private function canManageRoles(User $user): bool
     {
         return $user->hasPermission('users.manage_roles');
+    }
+
+    private function canRequestAnyUserDeletion(User $user): bool
+    {
+        return $user->isSuperAdmin()
+            || $user->hasGlobalReadAccess()
+            || $user->hasRole(
+                User::ROLE_DG,
+                User::ROLE_DGA_SUPERVISION,
+                User::ROLE_CABINET,
+                User::ROLE_CABINET_SUPERVISION,
+                User::ROLE_SCIQ,
+                User::ROLE_PLANIFICATION,
+                User::ROLE_ADMIN_FONCTIONNEL,
+                User::ROLE_DIRECTION,
+                User::ROLE_SERVICE,
+                User::ROLE_CHEF_UNITE_UCAS,
+                User::ROLE_UCAS,
+            );
     }
 
     /**

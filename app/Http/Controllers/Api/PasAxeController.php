@@ -73,7 +73,7 @@ class PasAxeController extends Controller
         $validated = $request->validated();
         $pas = Pas::query()->findOrFail((int) $validated['pas_id']);
 
-        if ($pas->statut === 'verrouille') {
+        if ($pas->statut === 'archive') {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'parent', 'Creation'),
             ], 409);
@@ -102,7 +102,7 @@ class PasAxeController extends Controller
         return response()->json([
             'data' => $pasAxe->load([
                 'pas:id,titre,periode_debut,periode_fin,statut',
-                'objectifs:id,pas_axe_id,code,libelle',
+                'objectifs:id,pas_axe_id,code,libelle,date_echeance',
             ]),
         ]);
     }
@@ -117,7 +117,7 @@ class PasAxeController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         $pasAxe->loadMissing('pas:id,statut');
-        if ($pasAxe->pas?->statut === 'verrouille') {
+        if ($pasAxe->pas?->statut === 'archive') {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'parent', 'Mise a jour'),
             ], 409);
@@ -125,7 +125,7 @@ class PasAxeController extends Controller
 
         $validated = $request->validated();
         $targetPas = Pas::query()->findOrFail((int) $validated['pas_id']);
-        if ($targetPas->statut === 'verrouille') {
+        if ($targetPas->statut === 'archive') {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'cible', 'Mise a jour'),
             ], 409);
@@ -153,7 +153,7 @@ class PasAxeController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         $pasAxe->loadMissing('pas:id,statut');
-        if ($pasAxe->pas?->statut === 'verrouille') {
+        if ($pasAxe->pas?->statut === 'archive') {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'parent', 'Suppression'),
             ], 409);
@@ -178,7 +178,15 @@ class PasAxeController extends Controller
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('pas.paos.ptas', fn ($q) => $q->where('service_id', (int) $user->service_id));
+            $query->where(function ($serviceQuery) use ($user): void {
+                $serviceQuery->whereHas(
+                    'objectifs.paos.objectifsOperationnels',
+                    fn ($q) => $q->where('service_id', (int) $user->service_id)
+                )->orWhereHas(
+                    'pas.paos.ptas',
+                    fn ($q) => $q->where('service_id', (int) $user->service_id)
+                );
+            });
             return;
         }
 

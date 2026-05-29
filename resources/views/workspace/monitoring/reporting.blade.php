@@ -15,12 +15,9 @@
         $officialCompletedText = 'Achevées sur '.$officialBaseLabel;
         $officialFilters = (array) ($basePolicy['route_filters'] ?? []);
         $directionServiceReport = collect($details['direction_service_report'] ?? []);
-        $summaryCards = [
-            ['label' => 'PAS', 'value' => $global['pas_total'] ?? 0, 'tone' => 'navy', 'meta' => null, 'href' => route('workspace.pas.index'), 'badge' => null, 'badge_tone' => 'info'],
-            ['label' => 'PAO', 'value' => $global['paos_total'] ?? 0, 'tone' => 'blue', 'meta' => null, 'href' => route('workspace.pao.index'), 'badge' => null, 'badge_tone' => 'warning'],
-            ['label' => 'Actions suivies', 'value' => $global['actions_total'] ?? 0, 'tone' => 'green', 'meta' => null, 'href' => route('workspace.actions.index', $officialFilters), 'badge' => null, 'badge_tone' => 'success'],
-            ['label' => 'Alertes', 'value' => ($alertes['actions_en_retard'] ?? 0) + ($alertes['mesures_kpi_sous_seuil'] ?? 0), 'tone' => 'amber', 'meta' => null, 'href' => route('workspace.alertes', ['limit' => 100]), 'badge' => null, 'badge_tone' => 'danger'],
-        ];
+        // Cartes synthèse PAS / PAO / Actions / Alertes retirées du module Reporting
+        // (non alignées avec la nouvelle logique métier — accessibles via leur module dédié).
+        $summaryCards = [];
         $scopeLabel = $roleProfile['role_label'] ?? strtoupper((string) ($scope['role'] ?? 'lecture'));
         $generatedLabel = isset($generatedAt) && $generatedAt instanceof \Illuminate\Support\Carbon ? $generatedAt->format('d/m/Y H:i') : now()->format('d/m/Y H:i');
         $managedKpis = collect($managedKpis ?? [])->take(6)->values();
@@ -31,6 +28,13 @@
             'Gantt critique et jauges de performance',
             'Tables de consolidation PAS et comparaisons interannuelles',
         ];
+        $reportTypes = collect($reportTypes ?? []);
+        $activeReportType = (string) ($activeReportType ?? request('report_type', 'consolide_dg'));
+        $reportFilterOptions = (array) ($reportFilterOptions ?? []);
+        $reportQuery = collect(request()->query())
+            ->only(['report_type', 'exercice', 'trimestre', 'direction_id', 'service_id', 'statut', 'type_action', 'responsable_id', 'criticite', 'periode_debut', 'periode_fin'])
+            ->filter(fn ($value): bool => trim((string) $value) !== '' && trim((string) $value) !== 'all')
+            ->all();
     @endphp
 
     <section class="showcase-hero mb-4">
@@ -45,13 +49,13 @@
             </div>
             <div class="showcase-action-row">
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ $dashboardAnalyticsUrl }}">Tableau de bord analytique</a>
-                <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.excel') }}">
+                <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.excel', $reportQuery) }}">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h11l5 5v11H4V4zm11 0v5h5M8 13h8M8 17h8M8 9h3" />
                     </svg>
                     Export Excel
                 </a>
-                <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.pdf') }}">
+                <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.pdf', $reportQuery) }}">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M8 13h2a2 2 0 010 4H8v-4zm6 0h2m-2 4h2" />
                     </svg>
@@ -61,69 +65,119 @@
         </div>
     </section>
 
-    <div class="mb-4 flex flex-wrap justify-center gap-3">
-        @foreach ($summaryCards as $card)
-            <x-stat-card-link
-                :href="$card['href']"
-                :label="$card['label']"
-                :value="$card['value']"
-                :meta="$card['meta']"
-                :badge="$card['badge']"
-                :badge-tone="$card['badge_tone']"
-                card-class="reporting-hub-kpi reporting-hub-kpi-{{ $card['tone'] }}"
-                label-class="dashboard-summary-label"
-                value-class="dashboard-summary-value mt-3 text-[2rem] font-black leading-none"
-                meta-class="dashboard-summary-meta mt-2 text-xs"
-            />
-        @endforeach
-    </div>
+    <section class="showcase-panel mb-4">
+        <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h2 class="showcase-panel-title">Rapports métiers</h2>
+            </div>
+            <span class="anbg-badge anbg-badge-info px-3 py-1">PDF + Excel</span>
+        </div>
 
-    @if ($managedKpis->isNotEmpty())
-        <section class="showcase-panel mb-4">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="showcase-panel-title">Performances d'exécution pilotes actives</h2>
-                </div>
+        <div class="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+            @foreach ($reportTypes as $code => $report)
+                @php
+                    $isActiveReport = $activeReportType === (string) $code;
+                    $reportHref = route('workspace.reporting', array_merge($reportQuery, ['report_type' => (string) $code]));
+                @endphp
+                <a href="{{ $reportHref }}" class="rounded-[1.1rem] border px-4 py-3 text-sm transition {{ $isActiveReport ? 'border-[#3996d3] bg-[#e8f3fb] text-[#17324a]' : 'border-slate-200 bg-white text-slate-700 hover:border-[#3996d3]/60' }}">
+                    <strong class="block text-[0.92rem]">{{ $report['label'] ?? $code }}</strong>
+                    <span class="mt-1 block text-xs leading-relaxed text-slate-500">{{ $report['description'] ?? '' }}</span>
+                </a>
+            @endforeach
+        </div>
+
+        <form method="GET" action="{{ route('workspace.reporting') }}" class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+            <input type="hidden" name="report_type" value="{{ $activeReportType }}">
+            <div>
+                <label for="exercice">Exercice</label>
+                <select id="exercice" name="exercice">
+                    @foreach (($reportFilterOptions['exercices'] ?? []) as $option)
+                        <option value="{{ $option['value'] }}" @selected((string) request('exercice', '') === (string) $option['value'])>{{ $option['label'] }}</option>
+                    @endforeach
+                </select>
             </div>
-            <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
-                @foreach ($managedKpis as $metric)
-                    <x-stat-card-link
-                        :href="route('workspace.super-admin.kpis.edit')"
-                        :label="$metric['label']"
-                        :value="number_format((float) ($metric['value'] ?? 0), 1)"
-                        :meta="collect([
-                            'Poids '.($metric['weight'] ?? 0),
-                            'Seuil vert '.number_format((float) ($metric['green_threshold'] ?? 0), 0),
-                        ])->filter()->implode(' | ')"
-                        badge="Actif"
-                        :badge-tone="$metric['tone'] === 'success' ? 'success' : ($metric['tone'] === 'warning' ? 'warning' : 'danger')"
-                    />
-                @endforeach
+            <div>
+                <label for="trimestre">Trimestre</label>
+                <select id="trimestre" name="trimestre">
+                    @foreach (($reportFilterOptions['trimestres'] ?? []) as $option)
+                        <option value="{{ $option['value'] }}" @selected((string) request('trimestre', '') === (string) $option['value'])>{{ $option['label'] }}</option>
+                    @endforeach
+                </select>
             </div>
-        </section>
-    @endif
+            <div>
+                <label for="direction_id">Direction</label>
+                <select id="direction_id" name="direction_id">
+                    <option value="all">Toutes</option>
+                    @foreach (($reportFilterOptions['directions'] ?? []) as $direction)
+                        <option value="{{ $direction['id'] }}" @selected((int) request('direction_id') === (int) $direction['id'])>{{ $direction['label'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="service_id">Service / unité</label>
+                <select id="service_id" name="service_id">
+                    <option value="all">Tous</option>
+                    @foreach (($reportFilterOptions['services'] ?? []) as $service)
+                        <option value="{{ $service['id'] }}" @selected((int) request('service_id') === (int) $service['id'])>{{ $service['label'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="statut">Statut</label>
+                <select id="statut" name="statut">
+                    <option value="all">Tous</option>
+                    @foreach (($reportFilterOptions['statuses'] ?? []) as $value => $label)
+                        <option value="{{ $value }}" @selected((string) request('statut') === (string) $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="type_action">Type d'action</label>
+                <select id="type_action" name="type_action">
+                    <option value="all">Tous</option>
+                    @foreach (($reportFilterOptions['types_action'] ?? []) as $value => $label)
+                        <option value="{{ $value }}" @selected((string) request('type_action') === (string) $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="responsable_id">Responsable</label>
+                <select id="responsable_id" name="responsable_id">
+                    <option value="all">Tous</option>
+                    @foreach (($reportFilterOptions['responsables'] ?? []) as $responsable)
+                        <option value="{{ $responsable['id'] }}" @selected((int) request('responsable_id') === (int) $responsable['id'])>{{ $responsable['label'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="criticite">Criticité</label>
+                <select id="criticite" name="criticite">
+                    <option value="all">Toutes</option>
+                    @foreach (($reportFilterOptions['criticites'] ?? []) as $value => $label)
+                        <option value="{{ $value }}" @selected((string) request('criticite') === (string) $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="periode_debut">Début</label>
+                <input id="periode_debut" name="periode_debut" type="date" value="{{ request('periode_debut') }}">
+            </div>
+            <div>
+                <label for="periode_fin">Fin</label>
+                <input id="periode_fin" name="periode_fin" type="date" value="{{ request('periode_fin') }}">
+            </div>
+            <div class="flex items-end gap-2">
+                <button class="btn btn-primary w-full rounded-2xl px-4 py-2.5" type="submit">Filtrer</button>
+                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting', ['report_type' => $activeReportType]) }}">Réinitialiser</a>
+            </div>
+        </form>
+    </section>
+
+    {{-- Bandeau cartes synthèse PAS / PAO / Actions / Alertes retiré du Reporting. --}}
+    {{-- Bloc « Performances d'exécution pilotes actives » retiré du Reporting. --}}
+    {{-- Bloc « Analytique disponible » retiré du Reporting. --}}
 
     <div class="grid gap-4">
-        <article class="showcase-panel">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="showcase-panel-title">Analytique disponible</h2>
-                </div>
-            </div>
-
-            <div class="grid gap-3">
-                @foreach ($analyticsFamilies as $family)
-                    <div class="rounded-[1.15rem] border border-slate-200/85 bg-slate-50/90 px-4 py-3 text-sm text-slate-700">
-                        {{ $family }}
-                    </div>
-                @endforeach
-            </div>
-
-            <div class="mt-4 flex flex-wrap gap-3">
-                <a href="{{ $dashboardAnalyticsUrl }}" class="btn btn-primary rounded-2xl px-4 py-2.5">Tableau de bord analytique</a>
-                <a href="{{ route('workspace.alertes') }}" class="btn btn-secondary rounded-2xl px-4 py-2.5">Alertes</a>
-            </div>
-        </article>
 
         <article class="showcase-panel">
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">

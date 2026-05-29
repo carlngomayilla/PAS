@@ -20,7 +20,7 @@ class SuperAdminCalculationPolicyTest extends TestCase
             ->get(route('workspace.super-admin.calculation.edit'))
             ->assertOk()
             ->assertSee('Politique de calcul des actions')
-            ->assertSee('Validation direction');
+            ->assertSee('Validation chef de service');
 
         $this->actingAs($superAdmin)
             ->put(route('workspace.super-admin.calculation.update'), [
@@ -45,7 +45,7 @@ class SuperAdminCalculationPolicyTest extends TestCase
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.calculation.edit'))
             ->assertOk()
-            ->assertSee('Validation chef ou direction')
+            ->assertSee('Validation chef de service')
             ->assertSee('Filtre actif');
     }
 

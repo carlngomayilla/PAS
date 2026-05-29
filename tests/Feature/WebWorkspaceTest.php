@@ -101,13 +101,15 @@ class WebWorkspaceTest extends TestCase
             ->assertOk()
             ->assertSee('PAO');
 
+        // Routes legacy /workspace/pas-axes et /workspace/pas-objectifs SUPPRIMEES
+        // (2026-05-29) : tout est gere dans le wizard PAS unique.
         $this->actingAs($admin)
             ->get('/workspace/pas-axes')
-            ->assertRedirect('/workspace/pas');
+            ->assertNotFound();
 
         $this->actingAs($admin)
             ->get('/workspace/pas-objectifs')
-            ->assertRedirect('/workspace/pas');
+            ->assertNotFound();
 
         $this->actingAs($admin)
             ->get('/workspace/pao-axes')
@@ -196,11 +198,13 @@ class WebWorkspaceTest extends TestCase
             ->assertSee('dashboard-report-status-unit-chart', false)
             ->assertSee('analytics-explorer-title', false);
 
+        // Le bloc « Analytique disponible » (qui contenait le bouton « Tableau de bord analytique »)
+        // a été retiré du module Reporting pour s'aligner sur la nouvelle logique métier.
         $this->actingAs($admin)
             ->get('/workspace/reporting')
             ->assertOk()
             ->assertSee("Centre d'export et de diffusion")
-            ->assertSee('Tableau de bord analytique')
+            ->assertDontSee('Analytique disponible')
             ->assertDontSee('dashboard-report-status-unit-chart', false);
     }
 
@@ -213,7 +217,7 @@ class WebWorkspaceTest extends TestCase
             ->assertOk()
             ->assertSee(route('workspace.actions.index'), false)
             ->assertSee(route('workspace.actions.index', ['statut' => 'en_retard']), false)
-            ->assertDontSee('statut_validation=validee_direction', false);
+            ->assertSee('statut_validation_min=validee_chef', false);
     }
 
     public function test_pilotage_stat_cards_expose_drilldown_links(): void
@@ -238,22 +242,22 @@ class WebWorkspaceTest extends TestCase
             ->assertDontSee('Provisoire');
 
         $this->actingAs($admin)
-            ->get('/workspace/actions?statut_validation=validee_direction')
+            ->get('/workspace/actions?statut_validation_min=validee_chef')
             ->assertOk()
             ->assertDontSee('Officiel');
 
         $this->actingAs($admin)
-            ->get('/workspace/pas?statut=valide_ou_verrouille')
+            ->get('/workspace/pas?statut=actif')
             ->assertOk()
             ->assertSee('Liste des PAS');
 
         $this->actingAs($admin)
-            ->get('/workspace/pao?statut=valide_ou_verrouille')
+            ->get('/workspace/pao?statut=en_cours')
             ->assertOk()
             ->assertSee('Liste des PAO');
 
         $this->actingAs($admin)
-            ->get('/workspace/pta?statut=valide_ou_verrouille')
+            ->get('/workspace/pta?statut=en_cours')
             ->assertOk()
             ->assertSee('Liste des PTA');
 
@@ -282,7 +286,7 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($serviceUser)
             ->get('/workspace/referentiel/directions')
-            ->assertForbidden();
+            ->assertOk();
 
         $this->actingAs($serviceUser)
             ->get('/workspace/kpi-mesures')
@@ -424,20 +428,32 @@ class WebWorkspaceTest extends TestCase
 
     public function test_user_role_management_access_follows_role_permissions(): void
     {
+        // Note (2026-05-29) : la liste utilisateurs est en lecture pour tout role
+        // disposant de referentiel.read (DG, Cabinet, Direction, etc.). Seules les
+        // ecritures (create/update/delete) sont restreintes a users.manage.
         $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
-        $planification = User::query()->where('email', 'hilaire.nguebet@anbg.ga')->firstOrFail();
+        $planification = User::query()->where('role', User::ROLE_PLANIFICATION)->firstOrFail();
         $cabinet = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
 
+        // DG : peut LIRE la liste mais pas CREER (pas users.manage).
         $this->actingAs($dg)
             ->get('/workspace/referentiel/utilisateurs')
+            ->assertOk();
+        $this->actingAs($dg)
+            ->get('/workspace/referentiel/utilisateurs/create')
             ->assertForbidden();
 
+        // Planification : peut LIRE et CREER (a users.manage).
         $this->actingAs($planification)
             ->get('/workspace/referentiel/utilisateurs/create')
             ->assertOk();
 
+        // Cabinet : peut LIRE mais pas CREER.
         $this->actingAs($cabinet)
             ->get('/workspace/referentiel/utilisateurs')
+            ->assertOk();
+        $this->actingAs($cabinet)
+            ->get('/workspace/referentiel/utilisateurs/create')
             ->assertForbidden();
     }
 
@@ -466,6 +482,9 @@ class WebWorkspaceTest extends TestCase
             ->get(route('workspace.pas.create'))
             ->assertForbidden();
 
+        // Le payload inclut date_echeance (champ obligatoire sur chaque objectif
+        // stratégique selon la nouvelle logique métier). Sans cela la validation
+        // échoue avant le check d'autorisation et le test reçoit 302 au lieu de 403.
         $this->actingAs($cabinet)
             ->post(route('workspace.pas.store'), [
                 'titre' => 'PAS cabinet test',
@@ -482,6 +501,7 @@ class WebWorkspaceTest extends TestCase
                                 'code' => 'OS-CAB-1',
                                 'libelle' => 'Objectif cabinet',
                                 'ordre' => 1,
+                                'date_echeance' => '2030-12-31',
                             ],
                         ],
                     ],
@@ -575,8 +595,8 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringContainsString('RMO_PERFORMANCE', (string) $workbookXml);
         $this->assertStringContainsString('JUSTIFICATIFS', (string) $workbookXml);
         $this->assertStringNotContainsString('Synthèse graphique', (string) $workbookXml);
-        $this->assertStringContainsString('Reporting consolidé ANBG', (string) $sheetOneXml);
-        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetOneXml);
+        $this->assertStringContainsString('Rapport Consolidé DG - PAS ANBG', (string) $sheetOneXml);
+        $this->assertStringContainsString('Base statistique : Validation chef de service', (string) $sheetOneXml);
         $this->assertStringContainsString('Plan d', (string) $sheetOneXml);
         $this->assertStringContainsString('Axes strat', (string) $sheetOneXml);
         $this->assertStringContainsString('Tableau 1 : Axes &amp; Objectifs stratégiques', (string) $sheetTwoXml);
@@ -618,7 +638,8 @@ class WebWorkspaceTest extends TestCase
         $html = view('workspace.monitoring.reporting-pdf', $payload)->render();
 
         $this->assertStringContainsString("Performance d'exécution (%)", $html);
-        $this->assertStringContainsString('Conformité (%)', $html);
+        // KPI Conformite retire (2026-05-28) — assertion inversee.
+        $this->assertStringNotContainsString('Conformité (%)', $html);
         $this->assertStringContainsString('Avancement réel (%)', $html);
         $this->assertStringNotContainsString('Indicateur risque (%)', $html);
         $this->assertStringNotContainsString('Indicateur global (%)', $html);
@@ -627,7 +648,7 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringNotContainsString('<th>Direction</th><th>Service</th><th>Axe stratégique</th>', $html);
         $this->assertStringNotContainsString('Provisoire', $html);
         $this->assertStringNotContainsString('Officiel', $html);
-        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
+        $this->assertStringContainsString('Base statistique : Validation chef de service', $html);
         $this->assertStringNotContainsString('level-badge level-officiel', $html);
     }
 
@@ -641,7 +662,7 @@ class WebWorkspaceTest extends TestCase
         $payload = app(ReportingAnalyticsService::class)->buildPayload($admin, true, true);
         $html = view('workspace.monitoring.reporting-pdf', $payload)->render();
 
-        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
+        $this->assertStringContainsString('Base statistique : Validation chef de service', $html);
         $this->assertStringContainsString('Statut validation', $html);
 
         $xlsxResponse = $this->actingAs($admin)
@@ -674,7 +695,7 @@ class WebWorkspaceTest extends TestCase
         $this->assertNotFalse($sheetTwoXml);
         $this->assertNotFalse($sheetSixXml);
         $this->assertNotFalse($sheetSevenXml);
-        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', (string) $sheetOneXml);
+        $this->assertStringContainsString('Base statistique : Validation chef de service', (string) $sheetOneXml);
         $this->assertStringContainsString('Tableau 1 : Axes &amp; Objectifs stratégiques', (string) $sheetTwoXml);
         $this->assertStringContainsString('Tableau 5 : Reporting synthétique', (string) $sheetSixXml);
         $this->assertStringContainsString('Tableau 6 : Alertes indicateurs sous seuil', (string) $sheetSevenXml);
@@ -688,14 +709,14 @@ class WebWorkspaceTest extends TestCase
             'actions_official_validation_status' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ]);
 
+        // Les cartes synthèse PAS / PAO / Actions suivies / Alertes ont été retirées
+        // du module Reporting (alignement nouvelle logique métier).
+        // Les assertions sur statut_validation_min / Moyenne validée direction portaient
+        // sur les liens de ces cartes — désormais non rendus dans la page.
         $this->actingAs($admin)
             ->get('/workspace/reporting')
             ->assertOk()
-            ->assertSee('Base statistique : Toutes les actions visibles')
-            ->assertSee('Actions suivies')
-            ->assertDontSee('statut_validation_min=validee_chef', false)
-            ->assertDontSee('statut_validation=validee_direction', false)
-            ->assertDontSee('Moyenne validee direction')
+            ->assertSee('Base statistique : Validation chef de service')
             ->assertDontSee('Lecture DG : opérationnel vs consolidé');
     }
 
@@ -711,10 +732,8 @@ class WebWorkspaceTest extends TestCase
             'reportingAnalytics' => $payload,
         ])->render();
 
-        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
+        $this->assertStringContainsString('Base statistique : Validation chef de service', $html);
         $this->assertStringContainsString('Actions', $html);
-        $this->assertStringNotContainsString('statut_validation_min=validee_chef', $html);
-        $this->assertStringNotContainsString('statut_validation=validee_direction', $html);
         $this->assertStringNotContainsString('Moyenne validee direction', $html);
         $this->assertStringNotContainsString('socle officiel valide direction', $html);
         $this->assertStringNotContainsString('Lecture DG : opérationnel vs consolidé', $html);
@@ -732,8 +751,8 @@ class WebWorkspaceTest extends TestCase
             'reportingAnalytics' => $payload,
         ])->render();
 
-        $this->assertStringContainsString('Base statistique : Toutes les actions visibles', $html);
-        $this->assertStringContainsString('Toutes les actions visibles', $html);
+        $this->assertStringContainsString('Base statistique : Validation chef de service', $html);
+        $this->assertStringContainsString('Validation chef de service', $html);
         $this->assertStringContainsString('Validées', $html);
         $this->assertStringNotContainsString('Moyenne validee direction', $html);
         $this->assertStringNotContainsString('socle officiel valide direction', $html);

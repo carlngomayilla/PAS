@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Support\UiLabel;
 use App\Services\ExerciceContext;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\PlanningModificationLockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -109,9 +110,14 @@ class PtaController extends Controller
         $existingPta = Pta::query()
             ->where('objectif_operationnel_id', (int) $objectifOperationnel->id)
             ->first();
+        $lockService = app(PlanningModificationLockService::class);
+        if ($existingPta instanceof Pta) {
+            if ($message = $lockService->ensureUnlocked($existingPta, $request->user())) {
+                return response()->json(['message' => $message], 409);
+            }
+        }
 
-        // statut / valide_* ne sont plus exposes via l API (cf. A02). Pour les
-        // transitions de workflow, utiliser submit/approve/lock dedies.
+        // Le PTA ne possede pas de statut valide : il nait en cours.
         $pta = Pta::query()->updateOrCreate([
             'objectif_operationnel_id' => (int) $objectifOperationnel->id,
         ], [
@@ -123,6 +129,10 @@ class PtaController extends Controller
             'description' => $validated['description'] ?? null,
             'exercice_id' => $pao->exercice_id,
         ]);
+        if (! in_array((string) $pta->statut, [Pta::STATUS_CLOTURE, Pta::STATUS_ARCHIVE], true)) {
+            $pta->forceFill(['statut' => Pta::STATUS_EN_COURS])->save();
+        }
+        $lockService->lockAfterSave($pta, $user);
         $this->recordAudit(
             $request,
             'pta',
@@ -186,10 +196,13 @@ class PtaController extends Controller
             abort(401);
         }
 
-        if ($pta->statut === 'verrouille') {
+        if ($pta->statut === Pta::STATUS_ARCHIVE) {
             return response()->json([
-                'message' => $this->lockedStateMessage('PTA', 'plus etre modifie'),
+                'message' => 'Impossible de modifier un PTA archive.',
             ], 409);
+        }
+        if ($message = app(PlanningModificationLockService::class)->ensureUnlocked($pta, $request->user())) {
+            return response()->json(['message' => $message], 409);
         }
 
         $validated = $request->validated();
@@ -212,7 +225,9 @@ class PtaController extends Controller
         );
 
         $before = $pta->toArray();
-        // statut / valide_* ne sont plus exposes via l API (cf. A02).
+        $statut = in_array((string) $pta->statut, [Pta::STATUS_CLOTURE, Pta::STATUS_ARCHIVE], true)
+            ? (string) $pta->statut
+            : Pta::STATUS_EN_COURS;
         $pta->fill([
             'pao_id' => (int) $targetPao->id,
             'objectif_operationnel_id' => (int) $objectifOperationnel->id,
@@ -222,7 +237,8 @@ class PtaController extends Controller
             'description' => $validated['description'] ?? null,
             'exercice_id' => $targetPao->exercice_id,
         ]);
-        $pta->save();
+        $pta->forceFill(['statut' => $statut])->save();
+        app(PlanningModificationLockService::class)->lockAfterSave($pta, $user);
 
         $this->recordAudit($request, 'pta', 'update', $pta, $before, $pta->toArray());
 
@@ -252,9 +268,9 @@ class PtaController extends Controller
             (int) $pta->service_id
         );
 
-        if ($pta->statut === 'verrouille') {
+        if ($pta->statut === Pta::STATUS_ARCHIVE) {
             return response()->json([
-                'message' => $this->lockedStateMessage('PTA', 'etre supprime'),
+                'message' => 'Impossible de supprimer directement un PTA archive.',
             ], 409);
         }
 

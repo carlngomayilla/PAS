@@ -20,6 +20,8 @@ use App\Services\Actions\ActionTrackingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\PlanningModificationLockService;
+use App\Services\PlanningClosureReportService;
 use App\Services\Security\SecureJustificatifStorage;
 use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
@@ -33,7 +35,7 @@ use Illuminate\View\View;
  * Contrôleur des PTA — Plan de Travail Annuel.
  *
  * Un PTA est le plan d'un service pour une année donnée. Il est rattaché à un PAO
- * et contient les actions à réaliser. Il suit un workflow : brouillon → soumis → validé → verrouillé.
+ * et contient les actions à réaliser. Il suit le cycle : en cours -> cloture -> archive.
  */
 class PtaWebController extends Controller
 {
@@ -50,6 +52,9 @@ class PtaWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        if ($user->isAgent()) {
+            abort(403, 'Acces non autorise.');
+        }
 
         $query = Pta::query();
 
@@ -74,11 +79,7 @@ class PtaWebController extends Controller
         );
         $statusFilter = trim((string) $request->string('statut'));
         if ($statusFilter !== '') {
-            if ($statusFilter === 'valide_ou_verrouille') {
-                $query->whereIn('statut', ['valide', 'verrouille']);
-            } else {
-                $query->where('statut', $statusFilter);
-            }
+            $query->where('statut', $statusFilter);
         }
         $query->when(
             $request->boolean('without_action'),
@@ -101,8 +102,9 @@ class PtaWebController extends Controller
         $ptaIdsSubquery = (clone $statsBase)->select('id');
         $ptaStats = [
             'total'          => (int) $byStatus->sum(),
-            'actifs'         => (int) (($byStatus['valide'] ?? 0) + ($byStatus['verrouille'] ?? 0)),
-            'brouillons'     => (int) ($byStatus['brouillon'] ?? 0),
+            'en_cours'       => (int) ($byStatus[Pta::STATUS_EN_COURS] ?? 0),
+            'clotures'       => (int) ($byStatus[Pta::STATUS_CLOTURE] ?? 0),
+            'archives'       => (int) ($byStatus[Pta::STATUS_ARCHIVE] ?? 0),
             'sans_action'    => (clone $statsBase)->doesntHave('actions')->count(),
             'actions_total'  => DB::table('actions')->whereIn('pta_id', $ptaIdsSubquery)->count(),
             'services'       => (clone $statsBase)->distinct()->count('service_id'),
@@ -132,7 +134,7 @@ class PtaWebController extends Controller
             'objectifOperationnelOptions' => $this->objectifOperationnelOptions($user),
             'paoOptions' => $this->paoOptions($user),
             'serviceOptions' => $this->serviceOptions($user),
-            'statusOptions' => array_merge($this->statusOptions($user), ['valide_ou_verrouille']),
+            'statusOptions' => $this->statusOptions($user),
             'canWrite' => $this->canWrite($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
@@ -200,7 +202,7 @@ class PtaWebController extends Controller
         $pao = $objectifOperationnel->pao;
         $serviceId = (int) $objectifOperationnel->service_id;
 
-        $statut = 'brouillon';
+        $statut = 'en_cours';
 
         $this->denyUnlessManagePta(
             $user,
@@ -219,10 +221,16 @@ class PtaWebController extends Controller
         ];
 
         $existingPta = $this->findServiceYearPta($serviceId, $pao);
-        if ($existingPta instanceof Pta && $existingPta->statut === 'verrouille') {
+        if ($existingPta instanceof Pta && $existingPta->statut === Pta::STATUS_ARCHIVE) {
             return back()->withErrors([
-                'service_id' => 'Le PTA annuel de ce service est verrouille. Il doit etre rouvre avant ajout ou modification d actions.',
+                'service_id' => 'Le PTA annuel de ce service est archive. Il ne peut plus recevoir d actions.',
             ])->withInput();
+        }
+        $lockService = app(PlanningModificationLockService::class);
+        if ($existingPta instanceof Pta) {
+            if ($message = $lockService->ensureUnlocked($existingPta, $user)) {
+                return back()->withInput()->withErrors(['general' => $message]);
+            }
         }
 
         $before = $existingPta?->toArray();
@@ -235,11 +243,14 @@ class PtaWebController extends Controller
             $payload['exercice_id'] = $existingPta->exercice_id;
             $payload['titre'] = (string) ($existingPta->titre ?: $payload['titre']);
         }
+        $currentStatus = in_array((string) $existingPta?->statut, [Pta::STATUS_CLOTURE, Pta::STATUS_ARCHIVE], true)
+            ? (string) $existingPta->statut
+            : $statut;
         $pta->fill($payload);
         // statut / valide_* ne sont plus mass-assignables (defense en profondeur
         // contre l'escalade de privileges). On les positionne via forceFill.
         $pta->forceFill([
-            'statut' => $existingPta?->statut ?: $statut,
+            'statut' => $currentStatus,
             'valide_le' => $existingPta?->valide_le,
             'valide_par' => $existingPta?->valide_par,
         ])->save();
@@ -250,6 +261,7 @@ class PtaWebController extends Controller
             $this->withUploadedActionFiles((array) ($validated['actions'] ?? []), $request),
             $user
         );
+        $lockService->lockAfterSave($pta, $user);
 
         $after = array_merge($pta->toArray(), [
             'actions_enregistrees' => collect($savedActions)->pluck('id')->all(),
@@ -292,7 +304,7 @@ class PtaWebController extends Controller
         $pta->loadMissing([
             'actions.responsables:id,name,email',
             'actions.sousActions:id,action_id,agent_id,libelle,description,resultat_attendu,cible_prevue,unite,commentaire,date_debut,date_fin,statut,est_effectuee',
-            'actions:id,pta_id,pao_id,objectif_operationnel_id,mode_evaluation,libelle,description,date_debut,date_fin,statut,priorite,intitule_cible,unite_cible,quantite_cible,seuil_minimum,seuil_mode,seuil_t1,seuil_t2,seuil_t3,seuil_t4,methode_calcul,justificatif_obligatoire,echeance_cible,resultat_attendu,observations,montant_estime,nature_financement,source_financement,commentaire_financement,justificatif_financement_path,ressources_necessaires,ressources_details,ressource_main_oeuvre,ressource_equipement,ressource_partenariat,ressource_autres,ressource_autres_details,risque_potentiel,niveau_risque,mesures_preventives,financement_requis,financement_statut,financement_soumis_le,financement_notifie_le,responsable_id',
+                'actions:id,pta_id,pao_id,objectif_operationnel_id,mode_evaluation,libelle,description,date_debut,date_fin,statut,priorite,intitule_cible,unite_cible,quantite_cible,seuil_minimum,seuil_mode,seuil_t1,seuil_t2,seuil_t3,seuil_t4,methode_calcul,justificatif_obligatoire,echeance_cible,resultat_attendu,observations,montant_estime,nature_financement,source_financement,commentaire_financement,justificatif_financement_path,ressources_necessaires,ressources_details,ressource_main_oeuvre,ressource_equipement,ressource_partenariat,ressource_autres,ressource_autres_details,risque_potentiel,niveau_risque,mesures_preventives,financement_requis,financement_statut,financement_soumis_le,financement_notifie_le,responsable_id,nombre_sous_actions_prevu,statut_parametrage,modification_locked_at,modification_unlocked_at,modification_unlock_expires_at',
         ]);
 
         return view('workspace.pta.form', [
@@ -313,8 +325,12 @@ class PtaWebController extends Controller
             abort(401);
         }
 
-        if ($pta->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedStateMessage('PTA', 'plus etre modifie')]);
+        if ($pta->statut === Pta::STATUS_ARCHIVE) {
+            return back()->withErrors(['general' => 'Impossible de modifier un PTA archive.']);
+        }
+        $lockService = app(PlanningModificationLockService::class);
+        if ($message = $lockService->ensureUnlocked($pta, $user)) {
+            return back()->withErrors(['general' => $message]);
         }
 
         $validated = $request->validated();
@@ -322,7 +338,9 @@ class PtaWebController extends Controller
         $targetPao = $objectifOperationnel->pao;
         $targetServiceId = (int) $objectifOperationnel->service_id;
 
-        $statut = (string) ($pta->statut ?: 'brouillon');
+        $statut = in_array((string) $pta->statut, [Pta::STATUS_CLOTURE, Pta::STATUS_ARCHIVE], true)
+            ? (string) $pta->statut
+            : Pta::STATUS_EN_COURS;
 
         $this->denyUnlessManagePta(
             $user,
@@ -364,6 +382,7 @@ class PtaWebController extends Controller
             $this->withUploadedActionFiles((array) ($validated['actions'] ?? []), $request),
             $user
         );
+        $lockService->lockAfterSave($pta->refresh(), $user);
 
         $after = array_merge($pta->toArray(), [
             'actions_enregistrees' => collect($savedActions)->pluck('id')->all(),
@@ -376,7 +395,7 @@ class PtaWebController extends Controller
             ->with('success', $this->entityUpdatedMessage(UiLabel::object('pta')));
     }
 
-    /** Supprime un PTA (uniquement si en brouillon et sans actions associées). */
+    /** Supprime un PTA si aucun impact metier ne bloque l'operation. */
     public function destroy(Request $request, Pta $pta): RedirectResponse
     {
         $user = $request->user();
@@ -384,8 +403,8 @@ class PtaWebController extends Controller
             abort(401);
         }
 
-        if ($pta->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedStateMessage('PTA', 'etre supprime')]);
+        if ($pta->statut === Pta::STATUS_ARCHIVE) {
+            return back()->withErrors(['general' => 'Impossible de supprimer directement un PTA archive.']);
         }
 
         $this->denyUnlessManagePta(
@@ -394,209 +413,239 @@ class PtaWebController extends Controller
             (int) $pta->service_id
         );
 
-        $before = $pta->toArray();
-        $pta->delete();
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+        $deletionRequests = app(\App\Services\DeletionRequestService::class);
+        // Super Admin et DG peuvent supprimer directement avec cascade (Actions et
+        // sous-actions). Les autres roles passent par le workflow de demande validee.
+        $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
+        if (! $canDeleteDirectly) {
+            $deletionRequest = $deletionRequests->requestBusinessDeletion($pta, $user, (string) $validated['motif'], 'pta');
+            $this->recordAudit($request, 'pta', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
 
-        $this->recordAudit($request, 'pta', 'delete', $pta, $before, null);
+            return redirect()
+                ->route('workspace.pta.index')
+                ->with('success', 'Demande de suppression PTA transmise au Super Admin.');
+        }
+
+        $before = $pta->toArray();
+        $impact = $deletionRequests->impactForEntity($pta);
+        $deletionRequests->deleteBusinessTarget($pta);
+
+        $this->recordAudit($request, 'pta', 'delete', $pta, [
+            ...$before,
+            'deletion_reason' => (string) $validated['motif'],
+            'impact' => $impact,
+        ], null);
 
         return redirect()
             ->route('workspace.pta.index')
             ->with('success', $this->entityDeletedMessage(UiLabel::object('pta')));
     }
 
-    /** Soumet le PTA pour validation par le chef de direction. */
-    public function submit(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
+    /**
+     * Sauvegarde inline d'une seule action via AJAX depuis le formulaire PTA.
+     *
+     * Le frontend envoie le payload d'UNE action (sans le prefixe `actions[0]`).
+     * On encapsule dans un tableau a un element pour reutiliser syncPtaActions(),
+     * puis on retourne JSON avec l'id (re)cree et eventuels erreurs de validation.
+     */
+    public function upsertActionInline(Request $request, Pta $pta): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
-            abort(401);
+            return response()->json(['ok' => false, 'message' => 'Non authentifie.'], 401);
         }
 
-        if ($pta->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedStateMessage('PTA', 'etre soumis')]);
-        }
-
-        if ($pta->statut !== 'brouillon') {
-            return back()->withErrors(['general' => $this->requiredStateMessage('PTA', 'brouillon', 'soumis')]);
+        if ($pta->statut === Pta::STATUS_ARCHIVE) {
+            return response()->json(['ok' => false, 'message' => 'Impossible de modifier un PTA archive.'], 422);
         }
 
         $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
-        $workflow = $this->planningWorkflowSummary();
-        if (! $workflow['submit_enabled']) {
-            return back()->withErrors(['general' => 'La soumission est desactivee pour le workflow PTA actif.']);
+
+        $lockService = app(PlanningModificationLockService::class);
+        if ($message = $lockService->ensureUnlocked($pta, $user)) {
+            return response()->json(['ok' => false, 'message' => $message], 422);
         }
 
-        $before = $pta->toArray();
-        $targetStatus = (string) $workflow['submit_target_status'];
-        $pta->forceFill([
-            'statut' => $targetStatus,
-            'valide_le' => in_array($targetStatus, ['valide', 'verrouille'], true) ? now() : null,
-            'valide_par' => in_array($targetStatus, ['valide', 'verrouille'], true) ? $user->id : null,
-        ])->save();
-
-        $this->recordAudit($request, 'pta', 'submit', $pta, $before, $pta->toArray());
-        $notificationService->notifyPtaStatus($pta, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
-        if ($targetStatus === 'soumis') {
-            $notificationService->notifyPtaSubmittedForValidation($pta, $user);
-        } else {
-            $notificationService->notifyPtaReviewedByDirection($pta, true, $user);
+        try {
+            $validated = $request->validate([
+                'id' => ['nullable', 'integer', 'exists:actions,id'],
+                'libelle' => ['required', 'string', 'max:255'],
+                'description' => ['nullable', 'string'],
+                'resultat_attendu' => ['nullable', 'string'],
+                'date_debut' => ['required', 'date', 'date_format:Y-m-d'],
+                'date_fin' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_debut'],
+                'mode_evaluation' => ['required', \Illuminate\Validation\Rule::in([
+                    Action::MODE_SOUS_ACTIONS,
+                    Action::MODE_QUANTITATIF,
+                    Action::MODE_SANS_QUANTITE,
+                    Action::MODE_MIXTE,
+                ])],
+                'rmo_ids' => ['required', 'array', 'min:1'],
+                'rmo_ids.*' => ['integer', 'exists:users,id'],
+                'quantite_cible' => ['nullable', 'numeric', 'min:0.0001'],
+                'unite_cible' => ['nullable', 'string', 'max:100'],
+                'seuil_mode' => ['nullable', \Illuminate\Validation\Rule::in(['unique', 'trimestriel'])],
+                'seuil_minimum' => ['nullable', 'numeric', 'min:0', 'max:100'],
+                'justificatif_obligatoire' => ['nullable', 'boolean'],
+                'financement_requis' => ['nullable', 'boolean'],
+                'montant_estime' => ['nullable', 'numeric', 'min:0'],
+                'nature_financement' => ['nullable', 'string', 'max:255'],
+                'ressources_necessaires' => ['nullable', 'array'],
+                'ressources_necessaires.*' => ['string', 'max:255'],
+                'sous_actions' => ['nullable', 'array'],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Donnees invalides.',
+                'errors' => $e->errors(),
+            ], 422);
         }
 
-        return redirect()
-            ->route('workspace.pta.index')
-            ->with('success', $targetStatus === 'soumis'
-                ? 'PTA soumis pour validation.'
-                : 'PTA valide directement selon le workflow configure.');
+        try {
+            $objectifOperationnel = $pta->objectifOperationnel;
+            if (! $objectifOperationnel instanceof ObjectifOperationnel) {
+                return response()->json(['ok' => false, 'message' => 'PTA sans objectif operationnel rattache.'], 422);
+            }
+
+            $saved = $this->syncPtaActions($pta, $objectifOperationnel, [$validated], $user);
+            $action = $saved[0] ?? null;
+
+            if (! $action instanceof Action) {
+                return response()->json(['ok' => false, 'message' => 'Echec de la sauvegarde.'], 500);
+            }
+
+            // Recharger les sous-actions dans l'ordre (id ASC) pour que le front
+            // puisse les associer 1:1 aux blocs DOM par index — indispensable pour
+            // mettre a jour les inputs cachés sous_actions[N][id] et eviter les
+            // doublons aux saves suivants.
+            $action->refresh();
+            $subActionIds = $action->sousActions()->orderBy('id')->pluck('id')->all();
+
+            return response()->json([
+                'ok' => true,
+                'message' => $validated['id'] ?? null ? 'Action mise a jour.' : 'Action creee.',
+                'action' => [
+                    'id' => $action->id,
+                    'code' => $action->code,
+                    'libelle' => $action->libelle,
+                    'sous_action_ids' => $subActionIds,
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Donnees invalides.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Erreur serveur : '.$e->getMessage(),
+            ], 500);
+        }
     }
 
-    /** Valide un PTA soumis (rôle direction ou admin). */
-    public function approve(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
+    public function close(Request $request, Pta $pta, PlanningClosureReportService $closureReportService): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
         }
 
-        if (! $this->canApprove($user, $pta)) {
-            abort(403, 'Acces non autorise.');
-        }
+        $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
 
-        $workflow = $this->planningWorkflowSummary();
-        if (! $workflow['approve_enabled']) {
-            return back()->withErrors(['general' => 'La validation intermediaire est desactivee pour le workflow PTA actif.']);
-        }
-
-        if ($pta->statut !== 'soumis') {
-            return back()->withErrors(['general' => $this->requiredStateMessage('PTA', 'soumis', 'valide')]);
-        }
-
-        $before = $pta->toArray();
-        $pta->forceFill([
-            'statut' => 'valide',
-            'valide_le' => now(),
-            'valide_par' => $user->id,
-        ])->save();
-
-        $this->recordAudit($request, 'pta', 'approve', $pta, $before, $pta->toArray());
-        $notificationService->notifyPtaStatus($pta, 'approved', $user);
-        $notificationService->notifyPtaReviewedByDirection($pta, true, $user);
-
-        return redirect()
-            ->route('workspace.pta.index')
-            ->with('success', $this->transitionedStateMessage('PTA', 'valide'));
-    }
-
-    /** Verrouille un PTA validé : il passe en lecture seule, plus aucune modification possible. */
-    public function lock(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $this->canLock($user)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        $workflow = $this->planningWorkflowSummary();
-        if (! $workflow['lock_enabled']) {
-            return back()->withErrors(['general' => 'Le verrouillage final est desactive pour le workflow PTA actif.']);
-        }
-
-        if ($pta->statut !== 'valide') {
-            return back()->withErrors(['general' => $this->requiredStateMessage('PTA', 'valide', 'verrouille')]);
-        }
-
-        $before = $pta->toArray();
-        $pta->forceFill([
-            'statut' => 'verrouille',
-            'valide_le' => now(),
-            'valide_par' => $user->id,
-        ])->save();
-
-        $this->recordAudit($request, 'pta', 'lock', $pta, $before, $pta->toArray());
-        $notificationService->notifyPtaStatus($pta, 'locked', $user);
-
-        return redirect()
-            ->route('workspace.pta.index')
-            ->with('success', $this->transitionedStateMessage('PTA', 'verrouille'));
-    }
-
-    /** Retourne un PTA en brouillon avec un motif obligatoire (correction avant re-soumission). */
-    public function reopen(Request $request, Pta $pta, WorkspaceNotificationService $notificationService): RedirectResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if ($pta->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedCannotBeReopenedMessage('PTA')]);
-        }
-
-        $workflow = $this->planningWorkflowSummary();
-        $allowedStatuses = $workflow['reopen_allowed_statuses'];
-
-        if (! in_array($pta->statut, $allowedStatuses, true)) {
-            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage($allowedStatuses)]);
-        }
-
-        if ($pta->statut === 'soumis'
-            && ! ($this->canApprove($user, $pta) || $this->canManagePta($user, (int) $pta->direction_id, (int) $pta->service_id))
-        ) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if ($pta->statut === 'valide'
-            && $workflow['approve_enabled']
-            && ! $this->canApprove($user, $pta)
-        ) {
-            abort(403, 'Acces non autorise.');
+        if ((string) $pta->statut === Pta::STATUS_ARCHIVE) {
+            return back()->withErrors(['general' => 'Impossible de cloturer un PTA archive.']);
         }
 
         $validated = $request->validate([
-            'motif_retour' => ['required', 'string', 'min:5', 'max:2000'],
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+            'force_close' => ['nullable', 'boolean'],
         ]);
 
-        $motifRetour = trim((string) $validated['motif_retour']);
+        $report = $closureReportService->forPta($pta);
+        $forceClose = $request->boolean('force_close');
+
+        if ($closureReportService->hasAnomalies($report) && ! $forceClose) {
+            return back()
+                ->withInput()
+                ->with('closure_report', $report)
+                ->withErrors(['general' => $this->closureReportErrorMessage($report)]);
+        }
 
         $before = $pta->toArray();
         $pta->forceFill([
-            'statut' => 'brouillon',
-            'valide_le' => null,
-            'valide_par' => null,
+            'statut' => Pta::STATUS_CLOTURE,
+            'valide_le' => now(),
+            'valide_par' => $user->id,
         ])->save();
 
-        $after = array_merge($pta->toArray(), ['motif_retour' => $motifRetour]);
-        $this->recordAudit($request, 'pta', 'reopen', $pta, $before, $after);
-        $notificationService->notifyPtaStatus($pta, 'reopened', $user);
-        $notificationService->notifyPtaReviewedByDirection($pta, false, $user);
+        $this->recordAudit($request, 'pta', 'close', $pta, $before, [
+            ...$pta->toArray(),
+            'motif' => (string) $validated['motif'],
+            'closure_report' => $report,
+            'forced_with_anomalies' => $forceClose,
+        ]);
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', $this->reopenedStateMessage('PTA'));
+            ->with('success', 'PTA cloture avec rapport d anomalies trace.');
+    }
+
+    public function archive(Request $request, Pta $pta): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
+
+        if ((string) $pta->statut !== Pta::STATUS_CLOTURE) {
+            return back()->withErrors(['general' => 'Le PTA doit etre cloture avant archivage.']);
+        }
+
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $before = $pta->toArray();
+        $pta->forceFill([
+            'statut' => Pta::STATUS_ARCHIVE,
+            'valide_le' => now(),
+            'valide_par' => $user->id,
+        ])->save();
+
+        $this->recordAudit($request, 'pta', 'archive', $pta, $before, [
+            ...$pta->toArray(),
+            'motif' => (string) $validated['motif'],
+        ]);
+
+        return redirect()
+            ->route('workspace.pta.index')
+            ->with('success', 'PTA archive.');
     }
 
     private function canWrite(User $user): bool
     {
         return $user->hasGlobalWriteAccess()
-            || $user->hasRole(User::ROLE_SERVICE);
+            || $user->hasPermission('planning.write.service');
     }
 
-    private function canApprove(User $user, Pta $pta): bool
+    /**
+     * @param array<string, mixed> $report
+     */
+    private function closureReportErrorMessage(array $report): string
     {
-        if ($user->hasGlobalWriteAccess()) {
-            return true;
-        }
+        $labels = collect($report['issues'] ?? [])
+            ->map(fn (array $issue): string => $issue['label'].' ('.$issue['count'].')')
+            ->implode(', ');
 
-        return $user->hasRole(User::ROLE_DIRECTION)
-            && $user->direction_id !== null
-            && (int) $user->direction_id === (int) $pta->direction_id;
-    }
-
-    private function canLock(User $user): bool
-    {
-        return $user->hasGlobalWriteAccess();
+        return 'Rapport d anomalies obligatoire : '.$labels.'. Ajoutez une justification et cochez la cloture avec anomalies pour continuer.';
     }
 
     /**
@@ -609,7 +658,7 @@ class PtaWebController extends Controller
             ->where('module', 'pta')
             ->where('entite_type', $pta::class)
             ->where('entite_id', (int) $pta->id)
-            ->whereIn('action', ['create', 'submit', 'approve', 'lock', 'reopen', 'update'])
+            ->whereIn('action', ['create', 'update', 'close', 'archive'])
             ->orderByDesc('id')
             ->limit(50)
             ->get()
@@ -631,10 +680,8 @@ class PtaWebController extends Controller
 
                 $label = match ($log->action) {
                     'create' => 'Creation',
-                    'submit' => 'Soumission',
-                    'approve' => 'Validation',
-                    'lock' => 'Verrouillage',
-                    'reopen' => 'Retour brouillon',
+                    'close' => 'Cloture',
+                    'archive' => 'Archivage',
                     'update' => 'Changement statut',
                     default => ucfirst((string) $log->action),
                 };
@@ -680,6 +727,7 @@ class PtaWebController extends Controller
         $trackingService = app(ActionTrackingService::class);
         $secureStorage = app(SecureJustificatifStorage::class);
         $notificationService = app(WorkspaceNotificationService::class);
+        $lockService = app(PlanningModificationLockService::class);
 
         foreach ($actionsPayload as $actionPayload) {
             if (! is_array($actionPayload)) {
@@ -709,6 +757,24 @@ class PtaWebController extends Controller
                     ->where('pta_id', (int) $pta->id)
                     ->firstOrFail();
 
+            if (! $isNewAction) {
+                // ensureUnlocked tient compte du role (SA/DG bypassent automatiquement).
+                if ($message = $lockService->ensureUnlocked($action, $actor)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'actions' => $message,
+                    ]);
+                }
+            }
+
+            // Capture du statut_parametrage AVANT save pour detecter la transition
+            // a_parametrer → parametre. Regle metier ANBG (2026-05-29) : les actions
+            // ne partent au RMO que LORSQU'ELLES SONT EFFECTIVEMENT PARAMETREES ET
+            // ENREGISTREES, pas a l'import. La notification est donc declenchee soit :
+            //  - sur une action nouvelle creee directement (isNewAction = true), soit
+            //  - sur une action existante qui passe de 'a_parametrer' a 'parametre'.
+            $wasUnparametre = ! $isNewAction
+                && (string) ($action->getOriginal('statut_parametrage') ?? '') === 'a_parametrer';
+
             $payload = $this->normalizePtaActionPayload($actionPayload, $pta, $objectifOperationnel, $rmoIds, $isNewAction, $action);
             // forceFill : le payload est integralement construit par normalizePtaActionPayload
             // (entrees utilisateur deja filtrees) et contient des champs workflow/calculs
@@ -718,12 +784,20 @@ class PtaWebController extends Controller
             $this->syncActionRmos($action, $rmoIds);
             $this->syncPlannedSubActions($action, $actionPayload, $rmoIds);
 
+            $becameParametre = (string) ($action->statut_parametrage ?? '') === 'parametre';
+
             if ($isNewAction) {
                 $trackingService->initializeActionTracking($action, $actor);
-                $notificationService->notifyActionAssigned($action, $actor);
+                if ($becameParametre) {
+                    $notificationService->notifyActionAssigned($action, $actor);
+                }
             } else {
                 $trackingService->regenerateWeeks($action);
                 $trackingService->refreshActionMetrics($action);
+                // Notification au(x) RMO uniquement a la PREMIERE bascule parametrage.
+                if ($wasUnparametre && $becameParametre) {
+                    $notificationService->notifyActionAssigned($action, $actor);
+                }
             }
 
             if ((bool) $action->financement_requis) {
@@ -759,10 +833,42 @@ class PtaWebController extends Controller
                 ])->save();
             }
 
+            $lockService->lockAfterSave($action->refresh(), $actor);
+
             $savedActions[] = $action;
         }
 
+        // Transition automatique BROUILLON → EN_COURS : si le PTA est en
+        // brouillon ET que toutes ses actions ont statut_parametrage = 'parametre'
+        // (i.e. plus aucune action a parametrer), il passe en cours.
+        $this->maybePromoteBrouillonToEnCours($pta);
+
         return $savedActions;
+    }
+
+    /**
+     * Si le PTA est en BROUILLON et que toutes ses actions ont ete parametrees
+     * (statut_parametrage = 'parametre'), bascule automatiquement en EN_COURS.
+     * Reflete la regle metier : le PTA est "enregistre" quand le chef de service
+     * a termine de parametrer chaque action une par une.
+     */
+    private function maybePromoteBrouillonToEnCours(Pta $pta): void
+    {
+        if ($pta->statut !== Pta::STATUS_BROUILLON) {
+            return;
+        }
+
+        $pendingActionsCount = Action::query()
+            ->where('pta_id', $pta->id)
+            ->where('statut_parametrage', 'a_parametrer')
+            ->count();
+
+        if ($pendingActionsCount > 0) {
+            return;
+        }
+
+        // Toutes les actions sont parametrees → le PTA est officiellement enregistre.
+        $pta->forceFill(['statut' => Pta::STATUS_EN_COURS])->save();
     }
 
     /**
@@ -813,11 +919,15 @@ class PtaWebController extends Controller
         $quantiteCible = $actionPayload['quantite_cible'] ?? null;
         $quantiteCible = ($quantiteCible === '' || $quantiteCible === null) ? null : $quantiteCible;
         $modeEvaluation = trim((string) ($actionPayload['mode_evaluation'] ?? ''));
-        if (! in_array($modeEvaluation, [Action::MODE_QUANTITATIF, Action::MODE_SOUS_ACTIONS, Action::MODE_MIXTE], true)) {
+        if ($modeEvaluation === Action::MODE_MIXTE) {
             $modeEvaluation = filled($quantiteCible) ? Action::MODE_QUANTITATIF : Action::MODE_SOUS_ACTIONS;
         }
-        if (! filled($quantiteCible) && ! in_array($modeEvaluation, [Action::MODE_QUANTITATIF, Action::MODE_MIXTE], true)) {
-            $modeEvaluation = Action::MODE_SOUS_ACTIONS;
+        if (! in_array($modeEvaluation, [
+            Action::MODE_QUANTITATIF,
+            Action::MODE_SANS_QUANTITE,
+            Action::MODE_SOUS_ACTIONS,
+        ], true)) {
+            $modeEvaluation = filled($quantiteCible) ? Action::MODE_QUANTITATIF : Action::MODE_SANS_QUANTITE;
         }
 
         $montantEstime = $actionPayload['montant_estime'] ?? null;
@@ -846,13 +956,11 @@ class PtaWebController extends Controller
             ?? ''
         ))) !== '' ? $value : null;
         $natureFinancement = ($value = trim((string) ($actionPayload['nature_financement'] ?? ''))) !== '' ? $value : null;
-        $sourceFinancement = ($value = trim((string) ($actionPayload['source_financement'] ?? ''))) !== '' ? $value : null;
-        $commentaireFinancement = ($value = trim((string) ($actionPayload['commentaire_financement'] ?? ''))) !== '' ? $value : null;
         $dateFin = $actionPayload['date_fin']
             ?? optional($existingAction?->date_fin)->format('Y-m-d')
             ?? optional($objectifOperationnel->echeance)->format('Y-m-d')
             ?? ($actionPayload['date_debut'] ?? null);
-        $isQuantitative = in_array($modeEvaluation, [Action::MODE_QUANTITATIF, Action::MODE_MIXTE], true);
+        $isQuantitative = $modeEvaluation === Action::MODE_QUANTITATIF;
         $actionPaoId = $isNewAction
             ? (int) $objectifOperationnel->pao_id
             : (int) ($existingAction?->pao_id ?: $objectifOperationnel->pao_id);
@@ -892,7 +1000,11 @@ class PtaWebController extends Controller
             'seuil_t2' => $this->nullableFloat($actionPayload['seuil_t2'] ?? $existingAction?->seuil_t2 ?? null),
             'seuil_t3' => $this->nullableFloat($actionPayload['seuil_t3'] ?? $existingAction?->seuil_t3 ?? null),
             'seuil_t4' => $this->nullableFloat($actionPayload['seuil_t4'] ?? $existingAction?->seuil_t4 ?? null),
-            'methode_calcul' => 'sum_sous_actions',
+            'methode_calcul' => match ($modeEvaluation) {
+                Action::MODE_QUANTITATIF => 'cumulative_quantity',
+                Action::MODE_SANS_QUANTITE => 'binary_completion',
+                default => 'sum_sous_actions',
+            },
             'justificatif_obligatoire' => filter_var($actionPayload['justificatif_obligatoire'] ?? $existingAction?->justificatif_obligatoire ?? false, FILTER_VALIDATE_BOOL),
             'echeance_cible' => $existingAction?->echeance_cible,
             'resultat_attendu' => ($value = trim((string) ($actionPayload['resultat_attendu'] ?? ''))) !== ''
@@ -907,6 +1019,7 @@ class PtaWebController extends Controller
             'origine_action' => Action::ORIGIN_PTA,
             'statut' => $status,
             'statut_dynamique' => $dynamicStatus,
+            'statut_parametrage' => 'parametre',
             'montant_estime' => $financementRequis ? $montantEstime : null,
             'financement_requis' => $financementRequis,
             'ressources_necessaires' => $selectedResources,
@@ -924,8 +1037,8 @@ class PtaWebController extends Controller
             'mesures_preventives' => $preventiveMeasures,
             'nature_financement' => $financementRequis ? $natureFinancement : null,
             'description_financement' => $financementRequis ? $natureFinancement : null,
-            'source_financement' => $financementRequis ? $sourceFinancement : null,
-            'commentaire_financement' => $financementRequis ? $commentaireFinancement : null,
+            'source_financement' => null,
+            'commentaire_financement' => null,
         ];
 
         if (! $financementRequis) {
@@ -933,9 +1046,9 @@ class PtaWebController extends Controller
             $payload['financement_soumis_le'] = null;
             $payload['financement_notifie_le'] = null;
         } elseif ($isNewAction) {
-            $payload['financement_statut'] = Action::FINANCEMENT_EN_ATTENTE_DAF;
-            $payload['financement_soumis_le'] = now();
-            $payload['financement_notifie_le'] = null;
+            $payload['financement_statut'] = Action::FINANCEMENT_PRE_SIGNALE_DAF;
+            $payload['financement_soumis_le'] = null;
+            $payload['financement_notifie_le'] = now();
         }
 
         if ($isNewAction) {
@@ -966,6 +1079,26 @@ class PtaWebController extends Controller
         if (! is_numeric($defaultAgentId) || (int) $defaultAgentId <= 0) {
             return;
         }
+
+        // Etape 1 — Determiner les ids preserves (ceux presents dans le payload).
+        // Toute sous-action existante dont l'id n'est PAS dans le payload sera
+        // supprimee : cela couvre le cas du save inline AJAX repete (sans cet
+        // appel, chaque save creait des doublons).
+        $preservedIds = [];
+        foreach ($subActionsPayload as $subActionPayload) {
+            if (! is_array($subActionPayload)) {
+                continue;
+            }
+            if (isset($subActionPayload['id']) && is_numeric($subActionPayload['id']) && (int) $subActionPayload['id'] > 0) {
+                $preservedIds[] = (int) $subActionPayload['id'];
+            }
+        }
+
+        $obsoleteQuery = SousAction::query()->where('action_id', (int) $action->id);
+        if ($preservedIds !== []) {
+            $obsoleteQuery->whereNotIn('id', $preservedIds);
+        }
+        $obsoleteQuery->delete();
 
         foreach ($subActionsPayload as $subActionIndex => $subActionPayload) {
             if (! is_array($subActionPayload)) {
@@ -1008,7 +1141,7 @@ class PtaWebController extends Controller
                 'quantite_realisee' => 0,
                 'resultat_obtenu' => null,
                 'taux_realisation' => 0,
-                'statut' => 'a_faire',
+                'statut' => 'non_demarre',
                 'est_effectuee' => false,
                 'taux_execution' => 0,
             ]);
@@ -1095,16 +1228,8 @@ class PtaWebController extends Controller
             $query->where('direction_id', (int) $user->direction_id);
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->where(function ($scopedQuery) use ($user, $forceObjectifId): void {
-                $scopedQuery->where('service_id', (int) $user->service_id);
-
-                if ($forceObjectifId !== null) {
-                    $scopedQuery->orWhere('id', $forceObjectifId);
-                }
-            });
-        } elseif ($forceObjectifId !== null) {
-            $query->orWhere('id', $forceObjectifId);
+        if ($this->hasOwnServicePlanningScope($user)) {
+            $query->where('service_id', (int) $user->service_id);
         }
 
         return $query->get([
@@ -1152,7 +1277,6 @@ class PtaWebController extends Controller
         app(ExerciceContext::class)->applyToPao($query);
 
         return $query
-            ->whereNotNull('service_id')
             ->get(['id', 'pas_id', 'direction_id', 'service_id', 'pas_objectif_id', 'annee', 'titre', 'objectif_operationnel']);
     }
 
@@ -1178,7 +1302,7 @@ class PtaWebController extends Controller
             $query->where('direction_id', (int) $user->direction_id);
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
+        if ($this->hasOwnServicePlanningScope($user)) {
             $query->where('id', (int) $user->service_id);
         }
 
@@ -1199,7 +1323,7 @@ class PtaWebController extends Controller
             $query->where('direction_id', (int) $user->direction_id);
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
+        if ($this->hasOwnServicePlanningScope($user)) {
             $query->where('service_id', (int) $user->service_id);
         }
 

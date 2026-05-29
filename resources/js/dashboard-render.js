@@ -1390,10 +1390,10 @@ function bootDashboardRender(force = false) {
 
   function mountMonthlyKpiLine(hostId = 'dashboard-kpi-line-chart', rows = monthly, period = 0) {
     const filtered = filterByPeriod(rows, period);
+    // KPI "Conformité" retire (2026-05-28) du graphique mensuel KPI.
     const kpiDatasets = [
       { label: 'Délai',       key: 'delai',       color: '#3996D3' },
       { label: 'Performance', key: 'performance', color: '#16A34A' },
-      { label: 'Conformité',  key: 'conformite',  color: '#D97706' },
       { label: 'Global',      key: 'global',      color: '#7C3AED' },
     ];
 
@@ -1454,10 +1454,10 @@ function bootDashboardRender(force = false) {
   function mountKpiGaugeSet(prefix, scores, official = true) {
     const actionsIndexUrl = payload.actions_index_url || '/workspace/actions';
     const officialFilters = isObject(payload.official_action_filters) ? payload.official_action_filters : {};
+    // Jauge "Conformité" retiree (2026-05-28) : seuls delai et performance restent.
     const definitions = [
       ['delai', 'Délai'],
       ['performance', 'Performance'],
-      ['conformite', 'Conformité'],
     ];
 
     definitions.forEach(([key, label]) => {

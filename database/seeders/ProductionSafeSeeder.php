@@ -16,6 +16,7 @@ class ProductionSafeSeeder extends Seeder
     {
         $this->call([
             SyncOrgUsersPreservingPasswordsSeeder::class,
+            FunctionalAdminSeeder::class,
             UniteDgSeeder::class,
             SuperAdminSeeder::class,
             PlatformSettingsSeeder::class,
@@ -29,7 +30,6 @@ class ProductionSafeSeeder extends Seeder
             ActionCalculationSettingsSeeder::class,
             ActionManagementSettingsSeeder::class,
             NotificationPolicySettingsSeeder::class,
-            OperationalActionCoverageSeeder::class,
         ]);
     }
 }

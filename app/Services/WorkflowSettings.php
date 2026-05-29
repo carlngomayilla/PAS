@@ -53,15 +53,15 @@ class WorkflowSettings
             'actions_service_validation_enabled' => '1',
             'actions_direction_validation_enabled' => '0',
             'actions_rejection_comment_required' => '1',
-            'pas_workflow_mode' => 'full',
-            'pao_workflow_mode' => 'full',
-            'pta_workflow_mode' => 'full',
+            'pas_workflow_mode' => 'canonical',
+            'pao_workflow_mode' => 'canonical',
+            'pta_workflow_mode' => 'canonical',
         ];
     }
 
     public function serviceValidationEnabled(): bool
     {
-        return $this->get('actions_service_validation_enabled', '1') === '1';
+        return true;
     }
 
     public function directionValidationEnabled(): bool
@@ -80,17 +80,13 @@ class WorkflowSettings
     public function planningWorkflowModes(): array
     {
         return [
-            'full' => 'Soumission -> Validation -> Verrouillage',
-            'approval_only' => 'Soumission -> Validation',
-            'direct_approval' => 'Validation directe',
+            'canonical' => 'Cycle metier canonique PAS ANBG',
         ];
     }
 
     public function planningWorkflowMode(string $module): string
     {
-        $mode = (string) $this->get($module.'_workflow_mode', 'full');
-
-        return array_key_exists($mode, $this->planningWorkflowModes()) ? $mode : 'full';
+        return 'canonical';
     }
 
     /**
@@ -98,66 +94,50 @@ class WorkflowSettings
      */
     public function planningWorkflowSummary(string $module): array
     {
-        $mode = $this->planningWorkflowMode($module);
+        $statusOptions = match ($module) {
+            'pas' => ['actif', 'cloture', 'archive'],
+            'pao' => ['en_cours', 'valide', 'cloture', 'archive'],
+            'pta' => ['en_cours', 'cloture', 'archive'],
+            default => [],
+        };
 
         return [
             'module' => $module,
-            'mode' => $mode,
-            'mode_label' => $this->planningWorkflowModes()[$mode],
-            'submit_enabled' => true,
-            'approve_enabled' => in_array($mode, ['full', 'approval_only'], true),
-            'lock_enabled' => $mode === 'full',
-            'submit_target_status' => $mode === 'direct_approval' ? 'valide' : 'soumis',
-            'reopen_allowed_statuses' => $mode === 'direct_approval'
-                ? ['valide']
-                : ['soumis', 'valide'],
-            'status_options_global' => match ($mode) {
-                'approval_only' => ['brouillon', 'soumis', 'valide'],
-                'direct_approval' => ['brouillon', 'valide'],
-                default => ['brouillon', 'soumis', 'valide', 'verrouille', 'fin'],
+            'mode' => 'canonical',
+            'mode_label' => $this->planningWorkflowModes()['canonical'],
+            'submit_enabled' => false,
+            'approve_enabled' => false,
+            'lock_enabled' => false,
+            'submit_target_status' => null,
+            'reopen_allowed_statuses' => [],
+            'status_options_global' => $statusOptions,
+            'status_options_writer' => $statusOptions,
+            'chain_label' => match ($module) {
+                'pas' => 'Actif -> Cloture -> Archive',
+                'pao' => 'En cours -> Valide automatiquement -> Cloture -> Archive',
+                'pta' => 'En cours -> Cloture -> Archive',
+                default => 'Cycle canonique',
             },
-            'status_options_writer' => match ($mode) {
-                'direct_approval' => ['brouillon', 'valide'],
-            default => ['brouillon', 'soumis', 'fin'],
-            },
-            'chain_label' => match ($mode) {
-                'approval_only' => 'Brouillon -> Soumis -> Valide',
-                'direct_approval' => 'Brouillon -> Valide',
-                default => 'Brouillon -> Soumis -> Valide -> Verrouille -> Fin',
-            },
-            'submit_button_label' => match ($mode) {
-                'direct_approval' => 'Valider directement',
-                default => 'Soumettre pour validation',
-            },
-            'submit_success_text' => match ($mode) {
-                'direct_approval' => 'Transition appliquee directement au statut valide.',
-                default => 'Element soumis pour validation.',
-            },
-            'approve_success_text' => 'Transition appliquee au statut valide.',
-            'lock_success_text' => 'Transition appliquee au statut verrouille.',
-            'final_statistics_hint' => match ($mode) {
-                'direct_approval', 'approval_only' => 'Le statut valide est la derniere etape du circuit.',
-                default => 'Le statut verrouille fige definitivement le plan valide.',
+            'submit_button_label' => 'Ancien circuit supprime',
+            'submit_success_text' => 'Ancien circuit supprime.',
+            'approve_success_text' => 'Ancienne validation supprimee.',
+            'lock_success_text' => 'Ancien verrouillage supprime.',
+            'final_statistics_hint' => match ($module) {
+                'pao' => 'Le PAO est valide automatiquement quand ses champs obligatoires sont complets.',
+                'pta' => 'Le PTA ne possede pas de statut valide.',
+                default => 'Le PAS est deja valide officiellement avant saisie.',
             },
         ];
     }
 
     public function actionSubmissionTarget(): string
     {
-        if ($this->serviceValidationEnabled()) {
-            return 'service';
-        }
-
-        return 'final';
+        return 'service';
     }
 
     public function actionFinalStage(): string
     {
-        if ($this->serviceValidationEnabled()) {
-            return 'service';
-        }
-
-        return 'direct';
+        return 'service';
     }
 
     /**
@@ -174,27 +154,12 @@ class WorkflowSettings
             'rejection_comment_required' => $this->rejectionCommentRequired(),
             'submission_target' => $submissionTarget,
             'final_stage' => $finalStage,
-            'chain_label' => match ($submissionTarget) {
-                'service' => 'Agent -> Chef de service',
-                'direction' => 'Agent -> Direction',
-                default => 'Agent -> cloture directe',
-            },
-            'submission_help_text' => match ($submissionTarget) {
-                'service' => 'L action est revue uniquement par le chef de service, qui cloture le circuit. Le directeur est notifie et conserve la lecture du dossier.',
-                'direction' => 'Le niveau service est desactive. La soumission est adressee directement a la direction.',
-                default => 'Le circuit hierarchique est desactive. La cloture rend l action finale immediatement.',
-            },
-            'submission_button_label' => match ($submissionTarget) {
-                'service' => 'Soumettre au chef de service',
-                'direction' => 'Soumettre a la direction',
-                default => 'Cloturer sans validation',
-            },
+            'chain_label' => 'Agent -> Chef de service',
+            'submission_help_text' => 'L action est envoyee au chef de service pour validation finale.',
+            'submission_button_label' => 'Soumettre',
             'service_review_button_label' => 'Valider la cloture',
             'service_review_success_text' => 'Action validee par le chef de service. Le directeur et l agent sont notifies.',
-            'final_statistics_hint' => match ($finalStage) {
-                'service' => 'Oui apres validation finale du chef de service.',
-                default => 'Oui des la cloture de l action.',
-            },
+            'final_statistics_hint' => 'Oui apres validation finale du chef de service.',
         ];
     }
 
@@ -213,6 +178,8 @@ class WorkflowSettings
             $value = ($payload[$key] ?? $defaultValue) === '1' ? '1' : '0';
             if ($key === 'actions_direction_validation_enabled') {
                 $value = '0';
+            } elseif ($key === 'actions_service_validation_enabled') {
+                $value = '1';
             }
 
             PlatformSetting::query()->updateOrCreate(
@@ -232,18 +199,12 @@ class WorkflowSettings
      */
     public function updatePlanningWorkflow(array $payload, ?User $actor = null): array
     {
-        $allowedModes = array_keys($this->planningWorkflowModes());
-
         foreach (['pas', 'pao', 'pta'] as $module) {
             $key = $module.'_workflow_mode';
-            $value = (string) ($payload[$key] ?? $this->defaults()[$key]);
-            if (! in_array($value, $allowedModes, true)) {
-                $value = $this->defaults()[$key];
-            }
 
             PlatformSetting::query()->updateOrCreate(
                 ['group' => 'workflow', 'key' => $key],
-                ['value' => $value, 'updated_by' => $actor?->id]
+                ['value' => 'canonical', 'updated_by' => $actor?->id]
             );
         }
 
@@ -270,4 +231,3 @@ class WorkflowSettings
         }
     }
 }
-

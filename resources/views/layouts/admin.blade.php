@@ -351,12 +351,9 @@
                             </div>
 
                             <div class="admin-dropdown-shortcuts border-b border-[#d8ecf8] px-3 py-2">
-                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div class="grid gap-2 text-xs">
                                     <a href="{{ route('workspace.messaging.index') }}" class="admin-dropdown-shortcut border border-[#d8ecf8] px-3 py-2 font-medium text-[#17324a] transition hover:bg-[#eaf6fd]">
                                         Messages récents
-                                    </a>
-                                    <a href="{{ route('workspace.messaging.index') }}#messaging-orgchart" class="admin-dropdown-shortcut border border-[#d8ecf8] px-3 py-2 font-medium text-[#17324a] transition hover:bg-[#eaf6fd]">
-                                        Organigramme
                                     </a>
                                 </div>
                             </div>
@@ -622,9 +619,9 @@
             </div>
             <div id="analytics-explorer-body" class="analytics-explorer-body"></div>
             <div class="analytics-explorer-actions">
-                <span class="text-xs font-medium text-[#667085]">Selection active</span>
+                <span class="text-xs font-medium text-[#667085]">Sélection active</span>
                 <div class="flex items-center gap-2">
-                    <button type="button" id="analytics-explorer-download" class="app-btn app-btn-primary hidden">Telecharger</button>
+                    <button type="button" id="analytics-explorer-download" class="app-btn app-btn-primary hidden">Télécharger</button>
                     <button type="button" class="app-btn app-btn-secondary" data-analytics-explorer-dismiss>Fermer</button>
                 </div>
             </div>

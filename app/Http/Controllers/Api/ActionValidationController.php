@@ -58,10 +58,11 @@ class ActionValidationController extends Controller
             array_unshift($commentRules, 'required');
         }
 
+        // Spec v2 : le chef ne note plus. Seul le motif de rejet/correction est conserve
+        // dans motif_validation_chef (ancien evaluation_commentaire).
         $validated = $request->validate([
             'decision_validation' => ['required', Rule::in(['valider', 'rejeter'])],
-            'evaluation_note' => ['required', 'numeric', 'min:0', 'max:100'],
-            'evaluation_commentaire' => $commentRules,
+            'motif_validation_chef' => $commentRules,
             'validation_sans_correction' => ['nullable', Rule::in(['0', '1', 0, 1, true, false])],
             'justificatif_evaluation' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
         ]);

@@ -37,6 +37,17 @@ class ActionLog extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saved(static function (): void {
+            app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->bumpAlerts();
+        });
+
+        static::deleted(static function (): void {
+            app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->bumpAlerts();
+        });
+    }
+
     public function action(): BelongsTo
     {
         return $this->belongsTo(Action::class, 'action_id');
@@ -60,7 +71,15 @@ class ActionLog extends Model
     public function scopeActiveAlert(Builder $query): Builder
     {
         return $query
-            ->whereIn('niveau', ['warning', 'critical', 'urgence'])
+            ->where(function (Builder $levelQuery): void {
+                $levelQuery
+                    ->whereIn('niveau', ['warning', 'critical', 'urgence'])
+                    ->orWhere(function (Builder $manualInfoQuery): void {
+                        $manualInfoQuery
+                            ->where('niveau', 'info')
+                            ->where('details->manual', true);
+                    });
+            })
             ->where(function (Builder $detailsQuery): void {
                 $detailsQuery
                     ->whereNull('details->resolved')

@@ -15,7 +15,8 @@ use App\Models\PasAxe;
 use App\Models\PasObjectif;
 use App\Models\User;
 use App\Services\PasStructureService;
-use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\PlanningModificationLockService;
+use App\Services\PlanningClosureReportService;
 use App\Services\ExerciceContext;
 use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
@@ -44,6 +45,9 @@ class PasWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        if ($user->isAgent()) {
+            abort(403, 'Acces non autorise.');
+        }
 
         $query = Pas::query();
 
@@ -52,11 +56,7 @@ class PasWebController extends Controller
 
         $statusFilter = trim((string) $request->string('statut'));
         if ($statusFilter !== '') {
-            if ($statusFilter === 'valide_ou_verrouille') {
-                $query->whereIn('statut', ['valide', 'verrouille']);
-            } else {
-                $query->where('statut', $statusFilter);
-            }
+            $query->where('statut', $statusFilter);
         }
         $query->when(
             $request->boolean('without_pao'),
@@ -77,8 +77,9 @@ class PasWebController extends Controller
         $pasIdsSubquery = (clone $statsBase)->select('id');
         $pasStats = [
             'total'           => (int) $byStatus->sum(),
-            'actifs'          => (int) (($byStatus['valide'] ?? 0) + ($byStatus['verrouille'] ?? 0)),
-            'brouillons'      => (int) ($byStatus['brouillon'] ?? 0),
+            'actifs'          => (int) ($byStatus[Pas::STATUS_ACTIF] ?? 0),
+            'clotures'        => (int) ($byStatus[Pas::STATUS_CLOTURE] ?? 0),
+            'archives'        => (int) ($byStatus[Pas::STATUS_ARCHIVE] ?? 0),
             'sans_pao'        => (clone $statsBase)->doesntHave('paos')->count(),
             'sans_axe'        => (clone $statsBase)->doesntHave('axes')->count(),
             'axes_total'      => PasAxe::query()->whereIn('pas_id', $pasIdsSubquery)->count(),
@@ -95,7 +96,7 @@ class PasWebController extends Controller
                     ->select(['id', 'pas_id', 'code', 'libelle', 'periode_debut', 'periode_fin', 'ordre'])
                     ->orderBy('ordre')
                     ->orderBy('id')
-                    ->with(['objectifs:id,pas_axe_id,code,libelle,ordre,valeurs_cible']),
+                    ->with(['objectifs:id,pas_axe_id,code,libelle,date_echeance,ordre,valeurs_cible']),
             ])
             ->withCount(['axes', 'paos'])
             ->orderByDesc('periode_debut')
@@ -107,7 +108,7 @@ class PasWebController extends Controller
             'rows' => $rows,
             'pasStats' => $pasStats,
             'canWrite' => $this->canWrite($user),
-            'statusOptions' => array_merge($this->statusOptions($user), ['valide_ou_verrouille']),
+            'statusOptions' => $this->statusOptions($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
                 'statut' => $statusFilter,
@@ -157,7 +158,7 @@ class PasWebController extends Controller
             $pas = new Pas();
             $pas->fill($payload);
             $pas->forceFill([
-                'statut' => 'brouillon',
+                'statut' => Pas::STATUS_ACTIF,
                 'valide_le' => null,
                 'valide_par' => null,
             ])->save();
@@ -169,6 +170,7 @@ class PasWebController extends Controller
 
             return $pas;
         });
+        app(PlanningModificationLockService::class)->lockAfterSave($pas, $user);
 
         $after = $pas->load([
             'directions:id,code,libelle',
@@ -209,8 +211,11 @@ class PasWebController extends Controller
 
         $this->denyUnlessStrategicWriter($user);
 
-        if ($pas->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedStateMessage('PAS', 'plus etre modifie')]);
+        if ($pas->statut === Pas::STATUS_ARCHIVE) {
+            return back()->withErrors(['general' => 'Impossible de modifier un PAS archive.']);
+        }
+        if ($message = app(PlanningModificationLockService::class)->ensureUnlocked($pas, $user)) {
+            return back()->withErrors(['general' => $message]);
         }
 
         $validated = $request->validated();
@@ -234,6 +239,7 @@ class PasWebController extends Controller
                 $user->id,
             );
         });
+        app(PlanningModificationLockService::class)->lockAfterSave($pas->refresh(), $user);
 
         $pas->refresh();
         $after = $pas->load([
@@ -257,21 +263,43 @@ class PasWebController extends Controller
 
         $this->denyUnlessStrategicWriter($user);
 
-        if ($pas->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedStateMessage('PAS', 'etre supprime')]);
+        if ($pas->statut === Pas::STATUS_ARCHIVE) {
+            return back()->withErrors(['general' => 'Impossible de supprimer directement un PAS archive.']);
+        }
+
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+        $deletionRequests = app(\App\Services\DeletionRequestService::class);
+        // Super Admin et DG peuvent supprimer directement avec cascade (PAOs, PTAs,
+        // OOs, Actions, Axes, Objectifs strategiques). Pour les autres roles, la
+        // suppression passe par le workflow de demande validee par le Super Admin.
+        $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
+        if (! $canDeleteDirectly) {
+            $deletionRequest = $deletionRequests->requestBusinessDeletion($pas, $user, (string) $validated['motif'], 'pas');
+            $this->recordAudit($request, 'pas', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
+
+            return redirect()
+                ->route('workspace.pas.index')
+                ->with('success', 'Demande de suppression PAS transmise au Super Admin.');
         }
 
         $before = $pas->toArray();
-        $pas->delete();
+        $impact = $deletionRequests->impactForEntity($pas);
+        $deletionRequests->deleteBusinessTarget($pas);
 
-        $this->recordAudit($request, 'pas', 'delete', $pas, $before, null);
+        $this->recordAudit($request, 'pas', 'delete', $pas, [
+            ...$before,
+            'deletion_reason' => (string) $validated['motif'],
+            'impact' => $impact,
+        ], null);
 
         return redirect()
             ->route('workspace.pas.index')
             ->with('success', $this->entityDeletedMessage(UiLabel::object('pas')));
     }
 
-    public function submit(Request $request, Pas $pas, WorkspaceNotificationService $notificationService): RedirectResponse
+    public function close(Request $request, Pas $pas, PlanningClosureReportService $closureReportService): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -280,145 +308,76 @@ class PasWebController extends Controller
 
         $this->denyUnlessStrategicWriter($user);
 
-        if ($pas->statut === 'verrouille') {
-            return back()->withErrors(['general' => $this->lockedStateMessage('PAS', 'etre soumis')]);
-        }
-
-        if ($pas->statut !== 'brouillon') {
-            return back()->withErrors(['general' => $this->requiredStateMessage('PAS', 'brouillon', 'soumis')]);
-        }
-
-        $before = $pas->toArray();
-        $workflow = $this->planningWorkflowSummary();
-        if (! $workflow['submit_enabled']) {
-            return back()->withErrors(['general' => 'La soumission est desactivee pour le workflow PAS actif.']);
-        }
-
-        $targetStatus = (string) $workflow['submit_target_status'];
-        $pas->forceFill([
-            'statut' => $targetStatus,
-            'valide_le' => in_array($targetStatus, ['valide', 'verrouille'], true) ? now() : null,
-            'valide_par' => in_array($targetStatus, ['valide', 'verrouille'], true) ? $user->id : null,
-        ])->save();
-
-        $this->recordAudit($request, 'pas', 'submit', $pas, $before, $pas->toArray());
-        $notificationService->notifyPasStatus($pas, $targetStatus === 'soumis' ? 'submitted' : 'approved', $user);
-
-        return redirect()
-            ->route('workspace.pas.index')
-            ->with('success', $targetStatus === 'soumis'
-                ? 'PAS soumis pour validation.'
-                : 'PAS valide directement selon le workflow configure.');
-    }
-
-    public function approve(Request $request, Pas $pas, WorkspaceNotificationService $notificationService): RedirectResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $this->canApprove($user)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        $workflow = $this->planningWorkflowSummary();
-        if (! $workflow['approve_enabled']) {
-            return back()->withErrors(['general' => 'La validation intermediaire est desactivee pour le workflow PAS actif.']);
-        }
-
-        if ($pas->statut !== 'soumis') {
-            return back()->withErrors(['general' => $this->requiredStateMessage('PAS', 'soumis', 'valide')]);
-        }
-
-        $before = $pas->toArray();
-        $pas->forceFill([
-            'statut' => 'valide',
-            'valide_le' => now(),
-            'valide_par' => $user->id,
-        ])->save();
-
-        $this->recordAudit($request, 'pas', 'approve', $pas, $before, $pas->toArray());
-        $notificationService->notifyPasStatus($pas, 'approved', $user);
-
-        return redirect()
-            ->route('workspace.pas.index')
-            ->with('success', $this->transitionedStateMessage('PAS', 'valide'));
-    }
-
-    public function lock(Request $request, Pas $pas, WorkspaceNotificationService $notificationService): RedirectResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $this->canApprove($user)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        $workflow = $this->planningWorkflowSummary();
-        if (! $workflow['lock_enabled']) {
-            return back()->withErrors(['general' => 'Le verrouillage final est desactive pour le workflow PAS actif.']);
-        }
-
-        if ($pas->statut !== 'valide') {
-            return back()->withErrors(['general' => $this->requiredStateMessage('PAS', 'valide', 'verrouille')]);
-        }
-
-        $before = $pas->toArray();
-        $pas->forceFill([
-            'statut' => 'verrouille',
-            'valide_le' => now(),
-            'valide_par' => $user->id,
-        ])->save();
-
-        $this->recordAudit($request, 'pas', 'lock', $pas, $before, $pas->toArray());
-        $notificationService->notifyPasStatus($pas, 'locked', $user);
-
-        return redirect()
-            ->route('workspace.pas.index')
-            ->with('success', $this->transitionedStateMessage('PAS', 'verrouille'));
-    }
-
-    public function reopen(Request $request, Pas $pas, WorkspaceNotificationService $notificationService): RedirectResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $this->canApprove($user)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        $workflow = $this->planningWorkflowSummary();
-        $allowedStatuses = $workflow['reopen_allowed_statuses'];
-
-        if (! in_array($pas->statut, $allowedStatuses, true)) {
-            return back()->withErrors(['general' => $this->reopenAllowedStatusesMessage($allowedStatuses)]);
+        if ((string) $pas->statut === Pas::STATUS_ARCHIVE) {
+            return back()->withErrors(['general' => 'Impossible de cloturer un PAS archive.']);
         }
 
         $validated = $request->validate([
-            'motif_retour' => ['required', 'string', 'min:5', 'max:2000'],
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+            'force_close' => ['nullable', 'boolean'],
         ]);
 
-        $motifRetour = trim((string) $validated['motif_retour']);
+        $report = $closureReportService->forPas($pas);
+        $forceClose = $request->boolean('force_close');
+
+        if ($closureReportService->hasAnomalies($report) && ! $forceClose) {
+            return back()
+                ->withInput()
+                ->with('closure_report', $report)
+                ->withErrors(['general' => $this->closureReportErrorMessage($report)]);
+        }
 
         $before = $pas->toArray();
         $pas->forceFill([
-            'statut' => 'brouillon',
-            'valide_le' => null,
-            'valide_par' => null,
+            'statut' => Pas::STATUS_CLOTURE,
+            'valide_le' => now(),
+            'valide_par' => $user->id,
         ])->save();
 
-        $after = array_merge($pas->toArray(), ['motif_retour' => $motifRetour]);
-        $this->recordAudit($request, 'pas', 'reopen', $pas, $before, $after);
-        $notificationService->notifyPasStatus($pas, 'reopened', $user);
+        $this->recordAudit($request, 'pas', 'close', $pas, $before, [
+            ...$pas->toArray(),
+            'motif' => (string) $validated['motif'],
+            'closure_report' => $report,
+            'forced_with_anomalies' => $forceClose,
+        ]);
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', $this->reopenedStateMessage('PAS'));
+            ->with('success', 'PAS cloture avec rapport d anomalies trace.');
+    }
+
+    public function archive(Request $request, Pas $pas): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->denyUnlessStrategicWriter($user);
+
+        if ((string) $pas->statut !== Pas::STATUS_CLOTURE) {
+            return back()->withErrors(['general' => 'Le PAS doit etre cloture avant archivage.']);
+        }
+
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $before = $pas->toArray();
+        $pas->forceFill([
+            'statut' => Pas::STATUS_ARCHIVE,
+            'valide_le' => now(),
+            'valide_par' => $user->id,
+        ])->save();
+
+        $this->recordAudit($request, 'pas', 'archive', $pas, $before, [
+            ...$pas->toArray(),
+            'motif' => (string) $validated['motif'],
+        ]);
+
+        return redirect()
+            ->route('workspace.pas.index')
+            ->with('success', 'PAS archive.');
     }
 
     private function canWrite(User $user): bool
@@ -432,6 +391,18 @@ class PasWebController extends Controller
         // valide / verrouille pas. La validation finale revient aux profils
         // SUPER_ADMIN et ADMIN (operations) uniquement.
         return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_ADMIN_FONCTIONNEL);
+    }
+
+    /**
+     * @param array<string, mixed> $report
+     */
+    private function closureReportErrorMessage(array $report): string
+    {
+        $labels = collect($report['issues'] ?? [])
+            ->map(fn (array $issue): string => $issue['label'].' ('.$issue['count'].')')
+            ->implode(', ');
+
+        return 'Rapport d anomalies obligatoire : '.$labels.'. Ajoutez une justification et cochez la cloture avec anomalies pour continuer.';
     }
 
     /**
@@ -466,6 +437,7 @@ class PasWebController extends Controller
         return $pas->axes
             ->map(function ($axe): array {
                 return [
+                    'id' => (int) $axe->id,
                     'direction_id' => $axe->direction_id !== null ? (int) $axe->direction_id : null,
                     'code' => (string) $axe->code,
                     'libelle' => (string) $axe->libelle,
@@ -476,8 +448,10 @@ class PasWebController extends Controller
                     'objectifs' => $axe->objectifs
                         ->map(function ($objectif): array {
                             return [
+                                'id' => (int) $objectif->id,
                                 'code' => (string) $objectif->code,
                                 'libelle' => (string) $objectif->libelle,
+                                'date_echeance' => optional($objectif->date_echeance)?->format('Y-m-d'),
                                 'description' => $objectif->description,
                                 'ordre' => (int) $objectif->ordre,
                                 'indicateur_global' => $objectif->indicateur_global,
@@ -503,7 +477,7 @@ class PasWebController extends Controller
             ->where('module', 'pas')
             ->where('entite_type', $pas::class)
             ->where('entite_id', (int) $pas->id)
-            ->whereIn('action', ['create', 'submit', 'approve', 'lock', 'reopen', 'update'])
+            ->whereIn('action', ['create', 'update', 'close', 'archive'])
             ->orderByDesc('id')
             ->limit(50)
             ->get()
@@ -525,10 +499,8 @@ class PasWebController extends Controller
 
                 $label = match ($log->action) {
                     'create' => 'Creation',
-                    'submit' => 'Soumission',
-                    'approve' => 'Validation',
-                    'lock' => 'Verrouillage',
-                    'reopen' => 'Retour brouillon',
+                    'close' => 'Cloture',
+                    'archive' => 'Archivage',
                     'update' => 'Changement statut',
                     default => ucfirst((string) $log->action),
                 };
@@ -552,6 +524,11 @@ class PasWebController extends Controller
      */
     private function generatedPasTitle(array $validated): string
     {
+        $title = trim((string) ($validated['titre'] ?? ''));
+        if ($title !== '') {
+            return $title;
+        }
+
         $start = (int) ($validated['periode_debut'] ?? 0);
         $end = (int) ($validated['periode_fin'] ?? 0);
 

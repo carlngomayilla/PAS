@@ -132,12 +132,14 @@ class PaoController extends Controller
 
         $operationalObjectives = $this->validatedOperationalObjectives($validated);
         $pao = DB::transaction(function () use ($validated, $objectif, $request, $operationalObjectives): Pao {
-            $pao = Pao::query()->create($this->paoPayload($objectif, $validated, $operationalObjectives[0]));
+            $pao = new Pao();
+            $pao->fill($this->paoPayload($objectif, $validated, $operationalObjectives[0]));
+            $pao->forceFill(['statut' => Pao::STATUS_VALIDE])->save();
             $this->recordAudit($request, 'pao', 'create', $pao, null, $pao->toArray());
 
             foreach ($operationalObjectives as $operationalObjective) {
                 $objective = $pao->objectifsOperationnels()->create(
-                    $this->operationalObjectivePayload($objectif, $validated, $operationalObjective)
+                    $this->operationalObjectivePayload($objectif, $validated, $operationalObjective, Pao::STATUS_VALIDE)
                 );
                 $this->recordAudit($request, 'objectif_operationnel', 'create', $objective, null, $objective->toArray());
             }
@@ -192,13 +194,16 @@ class PaoController extends Controller
             abort(401);
         }
 
-        if ($pao->statut === 'verrouille') {
+        if ($pao->statut === Pao::STATUS_ARCHIVE) {
             return response()->json([
-                'message' => $this->lockedStateMessage('PAO', 'plus etre modifie'),
+                'message' => 'Impossible de modifier un PAO archive.',
             ], 409);
         }
 
         $validated = $request->validated();
+        $statut = in_array((string) $pao->statut, [Pao::STATUS_CLOTURE, Pao::STATUS_ARCHIVE], true)
+            ? (string) $pao->statut
+            : Pao::STATUS_VALIDE;
 
         $this->authorize('update', $pao);
         $this->authorize('create', [Pao::class, (int) $validated['direction_id']]);
@@ -206,15 +211,15 @@ class PaoController extends Controller
 
         $operationalObjectives = $this->validatedOperationalObjectives($validated);
         $before = $pao->toArray();
-        DB::transaction(function () use ($pao, $before, $validated, $objectif, $request, $operationalObjectives): void {
+        DB::transaction(function () use ($pao, $before, $validated, $objectif, $request, $operationalObjectives, $statut): void {
             $pao->fill($this->paoPayload($objectif, $validated, $operationalObjectives[0]));
-            $pao->save();
+            $pao->forceFill(['statut' => $statut])->save();
             $this->recordAudit($request, 'pao', 'update', $pao, $before, $pao->toArray());
 
             $keptObjectiveIds = [];
             foreach ($operationalObjectives as $operationalObjective) {
                 $objectiveId = (int) ($operationalObjective['id'] ?? 0);
-                $payload = $this->operationalObjectivePayload($objectif, $validated, $operationalObjective);
+                $payload = $this->operationalObjectivePayload($objectif, $validated, $operationalObjective, $statut);
 
                 if ($objectiveId > 0) {
                     $objective = $pao->objectifsOperationnels()->whereKey($objectiveId)->first();
@@ -264,9 +269,9 @@ class PaoController extends Controller
 
         $this->authorize('delete', $pao);
 
-        if ($pao->statut === 'verrouille') {
+        if ($pao->statut === Pao::STATUS_ARCHIVE) {
             return response()->json([
-                'message' => $this->lockedStateMessage('PAO', 'etre supprime'),
+                'message' => 'Impossible de supprimer directement un PAO archive.',
             ], 409);
         }
 
@@ -318,12 +323,12 @@ class PaoController extends Controller
      */
     private function paoPayload(PasObjectif $objectif, array $validated, array $operationalObjective): array
     {
-        // statut n est plus mass-assignable (cf. A02) : default DB = brouillon.
+        // Le statut PAO racine est force par le service appelant.
         return [
             'pas_id' => (int) $objectif->pasAxe->pas_id,
             'pas_objectif_id' => (int) $objectif->id,
             'direction_id' => (int) $validated['direction_id'],
-            'service_id' => (int) $operationalObjective['service_id'],
+            'service_id' => null,
             'annee' => (int) $validated['annee'],
             'titre' => trim((string) ($validated['titre'] ?? '')) !== ''
                 ? (string) $validated['titre']
@@ -341,7 +346,7 @@ class PaoController extends Controller
      * @param array{id: int|null, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null} $operationalObjective
      * @return array<string, mixed>
      */
-    private function operationalObjectivePayload(PasObjectif $objectif, array $validated, array $operationalObjective): array
+    private function operationalObjectivePayload(PasObjectif $objectif, array $validated, array $operationalObjective, string $statut = Pao::STATUS_VALIDE): array
     {
         return [
             'pas_id' => (int) $objectif->pasAxe->pas_id,
@@ -353,7 +358,7 @@ class PaoController extends Controller
             'description' => $operationalObjective['description'],
             'echeance' => $operationalObjective['echeance'],
             'indicateurs' => $operationalObjective['indicateurs'],
-            'statut' => (string) ($validated['statut'] ?? 'brouillon'),
+            'statut' => $statut,
         ];
     }
 }

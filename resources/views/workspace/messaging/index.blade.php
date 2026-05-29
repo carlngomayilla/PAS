@@ -309,7 +309,7 @@
             @else
                 <x-ui.empty-state
                     title="Sélectionnez une conversation"
-                    message="L'annuaire à gauche et l'organigramme ci-dessous permettent d'ouvrir rapidement un échange direct."
+                    message="L'annuaire à gauche permet d'ouvrir rapidement un échange direct."
                     icon="users"
                     tone="info"
                     class="messaging-empty-state !h-full"
@@ -334,113 +334,7 @@
         </aside>
     </section>
 
-    <section id="messaging-orgchart" class="showcase-panel app-screen-block">
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h2 class="showcase-panel-title">Organigramme interactif</h2>
-            </div>
-            <a class="btn btn-secondary" href="{{ route('workspace.messaging.index') }}#messaging-orgchart">Ancre organigramme</a>
-        </div>
-
-        <form method="GET" action="{{ route('workspace.messaging.index') }}#messaging-orgchart" class="form-shell mb-5">
-            <div class="form-grid-compact">
-                <div>
-                    <label for="org_search">Recherche organigramme</label>
-                    <input id="org_search" name="org_search" type="text" value="{{ $orgFilters['search'] }}" placeholder="Nom, fonction, matricule...">
-                </div>
-                <div>
-                    <label for="org_direction_id">Direction</label>
-                    <select id="org_direction_id" name="org_direction_id">
-                        <option value="">Toutes</option>
-                        @foreach ($filterOptions['directions'] as $direction)
-                            <option value="{{ $direction->id }}" @selected((int) $orgFilters['direction_id'] === (int) $direction->id)>{{ $direction->libelle }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="org_service_id">Service</label>
-                    <select id="org_service_id" name="org_service_id">
-                        <option value="">Tous</option>
-                        @foreach ($filterOptions['services'] as $service)
-                            <option value="{{ $service->id }}" data-direction-id="{{ $service->direction_id }}" @selected((int) $orgFilters['service_id'] === (int) $service->id)>{{ $service->libelle }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                        <label for="org_role">Rôle</label>
-                    <select id="org_role" name="org_role">
-                        <option value="">Tous</option>
-                        @foreach ($filterOptions['roles'] as $role)
-                            <option value="{{ $role }}" @selected($orgFilters['role'] === $role)>{{ $roleLabel($role) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-            <div class="form-actions">
-                <button class="btn btn-primary" type="submit">Filtrer</button>
-                <a class="btn btn-secondary" href="{{ route('workspace.messaging.index') }}#messaging-orgchart">Réinitialiser</a>
-            </div>
-        </form>
-
-        @php
-            $orgUserCount = collect($orgChart['users'] ?? [])->count();
-        @endphp
-
-        <div class="messaging-org-tree-shell" data-org-tree="1">
-            <div class="mb-4 flex flex-wrap items-center gap-2">
-                <span class="anbg-badge anbg-badge-info">Liste arborescente</span>
-                <span class="anbg-badge anbg-badge-neutral">Cliquez sur une branche pour la replier</span>
-                <span class="anbg-badge anbg-badge-success">Cliquez sur une personne pour ouvrir sa fiche</span>
-                <span class="anbg-badge anbg-badge-warning">{{ $orgUserCount }} profil(s) chargé(s)</span>
-            </div>
-
-            <div class="messaging-org-tree-toolbar">
-                <div class="messaging-org-tree-toolbar-group">
-                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-expand-all>Tout déplier</button>
-                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-collapse-all>Tout replier</button>
-                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-reset-state>Réinitialiser l'arbre</button>
-                    <button type="button" class="btn btn-primary !px-3 !py-2" data-org-recenter>Recentrer la sélection</button>
-                </div>
-                <div class="messaging-org-tree-toolbar-group messaging-org-tree-toolbar-search">
-                    <label for="org_quick_search" class="sr-only">Recherche rapide dans la liste</label>
-                    <input
-                        id="org_quick_search"
-                        type="search"
-                        class="messaging-org-tree-search-input"
-                        data-org-quick-search
-                        placeholder="Filtrer la liste en direct..."
-                        autocomplete="off"
-                    >
-                    <button type="button" class="btn btn-secondary !px-3 !py-2" data-org-clear-search disabled>Effacer</button>
-                    <span class="anbg-badge anbg-badge-info whitespace-nowrap" data-org-search-count>{{ $orgUserCount }} profil(s) visible(s)</span>
-                </div>
-            </div>
-
-            @if (! empty($orgChart['tree']))
-                <div class="messaging-org-tree-viewport" data-org-tree-viewport>
-                    <div class="messaging-org-tree-stage" data-org-tree-stage>
-                        <ul class="messaging-org-tree-list" role="tree">
-                            @foreach ($orgChart['tree'] as $node)
-                                @include('workspace.messaging.partials.org-tree-node', [
-                                    'node' => $node,
-                                    'selectedUserId' => $selectedTreeUserId,
-                                    'activeConversationId' => $activeConversationId,
-                                ])
-                            @endforeach
-                        </ul>
-                    </div>
-                </div>
-            @else
-                <x-ui.empty-state
-                    title="Aucun bloc organisationnel"
-                    message="Élargissez les filtres pour retrouver les collaborateurs attendus."
-                    icon="filter"
-                    tone="info"
-                    class="messaging-empty-state"
-                />
-            @endif
-        </div>
-    </section>
+    {{-- Section organigramme retiree (2026-05-29) sur demande utilisateur. --}}
     </div>
 @endsection
 

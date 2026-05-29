@@ -24,6 +24,7 @@ class Action extends Model
 
     public const MODE_SOUS_ACTIONS = 'sous_actions';
     public const MODE_QUANTITATIF = 'quantitatif';
+    public const MODE_SANS_QUANTITE = 'sans_quantite';
     public const MODE_MIXTE = 'mixte';
 
     public const ORIGIN_PAS = 'PAS';
@@ -32,18 +33,26 @@ class Action extends Model
     public const ORIGIN_INTERNE = 'INTERNE';
 
     public const FINANCEMENT_NON_REQUIS = 'non_requis';
-    public const FINANCEMENT_EN_ATTENTE_DAF = 'en_attente_daf';
-    public const FINANCEMENT_EN_COURS_ANALYSE = 'en_cours_analyse';
-    public const FINANCEMENT_APPROUVE = 'approuve';
-    public const FINANCEMENT_REJETE = 'rejete';
-    public const FINANCEMENT_FINANCE = 'finance';
-    public const FINANCEMENT_NON_FINANCE = 'non_finance';
+    public const FINANCEMENT_PRE_SIGNALE_DAF = 'pre_signale_daf';
+    public const FINANCEMENT_EN_ATTENTE_VALIDATION_CHEF = 'en_attente_validation_chef';
+    public const FINANCEMENT_SOUMIS_DAF = 'soumis_daf';
+    public const FINANCEMENT_COMPLEMENT_DEMANDE = 'complement_demande';
+    public const FINANCEMENT_VALIDE_DAF = 'valide_daf';
+    public const FINANCEMENT_REJETE_DAF = 'rejete_daf';
+    public const FINANCEMENT_TRANSMIS_DG = 'transmis_dg';
+    public const FINANCEMENT_VALIDE_DG = 'valide_dg';
+    public const FINANCEMENT_REJETE_DG = 'rejete_dg';
 
-    public const FINANCEMENT_A_TRAITER_DAF = self::FINANCEMENT_EN_ATTENTE_DAF;
-    public const FINANCEMENT_VALIDE_DAF = self::FINANCEMENT_APPROUVE;
-    public const FINANCEMENT_REJETE_DAF = self::FINANCEMENT_REJETE;
-    public const FINANCEMENT_ACCORDE_DG = self::FINANCEMENT_FINANCE;
-    public const FINANCEMENT_REFUSE_DG = self::FINANCEMENT_NON_FINANCE;
+    public const FINANCEMENT_EN_ATTENTE_DAF = self::FINANCEMENT_PRE_SIGNALE_DAF;
+    public const FINANCEMENT_EN_COURS_ANALYSE = self::FINANCEMENT_COMPLEMENT_DEMANDE;
+    public const FINANCEMENT_APPROUVE = self::FINANCEMENT_VALIDE_DAF;
+    public const FINANCEMENT_REJETE = self::FINANCEMENT_REJETE_DAF;
+    public const FINANCEMENT_FINANCE = self::FINANCEMENT_VALIDE_DG;
+    public const FINANCEMENT_NON_FINANCE = self::FINANCEMENT_REJETE_DG;
+
+    public const FINANCEMENT_A_TRAITER_DAF = self::FINANCEMENT_SOUMIS_DAF;
+    public const FINANCEMENT_ACCORDE_DG = self::FINANCEMENT_VALIDE_DG;
+    public const FINANCEMENT_REFUSE_DG = self::FINANCEMENT_REJETE_DG;
 
     /**
      * @var list<string>
@@ -71,9 +80,13 @@ class Action extends Model
      */
     protected $fillable = [
         'exercice_id',
+        'code',
         'pta_id',
         'pao_id',
         'objectif_operationnel_id',
+        'ordre_import',
+        'nombre_sous_actions_prevu',
+        'statut_parametrage',
         'unite_dg_id',
         'mode_evaluation',
         'libelle',
@@ -140,6 +153,8 @@ class Action extends Model
             'date_debut' => 'date',
             'mode_evaluation' => 'string',
             'exercice_id' => 'integer',
+            'ordre_import' => 'integer',
+            'nombre_sous_actions_prevu' => 'integer',
             'date_fin' => 'date',
             'date_fin_reelle' => 'date',
             'date_echeance' => 'date',
@@ -173,18 +188,24 @@ class Action extends Model
             'validation_sans_correction' => 'boolean',
             'soumise_le' => 'datetime',
             'evalue_le' => 'datetime',
-            'evaluation_note' => 'decimal:2',
-            'taux_valide_chef' => 'decimal:2',
+            // Casts evaluation_note / taux_valide_chef retires : colonnes supprimees
+            // par la migration 2026_05_28_120000_drop_chef_quality_note_and_conformite_kpi
+            // (spec v2 : la note du chef et le KPI conformite sortent du modele metier).
             // Casts direction_* retires : colonnes supprimees par la migration
             // 2026_05_22_100000_drop_direction_validation_columns.
             'cloture_le' => 'datetime',
             'taux_performance' => 'decimal:2',
-            'taux_conformite' => 'decimal:2',
+            // taux_conformite : colonne supprimee (cf. migration spec v2).
             'taux_delai' => 'decimal:2',
             'taux_realisation_global' => 'decimal:2',
             'avancement_operationnel' => 'decimal:2',
             'taux_atteinte_cible' => 'decimal:2',
             'taux_global' => 'decimal:2',
+            'modification_locked_at' => 'datetime',
+            'modification_locked_by' => 'integer',
+            'modification_unlocked_at' => 'datetime',
+            'modification_unlocked_by' => 'integer',
+            'modification_unlock_expires_at' => 'datetime',
         ];
     }
 
@@ -272,6 +293,11 @@ class Action extends Model
         return $this->hasMany(ActionLog::class, 'action_id');
     }
 
+    public function deadlineExtensionRequests(): HasMany
+    {
+        return $this->hasMany(DeadlineExtensionRequest::class, 'action_id');
+    }
+
     public function discussionEntries(): HasMany
     {
         return $this->hasMany(ActionLog::class, 'action_id')
@@ -290,7 +316,9 @@ class Action extends Model
         $this->loadMissing('sousActions');
 
         $performanceService = app(ActionPerformanceService::class);
-        $target = max(0.0, (float) ($this->quantite_cible ?? 0));
+        $target = $this->usesQuantitativeProgress()
+            ? max(0.0, (float) ($this->quantite_cible ?? 0))
+            : 0.0;
         $subActions = $this->sousActions;
         $realized = $performanceService->realizedQuantity($this);
 
@@ -466,9 +494,11 @@ class Action extends Model
      *   - taux_global                : alias historique = progression_reelle
      *   - taux_atteinte_cible        : taux quantitatif quantite_realisee/cible
      *   - avancement_operationnel    : taux sous-actions completees / total
-     *   - taux_performance           : KPI execution (different : pondere delai/conformite)
+     *   - taux_performance           : KPI execution (pondere performance/delai uniquement)
      *   - taux_delai                 : KPI delai pur
-     *   - taux_conformite            : KPI conformite
+     *
+     * NOTE: KPI conformite et note du chef supprimes par la migration spec v2
+     * 2026_05_28_120000_drop_chef_quality_note_and_conformite_kpi.
      *
      * **Le code metier doit consommer authoritativeProgress() ci-dessous** :
      * en cas de drift entre les colonnes (race condition, recalcul partiel), on
@@ -554,8 +584,8 @@ class Action extends Model
     {
         return [
             self::MODE_QUANTITATIF => 'Cible quantitative',
+            self::MODE_SANS_QUANTITE => 'Sans quantité',
             self::MODE_SOUS_ACTIONS => 'Cible par sous-action',
-            self::MODE_MIXTE => 'Cible mixte',
         ];
     }
 
@@ -588,7 +618,7 @@ class Action extends Model
 
     public function isQualitativeOnlyTracking(): bool
     {
-        return $this->resolvedEvaluationMode() === self::MODE_SOUS_ACTIONS;
+        return in_array($this->resolvedEvaluationMode(), [self::MODE_SOUS_ACTIONS, self::MODE_SANS_QUANTITE], true);
     }
 
     public function isMixedTracking(): bool
@@ -599,6 +629,10 @@ class Action extends Model
     public function usesStructuredProgressTracking(): bool
     {
         if ($this->mode_evaluation !== null && $this->mode_evaluation !== '') {
+            return true;
+        }
+
+        if ($this->usesQuantitativeProgress()) {
             return true;
         }
 
@@ -619,6 +653,11 @@ class Action extends Model
         return in_array($this->resolvedEvaluationMode(), [self::MODE_QUANTITATIF, self::MODE_MIXTE], true);
     }
 
+    public function usesNoQuantityProgress(): bool
+    {
+        return $this->resolvedEvaluationMode() === self::MODE_SANS_QUANTITE;
+    }
+
     public function getModeEvaluationLabelAttribute(): string
     {
         return self::evaluationModeOptions()[$this->resolvedEvaluationMode()] ?? 'Par sous-actions';
@@ -631,12 +670,15 @@ class Action extends Model
     {
         return [
             self::FINANCEMENT_NON_REQUIS => 'Non requis',
-            self::FINANCEMENT_EN_ATTENTE_DAF => 'En attente DAF',
-            self::FINANCEMENT_EN_COURS_ANALYSE => 'En cours d analyse',
-            self::FINANCEMENT_APPROUVE => 'Approuve',
-            self::FINANCEMENT_REJETE => 'Rejete',
-            self::FINANCEMENT_FINANCE => 'Finance',
-            self::FINANCEMENT_NON_FINANCE => 'Non finance',
+            self::FINANCEMENT_PRE_SIGNALE_DAF => 'Pre-signale DAF',
+            self::FINANCEMENT_EN_ATTENTE_VALIDATION_CHEF => 'En attente validation chef',
+            self::FINANCEMENT_SOUMIS_DAF => 'Soumis DAF',
+            self::FINANCEMENT_COMPLEMENT_DEMANDE => 'Complement demande',
+            self::FINANCEMENT_VALIDE_DAF => 'Valide DAF',
+            self::FINANCEMENT_REJETE_DAF => 'Rejete DAF',
+            self::FINANCEMENT_TRANSMIS_DG => 'Transmis DG',
+            self::FINANCEMENT_VALIDE_DG => 'Valide DG',
+            self::FINANCEMENT_REJETE_DG => 'Rejete DG',
         ];
     }
 
@@ -646,11 +688,15 @@ class Action extends Model
     public static function legacyFinancingStatusMap(): array
     {
         return [
-            'a_traiter_daf' => self::FINANCEMENT_EN_ATTENTE_DAF,
-            'valide_daf' => self::FINANCEMENT_APPROUVE,
-            'rejete_daf' => self::FINANCEMENT_REJETE,
-            'accorde_dg' => self::FINANCEMENT_FINANCE,
-            'refuse_dg' => self::FINANCEMENT_NON_FINANCE,
+            'en_attente_daf' => self::FINANCEMENT_PRE_SIGNALE_DAF,
+            'en_cours_analyse' => self::FINANCEMENT_COMPLEMENT_DEMANDE,
+            'approuve' => self::FINANCEMENT_VALIDE_DAF,
+            'rejete' => self::FINANCEMENT_REJETE_DAF,
+            'finance' => self::FINANCEMENT_VALIDE_DG,
+            'non_finance' => self::FINANCEMENT_REJETE_DG,
+            'a_traiter_daf' => self::FINANCEMENT_SOUMIS_DAF,
+            'accorde_dg' => self::FINANCEMENT_VALIDE_DG,
+            'refuse_dg' => self::FINANCEMENT_REJETE_DG,
         ];
     }
 
@@ -774,12 +820,12 @@ class Action extends Model
 
         return array_key_exists($status, self::financingStatusOptions())
             ? $status
-            : self::FINANCEMENT_A_TRAITER_DAF;
+            : self::FINANCEMENT_PRE_SIGNALE_DAF;
     }
 
     public function getFinancementStatusLabelAttribute(): string
     {
-        return self::financingStatusOptions()[$this->financementStatus()] ?? 'A traiter DAF';
+        return self::financingStatusOptions()[$this->financementStatus()] ?? 'Pre-signale DAF';
     }
 
     public function isFundingRequested(): bool

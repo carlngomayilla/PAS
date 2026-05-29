@@ -184,7 +184,6 @@ class AlertDigestCommandTest extends TestCase
             'date_debut' => now()->subDays(14)->toDateString(),
             'date_fin' => now()->subDays(7)->toDateString(),
             'date_echeance' => now()->subDays(7)->toDateString(),
-            'frequence_execution' => 'hebdomadaire',
             'responsable_id' => $responsable->id,
             'statut' => 'non_demarre',
             'statut_dynamique' => 'en_retard',
@@ -316,7 +315,6 @@ class AlertDigestCommandTest extends TestCase
             'date_debut' => now()->toDateString(),
             'date_fin' => now()->addDays(10)->toDateString(),
             'date_echeance' => now()->addDays(10)->toDateString(),
-            'frequence_execution' => 'hebdomadaire',
             'responsable_id' => $responsable->id,
             'statut' => 'en_cours',
             'statut_dynamique' => 'en_cours',
@@ -330,7 +328,6 @@ class AlertDigestCommandTest extends TestCase
 
         ActionLog::query()->create([
             'action_id' => $action->id,
-            'action_week_id' => null,
             'niveau' => 'urgence',
             'type_evenement' => 'alerte_combinee_critique',
             'message' => 'Action en retard avec indicateur critique. Urgence et escalade DG requises.',

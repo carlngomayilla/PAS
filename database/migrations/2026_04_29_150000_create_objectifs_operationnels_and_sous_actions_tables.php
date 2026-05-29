@@ -78,7 +78,7 @@ return new class extends Migration
                 $table->date('date_debut');
                 $table->date('date_fin');
                 $table->dateTime('date_realisation')->nullable();
-                $table->string('statut', 50)->default('a_faire');
+                $table->string('statut', 50)->default('non_demarre');
                 $table->boolean('est_effectuee')->default(false);
                 $table->decimal('taux_execution', 5, 2)->default(0);
                 $table->timestamps();

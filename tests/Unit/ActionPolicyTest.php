@@ -238,7 +238,6 @@ class ActionPolicyTest extends TestCase
             'date_debut' => '2026-01-01',
             'date_fin' => '2026-01-14',
             'date_echeance' => '2026-01-14',
-            'frequence_execution' => ActionTrackingService::FREQUENCE_HEBDOMADAIRE,
             'responsable_id' => $agent->id,
             'statut' => 'non_demarre',
             'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,

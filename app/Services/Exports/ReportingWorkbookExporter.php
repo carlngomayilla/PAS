@@ -102,7 +102,16 @@ class ReportingWorkbookExporter
             $this->buildJustificatifsSheet($payload),
         ];
 
-        return array_merge($sheets, $this->buildInstitutionalServiceSheets($payload));
+        $sheets = array_merge(
+            $sheets,
+            $this->buildInstitutionalServiceSheets($payload),
+            [
+                $this->buildAnomaliesSheet($payload),
+                $this->buildFinancingSheet($payload),
+            ]
+        );
+
+        return $this->filterSheetsForReportType($sheets, (string) ($payload['report_context']['type'] ?? 'consolide_dg'));
     }
 
     private function buildDetailSheet(array $payload): array
@@ -527,10 +536,10 @@ class ReportingWorkbookExporter
             'ACTIONS',
             'ACTIONS',
             $this->standardReportMetaRows($payload, 'Tableau 3 : Actions détaillées'),
-            ['Direction', 'Service', 'Description action', 'RMO', 'Cible', 'Debut', 'Fin', 'Statut', 'Ressources', 'Avancement reel (%)', 'Justificatif'],
-            ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'percent', 'string'],
+            ['Direction', 'Service', 'Objectif operationnel', 'Description action', 'RMO', 'Debut', 'Fin', 'Mode execution', 'Cible', 'Avancement reel (%)', 'Financement', 'Risque', 'Ressources', 'KPI global (%)'],
+            ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'percent', 'string', 'string', 'string', 'percent'],
             $this->actionFinalSheetRows($payload),
-            [1 => 36, 2 => 36, 3 => 48, 4 => 26, 5 => 36, 6 => 16, 7 => 16, 8 => 18, 9 => 34, 10 => 18, 11 => 42],
+            [1 => 30, 2 => 30, 3 => 36, 4 => 46, 5 => 28, 6 => 14, 7 => 14, 8 => 22, 9 => 28, 10 => 18, 11 => 42, 12 => 44, 13 => 34, 14 => 16],
             [
                 'Tableau 3 : Actions detaillees',
             ]
@@ -784,15 +793,18 @@ class ReportingWorkbookExporter
             ->map(fn (array $row): array => [
                 (string) ($row['direction_label'] ?? '-'),
                 (string) ($row['service_label'] ?? '-'),
+                (string) ($row['objectif_operationnel'] ?? '-'),
                 (string) ($row['description_action'] ?? $row['action'] ?? '-'),
                 (string) ($row['rmo'] ?? $row['responsable'] ?? '-'),
-                (string) ($row['cible'] ?? '-'),
                 (string) ($row['debut'] ?? ''),
                 (string) ($row['fin'] ?? ''),
-                (string) ($row['statut'] ?? '-'),
-                (string) ($row['ressources_requises'] ?? '-'),
+                (string) ($row['mode_execution'] ?? '-'),
+                (string) ($row['cible'] ?? '-'),
                 (float) ($row['progression_value'] ?? 0),
-                (string) ($row['justificatif'] ?? '-'),
+                (string) ($row['financement_resume'] ?? '-'),
+                (string) ($row['risque_resume'] ?? '-'),
+                (string) ($row['ressources_requises'] ?? '-'),
+                (float) ($row['kpi_global_value'] ?? 0),
             ])
             ->values()
             ->all();
@@ -873,6 +885,112 @@ class ReportingWorkbookExporter
             ]);
 
         return $rows->merge($lateRows)->values()->all();
+    }
+
+    private function buildAnomaliesSheet(array $payload): array
+    {
+        return $this->buildTableSheet(
+            'ANOMALIES',
+            'ANOMALIES',
+            $this->standardReportMetaRows($payload, 'Rapport Anomalies'),
+            ['Direction', 'Service', 'Action', 'Type', 'Niveau', 'Responsable', 'Blocage', 'Correction attendue', 'Message', 'Signale par', 'Date'],
+            ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string'],
+            $this->anomalySheetRows($payload),
+            [1 => 28, 2 => 28, 3 => 38, 4 => 26, 5 => 16, 6 => 20, 7 => 22, 8 => 42, 9 => 52, 10 => 24, 11 => 18]
+        );
+    }
+
+    /**
+     * @return array<int, array<int, mixed>>
+     */
+    private function anomalySheetRows(array $payload): array
+    {
+        return $this->actionRows($payload)
+            ->flatMap(function (array $row): array {
+                return collect($row['anomalies'] ?? [])
+                    ->map(fn (array $anomaly): array => [
+                        (string) ($row['direction_label'] ?? '-'),
+                        (string) ($row['service_label'] ?? '-'),
+                        (string) ($row['action'] ?? '-'),
+                        (string) ($anomaly['type'] ?? '-'),
+                        (string) ($anomaly['niveau'] ?? '-'),
+                        (string) ($anomaly['responsable'] ?? '-'),
+                        (string) ($anomaly['blocage'] ?? '-'),
+                        (string) ($anomaly['correction_attendue'] ?? '-'),
+                        (string) ($anomaly['message'] ?? '-'),
+                        (string) ($anomaly['signale_par'] ?? '-'),
+                        (string) ($anomaly['date'] ?? ''),
+                    ])
+                    ->all();
+            })
+            ->values()
+            ->all();
+    }
+
+    private function buildFinancingSheet(array $payload): array
+    {
+        return $this->buildTableSheet(
+            'FINANCEMENT',
+            'FINANCEMENT',
+            $this->standardReportMetaRows($payload, 'Rapport Financement'),
+            ['Direction', 'Service', 'Action', 'RMO', 'Nature', 'Montant estime', 'Source', 'Statut DAF / DG', 'Observation', 'Avancement (%)', 'KPI global (%)'],
+            ['string', 'string', 'string', 'string', 'string', 'decimal', 'string', 'string', 'string', 'percent', 'percent'],
+            $this->financingSheetRows($payload),
+            [1 => 28, 2 => 28, 3 => 42, 4 => 26, 5 => 32, 6 => 18, 7 => 28, 8 => 24, 9 => 44, 10 => 16, 11 => 16]
+        );
+    }
+
+    /**
+     * @return array<int, array<int, mixed>>
+     */
+    private function financingSheetRows(array $payload): array
+    {
+        return $this->actionRows($payload)
+            ->filter(fn (array $row): bool => (bool) ($row['financement_requis'] ?? false))
+            ->map(fn (array $row): array => [
+                (string) ($row['direction_label'] ?? '-'),
+                (string) ($row['service_label'] ?? '-'),
+                (string) ($row['action'] ?? '-'),
+                (string) ($row['rmo'] ?? $row['responsable'] ?? '-'),
+                (string) ($row['financement_nature'] ?? '-'),
+                (float) ($row['financement_montant'] ?? 0),
+                (string) ($row['financement_source'] ?? '-'),
+                (string) ($row['financement_statut_label'] ?? $row['financement_statut'] ?? '-'),
+                (string) ($row['financement_observation'] ?? ''),
+                (float) ($row['progression_value'] ?? 0),
+                (float) ($row['kpi_global_value'] ?? 0),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $sheets
+     * @return array<int, array<string, mixed>>
+     */
+    private function filterSheetsForReportType(array $sheets, string $reportType): array
+    {
+        $allowed = match ($reportType) {
+            'pas' => ['PAS PLAN', 'STRATEGIE'],
+            'pao' => ['PAO'],
+            'pta' => ['SYNTHÈSE', 'PAO', 'ACTIONS'],
+            'actions' => ['ACTIONS'],
+            'kpi' => ['Indicateurs', 'RMO_PERFORMANCE'],
+            'anomalies' => ['ANOMALIES', 'ALERTES'],
+            'financement' => ['FINANCEMENT'],
+            default => [],
+        };
+
+        if ($allowed === []) {
+            return $sheets;
+        }
+
+        $filtered = array_values(array_filter(
+            $sheets,
+            static fn (array $sheet): bool => in_array((string) ($sheet['name'] ?? ''), $allowed, true)
+        ));
+
+        return $filtered !== [] ? $filtered : $sheets;
     }
 
     private function rmoPerformanceRows(array $payload): array
@@ -1258,7 +1376,7 @@ class ReportingWorkbookExporter
             'title' => 'Details - Actions en retard',
             'headers' => ['ID', 'Libelle', 'Echeance', 'Statut', 'PTA', 'Responsable', 'Performance d execution', 'Conformite'],
             'types' => ['integer', 'string', 'string', 'string', 'string', 'string', 'decimal', 'decimal'],
-            'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_performance ?? 0), (float) ($action->actionKpi?->kpi_conformite ?? 0)])->all(),
+            'rows' => collect($payload['details']['actions_retard'] ?? [])->map(fn ($action): array => [(int) $action->id, (string) $action->libelle, optional($action->date_echeance)->format('Y-m-d') ?? '', (string) $action->statut_dynamique, (string) ($action->pta?->titre ?? ''), (string) ($action->responsable?->name ?? ''), (float) ($action->actionKpi?->kpi_performance ?? 0), 0.0])->all(),
         ];
 
         $sections[] = [

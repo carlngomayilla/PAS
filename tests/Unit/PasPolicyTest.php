@@ -56,11 +56,23 @@ class PasPolicyTest extends TestCase
         $this->assertFalse($this->policy->update($fixture['service_user'], $fixture['pas']));
         $this->assertFalse($this->policy->delete($fixture['service_user'], $fixture['pas']));
 
+        // Nouvelle regle de perimetre (2026-05-28) : un directeur d'une AUTRE
+        // direction n'a pas de PAO/OO/PTA dans ce PAS, donc il ne doit pas le voir.
+        // viewAny reste true (il a planning.read) mais view sur un PAS hors perimetre
+        // doit retourner false pour eviter les fuites cross-direction.
         $this->assertTrue($this->policy->viewAny($fixture['other_direction_user']));
-        $this->assertTrue($this->policy->view($fixture['other_direction_user'], $fixture['pas']));
+        $this->assertFalse(
+            $this->policy->view($fixture['other_direction_user'], $fixture['pas']),
+            'Un directeur d\'une autre direction sans donnees dans ce PAS ne doit pas le voir.'
+        );
 
+        // Idem pour un chef de service d'un autre service (meme direction mais
+        // service different sans PAO/PTA/OO de son service rattaches).
         $this->assertTrue($this->policy->viewAny($fixture['other_service_user']));
-        $this->assertTrue($this->policy->view($fixture['other_service_user'], $fixture['pas']));
+        $this->assertFalse(
+            $this->policy->view($fixture['other_service_user'], $fixture['pas']),
+            'Un chef de service sans PTA/OO dans ce PAS ne doit pas le voir.'
+        );
     }
 
     /**

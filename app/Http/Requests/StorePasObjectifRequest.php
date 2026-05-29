@@ -22,6 +22,7 @@ class StorePasObjectifRequest extends FormRequest
             'pas_axe_id' => ['required', 'integer', 'exists:pas_axes,id'],
             'code' => ['required', 'string', 'max:30', $codeRule],
             'libelle' => ['required', 'string', 'max:255'],
+            'date_echeance' => ['required', 'date_format:Y-m-d'],
             'description' => ['nullable', 'string'],
             'indicateur_global' => ['nullable', 'string', 'max:255'],
             'valeur_cible' => ['nullable', 'string', 'max:255'],
@@ -38,4 +39,3 @@ class StorePasObjectifRequest extends FormRequest
         ];
     }
 }
-

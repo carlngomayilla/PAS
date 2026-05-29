@@ -269,9 +269,9 @@
 
                         @if (!empty($alert['metrics']) || !empty($alert['escalation_label']))
                             <div class="mt-3 flex flex-wrap items-center gap-2">
+                                {{-- KPI conformite retire (2026-05-28). --}}
                                 @foreach ([
                                     'kpi_performance' => "Performance d'exécution",
-                                    'kpi_conformite' => 'Conformité',
                                 ] as $metricKey => $metricLabel)
                                     @php
                                         $metricValue = (float) ($alert['metrics'][$metricKey] ?? 0);

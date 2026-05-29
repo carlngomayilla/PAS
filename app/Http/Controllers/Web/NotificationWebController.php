@@ -6,9 +6,28 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Contracts\View\View;
 
 class NotificationWebController extends Controller
 {
+    public function index(Request $request): View
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $notifications = $user->notifications()
+            ->latest()
+            ->paginate(30)
+            ->withQueryString();
+
+        return view('workspace.notifications.index', [
+            'notifications' => $notifications,
+            'unreadCount' => $user->unreadNotifications()->count(),
+        ]);
+    }
+
     public function read(Request $request, string $notification): RedirectResponse
     {
         $user = $request->user();

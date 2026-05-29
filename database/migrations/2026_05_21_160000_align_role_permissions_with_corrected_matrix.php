@@ -165,6 +165,7 @@ return new class extends Migration
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
+                'delegations.manage',
                 'messagerie.read',
             ],
             User::ROLE_SERVICE => [
@@ -173,6 +174,7 @@ return new class extends Migration
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
+                'delegations.manage',
                 'messagerie.read',
             ],
             User::ROLE_AGENT => [

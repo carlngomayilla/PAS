@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Réinitialisation du mot de passe — ANBG Pilotage</title>
+    <title>Reinitialisation du mot de passe - ANBG Pilotage</title>
     <link rel="icon" href="{{ asset('favicon.ico') }}">
     <style>
         *, *::before, *::after { box-sizing: border-box; }
@@ -24,11 +24,18 @@
         h1 { font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #0f172a; }
         .desc { color: #475569; font-size: 14px; line-height: 1.55; margin: 0 0 24px; }
         label { display: block; font-size: 13px; font-weight: 600; color: #334155; margin: 14px 0 6px; }
-        input[type=email], input[type=password] {
+        input[type=email], input[type=password], input[type=text] {
             width: 100%; padding: 11px 14px; border: 1px solid #cbd5e1; border-radius: 10px;
             font-size: 14px; outline: none; transition: border-color .15s ease, box-shadow .15s ease;
         }
         input:focus { border-color: #3996d3; box-shadow: 0 0 0 4px rgba(57, 150, 211, 0.15); }
+        .password-field { position: relative; }
+        .password-field input { padding-right: 72px; }
+        .password-toggle {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            border: 0; background: transparent; color: #3996d3; cursor: pointer;
+            font-size: 12px; font-weight: 700;
+        }
         .btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
             width: 100%; padding: 12px 22px; border-radius: 10px; font-weight: 600; font-size: 14px;
@@ -54,7 +61,7 @@
     <main class="auth-card" role="main">
         <p class="auth-brand">ANBG Pilotage</p>
         <h1>Nouveau mot de passe</h1>
-        <p class="desc">Définissez votre nouveau mot de passe. Il devra respecter la politique de sécurité de l'application.</p>
+        <p class="desc">Definissez votre nouveau mot de passe. Il devra respecter la politique de securite de l'application.</p>
 
         @if ($errors->any())
             <div class="alert">
@@ -72,22 +79,42 @@
             <input id="email" type="email" name="email" value="{{ old('email', $email) }}" required autocomplete="email">
 
             <label for="password">Nouveau mot de passe</label>
-            <input id="password" type="password" name="password" required autocomplete="new-password">
-
-            <label for="password_confirmation">Confirmer le mot de passe</label>
-            <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password">
-
-            <div class="policy">
-                <strong>Politique de sécurité :</strong> minimum 12 caractères, au moins une majuscule, une minuscule, un chiffre et un symbole. Les 5 derniers mots de passe ne peuvent pas être réutilisés.
+            <div class="password-field">
+                <input id="password" type="password" name="password" required autocomplete="new-password">
+                <button type="button" class="password-toggle" data-password-toggle="password">Voir</button>
             </div>
 
-            <button class="btn" type="submit">Réinitialiser le mot de passe</button>
+            <label for="password_confirmation">Confirmer le mot de passe</label>
+            <div class="password-field">
+                <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password">
+                <button type="button" class="password-toggle" data-password-toggle="password_confirmation">Voir</button>
+            </div>
+
+            <div class="policy">
+                <strong>Politique de securite :</strong> minimum 12 caracteres, au moins une majuscule, une minuscule, un chiffre et un symbole. Les 5 derniers mots de passe ne peuvent pas etre reutilises.
+            </div>
+
+            <button class="btn" type="submit">Reinitialiser le mot de passe</button>
         </form>
 
         <div class="links">
-            <a href="{{ route('login') }}">← Retour à la connexion</a>
+            <a href="{{ route('login.form') }}">Retour a la connexion</a>
         </div>
-        <p class="footer"><strong>ANBG Pilotage</strong> · PAS / PAO / PTA</p>
+        <p class="footer"><strong>ANBG Pilotage</strong> - PAS / PAO / PTA</p>
     </main>
+    <script>
+        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var input = document.getElementById(button.dataset.passwordToggle);
+                if (! input) {
+                    return;
+                }
+
+                var isHidden = input.type === 'password';
+                input.type = isHidden ? 'text' : 'password';
+                button.textContent = isHidden ? 'Cacher' : 'Voir';
+            });
+        });
+    </script>
 </body>
 </html>

@@ -121,7 +121,7 @@ class PlatformSimulationService
                 $simulatedDirectionEnabled
             ),
             'payload' => [
-                'actions_service_validation_enabled' => $simulatedServiceEnabled ? '1' : '0',
+                'actions_service_validation_enabled' => '1',
                 'actions_direction_validation_enabled' => '0',
                 'actions_min_progress_for_closure' => (string) $simulatedClosureProgress,
                 'actions_auto_complete_when_target_reached' => $simulatedAutoComplete ? '1' : '0',
@@ -208,19 +208,7 @@ class PlatformSimulationService
     ): array {
         $warnings = [];
 
-        if ($currentDirectionEnabled && ! $simulatedDirectionEnabled) {
-            $warnings[] = 'La validation direction est retiree du circuit simule.';
-        }
-
-        if ($currentServiceEnabled !== $simulatedServiceEnabled) {
-            $warnings[] = $simulatedServiceEnabled
-                ? 'La validation chef redevient une etape obligatoire.'
-                : 'La validation chef est retiree du circuit simule.';
-        }
-
-        if (! $simulatedServiceEnabled && ! $simulatedDirectionEnabled) {
-            $warnings[] = 'Le circuit simule cloture les actions sans validation complementaire.';
-        }
+        $warnings[] = 'La simulation conserve le circuit cible : agent vers chef de service.';
 
         return $warnings;
     }
@@ -286,18 +274,6 @@ class PlatformSimulationService
 
     private function chainLabel(bool $serviceEnabled, bool $directionEnabled): string
     {
-        if ($serviceEnabled && $directionEnabled) {
-            return 'Agent -> Chef de service -> Direction';
-        }
-
-        if ($serviceEnabled) {
-            return 'Agent -> Chef de service';
-        }
-
-        if ($directionEnabled) {
-            return 'Agent -> Direction';
-        }
-
-        return 'Agent -> cloture directe';
+        return 'Agent -> Chef de service';
     }
 }

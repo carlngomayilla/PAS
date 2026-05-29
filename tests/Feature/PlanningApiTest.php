@@ -85,6 +85,85 @@ class PlanningApiTest extends TestCase
         }
     }
 
+    public function test_service_user_sees_pao_transmitted_through_operational_objective(): void
+    {
+        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $year = app(\App\Services\ExerciceContext::class)->selectedYear();
+        $pas = Pas::query()->create([
+            'titre' => 'PAS test transmission service',
+            'periode_debut' => $year,
+            'periode_fin' => $year,
+            'statut' => 'actif',
+        ]);
+        $axe = PasAxe::query()->create([
+            'pas_id' => (int) $pas->id,
+            'code' => 'AXE-SVC',
+            'libelle' => 'Axe service',
+            'ordre' => 1,
+        ]);
+        $objectif = PasObjectif::query()->create([
+            'pas_axe_id' => (int) $axe->id,
+            'code' => 'OS-SVC',
+            'libelle' => 'Objectif service',
+            'ordre' => 1,
+        ]);
+
+        $pao = Pao::query()->create([
+            'pas_id' => (int) $pas->id,
+            'pas_objectif_id' => (int) $objectif->id,
+            'direction_id' => (int) $serviceUser->direction_id,
+            'service_id' => null,
+            'annee' => $year,
+            'titre' => 'PAO directionnel transmis service',
+            'echeance' => $year.'-12-31',
+            'objectif_operationnel' => 'Objectif porte par le service',
+        ]);
+        $pao->forceFill(['statut' => Pao::STATUS_VALIDE])->save();
+
+        ObjectifOperationnel::query()->create([
+            'pao_id' => (int) $pao->id,
+            'pas_id' => (int) $pas->id,
+            'pas_axe_id' => (int) $objectif->pas_axe_id,
+            'pas_objectif_id' => (int) $objectif->id,
+            'direction_id' => (int) $serviceUser->direction_id,
+            'service_id' => (int) $serviceUser->service_id,
+            'libelle' => 'Objectif operationnel transmis',
+            'echeance' => $year.'-12-31',
+            'statut' => Pao::STATUS_VALIDE,
+        ]);
+
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => $serviceUser->email,
+            'password' => 'Pass@12345',
+            'device_name' => 'phpunit-service-pao-objective',
+        ]);
+
+        $token = (string) $loginResponse->json('access_token');
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/paos?annee='.$year);
+
+        $response->assertOk();
+
+        $this->assertContains((int) $pao->id, collect($response->json('data'))->pluck('id')->map(fn ($id): int => (int) $id)->all());
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/paos/'.$pao->id)
+            ->assertOk()
+            ->assertJsonPath('data.service_id', null)
+            ->assertJsonPath('data.objectifs_operationnels.0.service_id', (int) $serviceUser->service_id);
+
+        $axesResponse = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/pas-axes');
+        $axesResponse->assertOk();
+        $this->assertContains((int) $axe->id, collect($axesResponse->json('data'))->pluck('id')->map(fn ($id): int => (int) $id)->all());
+
+        $objectifsResponse = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/pas-objectifs');
+        $objectifsResponse->assertOk();
+        $this->assertContains((int) $objectif->id, collect($objectifsResponse->json('data'))->pluck('id')->map(fn ($id): int => (int) $id)->all());
+    }
+
     public function test_service_user_cannot_create_pao_for_another_direction(): void
     {
         $loginResponse = $this->postJson('/api/v1/login', [
@@ -182,7 +261,8 @@ class PlanningApiTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.direction_id', $dafDirectionId)
-            ->assertJsonPath('data.service_id', $dafServiceId);
+            ->assertJsonPath('data.service_id', null)
+            ->assertJsonPath('data.objectifs_operationnels.0.service_id', $dafServiceId);
     }
 
     public function test_direction_user_can_create_pao_for_his_own_direction_on_an_accessible_objectif(): void
@@ -231,7 +311,8 @@ class PlanningApiTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.direction_id', $directionId)
-            ->assertJsonPath('data.service_id', $serviceId);
+            ->assertJsonPath('data.service_id', null)
+            ->assertJsonPath('data.objectifs_operationnels.0.service_id', $serviceId);
     }
 
     public function test_direction_user_can_decline_multiple_operational_objectives_for_the_same_pao_context(): void
@@ -354,6 +435,7 @@ class PlanningApiTest extends TestCase
                             [
                                 'code' => 'OS-TEST-1',
                                 'libelle' => 'Objectif test',
+                                'date_echeance' => '2029-12-31',
                                 'description' => 'Description objectif test',
                                 'indicateur_global' => 'Taux de completude',
                                 'valeur_cible' => '100%',

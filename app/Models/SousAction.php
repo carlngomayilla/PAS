@@ -80,4 +80,9 @@ class SousAction extends Model
     {
         return $this->hasMany(Justificatif::class, 'sous_action_id');
     }
+
+    public function deadlineExtensionRequests(): HasMany
+    {
+        return $this->hasMany(DeadlineExtensionRequest::class, 'sous_action_id');
+    }
 }

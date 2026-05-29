@@ -45,7 +45,7 @@ class RolePermissionSettings
             'retention.manage' => ['group' => 'Gouvernance', 'label' => 'Piloter la rétention', 'description' => 'Exécuter les actions de rétention.', 'sensitive' => true],
             'api_docs.read' => ['group' => 'Gouvernance', 'label' => 'Voir l’API', 'description' => 'Accéder à la documentation API.', 'sensitive' => false],
             'audit.read' => ['group' => 'Audit', 'label' => 'Voir l’audit', 'description' => 'Consulter les journaux d’audit.', 'sensitive' => true],
-            'messagerie.read' => ['group' => 'Communication', 'label' => 'Utiliser la messagerie', 'description' => 'Accéder à la messagerie et à l’organigramme.', 'sensitive' => false],
+            'messagerie.read' => ['group' => 'Communication', 'label' => 'Utiliser la messagerie', 'description' => 'Accéder à la messagerie interne.', 'sensitive' => false],
         ];
     }
 
@@ -215,9 +215,16 @@ class RolePermissionSettings
             // + audit, mais aucune ecriture ni validation directe. La validation
             // finale PAS/PAO/PTA revient a SUPER_ADMIN / ADMIN. Le DG voit tout
             // mais n est pas une voie d ecriture (separation des pouvoirs).
+            // DG (Directeur General) : pilote l'agence — autorite ecriture/suppression
+            // globale sur tout le portefeuille planification. Conserve les droits de
+            // lecture / reporting / audit. Le DG peut creer, modifier et supprimer
+            // PAS / PAO / PTA / Actions sans restriction de perimetre (scope global).
             User::ROLE_DG => [
                 'scope.global.read',
+                'scope.global.write',
                 'planning.read',
+                'planning.write.global',
+                'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',

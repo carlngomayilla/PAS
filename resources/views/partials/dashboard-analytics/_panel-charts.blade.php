@@ -111,7 +111,8 @@
                 <span class="showcase-chip">Survolez pour les détails</span>
             </div>
             <div class="dashboard-gauge-grid-4">
-                @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')],['key' => 'conformite', 'label' => $metricLabel('conformite')]] as $gauge)
+                {{-- KPI conformite retire (2026-05-28) : seuls delai et performance restent affiches. --}}
+                @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')]] as $gauge)
                     @php
                         $gaugeValue = min(100, max(0, (float) ($globalScores[$gauge['key']] ?? 0)));
                         $gaugeTone = $gaugeValue >= 80 ? '#8FC043' : ($gaugeValue >= 60 ? '#3996D3' : '#F9B13C');

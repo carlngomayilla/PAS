@@ -14,6 +14,42 @@
     $canSeeModule = static fn (string $code): bool => $workspaceModules->has($code);
     $moduleLabel = static fn (string $code, string $fallback): string => (string) (($workspaceModules->get($code)['label'] ?? null) ?: $fallback);
     $moduleOrder = static fn (string $code, int $fallback = 999): int => (int) ($workspaceModules->get($code)['display_order'] ?? $fallback);
+    $moduleEndpoint = static fn (string $code): string => (string) (($workspaceModules->get($code)['endpoint'] ?? null) ?: '/workspace/'.str_replace('_', '-', $code));
+    $moduleHref = static fn (string $code): string => url($moduleEndpoint($code));
+    $moduleIcon = static fn (string $code): string => match ($code) {
+        'mes_taches' => 'tasks',
+        'mes_actions' => 'actions',
+        'corrections' => 'corrections',
+        'validations' => 'validations',
+        'agents', 'services_agents' => 'agents',
+        'controle' => 'controle',
+        'notifications' => 'notifications',
+        'financement', 'financements_critiques' => 'financement',
+        'synthese_agence' => 'synthese',
+        'arbitrages' => 'arbitrages',
+        'rapports_consolides' => 'reporting',
+        'supervision' => 'supervision',
+        'roles_permissions' => 'roles',
+        'organisation' => 'organisation',
+        'workflows' => 'workflow',
+        'imports_excel' => 'docs',
+        default => $code,
+    };
+    $moduleSection = static fn (string $code): string => match ($code) {
+        'mes_taches', 'notifications' => 'Menu',
+        'pas', 'pao', 'pta', 'imports_excel' => 'Planification',
+        'execution', 'mes_actions', 'corrections', 'validations', 'agents', 'services_agents', 'controle', 'financement' => 'Exécution',
+        'reporting', 'alertes', 'synthese_agence', 'arbitrages', 'financements_critiques', 'rapports_consolides', 'supervision' => 'Pilotage',
+        'super_admin' => 'Plateforme',
+        default => 'Administration',
+    };
+    $moduleActive = static function (string $endpoint): bool {
+        $path = parse_url($endpoint, PHP_URL_PATH);
+        $path = is_string($path) && $path !== '' ? '/'.ltrim($path, '/') : $endpoint;
+        $current = '/'.ltrim(request()->path(), '/');
+
+        return $current === $path || str_starts_with($current, rtrim($path, '/').'/');
+    };
 
     $isActive = static function (array $patterns): bool {
         foreach ($patterns as $pattern) {
@@ -78,6 +114,16 @@
             'display_order' => $moduleOrder('pta', 60),
         ];
     }
+    if ($canSeeModule('imports_excel')) {
+        $planningItems[] = [
+            'code' => 'imports_excel',
+            'label' => $moduleLabel('imports_excel', 'Imports Excel'),
+            'route' => 'workspace.imports.index',
+            'icon' => 'docs',
+            'patterns' => ['workspace.imports.*'],
+            'display_order' => $moduleOrder('imports_excel', 55),
+        ];
+    }
     if ($planningItems !== []) {
         $sections[] = ['title' => 'Planification', 'items' => $sortItems($planningItems)];
     }
@@ -95,15 +141,15 @@
             'display_order' => $moduleOrder('execution', 70),
         ]];
 
-        if ($isDafFinanceReviewer || ($user?->hasRole(\App\Models\User::ROLE_DG) ?? false) || ($user?->hasGlobalReadAccess() ?? false)) {
+        if ($canSeeModule('financement')) {
             $executionItems[] = [
-                'code' => 'financements_daf',
-                'module_code' => 'execution',
-                'label' => 'Financements DAF',
+                'code' => 'financement',
+                'module_code' => 'financement',
+                'label' => $moduleLabel('financement', 'Financement des actions'),
                 'route' => 'workspace.daf.financements.index',
                 'icon' => 'financement',
                 'patterns' => ['workspace.daf.financements.*'],
-                'display_order' => $moduleOrder('execution', 71),
+                'display_order' => $moduleOrder('financement', 71),
             ];
         }
 
@@ -202,12 +248,67 @@
         ]]];
     }
 
+    $renderedModuleCodes = collect($sections)
+        ->flatMap(fn (array $section): array => $section['items'] ?? [])
+        ->map(fn (array $item): string => (string) ($item['module_code'] ?? $item['code'] ?? ''))
+        ->filter()
+        ->unique()
+        ->values();
+
+    $extraSections = [];
+    foreach ($workspaceModules as $moduleCode => $module) {
+        $moduleCode = (string) $moduleCode;
+        if ($renderedModuleCodes->contains($moduleCode)) {
+            continue;
+        }
+
+        $endpoint = $moduleEndpoint($moduleCode);
+        $extraSections[$moduleSection($moduleCode)][] = [
+            'code' => $moduleCode,
+            'module_code' => $moduleCode,
+            'label' => $moduleLabel($moduleCode, (string) ($module['label'] ?? ucfirst(str_replace('_', ' ', $moduleCode)))),
+            'href' => $moduleHref($moduleCode),
+            'icon' => $moduleIcon($moduleCode),
+            'active_when' => static fn (): bool => $moduleActive($endpoint),
+            'badge' => (int) ($moduleBadges[$moduleCode] ?? 0),
+            'display_order' => $moduleOrder($moduleCode, 999),
+        ];
+    }
+
+    foreach ($extraSections as $title => $items) {
+        $sectionIndex = null;
+        foreach ($sections as $index => $section) {
+            if (($section['title'] ?? null) === $title) {
+                $sectionIndex = $index;
+                break;
+            }
+        }
+
+        if ($sectionIndex === null) {
+            $sections[] = ['title' => $title, 'items' => $sortItems($items)];
+        } else {
+            $sections[$sectionIndex]['items'] = $sortItems(array_merge($sections[$sectionIndex]['items'], $items));
+        }
+    }
+
     $icons = [
         'dashboard' => 'M3 12l9-7 9 7v8a2 2 0 01-2 2h-4v-7H9v7H5a2 2 0 01-2-2v-8z',
         'pas' => 'M12 3v4m0 10v4m9-9h-4M7 12H3m13.364-5.364l-2.828 2.828M9.464 14.536l-2.828 2.828m0-10.728l2.828 2.828m7.072 7.072l-2.828-2.828',
         'pao' => 'M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
         'pta' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
         'actions' => 'M13 10V3L4 14h7v7l9-11h-7z',
+        'tasks' => 'M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01',
+        'corrections' => 'M4 20h4l10.5-10.5a2.1 2.1 0 00-3-3L5 17v3zm12-15l3 3',
+        'validations' => 'M9 12l2 2 4-5M12 3l7 4v5c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V7l7-4z',
+        'agents' => 'M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm10 10v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
+        'controle' => 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11',
+        'notifications' => 'M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0',
+        'synthese' => 'M4 5h16M4 12h8m-8 7h16M16 9l2 2 4-4',
+        'arbitrages' => 'M12 3v18m-6-4h12M5 7h14M7 7l-4 7h8L7 7zm10 0l-4 7h8l-4-7z',
+        'supervision' => 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zm10 3a3 3 0 100-6 3 3 0 000 6z',
+        'roles' => 'M12 12a5 5 0 100-10 5 5 0 000 10zm7 9a7 7 0 00-14 0m13-8l2 2 3-4',
+        'organisation' => 'M12 5v4m0 0H7m5 0h5M7 9v5m10-5v5M5 19h4v-5H5v5zm10 0h4v-5h-4v5z',
+        'workflow' => 'M4 6h6v6H4V6zm10 0h6v6h-6V6zM7 12v3a3 3 0 003 3h4m0 0l-2-2m2 2l-2 2',
         'financement' => 'M12 8c-2.8 0-5 1.2-5 3s2.2 3 5 3 5-1.2 5-3-2.2-3-5-3zm0 6v4m-6-4v3m12-3v3M5 20h14M12 4v2',
         'reporting' => 'M4 19V5m0 14h16M8 16V9m4 7V7m4 9v-5',
         'alertes' => 'M12 9v4m0 4h.01M10.29 3.86 2.82 17a2 2 0 001.71 3h14.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
@@ -278,10 +379,11 @@
                                     $moduleCode = (string) ($item['module_code'] ?? $item['code'] ?? '');
                                     $iconPath = $icons[$item['icon']] ?? $icons['dashboard'];
                                     $routeParams = is_array($item['route_params'] ?? null) ? $item['route_params'] : [];
+                                    $href = (string) ($item['href'] ?? route($item['route'], $routeParams));
                                 @endphp
 
                                 <a
-                                    href="{{ route($item['route'], $routeParams) }}"
+                                    href="{{ $href }}"
                                     class="app-sidebar-link {{ $active ? 'active is-active' : '' }}"
                                     data-sidebar-module="{{ $moduleCode }}"
                                     @if ($active) aria-current="page" @endif
@@ -303,10 +405,12 @@
                 @endforeach
             </nav>
 
-            <div class="app-sidebar-footer px-4 py-4">
-                <form method="POST" action="{{ route('logout') }}">
+            <div class="app-sidebar-footer flex justify-center px-3 py-3">
+                {{-- Carte profil supprimée : le profil utilisateur connecté est déjà affiché dans la navbar --}}
+
+                <form method="POST" action="{{ route('logout') }}" class="w-full">
                     @csrf
-                    <button type="submit" class="app-sidebar-logout text-sm transition">
+                    <button type="submit" class="app-sidebar-logout text-sm transition mx-auto">
                         <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $icons['logout'] }}" />
                         </svg>

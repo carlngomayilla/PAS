@@ -2,10 +2,10 @@
     <nav class="app-pagination mt-4" role="navigation" aria-label="Pagination">
         @if ($paginator->onFirstPage())
             <span class="px-3 py-2 text-xs opacity-50" aria-disabled="true">Premier</span>
-            <span class="px-3 py-2 text-xs opacity-50" aria-disabled="true">Precedent</span>
+            <span class="px-3 py-2 text-xs opacity-50" aria-disabled="true">Précédent</span>
         @else
             <a class="px-3 py-2 text-xs" href="{{ $paginator->url(1) }}" rel="first">Premier</a>
-            <a class="px-3 py-2 text-xs" href="{{ $paginator->previousPageUrl() }}" rel="prev">Precedent</a>
+            <a class="px-3 py-2 text-xs" href="{{ $paginator->previousPageUrl() }}" rel="prev">Précédent</a>
         @endif
 
         <span class="pagination-link-current px-3 py-2 text-xs">Page {{ $paginator->currentPage() }}</span>

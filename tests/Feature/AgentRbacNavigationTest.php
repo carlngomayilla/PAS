@@ -18,14 +18,22 @@ class AgentRbacNavigationTest extends TestCase
 
         $codes = collect($agent->workspaceModules())->pluck('code')->all();
 
-        $this->assertContains('pilotage', $codes);
-        $this->assertContains('messagerie', $codes);
-        $this->assertContains('pas', $codes);
-        $this->assertContains('pao', $codes);
-        $this->assertContains('pta', $codes);
-        $this->assertContains('execution', $codes);
-        $this->assertContains('reporting', $codes);
-        $this->assertContains('alertes', $codes);
+        // Fusion modules (2026-05-28) : 'mes_actions' devient 'execution' (label "Action")
+        // pour les agents. L'URL reste pointee sur ?vue=mes_actions cote sidebar.
+        $this->assertEqualsCanonicalizing([
+            'pilotage',
+            'execution',
+            'corrections',
+            'notifications',
+        ], $codes);
+
+        $this->assertNotContains('messagerie', $codes);
+        $this->assertNotContains('pas', $codes);
+        $this->assertNotContains('pao', $codes);
+        $this->assertNotContains('pta', $codes);
+        $this->assertNotContains('mes_actions', $codes, 'Le code mes_actions a ete fusionne avec execution.');
+        $this->assertNotContains('reporting', $codes);
+        $this->assertNotContains('alertes', $codes);
         $this->assertNotContains('referentiel', $codes);
         $this->assertNotContains('audit', $codes);
         $this->assertNotContains('api_docs', $codes);
@@ -34,14 +42,14 @@ class AgentRbacNavigationTest extends TestCase
         $this->assertNotContains('super_admin', $codes);
     }
 
-    public function test_agent_can_open_planning_read_routes_by_direct_url(): void
+    public function test_agent_cannot_open_planning_modules_by_direct_url(): void
     {
         $agent = User::factory()->create([
             'role' => User::ROLE_AGENT,
         ]);
 
-        $this->actingAs($agent)->get('/workspace/pas')->assertOk();
-        $this->actingAs($agent)->get('/workspace/pao')->assertOk();
-        $this->actingAs($agent)->get('/workspace/pta')->assertOk();
+        $this->actingAs($agent)->get('/workspace/pas')->assertForbidden();
+        $this->actingAs($agent)->get('/workspace/pao')->assertForbidden();
+        $this->actingAs($agent)->get('/workspace/pta')->assertForbidden();
     }
 }

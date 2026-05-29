@@ -118,10 +118,16 @@ class DashboardStatsService
     private function countActive(Builder $query): int
     {
         $table = $query->getModel()->getTable();
+        $activeStatuses = match ($table) {
+            'pas' => ['actif'],
+            'paos' => ['en_cours', 'valide'],
+            'ptas' => ['en_cours'],
+            default => ['actif', 'en_cours', 'valide'],
+        };
 
         foreach (['statut', 'status'] as $column) {
             if (Schema::hasColumn($table, $column)) {
-                return (clone $query)->whereIn($column, ['actif', 'valide', 'verrouille', 'en_cours'])->count();
+                return (clone $query)->whereIn($column, $activeStatuses)->count();
             }
         }
 
@@ -177,7 +183,7 @@ class DashboardStatsService
         }
 
         return (clone $query)
-            ->whereIn('statut_validation', ['soumise_chef', 'soumise_direction', 'en_attente_validation'])
+            ->whereIn('statut_validation', ['soumise_chef', 'en_attente_validation'])
             ->count();
     }
 

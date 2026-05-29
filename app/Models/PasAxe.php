@@ -28,6 +28,7 @@ class PasAxe extends Model
         'periode_fin',
         'description',
         'ordre',
+        'import_ordre',
         'created_by',
     ];
 

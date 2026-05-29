@@ -190,7 +190,6 @@ class CleanupInactiveUsersCommand extends Command
                             'date_fin' => $defaultEnd->toDateString(),
                             'date_echeance' => $defaultEnd->toDateString(),
                             'responsable_id' => $user->id,
-                            'frequence_execution' => 'hebdomadaire',
                             'resultat_attendu' => 'Resultat de demonstration : libre.',
                             'contexte_action' => 'operationnel',
                             'origine_action' => 'INTERNE',

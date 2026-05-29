@@ -91,6 +91,50 @@ class ProfileWebTest extends TestCase
         $this->assertTrue(Hash::check('Password-Old@123', $user->password));
     }
 
+    public function test_expired_password_profile_update_requires_new_password(): void
+    {
+        $user = User::factory()->create([
+            'password' => Hash::make('Password-Old@123'),
+            'password_changed_at' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('workspace.profile.edit'))
+            ->put(route('workspace.profile.update'), [
+                'name' => $user->name,
+                'email' => $user->email,
+            ])
+            ->assertRedirect(route('workspace.profile.edit'))
+            ->assertSessionHasErrors('password');
+
+        $user->refresh();
+        $this->assertNull($user->password_changed_at);
+        $this->assertTrue(Hash::check('Password-Old@123', $user->password));
+    }
+
+    public function test_expired_password_user_can_renew_password_from_profile(): void
+    {
+        $user = User::factory()->create([
+            'password' => Hash::make('Password-Old@123'),
+            'password_changed_at' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('workspace.profile.update'), [
+                'name' => $user->name,
+                'email' => $user->email,
+                'current_password' => 'Password-Old@123',
+                'password' => 'Password-New@123',
+                'password_confirmation' => 'Password-New@123',
+            ])
+            ->assertRedirect(route('workspace.profile.edit'))
+            ->assertSessionHas('success');
+
+        $user->refresh();
+        $this->assertNotNull($user->password_changed_at);
+        $this->assertTrue(Hash::check('Password-New@123', $user->password));
+    }
+
     public function test_profile_photo_url_uses_public_storage_path(): void
     {
         $user = User::factory()->create([

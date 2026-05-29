@@ -67,16 +67,16 @@
                 $trendUp   = ($ksc['trend'] ?? null) === 'up';
                 $trendDown = ($ksc['trend'] ?? null) === 'down';
             @endphp
-            <a href="{{ $ksc['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border border-[#3996d3]/30 bg-white px-4 py-3 text-center shadow-sm transition hover:shadow-md">
+            <a href="{{ $ksc['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border border-[#3996d3]/30 bg-white px-4 py-3 text-center shadow-sm transition" style="--kpi-accent:{{ $ksc['accent'] }};">
                 <div class="flex min-h-[4.5rem] flex-col items-center justify-center gap-2">
-                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef6fc]" style="color:{{ $ksc['accent'] }};">
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style="color:{{ $ksc['accent'] }}; background:color-mix(in srgb, {{ $ksc['accent'] }} 12%, transparent);">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                              stroke-linejoin="round" aria-hidden="true">{!! $ksc['icon'] !!}</svg>
                     </div>
                     <div class="min-w-0">
                         <p class="truncate text-center text-[11px] font-bold uppercase tracking-wide text-[#667085]">{{ $ksc['label'] }}</p>
-                        <p class="mt-1 text-center text-xl font-extrabold" style="color:{{ $ksc['accent'] }};">{{ $ksc['value'] }}</p>
+                        <p class="mt-1 text-center text-xl font-extrabold leading-none" style="color:{{ $ksc['accent'] }};">{{ $ksc['value'] }}</p>
                     </div>
                 </div>
                 @if (!is_null($ksc['trend'] ?? null))
@@ -104,21 +104,21 @@
                 [
                     'group' => 'PAS',
                     'cards' => [
-                        ['label' => 'Actifs', 'value' => $metrics['totals']['pas_actifs'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pas.index', ['statut' => 'valide_ou_verrouille'])],
+                        ['label' => 'Actifs', 'value' => $metrics['totals']['pas_actifs'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pas.index', ['statut' => 'actif'])],
                         ['label' => 'Total', 'value' => $metrics['totals']['pas_total'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pas.index')],
                     ],
                 ],
                 [
                     'group' => 'PAO',
                     'cards' => [
-                        ['label' => 'Actifs', 'value' => $metrics['totals']['paos_actifs'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pao.index', ['statut' => 'valide_ou_verrouille'])],
+                        ['label' => 'Actifs', 'value' => $metrics['totals']['paos_actifs'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pao.index', ['statut' => 'en_cours'])],
                         ['label' => 'Total', 'value' => $metrics['totals']['paos_total'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pao.index')],
                     ],
                 ],
                 [
                     'group' => 'PTA',
                     'cards' => [
-                        ['label' => 'Actifs', 'value' => $metrics['totals']['ptas_actifs'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille'])],
+                        ['label' => 'Actifs', 'value' => $metrics['totals']['ptas_actifs'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pta.index', ['statut' => 'en_cours'])],
                         ['label' => 'Total', 'value' => $metrics['totals']['ptas_total'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pta.index')],
                     ],
                 ],
@@ -136,7 +136,7 @@
                 [
                     'group' => 'PAS',
                     'cards' => [
-                        ['label' => 'PAS actif', 'value' => $metrics['totals']['pas_actifs'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pas.index', ['statut' => 'valide_ou_verrouille'])],
+                        ['label' => 'PAS actif', 'value' => $metrics['totals']['pas_actifs'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pas.index', ['statut' => 'actif'])],
                         ['label' => 'Axes concernés', 'value' => $decisionCounts['axes_concernes'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pas.index')],
                         ['label' => 'Objectifs stratégiques concernés', 'value' => $decisionCounts['objectifs_strategiques_concernes'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pas.index')],
                         ['label' => 'Taux d\'alignement stratégique', 'value' => $fmtPct($decisionCounts['taux_alignement'] ?? 0), 'accent' => '#178f5f', 'href' => route('workspace.actions.index')],
@@ -155,7 +155,7 @@
                     'group' => 'PTA',
                     'cards' => [
                         ['label' => 'PTA des services', 'value' => $metrics['totals']['ptas_total'] ?? 0, 'accent' => '#3996D3', 'href' => route('workspace.pta.index')],
-                        ['label' => 'PTA validés', 'value' => $metrics['totals']['ptas_actifs'] ?? 0, 'accent' => '#178f5f', 'href' => route('workspace.pta.index', ['statut' => 'valide_ou_verrouille'])],
+                        ['label' => 'PTA en cours', 'value' => $metrics['totals']['ptas_actifs'] ?? 0, 'accent' => '#178f5f', 'href' => route('workspace.pta.index', ['statut' => 'en_cours'])],
                         ['label' => 'PTA sans actions', 'value' => max(0, (int) ($metrics['totals']['ptas_total'] ?? 0) - (int) ($decisionCounts['ptas_avec_actions'] ?? 0)), 'accent' => '#B42318', 'href' => route('workspace.pta.index')],
                         ['label' => 'Services couverts', 'value' => $decisionCounts['services_couverts'] ?? 0, 'accent' => '#17324a', 'href' => route('workspace.pta.index')],
                     ],

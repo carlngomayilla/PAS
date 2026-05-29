@@ -101,7 +101,7 @@ class SuperAdminConfigurationSnapshotsTest extends TestCase
                 'compare_right' => $right->id,
             ]))
             ->assertOk()
-            ->assertSee('Differences detectees')
+            ->assertSee('Différences détectées')
             ->assertSee('app_name')
             ->assertSee('institution_label')
             ->assertSee('footer_text');

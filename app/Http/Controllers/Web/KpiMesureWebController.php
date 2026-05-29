@@ -37,7 +37,7 @@ class KpiMesureWebController extends Controller
             ->with('action.pta:id,direction_id,service_id,statut')
             ->findOrFail((int) $validated['kpi_id']);
 
-        if ($kpi->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $kpi->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withInput()->withErrors([
                 'kpi_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Creation'),
             ]);
@@ -70,7 +70,7 @@ class KpiMesureWebController extends Controller
 
         $kpiMesure->loadMissing('kpi.action.pta:id,direction_id,service_id,statut');
 
-        if ($kpiMesure->kpi?->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $kpiMesure->kpi?->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Mise a jour'),
             ]);
@@ -81,7 +81,7 @@ class KpiMesureWebController extends Controller
             ->with('action.pta:id,direction_id,service_id,statut')
             ->findOrFail((int) $validated['kpi_id']);
 
-        if ($targetKpi->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $targetKpi->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withInput()->withErrors([
                 'kpi_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
             ]);
@@ -117,7 +117,7 @@ class KpiMesureWebController extends Controller
 
         $kpiMesure->loadMissing('kpi.action.pta:id,direction_id,service_id,statut');
 
-        if ($kpiMesure->kpi?->action?->pta?->statut === 'verrouille') {
+        if (in_array((string) $kpiMesure->kpi?->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withErrors([
                 'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Suppression'),
             ]);

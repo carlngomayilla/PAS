@@ -12,7 +12,7 @@ trait EnsuresPtaIsUnlocked
 
     protected function assertPtaNotLocked(mixed $pta): ?JsonResponse
     {
-        if ($pta?->statut === 'verrouille') {
+        if (in_array((string) $pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
                 'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Operation'),
             ], 409);

@@ -114,14 +114,14 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Circuit PAS / PAO / PTA</h2>
-                <p class="form-section-subtitle">Chaque module peut conserver le workflow complet, s'arrêter à la validation, ou autoriser une validation directe sans étape `soumis`.</p>
+                <p class="form-section-subtitle">Le workflow PAS/PAO/PTA suit le cycle canonique valide, sans ancien circuit soumis/valide/verrouille.</p>
                 <div class="grid gap-4 md:grid-cols-3">
                     @foreach (['pas' => 'PAS', 'pao' => 'PAO', 'pta' => 'PTA'] as $module => $label)
                         <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
                             <label for="{{ $module }}_workflow_mode">{{ $label }}</label>
                             <select id="{{ $module }}_workflow_mode" name="{{ $module }}_workflow_mode" class="mt-2">
                                 @foreach ($planningModes as $mode => $modeLabel)
-                                    <option value="{{ $mode }}" @selected(($settings[$module.'_workflow_mode'] ?? 'full') === $mode)>{{ $modeLabel }}</option>
+                                    <option value="{{ $mode }}" @selected(($settings[$module.'_workflow_mode'] ?? 'canonical') === $mode)>{{ $modeLabel }}</option>
                                 @endforeach
                             </select>
                             <p class="mt-3 text-sm text-slate-600">{{ $planningWorkflows[$module]['chain_label'] }}</p>

@@ -34,7 +34,7 @@ class UpdateActionRequest extends FormRequest
             'libelle' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
 
-            'type_cible' => ['nullable', Rule::in(['quantitative', 'qualitative'])],
+            'type_cible' => ['nullable', Rule::in(['quantitative', 'qualitative', Action::MODE_SANS_QUANTITE])],
             'unite_cible' => ['nullable', 'string', 'max:100'],
             'quantite_cible' => ['nullable', 'numeric', 'min:0.0001'],
             'seuil_mode' => ['nullable', Rule::in(['unique', 'trimestriel'])],
@@ -43,6 +43,7 @@ class UpdateActionRequest extends FormRequest
             'seuil_t2' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'seuil_t3' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'seuil_t4' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'justificatif_obligatoire' => ['nullable', 'boolean'],
             'sous_actions' => ['nullable', 'array'],
             'sous_actions.*.id' => ['nullable', 'integer', 'exists:sous_actions,id'],
             'sous_actions.*.agent_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -77,6 +78,12 @@ class UpdateActionRequest extends FormRequest
             'kpi_est_a_renseigner' => ['required', 'boolean'],
 
             'financement_requis' => ['required', 'boolean'],
+            'ressources_necessaires' => ['nullable', 'array'],
+            'ressources_necessaires.*' => ['string', Rule::in(array_keys(Action::resourceOptions()))],
+            'ressources_details' => ['nullable', 'string'],
+            'risque_potentiel' => ['nullable', 'string'],
+            'niveau_risque' => ['nullable', 'string', 'max:50'],
+            'mesures_preventives' => ['nullable', 'string'],
             'ressource_main_oeuvre' => ['nullable', 'boolean'],
             'ressource_equipement' => ['nullable', 'boolean'],
             'ressource_partenariat' => ['nullable', 'boolean'],
@@ -140,7 +147,9 @@ class UpdateActionRequest extends FormRequest
 
             $type = $hasQuantitativeTarget
                 ? 'quantitative'
-                : (string) ($action?->type_cible ?: 'qualitative');
+                : ((string) $action?->mode_evaluation === Action::MODE_SANS_QUANTITE
+                    ? Action::MODE_SANS_QUANTITE
+                    : (string) ($action?->type_cible ?: 'qualitative'));
         }
 
         $contexteAction = $this->input('contexte_action');
@@ -169,6 +178,12 @@ class UpdateActionRequest extends FormRequest
         if ($rmoIds === [] && $action?->responsable_id !== null) {
             $rmoIds = [(int) $action->responsable_id];
         }
+
+        $resources = collect((array) $this->input('ressources_necessaires', []))
+            ->filter(fn ($value): bool => is_string($value) && array_key_exists($value, Action::resourceOptions()))
+            ->unique()
+            ->values()
+            ->all();
 
         $objectifId = $this->input('objectif_operationnel_id') ?: $this->input('objectif_operationnel_id_selector') ?: $action?->objectif_operationnel_id;
         if (($objectifId === null || $objectifId === '') && is_numeric($this->input('pta_id'))) {
@@ -209,16 +224,19 @@ class UpdateActionRequest extends FormRequest
             'seuil_t2' => ($this->input('seuil_t2') === null || $this->input('seuil_t2') === '') ? null : $this->input('seuil_t2'),
             'seuil_t3' => ($this->input('seuil_t3') === null || $this->input('seuil_t3') === '') ? null : $this->input('seuil_t3'),
             'seuil_t4' => ($this->input('seuil_t4') === null || $this->input('seuil_t4') === '') ? null : $this->input('seuil_t4'),
+            'justificatif_obligatoire' => $this->boolean('justificatif_obligatoire'),
             'sous_actions' => $this->normalizeSubActionsInput((array) $this->input('sous_actions', [])),
             'contexte_action' => $contexteAction,
             'origine_action' => $origineAction,
             'responsable_id' => $rmoIds[0] ?? $this->input('responsable_id'),
             'rmo_ids' => $rmoIds,
             'financement_requis' => $this->boolean('financement_requis'),
-            'ressource_main_oeuvre' => $this->boolean('ressource_main_oeuvre'),
-            'ressource_equipement' => $this->boolean('ressource_equipement'),
-            'ressource_partenariat' => $this->boolean('ressource_partenariat'),
-            'ressource_autres' => $this->boolean('ressource_autres'),
+            'ressources_necessaires' => $resources,
+            'ressource_main_oeuvre' => in_array('main_oeuvre', $resources, true) || in_array('ressources_humaines', $resources, true),
+            'ressource_equipement' => in_array('ressources_materielles', $resources, true) || in_array('ressources_informatiques', $resources, true),
+            'ressource_partenariat' => in_array('partenariat', $resources, true),
+            'ressource_autres' => in_array('autres_ressources', $resources, true),
+            'ressource_autres_details' => $this->input('ressources_details') ?: $this->input('ressource_autres_details'),
             'kpi_periodicite' => (string) $this->input('kpi_periodicite', 'mensuel'),
             'kpi_est_a_renseigner' => $this->boolean('kpi_est_a_renseigner', true),
         ]);
@@ -251,6 +269,8 @@ class UpdateActionRequest extends FormRequest
     {
         $validator->after(function (Validator $validator): void {
             $actionManagementSettings = app(ActionManagementSettings::class);
+            $action = $this->route('action');
+            $action = $action instanceof Action ? $action : null;
 
             if ($validator->errors()->isNotEmpty()) {
                 return;
@@ -284,6 +304,13 @@ class UpdateActionRequest extends FormRequest
                     $validator->errors()->add(
                         'nature_financement',
                         'La nature du financement est obligatoire lorsque le financement est requis.'
+                    );
+                }
+
+                if (! $this->hasFile('justificatif_financement') && ! $this->hasExistingFinancingJustificatif($action)) {
+                    $validator->errors()->add(
+                        'justificatif_financement',
+                        'La piece justificative du financement est obligatoire.'
                     );
                 }
             }
@@ -389,5 +416,20 @@ class UpdateActionRequest extends FormRequest
                 }
             }
         });
+    }
+
+    private function hasExistingFinancingJustificatif(?Action $action): bool
+    {
+        if (! $action instanceof Action) {
+            return false;
+        }
+
+        if (trim((string) ($action->justificatif_financement_path ?? '')) !== '') {
+            return true;
+        }
+
+        return $action->justificatifs()
+            ->where('categorie', 'financement')
+            ->exists();
     }
 }

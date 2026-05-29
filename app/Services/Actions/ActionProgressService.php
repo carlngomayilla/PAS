@@ -35,19 +35,29 @@ class ActionProgressService
     public function compute(Action $action, ?Carbon $referenceDate = null): array
     {
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
-        $action->loadMissing('sousActions.justificatifs', 'weeks');
+        if ($action->exists) {
+            $action->load('sousActions.justificatifs', 'weeks');
+        } else {
+            $action->loadMissing('sousActions.justificatifs', 'weeks');
+        }
 
-        $target = max(0.0, (float) ($action->quantite_cible ?? 0));
+        $target = $action->usesQuantitativeProgress()
+            ? max(0.0, (float) ($action->quantite_cible ?? 0))
+            : 0.0;
         $sousActions = $action->sousActions;
         $realizedQuantity = $this->actionPerformanceService->realizedQuantity($action);
         $totalSousActions = $sousActions->count();
         $completedSousActions = $sousActions
+            ->filter(fn (SousAction $sousAction): bool => $this->actionPerformanceService->isValidatedSubAction($sousAction))
+            ->count();
+        $declaredSousActions = $sousActions
             ->filter(fn (SousAction $sousAction): bool => $this->actionPerformanceService->isCompletedSubAction($sousAction))
             ->count();
 
         $avancementOperationnel = $totalSousActions > 0
             ? $this->actionPerformanceService->boundRate(($completedSousActions / $totalSousActions) * 100)
             : 0.0;
+        $avancementDeclare = $this->actionPerformanceService->calculateDeclaredProgress($action);
 
         $tauxAtteinteCible = $target > 0
             ? $this->actionPerformanceService->boundRate(($realizedQuantity / $target) * 100)
@@ -59,7 +69,9 @@ class ActionProgressService
 
         $progressionReelle = $target > 0
             ? $tauxAtteinteCible
-            : ($totalSousActions > 0 ? $avancementOperationnel : 0.0);
+            : ($totalSousActions > 0
+                ? $avancementOperationnel
+                : ($action->usesNoQuantityProgress() ? $avancementDeclare : 0.0));
 
         $progressionTheorique = $this->calculateTheoreticalProgress($action, $referenceDate->copy()->endOfDay());
 
@@ -67,11 +79,13 @@ class ActionProgressService
             'mode_evaluation' => $action->resolvedEvaluationMode(),
             'total_sous_actions' => $totalSousActions,
             'sous_actions_realisees' => $completedSousActions,
+            'sous_actions_declarees' => $declaredSousActions,
             'quantite_realisee' => $realizedQuantity,
             'cible_mesurable_attendue' => $target,
             'reste_a_realiser' => $remainingValue,
             'taux_depassement' => $overachievementRate,
             'avancement_operationnel' => $avancementOperationnel,
+            'progression_declaree' => $avancementDeclare,
             'taux_atteinte_cible' => $tauxAtteinteCible,
             'taux_global' => $progressionReelle,
             'progression_reelle' => $progressionReelle,
