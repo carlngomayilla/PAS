@@ -7599,4 +7599,320 @@
         z-index: 60;
     }
 
+    /* =========================================================
+       ANBG GLASS PREMIUM THEME v2 — spécificité renforcée
+       Override les classes app-card / showcase-panel existantes
+       en doublant la classe sur body (body.anbg-glass-theme.admin-theme-scope).
+       ========================================================= */
+    body.anbg-glass-theme {
+        --glass-bg: rgba(255, 255, 255, 0.58);
+        --glass-bg-soft: rgba(255, 255, 255, 0.46);
+        --glass-bg-strong: rgba(255, 255, 255, 0.82);
+        --glass-border: rgba(255, 255, 255, 0.68);
+        --glass-border-soft: rgba(148, 163, 184, 0.22);
+        --glass-shadow: 0 18px 55px rgba(28, 32, 61, 0.12),
+                        0 4px 14px rgba(28, 32, 61, 0.06);
+        --glass-shadow-strong: 0 22px 60px rgba(28, 32, 61, 0.16);
+        --glass-blue: #3996d3;
+        --glass-blue-deep: #1c5f91;
+        --glass-navy: #1c203d;
+        --glass-green: #8fc043;
+        --glass-yellow: #f8e932;
+        --glass-orange: #f9b13c;
+    }
+
+    /* Fond mesh général — appliqué seulement quand le thème glass est actif */
+    body.anbg-glass-theme {
+        min-height: 100vh;
+        background:
+            radial-gradient(720px 620px at 10% 5%, rgba(57, 150, 211, 0.34), transparent 65%),
+            radial-gradient(820px 700px at 92% 15%, rgba(143, 192, 67, 0.30), transparent 62%),
+            radial-gradient(900px 780px at 48% 105%, rgba(249, 177, 60, 0.22), transparent 58%),
+            linear-gradient(135deg, #dce9f8 0%, #eef6ff 48%, #eaf7df 100%);
+        background-attachment: fixed;
+    }
+
+    /* Grille texture très légère (override la pseudo-grille existante) */
+    body.anbg-glass-theme::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: -1;
+        background-image:
+            linear-gradient(rgba(255,255,255,0.18) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.18) 1px, transparent 1px);
+        background-size: 42px 42px;
+        opacity: 0.18;
+        display: block !important;
+    }
+
+    /* Base glass — toutes les surfaces principales (spécificité renforcée) */
+    body.anbg-glass-theme .glass-card,
+    body.anbg-glass-theme .showcase-panel,
+    body.anbg-glass-theme .action-detail-card,
+    body.anbg-glass-theme .dealdeck-panel,
+    body.anbg-glass-theme .workspace-panel,
+    body.anbg-glass-theme .app-card,
+    body.anbg-glass-theme .ui-card,
+    body.anbg-glass-theme .form-section,
+    body.anbg-glass-theme .form-shell,
+    body.anbg-glass-theme .data-table-shell,
+    body.anbg-glass-theme .app-table-wrapper,
+    body.anbg-glass-theme .reporting-hub-kpi {
+        background: var(--glass-bg) !important;
+        backdrop-filter: blur(24px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 24px !important;
+        box-shadow: var(--glass-shadow) !important;
+    }
+
+    /* Hero glass premium */
+    body.anbg-glass-theme .glass-hero,
+    body.anbg-glass-theme .showcase-hero,
+    body.anbg-glass-theme .page-header,
+    body.anbg-glass-theme .workspace-header {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.68),
+            rgba(255, 255, 255, 0.44)
+        ) !important;
+        backdrop-filter: blur(28px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 28px !important;
+        box-shadow: var(--glass-shadow) !important;
+    }
+    .anbg-glass-theme .showcase-hero::before {
+        content: "";
+        position: absolute;
+        right: -120px;
+        top: -140px;
+        width: 360px;
+        height: 360px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(57, 150, 211, 0.28), transparent 70%);
+        pointer-events: none;
+    }
+    .anbg-glass-theme .showcase-hero::after {
+        content: "";
+        position: absolute;
+        left: 30%;
+        bottom: -130px;
+        width: 300px;
+        height: 300px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(143, 192, 67, 0.22), transparent 70%);
+        pointer-events: none;
+    }
+
+    /* Titres premium */
+    .anbg-glass-theme .showcase-title,
+    .anbg-glass-theme .glass-title {
+        color: var(--glass-navy);
+        font-weight: 800;
+        letter-spacing: -0.03em;
+    }
+    .anbg-glass-theme .showcase-eyebrow,
+    .anbg-glass-theme .glass-eyebrow {
+        color: var(--glass-blue);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+    .anbg-glass-theme .showcase-panel-title,
+    .anbg-glass-theme .glass-panel-title {
+        color: var(--glass-navy);
+        font-weight: 800;
+    }
+
+    /* Cartes KPI glass */
+    body.anbg-glass-theme .glass-kpi,
+    body.anbg-glass-theme .showcase-kpi-card,
+    body.anbg-glass-theme .dealdeck-kpi-card,
+    body.anbg-glass-theme .stat-card,
+    body.anbg-glass-theme .anbg-kpi-stat-card {
+        background: rgba(255, 255, 255, 0.60) !important;
+        backdrop-filter: blur(22px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 22px !important;
+        box-shadow: var(--glass-shadow) !important;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+    body.anbg-glass-theme .glass-kpi:hover,
+    body.anbg-glass-theme .showcase-kpi-card:hover,
+    body.anbg-glass-theme .dealdeck-kpi-card:hover,
+    body.anbg-glass-theme .stat-card:hover,
+    body.anbg-glass-theme .anbg-kpi-stat-card:hover {
+        transform: translateY(-2px);
+        background: rgba(255, 255, 255, 0.78) !important;
+        box-shadow: var(--glass-shadow-strong) !important;
+    }
+
+    /* Sidebar transparente premium */
+    body.anbg-glass-theme .glass-sidebar,
+    body.anbg-glass-theme #admin-sidebar,
+    body.anbg-glass-theme .admin-sidebar,
+    body.anbg-glass-theme .workspace-sidebar,
+    body.anbg-glass-theme .app-sidebar,
+    body.anbg-glass-theme .eas-sidebar,
+    body.anbg-glass-theme .app-sidebar-panel {
+        background: rgba(255, 255, 255, 0.58) !important;
+        backdrop-filter: blur(28px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.72) !important;
+        box-shadow: var(--glass-shadow) !important;
+    }
+
+    /* Topbar / navbar */
+    body.anbg-glass-theme .glass-navbar,
+    body.anbg-glass-theme #admin-topbar,
+    body.anbg-glass-theme .admin-topbar,
+    body.anbg-glass-theme .workspace-topbar,
+    body.anbg-glass-theme .app-navbar,
+    body.anbg-glass-theme .admin-page-header,
+    body.anbg-glass-theme #admin-shell-header {
+        background: rgba(255, 255, 255, 0.76) !important;
+        backdrop-filter: blur(20px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.72) !important;
+        box-shadow: 0 10px 32px rgba(28, 32, 61, 0.08) !important;
+    }
+
+    /* Boutons premium */
+    body.anbg-glass-theme .glass-btn {
+        border-radius: 14px;
+        font-weight: 700;
+        transition: all 0.18s ease;
+    }
+    body.anbg-glass-theme .btn-primary,
+    body.anbg-glass-theme .glass-btn-primary,
+    body.anbg-glass-theme .app-button-primary {
+        background: linear-gradient(135deg, var(--glass-blue), var(--glass-blue-deep)) !important;
+        color: #ffffff !important;
+        border-color: transparent !important;
+        box-shadow: 0 10px 26px rgba(57, 150, 211, 0.32) !important;
+    }
+    body.anbg-glass-theme .btn-primary:hover,
+    body.anbg-glass-theme .glass-btn-primary:hover,
+    body.anbg-glass-theme .app-button-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 34px rgba(57, 150, 211, 0.38) !important;
+    }
+
+    /* Champs de formulaires lisibles */
+    body.anbg-glass-theme .glass-input,
+    body.anbg-glass-theme .form-input,
+    body.anbg-glass-theme .form-select,
+    body.anbg-glass-theme .form-textarea,
+    body.anbg-glass-theme input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+    body.anbg-glass-theme select,
+    body.anbg-glass-theme textarea {
+        background-color: rgba(255, 255, 255, 0.86) !important;
+        border-color: rgba(203, 213, 225, 0.82) !important;
+        color: #0f172a !important;
+        border-radius: 14px !important;
+        box-shadow: 0 4px 16px rgba(28, 32, 61, 0.04);
+    }
+    body.anbg-glass-theme .glass-input:focus,
+    body.anbg-glass-theme .form-input:focus,
+    body.anbg-glass-theme .form-select:focus,
+    body.anbg-glass-theme .form-textarea:focus,
+    body.anbg-glass-theme input:focus,
+    body.anbg-glass-theme select:focus,
+    body.anbg-glass-theme textarea:focus {
+        border-color: rgba(57, 150, 211, 0.75) !important;
+        box-shadow: 0 0 0 4px rgba(57, 150, 211, 0.14) !important;
+    }
+
+    /* Tables glass — header bleu ANBG */
+    body.anbg-glass-theme .glass-table,
+    body.anbg-glass-theme .app-table,
+    body.anbg-glass-theme .data-table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    body.anbg-glass-theme .glass-table thead th,
+    body.anbg-glass-theme .app-table thead th,
+    body.anbg-glass-theme .data-table thead th {
+        background: rgba(57, 150, 211, 0.94) !important;
+        color: #ffffff !important;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+    }
+    body.anbg-glass-theme .glass-table tbody td,
+    body.anbg-glass-theme .app-table tbody td,
+    body.anbg-glass-theme .data-table tbody td {
+        background: rgba(255, 255, 255, 0.64) !important;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18) !important;
+    }
+    body.anbg-glass-theme .glass-table tbody tr:hover td,
+    body.anbg-glass-theme .app-table tbody tr:hover td,
+    body.anbg-glass-theme .data-table tbody tr:hover td {
+        background: rgba(255, 255, 255, 0.86) !important;
+    }
+
+    /* Badges arrondis translucides */
+    body.anbg-glass-theme .anbg-badge,
+    body.anbg-glass-theme .app-badge {
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 999px !important;
+    }
+
+    /* Désactiver la grille existante body.admin-theme-scope qui masquait la nôtre */
+    body.anbg-glass-theme.admin-theme-scope::before {
+        background-image:
+            linear-gradient(rgba(255,255,255,0.18) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.18) 1px, transparent 1px) !important;
+        background-size: 42px 42px !important;
+        opacity: 0.18 !important;
+        display: block !important;
+    }
+
+    /* Override le background app-bg solide qui couvrait notre mesh */
+    body.anbg-glass-theme.admin-theme-scope,
+    body.anbg-glass-theme .admin-theme-scope,
+    body.anbg-glass-theme .admin-page-root,
+    body.anbg-glass-theme .admin-content-shell,
+    body.anbg-glass-theme .admin-shell-frame,
+    body.anbg-glass-theme main,
+    body.anbg-glass-theme .app-shell,
+    body.anbg-glass-theme .app-main {
+        background: transparent !important;
+    }
+
+    /* Mode sombre — version glass adaptée */
+    .dark body.anbg-glass-theme {
+        background:
+            radial-gradient(700px 600px at 10% 6%, rgba(57, 150, 211, 0.26), transparent 65%),
+            radial-gradient(780px 640px at 92% 16%, rgba(143, 192, 67, 0.18), transparent 62%),
+            linear-gradient(135deg, #0b1220 0%, #111827 55%, #1c203d 100%);
+    }
+    .dark .anbg-glass-theme .glass-card,
+    .dark .anbg-glass-theme .showcase-panel,
+    .dark .anbg-glass-theme .showcase-hero,
+    .dark .anbg-glass-theme .glass-kpi,
+    .dark .anbg-glass-theme .showcase-kpi-card,
+    .dark .anbg-glass-theme .dealdeck-kpi-card,
+    .dark .anbg-glass-theme .stat-card,
+    .dark .anbg-glass-theme .app-card {
+        background: rgba(15, 23, 42, 0.62);
+        border-color: rgba(148, 163, 184, 0.22);
+        color: #e5e7eb;
+    }
+    .dark .anbg-glass-theme .glass-input,
+    .dark .anbg-glass-theme .form-input,
+    .dark .anbg-glass-theme .form-select,
+    .dark .anbg-glass-theme .form-textarea {
+        background-color: rgba(15, 23, 42, 0.78);
+        color: #f8fafc;
+        border-color: rgba(148, 163, 184, 0.28);
+    }
+
 }

@@ -293,7 +293,7 @@ class ActionTrackingWebController extends Controller
             if (! $isSubmit) {
                 return redirect()
                     ->route('workspace.actions.suivi', $action)
-                    ->with('success', 'Suivi de sous-action enregistre.');
+                    ->with('success', 'Suivi de sous-action enregistré.');
             }
 
             return redirect()
@@ -760,7 +760,7 @@ class ActionTrackingWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Commentaire enregistre.');
+            ->with('success', 'Commentaire enregistré.');
     }
 
     public function signalAnomaly(
@@ -821,7 +821,7 @@ class ActionTrackingWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Anomalie signalee et notification envoyee.');
+            ->with('success', 'Anomalie signalée et notification envoyée.');
     }
 
     public function resolveAnomaly(Request $request, Action $action, ActionLog $log): RedirectResponse
@@ -861,7 +861,7 @@ class ActionTrackingWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Anomalie cloturee.');
+            ->with('success', 'Anomalie clôturée.');
     }
 
     public function reviewClosure(
@@ -992,7 +992,7 @@ class ActionTrackingWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Demande de report transmise a SCIQ / Planification.');
+            ->with('success', 'Demande de report transmise à SCIQ / Planification.');
     }
 
     public function reviewDeadlineExtensionBySciq(
@@ -1025,7 +1025,7 @@ class ActionTrackingWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.suivi', $deadlineExtensionRequest->action_id)
-            ->with('success', 'Avis SCIQ / Planification enregistre.');
+            ->with('success', 'Avis SCIQ / Planification enregistré.');
     }
 
     public function reviewDeadlineExtensionByDg(
@@ -1059,7 +1059,7 @@ class ActionTrackingWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.suivi', $deadlineExtensionRequest->action_id)
-            ->with('success', 'Decision DG enregistree.');
+            ->with('success', 'Décision DG enregistrée.');
     }
 
     public function reviewFinancingByDaf(
@@ -1245,7 +1245,7 @@ class ActionTrackingWebController extends Controller
 
         $this->recordAudit($request, 'action', 'update_financing_status_daf', $action, $before, $action->toArray());
 
-        return back()->with('success', 'Statut de financement mis a jour par la DAF.');
+        return back()->with('success', 'Statut de financement mis à jour par la DAF.');
     }
 
     public function downloadJustificatif(

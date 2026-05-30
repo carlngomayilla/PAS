@@ -432,7 +432,7 @@ class ActionWebController extends Controller
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', $existingAction instanceof Action
-                ? 'Action liee au PTA mise a jour avec succes.'
+                ? 'Action liee au PTA mise a jour avec succès.'
                 : 'Action creee avec succes et semaines generees automatiquement.');
     }
 
@@ -610,7 +610,7 @@ class ActionWebController extends Controller
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Action mise a jour avec succes.');
+            ->with('success', 'Action mise a jour avec succès.');
     }
 
     /** Supprime définitivement une action (avec ses sous-actions, KPI et justificatifs). */
@@ -655,7 +655,7 @@ class ActionWebController extends Controller
 
             return redirect()
                 ->route('workspace.actions.index')
-                ->with('success', 'Demande de suppression action transmise au Super Admin.');
+                ->with('success', 'Demande de suppression de l\'action transmise au Super Admin.');
         }
 
         $before = $action->toArray();

@@ -1014,7 +1014,7 @@ class MonitoringWebController extends Controller
         $this->alertReadService->markFingerprintsAsRead($user, $fingerprints);
         $this->markAlertNotificationsAsRead($user);
 
-        return back()->with('success', 'Les alertes visibles ont ete marquees comme lues.');
+        return back()->with('success', 'Les alertes visibles ont été marquées comme lues.');
     }
 
     private function scopePao(Builder|Relation $query, User $user): void

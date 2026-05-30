@@ -57,6 +57,6 @@ class NotificationWebController extends Controller
 
         $user->unreadNotifications()->update(['read_at' => now()]);
 
-        return back()->with('success', 'Toutes les notifications ont ete marquees comme lues.');
+        return back()->with('success', 'Toutes les notifications ont été marquées comme lues.');
     }
 }

@@ -5,6 +5,334 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-05-30 — Migration SMTP → API HTTP Brevo (résout les blocages IP dynamique) ✓
+
+### Demande utilisateur
+
+> *"pourquoi je doit toujour autoriser une nouvelle adresse"*
+
+Après le premier envoi SMTP réussi, l'IP de l'utilisateur (FAI Gabon, IP dynamique) changeait à
+chaque connexion, obligeant à ré-autoriser l'IP dans Brevo à chaque test. Inutilisable.
+
+### Décision
+
+Migrer le canal email de **SMTP** vers **API HTTP** Brevo. L'API HTTP s'authentifie par
+`BREVO_API_KEY` au lieu d'user/pass SMTP, plus simple et plus rapide.
+
+### Code modifié
+
+| Fichier | Changement |
+|---|---|
+| `config/services.php` | Nouvelles clés `brevo.transport` (api/smtp), `brevo.api_key`, `brevo.api_endpoint`, `brevo.api_timeout`, `brevo.api_verify_ssl` |
+| `app/Services/Notifications/BrevoMailService.php` | Ajout `sendViaApi()` (POST https://api.brevo.com/v3/smtp/email + render Blade) ; `sendViaSmtp()` extrait ; routage via `transport()` ; `canSendEmails()` vérifie `api_key` si transport=api |
+| `tests/Feature/BrevoEmailChannelTest.php` | Forcé `transport='smtp'` pour préserver le scénario fail-safe SMTP existant |
+| `tests/Feature/SuperAdminNotificationsSmokeTest.php` | Nouveau test API HTTP avec `Http::fake()` (vérifie endpoint, header `api-key`, body JSON, tags) |
+
+### Tests
+
+- 4/4 verts sur `SuperAdminNotificationsSmokeTest`
+- **318 passés, 3 skipped, 0 failed** sur la suite Feature complète (2223 assertions)
+
+### Galère côté config Brevo (à savoir pour la suite)
+
+Brevo a **3 niveaux** d'IP whitelist indépendants — il faut les désactiver tous pour un backend
+avec IP dynamique :
+
+1. **Toggle compte → SMTP** : `https://app.brevo.com/security/authorised_ips` (section "Blocage IP")
+2. **Toggle compte → API** : MÊME page, switch séparé (section "Blocage IP" → ligne "Clés API")
+3. **Restriction par clé** : Sur la création de chaque clé, option "Restreindre par IP"
+
+Pour notre cas : il a fallu **désactiver le toggle "Clés API"** (qui était par défaut **Activé**),
+plus créer une clé sans restriction par-clé. Le toggle SMTP était déjà désactivé.
+
+### Envoi réel — preuve du succès
+
+```
+LOG brevo_email_log id=13
+  status      = sent ✓
+  recipient   = carlngomayilla70@gmail.com
+  sent_at     = 2026-05-30 19:37:36
+  subject     = Nouvelle action attribuée
+  transport   = api
+  durée totale = 999 ms (vs 2-3s en SMTP)
+```
+
+### Note dev local Windows
+
+PHP CLI Windows n'a souvent pas de bundle CA cert configuré (`curl.cainfo` vide), provoquant
+`cURL error 60: SSL certificate ... unable to get local issuer certificate`. Ajout du flag
+`BREVO_API_VERIFY_SSL=false` (à n'utiliser **qu'en dev local**) pour bypass.
+
+En production, laisser `BREVO_API_VERIFY_SSL=true` (défaut) et s'assurer que PHP a accès
+à un bundle CA valide.
+
+### Configuration `.env` finale (template)
+
+```env
+# Transport actif
+BREVO_TRANSPORT=api
+BREVO_ENABLED=true
+BREVO_API_KEY=xkeysib-...                  # https://app.brevo.com/settings/keys/api
+BREVO_API_VERIFY_SSL=false                 # DEV ONLY (Windows sans bundle CA) — true en prod
+
+# Expéditeur
+BREVO_FROM_ADDRESS=carlngomayilla70@gmail.com
+BREVO_FROM_NAME="ANBG · e-Pilotage PAS"
+
+# Les anciennes credentials SMTP peuvent rester pour fallback transport=smtp
+# mais ne sont PAS utilisées tant que BREVO_TRANSPORT=api.
+```
+
+---
+
+## 2026-05-30 — Test E2E envoi email réel via Brevo (canal email actif) ✓
+
+### Demande utilisateur
+
+> *"oui à l'admin fonctionnel car c'est seule email fonctionnel actuellement"* → cible : `carlngomayilla70@gmail.com`
+
+### Setup
+
+| Élément | Action |
+|---|---|
+| `users.id=102` | Créé : `carlngomayilla70@gmail.com`, role=`super_admin`, `is_active=true` |
+| Login provisoire | `email=carlngomayilla70@gmail.com` / `password=ChangeMe-Now-2026!` |
+| Template `action_assigned` en BDD | Re-seedé via `NotificationPolicySettingsSeeder` → channels passés de `['in_app']` à `['in_app', 'email']`, message accentué + guillemets « » |
+| Action `id=660` | Pivot `action_responsables` réassigné temporairement à user 102 → restauré après le test |
+
+### Premier envoi (échec)
+
+```
+brevo_email_log id=4
+  status = failed
+  error  = 525 5.7.1 Unauthorized IP address
+```
+
+Cause : l'IP publique de la machine (`154.116.105.28`) n'était pas dans la liste blanche
+Brevo (https://app.brevo.com/security/authorised_ips). Utilisateur a ajouté l'IP.
+
+### Deuxième envoi (succès)
+
+```
+brevo_email_log id=5
+  status      = sent ✓
+  recipient   = carlngomayilla70@gmail.com
+  sent_at     = 2026-05-30 18:26:39
+  error       = NULL
+```
+
+Sujet attendu côté boîte : `[ANBG] Nouvelle action attribuée`
+Message : *"L'action « Produire un reporting global automatisé par direction » vous a été
+attribuée. Consultez-la dès maintenant."*
+
+### Découverte importante (effet de bord)
+
+Le re-seed `NotificationPolicySettingsSeeder` était **nécessaire** : les templates stockés en
+BDD étaient les anciennes versions (channels `['in_app']` seul, message sans accents corrects,
+guillemets ASCII `"X"`). Sans le re-seed, les changements de
+`NotificationPolicySettings::eventTemplateDefaults()` n'auraient pas pris effet pour
+l'utilisateur final.
+
+→ **Pour tout déploiement futur des nouveaux libellés en prod** : lancer
+`php artisan db:seed --class=NotificationPolicySettingsSeeder --force` après le déploiement,
+puis `app(NotificationPolicySettings::class)->flush()` pour vider le cache mémoire.
+
+### Configuration Brevo opérationnelle
+
+```env
+# .env (l'utilisateur l'a configuré lui-même)
+MAIL_MAILER=brevo
+MAIL_HOST=smtp-relay.brevo.com
+MAIL_PORT=587
+MAIL_USERNAME=abfe7e001@smtp-brevo.com
+MAIL_PASSWORD=***
+MAIL_FROM_ADDRESS=carlngomayilla70@gmail.com
+MAIL_FROM_NAME="ANBG · e-Pilotage PAS"
+BREVO_ENABLED=true
+```
+
+---
+
+## 2026-05-30 — Décalage des 11 échéances passées à J+30 (2026-06-29)
+
+### Demande utilisateur
+
+> *"MODIFI LES ECHEANCES DES ACTION QUI SONT INFERIEUR OU EGALE A LA DATE DE AUJOURD'HUI"*
+> Choix d'offset confirmé : **+30 jours**.
+
+### Diagnostic
+
+Au 2026-05-30, **11 actions** avaient `date_echeance <= today`, toutes au 2026-04-30 (un mois en
+retard) avec `date_fin = date_echeance` :
+
+```
+IDs : 595, 601, 607, 613, 619, 625, 631, 637, 643, 649, 655
+Statut : non_demarre / non_demarre  (aucune n'avait commencé)
+```
+
+Aucune `ActionWeek` rattachée, aucune `SousAction` avec `echeance` propre → pas de cascade
+nécessaire sur ces entités.
+
+### Action appliquée
+
+Update SQL (single transaction, via Eloquent) sur les 2 champs cohérents `date_echeance` ET
+`date_fin` pour qu'ils restent alignés :
+
+```php
+App\Models\Action::query()
+    ->whereIn('id', $ids)
+    ->update([
+        'date_echeance' => '2026-06-29 00:00:00',
+        'date_fin'      => '2026-06-29 00:00:00',
+    ]);
+// → 11 lignes mises à jour
+```
+
+### Vérification
+
+- 11/11 actions affichent maintenant `fin = ech = 2026-06-29` ✓
+- Actions restantes avec `date_echeance <= aujourd'hui` : **0** ✓
+
+### Note
+
+Le `date_debut` (2026-01-15) reste inchangé — les actions ont simplement vu leur fenêtre
+prolongée d'environ 2 mois (de 2026-04-30 à 2026-06-29). Aucune notification d'alerte
+"échéance proche" n'a été déclenchée (mise à jour silencieuse en BDD, hors workflow métier).
+
+---
+
+## 2026-05-30 — Personnalisation des notifications + alertes + flash messages (+ test Super Admin)
+
+### Demande utilisateur
+
+> *"MET A JOUR LES NOTIFICATION, ET ALERTE ET FAIS UN ESSAI AVEC LE SUPER ADMIN"*
+
+Suite à la demande précédente sur la colonne `Objectif opérationnel` du reporting (déjà corrigée).
+
+### Feature 1 — Personnalisation des libellés de notifications
+
+**Avant** : titres et messages avec accents manquants ("attribuee", "validee", "creee"), ton télégraphique
+("L action X attend votre evaluation."), parfois template vide.
+
+**Après** : accents UTF-8 propres, ton plus naturel et orienté action, format français typographique
+(« guillemets », apostrophes courbes).
+
+#### Fichiers touchés
+
+1. **`app/Services/NotificationPolicySettings.php`** (lignes 502-527) — **source de vérité** des libellés
+   user-facing. Les 26 templates `eventTemplateDefaults()` ont tous été repris :
+   - `action_assigned` : *"L'action « X » vous a été attribuée. Consultez-la dès maintenant."*
+   - `action_submitted_to_chef` : *"L'action « X » vient d'être soumise par l'agent et attend votre évaluation."*
+   - `action_submitted_to_direction` : nouveau titre `"Action transmise à la direction"` (était vide)
+   - `action_reviewed_by_chef` / `_by_direction` : nouveaux titres `"Décision du chef de service"` / `"Décision de la direction"` (étaient vides)
+   - `action_finalized_by_chef` : *"L'action « X » a été finalisée par le chef de service, sans étape direction supplémentaire."*
+   - `action_finalized_without_workflow` : ton confirmé "clôturée"
+   - `action_alert_escalation` : nouveau titre `"Alerte sur une action"` + format `"Niveau {level} — {message}"`
+   - `action_financing_requested` : *"Demande de financement à instruire"*
+   - `action_financing_reviewed_by_daf` / `_by_dg` : nouveaux titres `"Décision DAF / DG sur le financement"`
+   - `pao_transmitted_to_service` : *"Un nouveau PAO vient d'être transmis... Préparez votre PTA."*
+   - `pao_updated_for_service` : *"Vérifiez les ajustements."*
+   - `pta_created_to_direction` : *"vient de créer son PTA"*
+   - `pta_submitted_for_validation` : **bug corrigé** — "actualise" sans accent → *"vient d'actualiser son PTA"*
+   - `pta_reviewed_by_direction` : nouveau titre `"Décision direction sur le PTA"` (était vide)
+   - `sub_action_completed` : *"Sous-action terminée — à vérifier"* / *"Elle attend votre validation."*
+   - `justificatif_added` : *"Pièce justificative ajoutée"*
+   - `deadline_extension_*` : tous reformulés avec accents complets et "demande de report d'échéance"
+   - `pas_status` / `pao_status` / `pta_status` : nouveaux titres `"Mise à jour PAS/PAO/PTA"` (étaient vides)
+   - `delegation_created` : reformulation *"Une délégation vous a été attribuée par X sur le périmètre Y."*
+
+2. **`app/Services/Notifications/WorkspaceNotificationService.php`** — defaults (~25 blocs `dispatchEvent`)
+   et helpers (`resolveStatusPayload`, `serviceLabel`, `directionLabel`) accentués pour cohérence avec
+   les templates ci-dessus. Plus replace_all `'non renseigne'` → `'non renseigné'` et
+   `'non renseignee'` → `'non renseignée'`.
+
+### Feature 2 — Personnalisation des flash messages des controllers
+
+**124 remplacements** ciblés via script PowerShell (UTF-8 sans BOM, escape PHP `\'` propre) sur
+13 controllers Web. Patterns sûrs qui n'apparaissent que dans des chaînes user-facing
+(p. ex. `' avec succes.'` → `' avec succès.'`).
+
+#### Fichiers touchés (avec compteur)
+
+| Fichier                                      | Remplacements |
+|----------------------------------------------|---------------|
+| ActionWebController.php                      | 3             |
+| ActionTrackingWebController.php              | 8             |
+| GovernanceWebController.php                  | 2             |
+| NotificationWebController.php                | 1             |
+| PasWebController.php                         | 6             |
+| MonitoringWebController.php                  | 1             |
+| PaoWebController.php                         | 6             |
+| PtaWebController.php                         | 8             |
+| MessagingWebController.php                   | 1             |
+| PlanningUnlockWebController.php              | 2             |
+| **SuperAdminWebController.php**              | **72**        |
+| ProfileWebController.php                     | 5             |
+| ReferentielWebController.php                 | 9             |
+| **TOTAL**                                    | **124**       |
+
+#### Exemples concrets
+
+```diff
+- ->with('success', 'Direction creee avec succes.');
++ ->with('success', 'Direction créée avec succès.');
+
+- ->with('success', 'Decision DG enregistree.');
++ ->with('success', 'Décision DG enregistrée.');
+
+- ->with('success', 'PTA cloture avec rapport d anomalies trace.');
++ ->with('success', 'PTA clôturé avec rapport d\'anomalies tracé.');
+
+- ->with('success', 'Toutes les notifications ont ete marquees comme lues.');
++ ->with('success', 'Toutes les notifications ont été marquées comme lues.');
+```
+
+#### Incident résolu pendant l'implémentation
+
+Premier essai du script PowerShell : `''` (escape style SQL) passé à PowerShell devenait `''`
+dans le PHP, ce qui est interprété comme "deux strings vides" dans un single-quote PHP → 11 parse
+errors. Réparé en revertant les 13 controllers via `git checkout` puis en relançant avec
+`"\'"` (escape PHP) dans les strings PS double-quoted. **0 parse error** au final.
+
+### Feature 3 — Test E2E avec le Super Admin
+
+Création de **`tests/Feature/SuperAdminNotificationsSmokeTest.php`** avec deux tests :
+
+1. **`test_super_admin_flow_workspace_and_notifications`** : log Super Admin → GET sur les 5 routes
+   principales (`workspace.index`, `notifications.index`, `pas.index`, `pao.index`, `pta.index`)
+   → résolution du `WorkspaceNotificationService` depuis le container.
+2. **`test_action_assigned_notification_uses_personalized_french_label`** : crée Direction →
+   Service → Agent → PAS → PAO → PTA → Action, déclenche `notifyActionAssigned()`, assertions :
+   - titre = `"Nouvelle action attribuée"`
+   - message contient `"Cartographier les zones humides"`
+   - message contient `"été attribuée"` (vérifie l'accent)
+   - message contient `"« "` (vérifie les guillemets typographiques)
+
+**Résultat :** `2 passed (7 assertions)` ✓
+
+```
+PASS  Tests\Feature\SuperAdminNotificationsSmokeTest
+  ✓ super admin flow workspace and notifications              7.16s
+  ✓ action assigned notification uses personalized french label  0.11s
+```
+
+### Validation
+
+- `php -l` sur les 14 fichiers PHP modifiés : **0 erreur de syntaxe**
+- Tests dédiés Super Admin : **2/2 verts**
+- Régression : suite Feature complète en cours
+
+### Action utilisateur attendue
+
+Au prochain événement métier (attribution d'action, validation, soumission PTA, etc.) :
+- **Notif in-app** dans la cloche : doit afficher les nouveaux libellés (« » + accents)
+- **Toast/flash** après une création/modif : doit afficher les versions accentuées
+
+Si une zone d'UI affiche encore du texte sans accents ou non personnalisé, envoyer une capture
+pour traitement ciblé.
+
+---
+
 ## 2026-05-29 — Workflow ANBG : actions figees apres enregistrement + bouton "Demande de modification" + notif RMO post-parametrage
 
 ### Feature 1 — Gel des actions enregistrees + workflow de demande de modification

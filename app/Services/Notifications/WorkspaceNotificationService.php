@@ -60,8 +60,8 @@ class WorkspaceNotificationService
             'action_assigned',
             $users,
             [
-                'title' => 'Nouvelle action attribuee',
-                'message' => sprintf('L action "%s" vous a ete attribuee.', (string) $action->libelle),
+                'title' => 'Nouvelle action attribuée',
+                'message' => sprintf('L\'action « %s » vous a été attribuée. Consultez-la dès maintenant.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -100,8 +100,8 @@ class WorkspaceNotificationService
             'action_submitted_to_chef',
             $users,
             [
-                'title' => 'Action soumise pour validation',
-                'message' => sprintf('L action "%s" attend votre evaluation.', (string) $action->libelle),
+                'title' => 'Action en attente de validation',
+                'message' => sprintf('L\'action « %s » a été soumise par l\'agent et attend votre évaluation.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -141,8 +141,8 @@ class WorkspaceNotificationService
             'action_submitted_to_direction',
             $directionRecipients,
             [
-                'title' => 'Action soumise a la direction',
-                'message' => sprintf('L action "%s" attend directement votre evaluation finale.', (string) $action->libelle),
+                'title' => 'Action transmise à la direction',
+                'message' => sprintf('L\'action « %s » attend votre évaluation finale.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -162,8 +162,8 @@ class WorkspaceNotificationService
             'action_submitted_to_direction',
             $this->agentRecipient($action),
             [
-                'title' => 'Action cloturee',
-                'message' => sprintf('Votre action "%s" a ete finalisee dans le circuit actif.', (string) $action->libelle),
+                'title' => 'Action clôturée',
+                'message' => sprintf('Votre action « %s » a été finalisée dans le circuit actif. Bravo !', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -201,8 +201,8 @@ class WorkspaceNotificationService
                 'action_reviewed_by_chef',
                 $directionRecipients,
                 [
-                    'title' => 'Action validee par le chef',
-                    'message' => sprintf('L action "%s" a ete validee par le chef de service. Vous pouvez la consulter en lecture.', (string) $action->libelle),
+                    'title' => 'Action validée par le chef de service',
+                    'message' => sprintf('L\'action « %s » vient d\'être validée par le chef de service. Vous pouvez la consulter en lecture.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,
@@ -213,7 +213,7 @@ class WorkspaceNotificationService
                 ],
                 [
                     'action_label' => (string) $action->libelle,
-                    'decision' => 'Action validee par le chef',
+                    'decision' => 'Action validée par le chef de service',
                     'actor_name' => (string) ($actor?->name ?? ''),
                 ],
                 $actor?->id
@@ -223,8 +223,8 @@ class WorkspaceNotificationService
                 'action_reviewed_by_chef',
                 $agentRecipients,
                 [
-                    'title' => 'Action validee par le chef',
-                    'message' => sprintf('Votre action "%s" a ete validee par le chef de service.', (string) $action->libelle),
+                    'title' => 'Votre action a été validée',
+                    'message' => sprintf('Bonne nouvelle : votre action « %s » vient d\'être validée par le chef de service.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,
@@ -235,7 +235,7 @@ class WorkspaceNotificationService
                 ],
                 [
                     'action_label' => (string) $action->libelle,
-                    'decision' => 'Action validee par le chef',
+                    'decision' => 'Action validée par le chef de service',
                     'actor_name' => (string) ($actor?->name ?? ''),
                 ],
                 $actor?->id
@@ -254,8 +254,8 @@ class WorkspaceNotificationService
                 )
             ),
             [
-                'title' => 'Action rejetee par le chef',
-                'message' => sprintf('Votre action "%s" a ete rejetee. Consultez le motif.', (string) $action->libelle),
+                'title' => 'Action à corriger',
+                'message' => sprintf('Votre action « %s » a été renvoyée par le chef de service pour correction. Consultez le motif et resoumettez-la.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -266,7 +266,7 @@ class WorkspaceNotificationService
             ],
             [
                 'action_label' => (string) $action->libelle,
-                'decision' => 'Action rejetee par le chef',
+                'decision' => 'Action renvoyée par le chef pour correction',
                 'actor_name' => (string) ($actor?->name ?? ''),
             ],
             $actor?->id
@@ -294,8 +294,8 @@ class WorkspaceNotificationService
                 'action_reviewed_by_direction',
                 $serviceRecipients,
                 [
-                    'title' => 'Action validee par la direction',
-                    'message' => sprintf('L action "%s" est comptabilisee dans les statistiques.', (string) $action->libelle),
+                    'title' => 'Action validée par la direction',
+                    'message' => sprintf('L\'action « %s » est désormais validée et comptabilisée dans les statistiques.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,
@@ -306,7 +306,7 @@ class WorkspaceNotificationService
                 ],
                 [
                     'action_label' => (string) $action->libelle,
-                    'decision' => 'Action validee par la direction',
+                    'decision' => 'Action validée par la direction',
                     'actor_name' => (string) ($actor?->name ?? ''),
                 ],
                 $actor?->id
@@ -319,8 +319,8 @@ class WorkspaceNotificationService
             'action_reviewed_by_direction',
             $serviceRecipients,
             [
-                'title' => 'Action rejetee par la direction',
-                'message' => sprintf('L action "%s" doit etre corrigee puis resoumise.', (string) $action->libelle),
+                'title' => 'Action renvoyée par la direction',
+                'message' => sprintf('L\'action « %s » doit être corrigée puis resoumise. Consultez les observations de la direction.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -331,7 +331,7 @@ class WorkspaceNotificationService
             ],
             [
                 'action_label' => (string) $action->libelle,
-                'decision' => 'Action rejetee par la direction',
+                'decision' => 'Action renvoyée par la direction pour correction',
                 'actor_name' => (string) ($actor?->name ?? ''),
             ],
             $actor?->id
@@ -364,8 +364,8 @@ class WorkspaceNotificationService
             'action_finalized_by_chef',
             $targets,
             [
-                'title' => 'Action validee par le chef',
-                'message' => sprintf('L action "%s" est finalisee sans etape direction supplementaire.', (string) $action->libelle),
+                'title' => 'Action finalisée par le chef',
+                'message' => sprintf('L\'action « %s » a été finalisée par le chef de service, sans étape direction supplémentaire.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -411,8 +411,8 @@ class WorkspaceNotificationService
             'action_finalized_without_workflow',
             $targets,
             [
-                'title' => 'Action cloturee',
-                'message' => sprintf('L action "%s" a ete cloturee sans circuit de validation supplementaire.', (string) $action->libelle),
+                'title' => 'Action clôturée',
+                'message' => sprintf('L\'action « %s » a été clôturée sans circuit de validation supplémentaire.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -468,10 +468,10 @@ class WorkspaceNotificationService
             $targets,
             [
                 'title' => match ($level) {
-                    'urgence' => 'Urgence action',
-                    'critical' => 'Alerte critique action',
-                    'info' => 'Information action',
-                    default => 'Alerte action',
+                    'urgence' => 'Urgence sur une action',
+                    'critical' => 'Alerte critique — Action à traiter',
+                    'info' => 'Information sur une action',
+                    default => 'Alerte sur une action',
                 },
                 'message' => $this->notificationPolicySettings->renderActionAlertMessage($log),
                 'module' => 'alertes',
@@ -517,8 +517,8 @@ class WorkspaceNotificationService
             'action_financing_requested',
             $targets,
             [
-                'title' => 'Financement a traiter',
-                'message' => sprintf('L action "%s" necessite un financement. Traitement DAF requis.', (string) $action->libelle),
+                'title' => 'Demande de financement à instruire',
+                'message' => sprintf('L\'action « %s » nécessite un financement. Traitement DAF requis.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -554,10 +554,10 @@ class WorkspaceNotificationService
             'action_financing_reviewed_by_daf',
             $targets,
             [
-                'title' => $approved ? 'Financement valide par la DAF' : 'Financement rejete par la DAF',
+                'title' => $approved ? 'Financement validé par la DAF' : 'Financement refusé par la DAF',
                 'message' => $approved
-                    ? sprintf('La DAF a valide le financement de "%s". Accord DG requis.', (string) $action->libelle)
-                    : sprintf('La DAF a rejete le financement de "%s". Consultez le motif.', (string) $action->libelle),
+                    ? sprintf('La DAF a validé le financement de l\'action « %s ». Accord DG requis.', (string) $action->libelle)
+                    : sprintf('La DAF a refusé le financement de l\'action « %s ». Consultez le motif.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -594,8 +594,8 @@ class WorkspaceNotificationService
             'action_financing_reviewed_by_daf',
             $targets,
             [
-                'title' => 'Complement demande par la DAF',
-                'message' => sprintf('La DAF demande un complement sur le financement de "%s".', (string) $action->libelle),
+                'title' => 'Complément demandé par la DAF',
+                'message' => sprintf('La DAF demande un complément sur le financement de l\'action « %s ».', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -633,10 +633,10 @@ class WorkspaceNotificationService
             'action_financing_reviewed_by_dg',
             $targets,
             [
-                'title' => $approved ? 'Accord DG sur financement' : 'Refus DG sur financement',
+                'title' => $approved ? 'Accord DG sur le financement' : 'Refus DG sur le financement',
                 'message' => $approved
-                    ? sprintf('La DG a donne son accord de financement pour "%s".', (string) $action->libelle)
-                    : sprintf('La DG a refuse le financement de "%s". Consultez le motif.', (string) $action->libelle),
+                    ? sprintf('La Direction Générale a donné son accord de financement pour l\'action « %s ».', (string) $action->libelle)
+                    : sprintf('La Direction Générale a refusé le financement de l\'action « %s ». Consultez le motif.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -674,7 +674,7 @@ class WorkspaceNotificationService
             $targets,
             [
                 'title' => 'Nouveau PAO reçu',
-                'message' => sprintf('Un nouveau PAO a ete transmis a votre service pour l exercice %s.', (string) ($pao->annee ?? now()->year)),
+                'message' => sprintf('Un nouveau PAO vient d\'être transmis à votre service pour l\'exercice %s. Préparez votre PTA.', (string) ($pao->annee ?? now()->year)),
                 'module' => 'pao',
                 'entity_type' => 'pao',
                 'entity_id' => $pao->id,
@@ -724,7 +724,7 @@ class WorkspaceNotificationService
             $targets,
             [
                 'title' => 'PAO mis à jour',
-                'message' => 'Un objectif operationnel de votre service a ete modifie par votre direction.',
+                'message' => 'Un objectif opérationnel de votre service vient d\'être modifié par votre direction. Vérifiez les ajustements.',
                 'module' => 'pao',
                 'entity_type' => 'pao',
                 'entity_id' => $pao->id,
@@ -780,7 +780,7 @@ class WorkspaceNotificationService
             $targets,
             [
                 'title' => 'Nouveau PTA créé',
-                'message' => sprintf('Le service %s a cree son PTA pour l exercice %s.', $serviceLabel, $year),
+                'message' => sprintf('Le service %s vient de créer son PTA pour l\'exercice %s.', $serviceLabel, $year),
                 'module' => 'pta',
                 'entity_type' => 'pta',
                 'entity_id' => $pta->id,
@@ -838,8 +838,8 @@ class WorkspaceNotificationService
             'pta_submitted_for_validation',
             $targets,
             [
-                'title' => 'PTA actualise',
-                'message' => sprintf('Le service %s a actualise son PTA.', $serviceLabel),
+                'title' => 'PTA actualisé',
+                'message' => sprintf('Le service %s vient d\'actualiser son PTA.', $serviceLabel),
                 'module' => 'pta',
                 'entity_type' => 'pta',
                 'entity_id' => $pta->id,
@@ -892,10 +892,10 @@ class WorkspaceNotificationService
             'pta_reviewed_by_direction',
             $targets,
             [
-                'title' => $approved ? 'PTA validé' : 'PTA rejeté',
+                'title' => $approved ? 'PTA validé par la direction' : 'PTA renvoyé par la direction',
                 'message' => $approved
-                    ? 'Votre PTA a ete valide par la direction.'
-                    : 'Votre PTA a ete rejete par la direction. Veuillez consulter les observations.',
+                    ? 'Bonne nouvelle : votre PTA vient d\'être validé par la direction.'
+                    : 'Votre PTA a été renvoyé par la direction. Veuillez consulter les observations et resoumettre.',
                 'module' => 'pta',
                 'entity_type' => 'pta',
                 'entity_id' => $pta->id,
@@ -920,7 +920,7 @@ class WorkspaceNotificationService
             ],
             [
                 'service_label' => $serviceLabel,
-                'decision' => $approved ? 'PTA valide' : 'PTA rejete',
+                'decision' => $approved ? 'PTA validé' : 'PTA renvoyé pour correction',
                 'pta_title' => (string) $pta->titre,
                 'actor_name' => (string) ($actor?->name ?? ''),
             ],
@@ -940,7 +940,7 @@ class WorkspaceNotificationService
             $actor,
             [
                 'title' => 'Nouvelle sous-action créée',
-                'message' => sprintf('%s a cree une sous-action dans l action "%s".', (string) ($actor?->name ?? 'Un agent'), (string) $action->libelle),
+                'message' => sprintf('%s vient d\'ajouter une sous-action dans l\'action « %s ».', (string) ($actor?->name ?? 'Un agent'), (string) $action->libelle),
                 'icon' => 'list-plus',
                 'status' => 'info',
                 'priority' => 'normal',
@@ -970,8 +970,8 @@ class WorkspaceNotificationService
             $action,
             $actor,
             [
-                'title' => 'Action soumise pour vérification',
-                'message' => sprintf('%s a marque une action ou sous-action comme effectuee.', (string) ($actor?->name ?? 'Un agent')),
+                'title' => 'Sous-action terminée — à vérifier',
+                'message' => sprintf('%s a marqué une sous-action comme réalisée. Elle attend votre validation.', (string) ($actor?->name ?? 'Un agent')),
                 'icon' => 'clipboard-check',
                 'status' => 'warning',
                 'priority' => 'high',
@@ -1001,8 +1001,8 @@ class WorkspaceNotificationService
             $action,
             $actor,
             [
-                'title' => 'Justificatif ajouté',
-                'message' => sprintf('%s a ajoute une piece justificative sur l action "%s".', (string) ($actor?->name ?? 'Un agent'), (string) $action->libelle),
+                'title' => 'Pièce justificative ajoutée',
+                'message' => sprintf('%s vient d\'ajouter une pièce justificative sur l\'action « %s ».', (string) ($actor?->name ?? 'Un agent'), (string) $action->libelle),
                 'icon' => 'paperclip',
                 'status' => 'info',
                 'priority' => 'normal',
@@ -1036,8 +1036,8 @@ class WorkspaceNotificationService
             'deadline_extension_requested',
             $this->controlRecipients(),
             [
-                'title' => 'Demande de report d echeance',
-                'message' => sprintf('Une demande de report est soumise pour "%s".', (string) $action->libelle),
+                'title' => 'Demande de report d\'échéance',
+                'message' => sprintf('Une demande de report d\'échéance vient d\'être soumise pour l\'action « %s ».', (string) $action->libelle),
                 'module' => 'reports_echeance',
                 'entity_type' => 'deadline_extension_request',
                 'entity_id' => $request->id,
@@ -1070,8 +1070,8 @@ class WorkspaceNotificationService
             'deadline_extension_sciq_reviewed',
             $recipients,
             [
-                'title' => 'Avis SCIQ / Planification',
-                'message' => sprintf('Avis %s sur le report de "%s".', (string) $request->sciq_avis, (string) $action->libelle),
+                'title' => 'Avis SCIQ / Planification rendu',
+                'message' => sprintf('Avis « %s » émis sur la demande de report de l\'action « %s ».', (string) $request->sciq_avis, (string) $action->libelle),
                 'module' => 'reports_echeance',
                 'entity_type' => 'deadline_extension_request',
                 'entity_id' => $request->id,
@@ -1106,8 +1106,8 @@ class WorkspaceNotificationService
             'deadline_extension_dg_decided',
             $recipients,
             [
-                'title' => 'Decision DG sur report',
-                'message' => sprintf('Decision DG "%s" pour le report de "%s".', (string) $request->dg_decision, (string) $action->libelle),
+                'title' => 'Décision DG sur le report',
+                'message' => sprintf('Décision DG « %s » pour la demande de report de l\'action « %s ».', (string) $request->dg_decision, (string) $action->libelle),
                 'module' => 'reports_echeance',
                 'entity_type' => 'deadline_extension_request',
                 'entity_id' => $request->id,
@@ -1275,11 +1275,11 @@ class WorkspaceNotificationService
             'delegation_created',
             new EloquentCollection([$delegate]),
             [
-                'title' => 'Nouvelle delegation recue',
+                'title' => 'Nouvelle délégation reçue',
                 'message' => sprintf(
-                    'Une delegation de %s vous a ete attribuee sur le perimetre %s.',
+                    'Une délégation vous a été attribuée par %s sur le périmètre %s.',
                     (string) ($delegation->delegant?->name ?? 'un responsable'),
-                    $scopeLabel !== '' ? $scopeLabel : 'non renseigne'
+                    $scopeLabel !== '' ? $scopeLabel : 'non renseigné'
                 ),
                 'module' => 'delegations',
                 'entity_type' => 'delegation',
@@ -1291,7 +1291,7 @@ class WorkspaceNotificationService
             ],
             [
                 'actor_name' => (string) ($delegation->delegant?->name ?? 'un responsable'),
-                'scope_label' => $scopeLabel !== '' ? $scopeLabel : 'non renseigne',
+                'scope_label' => $scopeLabel !== '' ? $scopeLabel : 'non renseigné',
             ],
             $actor?->id
         );
@@ -1304,28 +1304,28 @@ class WorkspaceNotificationService
     {
         return match ($event) {
             'submitted' => [
-                sprintf('%s actualise', $moduleLabel),
-                sprintf('%s "%s" a ete actualise.', $moduleLabel, $titleValue),
+                sprintf('%s actualisé', $moduleLabel),
+                sprintf('%s « %s » vient d\'être actualisé.', $moduleLabel, $titleValue),
                 'info',
             ],
             'approved' => [
-                sprintf('%s valide', $moduleLabel),
-                sprintf('%s "%s" a ete valide.', $moduleLabel, $titleValue),
+                sprintf('%s validé', $moduleLabel),
+                sprintf('%s « %s » a été validé.', $moduleLabel, $titleValue),
                 'success',
             ],
             'locked' => [
-                sprintf('%s archive', $moduleLabel),
-                sprintf('%s "%s" a ete archive.', $moduleLabel, $titleValue),
+                sprintf('%s archivé', $moduleLabel),
+                sprintf('%s « %s » a été archivé.', $moduleLabel, $titleValue),
                 'info',
             ],
             'reopened' => [
                 sprintf('%s remis en cours', $moduleLabel),
-                sprintf('%s "%s" a ete remis en cours.', $moduleLabel, $titleValue),
+                sprintf('%s « %s » a été remis en cours.', $moduleLabel, $titleValue),
                 'warning',
             ],
             default => [
-                sprintf('%s mis a jour', $moduleLabel),
-                sprintf('%s "%s" a ete mis a jour.', $moduleLabel, $titleValue),
+                sprintf('%s mis à jour', $moduleLabel),
+                sprintf('%s « %s » a été mis à jour.', $moduleLabel, $titleValue),
                 'info',
             ],
         };
@@ -1598,19 +1598,19 @@ class WorkspaceNotificationService
     private function serviceLabel(mixed $service): string
     {
         if ($service === null) {
-            return 'non renseigne';
+            return 'non renseigné';
         }
 
-        return trim((string) (($service->code ?? '') !== '' ? $service->code : ($service->libelle ?? ''))) ?: 'non renseigne';
+        return trim((string) (($service->code ?? '') !== '' ? $service->code : ($service->libelle ?? ''))) ?: 'non renseigné';
     }
 
     private function directionLabel(mixed $direction): string
     {
         if ($direction === null) {
-            return 'non renseignee';
+            return 'non renseignée';
         }
 
-        return trim((string) (($direction->code ?? '') !== '' ? $direction->code : ($direction->libelle ?? ''))) ?: 'non renseignee';
+        return trim((string) (($direction->code ?? '') !== '' ? $direction->code : ($direction->libelle ?? ''))) ?: 'non renseignée';
     }
 
     private function dafDirectionUsers(): EloquentCollection

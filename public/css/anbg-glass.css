@@ -1,0 +1,884 @@
+/* ============================================================
+   ANBG GLASS PREMIUM THEME — standalone v2 (2026-05-30)
+   Chargé directement via <link> dans admin.blade.php
+   Indépendant du build Vite — modifs visibles au prochain refresh
+
+   v2 : transparence réellement visible (le fond mesh passe à travers),
+   moins de blanc opaque, plus de teinte couleur (bleu/vert/orange) sur
+   les surfaces, support dark mode renforcé.
+   ============================================================ */
+
+/* ========================================================
+   ─── LIGHT MODE (par défaut) ───
+   ======================================================== */
+body.anbg-glass-theme {
+    /* Couleurs de la palette ANBG */
+    --glass-blue: #3996d3;
+    --glass-blue-deep: #1c5f91;
+    --glass-navy: #1c203d;
+    --glass-green: #8fc043;
+    --glass-orange: #f9b13c;
+    --glass-yellow: #f8e932;
+
+    /* Surfaces — opacité réduite pour laisser passer le fond */
+    --glass-surface: rgba(255, 255, 255, 0.38);
+    --glass-surface-soft: rgba(255, 255, 255, 0.28);
+    --glass-surface-strong: rgba(255, 255, 255, 0.62);
+    --glass-surface-hover: rgba(255, 255, 255, 0.55);
+
+    /* Bordures translucides */
+    --glass-border: rgba(255, 255, 255, 0.55);
+    --glass-border-soft: rgba(255, 255, 255, 0.32);
+
+    /* Ombres profondes pour donner du relief */
+    --glass-shadow-sm: 0 4px 14px rgba(28, 32, 61, 0.08);
+    --glass-shadow: 0 18px 55px rgba(28, 32, 61, 0.14),
+                    0 6px 18px rgba(28, 32, 61, 0.08);
+    --glass-shadow-strong: 0 28px 70px rgba(28, 32, 61, 0.20),
+                           0 10px 24px rgba(28, 32, 61, 0.10);
+
+    /* Surfaces teintées (subtil rappel de la couleur de fond) */
+    --glass-tint-blue: rgba(57, 150, 211, 0.12);
+    --glass-tint-green: rgba(143, 192, 67, 0.10);
+    --glass-tint-orange: rgba(249, 177, 60, 0.10);
+
+    /* Fond mesh ANBG — plus saturé et vivant */
+    min-height: 100vh !important;
+    background:
+        radial-gradient(900px 700px at 8% 0%, rgba(57, 150, 211, 0.52), transparent 60%),
+        radial-gradient(1000px 800px at 95% 12%, rgba(143, 192, 67, 0.48), transparent 58%),
+        radial-gradient(1100px 900px at 50% 110%, rgba(249, 177, 60, 0.36), transparent 55%),
+        radial-gradient(800px 600px at 50% 50%, rgba(124, 58, 237, 0.10), transparent 70%),
+        linear-gradient(135deg, #c8def4 0%, #e0eef9 35%, #ddf0c5 70%, #fde7ce 100%) !important;
+    background-attachment: fixed !important;
+    color: var(--glass-navy) !important;
+}
+
+/* Grille de texture subtile */
+body.anbg-glass-theme::before {
+    content: "" !important;
+    position: fixed !important;
+    inset: 0 !important;
+    pointer-events: none !important;
+    z-index: -1 !important;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.14) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.14) 1px, transparent 1px) !important;
+    background-size: 48px 48px !important;
+    opacity: 0.55 !important;
+    display: block !important;
+}
+
+/* Wrappers transparents pour laisser passer le mesh */
+body.anbg-glass-theme .admin-page-root,
+body.anbg-glass-theme .admin-content-shell,
+body.anbg-glass-theme .admin-shell-frame,
+body.anbg-glass-theme .app-shell,
+body.anbg-glass-theme .app-main,
+body.anbg-glass-theme main {
+    background: transparent !important;
+}
+
+/* === SURFACES PRINCIPALES — transparence visible === */
+body.anbg-glass-theme .glass-card,
+body.anbg-glass-theme .showcase-panel,
+body.anbg-glass-theme .action-detail-card,
+body.anbg-glass-theme .dealdeck-panel,
+body.anbg-glass-theme .workspace-panel,
+body.anbg-glass-theme .app-card,
+body.anbg-glass-theme .ui-card,
+body.anbg-glass-theme .form-section,
+body.anbg-glass-theme .form-shell,
+body.anbg-glass-theme .data-table-shell,
+body.anbg-glass-theme .app-table-wrapper,
+body.anbg-glass-theme .reporting-hub-kpi {
+    background: var(--glass-surface) !important;
+    backdrop-filter: blur(20px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 20px !important;
+    box-shadow: var(--glass-shadow) !important;
+}
+
+/* Halo doux sur le bord supérieur des cartes (effet premium) */
+body.anbg-glass-theme .showcase-panel,
+body.anbg-glass-theme .app-card,
+body.anbg-glass-theme .ui-card,
+body.anbg-glass-theme .form-section {
+    position: relative !important;
+}
+body.anbg-glass-theme .showcase-panel::before,
+body.anbg-glass-theme .app-card::before,
+body.anbg-glass-theme .ui-card::before,
+body.anbg-glass-theme .form-section::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 12% !important;
+    right: 12% !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.85), transparent) !important;
+    pointer-events: none !important;
+    border-radius: inherit !important;
+}
+
+/* === HERO PREMIUM === */
+body.anbg-glass-theme .glass-hero,
+body.anbg-glass-theme .showcase-hero,
+body.anbg-glass-theme .page-header,
+body.anbg-glass-theme .workspace-header {
+    position: relative !important;
+    overflow: hidden !important;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.48),
+        rgba(57, 150, 211, 0.10) 50%,
+        rgba(143, 192, 67, 0.10)
+    ) !important;
+    backdrop-filter: blur(24px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 24px !important;
+    box-shadow: var(--glass-shadow-strong) !important;
+}
+
+body.anbg-glass-theme .showcase-hero::before,
+body.anbg-glass-theme .page-header::before {
+    content: "" !important;
+    position: absolute !important;
+    right: -120px !important;
+    top: -140px !important;
+    width: 360px !important;
+    height: 360px !important;
+    border-radius: 999px !important;
+    background: radial-gradient(circle, rgba(57, 150, 211, 0.35), transparent 70%) !important;
+    pointer-events: none !important;
+}
+
+body.anbg-glass-theme .showcase-hero::after,
+body.anbg-glass-theme .page-header::after {
+    content: "" !important;
+    position: absolute !important;
+    left: 30% !important;
+    bottom: -130px !important;
+    width: 300px !important;
+    height: 300px !important;
+    border-radius: 999px !important;
+    background: radial-gradient(circle, rgba(143, 192, 67, 0.30), transparent 70%) !important;
+    pointer-events: none !important;
+}
+
+/* === CARTES KPI === */
+body.anbg-glass-theme .glass-kpi,
+body.anbg-glass-theme .showcase-kpi-card,
+body.anbg-glass-theme .dealdeck-kpi-card,
+body.anbg-glass-theme .stat-card,
+body.anbg-glass-theme .anbg-kpi-stat-card,
+body.anbg-glass-theme .no-kpi-band.stat-card {
+    background: var(--glass-surface) !important;
+    backdrop-filter: blur(18px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 18px !important;
+    box-shadow: var(--glass-shadow) !important;
+    transition: transform 0.20s ease, box-shadow 0.20s ease, background 0.20s ease !important;
+}
+
+body.anbg-glass-theme .glass-kpi:hover,
+body.anbg-glass-theme .showcase-kpi-card:hover,
+body.anbg-glass-theme .dealdeck-kpi-card:hover,
+body.anbg-glass-theme .stat-card:hover,
+body.anbg-glass-theme .anbg-kpi-stat-card:hover {
+    transform: translateY(-3px) !important;
+    background: var(--glass-surface-hover) !important;
+    box-shadow: var(--glass-shadow-strong) !important;
+}
+
+/* === SIDEBAR === */
+body.anbg-glass-theme .glass-sidebar,
+body.anbg-glass-theme #admin-sidebar,
+body.anbg-glass-theme .admin-sidebar,
+body.anbg-glass-theme .workspace-sidebar,
+body.anbg-glass-theme .app-sidebar-panel,
+body.anbg-glass-theme .eas-sidebar {
+    background: var(--glass-surface-strong) !important;
+    backdrop-filter: blur(28px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+    border-right: 1px solid var(--glass-border) !important;
+    box-shadow: var(--glass-shadow) !important;
+}
+
+/* === TOPBAR / HEADER === */
+body.anbg-glass-theme .glass-navbar,
+body.anbg-glass-theme #admin-topbar,
+body.anbg-glass-theme #admin-shell-header,
+body.anbg-glass-theme .admin-topbar,
+body.anbg-glass-theme .workspace-topbar,
+body.anbg-glass-theme .admin-page-header {
+    background: var(--glass-surface-strong) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border-bottom: 1px solid var(--glass-border) !important;
+    box-shadow: 0 6px 24px rgba(28, 32, 61, 0.08) !important;
+}
+
+/* === BOUTONS === */
+body.anbg-glass-theme .btn {
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    transition: all 0.18s ease !important;
+}
+body.anbg-glass-theme .btn-primary,
+body.anbg-glass-theme .glass-btn-primary {
+    background: linear-gradient(135deg, var(--glass-blue), var(--glass-blue-deep)) !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+    box-shadow: 0 8px 22px rgba(57, 150, 211, 0.30) !important;
+}
+body.anbg-glass-theme .btn-primary:hover,
+body.anbg-glass-theme .glass-btn-primary:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 12px 28px rgba(57, 150, 211, 0.38) !important;
+}
+body.anbg-glass-theme .btn-success {
+    background: linear-gradient(135deg, var(--glass-green), #6da32f) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+    box-shadow: 0 8px 22px rgba(143, 192, 67, 0.28) !important;
+}
+body.anbg-glass-theme .btn-warning {
+    background: linear-gradient(135deg, var(--glass-orange), #d9881f) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+    box-shadow: 0 8px 22px rgba(249, 177, 60, 0.28) !important;
+}
+body.anbg-glass-theme .btn-danger {
+    background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+    box-shadow: 0 8px 22px rgba(239, 68, 68, 0.28) !important;
+}
+body.anbg-glass-theme .btn-secondary {
+    background: rgba(255, 255, 255, 0.62) !important;
+    color: var(--glass-navy) !important;
+    border: 1px solid var(--glass-border) !important;
+    backdrop-filter: blur(12px) !important;
+}
+
+/* === FORMULAIRES === */
+body.anbg-glass-theme input,
+body.anbg-glass-theme select,
+body.anbg-glass-theme textarea,
+body.anbg-glass-theme .form-input,
+body.anbg-glass-theme .form-select,
+body.anbg-glass-theme .form-textarea,
+body.anbg-glass-theme .glass-input {
+    background-color: rgba(255, 255, 255, 0.78) !important;
+    border: 1px solid rgba(57, 150, 211, 0.22) !important;
+    color: #0f172a !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 14px rgba(28, 32, 61, 0.05) !important;
+    transition: all 0.18s ease !important;
+}
+body.anbg-glass-theme input:focus,
+body.anbg-glass-theme select:focus,
+body.anbg-glass-theme textarea:focus,
+body.anbg-glass-theme .form-input:focus,
+body.anbg-glass-theme .form-select:focus,
+body.anbg-glass-theme .form-textarea:focus,
+body.anbg-glass-theme .glass-input:focus {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    border-color: var(--glass-blue) !important;
+    box-shadow: 0 0 0 4px rgba(57, 150, 211, 0.18) !important;
+    outline: none !important;
+}
+body.anbg-glass-theme label {
+    color: var(--glass-navy) !important;
+    font-weight: 600 !important;
+}
+
+/* === TABLES === */
+body.anbg-glass-theme .glass-table,
+body.anbg-glass-theme .data-table,
+body.anbg-glass-theme .app-table,
+body.anbg-glass-theme table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    background: transparent !important;
+}
+body.anbg-glass-theme .data-table thead th,
+body.anbg-glass-theme .app-table thead th,
+body.anbg-glass-theme table thead th {
+    background: linear-gradient(135deg, var(--glass-blue), var(--glass-blue-deep)) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.04em !important;
+    border: none !important;
+}
+body.anbg-glass-theme .data-table tbody td,
+body.anbg-glass-theme .app-table tbody td,
+body.anbg-glass-theme table tbody td {
+    background: rgba(255, 255, 255, 0.50) !important;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.20) !important;
+    color: var(--glass-navy) !important;
+}
+body.anbg-glass-theme .data-table tbody tr:hover td,
+body.anbg-glass-theme .app-table tbody tr:hover td,
+body.anbg-glass-theme table tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.78) !important;
+}
+
+/* === BADGES === */
+body.anbg-glass-theme .anbg-badge {
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border-radius: 999px !important;
+    font-weight: 700 !important;
+    border: 1px solid rgba(255, 255, 255, 0.45) !important;
+}
+
+/* === ALERTS / FLASH MESSAGES === */
+body.anbg-glass-theme .alert-success,
+body.anbg-glass-theme [role="status"].success {
+    background: linear-gradient(135deg, rgba(143, 192, 67, 0.22), rgba(143, 192, 67, 0.10)) !important;
+    border: 1px solid rgba(143, 192, 67, 0.45) !important;
+    color: #355c0f !important;
+    backdrop-filter: blur(16px) !important;
+}
+body.anbg-glass-theme .alert-warning,
+body.anbg-glass-theme [role="status"].warning {
+    background: linear-gradient(135deg, rgba(249, 177, 60, 0.22), rgba(249, 177, 60, 0.10)) !important;
+    border: 1px solid rgba(249, 177, 60, 0.45) !important;
+    color: #7a3f00 !important;
+    backdrop-filter: blur(16px) !important;
+}
+body.anbg-glass-theme .alert-danger,
+body.anbg-glass-theme [role="status"].danger {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(239, 68, 68, 0.10)) !important;
+    border: 1px solid rgba(239, 68, 68, 0.45) !important;
+    color: #7f1d1d !important;
+    backdrop-filter: blur(16px) !important;
+}
+
+/* ========================================================
+   ─── DARK MODE — palette nuit ANBG ───
+   Active sur <html class="dark"> ou body.dark
+   ======================================================== */
+html.dark body.anbg-glass-theme,
+body.anbg-glass-theme.dark {
+    --glass-surface: rgba(15, 23, 42, 0.45);
+    --glass-surface-soft: rgba(15, 23, 42, 0.32);
+    --glass-surface-strong: rgba(15, 23, 42, 0.70);
+    --glass-surface-hover: rgba(30, 41, 59, 0.62);
+    --glass-border: rgba(148, 163, 184, 0.28);
+    --glass-border-soft: rgba(148, 163, 184, 0.18);
+    --glass-navy: #e2e8f0;
+
+    background:
+        radial-gradient(900px 700px at 10% 4%, rgba(57, 150, 211, 0.30), transparent 60%),
+        radial-gradient(1000px 800px at 95% 12%, rgba(143, 192, 67, 0.22), transparent 58%),
+        radial-gradient(1100px 900px at 50% 110%, rgba(249, 177, 60, 0.18), transparent 55%),
+        linear-gradient(135deg, #0a0f1f 0%, #111827 45%, #1a2240 100%) !important;
+    color: #e2e8f0 !important;
+}
+
+html.dark body.anbg-glass-theme::before,
+body.anbg-glass-theme.dark::before {
+    background-image:
+        linear-gradient(rgba(148,163,184,0.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,0.10) 1px, transparent 1px) !important;
+    opacity: 0.40 !important;
+}
+
+html.dark body.anbg-glass-theme .glass-card,
+html.dark body.anbg-glass-theme .showcase-panel,
+html.dark body.anbg-glass-theme .app-card,
+html.dark body.anbg-glass-theme .ui-card,
+html.dark body.anbg-glass-theme .form-section,
+html.dark body.anbg-glass-theme .form-shell,
+html.dark body.anbg-glass-theme .stat-card,
+html.dark body.anbg-glass-theme .anbg-kpi-stat-card,
+html.dark body.anbg-glass-theme .showcase-kpi-card {
+    background: var(--glass-surface) !important;
+    border-color: var(--glass-border) !important;
+    color: #e2e8f0 !important;
+}
+
+html.dark body.anbg-glass-theme input,
+html.dark body.anbg-glass-theme select,
+html.dark body.anbg-glass-theme textarea {
+    background-color: rgba(15, 23, 42, 0.72) !important;
+    color: #f8fafc !important;
+    border-color: rgba(148, 163, 184, 0.28) !important;
+}
+html.dark body.anbg-glass-theme input:focus,
+html.dark body.anbg-glass-theme select:focus,
+html.dark body.anbg-glass-theme textarea:focus {
+    background-color: rgba(15, 23, 42, 0.90) !important;
+    border-color: var(--glass-blue) !important;
+}
+html.dark body.anbg-glass-theme label {
+    color: #cbd5e1 !important;
+}
+
+html.dark body.anbg-glass-theme .data-table tbody td,
+html.dark body.anbg-glass-theme .app-table tbody td,
+html.dark body.anbg-glass-theme table tbody td {
+    background: rgba(15, 23, 42, 0.42) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(148, 163, 184, 0.18) !important;
+}
+html.dark body.anbg-glass-theme .data-table tbody tr:hover td,
+html.dark body.anbg-glass-theme .app-table tbody tr:hover td,
+html.dark body.anbg-glass-theme table tbody tr:hover td {
+    background: rgba(30, 41, 59, 0.65) !important;
+}
+
+html.dark body.anbg-glass-theme .btn-secondary {
+    background: rgba(30, 41, 59, 0.70) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(148, 163, 184, 0.28) !important;
+}
+
+html.dark body.anbg-glass-theme #admin-sidebar,
+html.dark body.anbg-glass-theme .app-sidebar-panel,
+html.dark body.anbg-glass-theme #admin-shell-header,
+html.dark body.anbg-glass-theme .admin-page-header {
+    background: rgba(15, 23, 42, 0.78) !important;
+    border-color: var(--glass-border) !important;
+}
+
+/* ============================================================
+   ─── CHARTS PREMIUM (2026-05-30) ───
+   Layout Bento + animations + finitions premium
+   ============================================================ */
+
+/* Bento grid layouts */
+body.anbg-glass-theme .charts-bento {
+    display: grid !important;
+    gap: 1rem !important;
+}
+body.anbg-glass-theme .charts-bento-row-hero {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) !important;
+}
+body.anbg-glass-theme .charts-bento-row-trend {
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) !important;
+}
+body.anbg-glass-theme .charts-bento-row-rank {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) !important;
+}
+@media (max-width: 1100px) {
+    body.anbg-glass-theme .charts-bento {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Animation a l'apparition des panels */
+body.anbg-glass-theme .charts-bento .showcase-panel {
+    animation: chartsFadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+body.anbg-glass-theme .charts-bento .showcase-panel:nth-child(2) { animation-delay: 0.08s; }
+body.anbg-glass-theme .charts-bento .showcase-panel:nth-child(3) { animation-delay: 0.16s; }
+@keyframes chartsFadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── HERO SCORE PANEL ─── */
+body.anbg-glass-theme .charts-hero-panel {
+    position: relative !important;
+    overflow: hidden !important;
+    padding: 1.5rem 1.75rem !important;
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.62),
+        color-mix(in srgb, var(--tone, #3996d3) 18%, transparent)
+    ) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.85rem !important;
+}
+body.anbg-glass-theme .charts-hero-panel::after {
+    content: "" !important;
+    position: absolute !important;
+    right: -90px !important;
+    top: -90px !important;
+    width: 260px !important;
+    height: 260px !important;
+    border-radius: 999px !important;
+    background: radial-gradient(circle, var(--tone, #3996d3), transparent 70%) !important;
+    opacity: 0.20 !important;
+    pointer-events: none !important;
+}
+
+body.anbg-glass-theme .charts-hero-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.75rem !important;
+    z-index: 1 !important;
+    position: relative !important;
+}
+body.anbg-glass-theme .charts-hero-eyebrow {
+    font-size: 0.7rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.18em !important;
+    text-transform: uppercase !important;
+    color: #475569 !important;
+}
+body.anbg-glass-theme .charts-hero-tone-badge {
+    padding: 0.25rem 0.65rem !important;
+    border-radius: 999px !important;
+    color: #ffffff !important;
+    font-size: 0.7rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase !important;
+    box-shadow: 0 4px 14px rgba(28, 32, 61, 0.18) !important;
+}
+
+body.anbg-glass-theme .charts-hero-value-block {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 0.35rem !important;
+    z-index: 1 !important;
+    position: relative !important;
+}
+body.anbg-glass-theme .charts-hero-value {
+    font-size: 3.8rem !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    letter-spacing: -0.04em !important;
+    color: var(--glass-navy, #1c203d) !important;
+    font-variant-numeric: tabular-nums !important;
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace !important;
+}
+body.anbg-glass-theme .charts-hero-unit {
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    color: #94a3b8 !important;
+}
+
+body.anbg-glass-theme .charts-hero-progress-track {
+    position: relative !important;
+    height: 12px !important;
+    background: rgba(148, 163, 184, 0.18) !important;
+    border-radius: 999px !important;
+    overflow: hidden !important;
+    z-index: 1 !important;
+}
+body.anbg-glass-theme .charts-hero-progress-fill {
+    position: absolute !important;
+    inset: 0 auto 0 0 !important;
+    border-radius: 999px !important;
+    transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 0 0 16px var(--tone, #3996d3) !important;
+}
+body.anbg-glass-theme .charts-hero-progress-threshold {
+    position: absolute !important;
+    top: -3px !important;
+    bottom: -3px !important;
+    width: 2px !important;
+    background: rgba(28, 32, 61, 0.45) !important;
+    border-radius: 999px !important;
+}
+body.anbg-glass-theme .charts-hero-progress-threshold::after {
+    content: "60" !important;
+    position: absolute !important;
+    top: -16px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    color: rgba(28, 32, 61, 0.55) !important;
+}
+
+body.anbg-glass-theme .charts-hero-meta {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.6rem !important;
+    z-index: 1 !important;
+    position: relative !important;
+}
+body.anbg-glass-theme .charts-hero-meta-cell {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.15rem !important;
+    padding: 0.6rem 0.75rem !important;
+    background: rgba(255, 255, 255, 0.55) !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(255, 255, 255, 0.7) !important;
+}
+body.anbg-glass-theme .charts-hero-meta-label {
+    font-size: 0.65rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+    color: #64748b !important;
+}
+body.anbg-glass-theme .charts-hero-meta-value {
+    font-size: 1.05rem !important;
+    font-weight: 800 !important;
+    color: var(--glass-navy, #1c203d) !important;
+    font-variant-numeric: tabular-nums !important;
+}
+
+body.anbg-glass-theme .charts-hero-sparkline {
+    position: absolute !important;
+    bottom: 14px !important;
+    right: 18px !important;
+    width: 120px !important;
+    height: 32px !important;
+    opacity: 0.65 !important;
+    pointer-events: none !important;
+}
+
+/* ─── JAUGES KPI PANEL ─── */
+body.anbg-glass-theme .charts-gauges-panel {
+    display: flex !important;
+    flex-direction: column !important;
+}
+body.anbg-glass-theme .charts-gauges-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 1rem !important;
+    flex: 1 !important;
+    align-items: center !important;
+}
+
+/* ─── STATUS GRID PREMIUM ─── */
+body.anbg-glass-theme .charts-status-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.7rem !important;
+}
+body.anbg-glass-theme .charts-status-item {
+    padding: 0.65rem 0.85rem !important;
+    background: rgba(255, 255, 255, 0.5) !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255, 255, 255, 0.65) !important;
+    transition: transform 0.16s ease, background 0.16s ease !important;
+}
+body.anbg-glass-theme .charts-status-item:hover {
+    transform: translateX(2px) !important;
+    background: rgba(255, 255, 255, 0.78) !important;
+    border-color: var(--tone, #3996d3) !important;
+}
+body.anbg-glass-theme .charts-status-item-head {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    margin-bottom: 0.4rem !important;
+}
+body.anbg-glass-theme .charts-status-dot {
+    width: 10px !important;
+    height: 10px !important;
+    border-radius: 999px !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone, #3996d3) 22%, transparent) !important;
+    flex: 0 0 auto !important;
+}
+body.anbg-glass-theme .charts-status-item-name {
+    flex: 1 !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    color: var(--glass-navy, #1c203d) !important;
+}
+body.anbg-glass-theme .charts-status-item-count {
+    font-weight: 900 !important;
+    font-size: 1.1rem !important;
+    font-variant-numeric: tabular-nums !important;
+}
+body.anbg-glass-theme .charts-status-item-track {
+    position: relative !important;
+    height: 6px !important;
+    background: rgba(148, 163, 184, 0.20) !important;
+    border-radius: 999px !important;
+    overflow: hidden !important;
+    margin-bottom: 0.25rem !important;
+}
+body.anbg-glass-theme .charts-status-item-fill {
+    position: absolute !important;
+    inset: 0 auto 0 0 !important;
+    border-radius: 999px !important;
+    transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+body.anbg-glass-theme .charts-status-item-pct {
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    color: #64748b !important;
+    font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── UNIT BARS PREMIUM ─── */
+body.anbg-glass-theme .charts-unit-bars {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.7rem !important;
+}
+body.anbg-glass-theme .charts-unit-bar {
+    display: grid !important;
+    grid-template-columns: minmax(80px, 130px) 1fr 56px !important;
+    align-items: center !important;
+    gap: 0.65rem !important;
+    padding: 0.4rem 0.5rem !important;
+    border-radius: 12px !important;
+    transition: background 0.16s ease !important;
+}
+body.anbg-glass-theme .charts-unit-bar:hover {
+    background: rgba(255, 255, 255, 0.45) !important;
+}
+body.anbg-glass-theme .charts-unit-bar-label {
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    color: var(--glass-navy, #1c203d) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+body.anbg-glass-theme .charts-unit-bar-track {
+    position: relative !important;
+    height: 10px !important;
+    background: rgba(148, 163, 184, 0.18) !important;
+    border-radius: 999px !important;
+    overflow: hidden !important;
+}
+body.anbg-glass-theme .charts-unit-bar-fill {
+    position: absolute !important;
+    inset: 0 auto 0 0 !important;
+    border-radius: 999px !important;
+    transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+body.anbg-glass-theme .charts-unit-bar-value {
+    font-size: 0.85rem !important;
+    font-weight: 900 !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── TOP ACTIONS PREMIUM ─── */
+body.anbg-glass-theme .charts-top-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.55rem !important;
+}
+body.anbg-glass-theme .charts-top-action-row {
+    display: grid !important;
+    grid-template-columns: 28px 1fr 56px !important;
+    align-items: center !important;
+    gap: 0.6rem !important;
+    padding: 0.55rem 0.7rem !important;
+    border-radius: 14px !important;
+    background: rgba(255, 255, 255, 0.45) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    text-decoration: none !important;
+    color: inherit !important;
+    transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease !important;
+}
+body.anbg-glass-theme .charts-top-action-row:hover {
+    transform: translateY(-1px) !important;
+    background: rgba(255, 255, 255, 0.78) !important;
+    border-color: rgba(57, 150, 211, 0.5) !important;
+    box-shadow: 0 8px 18px rgba(28, 32, 61, 0.10) !important;
+}
+body.anbg-glass-theme .charts-top-action-rank {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 999px !important;
+    background: linear-gradient(135deg, var(--glass-blue, #3996d3), var(--glass-blue-deep, #1c5f91)) !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    font-size: 0.75rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 12px rgba(57, 150, 211, 0.28) !important;
+    font-variant-numeric: tabular-nums !important;
+}
+body.anbg-glass-theme .charts-top-action-body {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.25rem !important;
+    min-width: 0 !important;
+}
+body.anbg-glass-theme .charts-top-action-label {
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    color: var(--glass-navy, #1c203d) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+body.anbg-glass-theme .charts-top-action-track {
+    position: relative !important;
+    height: 6px !important;
+    background: rgba(148, 163, 184, 0.18) !important;
+    border-radius: 999px !important;
+    overflow: hidden !important;
+}
+body.anbg-glass-theme .charts-top-action-fill {
+    position: absolute !important;
+    inset: 0 auto 0 0 !important;
+    border-radius: 999px !important;
+    transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+body.anbg-glass-theme .charts-top-action-value {
+    font-size: 0.95rem !important;
+    font-weight: 900 !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+}
+
+/* ─── PERIOD BUTTONS PREMIUM ─── */
+body.anbg-glass-theme .chart-period-bar {
+    display: inline-flex !important;
+    gap: 0.25rem !important;
+    padding: 0.25rem !important;
+    background: rgba(148, 163, 184, 0.12) !important;
+    border-radius: 999px !important;
+}
+body.anbg-glass-theme .chart-period-btn {
+    padding: 0.3rem 0.7rem !important;
+    border-radius: 999px !important;
+    border: none !important;
+    background: transparent !important;
+    color: #64748b !important;
+    font-weight: 700 !important;
+    font-size: 0.72rem !important;
+    cursor: pointer !important;
+    transition: all 0.16s ease !important;
+}
+body.anbg-glass-theme .chart-period-btn:hover {
+    color: var(--glass-navy, #1c203d) !important;
+    background: rgba(255, 255, 255, 0.7) !important;
+}
+body.anbg-glass-theme .chart-period-btn.active {
+    background: linear-gradient(135deg, var(--glass-blue, #3996d3), var(--glass-blue-deep, #1c5f91)) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(57, 150, 211, 0.28) !important;
+}
+
+/* ─── DARK MODE pour charts premium ─── */
+html.dark body.anbg-glass-theme .charts-hero-panel {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.6), color-mix(in srgb, var(--tone, #3996d3) 18%, rgba(15, 23, 42, 0.4))) !important;
+}
+html.dark body.anbg-glass-theme .charts-hero-value {
+    color: #f1f5f9 !important;
+}
+html.dark body.anbg-glass-theme .charts-hero-meta-cell {
+    background: rgba(15, 23, 42, 0.5) !important;
+    border-color: rgba(148, 163, 184, 0.22) !important;
+}
+html.dark body.anbg-glass-theme .charts-hero-meta-value,
+html.dark body.anbg-glass-theme .charts-status-item-name,
+html.dark body.anbg-glass-theme .charts-unit-bar-label,
+html.dark body.anbg-glass-theme .charts-top-action-label {
+    color: #e2e8f0 !important;
+}
+html.dark body.anbg-glass-theme .charts-status-item,
+html.dark body.anbg-glass-theme .charts-top-action-row {
+    background: rgba(15, 23, 42, 0.45) !important;
+    border-color: rgba(148, 163, 184, 0.22) !important;
+}
+html.dark body.anbg-glass-theme .charts-status-item:hover,
+html.dark body.anbg-glass-theme .charts-top-action-row:hover {
+    background: rgba(30, 41, 59, 0.65) !important;
+}

@@ -113,7 +113,7 @@ class ReferentielWebController extends Controller
 
         return redirect()
             ->route('workspace.referentiel.directions.index')
-            ->with('success', 'Direction creee avec succes.');
+            ->with('success', 'Direction creee avec succès.');
     }
 
     public function directionsEdit(Request $request, Direction $direction): View
@@ -145,7 +145,7 @@ class ReferentielWebController extends Controller
 
         return redirect()
             ->route('workspace.referentiel.directions.index')
-            ->with('success', 'Direction mise a jour avec succes.');
+            ->with('success', 'Direction mise a jour avec succès.');
     }
 
     public function directionsDestroy(Request $request, Direction $direction): RedirectResponse
@@ -167,7 +167,7 @@ class ReferentielWebController extends Controller
 
         return redirect()
             ->route('workspace.referentiel.directions.index')
-            ->with('success', 'Direction supprimee avec succes.');
+            ->with('success', 'Direction supprimee avec succès.');
     }
 
     public function servicesIndex(Request $request): View
@@ -268,7 +268,7 @@ class ReferentielWebController extends Controller
 
         return redirect()
             ->route('workspace.referentiel.services.index')
-            ->with('success', 'Service cree avec succes.');
+            ->with('success', 'Service cree avec succès.');
     }
 
     public function servicesEdit(Request $request, Service $service): View
@@ -311,7 +311,7 @@ class ReferentielWebController extends Controller
 
         return redirect()
             ->route('workspace.referentiel.services.index')
-            ->with('success', 'Service mis a jour avec succes.');
+            ->with('success', 'Service mis a jour avec succès.');
     }
 
     public function servicesDestroy(Request $request, Service $service): RedirectResponse
@@ -333,7 +333,7 @@ class ReferentielWebController extends Controller
 
         return redirect()
             ->route('workspace.referentiel.services.index')
-            ->with('success', 'Service supprime avec succes.');
+            ->with('success', 'Service supprime avec succès.');
     }
 
     public function utilisateursIndex(Request $request): View
@@ -489,7 +489,7 @@ class ReferentielWebController extends Controller
 
         return redirect()
             ->route('workspace.referentiel.utilisateurs.index')
-            ->with('success', 'Utilisateur cree avec succes.');
+            ->with('success', 'Utilisateur cree avec succès.');
     }
 
     public function utilisateursEdit(Request $request, User $utilisateur): View
@@ -561,7 +561,7 @@ class ReferentielWebController extends Controller
 
         return redirect()
             ->route('workspace.referentiel.utilisateurs.index')
-            ->with('success', 'Utilisateur mis a jour avec succes.');
+            ->with('success', 'Utilisateur mis a jour avec succès.');
     }
 
     public function utilisateursDeletionRequestStore(Request $request, User $utilisateur): RedirectResponse
@@ -633,7 +633,7 @@ class ReferentielWebController extends Controller
 
         return redirect()
             ->route('workspace.referentiel.utilisateurs.index')
-            ->with('success', 'Utilisateur supprime avec succes.');
+            ->with('success', 'Utilisateur supprime avec succès.');
     }
 
     /**

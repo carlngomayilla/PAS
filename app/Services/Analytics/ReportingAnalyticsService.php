@@ -261,10 +261,19 @@ class ReportingAnalyticsService
                         ->implode(' | ');
 
                     return [
-                        'axe_strategique' => (string) ($action->pta?->pao?->titre ?? $action->pta?->titre ?? ''),
-                        'objectif_strategique' => (string) ($action->pta?->titre ?? ''),
-                        'objectif_operationnel' => (string) $action->libelle,
-                        'description_actions_detaillees' => (string) ($action->description ?? ''),
+                        // Cf. reportActionRow() : axe stratégique = pasAxe->libelle,
+                        // objectif stratégique = pasObjectif->libelle, objectif
+                        // opérationnel = ObjectifOperationnel->libelle. Les anciens
+                        // fallbacks vers les titres de PAO/PTA causaient l'affichage
+                        // de "PTA - SCIQ" en lieu et place du libellé d'OO.
+                        'axe_strategique' => (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->libelle ?? '-'),
+                        'objectif_strategique' => (string) ($action->pta?->pao?->pasObjectif?->libelle ?? '-'),
+                        'objectif_operationnel' => (string) (
+                            $action->objectifOperationnel?->libelle
+                            ?? $action->pta?->objectifOperationnel?->libelle
+                            ?? '-'
+                        ),
+                        'description_actions_detaillees' => (string) ($action->description ?? $action->libelle ?? ''),
                         'rmo' => (string) ($action->responsable?->name ?? ''),
                         'cible' => (string) $cible,
                         'debut' => optional($action->date_debut)->format('Y-m-d') ?? '',
@@ -410,7 +419,12 @@ class ReportingAnalyticsService
 
         $actionsQuery = Action::query()
             ->with([
-                'pta:id,pao_id,titre,direction_id,service_id',
+                'pta:id,pao_id,objectif_operationnel_id,titre,direction_id,service_id',
+                // Charger l'objectif operationnel reel (via le PTA ET via l'action
+                // directement) pour que reportActionRow() puisse afficher le bon
+                // libelle d'OO et eviter le fallback sur le titre du PTA.
+                'pta.objectifOperationnel:id,libelle',
+                'objectifOperationnel:id,libelle',
                 'pta.pao:id,pas_objectif_id,titre,annee,direction_id,service_id,objectif_operationnel,echeance',
                 'pta.pao.pasObjectif:id,pas_axe_id,code,libelle',
                 'pta.pao.pasObjectif.pasAxe:id,code,libelle,periode_fin',
@@ -776,9 +790,15 @@ class ReportingAnalyticsService
             ?? $action->pta?->pao?->titre
             ?? '-'
         );
+        // Le vrai objectif operationnel vient du modele ObjectifOperationnel
+        // (rattache a l'action via objectif_operationnel_id, ou au PTA via
+        // pta.objectif_operationnel_id). On evite a tout prix de retomber sur
+        // $pta->titre qui contient "PTA - <service>" (l'utilisateur le voyait
+        // affiche en lieu et place du libelle d'objectif operationnel).
         $operationalObjective = (string) (
-            $action->pta?->pao?->objectif_operationnel
-            ?? $action->pta?->titre
+            $action->objectifOperationnel?->libelle
+            ?? $action->pta?->objectifOperationnel?->libelle
+            ?? $action->pta?->pao?->objectif_operationnel
             ?? '-'
         );
         $pasAxe = $action->pta?->pao?->pasObjectif?->pasAxe;

@@ -103,19 +103,65 @@
         </section>
     @endif
 
-    {{-- Rangée 1 : Jauges (compact 4-col) + Score global côte à côte --}}
-    <div class="charts-row-2 mb-4">
-        <article class="showcase-panel">
+    {{-- ╔═══════════════════════════════════════════════════════════════╗
+         ║ NOUVELLE DISPOSITION PREMIUM (2026-05-30) — layout Bento     ║
+         ║ Rangee 1 : HERO SCORE (large) + 2 jauges KPI (a droite)     ║
+         ║ Rangee 2 : Tendance 12 mois (large) + Repartition statuts   ║
+         ║ Rangee 3 : Performance par unite + Top actions              ║
+         ╚═══════════════════════════════════════════════════════════════╝ --}}
+
+    @php
+        $globalScore = (float) ($globalScores['global'] ?? 0);
+        $progressionScore = (float) ($globalScores['progression'] ?? 0);
+        $scoreTone = $globalScore >= 80 ? '#8FC043' : ($globalScore >= 60 ? '#3996D3' : ($globalScore >= 40 ? '#F9B13C' : '#ef4444'));
+        $scoreToneLabel = $globalScore >= 80 ? 'Excellent' : ($globalScore >= 60 ? 'Bon' : ($globalScore >= 40 ? 'A surveiller' : 'Critique'));
+    @endphp
+
+    {{-- ─── RANGEE 1 : HERO SCORE + JAUGES KPI ─────────────────────── --}}
+    <div class="charts-bento charts-bento-row-hero mb-4">
+        <article class="showcase-panel charts-hero-panel" style="--tone: {{ $scoreTone }};">
+            <div class="charts-hero-head">
+                <span class="charts-hero-eyebrow">Score global pondéré</span>
+                <span class="charts-hero-tone-badge" style="background: {{ $scoreTone }};">{{ $scoreToneLabel }}</span>
+            </div>
+            <div class="charts-hero-value-block">
+                <span class="charts-hero-value">{{ number_format($globalScore, 1, ',', ' ') }}</span>
+                <span class="charts-hero-unit">/100</span>
+            </div>
+            <div class="charts-hero-progress-track">
+                <div class="charts-hero-progress-fill" style="width: {{ min(100, max(0, $globalScore)) }}%; background: linear-gradient(90deg, {{ $scoreTone }}, {{ $scoreTone }}cc);"></div>
+                <div class="charts-hero-progress-threshold" style="left: 60%;" title="Seuil de qualité : 60"></div>
+            </div>
+            <div class="charts-hero-meta">
+                <div class="charts-hero-meta-cell">
+                    <span class="charts-hero-meta-label">Progression moy.</span>
+                    <span class="charts-hero-meta-value">{{ number_format($progressionScore, 1, ',', ' ') }}%</span>
+                </div>
+                <div class="charts-hero-meta-cell">
+                    <span class="charts-hero-meta-label">Seuil qualité</span>
+                    <span class="charts-hero-meta-value">60</span>
+                </div>
+            </div>
+            {{-- Mini-sparkline si on a des donnees mensuelles --}}
+            @if ($monthlyOfficial !== [])
+                <div class="charts-hero-sparkline" aria-hidden="true">
+                    <svg viewBox="0 0 200 40" preserveAspectRatio="none">
+                        <polyline points="{{ $chartFallbackPoints($monthlyOfficial, 'global') }}" fill="none" stroke="{{ $scoreTone }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
+                    </svg>
+                </div>
+            @endif
+        </article>
+
+        <article class="showcase-panel charts-gauges-panel">
             <div class="chart-panel-head mb-3">
                 <h2 class="chart-title">Indicateurs KPI</h2>
-                <span class="showcase-chip">Survolez pour les détails</span>
+                <span class="showcase-chip">Délai · Performance</span>
             </div>
-            <div class="dashboard-gauge-grid-4">
-                {{-- KPI conformite retire (2026-05-28) : seuls delai et performance restent affiches. --}}
+            <div class="charts-gauges-grid">
                 @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')]] as $gauge)
                     @php
                         $gaugeValue = min(100, max(0, (float) ($globalScores[$gauge['key']] ?? 0)));
-                        $gaugeTone = $gaugeValue >= 80 ? '#8FC043' : ($gaugeValue >= 60 ? '#3996D3' : '#F9B13C');
+                        $gaugeTone = $gaugeValue >= 80 ? '#8FC043' : ($gaugeValue >= 60 ? '#3996D3' : ($gaugeValue >= 40 ? '#F9B13C' : '#ef4444'));
                     @endphp
                     <div class="dashboard-gauge-item">
                         <div id="dashboard-kpi-gauge-{{ $gauge['key'] }}" class="dashboard-chart-host">
@@ -130,87 +176,104 @@
                 @endforeach
             </div>
         </article>
+    </div>
 
-        <article class="showcase-panel charts-score-side">
+    {{-- ─── RANGEE 2 : TENDANCE MENSUELLE + REPARTITION STATUTS ─── --}}
+    <div class="charts-bento charts-bento-row-trend mb-4">
+        <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Score global</h2>
-                <span class="showcase-chip">Seuil 60</span>
-            </div>
-            <div class="charts-score-block">
-                <p class="charts-score-value">{{ number_format((float) ($globalScores['global'] ?? 0), 1, ',', ' ') }}</p>
-                <p class="charts-score-label">{{ $metricLabel('global') }}</p>
-                <div class="charts-score-bar mt-3">
-                    <div class="charts-score-fill" style="width: {{ min(100, max(0, (float) ($globalScores['global'] ?? 0))) }}%;"></div>
+                <h2 class="chart-title">Évolution mensuelle des indicateurs</h2>
+                <div class="chart-period-bar" data-period-chart="kpi-line">
+                    <button type="button" class="chart-period-btn" data-period="3">3M</button>
+                    <button type="button" class="chart-period-btn" data-period="6">6M</button>
+                    <button type="button" class="chart-period-btn" data-period="12">12M</button>
+                    <button type="button" class="chart-period-btn active" data-period="0">Tout</button>
                 </div>
-                <p class="charts-score-meta mt-2">Progression moy. : {{ number_format((float) ($globalScores['progression'] ?? 0), 1, ',', ' ') }}%</p>
             </div>
-            <div class="charts-status-list mt-3">
-                @foreach ($statusCards as $card)
-                    <div class="charts-status-row">
-                        <span class="charts-status-dot" style="background: {{ $card['color'] }};"></span>
-                        <span class="charts-status-name">{{ $card['label'] }}</span>
-                        <span class="charts-status-count" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span>
+            <div class="dashboard-canvas">
+                <div id="dashboard-kpi-line-chart" class="dashboard-chart-host">
+                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                        @if ($monthlyOfficial !== [])
+                            <svg viewBox="0 0 360 140" preserveAspectRatio="none">
+                                <defs>
+                                    <linearGradient id="charts-area-grad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stop-color="#3996D3" stop-opacity="0.32" />
+                                        <stop offset="100%" stop-color="#3996D3" stop-opacity="0.02" />
+                                    </linearGradient>
+                                </defs>
+                                <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
+                                <line x1="20" y1="84" x2="340" y2="84" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="3 4" opacity="0.6" />
+                                <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
+                                <polygon points="20,120 {{ $chartFallbackPoints($monthlyOfficial, 'global') }} 340,120" fill="url(#charts-area-grad)" />
+                                <polyline points="{{ $chartFallbackPoints($monthlyOfficial, 'global') }}" fill="none" stroke="#3996D3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                                @foreach (collect($monthlyOfficial)->values() as $row)
+                                    @php
+                                        $x = 20 + (($loop->index * 320) / max(1, count($monthlyOfficial) - 1));
+                                        $y = 120 - (min(100, max(0, (float) ($row['global'] ?? 0))) * 0.9);
+                                    @endphp
+                                    <circle cx="{{ $x }}" cy="{{ $y }}" r="4" fill="#ffffff" stroke="#3996D3" stroke-width="2.5" />
+                                @endforeach
+                            </svg>
+                        @else
+                            <div class="dashboard-chart-empty">Aucune donnée disponible pour ce graphique.</div>
+                        @endif
                     </div>
-                @endforeach
+                </div>
             </div>
+        </article>
+
+        <article class="showcase-panel">
+            <div class="chart-panel-head mb-3">
+                <h2 class="chart-title">Répartition des statuts</h2>
+                <span class="showcase-chip">{{ collect($statusCards)->sum('count') }} actions</span>
+            </div>
+            @if (! empty($statusCards) && collect($statusCards)->sum('count') > 0)
+                <div class="charts-status-grid">
+                    @foreach ($statusCards as $card)
+                        @php $cardTotal = collect($statusCards)->sum('count'); @endphp
+                        @php $cardPct = $cardTotal > 0 ? round(((float) $card['count'] / $cardTotal) * 100, 1) : 0; @endphp
+                        <div class="charts-status-item" style="--tone: {{ $card['color'] }};">
+                            <div class="charts-status-item-head">
+                                <span class="charts-status-dot" style="background: {{ $card['color'] }};"></span>
+                                <span class="charts-status-item-name">{{ $card['label'] }}</span>
+                                <span class="charts-status-item-count" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span>
+                            </div>
+                            <div class="charts-status-item-track">
+                                <div class="charts-status-item-fill" style="width: {{ $cardPct }}%; background: {{ $card['color'] }};"></div>
+                            </div>
+                            <span class="charts-status-item-pct">{{ number_format($cardPct, 1, ',', ' ') }}%</span>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <x-ui.empty-state title="Aucun statut à afficher" message="Importez des actions pour voir la répartition." icon="chart" tone="info" />
+            @endif
         </article>
     </div>
 
-    {{-- Rangée 2 : Courbe KPI mensuelle pleine largeur --}}
-    <article class="showcase-panel mb-4">
-        <div class="chart-panel-head mb-3">
-            <h2 class="chart-title">Évolution mensuelle des indicateurs</h2>
-            <div class="chart-period-bar" data-period-chart="kpi-line">
-                <button type="button" class="chart-period-btn" data-period="3">3M</button>
-                <button type="button" class="chart-period-btn" data-period="6">6M</button>
-                <button type="button" class="chart-period-btn" data-period="12">12M</button>
-                <button type="button" class="chart-period-btn active" data-period="0">Tout</button>
-            </div>
-        </div>
-        <div class="dashboard-canvas">
-            <div id="dashboard-kpi-line-chart" class="dashboard-chart-host">
-                <div class="dashboard-chart-fallback" aria-hidden="true">
-                    @if ($monthlyOfficial !== [])
-                        <svg viewBox="0 0 360 140" preserveAspectRatio="none">
-                            <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
-                            <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
-                            <polyline points="{{ $chartFallbackPoints($monthlyOfficial, 'global') }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                            @foreach (collect($monthlyOfficial)->values() as $row)
-                                @php
-                                    $x = 20 + (($loop->index * 320) / max(1, count($monthlyOfficial) - 1));
-                                    $y = 120 - (min(100, max(0, (float) ($row['global'] ?? 0))) * 0.9);
-                                @endphp
-                                <circle cx="{{ $x }}" cy="{{ $y }}" r="3.5" fill="#3996D3" />
-                            @endforeach
-                        </svg>
-                    @else
-                        <div class="dashboard-chart-empty">Aucune donnée disponible pour ce graphique.</div>
-                    @endif
-                </div>
-            </div>
-        </div>
-    </article>
-
-    {{-- Rangée 3 : Synthèse par unité + Classement Top 6 --}}
-    <div class="charts-row-2 mb-4">
+    {{-- ─── RANGEE 3 : PERFORMANCE PAR UNITE + TOP ACTIONS ─────────── --}}
+    <div class="charts-bento charts-bento-row-rank mb-4">
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Synthèse par {{ strtolower($unitModeLabel) }}</h2>
+                <h2 class="chart-title">Performance par {{ strtolower($unitModeLabel) }}</h2>
                 <span class="showcase-chip">{{ count($unitRows) }} {{ strtolower($unitModeLabel) }}</span>
             </div>
             <div class="dashboard-canvas">
                 <div id="dashboard-unit-summary-chart" class="dashboard-chart-host">
                     <div class="dashboard-chart-fallback" aria-hidden="true">
                         @if ($unitFallbackRows->isNotEmpty())
-                            <div class="dashboard-chart-fallback-bars">
+                            <div class="charts-unit-bars">
                                 @foreach ($unitFallbackRows as $row)
-                                    @php $unitValue = min(100, max(0, (float) ($row['kpi_global'] ?? $row['progression_moyenne'] ?? 0))); @endphp
-                                    <div class="dashboard-chart-fallback-bar">
-                                        <span class="truncate">{{ $row['label'] ?? '-' }}</span>
-                                        <span class="dashboard-chart-fallback-track">
-                                            <span class="dashboard-chart-fallback-fill" style="width: {{ $unitValue }}%;"></span>
+                                    @php
+                                        $unitValue = min(100, max(0, (float) ($row['kpi_global'] ?? $row['progression_moyenne'] ?? 0)));
+                                        $unitTone = $unitValue >= 80 ? '#8FC043' : ($unitValue >= 60 ? '#3996D3' : ($unitValue >= 40 ? '#F9B13C' : '#ef4444'));
+                                    @endphp
+                                    <div class="charts-unit-bar">
+                                        <span class="charts-unit-bar-label">{{ $row['label'] ?? '-' }}</span>
+                                        <span class="charts-unit-bar-track">
+                                            <span class="charts-unit-bar-fill" style="width: {{ $unitValue }}%; background: linear-gradient(90deg, {{ $unitTone }}, {{ $unitTone }}cc);"></span>
                                         </span>
-                                        <span class="text-right">{{ number_format($unitValue, 1, ',', ' ') }}%</span>
+                                        <span class="charts-unit-bar-value" style="color: {{ $unitTone }};">{{ number_format($unitValue, 1, ',', ' ') }}%</span>
                                     </div>
                                 @endforeach
                             </div>
@@ -224,25 +287,28 @@
 
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Classement des actions</h2>
+                <h2 class="chart-title">Top actions à risque</h2>
                 <span class="showcase-chip">Top {{ count($analytics['top_action_bars'] ?? []) }}</span>
             </div>
             @if ($analytics['top_action_bars'] ?? false)
-                <div class="grid gap-2">
+                <div class="charts-top-actions">
                     @foreach ($analytics['top_action_bars'] as $row)
-                        <a href="{{ $row['url'] }}" class="dashboard-bullet rounded-xl px-2 py-1.5 transition hover:bg-[#E8F3FB]/70">
-                            <span class="truncate text-xs font-semibold text-[#667085]">{{ $row['label'] }}</span>
-                            <span class="dashboard-bullet-track">
-                                <span class="dashboard-bullet-value" style="width: {{ min(100, max(0, (float) $row['value'])) }}%; background: {{ $row['color'] }};"></span>
+                        <a href="{{ $row['url'] }}" class="charts-top-action-row">
+                            <span class="charts-top-action-rank">{{ $loop->iteration }}</span>
+                            <span class="charts-top-action-body">
+                                <span class="charts-top-action-label">{{ $row['label'] }}</span>
+                                <span class="charts-top-action-track">
+                                    <span class="charts-top-action-fill" style="width: {{ min(100, max(0, (float) $row['value'])) }}%; background: linear-gradient(90deg, {{ $row['color'] }}, {{ $row['color'] }}cc);"></span>
+                                </span>
                             </span>
-                            <span class="text-right text-[11px] font-black" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 1, ',', ' ') }}</span>
+                            <span class="charts-top-action-value" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 1, ',', ' ') }}</span>
                         </a>
                     @endforeach
                 </div>
             @else
                 <x-ui.empty-state
                     title="Aucune action classée"
-                    message="Aucune action classée pour le moment."
+                    message="Le classement apparaîtra quand des actions seront en cours."
                     icon="chart"
                     tone="info"
                 />

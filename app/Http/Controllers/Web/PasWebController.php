@@ -212,7 +212,7 @@ class PasWebController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         if ($pas->statut === Pas::STATUS_ARCHIVE) {
-            return back()->withErrors(['general' => 'Impossible de modifier un PAS archive.']);
+            return back()->withErrors(['general' => 'Impossible de modifier un PAS archivé.']);
         }
         if ($message = app(PlanningModificationLockService::class)->ensureUnlocked($pas, $user)) {
             return back()->withErrors(['general' => $message]);
@@ -264,7 +264,7 @@ class PasWebController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         if ($pas->statut === Pas::STATUS_ARCHIVE) {
-            return back()->withErrors(['general' => 'Impossible de supprimer directement un PAS archive.']);
+            return back()->withErrors(['general' => 'Impossible de supprimer directement un PAS archivé.']);
         }
 
         $validated = $request->validate([
@@ -281,7 +281,7 @@ class PasWebController extends Controller
 
             return redirect()
                 ->route('workspace.pas.index')
-                ->with('success', 'Demande de suppression PAS transmise au Super Admin.');
+                ->with('success', 'Demande de suppression du PAS transmise au Super Admin.');
         }
 
         $before = $pas->toArray();
@@ -309,7 +309,7 @@ class PasWebController extends Controller
         $this->denyUnlessStrategicWriter($user);
 
         if ((string) $pas->statut === Pas::STATUS_ARCHIVE) {
-            return back()->withErrors(['general' => 'Impossible de cloturer un PAS archive.']);
+            return back()->withErrors(['general' => 'Impossible de cloturer un PAS archivé.']);
         }
 
         $validated = $request->validate([
@@ -343,7 +343,7 @@ class PasWebController extends Controller
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', 'PAS cloture avec rapport d anomalies trace.');
+            ->with('success', 'PAS clôturé avec rapport d\'anomalies tracé.');
     }
 
     public function archive(Request $request, Pas $pas): RedirectResponse
@@ -377,7 +377,7 @@ class PasWebController extends Controller
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', 'PAS archive.');
+            ->with('success', 'PAS archivé.');
     }
 
     private function canWrite(User $user): bool

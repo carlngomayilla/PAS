@@ -112,6 +112,14 @@ class ExerciceContext
     }
 
     /**
+     * Annees affichees dans le selecteur d'exercice de la navbar.
+     *
+     * Regle metier ANBG (2026-05-30) : on n'expose QUE les annees couvertes par
+     * un PAS existant en BDD (periode_debut..periode_fin) plus celles deduites
+     * des PAO presents. Aucune annee "fallback" (annee courante ±N) ni annee
+     * issue de la table exercices pour eviter d'afficher des annees sans aucune
+     * donnee planning. Quand l'appli est vide, le selecteur ne montre que "Tous ex.".
+     *
      * @return list<array{value: string, label: string, statut: string|null}>
      */
     public function options(): array
@@ -119,28 +127,7 @@ class ExerciceContext
         $years = [];
         $statuses = [];
 
-        if (Schema::hasTable('exercices')) {
-            Exercice::query()
-                ->orderByDesc('annee')
-                ->get(['annee', 'libelle', 'statut'])
-                ->each(function (Exercice $exercice) use (&$years, &$statuses): void {
-                    $year = (int) $exercice->annee;
-                    $years[$year] = (string) ($exercice->libelle ?: 'Exercice '.$year);
-                    $statuses[$year] = (string) $exercice->statut;
-                });
-        }
-
-        if (Schema::hasTable('paos')) {
-            Pao::query()
-                ->whereNotNull('annee')
-                ->distinct()
-                ->pluck('annee')
-                ->each(static function ($year) use (&$years): void {
-                    $year = (int) $year;
-                    $years[$year] = $years[$year] ?? 'Exercice '.$year;
-                });
-        }
-
+        // 1. Annees couvertes par les PAS en BDD (periode_debut → periode_fin inclus).
         if (Schema::hasTable('pas')) {
             Pas::query()
                 ->select(['periode_debut', 'periode_fin'])
@@ -153,14 +140,39 @@ class ExerciceContext
                     }
 
                     foreach (range($start, $end) as $year) {
+                        $years[$year] = 'Exercice '.$year;
+                    }
+                });
+        }
+
+        // 2. Annees des PAO (filet de securite si un PAO orphelin existe).
+        if (Schema::hasTable('paos')) {
+            Pao::query()
+                ->whereNotNull('annee')
+                ->distinct()
+                ->pluck('annee')
+                ->each(static function ($year) use (&$years): void {
+                    $year = (int) $year;
+                    if ($year > 0) {
                         $years[$year] = $years[$year] ?? 'Exercice '.$year;
                     }
                 });
         }
 
-        $current = (int) now()->year;
-        foreach (range($current - 2, $current + 1) as $year) {
-            $years[$year] = $years[$year] ?? 'Exercice '.$year;
+        // 3. Pour les annees retenues, on enrichit le libelle/statut depuis la
+        //    table exercices SI un exercice correspondant existe. On NE remonte
+        //    PAS d'annees supplementaires depuis cette table.
+        if ($years !== [] && Schema::hasTable('exercices')) {
+            Exercice::query()
+                ->whereIn('annee', array_keys($years))
+                ->get(['annee', 'libelle', 'statut'])
+                ->each(function (Exercice $exercice) use (&$years, &$statuses): void {
+                    $year = (int) $exercice->annee;
+                    if ($exercice->libelle !== null && $exercice->libelle !== '') {
+                        $years[$year] = (string) $exercice->libelle;
+                    }
+                    $statuses[$year] = (string) $exercice->statut;
+                });
         }
 
         krsort($years);

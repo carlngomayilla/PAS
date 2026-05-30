@@ -499,32 +499,37 @@ class NotificationPolicySettings
         return [
             // Canal "email" ajouté sur les 10 événements clés v1.1 (Brevo).
             // L'envoi effectif est gouverné par services.brevo.enabled (fail-safe).
-            'action_assigned' => ['title' => 'Nouvelle action attribuée', 'message' => 'L’action \"{action_label}\" vous a été attribuée.', 'channels' => ['in_app', 'email']],
-            'action_submitted_to_chef' => ['title' => 'Action soumise pour validation', 'message' => 'L’action \"{action_label}\" attend votre évaluation.', 'channels' => ['in_app', 'email']],
+            'action_assigned' => ['title' => 'Nouvelle action attribuée', 'message' => 'L’action « {action_label} » vous a été attribuée. Consultez-la dès maintenant.', 'channels' => ['in_app', 'email']],
+            'action_submitted_to_chef' => ['title' => 'Action en attente de validation', 'message' => 'L’action « {action_label} » vient d’être soumise par l’agent et attend votre évaluation.', 'channels' => ['in_app', 'email']],
+            // Templates vides volontaires : ces évènements ont DEUX titres distincts
+            // (approuvé vs rejeté, agent vs direction) gérés en defaults par le service.
             'action_submitted_to_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'action_reviewed_by_chef' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'action_reviewed_by_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
-            'action_finalized_by_chef' => ['title' => 'Action validée par le chef', 'message' => 'L’action \"{action_label}\" est finalisée sans étape direction supplémentaire.', 'channels' => ['in_app']],
-            'action_finalized_without_workflow' => ['title' => 'Action clôturée', 'message' => 'L’action \"{action_label}\" a été clôturée sans circuit de validation supplémentaire.', 'channels' => ['in_app']],
+            'action_finalized_by_chef' => ['title' => 'Action finalisée par le chef', 'message' => 'L’action « {action_label} » a été finalisée par le chef de service, sans étape direction supplémentaire.', 'channels' => ['in_app']],
+            'action_finalized_without_workflow' => ['title' => 'Action clôturée', 'message' => 'L’action « {action_label} » a été clôturée sans circuit de validation supplémentaire.', 'channels' => ['in_app']],
             'action_alert_escalation' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit', 'email']],
-            'action_financing_requested' => ['title' => 'Financement à traiter', 'message' => 'L’action \"{action_label}\" nécessite un financement estimé à {montant_estime}. Traitement DAF requis.', 'channels' => ['in_app', 'audit', 'email']],
+            'action_financing_requested' => ['title' => 'Demande de financement à instruire', 'message' => 'L’action « {action_label} » nécessite un financement estimé à {montant_estime}. Traitement DAF requis.', 'channels' => ['in_app', 'audit', 'email']],
+            // Titres défaut variables (validé / refusé / complément) — gérés côté service.
             'action_financing_reviewed_by_daf' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit', 'email']],
             'action_financing_reviewed_by_dg' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit', 'email']],
-            'pao_transmitted_to_service' => ['title' => 'Nouveau PAO reçu', 'message' => 'Un nouveau PAO a été transmis à votre service pour l’exercice {year}.', 'channels' => ['in_app']],
-            'pao_updated_for_service' => ['title' => 'PAO mis à jour', 'message' => 'Un objectif opérationnel de votre service a été modifié par votre direction.', 'channels' => ['in_app']],
-            'pta_created_to_direction' => ['title' => 'Nouveau PTA créé', 'message' => 'Le service {service_label} a créé son PTA pour l’exercice {year}.', 'channels' => ['in_app']],
-            'pta_submitted_for_validation' => ['title' => 'PTA actualisé', 'message' => 'Le service {service_label} a actualise son PTA.', 'channels' => ['in_app']],
+            'pao_transmitted_to_service' => ['title' => 'Nouveau PAO reçu', 'message' => 'Un nouveau PAO vient d’être transmis à votre service pour l’exercice {year}. Préparez votre PTA.', 'channels' => ['in_app']],
+            'pao_updated_for_service' => ['title' => 'PAO mis à jour', 'message' => 'Un objectif opérationnel de votre service vient d’être modifié par votre direction. Vérifiez les ajustements.', 'channels' => ['in_app']],
+            'pta_created_to_direction' => ['title' => 'Nouveau PTA créé', 'message' => 'Le service {service_label} vient de créer son PTA pour l’exercice {year}.', 'channels' => ['in_app']],
+            'pta_submitted_for_validation' => ['title' => 'PTA actualisé', 'message' => 'Le service {service_label} vient d’actualiser son PTA.', 'channels' => ['in_app']],
+            // Titre variable selon validation / rejet — défaut côté service.
             'pta_reviewed_by_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
-            'sub_action_created' => ['title' => 'Nouvelle sous-action créée', 'message' => '{actor_name} a créé une sous-action dans l’action \"{action_label}\".', 'channels' => ['in_app', 'email']],
-            'sub_action_completed' => ['title' => 'Action soumise pour vérification', 'message' => '{actor_name} a marqué une action ou sous-action comme effectuée.', 'channels' => ['in_app']],
-            'justificatif_added' => ['title' => 'Justificatif ajouté', 'message' => '{actor_name} a ajouté une pièce justificative sur l’action \"{action_label}\".', 'channels' => ['in_app']],
-            'deadline_extension_requested' => ['title' => 'Demande de report d’échéance', 'message' => '{actor_name} demande un report pour l’action \"{action_label}\".', 'channels' => ['in_app', 'audit', 'email']],
-            'deadline_extension_sciq_reviewed' => ['title' => 'Avis SCIQ / Planification', 'message' => 'Avis {avis} sur le report de l’action \"{action_label}\".', 'channels' => ['in_app', 'audit', 'email']],
-            'deadline_extension_dg_decided' => ['title' => 'Décision DG sur report', 'message' => 'Décision {decision} sur le report de l’action \"{action_label}\".', 'channels' => ['in_app', 'audit', 'email']],
+            'sub_action_created' => ['title' => 'Nouvelle sous-action créée', 'message' => '{actor_name} vient d’ajouter une sous-action dans l’action « {action_label} ».', 'channels' => ['in_app', 'email']],
+            'sub_action_completed' => ['title' => 'Sous-action terminée — à vérifier', 'message' => '{actor_name} a marqué une sous-action comme réalisée. Elle attend votre validation.', 'channels' => ['in_app']],
+            'justificatif_added' => ['title' => 'Pièce justificative ajoutée', 'message' => '{actor_name} vient d’ajouter une pièce justificative sur l’action « {action_label} ».', 'channels' => ['in_app']],
+            'deadline_extension_requested' => ['title' => 'Demande de report d’échéance', 'message' => '{actor_name} demande un report d’échéance pour l’action « {action_label} ».', 'channels' => ['in_app', 'audit', 'email']],
+            'deadline_extension_sciq_reviewed' => ['title' => 'Avis SCIQ / Planification rendu', 'message' => 'Avis « {avis} » émis sur la demande de report de l’action « {action_label} ».', 'channels' => ['in_app', 'audit', 'email']],
+            'deadline_extension_dg_decided' => ['title' => 'Décision DG sur le report', 'message' => 'Décision « {decision} » sur la demande de report de l’action « {action_label} ».', 'channels' => ['in_app', 'audit', 'email']],
+            // Titre dynamique selon l'event (submitted, approved, locked, reopened) — défaut côté service.
             'pas_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'pao_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'pta_status' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
-            'delegation_created' => ['title' => 'Nouvelle délégation reçue', 'message' => 'Une délégation de {actor_name} vous a été attribuée sur le périmètre {scope_label}.', 'channels' => ['in_app']],
+            'delegation_created' => ['title' => 'Nouvelle délégation reçue', 'message' => 'Une délégation vous a été attribuée par {actor_name} sur le périmètre {scope_label}.', 'channels' => ['in_app']],
         ];
     }
 

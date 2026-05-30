@@ -147,7 +147,7 @@ class ActionFinancingWorkflowTest extends TestCase
         $this->assertNotNull($fixture['agent']->fresh()->notifications()->first());
         $this->assertNotNull($fixture['service_user']->fresh()->notifications()->first());
         $this->assertFalse($fixture['dg']->fresh()->notifications->contains(
-            fn ($notification): bool => ($notification->data['title'] ?? '') === 'Complement demande par la DAF'
+            fn ($notification): bool => ($notification->data['title'] ?? '') === 'Complément demandé par la DAF'
         ));
         $this->assertDatabaseHas('action_logs', [
             'action_id' => $action->id,

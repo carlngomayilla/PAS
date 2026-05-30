@@ -197,7 +197,7 @@ class MessagingWebController extends Controller
 
         return redirect()
             ->route('workspace.messaging.index', ['conversation' => $activeConversation->id])
-            ->with('success', 'Message envoye.');
+            ->with('success', 'Message envoyé.');
     }
 
     public function updates(Request $request, Conversation $conversation): JsonResponse

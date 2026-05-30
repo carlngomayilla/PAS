@@ -328,7 +328,7 @@
                                         @foreach ($synthesisTable['headers'] as $header)
                                             <th>{{ $header }}</th>
                                         @endforeach
-                                        <th class="dashboard-no-export">D&eacute;tail</th>
+                                        <th class="dashboard-no-export">Détail</th>
                                     </tr>
                                 </thead>
                                 <tbody>

@@ -248,7 +248,7 @@ class GovernanceWebController extends Controller
 
         return redirect()
             ->route('workspace.delegations.index')
-            ->with('success', 'Delegation enregistree avec succes.');
+            ->with('success', 'Delegation enregistree avec succès.');
     }
 
     public function delegationsCancel(Request $request, Delegation $delegation): RedirectResponse
@@ -276,7 +276,7 @@ class GovernanceWebController extends Controller
 
         return redirect()
             ->route('workspace.delegations.index')
-            ->with('success', 'Delegation annulee.');
+            ->with('success', 'Délégation annulée.');
     }
 
     private function delegationEligibleUsers()

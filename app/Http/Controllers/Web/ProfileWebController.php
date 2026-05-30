@@ -107,7 +107,7 @@ class ProfileWebController extends Controller
 
         return redirect()
             ->route('workspace.profile.edit')
-            ->with('success', 'Profil mis a jour avec succes.');
+            ->with('success', 'Profil mis a jour avec succès.');
     }
 
     public function revokeCurrentSession(Request $request): RedirectResponse
@@ -124,7 +124,7 @@ class ProfileWebController extends Controller
 
         return redirect()
             ->route('login.form')
-            ->with('success', 'Session courante revoquee.');
+            ->with('success', 'Session courante révoquée.');
     }
 
     public function revokeOtherSessions(Request $request): RedirectResponse
@@ -138,7 +138,7 @@ class ProfileWebController extends Controller
 
         return redirect()
             ->route('workspace.profile.edit')
-            ->with('success', 'Toutes les autres sessions ont ete revoquees.');
+            ->with('success', 'Toutes les autres sessions ont été révoquées.');
     }
 
     public function revokeSession(Request $request, string $sessionId): RedirectResponse
@@ -162,12 +162,12 @@ class ProfileWebController extends Controller
 
             return redirect()
                 ->route('login.form')
-                ->with('success', 'Session courante revoquee.');
+                ->with('success', 'Session courante révoquée.');
         }
 
         return redirect()
             ->route('workspace.profile.edit')
-            ->with('success', 'Session revoquee avec succes.');
+            ->with('success', 'Session revoquee avec succès.');
     }
 
     /**

@@ -41,6 +41,7 @@ class BrevoEmailChannelTest extends TestCase
          * et BrevoEmailChannel ne peut pas écrire dans brevo_email_log.
          */
         config()->set('services.brevo.enabled', true);
+        config()->set('services.brevo.transport', 'smtp');
         config()->set('services.brevo.mailer', 'brevo');
 
         config()->set('mail.mailers.brevo', [

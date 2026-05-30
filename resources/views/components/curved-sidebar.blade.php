@@ -67,7 +67,7 @@
     ];
 @endphp
 
-<aside class="eas-sidebar w-full md:sticky md:top-0 md:h-screen md:w-[280px] md:min-w-[280px]">
+<aside class="eas-sidebar glass-sidebar app-sidebar w-full md:sticky md:top-0 md:h-screen md:w-[280px] md:min-w-[280px]">
     <div class="dealdeck-sidebar-panel flex h-full flex-col border-r border-[#e5e7eb] bg-white text-[#1c203d]">
 
         {{-- Header --}}

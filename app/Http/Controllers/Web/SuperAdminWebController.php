@@ -198,7 +198,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.settings.edit')
-            ->with('success', 'Parametres generaux mis a jour.');
+            ->with('success', 'Paramètres généraux mis à jour.');
     }
 
     public function settingsDraftUpdate(Request $request): RedirectResponse
@@ -248,7 +248,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.settings.edit')
-            ->with('success', 'Brouillon des parametres generaux enregistre.');
+            ->with('success', 'Brouillon des paramètres généraux enregistre.');
     }
 
     public function settingsPublishDraft(Request $request): RedirectResponse
@@ -259,7 +259,7 @@ class SuperAdminWebController extends Controller
         if (! $this->platformSettings->hasDraft()) {
             return redirect()
                 ->route('workspace.super-admin.settings.edit')
-                ->with('success', 'Aucun brouillon a publier.');
+                ->with('success', 'Aucun brouillon à publier.');
         }
 
         $before = $this->platformSettings->all();
@@ -278,7 +278,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.settings.edit')
-            ->with('success', 'Brouillon des parametres generaux publie.');
+            ->with('success', 'Brouillon des paramètres généraux publie.');
     }
 
     public function settingsDiscardDraft(Request $request): RedirectResponse
@@ -289,7 +289,7 @@ class SuperAdminWebController extends Controller
         if (! $this->platformSettings->hasDraft()) {
             return redirect()
                 ->route('workspace.super-admin.settings.edit')
-                ->with('success', 'Aucun brouillon a supprimer.');
+                ->with('success', 'Aucun brouillon à supprimer.');
         }
 
         $before = $this->platformSettings->draft();
@@ -304,7 +304,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.settings.edit')
-            ->with('success', 'Brouillon des parametres generaux supprime.');
+            ->with('success', 'Brouillon des paramètres généraux supprime.');
     }
 
     public function modulesEdit(Request $request): View
@@ -348,7 +348,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.modules.edit')
-            ->with('success', 'Modules et navigation mis a jour.');
+            ->with('success', 'Modules et navigation mis à jour.');
     }
 
     public function modulesDraftUpdate(Request $request): RedirectResponse
@@ -383,7 +383,7 @@ class SuperAdminWebController extends Controller
         if (! $this->workspaceModuleSettings->hasDraft()) {
             return redirect()
                 ->route('workspace.super-admin.modules.edit')
-                ->with('success', 'Aucun brouillon a publier.');
+                ->with('success', 'Aucun brouillon à publier.');
         }
 
         $before = $this->workspaceModuleSettings->all();
@@ -409,7 +409,7 @@ class SuperAdminWebController extends Controller
         if (! $this->workspaceModuleSettings->hasDraft()) {
             return redirect()
                 ->route('workspace.super-admin.modules.edit')
-                ->with('success', 'Aucun brouillon a supprimer.');
+                ->with('success', 'Aucun brouillon à supprimer.');
         }
 
         $before = $this->workspaceModuleSettings->draft();
@@ -499,7 +499,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.roles.edit')
-            ->with('success', 'Registre des roles personnalises mis a jour.');
+            ->with('success', 'Registre des rôles personnalisés mis à jour.');
     }
 
     public function rolesRegistryDuplicate(Request $request): RedirectResponse
@@ -547,7 +547,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.roles.edit', ['simulate_role' => $result['code']])
-            ->with('success', 'Role personnalise duplique.');
+            ->with('success', 'Rôle personnalisé dupliqué.');
     }
 
     public function rolesRegistryRestore(Request $request, string $versionId): RedirectResponse
@@ -587,7 +587,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.roles.edit')
-            ->with('success', 'Version du registre de roles restauree.');
+            ->with('success', 'Version du registre de rôles restaurée.');
     }
 
     public function rolesUpdate(Request $request): RedirectResponse
@@ -625,7 +625,7 @@ class SuperAdminWebController extends Controller
             ->route('workspace.super-admin.roles.edit', [
                 'simulate_role' => (string) $request->string('simulate_role', User::ROLE_ADMIN_FONCTIONNEL),
             ])
-            ->with('success', 'Roles et permissions mis a jour.');
+            ->with('success', 'Rôles et permissions mis à jour.');
     }
 
     /**
@@ -894,7 +894,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.exercises.index')
-            ->with('success', 'Exercice cree avec succes.');
+            ->with('success', 'Exercice cree avec succès.');
     }
 
     public function exercisesUpdate(Request $request, Exercice $exercice): RedirectResponse
@@ -921,7 +921,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.exercises.index')
-            ->with('success', 'Exercice mis a jour.');
+            ->with('success', 'Exercice mis à jour.');
     }
 
     public function exercisesActivate(Request $request, Exercice $exercice): RedirectResponse
@@ -957,7 +957,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.exercises.index')
-            ->with('success', 'Exercice actif mis a jour.');
+            ->with('success', 'Exercice actif mis à jour.');
     }
 
     public function exercisesArchiveSettingsUpdate(Request $request): RedirectResponse
@@ -983,7 +983,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.exercises.index')
-            ->with('success', 'Parametres d archivage automatique mis a jour.');
+            ->with('success', 'Paramètres d\'archivage automatique mis à jour.');
     }
 
     public function organizationDirectionStore(Request $request): RedirectResponse
@@ -998,7 +998,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Direction creee avec succes.');
+            ->with('success', 'Direction creee avec succès.');
     }
 
     public function organizationDirectionUpdate(Request $request, Direction $direction): RedirectResponse
@@ -1014,7 +1014,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Direction mise a jour.');
+            ->with('success', 'Direction mise à jour.');
     }
 
     public function organizationServiceStore(Request $request): RedirectResponse
@@ -1030,7 +1030,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Service cree avec succes.');
+            ->with('success', 'Service cree avec succès.');
     }
 
     public function organizationServiceUpdate(Request $request, Service $service): RedirectResponse
@@ -1047,7 +1047,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Service mis a jour.');
+            ->with('success', 'Service mis à jour.');
     }
 
     public function organizationUserStore(Request $request): RedirectResponse
@@ -1081,7 +1081,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Utilisateur cree avec succes.');
+            ->with('success', 'Utilisateur cree avec succès.');
     }
 
     public function organizationUserUpdate(Request $request, User $managedUser): RedirectResponse
@@ -1164,7 +1164,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Utilisateur mis a jour.');
+            ->with('success', 'Utilisateur mis à jour.');
     }
 
     public function organizationDirectionToggle(Request $request, Direction $direction): RedirectResponse
@@ -1179,7 +1179,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Etat de la direction mis a jour.');
+            ->with('success', 'État de la direction mis à jour.');
     }
 
     public function organizationServiceToggle(Request $request, Service $service): RedirectResponse
@@ -1194,7 +1194,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Etat du service mis a jour.');
+            ->with('success', 'État du service mis à jour.');
     }
 
     public function organizationUserToggle(Request $request, User $managedUser): RedirectResponse
@@ -1240,7 +1240,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Etat du compte utilisateur mis a jour.');
+            ->with('success', 'État du compte utilisateur mis à jour.');
     }
 
     public function organizationUserResetPassword(Request $request, User $managedUser): RedirectResponse
@@ -1264,7 +1264,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Mot de passe temporaire reinitialise.')
+            ->with('success', 'Mot de passe temporaire réinitialisé.')
             ->with('temporary_password_value', $temporaryPassword)
             ->with('temporary_password_user', $managedUser->email);
     }
@@ -1605,7 +1605,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Decision de suppression enregistree.');
+            ->with('success', 'Décision de suppression enregistrée.');
     }
 
     public function dashboardProfilesEdit(Request $request): View
@@ -1680,7 +1680,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.dashboard-profiles.edit')
-            ->with('success', 'Dashboards par profil mis a jour.');
+            ->with('success', 'Dashboards par profil mis à jour.');
     }
 
     public function referentialsEdit(Request $request): View
@@ -1771,7 +1771,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.kpis.edit')
-            ->with('success', 'Registre KPI mis a jour.');
+            ->with('success', 'Registre KPI mis à jour.');
     }
 
     public function referentialsUpdate(Request $request): RedirectResponse
@@ -1810,7 +1810,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.referentials.edit')
-            ->with('success', 'Referentiels dynamiques mis a jour.');
+            ->with('success', 'Référentiels dynamiques mis à jour.');
     }
 
     public function documentsEdit(Request $request): View
@@ -1852,7 +1852,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.documents.edit')
-            ->with('success', 'Politique documentaire mise a jour.');
+            ->with('success', 'Politique documentaire mise à jour.');
     }
 
     public function notificationsEdit(Request $request): View
@@ -1911,7 +1911,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.notifications.edit')
-            ->with('success', 'Alertes et notifications mises a jour.');
+            ->with('success', 'Alertes et notifications mises à jour.');
     }
 
     public function actionPoliciesEdit(Request $request): View
@@ -1958,7 +1958,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.action-policies.edit')
-            ->with('success', 'Parametres metier des actions mis a jour.');
+            ->with('success', 'Paramètres métier des actions mis à jour.');
     }
 
     public function snapshotsIndex(Request $request): View
@@ -2016,7 +2016,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.snapshots.index')
-            ->with('success', 'Snapshot de configuration cree.');
+            ->with('success', 'Snapshot de configuration créé.');
     }
 
     public function snapshotsRestore(Request $request, PlatformSettingSnapshot $snapshot): RedirectResponse
@@ -2164,7 +2164,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.appearance.edit')
-            ->with('success', 'Apparence de la plateforme mise a jour.');
+            ->with('success', 'Apparence de la plateforme mise à jour.');
     }
 
     public function appearanceDraftUpdate(Request $request): RedirectResponse
@@ -2182,7 +2182,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.appearance.edit')
-            ->with('success', 'Brouillon d apparence enregistre.');
+            ->with('success', 'Brouillon d\'apparence enregistre.');
     }
 
     public function appearancePublishDraft(Request $request): RedirectResponse
@@ -2193,7 +2193,7 @@ class SuperAdminWebController extends Controller
         if (! $this->appearanceSettings->hasDraft()) {
             return redirect()
                 ->route('workspace.super-admin.appearance.edit')
-                ->with('success', 'Aucun brouillon a publier.');
+                ->with('success', 'Aucun brouillon à publier.');
         }
 
         $before = $this->appearanceSettings->all();
@@ -2208,7 +2208,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.appearance.edit')
-            ->with('success', 'Brouillon d apparence publie.');
+            ->with('success', 'Brouillon d\'apparence publie.');
     }
 
     public function appearanceDiscardDraft(Request $request): RedirectResponse
@@ -2219,7 +2219,7 @@ class SuperAdminWebController extends Controller
         if (! $this->appearanceSettings->hasDraft()) {
             return redirect()
                 ->route('workspace.super-admin.appearance.edit')
-                ->with('success', 'Aucun brouillon a supprimer.');
+                ->with('success', 'Aucun brouillon à supprimer.');
         }
 
         $before = $this->appearanceSettings->draft();
@@ -2234,7 +2234,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.appearance.edit')
-            ->with('success', 'Brouillon d apparence supprime.');
+            ->with('success', 'Brouillon d\'apparence supprime.');
     }
 
     /**
@@ -2431,7 +2431,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.workflow.edit')
-            ->with('success', 'Workflow et validations mis a jour.');
+            ->with('success', 'Workflow et validations mis à jour.');
     }
 
     public function auditDiagnosticIndex(Request $request): View
@@ -2502,7 +2502,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.calculation.edit')
-            ->with('success', 'Politique de calcul des actions mise a jour.');
+            ->with('success', 'Politique de calcul des actions mise à jour.');
     }
 
     public function templatesCreate(Request $request): View
@@ -2546,7 +2546,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
-            ->with('success', 'Template d export cree avec succes.');
+            ->with('success', 'Template d\'export cree avec succès.');
     }
 
     public function templatesShow(Request $request, ExportTemplate $template): View
@@ -2603,7 +2603,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
-            ->with('success', 'Template d export mis a jour avec succes.');
+            ->with('success', 'Template d\'export mis a jour avec succès.');
     }
 
     public function templatesPublish(Request $request, ExportTemplate $template): RedirectResponse
@@ -2641,7 +2641,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
-            ->with('success', 'Template publie avec succes.');
+            ->with('success', 'Template publie avec succès.');
     }
 
     public function templatesArchive(Request $request, ExportTemplate $template): RedirectResponse
@@ -2657,7 +2657,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
-            ->with('success', 'Template archive avec succes.');
+            ->with('success', 'Template archive avec succès.');
     }
 
     public function templatesDuplicate(Request $request, ExportTemplate $template): RedirectResponse
@@ -2670,7 +2670,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.templates.edit', $copy)
-            ->with('success', 'Template duplique. Ajustez le brouillon avant publication.');
+            ->with('success', 'Template dupliqué. Ajustez le brouillon avant publication.');
     }
 
     public function templatesPreview(Request $request, ExportTemplate $template): View
@@ -2789,7 +2789,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.templates.edit', $template)
-            ->with('success', 'Template JSON importe en brouillon.');
+            ->with('success', 'Template JSON importé en brouillon.');
     }
 
     public function templateVersionRestore(Request $request, ExportTemplate $template, ExportTemplateVersion $version): RedirectResponse
@@ -2810,7 +2810,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
-            ->with('success', 'Version restauree dans le brouillon courant.');
+            ->with('success', 'Version restaurée dans le brouillon courant.');
     }
 
     public function assignmentStore(Request $request, ExportTemplate $template): RedirectResponse
@@ -2861,7 +2861,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
-            ->with('success', 'Affectation ajoutee.');
+            ->with('success', 'Affectation ajoutée.');
     }
 
     public function assignmentToggle(Request $request, ExportTemplateAssignment $assignment): RedirectResponse
@@ -2879,7 +2879,7 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $assignment->template)
-            ->with('success', 'Etat de l affectation mis a jour.');
+            ->with('success', 'État de l\'affectation mis à jour.');
     }
 
     private function authUser(Request $request): User

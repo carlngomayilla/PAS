@@ -38,8 +38,25 @@ return [
     // Canal email Brevo (complémentaire aux notifications internes).
     // BREVO_ENABLED=false par défaut : aucun envoi tant que l'admin n'a pas branché
     // ses credentials et activé explicitement le canal. Aucune incidence sur le métier.
+    //
+    // Deux transports disponibles :
+    //   - 'api'  : HTTP POST https://api.brevo.com/v3/smtp/email (auth par BREVO_API_KEY)
+    //              ✓ Pas de restriction d'IP, plus rapide, recommandé en production.
+    //   - 'smtp' : SMTP relais smtp-relay.brevo.com:587 (auth login/pass)
+    //              ⚠️ Sujet aux restrictions d'IP autorisées côté compte Brevo.
+    //
+    // Sélection : BREVO_TRANSPORT=api (défaut) ou BREVO_TRANSPORT=smtp.
+    // En mode 'api', BREVO_API_KEY est requis (xkeysib-...).
     'brevo' => [
         'enabled' => filter_var(env('BREVO_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'transport' => env('BREVO_TRANSPORT', 'api'),
+        'api_key' => env('BREVO_API_KEY'),
+        'api_endpoint' => env('BREVO_API_ENDPOINT', 'https://api.brevo.com/v3/smtp/email'),
+        'api_timeout' => (int) env('BREVO_API_TIMEOUT', 10),
+        // En local Windows PHP n'a souvent pas de bundle CA configuré (curl.cainfo
+        // vide dans php.ini) → cURL error 60. En dev, on peut désactiver la vérif
+        // SSL via BREVO_API_VERIFY_SSL=false. NE JAMAIS le faire en production.
+        'api_verify_ssl' => filter_var(env('BREVO_API_VERIFY_SSL', true), FILTER_VALIDATE_BOOLEAN),
         'mailer' => env('BREVO_MAILER', 'brevo'),
         'from' => [
             'address' => env('BREVO_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', 'no-reply@anbg.ga')),

@@ -109,7 +109,7 @@ class PlanningUnlockWebController extends Controller
 
         return redirect()
             ->route('workspace.planning-unlocks.index')
-            ->with('success', 'Decision DG enregistree.');
+            ->with('success', 'Décision DG enregistrée.');
     }
 
     private function storeForTarget(Request $request, Model $target): RedirectResponse
@@ -137,6 +137,6 @@ class PlanningUnlockWebController extends Controller
             $unlockRequest->toArray()
         );
 
-        return back()->with('success', 'Demande de deverrouillage transmise au DG.');
+        return back()->with('success', 'Demande de déverrouillage transmise au DG.');
     }
 }

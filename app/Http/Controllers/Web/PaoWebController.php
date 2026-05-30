@@ -289,7 +289,7 @@ class PaoWebController extends Controller
         }
 
         if ($pao->statut === Pao::STATUS_ARCHIVE) {
-            return back()->withErrors(['general' => 'Impossible de modifier un PAO archive.']);
+            return back()->withErrors(['general' => 'Impossible de modifier un PAO archivé.']);
         }
 
         $validated = $request->validated();
@@ -354,7 +354,7 @@ class PaoWebController extends Controller
         }
 
         if ($pao->statut === Pao::STATUS_ARCHIVE) {
-            return back()->withErrors(['general' => 'Impossible de supprimer directement un PAO archive.']);
+            return back()->withErrors(['general' => 'Impossible de supprimer directement un PAO archivé.']);
         }
 
         $this->denyUnlessManagePao($user, (int) $pao->direction_id);
@@ -372,7 +372,7 @@ class PaoWebController extends Controller
 
             return redirect()
                 ->route('workspace.pao.index')
-                ->with('success', 'Demande de suppression PAO transmise au Super Admin.');
+                ->with('success', 'Demande de suppression du PAO transmise au Super Admin.');
         }
 
         $before = $pao->toArray();
@@ -400,7 +400,7 @@ class PaoWebController extends Controller
         $this->denyUnlessManagePao($user, (int) $pao->direction_id);
 
         if ((string) $pao->statut === Pao::STATUS_ARCHIVE) {
-            return back()->withErrors(['general' => 'Impossible de cloturer un PAO archive.']);
+            return back()->withErrors(['general' => 'Impossible de cloturer un PAO archivé.']);
         }
 
         $validated = $request->validate([
@@ -434,7 +434,7 @@ class PaoWebController extends Controller
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', 'PAO cloture avec rapport d anomalies trace.');
+            ->with('success', 'PAO clôturé avec rapport d\'anomalies tracé.');
     }
 
     public function archive(Request $request, Pao $pao): RedirectResponse
@@ -468,7 +468,7 @@ class PaoWebController extends Controller
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', 'PAO archive.');
+            ->with('success', 'PAO archivé.');
     }
 
     private function canWrite(User $user): bool

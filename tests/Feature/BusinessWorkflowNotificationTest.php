@@ -120,10 +120,10 @@ class BusinessWorkflowNotificationTest extends TestCase
         $notificationService->notifyJustificatifAdded($action, $agent, $sousAction, 'sous_action');
 
         foreach ([$fixture['service_user'], $unitChief] as $recipient) {
-            Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Action soumise pour validation');
+            Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Action en attente de validation');
             Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Nouvelle sous-action créée');
-            Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Action soumise pour vérification');
-            Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Justificatif ajouté');
+            Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Sous-action terminée — à vérifier');
+            Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Pièce justificative ajoutée');
         }
     }
 

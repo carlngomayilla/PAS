@@ -36,6 +36,8 @@
     <title>@yield('title', 'Dashboard') - {{ $platformSettings->get('app_short_name', 'ANBG') }}</title>
     @stack('head')
     @include('partials.vite-assets')
+    {{-- ANBG Glass theme — chargé après Vite pour gagner la cascade --}}
+    <link rel="stylesheet" href="{{ asset('css/anbg-glass.css') }}?v={{ filemtime(public_path('css/anbg-glass.css')) }}">
     <style>
         :root { --app-sidebar-width: 232px; --app-sidebar-collapsed-width: 72px; }
 
@@ -196,7 +198,7 @@
     };
 @endphp
 
-<body class="admin-theme-scope h-full" data-auto-refresh="60" data-alert-unread="{{ (int) $headerAlertUnreadCount }}" data-notification-unread="{{ (int) $headerNotificationUnreadCount }}" data-message-unread="{{ (int) $headerMessageUnreadCount }}">
+<body class="admin-theme-scope anbg-glass-theme h-full" data-auto-refresh="60" data-alert-unread="{{ (int) $headerAlertUnreadCount }}" data-notification-unread="{{ (int) $headerNotificationUnreadCount }}" data-message-unread="{{ (int) $headerMessageUnreadCount }}">
     <a href="#admin-main-content" class="skip-to-content">Aller au contenu principal</a>
     <div class="admin-page-root app-shell min-h-screen">
         <div id="admin-overlay" class="fixed inset-0 z-40 hidden bg-white/70 backdrop-blur-sm lg:hidden"></div>

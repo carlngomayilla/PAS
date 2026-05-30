@@ -326,7 +326,7 @@ class PtaWebController extends Controller
         }
 
         if ($pta->statut === Pta::STATUS_ARCHIVE) {
-            return back()->withErrors(['general' => 'Impossible de modifier un PTA archive.']);
+            return back()->withErrors(['general' => 'Impossible de modifier un PTA archivé.']);
         }
         $lockService = app(PlanningModificationLockService::class);
         if ($message = $lockService->ensureUnlocked($pta, $user)) {
@@ -404,7 +404,7 @@ class PtaWebController extends Controller
         }
 
         if ($pta->statut === Pta::STATUS_ARCHIVE) {
-            return back()->withErrors(['general' => 'Impossible de supprimer directement un PTA archive.']);
+            return back()->withErrors(['general' => 'Impossible de supprimer directement un PTA archivé.']);
         }
 
         $this->denyUnlessManagePta(
@@ -426,7 +426,7 @@ class PtaWebController extends Controller
 
             return redirect()
                 ->route('workspace.pta.index')
-                ->with('success', 'Demande de suppression PTA transmise au Super Admin.');
+                ->with('success', 'Demande de suppression du PTA transmise au Super Admin.');
         }
 
         $before = $pta->toArray();
@@ -459,7 +459,7 @@ class PtaWebController extends Controller
         }
 
         if ($pta->statut === Pta::STATUS_ARCHIVE) {
-            return response()->json(['ok' => false, 'message' => 'Impossible de modifier un PTA archive.'], 422);
+            return response()->json(['ok' => false, 'message' => 'Impossible de modifier un PTA archivé.'], 422);
         }
 
         $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
@@ -527,7 +527,7 @@ class PtaWebController extends Controller
 
             return response()->json([
                 'ok' => true,
-                'message' => $validated['id'] ?? null ? 'Action mise a jour.' : 'Action creee.',
+                'message' => $validated['id'] ?? null ? 'Action mise à jour.' : 'Action creee.',
                 'action' => [
                     'id' => $action->id,
                     'code' => $action->code,
@@ -559,7 +559,7 @@ class PtaWebController extends Controller
         $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
 
         if ((string) $pta->statut === Pta::STATUS_ARCHIVE) {
-            return back()->withErrors(['general' => 'Impossible de cloturer un PTA archive.']);
+            return back()->withErrors(['general' => 'Impossible de cloturer un PTA archivé.']);
         }
 
         $validated = $request->validate([
@@ -593,7 +593,7 @@ class PtaWebController extends Controller
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA cloture avec rapport d anomalies trace.');
+            ->with('success', 'PTA clôturé avec rapport d\'anomalies tracé.');
     }
 
     public function archive(Request $request, Pta $pta): RedirectResponse
@@ -627,7 +627,7 @@ class PtaWebController extends Controller
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA archive.');
+            ->with('success', 'PTA archivé.');
     }
 
     private function canWrite(User $user): bool

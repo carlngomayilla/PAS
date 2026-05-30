@@ -34,13 +34,13 @@ class ActionNotificationWorkflowTest extends TestCase
         app(WorkspaceNotificationService::class)->notifyActionSubmittedToChef($action, $fixture['agent']);
 
         $this->assertNotNull($fixture['service_user']->fresh()->notifications->first(
-            fn ($notification) => ($notification->data['title'] ?? null) === 'Action soumise pour validation'
+            fn ($notification) => ($notification->data['title'] ?? null) === 'Action en attente de validation'
         ));
         $this->assertNull($fixture['direction_user']->fresh()->notifications->first(
-            fn ($notification) => ($notification->data['title'] ?? null) === 'Action soumise pour validation'
+            fn ($notification) => ($notification->data['title'] ?? null) === 'Action en attente de validation'
         ));
         $this->assertNull($fixture['agent']->fresh()->notifications->first(
-            fn ($notification) => ($notification->data['title'] ?? null) === 'Action soumise pour validation'
+            fn ($notification) => ($notification->data['title'] ?? null) === 'Action en attente de validation'
         ));
 
         Sanctum::actingAs($fixture['service_user']);
@@ -50,11 +50,12 @@ class ActionNotificationWorkflowTest extends TestCase
             'validation_sans_correction' => 1,
         ])->assertOk();
 
+        // validation_sans_correction=1 -> notifyActionFinalizedByChef -> titre "Action finalisée par le chef"
         $this->assertNotNull($fixture['direction_user']->fresh()->notifications->first(
-            fn ($notification) => in_array(($notification->data['title'] ?? null), ['Action validee par le chef', 'Action validée par le chef'], true)
+            fn ($notification) => in_array(($notification->data['title'] ?? null), ['Action finalisée par le chef', 'Action validée par le chef de service', 'Action validée par le chef'], true)
         ));
         $this->assertNotNull($fixture['agent']->fresh()->notifications->first(
-            fn ($notification) => in_array(($notification->data['title'] ?? null), ['Action validee par le chef', 'Action validée par le chef'], true)
+            fn ($notification) => in_array(($notification->data['title'] ?? null), ['Action finalisée par le chef', 'Votre action a été validée', 'Action validée par le chef de service', 'Action validée par le chef'], true)
         ));
 
         Sanctum::actingAs($fixture['direction_user']);
@@ -64,10 +65,10 @@ class ActionNotificationWorkflowTest extends TestCase
         ])->assertForbidden();
 
         $this->assertNull($fixture['agent']->fresh()->notifications->first(
-            fn ($notification) => ($notification->data['title'] ?? null) === 'Action validee par la direction'
+            fn ($notification) => ($notification->data['title'] ?? null) === 'Action validée par la direction'
         ));
         $this->assertNull($fixture['service_user']->fresh()->notifications->first(
-            fn ($notification) => ($notification->data['title'] ?? null) === 'Action validee par la direction'
+            fn ($notification) => ($notification->data['title'] ?? null) === 'Action validée par la direction'
         ));
     }
 

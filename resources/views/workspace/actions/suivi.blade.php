@@ -767,12 +767,13 @@
                                     </div>
                                 @endif
                                 <div>
-                                    <label for="commentaire_sous_action_{{ $sousAction->id }}">Commentaire de réalisation</label>
-                                    <textarea id="commentaire_sous_action_{{ $sousAction->id }}" name="commentaire">{{ old('commentaire', $sousAction->commentaire) }}</textarea>
+                                    <label for="commentaire_sous_action_{{ $sousAction->id }}">Commentaire de réalisation <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+                                    <textarea id="commentaire_sous_action_{{ $sousAction->id }}" name="commentaire" placeholder="Décrivez brièvement le résultat de votre travail (facultatif).">{{ old('commentaire', $sousAction->commentaire) }}</textarea>
+                                    @error('commentaire') <p class="field-error">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
                                     <label for="difficultes_sous_action_{{ $sousAction->id }}">Difficultes rencontrees</label>
-                                    <textarea id="difficultes_sous_action_{{ $sousAction->id }}" name="difficultes">{{ old('difficultes') }}</textarea>
+                                    <textarea id="difficultes_sous_action_{{ $sousAction->id }}" name="difficultes" placeholder="Optionnel">{{ old('difficultes') }}</textarea>
                                 </div>
                                 <div>
                                     <label for="justificatif_sous_action_{{ $sousAction->id }}">Pièce justificative</label>
@@ -1202,3 +1203,4 @@
         </div>
     </section>
 @endsection
+
