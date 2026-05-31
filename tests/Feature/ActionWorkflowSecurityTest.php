@@ -138,8 +138,10 @@ class ActionWorkflowSecurityTest extends TestCase
         ]);
     }
 
-    public function test_quantified_sub_action_submission_requires_comment(): void
+    public function test_quantified_sub_action_submission_succeeds_without_comment(): void
     {
+        // Workflow attendu : on enregistre/soumet d'abord, le commentaire est
+        // toujours optionnel pour ne pas bloquer le RMO.
         Storage::fake('local');
 
         $fixture = $this->createActionFixture();
@@ -171,15 +173,16 @@ class ActionWorkflowSecurityTest extends TestCase
             ->post($route, [
                 '_method' => 'PUT',
                 'execution_only' => '1',
+                'tracking_action' => 'submit',
                 'est_effectuee' => '1',
                 'quantite_realisee' => 1,
                 'justificatif' => UploadedFile::fake()->create('preuve-commentaire.pdf', 64, 'application/pdf'),
             ])
-            ->assertSessionHasErrors('commentaire');
+            ->assertSessionHasNoErrors('commentaire');
 
         $sousAction->refresh();
-        $this->assertFalse((bool) $sousAction->est_effectuee);
-        $this->assertSame('non_demarre', $sousAction->statut);
+        $this->assertTrue((bool) $sousAction->est_effectuee);
+        $this->assertSame('en_attente_validation_chef', $sousAction->statut);
     }
 
     public function test_non_quantified_sub_action_requires_proof_but_not_quantity(): void

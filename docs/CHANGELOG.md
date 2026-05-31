@@ -5,6 +5,119 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-05-31 — Fix workflow save→submit sous-action (commentaire toujours optionnel + plus visible)
+
+### Demande utilisateur
+
+> *"DANS LES SOUS ACTION AVEC QUANTITE IL N'Y A PAS LE CHAMP COMMENTAIRE ET DONC L'ACTION
+> NE PEUT PAS ETRE ENREGISTRER PUI SOUMISE CAR OUI POUR TOUT TYPE D'ACTION OU SOUS ACTION
+> ON ENREGISTRE D'ABORD PUIS ON PEUT LA SOUMETRE PAR LA SUISTE"*
+
+### Bugs identifiés
+
+#### Bug A — Backend bloquait la soumission si commentaire vide
+
+Dans `ActionTrackingWebController::updateSubAction` (ligne ~171) ET
+`updateQuantitativeProgress` (ligne ~586), le champ commentaire était marqué
+`Rule::requiredIf($isSubmit)` + une vérification explicite renvoyait *"Le commentaire est
+obligatoire pour soumettre"*. Or le workflow attendu est : **enregistrer d'abord (save),
+puis soumettre plus tard (submit)**, sans contrainte sur le commentaire.
+
+#### Bug B — Champ commentaire visuellement noyé pour les sous-actions quantitatives
+
+Le grid `auto-fit minmax(220px, 1fr)` empilait 5 champs (quantité + résultat + commentaire
++ difficultés + justificatif) → sur viewport moyen le commentaire se retrouvait coincé en
+3e position d'une rangée, peu visible.
+
+### Corrections
+
+1. **`app/Http/Controllers/Web/ActionTrackingWebController.php`**
+   - `updateSubAction` : `commentaire` passe à `['nullable', 'string', 'max:5000']` (plus de
+     `requiredIf($isSubmit)`), retrait du bloc `if($isSubmit && trim(commentaire) === '')`.
+   - `updateQuantitativeProgress` : même traitement pour `commentaire_quantitatif`.
+
+2. **`resources/views/workspace/actions/suivi.blade.php`**
+   - Formulaire **sous-action** : layout repensé en 2 lignes
+     - Ligne 1 (grid compact) : quantité + difficultés + justificatif
+     - Ligne 2 (pleine largeur, label en `font-semibold`) : résultat obtenu (si quantité) +
+       **commentaire de réalisation** — chaque label porte explicitement `(optionnel)`.
+   - Formulaire **action quantitative** : même restructuration, commentaire en pleine
+     largeur juste au-dessus des boutons Enregistrer / Soumettre.
+
+### Impact
+
+- ✓ "Enregistrer" et "Soumettre" fonctionnent désormais sans commentaire pour tous les types
+  d'action et sous-action.
+- ✓ Le champ commentaire est visible en pleine largeur, jamais noyé.
+- ✓ Workflow utilisateur respecté : save dès qu'on a une donnée, soumettre quand on est prêt.
+
+### Validation
+
+- Tests `ActionTracking` + `SubAction` : 25 passés (57 assertions) ✓
+- Suite Feature complète : 318 passés, 3 skipped, 0 régression (2222 assertions)
+
+---
+
+## 2026-05-31 — Justificatif TOUJOURS obligatoire à la soumission (tous types)
+
+### Demande utilisateur
+
+> *"LES PIECE JUSTIFICATIVE RESTRE TOUJOUR OBLIGATOIR POUR TOUT TYDE D'ACTION OU SOUS ACTOIN"*
+
+### Avant
+
+La validation conditionnait le justificatif à `$submissionRequirements['proof']` :
+- Sous-action : `requiredIf($isSubmit && $submissionRequirements['proof'] && ! $hasJustificatif)`
+- Action quantitative : `requiredIf($isSubmit && $submissionRequirements['proof'] && ! $hasExistingProof)`
+
+→ Certains types d'action/sous-action où `proof=false` permettaient la soumission sans aucune
+pièce. Pas conforme à la règle métier ANBG.
+
+### Après
+
+Justificatif **toujours requis à la soumission**, indépendamment du type, sauf si une pièce
+a déjà été déposée précédemment :
+
+```php
+// app/Http/Controllers/Web/ActionTrackingWebController.php
+'justificatif' => [
+    Rule::requiredIf($isSubmit && ! $hasJustificatif),
+    'nullable', 'file', ...
+],
+'justificatif_quantitatif' => [
+    Rule::requiredIf($isSubmit && ! $hasExistingProof),
+    'nullable', 'file', ...
+],
+```
+
+### UI mise à jour (suivi.blade.php)
+
+Les deux formulaires (sous-action + action quantitative) affichent désormais le champ
+pièce justificative avec :
+- **Astérisque rouge** `*` sur le label
+- Tag `(obligatoire à la soumission)`
+- **Indicateur visuel dynamique** :
+  - Si pièce(s) déjà déposée(s) → texte vert `✓ X pièce(s) déjà déposée(s) — vous pouvez soumettre sans en ajouter une nouvelle.`
+  - Sinon → texte gris `Aucune pièce déposée. Une pièce est requise pour soumettre.`
+- Slot `@error('justificatif')` pour afficher l'erreur de validation côté champ.
+
+### Règles consolidées (référence)
+
+| Champ | Save | Submit |
+|---|---|---|
+| Quantité réalisée | ⚪ optionnel | 🔴 requis (si type quantitatif) |
+| Difficultés rencontrées | ⚪ optionnel | 🔴 requis (si type qualitatif/mixte) |
+| **Pièce justificative** | ⚪ optionnel | 🔴 **TOUJOURS requis** (sauf si déjà déposée) |
+| Commentaire de réalisation | ⚪ optionnel | ⚪ optionnel |
+| Résultat obtenu | ⚪ optionnel | ⚪ optionnel |
+
+### Validation
+
+- Tests ciblés (ActionWorkflowSecurity, ActionTracking, sub_action) : 56 passés ✓
+- Suite Feature complète : **318 passés, 3 skipped, 0 régression** (2222 assertions, 278s)
+
+---
+
 ## 2026-05-30 — Audit & renforcement sécurité + design (vagues 1-3)
 
 ### Demande utilisateur

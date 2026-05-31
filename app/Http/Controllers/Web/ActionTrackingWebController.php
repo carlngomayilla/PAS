@@ -161,40 +161,34 @@ class ActionTrackingWebController extends Controller
             $hasJustificatif = $request->hasFile('justificatif') || $sousAction->justificatifs()->exists();
 
             /** @var array<string, mixed> $validated */
+            // Règle générale : SAVE = brouillon (aucun champ requis, juste les types).
+            //                  SUBMIT = full validation (quantité + justificatif si applicable).
+            // Le commentaire reste TOUJOURS optionnel des deux côtés.
             $validated = $request->validate([
                 'quantite_realisee' => [
-                    Rule::requiredIf($submissionRequirements['quantity']),
+                    Rule::requiredIf($isSubmit && $submissionRequirements['quantity']),
                     'nullable',
                     'numeric',
                     'min:0',
                 ],
-                'commentaire' => [
-                    Rule::requiredIf($isSubmit),
-                    'nullable',
-                    'string',
-                    'max:5000',
-                ],
+                'commentaire' => ['nullable', 'string', 'max:5000'],
                 'resultat_obtenu' => ['nullable', 'string', 'max:5000'],
                 'difficultes' => [
-                    Rule::requiredIf($submissionRequirements['difficulties']),
+                    Rule::requiredIf($isSubmit && $submissionRequirements['difficulties']),
                     'nullable',
                     'string',
                     'max:5000',
                 ],
+                // Pièce justificative TOUJOURS obligatoire à la soumission (tous types
+                // de sous-action), sauf si une pièce a déjà été déposée auparavant.
                 'justificatif' => [
-                    Rule::requiredIf($isSubmit && $submissionRequirements['proof'] && ! $hasJustificatif),
+                    Rule::requiredIf($isSubmit && ! $hasJustificatif),
                     'nullable',
                     'file',
                     'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(),
                     app(DocumentPolicySettings::class)->mimesRule(),
                 ],
             ]);
-
-            if ($isSubmit && trim((string) ($validated['commentaire'] ?? '')) === '') {
-                return back()->withInput()->withErrors([
-                    'commentaire' => 'Le commentaire est obligatoire pour soumettre une sous-action.',
-                ]);
-            }
 
             $plannedTargetValue = $sousAction->cible_prevue === null || $sousAction->cible_prevue === ''
                 ? null
@@ -576,39 +570,32 @@ class ActionTrackingWebController extends Controller
             ->exists();
 
         /** @var array<string, mixed> $validated */
+        // SAVE = brouillon sans contrainte. SUBMIT = full validation. Commentaire toujours
+        // optionnel pour respecter le workflow save→submit en plusieurs étapes.
         $validated = $request->validate([
             'quantite_realisee' => [
-                Rule::requiredIf($submissionRequirements['quantity'] && (! $isSubmit || ! $hasExistingFollowUp)),
+                Rule::requiredIf($isSubmit && $submissionRequirements['quantity'] && ! $hasExistingFollowUp),
                 'nullable',
                 'numeric',
                 'min:0',
             ],
-            'commentaire_quantitatif' => [
-                Rule::requiredIf($isSubmit),
-                'nullable',
-                'string',
-                'max:5000',
-            ],
+            'commentaire_quantitatif' => ['nullable', 'string', 'max:5000'],
             'difficultes_quantitatives' => [
-                Rule::requiredIf($submissionRequirements['difficulties']),
+                Rule::requiredIf($isSubmit && $submissionRequirements['difficulties']),
                 'nullable',
                 'string',
                 'max:5000',
             ],
+            // Pièce justificative TOUJOURS obligatoire à la soumission (tous types
+            // d'action), sauf si une pièce a déjà été déposée auparavant.
             'justificatif_quantitatif' => [
-                Rule::requiredIf($isSubmit && $submissionRequirements['proof'] && ! $hasExistingProof),
+                Rule::requiredIf($isSubmit && ! $hasExistingProof),
                 'nullable',
                 'file',
                 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(),
                 app(DocumentPolicySettings::class)->mimesRule(),
             ],
         ]);
-
-        if ($isSubmit && trim((string) ($validated['commentaire_quantitatif'] ?? '')) === '') {
-            return back()->withInput()->withErrors([
-                'commentaire_quantitatif' => 'Le commentaire est obligatoire pour soumettre au chef.',
-            ]);
-        }
 
         $before = $action->toArray();
         $oldTotal = max(0.0, (float) ($action->quantite_realisee ?? 0));

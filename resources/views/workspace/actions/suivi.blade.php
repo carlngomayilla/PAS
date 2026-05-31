@@ -651,6 +651,7 @@
                         </span>
                     @endif
                 </div>
+                {{-- Ligne 1 (compacte) : quantité + difficultés + justificatif --}}
                 <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
                     @if ($actionSubmissionRequirements['quantity'])
                     <div>
@@ -659,17 +660,26 @@
                     </div>
                     @endif
                     <div>
-                        <label for="commentaire_quantitatif">Commentaire d'avancement</label>
-                        <textarea id="commentaire_quantitatif" name="commentaire_quantitatif">{{ old('commentaire_quantitatif') }}</textarea>
+                        <label for="difficultes_quantitatives">Difficultés rencontrées <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+                        <textarea id="difficultes_quantitatives" name="difficultes_quantitatives" rows="2" @if($actionSubmissionRequirements['difficulties']) required @endif>{{ old('difficultes_quantitatives') }}</textarea>
                     </div>
                     <div>
-                        <label for="difficultes_quantitatives">Difficultes rencontrees</label>
-                        <textarea id="difficultes_quantitatives" name="difficultes_quantitatives" @if($actionSubmissionRequirements['difficulties']) required @endif>{{ old('difficultes_quantitatives') }}</textarea>
-                    </div>
-                    <div>
-                        <label for="justificatif_quantitatif">Pièce justificative</label>
+                        <label for="justificatif_quantitatif">Pièce justificative <span class="text-xs font-semibold text-red-600">*</span> <span class="text-xs font-normal text-slate-500">(obligatoire à la soumission)</span></label>
                         <input id="justificatif_quantitatif" name="justificatif_quantitatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
+                        @if ($action->justificatifs->count() > 0)
+                            <p class="mt-1 text-xs text-emerald-600">✓ {{ $action->justificatifs->count() }} pièce(s) déjà déposée(s) sur l'action — vous pouvez soumettre sans en ajouter une nouvelle.</p>
+                        @else
+                            <p class="mt-1 text-xs text-slate-500">Aucune pièce déposée. Une pièce est requise pour soumettre.</p>
+                        @endif
+                        @error('justificatif_quantitatif') <p class="field-error">{{ $message }}</p> @enderror
                     </div>
+                </div>
+                {{-- Ligne 2 (pleine largeur) : commentaire — TOUJOURS visible. Workflow save→submit
+                     en plusieurs étapes : ce champ ne bloque JAMAIS la soumission s'il est vide. --}}
+                <div class="mt-3">
+                    <label for="commentaire_quantitatif" class="font-semibold">Commentaire d'avancement <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+                    <textarea id="commentaire_quantitatif" name="commentaire_quantitatif" rows="3" class="w-full" placeholder="Décrivez brièvement l'état d'avancement (facultatif).">{{ old('commentaire_quantitatif') }}</textarea>
+                    @error('commentaire_quantitatif') <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div class="mt-3 flex flex-wrap gap-2">
                     <button class="btn btn-secondary" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
@@ -755,30 +765,41 @@
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="execution_only" value="1">
+                            {{-- Ligne 1 (compacte) : quantite + difficultes + justificatif --}}
                             <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
                                 @if ($subActionRequirements['quantity'])
                                     <div>
                                         <label for="quantite_realisee_sous_action_{{ $sousAction->id }}">Quantité effectuée</label>
                                         <input id="quantite_realisee_sous_action_{{ $sousAction->id }}" name="quantite_realisee" type="number" step="0.0001" min="0" value="{{ old('quantite_realisee', $sousAction->quantite_realisee) }}">
                                     </div>
-                                    <div>
-                                        <label for="resultat_obtenu_sous_action_{{ $sousAction->id }}">Résultat obtenu</label>
-                                        <textarea id="resultat_obtenu_sous_action_{{ $sousAction->id }}" name="resultat_obtenu">{{ old('resultat_obtenu', $sousAction->resultat_obtenu) }}</textarea>
-                                    </div>
                                 @endif
                                 <div>
-                                    <label for="commentaire_sous_action_{{ $sousAction->id }}">Commentaire de réalisation <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-                                    <textarea id="commentaire_sous_action_{{ $sousAction->id }}" name="commentaire" placeholder="Décrivez brièvement le résultat de votre travail (facultatif).">{{ old('commentaire', $sousAction->commentaire) }}</textarea>
-                                    @error('commentaire') <p class="field-error">{{ $message }}</p> @enderror
+                                    <label for="difficultes_sous_action_{{ $sousAction->id }}">Difficultés rencontrées <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+                                    <textarea id="difficultes_sous_action_{{ $sousAction->id }}" name="difficultes" rows="2" placeholder="Optionnel">{{ old('difficultes') }}</textarea>
                                 </div>
                                 <div>
-                                    <label for="difficultes_sous_action_{{ $sousAction->id }}">Difficultes rencontrees</label>
-                                    <textarea id="difficultes_sous_action_{{ $sousAction->id }}" name="difficultes" placeholder="Optionnel">{{ old('difficultes') }}</textarea>
-                                </div>
-                                <div>
-                                    <label for="justificatif_sous_action_{{ $sousAction->id }}">Pièce justificative</label>
+                                    <label for="justificatif_sous_action_{{ $sousAction->id }}">Pièce justificative <span class="text-xs font-semibold text-red-600">*</span> <span class="text-xs font-normal text-slate-500">(obligatoire à la soumission)</span></label>
                                     <input id="justificatif_sous_action_{{ $sousAction->id }}" name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
+                                    @if ($sousAction->justificatifs->count() > 0)
+                                        <p class="mt-1 text-xs text-emerald-600">✓ {{ $sousAction->justificatifs->count() }} pièce(s) déjà déposée(s) — vous pouvez soumettre sans en ajouter une nouvelle.</p>
+                                    @else
+                                        <p class="mt-1 text-xs text-slate-500">Aucune pièce déposée pour l'instant. Une pièce est requise pour soumettre.</p>
+                                    @endif
+                                    @error('justificatif') <p class="field-error">{{ $message }}</p> @enderror
                                 </div>
+                            </div>
+                            {{-- Ligne 2 (pleine largeur) : commentaire — TOUJOURS visible pour TOUS types
+                                 (quantitatif/non-quantitatif). Optionnel — workflow save→submit sans contrainte. --}}
+                            @if ($subActionRequirements['quantity'])
+                                <div class="mt-3">
+                                    <label for="resultat_obtenu_sous_action_{{ $sousAction->id }}">Résultat obtenu <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+                                    <textarea id="resultat_obtenu_sous_action_{{ $sousAction->id }}" name="resultat_obtenu" rows="2">{{ old('resultat_obtenu', $sousAction->resultat_obtenu) }}</textarea>
+                                </div>
+                            @endif
+                            <div class="mt-3">
+                                <label for="commentaire_sous_action_{{ $sousAction->id }}" class="font-semibold">Commentaire de réalisation <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+                                <textarea id="commentaire_sous_action_{{ $sousAction->id }}" name="commentaire" rows="3" class="w-full" placeholder="Décrivez brièvement le résultat de votre travail (facultatif).">{{ old('commentaire', $sousAction->commentaire) }}</textarea>
+                                @error('commentaire') <p class="field-error">{{ $message }}</p> @enderror
                             </div>
                             <div class="mt-3 flex flex-wrap gap-2">
                                 <button class="btn btn-secondary" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
