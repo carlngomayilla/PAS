@@ -108,10 +108,12 @@ Action DÉVERROUILLÉE → modifiable par le chef au niveau du PTA
 - `PlanningModificationLockWorkflowTest` : test mis à jour (chef ne peut plus modifier une
   action verrouillée → 409).
 
-### Note
-- Justificatif à l'appui : backend prêt (upload chiffré). Depuis le PTA, le bouton utilise
-  encore un prompt (motif seul) ; l'upload se fait via la page « Demandes de modification ».
-  Un mini-formulaire avec fichier pourra remplacer le prompt dans une itération suivante.
+### Justificatif depuis le PTA (modal)
+- Le bouton « Demande de modification » du PTA ouvre désormais un **modal** (motif obligatoire
+  + justificatif fichier optionnel) au lieu d'un simple prompt. Envoi AJAX multipart vers
+  `actions.unlock-requests.store`. Le justificatif est stocké chiffré (`unlock-requests/Y/m`).
+- Modal accessible (role=dialog, aria-modal), fermeture par overlay/Annuler, dark mode.
+  CSS `.modif-modal-overlay` / `.modif-modal-card` dans app.css.
 
 ---
 

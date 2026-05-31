@@ -371,6 +371,33 @@
             <button class="btn btn-outline" type="button" data-remove-rmo>Retirer</button>
         </div>
     </template>
+
+    {{-- Modal « Demande de modification » : motif + justificatif (circuit Chef→Directeur→Planif→DG). --}}
+    <div id="modif-request-modal" class="modif-modal-overlay" hidden>
+        <div class="modif-modal-card" role="dialog" aria-modal="true" aria-labelledby="modif-modal-title">
+            <h3 id="modif-modal-title" class="text-lg font-bold text-[#17324a]">Demande de modification</h3>
+            <p class="mt-1 text-sm text-slate-600">
+                Votre demande part au <strong>directeur</strong>, qui la transfère à la <strong>Planification</strong> (avis)
+                puis à la <strong>DG</strong> (décision). Si accord, l'action redevient modifiable.
+            </p>
+            <form id="modif-request-form" enctype="multipart/form-data" class="mt-3 grid gap-3">
+                <input type="hidden" name="action_id" value="">
+                <div>
+                    <label for="modif-reason" class="font-semibold">Motif <span class="text-xs text-red-600">*</span></label>
+                    <textarea id="modif-reason" name="reason" rows="3" required minlength="5" class="w-full" placeholder="Expliquez la modification souhaitée (5 caractères min)."></textarea>
+                </div>
+                <div>
+                    <label for="modif-justificatif" class="font-semibold">Justificatif à l'appui <span class="text-xs text-slate-400">(recommandé)</span></label>
+                    <input id="modif-justificatif" name="justificatif" type="file" accept="{{ app(\App\Services\DocumentPolicySettings::class)->acceptAttribute() }}">
+                </div>
+                <p class="modif-modal-error field-error" hidden></p>
+                <div class="flex flex-wrap justify-end gap-2">
+                    <button class="btn btn-secondary" type="button" data-modif-cancel>Annuler</button>
+                    <button class="btn btn-primary" type="submit" data-modif-submit>Envoyer la demande</button>
+                </div>
+            </form>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -944,11 +971,77 @@
                     return payload;
                 }
 
+                // ── MODAL « Demande de modification » (motif + justificatif) ──────
+                var modifModal = document.getElementById('modif-request-modal');
+                var modifForm = document.getElementById('modif-request-form');
+
+                function openModifModal(actionId) {
+                    if (!modifModal || !modifForm) return;
+                    modifForm.reset();
+                    modifForm.querySelector('[name="action_id"]').value = actionId;
+                    var err = modifModal.querySelector('.modif-modal-error');
+                    if (err) { err.hidden = true; err.textContent = ''; }
+                    modifModal.hidden = false;
+                    var reasonField = document.getElementById('modif-reason');
+                    if (reasonField) reasonField.focus();
+                }
+
+                function closeModifModal() {
+                    if (modifModal) modifModal.hidden = true;
+                }
+
+                if (modifModal) {
+                    modifModal.addEventListener('click', function (e) {
+                        if (e.target === modifModal || (e.target instanceof HTMLElement && e.target.matches('[data-modif-cancel]'))) {
+                            closeModifModal();
+                        }
+                    });
+                }
+
+                if (modifForm) {
+                    modifForm.addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        var actionId = modifForm.querySelector('[name="action_id"]').value;
+                        var reason = (document.getElementById('modif-reason').value || '').trim();
+                        var errEl = modifModal.querySelector('.modif-modal-error');
+                        var submitBtn = modifForm.querySelector('[data-modif-submit]');
+                        if (reason.length < 5) {
+                            if (errEl) { errEl.textContent = 'Le motif doit comporter au moins 5 caractères.'; errEl.hidden = false; }
+                            return;
+                        }
+                        var fd = new FormData(modifForm);
+                        fd.append('_token', csrfToken);
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Envoi…';
+                        fetch('/workspace/actions/' + actionId + '/demandes-deverrouillage', {
+                            method: 'POST',
+                            body: fd,
+                            credentials: 'same-origin',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+                        }).then(function (resp) {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Envoyer la demande';
+                            var blockReq = document.querySelector('[data-action-block][data-action-id="' + actionId + '"]');
+                            if (resp.ok || resp.redirected) {
+                                closeModifModal();
+                                if (blockReq) flashActionMessage(blockReq, false, 'Demande envoyée au directeur (transfert Planification + DG).');
+                            } else if (errEl) {
+                                errEl.textContent = 'Échec de l\'envoi (HTTP ' + resp.status + ').';
+                                errEl.hidden = false;
+                            }
+                        }).catch(function (err) {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Envoyer la demande';
+                            if (errEl) { errEl.textContent = 'Erreur réseau : ' + (err && err.message ? err.message : 'inconnue'); errEl.hidden = false; }
+                        });
+                    });
+                }
+
                 actionsList.addEventListener('click', function (event) {
                     var target = event.target;
                     if (!(target instanceof HTMLElement)) return;
 
-                    // Bouton "Demande de modification" : POST vers la route unlock-requests.
+                    // Bouton "Demande de modification" : ouvre le modal (motif + justificatif).
                     if (target.matches('[data-request-modification]')) {
                         event.preventDefault();
                         event.stopPropagation();
@@ -959,38 +1052,8 @@
                             flashActionMessage(blockReq, true, 'Action non sauvegardee : impossible de demander une modification.');
                             return;
                         }
-                        var reason = window.prompt(
-                            "Motif de la demande de modification (min 5 caracteres) :\n\nCircuit : votre demande part au DIRECTEUR, qui la transfère à la Planification (avis) puis à la DG (décision). Si accord, l'action redevient modifiable.\n\n(Pour joindre un justificatif, rendez-vous sur la page Demandes de modification.)",
-                            ''
-                        );
-                        if (reason === null) return;
-                        if (reason.trim().length < 5) {
-                            flashActionMessage(blockReq, true, 'Motif requis (5 caracteres minimum).');
-                            return;
-                        }
-                        target.disabled = true;
-                        target.textContent = 'Envoi…';
-                        var fd = new FormData();
-                        fd.append('_token', csrfToken);
-                        fd.append('reason', reason);
-                        fetch('/workspace/actions/' + actionId + '/demandes-deverrouillage', {
-                            method: 'POST',
-                            body: fd,
-                            credentials: 'same-origin',
-                            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
-                        }).then(function (resp) {
-                            target.disabled = false;
-                            target.textContent = 'Demande de modification';
-                            if (resp.ok || resp.redirected) {
-                                flashActionMessage(blockReq, false, 'Demande envoyée au directeur pour transfert à la Planification et à la DG.');
-                            } else {
-                                flashActionMessage(blockReq, true, 'Echec de l\'envoi (HTTP ' + resp.status + ').');
-                            }
-                        }).catch(function (err) {
-                            target.disabled = false;
-                            target.textContent = 'Demande de modification';
-                            flashActionMessage(blockReq, true, 'Erreur reseau : ' + (err && err.message ? err.message : 'inconnue'));
-                        });
+                        // Ouvre le modal de demande (motif + justificatif).
+                        openModifModal(actionId);
                         return;
                     }
 
