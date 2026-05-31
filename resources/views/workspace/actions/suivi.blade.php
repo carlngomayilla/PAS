@@ -258,10 +258,198 @@
         </article>
     </section>
 
-    {{-- Sections workflow opérationnel SUPPRIMÉES le 2026-05-31 (refonte en cours) :
-         - action-validation (Circuit de validation)
-         - reports-echeance (Reports d'échéance)
-         À reconstruire from scratch quand le nouveau workflow sera spécifié. --}}
+    {{-- ════════════════════════════════════════════════════════════════════
+         SUIVI V2 (cf. docs/WORKFLOW-SUIVI-V2.md)
+         Performance officielle/provisoire + saisie agent + validation chef.
+         ════════════════════════════════════════════════════════════════════ --}}
+    @php
+        $v2PerfLabels = [
+            'non_demarre' => ['Non démarrée', 'anbg-badge-neutral'],
+            'critique' => ['Critique', 'anbg-badge-danger'],
+            'en_alerte' => ['En alerte', 'anbg-badge-warning'],
+            'acceptable' => ['Acceptable', 'anbg-badge-info'],
+            'cible_atteinte' => ['Cible atteinte', 'anbg-badge-success'],
+            'cible_depassee' => ['Cible dépassée', 'anbg-badge-success'],
+        ];
+        $v2TemporalLabels = [
+            'dans_delai' => ['Dans les délais', 'anbg-badge-success'],
+            'bientot_retard' => ['Bientôt en retard', 'anbg-badge-warning'],
+            'en_retard' => ['En retard', 'anbg-badge-danger'],
+            'critique' => ['Critique', 'anbg-badge-danger'],
+            'sans_echeance' => ['Sans échéance', 'anbg-badge-neutral'],
+        ];
+        [$perfLabel, $perfClass] = $v2PerfLabels[$v2PerfStatus ?? 'non_demarre'] ?? $v2PerfLabels['non_demarre'];
+        [$tempLabel, $tempClass] = $v2TemporalLabels[$v2TemporalStatus ?? 'sans_echeance'] ?? $v2TemporalLabels['sans_echeance'];
+        $v2ValidationStatus = (string) ($action->statut_validation ?? 'non_soumise');
+        $v2IsSubmitted = $v2ValidationStatus === 'soumise_chef';
+        $v2IsValidated = $v2ValidationStatus === 'validee_chef';
+    @endphp
+
+    <section id="action-suivi" class="showcase-panel mb-4">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 class="showcase-panel-title">Suivi de l'action</h2>
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="anbg-badge {{ $perfClass }} px-3 py-1">{{ $perfLabel }}</span>
+                <span class="anbg-badge {{ $tempClass }} px-3 py-1">{{ $tempLabel }}</span>
+            </div>
+        </div>
+
+        {{-- Performances : officielle en avant, provisoire en complément --}}
+        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))] mb-4">
+            <article class="showcase-inline-stat">
+                <strong>Performance officielle</strong>
+                <p class="mt-1 text-3xl font-extrabold text-[#17324a]">{{ number_format((float) $v2OfficialPerf, 1, ',', ' ') }}%</p>
+                <p class="text-xs text-slate-500">{{ $v2IsValidated ? 'Validée par le chef' : 'En attente de validation' }}</p>
+            </article>
+            <article class="showcase-inline-stat">
+                <strong>Performance provisoire</strong>
+                <p class="mt-1 text-xl font-bold text-[#3996d3]">{{ number_format((float) $v2ProvisionalPerf, 1, ',', ' ') }}%</p>
+                <p class="text-xs text-slate-500">Calculée à chaque enregistrement</p>
+            </article>
+            <article class="showcase-inline-stat">
+                <strong>Type d'action</strong>
+                <p class="mt-2 dd-badges"><span class="anbg-badge anbg-badge-info px-3 py-1">{{ $action->typeActionLabel() }}</span></p>
+            </article>
+        </div>
+
+        @if ($v2IsSubmitted)
+            <p class="action-section-note mb-3">Action soumise au chef de service — saisie gelée en attente de sa décision.</p>
+        @elseif ($v2IsValidated)
+            <p class="action-section-note mb-3">Action validée officiellement par le chef de service.</p>
+        @elseif ($v2ValidationStatus === 'correction_demandee')
+            <p class="action-section-note action-section-note-warning mb-3">Renvoyée pour correction. Motif : <strong>{{ $action->motif_validation_chef ?: '—' }}</strong></p>
+        @endif
+
+        {{-- FORMULAIRE AGENT — action simple (quantitative ou non quantitative) --}}
+        @if (($canTrackActionV2 ?? false) && ! $action->isComposee())
+            <form class="mt-2 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.execution.update', $action) }}">
+                @csrf
+                @error('general') <p class="field-error mb-2">{{ $message }}</p> @enderror
+                <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+                    @if ($action->isQuantitative())
+                        <div>
+                            <label for="qr">Quantité réalisée (totale à ce jour) — cible {{ number_format((float) ($action->quantite_cible ?? 0), 1, ',', ' ') }} {{ $action->unite_cible }}</label>
+                            <input id="qr" name="quantite_realisee" type="number" step="0.0001" min="0" value="{{ old('quantite_realisee', $action->quantite_realisee) }}">
+                        </div>
+                    @endif
+                    @if ($action->allows_difficulty)
+                        <div>
+                            <label for="diff">Difficulté rencontrée <span class="text-xs text-slate-400">(optionnel)</span></label>
+                            <textarea id="diff" name="difficulte" rows="2">{{ old('difficulte') }}</textarea>
+                        </div>
+                    @endif
+                    <div>
+                        <label for="jf">Pièce justificative <span class="text-xs font-semibold text-red-600">*</span> <span class="text-xs text-slate-500">(obligatoire à la soumission)</span></label>
+                        <input id="jf" name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
+                        @if ($action->justificatifs->whereIn('categorie', ['execution_quantitative','execution_non_quantitative','final'])->count() > 0)
+                            <p class="mt-1 text-xs text-emerald-600">✓ Pièce déjà déposée — vous pouvez soumettre sans en rajouter.</p>
+                        @endif
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label for="cmt" class="font-semibold">Commentaire @if ($action->requires_comment)<span class="text-xs font-semibold text-red-600">*</span>@else<span class="text-xs font-normal text-slate-400">(optionnel)</span>@endif</label>
+                    <textarea id="cmt" name="commentaire" rows="3" class="w-full" placeholder="Décrivez l'avancement.">{{ old('commentaire') }}</textarea>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <button class="btn btn-secondary" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
+                    <button class="btn btn-primary" type="submit" name="tracking_action" value="submit">Soumettre au chef</button>
+                </div>
+            </form>
+        @endif
+
+        {{-- FORMULAIRES AGENT — sous-actions (action composée) --}}
+        @if ($action->isComposee())
+            <div class="mt-2 space-y-3">
+                @forelse ($action->sousActions as $sa)
+                    @php
+                        $saPerf = app(\App\Services\Workflow\ActionPerformanceCalculator::class)->subActionPerformance($sa);
+                        $saValStatus = (string) ($sa->validation_status ?? 'non_soumise');
+                        $saEditable = ($canTrackSubActionsV2 ?? false)
+                            && $saValStatus !== 'validee'
+                            && ((int) $sa->agent_id === (int) auth()->id() || ($canReviewByChefV2 ?? false));
+                    @endphp
+                    <article class="rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <strong>{{ $sa->libelle }}</strong>
+                                <span class="ml-2 anbg-badge anbg-badge-info px-2 py-0.5 text-[11px]">{{ $sa->isQuantitative() ? 'Quantitative' : 'Non quantitative' }}</span>
+                                @if ($sa->weight !== null)<span class="ml-1 text-xs text-slate-500">poids {{ rtrim(rtrim(number_format((float) $sa->weight, 2, ',', ' '), '0'), ',') }}%</span>@endif
+                                <p class="text-sm text-slate-600">Perf : <strong>{{ number_format($saPerf, 1, ',', ' ') }}%</strong> · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
+                            </div>
+                        </div>
+
+                        @if ($saEditable && (int) $sa->agent_id === (int) auth()->id())
+                            <form class="mt-3 border-t border-slate-100 pt-3" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.sub-actions.update', [$action, $sa]) }}">
+                                @csrf
+                                <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+                                    @if ($sa->isQuantitative())
+                                        <div>
+                                            <label>Quantité réalisée — cible {{ number_format((float) ($sa->cible_prevue ?? 0), 1, ',', ' ') }} {{ $sa->unite }}</label>
+                                            <input name="quantite_realisee" type="number" step="0.0001" min="0" value="{{ $sa->quantite_realisee }}">
+                                        </div>
+                                    @endif
+                                    @if ($sa->allows_difficulty)
+                                        <div><label>Difficulté <span class="text-xs text-slate-400">(opt.)</span></label><textarea name="difficulte" rows="2"></textarea></div>
+                                    @endif
+                                    <div>
+                                        <label>Pièce justificative @if ($sa->requires_proof)<span class="text-xs font-semibold text-red-600">*</span>@endif</label>
+                                        <input name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <label class="font-semibold">Commentaire @if ($sa->requires_comment)<span class="text-xs font-semibold text-red-600">*</span>@else<span class="text-xs text-slate-400">(opt.)</span>@endif</label>
+                                    <textarea name="commentaire" rows="2" class="w-full">{{ $sa->commentaire }}</textarea>
+                                </div>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <button class="btn btn-secondary btn-sm" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
+                                    <button class="btn btn-primary btn-sm" type="submit" name="tracking_action" value="submit">Soumettre</button>
+                                </div>
+                            </form>
+                        @endif
+
+                        {{-- VALIDATION CHEF par sous-action --}}
+                        @if (($canReviewByChefV2 ?? false) && $saValStatus === 'soumise')
+                            <div class="mt-3 border-t border-slate-100 pt-3">
+                                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="flex flex-wrap items-end gap-2">
+                                    @csrf
+                                    <input type="hidden" name="sous_action_id" value="{{ $sa->id }}">
+                                    <input type="hidden" name="decision" value="valider">
+                                    <button class="btn btn-primary btn-sm" type="submit">Valider la sous-action</button>
+                                </form>
+                                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-2 flex flex-wrap items-end gap-2">
+                                    @csrf
+                                    <input type="hidden" name="sous_action_id" value="{{ $sa->id }}">
+                                    <input type="hidden" name="decision" value="rejeter">
+                                    <input name="motif" type="text" placeholder="Motif (obligatoire)" required class="flex-1">
+                                    <button class="btn btn-secondary btn-sm" type="submit">Renvoyer</button>
+                                </form>
+                            </div>
+                        @endif
+                    </article>
+                @empty
+                    <p class="action-section-note">Aucune sous-action planifiée pour cette action composée.</p>
+                @endforelse
+            </div>
+        @endif
+
+        {{-- VALIDATION CHEF — action simple soumise --}}
+        @if (($canReviewByChefV2 ?? false) && ! $action->isComposee() && $v2IsSubmitted)
+            <div class="mt-3 rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm">
+                <strong class="text-sm text-[#17324a]">Décision du chef de service</strong>
+                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-2 flex flex-wrap items-end gap-2">
+                    @csrf
+                    <input type="hidden" name="decision" value="valider">
+                    <button class="btn btn-primary" type="submit">Valider l'action</button>
+                </form>
+                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-2 flex flex-wrap items-end gap-2">
+                    @csrf
+                    <input type="hidden" name="decision" value="rejeter">
+                    <input name="motif" type="text" placeholder="Motif de renvoi (obligatoire)" required class="flex-1">
+                    <button class="btn btn-secondary" type="submit">Renvoyer pour correction</button>
+                </form>
+            </div>
+        @endif
+    </section>
 
     <section id="action-fiche" class="showcase-panel mb-4">
         <h2 class="showcase-panel-title">Fiche complète de l'action</h2>

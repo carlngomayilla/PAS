@@ -27,6 +27,11 @@ class Action extends Model
     public const MODE_SANS_QUANTITE = 'sans_quantite';
     public const MODE_MIXTE = 'mixte';
 
+    // Workflow V2 — type_action pivot (cf. docs/WORKFLOW-SUIVI-V2.md).
+    public const TYPE_QUANTITATIVE = 'quantitative';
+    public const TYPE_NON_QUANTITATIVE = 'non_quantitative';
+    public const TYPE_COMPOSEE = 'composee';
+
     public const ORIGIN_PAS = 'PAS';
     public const ORIGIN_PAO = 'PAO';
     public const ORIGIN_PTA = 'PTA';
@@ -89,6 +94,11 @@ class Action extends Model
         'statut_parametrage',
         'unite_dg_id',
         'mode_evaluation',
+        // Workflow V2 (cf. docs/WORKFLOW-SUIVI-V2.md)
+        'type_action',
+        'requires_comment',
+        'allows_difficulty',
+        'official_progress_percent',
         'libelle',
         'description',
         'type_cible',
@@ -152,6 +162,10 @@ class Action extends Model
         return [
             'date_debut' => 'date',
             'mode_evaluation' => 'string',
+            'type_action' => 'string',
+            'requires_comment' => 'boolean',
+            'allows_difficulty' => 'boolean',
+            'official_progress_percent' => 'decimal:2',
             'exercice_id' => 'integer',
             'ordre_import' => 'integer',
             'nombre_sous_actions_prevu' => 'integer',
@@ -587,6 +601,62 @@ class Action extends Model
             self::MODE_SANS_QUANTITE => 'Sans quantité',
             self::MODE_SOUS_ACTIONS => 'Cible par sous-action',
         ];
+    }
+
+    // ── WORKFLOW V2 — résolution du type_action pivot ────────────────────────
+    // (cf. docs/WORKFLOW-SUIVI-V2.md). type_action ∈ {quantitative,
+    // non_quantitative, composee}. Fallback dérivé de l'ancien modèle si null.
+
+    /**
+     * @return array<string, string>
+     */
+    public static function typeActionOptions(): array
+    {
+        return [
+            self::TYPE_QUANTITATIVE => 'Action simple quantitative',
+            self::TYPE_NON_QUANTITATIVE => 'Action simple non quantitative',
+            self::TYPE_COMPOSEE => 'Action composée (sous-actions)',
+        ];
+    }
+
+    public function resolvedTypeAction(): string
+    {
+        $type = trim((string) ($this->type_action ?? ''));
+        if (array_key_exists($type, self::typeActionOptions())) {
+            return $type;
+        }
+
+        // Fallback dérivé : sous-actions → composée, cible quantitative → quantitative.
+        if ($this->relationLoaded('sousActions') ? $this->sousActions->isNotEmpty() : $this->sousActions()->exists()) {
+            return self::TYPE_COMPOSEE;
+        }
+
+        $legacyType = trim((string) ($this->type_cible ?? ''));
+        if (in_array($legacyType, ['quantitative', 'quantitatif'], true)) {
+            return self::TYPE_QUANTITATIVE;
+        }
+
+        return self::TYPE_NON_QUANTITATIVE;
+    }
+
+    public function typeActionLabel(): string
+    {
+        return self::typeActionOptions()[$this->resolvedTypeAction()] ?? 'Action composée (sous-actions)';
+    }
+
+    public function isQuantitative(): bool
+    {
+        return $this->resolvedTypeAction() === self::TYPE_QUANTITATIVE;
+    }
+
+    public function isNonQuantitative(): bool
+    {
+        return $this->resolvedTypeAction() === self::TYPE_NON_QUANTITATIVE;
+    }
+
+    public function isComposee(): bool
+    {
+        return $this->resolvedTypeAction() === self::TYPE_COMPOSEE;
     }
 
     public function resolvedEvaluationMode(): string

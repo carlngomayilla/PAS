@@ -315,13 +315,17 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('kpi-mesures.update');
             Route::delete('kpi-mesures/{kpiMesure}', [KpiMesureWebController::class, 'destroy'])
                 ->name('kpi-mesures.destroy');
-            // ── PAGE DE SUIVI (lecture seule pour l'instant) ───────────────────
-            // Le workflow operationnel (saisie progression, sous-actions, validations
-            // chef/direction, anomalies, reports d'echeance) a ete SUPPRIME le
-            // 2026-05-31 pour etre repense from scratch. Seules les routes ci-dessous
-            // restent actives : page info + financement + commentaires + downloads.
+            // ── PAGE DE SUIVI + WORKFLOW V2 (cf. docs/WORKFLOW-SUIVI-V2.md) ─────
             Route::get('actions/{action}/suivi', [ActionTrackingWebController::class, 'show'])
                 ->name('actions.suivi');
+            // Suivi opérationnel V2 : enregistrement (save) + soumission (submit).
+            Route::post('actions/{action}/execution', [ActionTrackingWebController::class, 'updateActionProgress'])
+                ->name('actions.execution.update');
+            Route::post('actions/{action}/sous-actions/{sousAction}', [ActionTrackingWebController::class, 'updateSubActionProgress'])
+                ->name('actions.sub-actions.update');
+            // Validation chef (action simple ou sous-action via sous_action_id).
+            Route::post('actions/{action}/review', [ActionTrackingWebController::class, 'reviewItem'])
+                ->name('actions.review');
             Route::post('actions/{action}/financement/daf', [ActionTrackingWebController::class, 'reviewFinancingByDaf'])
                 ->name('actions.financement.daf');
             Route::post('actions/{action}/financement/daf/statut', [ActionTrackingWebController::class, 'updateFinancingStatusByDaf'])
@@ -334,21 +338,14 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.justificatifs.download');
             Route::get('actions/{action}/justificatifs/{justificatif}/preview', [ActionTrackingWebController::class, 'previewJustificatif'])
                 ->name('actions.justificatifs.preview');
-            // Routes legacy preservees mais qui retournent 410 (Gone) : empeche
-            // le code/tests existants de planter au coup d'apres tout en signalant
-            // clairement la suppression dans les logs.
-            Route::any('actions/{action}/sous-actions/{sousAction}', static function () {
-                abort(410, 'Workflow de suivi des sous-actions supprime (refonte en cours).');
-            })->name('actions.sub-actions.update');
+            // Routes legacy NON ré-implémentées en V2 (anomalies, reports d'échéance,
+            // validation direction, suivi hebdo) → 410 Gone tant que non rouvertes.
             Route::any('actions/{action}/sous-actions/{sousAction}/review', static function () {
-                abort(410, 'Workflow de validation chef supprime (refonte en cours).');
+                abort(410, 'Validation par route dédiée supprimée : utilisez actions.review avec sous_action_id.');
             })->name('actions.sub-actions.review');
-            Route::any('actions/{action}/execution', static function () {
-                abort(410, 'Workflow de saisie quantitative supprime (refonte en cours).');
-            })->name('actions.execution.update');
-            Route::any('actions/{action}/review', static function () {
-                abort(410, 'Workflow de validation cloture supprime (refonte en cours).');
-            })->name('actions.review');
+            Route::any('actions/{action}/review-direction', static function () {
+                abort(410, 'Workflow de validation direction supprime (refonte en cours).');
+            })->name('actions.review-direction');
             Route::any('actions/{action}/review-direction', static function () {
                 abort(410, 'Workflow de validation direction supprime (refonte en cours).');
             })->name('actions.review-direction');

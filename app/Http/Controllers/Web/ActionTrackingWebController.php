@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\Justificatif;
+use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\DocumentPolicySettings;
@@ -16,6 +17,7 @@ use App\Services\DynamicReferentialSettings;
 use App\Services\Governance\DelegationService;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\Security\SecureJustificatifStorage;
+use App\Services\Workflow\ActionWorkflowService;
 use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
 use Illuminate\Http\RedirectResponse;
@@ -81,11 +83,22 @@ class ActionTrackingWebController extends Controller
             'actionLogs' => fn ($q) => $q->with('utilisateur:id,name,email')->latest()->limit(80),
         ]);
 
+        // ── Workflow V2 : performances + permissions de suivi ──────────────────
+        $calculator = app(\App\Services\Workflow\ActionPerformanceCalculator::class);
+        $provisional = $calculator->provisionalPerformance($action);
+        $official = (float) ($action->official_progress_percent ?? 0);
+
         return view('workspace.actions.suivi', [
             'action' => $action,
-            // Tous les "canX" du workflow opérationnel sont neutralisés en attendant
-            // la refonte. La page reste accessible en lecture (downloads + commentaires
-            // + financement uniquement).
+            // Workflow V2
+            'v2ProvisionalPerf' => $provisional,
+            'v2OfficialPerf' => $official,
+            'v2PerfStatus' => $calculator->performanceStatus($provisional),
+            'v2TemporalStatus' => $calculator->temporalStatus($action),
+            'canTrackActionV2' => $this->canTrackAction($user, $action) && ! $action->isComposee(),
+            'canTrackSubActionsV2' => $action->isComposee() && ($action->isResponsible($user) || $user->isAgent()),
+            'canReviewByChefV2' => $this->canReviewByChef($user, $action),
+            // Compat anciennes clés (encore lues par certaines parties de la vue).
             'canTrackWeekly' => false,
             'canSubmitAssignedSubActions' => false,
             'canManageAction' => $this->canManageAction($user, $action),
@@ -137,6 +150,229 @@ class ActionTrackingWebController extends Controller
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', 'Commentaire enregistré.');
+    }
+
+    // ── WORKFLOW V2 — suivi opérationnel (cf. docs/WORKFLOW-SUIVI-V2.md) ───────
+
+    /**
+     * Suivi d'une action SIMPLE (quantitative ou non quantitative).
+     * tracking_action=save → brouillon ; tracking_action=submit → soumission chef.
+     */
+    public function updateActionProgress(
+        Request $request,
+        Action $action,
+        ActionWorkflowService $workflow,
+        SecureJustificatifStorage $secureStorage,
+        WorkspaceNotificationService $notificationService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
+        if (! $this->canTrackAction($user, $action)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        if ($action->isComposee()) {
+            return back()->withErrors(['general' => 'Cette action est composée : le suivi se fait par sous-action.']);
+        }
+
+        $intent = (string) $request->input('tracking_action', 'save') === 'submit' ? 'submit' : 'save';
+
+        $validated = $request->validate([
+            'quantite_realisee' => ['nullable', 'numeric', 'min:0'],
+            'commentaire' => ['nullable', 'string', 'max:5000'],
+            'difficulte' => ['nullable', 'string', 'max:5000'],
+            'justificatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
+        ]);
+
+        $hasNewProof = $request->hasFile('justificatif');
+
+        try {
+            DB::transaction(function () use ($workflow, $action, $validated, $intent, $user, $request, $secureStorage, $hasNewProof): void {
+                if ($hasNewProof) {
+                    $stored = $secureStorage->store($request->file('justificatif'), 'justificatifs/'.date('Y/m'));
+                    Justificatif::query()->create([
+                        'justifiable_type' => Action::class,
+                        'justifiable_id' => $action->id,
+                        'categorie' => $action->isQuantitative() ? 'execution_quantitative' : 'execution_non_quantitative',
+                        'nom_original' => $stored['nom_original'],
+                        'chemin_stockage' => $stored['path'],
+                        'est_chiffre' => $stored['est_chiffre'],
+                        'mime_type' => $stored['mime_type'],
+                        'taille_octets' => $stored['taille_octets'],
+                        'description' => 'Justificatif de suivi action',
+                        'ajoute_par' => $user->id,
+                    ]);
+                    $action->load('justificatifs');
+                }
+
+                $workflow->recordActionProgress($action, [
+                    'quantite_realisee' => $validated['quantite_realisee'] ?? null,
+                    'commentaire' => $validated['commentaire'] ?? null,
+                    'difficulte' => $validated['difficulte'] ?? null,
+                ], $user);
+
+                if ($intent === 'submit') {
+                    $workflow->submitAction($action->fresh(['justificatifs']), [
+                        'commentaire' => $validated['commentaire'] ?? null,
+                        'difficulte' => $validated['difficulte'] ?? null,
+                        'has_new_proof' => $hasNewProof,
+                    ], $user);
+                }
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->withInput()->withErrors(['general' => $e->getMessage()]);
+        }
+
+        if ($intent === 'submit') {
+            $notificationService->notifyActionSubmittedToChef($action->fresh()->loadMissing('pta:id,direction_id,service_id'), $user);
+        }
+
+        return redirect()
+            ->route('workspace.actions.suivi', $action)
+            ->with('success', $intent === 'submit'
+                ? 'Action soumise au chef de service pour validation.'
+                : 'Avancement enregistré. Vous pourrez soumettre quand vous serez prêt.');
+    }
+
+    /**
+     * Suivi d'une SOUS-ACTION (action composée).
+     */
+    public function updateSubActionProgress(
+        Request $request,
+        Action $action,
+        SousAction $sousAction,
+        ActionWorkflowService $workflow,
+        SecureJustificatifStorage $secureStorage,
+        WorkspaceNotificationService $notificationService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
+        if ((int) $sousAction->action_id !== (int) $action->id) {
+            abort(404);
+        }
+        if (! $this->canTrackSubAction($user, $action, $sousAction)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $intent = (string) $request->input('tracking_action', 'save') === 'submit' ? 'submit' : 'save';
+
+        $validated = $request->validate([
+            'quantite_realisee' => ['nullable', 'numeric', 'min:0'],
+            'resultat_obtenu' => ['nullable', 'string', 'max:5000'],
+            'commentaire' => ['nullable', 'string', 'max:5000'],
+            'difficulte' => ['nullable', 'string', 'max:5000'],
+            'justificatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
+        ]);
+
+        $hasNewProof = $request->hasFile('justificatif');
+
+        try {
+            DB::transaction(function () use ($workflow, $action, $sousAction, $validated, $intent, $user, $request, $secureStorage, $hasNewProof): void {
+                if ($hasNewProof) {
+                    $stored = $secureStorage->store($request->file('justificatif'), 'justificatifs/'.date('Y/m'));
+                    Justificatif::query()->create([
+                        'justifiable_type' => Action::class,
+                        'justifiable_id' => $sousAction->action_id,
+                        'sous_action_id' => $sousAction->id,
+                        'categorie' => 'sous_action',
+                        'nom_original' => $stored['nom_original'],
+                        'chemin_stockage' => $stored['path'],
+                        'est_chiffre' => $stored['est_chiffre'],
+                        'mime_type' => $stored['mime_type'],
+                        'taille_octets' => $stored['taille_octets'],
+                        'description' => 'Justificatif de sous-action',
+                        'ajoute_par' => $user->id,
+                    ]);
+                    $sousAction->load('justificatifs');
+                }
+
+                $workflow->recordSubActionProgress($sousAction, [
+                    'quantite_realisee' => $validated['quantite_realisee'] ?? null,
+                    'resultat_obtenu' => $validated['resultat_obtenu'] ?? null,
+                    'commentaire' => $validated['commentaire'] ?? null,
+                ], $user);
+
+                if ($intent === 'submit') {
+                    $workflow->submitSubAction($sousAction->fresh(['justificatifs']), [
+                        'commentaire' => $validated['commentaire'] ?? null,
+                        'difficulte' => $validated['difficulte'] ?? null,
+                        'has_new_proof' => $hasNewProof,
+                    ], $user);
+                }
+
+                $workflow->refreshCompositeParent($action->fresh(['sousActions']), $user);
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->withInput()->withErrors(['general' => $e->getMessage()]);
+        }
+
+        if ($intent === 'submit') {
+            $notificationService->notifySubActionCompleted(
+                $action->fresh()->loadMissing('pta:id,direction_id,service_id'),
+                $sousAction->fresh(),
+                $user
+            );
+        }
+
+        return redirect()
+            ->route('workspace.actions.suivi', $action)
+            ->with('success', $intent === 'submit'
+                ? 'Sous-action soumise au chef de service.'
+                : 'Sous-action enregistrée en brouillon.');
+    }
+
+    /**
+     * Décision du chef de service : valider ou renvoyer pour correction.
+     * Gère action simple OU sous-action (selon présence de sous_action_id).
+     */
+    public function reviewItem(
+        Request $request,
+        Action $action,
+        ActionWorkflowService $workflow,
+        WorkspaceNotificationService $notificationService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
+        if (! $this->canReviewByChef($user, $action)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $validated = $request->validate([
+            'decision' => ['required', Rule::in(['valider', 'rejeter'])],
+            'sous_action_id' => ['nullable', 'integer', 'exists:sous_actions,id'],
+            'motif' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $approve = $validated['decision'] === 'valider';
+        if (! $approve && trim((string) ($validated['motif'] ?? '')) === '') {
+            return back()->withErrors(['motif' => 'Le motif est obligatoire en cas de renvoi pour correction.']);
+        }
+
+        $subActionId = $validated['sous_action_id'] ?? null;
+        if ($subActionId !== null) {
+            $sousAction = SousAction::query()->whereKey((int) $subActionId)->where('action_id', $action->id)->firstOrFail();
+            $workflow->reviewSubAction($sousAction, $approve, $validated['motif'] ?? null, $user);
+        } else {
+            $workflow->reviewAction($action, $approve, $validated['motif'] ?? null, $user);
+        }
+
+        $notificationService->notifyActionReviewedByChef($action->fresh()->loadMissing('pta:id,direction_id,service_id'), $approve, $user);
+
+        return redirect()
+            ->route('workspace.actions.suivi', $action)
+            ->with('success', $approve ? 'Validation enregistrée.' : 'Renvoi pour correction enregistré.');
     }
 
     public function reviewFinancingByDaf(
@@ -471,6 +707,64 @@ class ActionTrackingWebController extends Controller
     {
         return ! $user->isAgent()
             && $this->canWriteService(
+                $user,
+                (int) $action->pta?->direction_id,
+                (int) $action->pta?->service_id
+            );
+    }
+
+    // ── WORKFLOW V2 — autorisations de suivi ─────────────────────────────────
+
+    /**
+     * L'action n'est éditable par l'agent que tant qu'elle n'est pas validée
+     * (non_soumise / correction_demandee / rejetee_chef).
+     */
+    private function isExecutionEditable(Action $action): bool
+    {
+        return in_array((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE), [
+            ActionTrackingService::VALIDATION_NON_SOUMISE,
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+            ActionTrackingService::VALIDATION_REJETEE_CHEF,
+        ], true);
+    }
+
+    private function canTrackAction(User $user, Action $action): bool
+    {
+        if ((string) ($action->statut_parametrage ?? '') === 'a_parametrer') {
+            return false;
+        }
+        if (! $this->isExecutionEditable($action)) {
+            return false;
+        }
+
+        return $action->isResponsible($user)
+            && ($user->isAgent() || $action->isOperationalContext());
+    }
+
+    private function canTrackSubAction(User $user, Action $action, SousAction $sousAction): bool
+    {
+        if ((string) ($action->statut_parametrage ?? '') === 'a_parametrer') {
+            return false;
+        }
+        if (in_array((string) $sousAction->validation_status, [SousAction::VALIDATION_VALIDEE], true)) {
+            return false;
+        }
+
+        return (int) $sousAction->agent_id === (int) $user->id
+            || $action->isResponsible($user);
+    }
+
+    private function canReviewByChef(User $user, Action $action): bool
+    {
+        if ($action->isResponsible($user)) {
+            return false;
+        }
+        if (! $this->workflowSettings()->serviceValidationEnabled()) {
+            return false;
+        }
+
+        return ($user->hasRole(User::ROLE_SERVICE) && $this->canManageAction($user, $action))
+            || app(DelegationService::class)->canReviewServiceAction(
                 $user,
                 (int) $action->pta?->direction_id,
                 (int) $action->pta?->service_id

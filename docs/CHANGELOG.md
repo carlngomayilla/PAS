@@ -58,6 +58,66 @@ Le grid `auto-fit minmax(220px, 1fr)` empilait 5 champs (quantité + résultat +
 
 ---
 
+## 2026-05-31 — Workflow de suivi V2 : reconstruction (P1 → P5 + UI)
+
+> Branche `feature/reset-action-workflow`. Spec : docs/WORKFLOW-SUIVI-V2.md.
+> Reconstruction du workflow de suivi après le reset, selon l'architecture co-validée.
+
+### P1 — Migration BDD
+- `actions` : + `type_action`, `requires_comment`, `allows_difficulty`, `official_progress_percent`.
+- `sous_actions` : + `sub_action_type`, `weight`, `requires_proof`, `requires_comment`,
+  `allows_difficulty`, `official_progress_percent`, `validation_status`.
+- Mapping auto des 66 actions existantes : 65 quantitative + 1 composée.
+  Migration réversible.
+
+### P2 — Modèles + calculateur
+- `Action` : constantes `TYPE_QUANTITATIVE|NON_QUANTITATIVE|COMPOSEE`, helpers
+  `resolvedTypeAction()`, `isQuantitative/isNonQuantitative/isComposee`, `typeActionLabel()`.
+- `SousAction` : `TYPE_*`, `VALIDATION_*`, `resolvedType()`, `isQuantitative()`.
+- **`App\Services\Workflow\ActionPerformanceCalculator`** (service PUR, sans BDD) :
+  perf provisoire par type, paliers (critique<50 / alerte<80 / acceptable<100 / atteinte / dépassée),
+  statut temporel, conformité, calcul pondéré composée. **19 tests unitaires.**
+
+### P3 — Formulaire PTA V2
+- Select **type_action** pilote (mappé vers mode_evaluation en backend).
+- Cases conformité action : commentaire obligatoire, champ difficulté.
+- Sous-actions enrichies : type, **poids %**, justificatif/commentaire/difficulté + compteur Σ poids live.
+- JS : affichage conditionnel par type + compteur poids (vert si =100%).
+- Validation backend (StorePtaRequest + UpdatePtaRequest + upsertActionInline) :
+  mapping, normalisation, **Σ poids = 100% obligatoire**.
+- Persistance : syncPtaActions + syncPlannedSubActions enrichis.
+
+### P4/P5 — Suivi opérationnel (backend + UI)
+- **`App\Services\Workflow\ActionWorkflowService`** : orchestrateur du cycle
+  save → submit → validate.
+  - `recordActionProgress` / `recordSubActionProgress` : brouillon + perf provisoire.
+  - `submitAction` / `submitSubAction` : conformité vérifiée → soumise_chef.
+  - `reviewAction` / `reviewSubAction` : valider (officialise `official_progress_percent`) / rejeter (motif).
+  - `refreshCompositeParent` : action composée clôturée AUTO quand toutes sous-actions validées
+    (perf = Σ pondérée).
+- `ActionTrackingWebController` : méthodes `updateActionProgress`, `updateSubActionProgress`,
+  `reviewItem` + helpers d'autorisation V2 (`canTrackAction`, `canTrackSubAction`, `canReviewByChef`).
+- Routes : `actions.execution.update`, `actions.sub-actions.update`, `actions.review` réactivées
+  (les routes legacy non ré-implémentées restent en 410).
+- **UI** (suivi.blade.php) : section « Suivi de l'action » avec perf officielle (en avant) +
+  provisoire, badges type/perf/temporel, formulaire agent (simple ou par sous-action),
+  validation chef par sous-action ou globale. Saisie quantitative en **remplacement** (total à ce jour).
+
+### Décisions UX validées
+- Affichage : 2 performances, officielle en avant.
+- Action composée : validation par sous-action → clôture auto du parent.
+- Saisie quantitative : remplacement (quantité totale à ce jour).
+
+### Tests
+- 19 unit (calculateur) + 7 feature (cycle V2 + rendu UI) + 20 PTA.
+- Suite Feature complète : objectif 0 régression (en cours de vérification).
+
+### Reste à faire
+- P7 : Reporting → basculer les stats consolidées sur `official_progress_percent`.
+- P8 : Recette visuelle utilisateur (navigateur) + tests E2E complémentaires.
+
+---
+
 ## 2026-05-31 — RESET COMPLET du workflow de suivi action/sous-action (branche dédiée)
 
 ### Demande utilisateur

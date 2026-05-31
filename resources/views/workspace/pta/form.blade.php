@@ -446,13 +446,14 @@
             function syncActionMode(block) {
                 if (!block) return;
 
-                var modeField = block.querySelector('[data-mode-select]');
-                var mode = modeField ? modeField.value : 'sans_quantite';
-                var targetInput = block.querySelector('[data-target-input]');
+                // Workflow V2 : le select pilote type_action (quantitative /
+                // non_quantitative / composee).
+                var modeField = block.querySelector('[data-type-action-select]') || block.querySelector('[data-mode-select]');
+                var mode = modeField ? modeField.value : 'non_quantitative';
                 var targetWrappers = block.querySelectorAll('[data-target-wrapper]');
                 var subActionsSection = block.querySelector('[data-sub-actions-section]');
-                var isQuantitative = mode === 'quantitatif';
-                var showSubActions = mode === 'sous_actions';
+                var isQuantitative = mode === 'quantitative';
+                var showSubActions = mode === 'composee';
 
                 targetWrappers.forEach(function (wrapper) {
                     var input = wrapper.querySelector('input:not([type="hidden"]), select, textarea');
@@ -470,6 +471,54 @@
                     });
                     if (showSubActions) {
                         refreshSubActionIndexes(block);
+                        updateWeightTotal(block);
+                    }
+                }
+
+                // Indice contextuel sous le select.
+                var hint = block.querySelector('[data-type-action-hint]');
+                if (hint) {
+                    hint.textContent = isQuantitative
+                        ? 'Cible chiffrée + unité + seuils numériques.'
+                        : (showSubActions
+                            ? 'Performance calculée depuis les sous-actions (poids Σ=100%).'
+                            : 'Pièce justificative attendue (réalisé = 0 % ou 100 %).');
+                }
+            }
+
+            // Affiche/masque cible+unité d'une sous-action selon son type.
+            function syncSubActionType(row) {
+                if (!row) return;
+                var typeField = row.querySelector('[data-sub-type-select]');
+                var type = typeField ? typeField.value : 'quantitative';
+                var isQuanti = type === 'quantitative';
+                row.querySelectorAll('[data-sub-target-wrapper]').forEach(function (wrapper) {
+                    wrapper.classList.toggle('hidden', !isQuanti);
+                    var input = wrapper.querySelector('input:not([type="hidden"]), select, textarea');
+                    if (input) { input.disabled = !isQuanti; }
+                });
+            }
+
+            // Recalcule la somme des poids des sous-actions + feedback couleur.
+            function updateWeightTotal(block) {
+                if (!block) return;
+                var total = 0;
+                var hasValue = false;
+                block.querySelectorAll('[data-sub-action-row]').forEach(function (row) {
+                    if (row.classList.contains('hidden')) return;
+                    var input = row.querySelector('[data-sub-weight-input]');
+                    if (input && input.value !== '') {
+                        total += parseFloat(input.value) || 0;
+                        hasValue = true;
+                    }
+                });
+                var counter = block.querySelector('[data-weight-total]');
+                if (counter) {
+                    counter.textContent = hasValue ? (Math.round(total * 100) / 100) : '0';
+                    var wrapper = block.querySelector('[data-weight-counter]');
+                    if (wrapper) {
+                        var ok = !hasValue || Math.abs(total - 100) < 0.01;
+                        wrapper.style.color = ok ? '#16a34a' : '#dc2626';
                     }
                 }
             }
@@ -580,9 +629,18 @@
                 if (subEnd && actionEnd) subEnd.value = actionEnd.value;
                 if (subUnit && unit) subUnit.value = unit.value;
 
+                // Rétablit les valeurs par défaut V2 des cases à cocher de la sous-action
+                // (le clone les a toutes décochées) : justificatif + difficulté activés.
+                var cbProof = clone.querySelector('input[type="checkbox"][name$="[requires_proof]"]');
+                if (cbProof) cbProof.checked = true;
+                var cbDiff = clone.querySelector('input[type="checkbox"][name$="[allows_difficulty]"]');
+                if (cbDiff) cbDiff.checked = true;
+
                 list.appendChild(clone);
                 refreshSubActionIndexes(block);
                 syncSubActionEcheances(block);
+                syncSubActionType(clone);
+                updateWeightTotal(block);
             }
 
             function syncActionFinancing(block) {
@@ -690,6 +748,8 @@
                     syncActionEcheance(block);
                     syncThresholdMode(block);
                     refreshSubActionIndexes(block);
+                    block.querySelectorAll('[data-sub-action-row]').forEach(syncSubActionType);
+                    updateWeightTotal(block);
                 });
                 filterRmosForScope();
 
@@ -769,6 +829,10 @@
                         syncThresholdMode(target.closest('[data-action-block]'));
                     }
 
+                    if (target.matches('[data-sub-type-select]')) {
+                        syncSubActionType(target.closest('[data-sub-action-row]'));
+                    }
+
                     if (target.matches('[data-financing-select]')) {
                         syncActionFinancing(target.closest('[data-action-block]'));
                     }
@@ -794,6 +858,10 @@
                     if (target.matches('[data-target-input]')) {
                         target.dataset.forceSousActions = target.value.trim() === '' ? '1' : '0';
                         syncActionMode(target.closest('[data-action-block]'));
+                    }
+
+                    if (target.matches('[data-sub-weight-input]')) {
+                        updateWeightTotal(target.closest('[data-action-block]'));
                     }
 
                     if (target.matches('input[name$="[libelle]"]')) {

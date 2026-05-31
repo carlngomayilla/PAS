@@ -89,6 +89,22 @@ class StorePtaRequest extends FormRequest
                 Action::MODE_SANS_QUANTITE,
                 Action::MODE_SOUS_ACTIONS,
             ])],
+            // Workflow V2 (cf. docs/WORKFLOW-SUIVI-V2.md)
+            'actions.*.type_action' => ['required', Rule::in([
+                Action::TYPE_QUANTITATIVE,
+                Action::TYPE_NON_QUANTITATIVE,
+                Action::TYPE_COMPOSEE,
+            ])],
+            'actions.*.requires_comment' => ['nullable', 'boolean'],
+            'actions.*.allows_difficulty' => ['nullable', 'boolean'],
+            'actions.*.sous_actions.*.sub_action_type' => ['nullable', Rule::in([
+                \App\Models\SousAction::TYPE_QUANTITATIVE,
+                \App\Models\SousAction::TYPE_NON_QUANTITATIVE,
+            ])],
+            'actions.*.sous_actions.*.weight' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'actions.*.sous_actions.*.requires_proof' => ['nullable', 'boolean'],
+            'actions.*.sous_actions.*.requires_comment' => ['nullable', 'boolean'],
+            'actions.*.sous_actions.*.allows_difficulty' => ['nullable', 'boolean'],
             'actions.*.priorite' => ['nullable', 'string', 'max:50'],
             'actions.*.quantite_cible' => ['nullable', 'numeric', 'min:0.0001'],
             'actions.*.unite_cible' => ['nullable', 'string', 'max:100'],
@@ -216,6 +232,26 @@ class StorePtaRequest extends FormRequest
                 }
 
                 $subActions = is_array($actionPayload['sous_actions'] ?? null) ? $actionPayload['sous_actions'] : [];
+
+                // Workflow V2 : pour une action composée, si des poids sont saisis,
+                // leur somme doit valoir 100 % (cf. docs/WORKFLOW-SUIVI-V2.md §6.3).
+                $typeAction = (string) ($actionPayload['type_action'] ?? '');
+                if ($typeAction === Action::TYPE_COMPOSEE && $subActions !== []) {
+                    $weights = collect($subActions)
+                        ->filter(fn ($sa): bool => is_array($sa) && ($sa['weight'] ?? '') !== '' && $sa['weight'] !== null)
+                        ->map(fn ($sa): float => (float) $sa['weight']);
+
+                    if ($weights->isNotEmpty()) {
+                        $sum = round($weights->sum(), 2);
+                        if (abs($sum - 100.0) > 0.01) {
+                            $validator->errors()->add(
+                                "actions.{$index}.sous_actions",
+                                "La somme des poids des sous-actions doit être égale à 100 % (actuellement {$sum} %)."
+                            );
+                        }
+                    }
+                }
+
                 foreach ($subActions as $subIndex => $subActionPayload) {
                     if (! is_array($subActionPayload)) {
                         continue;
@@ -343,7 +379,19 @@ class StorePtaRequest extends FormRequest
                     && $action['quantite_cible'] !== null
                     && (float) $action['quantite_cible'] > 0;
 
+                // Workflow V2 : le formulaire pilote type_action. On le mappe vers
+                // mode_evaluation (rétrocompat) pour le reste de la chaîne de persistance.
+                $typeActionMapToMode = [
+                    Action::TYPE_QUANTITATIVE => Action::MODE_QUANTITATIF,
+                    Action::TYPE_NON_QUANTITATIVE => Action::MODE_SANS_QUANTITE,
+                    Action::TYPE_COMPOSEE => Action::MODE_SOUS_ACTIONS,
+                ];
+                $typeAction = trim((string) ($action['type_action'] ?? ''));
+
                 $mode = trim((string) ($action['mode_evaluation'] ?? ''));
+                if ($typeAction !== '' && array_key_exists($typeAction, $typeActionMapToMode)) {
+                    $mode = $typeActionMapToMode[$typeAction];
+                }
                 if ($mode === Action::MODE_MIXTE) {
                     $mode = $targetProvided ? Action::MODE_QUANTITATIF : Action::MODE_SOUS_ACTIONS;
                 }
@@ -363,6 +411,12 @@ class StorePtaRequest extends FormRequest
                 }
 
                 $action['mode_evaluation'] = $mode;
+
+                // type_action canonique (inverse du mapping) + flags conformité V2.
+                $modeToTypeAction = array_flip($typeActionMapToMode);
+                $action['type_action'] = $modeToTypeAction[$mode] ?? Action::TYPE_NON_QUANTITATIVE;
+                $action['requires_comment'] = filter_var($action['requires_comment'] ?? false, FILTER_VALIDATE_BOOL);
+                $action['allows_difficulty'] = filter_var($action['allows_difficulty'] ?? true, FILTER_VALIDATE_BOOL);
                 $action['rmo_ids'] = $rmoIds;
                 $action['financement_requis'] = filter_var($action['financement_requis'] ?? false, FILTER_VALIDATE_BOOL);
                 $action['justificatif_obligatoire'] = filter_var($action['justificatif_obligatoire'] ?? false, FILTER_VALIDATE_BOOL);
@@ -380,6 +434,22 @@ class StorePtaRequest extends FormRequest
                         foreach (['id', 'agent_id', 'libelle', 'description', 'resultat_attendu', 'date_debut', 'date_fin', 'cible_prevue', 'unite', 'commentaire'] as $key) {
                             $subAction[$key] = $subAction[$key] ?? null;
                         }
+
+                        // Workflow V2 : type + poids + conditions de la sous-action.
+                        $saType = trim((string) ($subAction['sub_action_type'] ?? ''));
+                        if (! in_array($saType, [\App\Models\SousAction::TYPE_QUANTITATIVE, \App\Models\SousAction::TYPE_NON_QUANTITATIVE], true)) {
+                            $saType = (filled($subAction['cible_prevue']) && (float) $subAction['cible_prevue'] > 0)
+                                ? \App\Models\SousAction::TYPE_QUANTITATIVE
+                                : \App\Models\SousAction::TYPE_NON_QUANTITATIVE;
+                        }
+                        $subAction['sub_action_type'] = $saType;
+                        $subAction['weight'] = ($subAction['weight'] ?? '') === '' ? null : (float) $subAction['weight'];
+                        if ($saType !== \App\Models\SousAction::TYPE_QUANTITATIVE) {
+                            $subAction['cible_prevue'] = null;
+                        }
+                        $subAction['requires_proof'] = filter_var($subAction['requires_proof'] ?? true, FILTER_VALIDATE_BOOL);
+                        $subAction['requires_comment'] = filter_var($subAction['requires_comment'] ?? false, FILTER_VALIDATE_BOOL);
+                        $subAction['allows_difficulty'] = filter_var($subAction['allows_difficulty'] ?? true, FILTER_VALIDATE_BOOL);
 
                         return $subAction;
                     })
