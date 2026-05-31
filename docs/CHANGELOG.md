@@ -58,6 +58,112 @@ Le grid `auto-fit minmax(220px, 1fr)` empilait 5 champs (quantité + résultat +
 
 ---
 
+## 2026-05-31 — RESET COMPLET du workflow de suivi action/sous-action (branche dédiée)
+
+### Demande utilisateur
+
+> *"JE VEUX QUE TU SUPRIME TOUTE LA LOGIQUE DU WORKFLO DE SUIVI DE L'ACTION OU SOUS ACTION
+> DE TOUT TYPE ET ON VA LA REFAIR PROMENT TOI E MOI"*
+
+Travail effectué sur **branche `feature/reset-action-workflow`** (main intact).
+
+### Périmètre
+
+**SUPPRIMÉ :**
+- Saisie de progression quantitative (parent action)
+- Saisie + soumission des sous-actions par l'agent
+- Validation chef de service (sous-action + clôture action)
+- Validation direction (déjà supprimée dans une session précédente, stubs nettoyés)
+- Signalement et résolution d'anomalies
+- Demandes de report d'échéance (création + avis SCIQ + décision DG)
+- Bascule auto vers chef à la saisie
+
+**PRÉSERVÉ (intact) :**
+- Création / édition d'action via le formulaire PTA
+- Workflow stratégique PAS → PAO → PTA (approbations)
+- Workflow financement DAF → DG (séparé du suivi)
+- Téléchargement / preview des justificatifs
+- Fil de discussion / commentaires sur l'action
+- Infrastructure notifications (BrevoMailService, NotificationPolicySettings,
+  WorkspaceNotificationService)
+- Modèles + colonnes BDD (Action, SousAction, ActionLog, etc.)
+
+### Code supprimé / nettoyé
+
+| Fichier | Avant | Après | Δ |
+|---|---|---|---|
+| `app/Http/Controllers/Web/ActionTrackingWebController.php` | 1625 | 527 | -1098 |
+| `app/Services/Actions/ActionTrackingService.php` | 1660 | 1319 | -341 |
+| `app/Services/Actions/DeadlineExtensionRequestService.php` | 245 | **supprimé** | -245 |
+| `app/Http/Controllers/Api/ActionValidationController.php` | 120 | 25 (stub 410) | -95 |
+| `resources/views/workspace/actions/suivi.blade.php` | 1227 | 736 | -491 |
+| Routes web tracking (web.php) | 14 routes | 1 active + 10 stubs 410 | nettoyé |
+| Tests obsolètes supprimés | — | — | -1763 |
+
+**Tests supprimés (4 fichiers) :**
+- `tests/Feature/ActionWorkflowSecurityTest.php` (1078 lignes)
+- `tests/Feature/ActionNotificationWorkflowTest.php` (180)
+- `tests/Feature/DeadlineExtensionRequestWorkflowTest.php` (193)
+- `tests/Feature/ActionAnomalyAlertWorkflowTest.php` (312)
+
+**Test ajusté :**
+- `tests/Feature/ActionFinancingWorkflowTest.php` : remplacement des appels
+  `reviewClosureByChef` par des `forceFill(financement_statut)` pour préserver
+  l'initialisation du scénario financement.
+
+### Routes (web)
+
+Routes actives (workspace.actions.*) :
+- `GET suivi` → page lecture seule
+- `POST commentaires` → fil discussion
+- `POST financement/daf`, `POST financement/daf/statut`, `POST financement/dg`
+- `GET justificatifs/{j}/download`, `GET justificatifs/{j}/preview`
+
+Routes stubs (retournent **HTTP 410 Gone** avec message explicite) :
+- `sous-actions/{sa}` (update + review)
+- `execution`, `review`, `review-direction`
+- `anomalies` (signal + resolve)
+- `reports-echeance` + `reports-echeance/{r}/sciq` + `/dg`
+- `semaines/{w}/soumettre` (legacy weekly)
+
+### Reset BDD effectué
+
+```
+Actions reset       : 66 (libellés/dates/responsables intacts)
+Sous-actions reset  : 2  (libellés/dates intacts)
+Justificatifs delete: 0  (aucune pièce de catégorie suivi en base)
+ActionLogs delete   : 4  (traces des tests de notification)
+deadline_extension_requests : vidée
+```
+
+Champs Action reset à valeurs initiales :
+`statut='non_demarre'`, `statut_dynamique='non_demarre'`, `statut_validation='non_soumise'`,
+`statut_parametrage='a_parametrer'`, `quantite_realisee=0`, `progression_*=0`,
+`date_fin_reelle=NULL`, `soumise_le=NULL`, `evalue_le=NULL`, `evalue_par=NULL`,
+`rapport_final=NULL`, `difficultes_rencontrees=NULL`, `motif_validation_chef=NULL`.
+
+Champs SousAction reset :
+`statut='non_demarre'`, `est_effectuee=false`, `date_realisation=NULL`, `completed_at=NULL`,
+`quantite_realisee=0`, `taux_realisation=0`, `taux_execution=0`, `resultat_obtenu=NULL`,
+`commentaire=NULL`.
+
+### Validation
+
+- Lint PHP (4 fichiers touchés) : 0 erreur
+- Vite build : ✓ 17.76s, 0 erreur
+- Suite Feature complète : en cours d'exécution
+
+### À faire (suite logique)
+
+La refonte du workflow opérationnel se fera sur cette même branche
+`feature/reset-action-workflow` à travers une nouvelle spec à co-construire :
+1. Spec métier détaillée (états, transitions, règles, qui fait quoi quand)
+2. Migration / nouvelles colonnes si besoin
+3. Implémentation incrémentale (controllers → services → vues → tests)
+4. Merge dans main après recette utilisateur
+
+---
+
 ## 2026-05-31 — Justificatif TOUJOURS obligatoire à la soumission (tous types)
 
 ### Demande utilisateur

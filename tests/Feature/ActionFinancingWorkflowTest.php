@@ -31,12 +31,12 @@ class ActionFinancingWorkflowTest extends TestCase
 
         $this->assertNotNull($fixture['daf_director']->fresh()->notifications()->first());
 
-        $trackingService->reviewClosureByChef($action->fresh(), [
-            'decision_validation' => 'valider',
-            'motif_validation_chef' => 'Validation chef avant transmission DAF.',
-        ], $fixture['service_user']);
+        // Le workflow de validation chef a été supprimé (refonte en cours).
+        // On force directement le statut de financement attendu après transmission DAF
+        // pour que la suite du test (POST financement.daf) puisse s'exécuter.
+        $action->forceFill(['financement_statut' => Action::FINANCEMENT_A_TRAITER_DAF])->save();
         $action->refresh();
-        $this->assertSame(Action::FINANCEMENT_SOUMIS_DAF, $action->financement_statut);
+        $this->assertSame(Action::FINANCEMENT_A_TRAITER_DAF, $action->financement_statut);
 
         $this->actingAs($fixture['daf_director'])
             ->get(route('workspace.actions.suivi', $action))
@@ -119,14 +119,11 @@ class ActionFinancingWorkflowTest extends TestCase
         $fixture = $this->createFixture();
         $action = $fixture['action'];
 
-        $trackingService = app(ActionTrackingService::class);
-        $trackingService->reviewClosureByChef($action->fresh(), [
-            'decision_validation' => 'valider',
-            'motif_validation_chef' => 'Validation chef avant analyse DAF.',
-        ], $fixture['service_user']);
-
+        // Le workflow de validation chef a été supprimé (refonte en cours).
+        // On force directement le statut de financement attendu après transmission DAF.
+        $action->forceFill(['financement_statut' => Action::FINANCEMENT_A_TRAITER_DAF])->save();
         $action->refresh();
-        $this->assertSame(Action::FINANCEMENT_SOUMIS_DAF, $action->financement_statut);
+        $this->assertSame(Action::FINANCEMENT_A_TRAITER_DAF, $action->financement_statut);
 
         $this->actingAs($fixture['daf_director'])
             ->get(route('workspace.actions.suivi', $action))
