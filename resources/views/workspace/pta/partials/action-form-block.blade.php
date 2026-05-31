@@ -231,7 +231,7 @@
                 </div>
                 <div class="{{ $showTargetFields ? '' : 'hidden' }}" data-target-wrapper>
                     <label>Valeur cible</label>
-                    <input name="actions[{{ $index }}][quantite_cible]" data-target-input type="number" step="0.0001" min="0" value="{{ $rowData['quantite_cible'] ?? '' }}" @disabled(! $showTargetFields)>
+                    <input name="actions[{{ $index }}][quantite_cible]" data-target-input type="number" step="1" min="0" value="{{ isset($rowData['quantite_cible']) && $rowData['quantite_cible'] !== '' && $rowData['quantite_cible'] !== null ? (int) $rowData['quantite_cible'] : '' }}" @disabled(! $showTargetFields)>
                     @error("actions.$index.quantite_cible") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div class="{{ $showTargetFields ? '' : 'hidden' }}" data-target-wrapper>
@@ -335,7 +335,7 @@
                             </div>
                             <div data-sub-target-wrapper class="{{ $saType === 'quantitative' ? '' : 'hidden' }}">
                                 <label>Cible prévue</label>
-                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][cible_prevue]" type="number" step="0.0001" min="0" value="{{ $subAction['cible_prevue'] ?? '' }}">
+                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][cible_prevue]" type="number" step="1" min="0" value="{{ isset($subAction['cible_prevue']) && $subAction['cible_prevue'] !== '' && $subAction['cible_prevue'] !== null ? (int) $subAction['cible_prevue'] : '' }}">
                             </div>
                             <div data-sub-target-wrapper class="{{ $saType === 'quantitative' ? '' : 'hidden' }}">
                                 <label>Unité</label>

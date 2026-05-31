@@ -98,6 +98,12 @@ class ActionTrackingWebController extends Controller
             'canTrackActionV2' => $this->canTrackAction($user, $action) && ! $action->isComposee(),
             'canTrackSubActionsV2' => $action->isComposee() && ($action->isResponsible($user) || $user->isAgent()),
             'canReviewByChefV2' => $this->canReviewByChef($user, $action),
+            // Le responsable VOIT toujours le formulaire (figé si non éditable),
+            // tant que l'action est paramétrée. L'édition dépend de canTrackActionV2.
+            'v2ActionResponsible' => $action->isResponsible($user)
+                && (string) ($action->statut_parametrage ?? '') !== 'a_parametrer'
+                && ! $action->isComposee(),
+            'v2ActionFrozen' => ! $this->isExecutionEditable($action),
             // Compat anciennes clés (encore lues par certaines parties de la vue).
             'canTrackWeekly' => false,
             'canSubmitAssignedSubActions' => false,

@@ -320,16 +320,23 @@
             <p class="action-section-note action-section-note-warning mb-3">Renvoyée pour correction. Motif : <strong>{{ $action->motif_validation_chef ?: '—' }}</strong></p>
         @endif
 
-        {{-- FORMULAIRE AGENT — action simple (quantitative ou non quantitative) --}}
-        @if (($canTrackActionV2 ?? false) && ! $action->isComposee())
-            <form class="mt-2 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.execution.update', $action) }}">
+        {{-- FORMULAIRE AGENT — action simple (quantitative ou non quantitative).
+             Visible tant que l'utilisateur est responsable ; FIGÉ (fieldset disabled)
+             dès la soumission, réouvert uniquement après rejet motivé du chef. --}}
+        @if (($v2ActionResponsible ?? false))
+            @php $v2FormFrozen = ($v2ActionFrozen ?? false); @endphp
+            @if ($v2FormFrozen)
+                <p class="action-section-note mb-2">🔒 Formulaire figé — l'action est soumise. Il se rouvrira uniquement si le chef de service la renvoie pour correction avec motif.</p>
+            @endif
+            <form class="mt-2 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm @if ($v2FormFrozen) opacity-70 @endif" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.execution.update', $action) }}">
                 @csrf
                 @error('general') <p class="field-error mb-2">{{ $message }}</p> @enderror
+                <fieldset @disabled($v2FormFrozen)>
                 <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
                     @if ($action->isQuantitative())
                         <div>
-                            <label for="qr">Quantité réalisée (totale à ce jour) — cible {{ number_format((float) ($action->quantite_cible ?? 0), 1, ',', ' ') }} {{ $action->unite_cible }}</label>
-                            <input id="qr" name="quantite_realisee" type="number" step="0.0001" min="0" value="{{ old('quantite_realisee', $action->quantite_realisee) }}">
+                            <label for="qr">Quantité réalisée (totale à ce jour) — cible {{ number_format((float) ($action->quantite_cible ?? 0), 0, ',', ' ') }} {{ $action->unite_cible }}</label>
+                            <input id="qr" name="quantite_realisee" type="number" step="1" min="0" value="{{ old('quantite_realisee', $action->quantite_realisee !== null ? (int) $action->quantite_realisee : '') }}">
                         </div>
                     @endif
                     @if ($action->allows_difficulty)
@@ -350,10 +357,13 @@
                     <label for="cmt" class="font-semibold">Commentaire @if ($action->requires_comment)<span class="text-xs font-semibold text-red-600">*</span>@else<span class="text-xs font-normal text-slate-400">(optionnel)</span>@endif</label>
                     <textarea id="cmt" name="commentaire" rows="3" class="w-full" placeholder="Décrivez l'avancement.">{{ old('commentaire') }}</textarea>
                 </div>
-                <div class="mt-3 flex flex-wrap gap-2">
-                    <button class="btn btn-secondary" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
-                    <button class="btn btn-primary" type="submit" name="tracking_action" value="submit">Soumettre au chef</button>
-                </div>
+                </fieldset>
+                @unless ($v2FormFrozen)
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <button class="btn btn-secondary" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
+                        <button class="btn btn-primary" type="submit" name="tracking_action" value="submit">Soumettre au chef</button>
+                    </div>
+                @endunless
             </form>
         @endif
 
@@ -364,9 +374,11 @@
                     @php
                         $saPerf = app(\App\Services\Workflow\ActionPerformanceCalculator::class)->subActionPerformance($sa);
                         $saValStatus = (string) ($sa->validation_status ?? 'non_soumise');
+                        // Éditable uniquement si non soumise ou rejetée (gel après soumission).
                         $saEditable = ($canTrackSubActionsV2 ?? false)
-                            && $saValStatus !== 'validee'
-                            && ((int) $sa->agent_id === (int) auth()->id() || ($canReviewByChefV2 ?? false));
+                            && in_array($saValStatus, ['non_soumise', 'rejetee'], true)
+                            && (int) $sa->agent_id === (int) auth()->id();
+                        $saFrozen = $saValStatus === 'soumise';
                     @endphp
                     <article class="rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm">
                         <div class="flex flex-wrap items-start justify-between gap-2">
@@ -374,18 +386,22 @@
                                 <strong>{{ $sa->libelle }}</strong>
                                 <span class="ml-2 anbg-badge anbg-badge-info px-2 py-0.5 text-[11px]">{{ $sa->isQuantitative() ? 'Quantitative' : 'Non quantitative' }}</span>
                                 @if ($sa->weight !== null)<span class="ml-1 text-xs text-slate-500">poids {{ rtrim(rtrim(number_format((float) $sa->weight, 2, ',', ' '), '0'), ',') }}%</span>@endif
-                                <p class="text-sm text-slate-600">Perf : <strong>{{ number_format($saPerf, 1, ',', ' ') }}%</strong> · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
+                                <p class="text-sm text-slate-600">Perf : <strong>{{ number_format($saPerf, 0, ',', ' ') }}%</strong> · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
                             </div>
                         </div>
 
-                        @if ($saEditable && (int) $sa->agent_id === (int) auth()->id())
+                        @if ($saFrozen && (int) $sa->agent_id === (int) auth()->id())
+                            <p class="action-section-note mt-2">🔒 Sous-action soumise — figée jusqu'à la décision du chef.</p>
+                        @endif
+
+                        @if ($saEditable)
                             <form class="mt-3 border-t border-slate-100 pt-3" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.sub-actions.update', [$action, $sa]) }}">
                                 @csrf
                                 <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                                     @if ($sa->isQuantitative())
                                         <div>
-                                            <label>Quantité réalisée — cible {{ number_format((float) ($sa->cible_prevue ?? 0), 1, ',', ' ') }} {{ $sa->unite }}</label>
-                                            <input name="quantite_realisee" type="number" step="0.0001" min="0" value="{{ $sa->quantite_realisee }}">
+                                            <label>Quantité réalisée — cible {{ number_format((float) ($sa->cible_prevue ?? 0), 0, ',', ' ') }} {{ $sa->unite }}</label>
+                                            <input name="quantite_realisee" type="number" step="1" min="0" value="{{ $sa->quantite_realisee !== null ? (int) $sa->quantite_realisee : '' }}">
                                         </div>
                                     @endif
                                     @if ($sa->allows_difficulty)
@@ -512,10 +528,10 @@
                 <dl class="action-fiche-dl mt-2">
                     <dt>Mode évaluation</dt><dd>{{ $modeEvaluationLabel }}</dd>
                     @if ($usesQuantitativeProgress)
-                        <dt>Cible attendue</dt><dd>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 1, ',', ' ') : '-' }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Cible attendue</dt><dd>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 0, ',', ' ') : '-' }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Unité</dt><dd>{{ $action->unite_cible ?: '-' }}</dd>
-                        <dt>Réalisé</dt><dd>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 1, ',', ' ') : '0,0' }} {{ $action->unite_cible ?: '' }}</dd>
-                        <dt>Reste</dt><dd>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 1, ',', ' ') }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Réalisé</dt><dd>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 0, ',', ' ') : '0' }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Reste</dt><dd>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 0, ',', ' ') }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Taux cible</dt><dd>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 1, ',', ' ') }}%</dd>
                         <dt>Dépassement</dt><dd>{{ $overachievementRate > 0 ? '+'.number_format($overachievementRate, 1, ',', ' ').'%' : '-' }}</dd>
                         <dt>Seuil minimum</dt><dd>{{ number_format((float) ($action->seuil_minimum ?? 80), 1, ',', ' ') }}%</dd>

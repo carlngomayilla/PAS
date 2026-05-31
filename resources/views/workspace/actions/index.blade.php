@@ -683,8 +683,8 @@
                                 </div>
                                 @if ($row->usesQuantitativeProgress())
                                     <p class="mt-1 text-xs text-slate-500">
-                                        Cible {{ $row->quantite_cible !== null ? number_format((float) $row->quantite_cible, 1, ',', ' ') : '0' }} {{ $row->unite_cible ?: '' }}
-                                        · Réalisé {{ number_format($realizedValue, 1, ',', ' ') }}
+                                        Cible {{ $row->quantite_cible !== null ? number_format((float) $row->quantite_cible, 0, ',', ' ') : '0' }} {{ $row->unite_cible ?: '' }}
+                                        · Réalisé {{ number_format($realizedValue, 0, ',', ' ') }}
                                     </p>
                                 @else
                                     <p class="mt-1 text-xs text-slate-500">Sous-actions : {{ $semainesRenseignees }}/{{ $semainesTotal }}</p>
