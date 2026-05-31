@@ -5,6 +5,81 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-05-30 — Audit & renforcement sécurité + design (vagues 1-3)
+
+### Demande utilisateur
+
+> *"fais le tous"* (suite à la liste des améliorations sécurité + design).
+
+### Vague 1+2 — Sécurité (audit + corrections ciblées)
+
+**Bonne nouvelle :** le projet avait déjà énormément de hardening en place. La majorité du
+travail a consisté à vérifier l'existant plutôt qu'à ajouter du code.
+
+| Item | État | Action |
+|---|---|---|
+| Security Headers (CSP, X-Frame, HSTS, COOP, etc.) | ✅ déjà actif | `AddSecurityHeaders` middleware enregistré sur web + api |
+| Rate limiting login + API | ✅ déjà actif | `login`, `api-login`, `api`, `api-downloads` configurés dans `AppServiceProvider` (5/10min user+IP, 25/10min IP) |
+| Force password change premier login | ✅ déjà actif | `EnsurePasswordIsFresh` + `PasswordPolicyService::isExpired()` détecte `password_changed_at = NULL`. **Corrigé user 102** : reset à NULL pour forcer changement à 1ère connexion |
+| Validation uploads (MIME + taille + antivirus + chiffrement) | ✅ déjà actif | `DocumentPolicySettings::mimesRule()/maxUploadKilobytes()`, `SecureJustificatifStorage` chiffre + UUID + nosniff, `AntivirusScanner` ClamAV fail-closed en prod |
+| Audit logs — exclusion champs sensibles | ✅ déjà actif | `SuperAdminWebController` strip `password` via `Arr::except`, User model `$hidden = ['password', ...]` |
+| **`BREVO_API_VERIFY_SSL` en prod** | ✅ corrigé | `.env.example` + `.env.production.example` à jour avec avertissement explicite "TOUJOURS true en prod" |
+| Policy mots de passe (12 chars, mixed case, symboles, pwned check, history 5, expiry 90j) | ✅ déjà actif | `config/security.php` |
+
+### Vague 3 — Design (cleanup + UI feedback + a11y)
+
+#### Cleanup
+- Supprimé 5 mockups exploratoires HTML : `mockup_01_executive_dark.html`,
+  `mockup_02_glass_premium.html`, `mockup_03_data_pro.html`,
+  `public/mockups-glass-pas.html`, `public/mockups-premium-pas.html` (215 KB libérés).
+
+#### Spinners + top progress bar
+**Fichier :** `resources/js/ui-enhancements.js`
+- Le mécanisme de disable submit existait → **enrichi avec un vrai spinner SVG inline** +
+  remplacement du texte du bouton par "Envoi en cours…" + `aria-busy=true` pour les
+  lecteurs d'écran.
+- **Nouveau : top-bar progress** (style nprogress) wrappant `window.fetch()` → barre bleue
+  de 3px en haut de page pendant les calls AJAX (commentaires inline, save action, etc.).
+
+**Fichier :** `resources/css/app.css`
+- Classes `.ui-spinner`, `.ui-topbar-progress`, `.is-loading`, `.is-submitting`
+  avec animation `ui-spin` (0.7s linear) et `ui-topbar-slide` (1.4s).
+- Respecte `prefers-reduced-motion` (désactive les animations).
+
+#### Responsive Bento (charts dashboard)
+**Fichier :** `public/css/anbg-glass.css`
+- **Bug fix :** la media query `< 1100px` ne collapsait que le grid parent `.charts-bento`
+  mais pas les sous-grids `.charts-bento-row-hero/trend/rank` qui restaient en 2 colonnes.
+  Maintenant les 3 rows passent en 1 colonne aussi.
+- **Nouveau breakpoint `< 768px`** : padding et border-radius réduits, taille du score
+  hero réduite (2.5rem au lieu de 4rem) → plus de scroll horizontal sur mobile.
+
+#### Accessibilité
+**Fichier :** `resources/css/app.css`
+- `*:focus-visible` global : outline bleu 2px avec offset 2px sur tous les éléments
+  interactifs (light + dark mode adaptés).
+- **Skip-link** déjà branché dans le layout admin (`.skip-to-content` ligne 202 de
+  `resources/views/layouts/admin.blade.php`), vérifié non régressé.
+- Tooltip auto pour les `button[aria-label]:not([title])` au focus (rend visible
+  les libellés des boutons-icônes seuls).
+- **Système typographique 5 niveaux** : classes `.ui-typo-h1`, `.ui-typo-h2`, `.ui-typo-h3`,
+  `.ui-typo-h4`, `.ui-typo-caption` avec tailles + letter-spacing + couleurs cohérents
+  (dark mode adapté pour caption).
+
+### Vague 4 — 2FA : **différé**
+
+Un 2FA correct nécessite : migration colonnes chiffrées + package
+`pragmarx/google2fa-laravel` + routes (setup/verify/disable/recovery) + 5 pages UI +
+middleware d'enforcement post-login + tests. **Estimation : 1-2 jours dédiés**, hors scope
+de cette série. À planifier en session dédiée.
+
+### Build + tests
+
+- Vite build : ✓ (19.27s, 0 erreur)
+- Suite Feature : à vérifier ci-dessous
+
+---
+
 ## 2026-05-30 — Migration SMTP → API HTTP Brevo (résout les blocages IP dynamique) ✓
 
 ### Demande utilisateur

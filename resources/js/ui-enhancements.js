@@ -7,29 +7,94 @@ import { gsap } from 'gsap';
     'use strict';
 
     // ── FORM SUBMIT SPINNER ──────────────────────────────────────────────
-    // Finds the submit button, marks it as loading, disables form resubmit
+    // Finds the submit button, marks it as loading, disables form resubmit,
+    // and shows a visible inline spinner with aria-busy for accessibility.
+    var SPINNER_HTML = '<span class="ui-spinner" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg></span>';
+
     document.addEventListener('submit', function (event) {
         var form = event.target;
         if (!(form instanceof HTMLFormElement)) return;
-        // Skip forms handled by the confirm/prompt dialog
         if (form.dataset.confirmMessage || form.dataset.promptMessage) return;
-        // Skip GET search forms
         if ((form.method || 'get').toLowerCase() === 'get') return;
 
         var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
         if (!submitBtn || submitBtn.dataset.loading) return;
 
         submitBtn.dataset.loading = '1';
+        submitBtn.dataset.originalContent = submitBtn.innerHTML;
+        submitBtn.setAttribute('aria-busy', 'true');
         submitBtn.disabled = true;
+        submitBtn.classList.add('is-loading');
 
-        // Safety: restore after 10s in case of network error / redirect cancel
+        // Replace button content with spinner + "Envoi…" while preserving width
+        var labelText = (submitBtn.textContent || '').trim() || 'Envoi…';
+        if (submitBtn.tagName === 'BUTTON') {
+            submitBtn.innerHTML = SPINNER_HTML + '<span class="ui-spinner-label">Envoi en cours…</span>';
+        } else {
+            submitBtn.value = 'Envoi en cours…';
+        }
+
+        form.setAttribute('aria-busy', 'true');
+        form.classList.add('is-submitting');
+
+        // Safety: restore after 15s in case of network error / redirect cancel
         setTimeout(function () {
             if (submitBtn.dataset.loading) {
                 delete submitBtn.dataset.loading;
                 submitBtn.disabled = false;
+                submitBtn.removeAttribute('aria-busy');
+                submitBtn.classList.remove('is-loading');
+                if (submitBtn.dataset.originalContent !== undefined) {
+                    submitBtn.innerHTML = submitBtn.dataset.originalContent;
+                    delete submitBtn.dataset.originalContent;
+                }
+                form.removeAttribute('aria-busy');
+                form.classList.remove('is-submitting');
             }
-        }, 10000);
+        }, 15000);
     });
+
+    // ── TOP PROGRESS BAR FOR FETCH CALLS ─────────────────────────────────
+    // Lightweight nprogress-style bar for AJAX fetch() calls.
+    var topbar = null;
+    var pendingFetches = 0;
+
+    function ensureTopbar() {
+        if (topbar) return topbar;
+        topbar = document.createElement('div');
+        topbar.className = 'ui-topbar-progress';
+        topbar.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(topbar);
+        return topbar;
+    }
+
+    function startTopbar() {
+        pendingFetches++;
+        var bar = ensureTopbar();
+        bar.classList.add('is-active');
+    }
+
+    function stopTopbar() {
+        pendingFetches = Math.max(0, pendingFetches - 1);
+        if (pendingFetches === 0 && topbar) {
+            topbar.classList.add('is-complete');
+            setTimeout(function () {
+                if (topbar) {
+                    topbar.classList.remove('is-active', 'is-complete');
+                }
+            }, 300);
+        }
+    }
+
+    // Wrap window.fetch to drive the top bar
+    if (typeof window.fetch === 'function' && !window.fetch.__uiWrapped) {
+        var originalFetch = window.fetch.bind(window);
+        window.fetch = function () {
+            startTopbar();
+            return originalFetch.apply(null, arguments).finally(stopTopbar);
+        };
+        window.fetch.__uiWrapped = true;
+    }
 
     // ── FLASH MESSAGE DISMISS ────────────────────────────────────────────
     function fadeRemove(el) {

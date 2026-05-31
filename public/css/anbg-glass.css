@@ -471,6 +471,25 @@ body.anbg-glass-theme .charts-bento-row-rank {
     body.anbg-glass-theme .charts-bento {
         grid-template-columns: 1fr !important;
     }
+    /* Bug fix : les rows internes restaient en 2 colonnes <1100px → stack */
+    body.anbg-glass-theme .charts-bento-row-hero,
+    body.anbg-glass-theme .charts-bento-row-trend,
+    body.anbg-glass-theme .charts-bento-row-rank {
+        grid-template-columns: 1fr !important;
+    }
+}
+@media (max-width: 768px) {
+    body.anbg-glass-theme .charts-bento {
+        gap: 0.75rem !important;
+    }
+    body.anbg-glass-theme .charts-bento .showcase-panel {
+        padding: 0.875rem !important;
+        border-radius: 14px !important;
+    }
+    /* Réduit typo + chart heights sur mobile pour éviter scroll horizontal */
+    body.anbg-glass-theme .charts-hero-panel .charts-hero-score {
+        font-size: 2.5rem !important;
+    }
 }
 
 /* Animation a l'apparition des panels */

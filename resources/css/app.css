@@ -7915,4 +7915,98 @@
         border-color: rgba(148, 163, 184, 0.28);
     }
 
+/* ─── ACCESSIBILITY BASELINE (a11y) ──────────────────────────────────── */
+/* Focus visible global — bordure bleue claire visible sur tous les éléments
+   interactifs, y compris ceux qui surchargent l'outline natif. */
+*:focus-visible {
+    outline: 2px solid #3b82f6 !important;
+    outline-offset: 2px !important;
+    border-radius: 3px;
+}
+.dark *:focus-visible {
+    outline-color: #60a5fa !important;
+}
+/* Garantit que les icônes seules ont un aria-label visible (au focus) */
+button[aria-label]:not([title]):focus-visible::after,
+a[aria-label]:not([title]):focus-visible::after {
+    content: attr(aria-label);
+    position: absolute;
+    background: #0f172a;
+    color: #fff;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-top: 1.75rem;
+    white-space: nowrap;
+    z-index: 100;
+}
+/* Système typographique cohérent — 4 niveaux fixes pour titres de section */
+.ui-typo-h1 { font-size: 1.75rem; line-height: 2.25rem; font-weight: 700; letter-spacing: -0.025em; }
+.ui-typo-h2 { font-size: 1.375rem; line-height: 1.875rem; font-weight: 700; letter-spacing: -0.02em; }
+.ui-typo-h3 { font-size: 1.125rem; line-height: 1.625rem; font-weight: 600; }
+.ui-typo-h4 { font-size: 0.9375rem; line-height: 1.4rem; font-weight: 600; letter-spacing: 0.01em; }
+.ui-typo-caption { font-size: 0.75rem; line-height: 1rem; color: #64748b; }
+.dark .ui-typo-caption { color: #94a3b8; }
+
+/* ─── UI SPINNER & TOP PROGRESS BAR ──────────────────────────────────── */
+.ui-spinner {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+.ui-spinner svg {
+    animation: ui-spin 0.7s linear infinite;
+}
+.ui-spinner-label {
+    vertical-align: middle;
+}
+@keyframes ui-spin {
+    to { transform: rotate(360deg); }
+}
+
+button.is-loading,
+input[type="submit"].is-loading {
+    cursor: progress !important;
+    opacity: 0.85;
+}
+
+form.is-submitting {
+    cursor: progress;
+}
+
+/* Top-bar progress for fetch() AJAX calls — nprogress-style */
+.ui-topbar-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 50%, #3b82f6 100%);
+    background-size: 200% 100%;
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    transition: transform 0.2s ease-out, opacity 0.2s ease;
+    opacity: 0;
+    z-index: 9999;
+    pointer-events: none;
+}
+.ui-topbar-progress.is-active {
+    transform: scaleX(0.7);
+    opacity: 1;
+    animation: ui-topbar-slide 1.4s linear infinite;
+}
+.ui-topbar-progress.is-complete {
+    transform: scaleX(1);
+    opacity: 0;
+}
+@keyframes ui-topbar-slide {
+    0%   { background-position: 0% 0; }
+    100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ui-spinner svg,
+    .ui-topbar-progress.is-active { animation: none; }
+}
+
 }
