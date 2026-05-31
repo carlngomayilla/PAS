@@ -126,6 +126,14 @@ class PlanningModificationLockService
             return true;
         }
 
+        // RÈGLE V2 (2026-05-31) : une ACTION verrouillée n'est PLUS modifiable
+        // directement par la direction / le chef de service. Sa modification
+        // exige le circuit chef → directeur → planification → DG. Le bypass
+        // direction/chef ci-dessous ne s'applique donc qu'aux PAS / PTA.
+        if ($target instanceof Action) {
+            return false;
+        }
+
         [$directionId, $serviceId] = $this->targetScope($target);
 
         // 3. Direction : bypass uniquement dans SA direction.
@@ -196,7 +204,7 @@ class PlanningModificationLockService
         return $user->hasRole(User::ROLE_DG);
     }
 
-    public function requestUnlock(Model $target, User $requester, string $reason): PlanningUnlockRequest
+    public function requestUnlock(Model $target, User $requester, string $reason, ?string $justificatifPath = null): PlanningUnlockRequest
     {
         if (! $this->supports($target)) {
             throw new InvalidArgumentException('Type de cible non pris en charge.');
@@ -205,7 +213,7 @@ class PlanningModificationLockService
         $pending = PlanningUnlockRequest::query()
             ->where('target_type', $target::class)
             ->where('target_id', (int) $target->getKey())
-            ->where('status', PlanningUnlockRequest::STATUS_SOUMISE)
+            ->whereIn('status', [PlanningUnlockRequest::STATUS_SOUMISE, PlanningUnlockRequest::STATUS_TRANSMISE])
             ->first();
 
         if ($pending instanceof PlanningUnlockRequest) {
@@ -223,6 +231,7 @@ class PlanningModificationLockService
             'service_id' => $serviceId,
             'requested_by' => (int) $requester->id,
             'reason' => trim($reason),
+            'justificatif_path' => $justificatifPath,
             'status' => PlanningUnlockRequest::STATUS_SOUMISE,
             'metadata' => [
                 'locked_at' => optional($target->getAttribute('modification_locked_at'))->toDateTimeString(),
@@ -230,15 +239,68 @@ class PlanningModificationLockService
             ],
         ]);
 
-        $this->notifyDg($unlockRequest, $requester);
+        // Circuit V2 : la demande part d'abord vers le DIRECTEUR de la direction.
+        $this->notifyDirecteur($unlockRequest, $requester);
 
         return $unlockRequest;
+    }
+
+    /**
+     * Étape directeur : transfère la demande à la Planification (avis) + DG (décision).
+     */
+    public function transferByDirecteur(PlanningUnlockRequest $unlockRequest, User $directeur, ?string $comment = null): void
+    {
+        if (! $this->canTransfer($directeur, $unlockRequest)) {
+            abort(403, 'Seul le directeur de la direction concernée peut transférer cette demande.');
+        }
+
+        if ((string) $unlockRequest->status !== PlanningUnlockRequest::STATUS_SOUMISE) {
+            abort(409, 'Cette demande n\'est plus en attente de transfert.');
+        }
+
+        $unlockRequest->forceFill([
+            'status' => PlanningUnlockRequest::STATUS_TRANSMISE,
+            'transferred_by' => (int) $directeur->id,
+            'transferred_at' => now(),
+            'transfer_comment' => ($value = trim((string) $comment)) !== '' ? $value : null,
+        ])->save();
+
+        $this->notifyPlanifAndDg($unlockRequest, $directeur);
+    }
+
+    /**
+     * Étape planification : avis CONSULTATIF (ne décide pas). Notifie le DG.
+     */
+    public function recordPlanifAvis(PlanningUnlockRequest $unlockRequest, User $planif, string $avis, ?string $comment = null): void
+    {
+        if (! $this->canGivePlanifAvis($planif)) {
+            abort(403, 'Seule la Planification peut émettre un avis.');
+        }
+
+        if ((string) $unlockRequest->status !== PlanningUnlockRequest::STATUS_TRANSMISE) {
+            abort(409, 'Cette demande n\'attend pas d\'avis de la Planification.');
+        }
+
+        $unlockRequest->forceFill([
+            'planif_avis' => $avis === PlanningUnlockRequest::AVIS_FAVORABLE
+                ? PlanningUnlockRequest::AVIS_FAVORABLE
+                : PlanningUnlockRequest::AVIS_DEFAVORABLE,
+            'planif_avis_by' => (int) $planif->id,
+            'planif_avis_at' => now(),
+            'planif_comment' => ($value = trim((string) $comment)) !== '' ? $value : null,
+        ])->save();
+
+        $this->notifyDgAfterAvis($unlockRequest, $planif);
     }
 
     public function approve(PlanningUnlockRequest $unlockRequest, User $reviewer, ?string $comment = null, ?Carbon $unlockedUntil = null): void
     {
         if (! $this->isUnlockReviewer($reviewer)) {
             abort(403, 'Seul le DG peut approuver un deverrouillage.');
+        }
+
+        if ((string) $unlockRequest->status !== PlanningUnlockRequest::STATUS_TRANSMISE) {
+            abort(409, 'La demande doit être transférée par le directeur avant décision du DG.');
         }
 
         $target = $unlockRequest->target;
@@ -271,6 +333,10 @@ class PlanningModificationLockService
             abort(403, 'Seul le DG peut rejeter un deverrouillage.');
         }
 
+        if ((string) $unlockRequest->status !== PlanningUnlockRequest::STATUS_TRANSMISE) {
+            abort(409, 'La demande doit être transférée par le directeur avant décision du DG.');
+        }
+
         $unlockRequest->forceFill([
             'status' => PlanningUnlockRequest::STATUS_REJETEE,
             'decision' => PlanningUnlockRequest::DECISION_REJETER,
@@ -280,6 +346,30 @@ class PlanningModificationLockService
         ])->save();
 
         $this->notifyRequester($unlockRequest, false, $reviewer);
+    }
+
+    /**
+     * Le directeur de la direction de la cible peut transférer (ou SA/admin).
+     */
+    public function canTransfer(User $user, PlanningUnlockRequest $unlockRequest): bool
+    {
+        if ($user->isSuperAdmin() || $user->hasRole(User::ROLE_ADMIN, User::ROLE_ADMIN_FONCTIONNEL)) {
+            return true;
+        }
+
+        return $user->hasRole(User::ROLE_DIRECTION)
+            && $user->direction_id !== null
+            && (int) $user->direction_id === (int) $unlockRequest->direction_id;
+    }
+
+    public function canGivePlanifAvis(User $user): bool
+    {
+        return $user->hasRole(
+            User::ROLE_PLANIFICATION,
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ
+        );
     }
 
     public function targetHumanName(Model $target): string
@@ -338,12 +428,38 @@ class PlanningModificationLockService
         return [null, null];
     }
 
-    private function notifyDg(PlanningUnlockRequest $unlockRequest, User $requester): void
+    /**
+     * Circuit V2 — étape 1 : notifier le directeur de la direction concernée.
+     */
+    private function notifyDirecteur(PlanningUnlockRequest $unlockRequest, User $requester): void
     {
-        // Regle metier ANBG (2026-05-29) : la demande de modification d'action est
-        // transmise au DG (qui decide) ET au service Planification en copie pour
-        // information / suivi global. Les SCIQ recoivent aussi l'info car ils
-        // pilotent le controle qualite des PAS/PAO/PTA.
+        $recipients = User::query()
+            ->where('role', User::ROLE_DIRECTION)
+            ->where('is_active', true)
+            ->when($unlockRequest->direction_id !== null, fn ($q) => $q->where('direction_id', (int) $unlockRequest->direction_id))
+            ->get();
+
+        $this->notifyUsers(
+            $recipients,
+            [
+                'title' => 'Demande de modification à transférer',
+                'message' => sprintf('%s demande la modification de %s. À transférer à la Planification et à la DG.', $requester->name, (string) $unlockRequest->target_label),
+                'module' => 'gouvernance',
+                'entity_type' => 'planning_unlock_request',
+                'entity_id' => $unlockRequest->id,
+                'url' => route('workspace.planning-unlocks.index'),
+                'icon' => 'lock-keyhole',
+                'status' => 'warning',
+                'priority' => 'high',
+            ]
+        );
+    }
+
+    /**
+     * Circuit V2 — étape 2 : le directeur a transféré → Planification (avis) + DG (décision).
+     */
+    private function notifyPlanifAndDg(PlanningUnlockRequest $unlockRequest, User $directeur): void
+    {
         $recipients = User::query()
             ->whereIn('role', [User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_SCIQ])
             ->where('is_active', true)
@@ -352,13 +468,39 @@ class PlanningModificationLockService
         $this->notifyUsers(
             $recipients,
             [
-                'title' => 'Demande de modification',
-                'message' => sprintf('%s demande la modification de %s.', $requester->name, (string) $unlockRequest->target_label),
+                'title' => 'Demande de modification transmise',
+                'message' => sprintf('%s (direction) a transmis une demande de modification de %s. Avis Planification puis décision DG attendus.', $directeur->name, (string) $unlockRequest->target_label),
                 'module' => 'gouvernance',
                 'entity_type' => 'planning_unlock_request',
                 'entity_id' => $unlockRequest->id,
                 'url' => route('workspace.planning-unlocks.index'),
-                'icon' => 'lock-keyhole',
+                'icon' => 'send',
+                'status' => 'info',
+                'priority' => 'high',
+            ]
+        );
+    }
+
+    /**
+     * Circuit V2 — étape 3 : avis Planification rendu → notifier le DG pour décision.
+     */
+    private function notifyDgAfterAvis(PlanningUnlockRequest $unlockRequest, User $planif): void
+    {
+        $recipients = User::query()
+            ->where('role', User::ROLE_DG)
+            ->where('is_active', true)
+            ->get();
+
+        $this->notifyUsers(
+            $recipients,
+            [
+                'title' => 'Avis Planification rendu — décision DG attendue',
+                'message' => sprintf('Avis « %s » de la Planification sur la modification de %s. Votre décision est attendue.', (string) $unlockRequest->planif_avis, (string) $unlockRequest->target_label),
+                'module' => 'gouvernance',
+                'entity_type' => 'planning_unlock_request',
+                'entity_id' => $unlockRequest->id,
+                'url' => route('workspace.planning-unlocks.index'),
+                'icon' => 'gavel',
                 'status' => 'warning',
                 'priority' => 'high',
             ]

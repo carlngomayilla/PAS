@@ -58,6 +58,63 @@ Le grid `auto-fit minmax(220px, 1fr)` empilait 5 champs (quantité + résultat +
 
 ---
 
+## 2026-05-31 — Circuit de modification d'action (Chef → Directeur → Planif → DG)
+
+### Demande utilisateur
+
+> *"JE NE VEUX PLUS QUE L'ACTION SOIT MODIFIABLE APRÈS ENREGISTREMENT CAR SA MODIFICATION
+> NE SERA QUE SOUS DEMANDE DE REPORT D'ÉCHÉANCE PAR LE CHEF DE SERVICE AVEC JUSTIFICATIF
+> ADRESSÉE À SON DIRECTEUR QUI VA TRANSFÉRER À LA PLANIFICATION ET À LA DG POUR ACCORD OU
+> REJET MOTIVÉ ET SI ELLE ACCORDE L'ACTION POURRA REVENIR EN ÉCRITURE..."*
+
+### Circuit implémenté
+
+```
+Action enregistrée au PTA → FIGÉE
+   ↓
+Chef de service/unité : « Demande de modification » (+ justificatif optionnel)
+   ↓ statut = soumise
+Directeur de la direction : transfère
+   ↓ statut = transmise
+Planification : avis CONSULTATIF (favorable / défavorable)
+   ↓ (l'avis ne tranche pas)
+DG : décision (approuver / rejeter motivé)
+   ↓ si approuvé
+Action DÉVERROUILLÉE → modifiable par le chef au niveau du PTA
+```
+
+### Changements
+
+1. **Migration** : `planning_unlock_requests` + `transferred_by/at`, `transfer_comment`,
+   `planif_avis/_by/_at`, `planif_comment`, `justificatif_path`.
+2. **`PlanningUnlockRequest`** : statut `transmise`, constantes `AVIS_*`, relations
+   `transferredBy` / `planifReviewer`.
+3. **`PlanningModificationLockService`** :
+   - `requestUnlock` notifie désormais le **directeur** (plus le DG directement) + justificatif.
+   - Nouveau `transferByDirecteur` (→ notifie Planif + DG).
+   - Nouveau `recordPlanifAvis` (avis consultatif → notifie DG).
+   - `approve` / `reject` exigent le statut `transmise` (le DG ne peut décider qu'après transfert).
+   - `canTransfer` (directeur de la direction), `canGivePlanifAvis` (Planification).
+   - **`canBypassLock` : une ACTION verrouillée n'est plus modifiable par le chef/direction**
+     — bypass conservé uniquement pour PAS/PTA. L'action exige le circuit.
+4. **`PlanningUnlockWebController`** : `transferByDirecteur`, `reviewByPlanification`,
+   upload justificatif dans `storeForTarget`.
+5. **Routes** : `planning-unlocks.transfer`, `planning-unlocks.planif` (+ `.dg` existante).
+6. **UI** : page « Demandes de modification » refondue (suivi du circuit + bouton par étape
+   selon rôle/statut). Texte du bouton « Demande de modification » du PTA mis à jour.
+
+### Tests
+- `PlanningUnlockCircuitV2Test` : 3 verts (circuit complet, ordre imposé, périmètre directeur).
+- `PlanningModificationLockWorkflowTest` : test mis à jour (chef ne peut plus modifier une
+  action verrouillée → 409).
+
+### Note
+- Justificatif à l'appui : backend prêt (upload chiffré). Depuis le PTA, le bouton utilise
+  encore un prompt (motif seul) ; l'upload se fait via la page « Demandes de modification ».
+  Un mini-formulaire avec fichier pourra remplacer le prompt dans une itération suivante.
+
+---
+
 ## 2026-05-31 — Workflow de suivi V2 : reconstruction (P1 → P5 + UI)
 
 > Branche `feature/reset-action-workflow`. Spec : docs/WORKFLOW-SUIVI-V2.md.

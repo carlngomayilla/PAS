@@ -960,7 +960,7 @@
                             return;
                         }
                         var reason = window.prompt(
-                            "Motif de la demande de modification (min 5 caracteres) :\n\nLa demande sera transmise au DG. Le service Planification sera également notifié.",
+                            "Motif de la demande de modification (min 5 caracteres) :\n\nCircuit : votre demande part au DIRECTEUR, qui la transfère à la Planification (avis) puis à la DG (décision). Si accord, l'action redevient modifiable.\n\n(Pour joindre un justificatif, rendez-vous sur la page Demandes de modification.)",
                             ''
                         );
                         if (reason === null) return;
@@ -982,7 +982,7 @@
                             target.disabled = false;
                             target.textContent = 'Demande de modification';
                             if (resp.ok || resp.redirected) {
-                                flashActionMessage(blockReq, false, 'Demande envoyee au DG (Planification en copie).');
+                                flashActionMessage(blockReq, false, 'Demande envoyée au directeur pour transfert à la Planification et à la DG.');
                             } else {
                                 flashActionMessage(blockReq, true, 'Echec de l\'envoi (HTTP ' + resp.status + ').');
                             }

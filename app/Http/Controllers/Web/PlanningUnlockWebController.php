@@ -10,7 +10,9 @@ use App\Models\Pas;
 use App\Models\PlanningUnlockRequest;
 use App\Models\Pta;
 use App\Models\User;
+use App\Services\DocumentPolicySettings;
 use App\Services\PlanningModificationLockService;
+use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,6 +49,8 @@ class PlanningUnlockWebController extends Controller
         return view('workspace.planning-unlocks.index', [
             'rows' => $query->paginate(20)->withQueryString(),
             'canReview' => $this->locks->isUnlockReviewer($user),
+            'canGivePlanifAvis' => $this->locks->canGivePlanifAvis($user),
+            'currentUser' => $user,
         ]);
     }
 
@@ -63,6 +67,63 @@ class PlanningUnlockWebController extends Controller
     public function storeAction(Request $request, Action $action): RedirectResponse
     {
         return $this->storeForTarget($request, $action);
+    }
+
+    /**
+     * Circuit V2 — étape directeur : transfère la demande à Planif + DG.
+     */
+    public function transferByDirecteur(Request $request, PlanningUnlockRequest $planningUnlockRequest): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        if (! $this->locks->canTransfer($user, $planningUnlockRequest)) {
+            abort(403, 'Seul le directeur de la direction concernée peut transférer cette demande.');
+        }
+
+        $validated = $request->validate([
+            'transfer_comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $before = $planningUnlockRequest->toArray();
+        $this->locks->transferByDirecteur($planningUnlockRequest, $user, $validated['transfer_comment'] ?? null);
+        $planningUnlockRequest->refresh();
+        $this->recordAudit($request, 'planning_unlock', 'directeur_transfer', $planningUnlockRequest, $before, $planningUnlockRequest->toArray());
+
+        return redirect()
+            ->route('workspace.planning-unlocks.index')
+            ->with('success', 'Demande transmise à la Planification et à la DG.');
+    }
+
+    /**
+     * Circuit V2 — étape planification : avis consultatif.
+     */
+    public function reviewByPlanification(Request $request, PlanningUnlockRequest $planningUnlockRequest): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        if (! $this->locks->canGivePlanifAvis($user)) {
+            abort(403, 'Seule la Planification peut émettre un avis.');
+        }
+
+        $validated = $request->validate([
+            'planif_avis' => ['required', 'in:favorable,defavorable'],
+            'planif_comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $before = $planningUnlockRequest->toArray();
+        $this->locks->recordPlanifAvis($planningUnlockRequest, $user, (string) $validated['planif_avis'], $validated['planif_comment'] ?? null);
+        $planningUnlockRequest->refresh();
+        $this->recordAudit($request, 'planning_unlock', 'planif_avis', $planningUnlockRequest, $before, $planningUnlockRequest->toArray());
+
+        return redirect()
+            ->route('workspace.planning-unlocks.index')
+            ->with('success', 'Avis de la Planification enregistré. La DG va statuer.');
     }
 
     public function reviewByDg(Request $request, PlanningUnlockRequest $planningUnlockRequest): RedirectResponse
@@ -125,9 +186,17 @@ class PlanningUnlockWebController extends Controller
 
         $validated = $request->validate([
             'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'justificatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
         ]);
 
-        $unlockRequest = $this->locks->requestUnlock($target, $user, (string) $validated['reason']);
+        // Justificatif à l'appui (optionnel mais recommandé), stocké chiffré.
+        $justificatifPath = null;
+        if ($request->hasFile('justificatif')) {
+            $stored = app(SecureJustificatifStorage::class)->store($request->file('justificatif'), 'unlock-requests/'.date('Y/m'));
+            $justificatifPath = $stored['path'];
+        }
+
+        $unlockRequest = $this->locks->requestUnlock($target, $user, (string) $validated['reason'], $justificatifPath);
         $this->recordAudit(
             $request,
             'planning_unlock',
@@ -137,6 +206,6 @@ class PlanningUnlockWebController extends Controller
             $unlockRequest->toArray()
         );
 
-        return back()->with('success', 'Demande de déverrouillage transmise au DG.');
+        return back()->with('success', 'Demande de modification transmise au directeur pour transfert à la Planification et la DG.');
     }
 }
