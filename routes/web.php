@@ -254,6 +254,11 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.quick-status');
             Route::post('actions/{action}/demandes-deverrouillage', [PlanningUnlockWebController::class, 'storeAction'])
                 ->name('actions.unlock-requests.store');
+            // Circuit V2 : directeur transfère → planification donne avis → DG décide.
+            Route::post('demandes-deverrouillage/{planningUnlockRequest}/transfert', [PlanningUnlockWebController::class, 'transferByDirecteur'])
+                ->name('planning-unlocks.transfer');
+            Route::post('demandes-deverrouillage/{planningUnlockRequest}/avis-planif', [PlanningUnlockWebController::class, 'reviewByPlanification'])
+                ->name('planning-unlocks.planif');
             Route::post('demandes-deverrouillage/{planningUnlockRequest}/dg', [PlanningUnlockWebController::class, 'reviewByDg'])
                 ->name('planning-unlocks.dg');
 
