@@ -58,6 +58,231 @@ Le grid `auto-fit minmax(220px, 1fr)` empilait 5 champs (quantité + résultat +
 
 ---
 
+## 2026-05-31 — Circuit de modification d'action (Chef → Directeur → Planif → DG)
+
+### Demande utilisateur
+
+> *"JE NE VEUX PLUS QUE L'ACTION SOIT MODIFIABLE APRÈS ENREGISTREMENT CAR SA MODIFICATION
+> NE SERA QUE SOUS DEMANDE DE REPORT D'ÉCHÉANCE PAR LE CHEF DE SERVICE AVEC JUSTIFICATIF
+> ADRESSÉE À SON DIRECTEUR QUI VA TRANSFÉRER À LA PLANIFICATION ET À LA DG POUR ACCORD OU
+> REJET MOTIVÉ ET SI ELLE ACCORDE L'ACTION POURRA REVENIR EN ÉCRITURE..."*
+
+### Circuit implémenté
+
+```
+Action enregistrée au PTA → FIGÉE
+   ↓
+Chef de service/unité : « Demande de modification » (+ justificatif optionnel)
+   ↓ statut = soumise
+Directeur de la direction : transfère
+   ↓ statut = transmise
+Planification : avis CONSULTATIF (favorable / défavorable)
+   ↓ (l'avis ne tranche pas)
+DG : décision (approuver / rejeter motivé)
+   ↓ si approuvé
+Action DÉVERROUILLÉE → modifiable par le chef au niveau du PTA
+```
+
+### Changements
+
+1. **Migration** : `planning_unlock_requests` + `transferred_by/at`, `transfer_comment`,
+   `planif_avis/_by/_at`, `planif_comment`, `justificatif_path`.
+2. **`PlanningUnlockRequest`** : statut `transmise`, constantes `AVIS_*`, relations
+   `transferredBy` / `planifReviewer`.
+3. **`PlanningModificationLockService`** :
+   - `requestUnlock` notifie désormais le **directeur** (plus le DG directement) + justificatif.
+   - Nouveau `transferByDirecteur` (→ notifie Planif + DG).
+   - Nouveau `recordPlanifAvis` (avis consultatif → notifie DG).
+   - `approve` / `reject` exigent le statut `transmise` (le DG ne peut décider qu'après transfert).
+   - `canTransfer` (directeur de la direction), `canGivePlanifAvis` (Planification).
+   - **`canBypassLock` : une ACTION verrouillée n'est plus modifiable par le chef/direction**
+     — bypass conservé uniquement pour PAS/PTA. L'action exige le circuit.
+4. **`PlanningUnlockWebController`** : `transferByDirecteur`, `reviewByPlanification`,
+   upload justificatif dans `storeForTarget`.
+5. **Routes** : `planning-unlocks.transfer`, `planning-unlocks.planif` (+ `.dg` existante).
+6. **UI** : page « Demandes de modification » refondue (suivi du circuit + bouton par étape
+   selon rôle/statut). Texte du bouton « Demande de modification » du PTA mis à jour.
+
+### Tests
+- `PlanningUnlockCircuitV2Test` : 3 verts (circuit complet, ordre imposé, périmètre directeur).
+- `PlanningModificationLockWorkflowTest` : test mis à jour (chef ne peut plus modifier une
+  action verrouillée → 409).
+
+### Justificatif depuis le PTA (modal)
+- Le bouton « Demande de modification » du PTA ouvre désormais un **modal** (motif obligatoire
+  + justificatif fichier optionnel) au lieu d'un simple prompt. Envoi AJAX multipart vers
+  `actions.unlock-requests.store`. Le justificatif est stocké chiffré (`unlock-requests/Y/m`).
+- Modal accessible (role=dialog, aria-modal), fermeture par overlay/Annuler, dark mode.
+  CSS `.modif-modal-overlay` / `.modif-modal-card` dans app.css.
+
+---
+
+## 2026-05-31 — Workflow de suivi V2 : reconstruction (P1 → P5 + UI)
+
+> Branche `feature/reset-action-workflow`. Spec : docs/WORKFLOW-SUIVI-V2.md.
+> Reconstruction du workflow de suivi après le reset, selon l'architecture co-validée.
+
+### P1 — Migration BDD
+- `actions` : + `type_action`, `requires_comment`, `allows_difficulty`, `official_progress_percent`.
+- `sous_actions` : + `sub_action_type`, `weight`, `requires_proof`, `requires_comment`,
+  `allows_difficulty`, `official_progress_percent`, `validation_status`.
+- Mapping auto des 66 actions existantes : 65 quantitative + 1 composée.
+  Migration réversible.
+
+### P2 — Modèles + calculateur
+- `Action` : constantes `TYPE_QUANTITATIVE|NON_QUANTITATIVE|COMPOSEE`, helpers
+  `resolvedTypeAction()`, `isQuantitative/isNonQuantitative/isComposee`, `typeActionLabel()`.
+- `SousAction` : `TYPE_*`, `VALIDATION_*`, `resolvedType()`, `isQuantitative()`.
+- **`App\Services\Workflow\ActionPerformanceCalculator`** (service PUR, sans BDD) :
+  perf provisoire par type, paliers (critique<50 / alerte<80 / acceptable<100 / atteinte / dépassée),
+  statut temporel, conformité, calcul pondéré composée. **19 tests unitaires.**
+
+### P3 — Formulaire PTA V2
+- Select **type_action** pilote (mappé vers mode_evaluation en backend).
+- Cases conformité action : commentaire obligatoire, champ difficulté.
+- Sous-actions enrichies : type, **poids %**, justificatif/commentaire/difficulté + compteur Σ poids live.
+- JS : affichage conditionnel par type + compteur poids (vert si =100%).
+- Validation backend (StorePtaRequest + UpdatePtaRequest + upsertActionInline) :
+  mapping, normalisation, **Σ poids = 100% obligatoire**.
+- Persistance : syncPtaActions + syncPlannedSubActions enrichis.
+
+### P4/P5 — Suivi opérationnel (backend + UI)
+- **`App\Services\Workflow\ActionWorkflowService`** : orchestrateur du cycle
+  save → submit → validate.
+  - `recordActionProgress` / `recordSubActionProgress` : brouillon + perf provisoire.
+  - `submitAction` / `submitSubAction` : conformité vérifiée → soumise_chef.
+  - `reviewAction` / `reviewSubAction` : valider (officialise `official_progress_percent`) / rejeter (motif).
+  - `refreshCompositeParent` : action composée clôturée AUTO quand toutes sous-actions validées
+    (perf = Σ pondérée).
+- `ActionTrackingWebController` : méthodes `updateActionProgress`, `updateSubActionProgress`,
+  `reviewItem` + helpers d'autorisation V2 (`canTrackAction`, `canTrackSubAction`, `canReviewByChef`).
+- Routes : `actions.execution.update`, `actions.sub-actions.update`, `actions.review` réactivées
+  (les routes legacy non ré-implémentées restent en 410).
+- **UI** (suivi.blade.php) : section « Suivi de l'action » avec perf officielle (en avant) +
+  provisoire, badges type/perf/temporel, formulaire agent (simple ou par sous-action),
+  validation chef par sous-action ou globale. Saisie quantitative en **remplacement** (total à ce jour).
+
+### Décisions UX validées
+- Affichage : 2 performances, officielle en avant.
+- Action composée : validation par sous-action → clôture auto du parent.
+- Saisie quantitative : remplacement (quantité totale à ce jour).
+
+### Tests
+- 19 unit (calculateur) + 7 feature (cycle V2 + rendu UI) + 20 PTA.
+- Suite Feature complète : objectif 0 régression (en cours de vérification).
+
+### Reste à faire
+- P7 : Reporting → basculer les stats consolidées sur `official_progress_percent`.
+- P8 : Recette visuelle utilisateur (navigateur) + tests E2E complémentaires.
+
+---
+
+## 2026-05-31 — RESET COMPLET du workflow de suivi action/sous-action (branche dédiée)
+
+### Demande utilisateur
+
+> *"JE VEUX QUE TU SUPRIME TOUTE LA LOGIQUE DU WORKFLO DE SUIVI DE L'ACTION OU SOUS ACTION
+> DE TOUT TYPE ET ON VA LA REFAIR PROMENT TOI E MOI"*
+
+Travail effectué sur **branche `feature/reset-action-workflow`** (main intact).
+
+### Périmètre
+
+**SUPPRIMÉ :**
+- Saisie de progression quantitative (parent action)
+- Saisie + soumission des sous-actions par l'agent
+- Validation chef de service (sous-action + clôture action)
+- Validation direction (déjà supprimée dans une session précédente, stubs nettoyés)
+- Signalement et résolution d'anomalies
+- Demandes de report d'échéance (création + avis SCIQ + décision DG)
+- Bascule auto vers chef à la saisie
+
+**PRÉSERVÉ (intact) :**
+- Création / édition d'action via le formulaire PTA
+- Workflow stratégique PAS → PAO → PTA (approbations)
+- Workflow financement DAF → DG (séparé du suivi)
+- Téléchargement / preview des justificatifs
+- Fil de discussion / commentaires sur l'action
+- Infrastructure notifications (BrevoMailService, NotificationPolicySettings,
+  WorkspaceNotificationService)
+- Modèles + colonnes BDD (Action, SousAction, ActionLog, etc.)
+
+### Code supprimé / nettoyé
+
+| Fichier | Avant | Après | Δ |
+|---|---|---|---|
+| `app/Http/Controllers/Web/ActionTrackingWebController.php` | 1625 | 527 | -1098 |
+| `app/Services/Actions/ActionTrackingService.php` | 1660 | 1319 | -341 |
+| `app/Services/Actions/DeadlineExtensionRequestService.php` | 245 | **supprimé** | -245 |
+| `app/Http/Controllers/Api/ActionValidationController.php` | 120 | 25 (stub 410) | -95 |
+| `resources/views/workspace/actions/suivi.blade.php` | 1227 | 736 | -491 |
+| Routes web tracking (web.php) | 14 routes | 1 active + 10 stubs 410 | nettoyé |
+| Tests obsolètes supprimés | — | — | -1763 |
+
+**Tests supprimés (4 fichiers) :**
+- `tests/Feature/ActionWorkflowSecurityTest.php` (1078 lignes)
+- `tests/Feature/ActionNotificationWorkflowTest.php` (180)
+- `tests/Feature/DeadlineExtensionRequestWorkflowTest.php` (193)
+- `tests/Feature/ActionAnomalyAlertWorkflowTest.php` (312)
+
+**Test ajusté :**
+- `tests/Feature/ActionFinancingWorkflowTest.php` : remplacement des appels
+  `reviewClosureByChef` par des `forceFill(financement_statut)` pour préserver
+  l'initialisation du scénario financement.
+
+### Routes (web)
+
+Routes actives (workspace.actions.*) :
+- `GET suivi` → page lecture seule
+- `POST commentaires` → fil discussion
+- `POST financement/daf`, `POST financement/daf/statut`, `POST financement/dg`
+- `GET justificatifs/{j}/download`, `GET justificatifs/{j}/preview`
+
+Routes stubs (retournent **HTTP 410 Gone** avec message explicite) :
+- `sous-actions/{sa}` (update + review)
+- `execution`, `review`, `review-direction`
+- `anomalies` (signal + resolve)
+- `reports-echeance` + `reports-echeance/{r}/sciq` + `/dg`
+- `semaines/{w}/soumettre` (legacy weekly)
+
+### Reset BDD effectué
+
+```
+Actions reset       : 66 (libellés/dates/responsables intacts)
+Sous-actions reset  : 2  (libellés/dates intacts)
+Justificatifs delete: 0  (aucune pièce de catégorie suivi en base)
+ActionLogs delete   : 4  (traces des tests de notification)
+deadline_extension_requests : vidée
+```
+
+Champs Action reset à valeurs initiales :
+`statut='non_demarre'`, `statut_dynamique='non_demarre'`, `statut_validation='non_soumise'`,
+`statut_parametrage='a_parametrer'`, `quantite_realisee=0`, `progression_*=0`,
+`date_fin_reelle=NULL`, `soumise_le=NULL`, `evalue_le=NULL`, `evalue_par=NULL`,
+`rapport_final=NULL`, `difficultes_rencontrees=NULL`, `motif_validation_chef=NULL`.
+
+Champs SousAction reset :
+`statut='non_demarre'`, `est_effectuee=false`, `date_realisation=NULL`, `completed_at=NULL`,
+`quantite_realisee=0`, `taux_realisation=0`, `taux_execution=0`, `resultat_obtenu=NULL`,
+`commentaire=NULL`.
+
+### Validation
+
+- Lint PHP (4 fichiers touchés) : 0 erreur
+- Vite build : ✓ 17.76s, 0 erreur
+- Suite Feature complète : en cours d'exécution
+
+### À faire (suite logique)
+
+La refonte du workflow opérationnel se fera sur cette même branche
+`feature/reset-action-workflow` à travers une nouvelle spec à co-construire :
+1. Spec métier détaillée (états, transitions, règles, qui fait quoi quand)
+2. Migration / nouvelles colonnes si besoin
+3. Implémentation incrémentale (controllers → services → vues → tests)
+4. Merge dans main après recette utilisateur
+
+---
+
 ## 2026-05-31 — Justificatif TOUJOURS obligatoire à la soumission (tous types)
 
 ### Demande utilisateur

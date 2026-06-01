@@ -254,6 +254,11 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.quick-status');
             Route::post('actions/{action}/demandes-deverrouillage', [PlanningUnlockWebController::class, 'storeAction'])
                 ->name('actions.unlock-requests.store');
+            // Circuit V2 : directeur transfère → planification donne avis → DG décide.
+            Route::post('demandes-deverrouillage/{planningUnlockRequest}/transfert', [PlanningUnlockWebController::class, 'transferByDirecteur'])
+                ->name('planning-unlocks.transfer');
+            Route::post('demandes-deverrouillage/{planningUnlockRequest}/avis-planif', [PlanningUnlockWebController::class, 'reviewByPlanification'])
+                ->name('planning-unlocks.planif');
             Route::post('demandes-deverrouillage/{planningUnlockRequest}/dg', [PlanningUnlockWebController::class, 'reviewByDg'])
                 ->name('planning-unlocks.dg');
 
@@ -315,32 +320,17 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('kpi-mesures.update');
             Route::delete('kpi-mesures/{kpiMesure}', [KpiMesureWebController::class, 'destroy'])
                 ->name('kpi-mesures.destroy');
+            // ── PAGE DE SUIVI + WORKFLOW V2 (cf. docs/WORKFLOW-SUIVI-V2.md) ─────
             Route::get('actions/{action}/suivi', [ActionTrackingWebController::class, 'show'])
                 ->name('actions.suivi');
-            Route::put('actions/{action}/sous-actions/{sousAction}', [ActionTrackingWebController::class, 'updateSubAction'])
-                ->name('actions.sub-actions.update');
-            Route::post('actions/{action}/sous-actions/{sousAction}/review', [ActionTrackingWebController::class, 'reviewSubAction'])
-                ->name('actions.sub-actions.review');
-            Route::post('actions/{action}/execution', [ActionTrackingWebController::class, 'updateQuantitativeProgress'])
+            // Suivi opérationnel V2 : enregistrement (save) + soumission (submit).
+            Route::post('actions/{action}/execution', [ActionTrackingWebController::class, 'updateActionProgress'])
                 ->name('actions.execution.update');
-            // Route actions.weeks.submit supprimee : le suivi hebdomadaire n'existe plus.
-            Route::post('actions/{action}/semaines/{week}/soumettre', static function () {
-                abort(410, 'Le suivi hebdomadaire a ete supprime du circuit metier.');
-            })->name('actions.weeks.submit');
-            Route::post('actions/{action}/review', [ActionTrackingWebController::class, 'reviewClosure'])
+            Route::post('actions/{action}/sous-actions/{sousAction}', [ActionTrackingWebController::class, 'updateSubActionProgress'])
+                ->name('actions.sub-actions.update');
+            // Validation chef (action simple ou sous-action via sous_action_id).
+            Route::post('actions/{action}/review', [ActionTrackingWebController::class, 'reviewItem'])
                 ->name('actions.review');
-            Route::post('actions/{action}/reports-echeance', [ActionTrackingWebController::class, 'storeDeadlineExtensionRequest'])
-                ->name('actions.deadline-extension.store');
-            Route::post('reports-echeance/{deadlineExtensionRequest}/sciq', [ActionTrackingWebController::class, 'reviewDeadlineExtensionBySciq'])
-                ->name('deadline-extension.sciq');
-            Route::post('reports-echeance/{deadlineExtensionRequest}/dg', [ActionTrackingWebController::class, 'reviewDeadlineExtensionByDg'])
-                ->name('deadline-extension.dg');
-            // Etape « validation direction » supprimee. La route est conservee
-            // pour ne pas casser les liens existants ; tout appel est refuse en
-            // 403 (les tests d'autorisation continuent de passer).
-            Route::post('actions/{action}/review-direction', static function () {
-                abort(403, "L'etape de validation direction a ete supprimee. Le circuit se termine au chef de service.");
-            })->name('actions.review-direction');
             Route::post('actions/{action}/financement/daf', [ActionTrackingWebController::class, 'reviewFinancingByDaf'])
                 ->name('actions.financement.daf');
             Route::post('actions/{action}/financement/daf/statut', [ActionTrackingWebController::class, 'updateFinancingStatusByDaf'])
@@ -349,14 +339,39 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.financement.dg');
             Route::post('actions/{action}/commentaires', [ActionTrackingWebController::class, 'comment'])
                 ->name('actions.comment');
-            Route::post('actions/{action}/anomalies', [ActionTrackingWebController::class, 'signalAnomaly'])
-                ->name('actions.anomalies.signal');
-            Route::post('actions/{action}/anomalies/{log}/resolve', [ActionTrackingWebController::class, 'resolveAnomaly'])
-                ->name('actions.anomalies.resolve');
             Route::get('actions/{action}/justificatifs/{justificatif}/download', [ActionTrackingWebController::class, 'downloadJustificatif'])
                 ->name('actions.justificatifs.download');
             Route::get('actions/{action}/justificatifs/{justificatif}/preview', [ActionTrackingWebController::class, 'previewJustificatif'])
                 ->name('actions.justificatifs.preview');
+            // Routes legacy NON ré-implémentées en V2 (anomalies, reports d'échéance,
+            // validation direction, suivi hebdo) → 410 Gone tant que non rouvertes.
+            Route::any('actions/{action}/sous-actions/{sousAction}/review', static function () {
+                abort(410, 'Validation par route dédiée supprimée : utilisez actions.review avec sous_action_id.');
+            })->name('actions.sub-actions.review');
+            Route::any('actions/{action}/review-direction', static function () {
+                abort(410, 'Workflow de validation direction supprime (refonte en cours).');
+            })->name('actions.review-direction');
+            Route::any('actions/{action}/review-direction', static function () {
+                abort(410, 'Workflow de validation direction supprime (refonte en cours).');
+            })->name('actions.review-direction');
+            Route::any('actions/{action}/anomalies', static function () {
+                abort(410, 'Workflow de gestion d\'anomalies supprime (refonte en cours).');
+            })->name('actions.anomalies.signal');
+            Route::any('actions/{action}/anomalies/{log}/resolve', static function () {
+                abort(410, 'Workflow de gestion d\'anomalies supprime (refonte en cours).');
+            })->name('actions.anomalies.resolve');
+            Route::any('actions/{action}/reports-echeance', static function () {
+                abort(410, 'Workflow de report d\'echeance supprime (refonte en cours).');
+            })->name('actions.deadline-extension.store');
+            Route::any('reports-echeance/{deadlineExtensionRequest}/sciq', static function () {
+                abort(410, 'Workflow de report d\'echeance SCIQ supprime (refonte en cours).');
+            })->name('deadline-extension.sciq');
+            Route::any('reports-echeance/{deadlineExtensionRequest}/dg', static function () {
+                abort(410, 'Workflow de report d\'echeance DG supprime (refonte en cours).');
+            })->name('deadline-extension.dg');
+            Route::any('actions/{action}/semaines/{week}/soumettre', static function () {
+                abort(410, 'Le suivi hebdomadaire a ete supprime du circuit metier.');
+            })->name('actions.weeks.submit');
 
         });
 

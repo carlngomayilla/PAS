@@ -258,134 +258,213 @@
         </article>
     </section>
 
-    <section id="action-validation" class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">Circuit de validation</h2>
-        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-            <article class="showcase-inline-stat action-detail-card">
-                <h3 class="form-section-title">Étape 1 — Soumission agent</h3>
-                <p class="mt-2 text-slate-600 flex flex-wrap items-center gap-2">Statut :
-                    @if (in_array($validationStatus, ['non_soumise', 'correction_demandee', 'rejetee_chef', 'rejetee_direction'], true))
-                        <span class="anbg-badge anbg-badge-warning px-3">À corriger</span>
-                    @else
-                        <span class="anbg-badge anbg-badge-success px-3">Effectuée</span>
-                    @endif
-                </p>
-                <p class="text-slate-600">Soumis par : <strong>{{ $action->soumisPar?->name ?? '-' }}</strong></p>
-                <p class="text-slate-600">Date de soumission : <strong>{{ optional($action->soumise_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
-            </article>
-            @if ($workflow['service_enabled'])
-                <article class="showcase-inline-stat action-detail-card">
-                    <h3 class="form-section-title">Étape 2 — Vérification chef de service</h3>
-                    <p class="mt-2 text-slate-600">Statut : <strong>{{ in_array($validationStatus, ['validee_chef', 'rejetee_direction', 'validee_direction'], true) ? 'Effectuée' : ($isAwaitingChef ? 'En attente' : '-') }}</strong></p>
-                    <p class="text-slate-600">Vérificateur : <strong>{{ $action->evaluePar?->name ?? '-' }}</strong></p>
-                    <p class="text-slate-600">Date : <strong>{{ optional($action->evalue_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
-                </article>
-            @endif
+    {{-- ════════════════════════════════════════════════════════════════════
+         SUIVI V2 (cf. docs/WORKFLOW-SUIVI-V2.md)
+         Performance officielle/provisoire + saisie agent + validation chef.
+         ════════════════════════════════════════════════════════════════════ --}}
+    @php
+        $v2PerfLabels = [
+            'non_demarre' => ['Non démarrée', 'anbg-badge-neutral'],
+            'critique' => ['Critique', 'anbg-badge-danger'],
+            'en_alerte' => ['En alerte', 'anbg-badge-warning'],
+            'acceptable' => ['Acceptable', 'anbg-badge-info'],
+            'cible_atteinte' => ['Cible atteinte', 'anbg-badge-success'],
+            'cible_depassee' => ['Cible dépassée', 'anbg-badge-success'],
+        ];
+        $v2TemporalLabels = [
+            'dans_delai' => ['Dans les délais', 'anbg-badge-success'],
+            'bientot_retard' => ['Bientôt en retard', 'anbg-badge-warning'],
+            'en_retard' => ['En retard', 'anbg-badge-danger'],
+            'critique' => ['Critique', 'anbg-badge-danger'],
+            'sans_echeance' => ['Sans échéance', 'anbg-badge-neutral'],
+        ];
+        [$perfLabel, $perfClass] = $v2PerfLabels[$v2PerfStatus ?? 'non_demarre'] ?? $v2PerfLabels['non_demarre'];
+        [$tempLabel, $tempClass] = $v2TemporalLabels[$v2TemporalStatus ?? 'sans_echeance'] ?? $v2TemporalLabels['sans_echeance'];
+        $v2ValidationStatus = (string) ($action->statut_validation ?? 'non_soumise');
+        $v2IsSubmitted = $v2ValidationStatus === 'soumise_chef';
+        $v2IsValidated = $v2ValidationStatus === 'validee_chef';
+    @endphp
+
+    <section id="action-suivi" class="showcase-panel mb-4">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 class="showcase-panel-title">Suivi de l'action</h2>
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="anbg-badge {{ $perfClass }} px-3 py-1">{{ $perfLabel }}</span>
+                <span class="anbg-badge {{ $tempClass }} px-3 py-1">{{ $tempLabel }}</span>
+            </div>
         </div>
-        @if ($validationStatus === 'rejetee_chef')
-            <p class="mt-2 text-sm text-[#f9b13c]">Motif rejet chef : <strong>{{ $action->motif_validation_chef ?: '-' }}</strong></p>
+
+        {{-- Performances : officielle en avant, provisoire en complément --}}
+        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))] mb-4">
+            <article class="showcase-inline-stat">
+                <strong>Performance officielle</strong>
+                <p class="mt-1 text-3xl font-extrabold text-[#17324a]">{{ number_format((float) $v2OfficialPerf, 1, ',', ' ') }}%</p>
+                <p class="text-xs text-slate-500">{{ $v2IsValidated ? 'Validée par le chef' : 'En attente de validation' }}</p>
+            </article>
+            <article class="showcase-inline-stat">
+                <strong>Performance provisoire</strong>
+                <p class="mt-1 text-xl font-bold text-[#3996d3]">{{ number_format((float) $v2ProvisionalPerf, 1, ',', ' ') }}%</p>
+                <p class="text-xs text-slate-500">Calculée à chaque enregistrement</p>
+            </article>
+            <article class="showcase-inline-stat">
+                <strong>Type d'action</strong>
+                <p class="mt-2 dd-badges"><span class="anbg-badge anbg-badge-info px-3 py-1">{{ $action->typeActionLabel() }}</span></p>
+            </article>
+        </div>
+
+        @if ($v2IsSubmitted)
+            <p class="action-section-note mb-3">Action soumise au chef de service — saisie gelée en attente de sa décision.</p>
+        @elseif ($v2IsValidated)
+            <p class="action-section-note mb-3">Action validée officiellement par le chef de service.</p>
+        @elseif ($v2ValidationStatus === 'correction_demandee')
+            <p class="action-section-note action-section-note-warning mb-3">Renvoyée pour correction. Motif : <strong>{{ $action->motif_validation_chef ?: '—' }}</strong></p>
         @endif
 
-    </section>
-
-    <section id="reports-echeance" class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">Reports d'échéance</h2>
-
-        @if ($canRequestDeadlineExtension ?? false)
-            <form class="mt-3 grid gap-3 rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.deadline-extension.store', $action) }}">
+        {{-- FORMULAIRE AGENT — action simple (quantitative ou non quantitative).
+             Visible tant que l'utilisateur est responsable ; FIGÉ (fieldset disabled)
+             dès la soumission, réouvert uniquement après rejet motivé du chef. --}}
+        @if (($v2ActionResponsible ?? false))
+            @php $v2FormFrozen = ($v2ActionFrozen ?? false); @endphp
+            @if ($v2FormFrozen)
+                <p class="action-section-note mb-2">🔒 Formulaire figé — l'action est soumise. Il se rouvrira uniquement si le chef de service la renvoie pour correction avec motif.</p>
+            @endif
+            <form class="mt-2 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm @if ($v2FormFrozen) opacity-70 @endif" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.execution.update', $action) }}">
                 @csrf
+                @error('general') <p class="field-error mb-2">{{ $message }}</p> @enderror
+                <fieldset @disabled($v2FormFrozen)>
                 <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+                    @if ($action->isQuantitative())
+                        <div>
+                            <label for="qr">Quantité réalisée (totale à ce jour) — cible {{ number_format((float) ($action->quantite_cible ?? 0), 0, ',', ' ') }} {{ $action->unite_cible }}</label>
+                            <input id="qr" name="quantite_realisee" type="number" step="1" min="0" value="{{ old('quantite_realisee', $action->quantite_realisee !== null ? (int) $action->quantite_realisee : '') }}">
+                        </div>
+                    @endif
+                    @if ($action->allows_difficulty)
+                        <div>
+                            <label for="diff">Difficulté rencontrée <span class="text-xs text-slate-400">(optionnel)</span></label>
+                            <textarea id="diff" name="difficulte" rows="2">{{ old('difficulte') }}</textarea>
+                        </div>
+                    @endif
                     <div>
-                        <label for="report_target">Élément concerné</label>
-                        <select id="report_target" name="sous_action_id">
-                            <option value="">Action principale - {{ optional($action->date_fin)->format('d/m/Y') ?: '-' }}</option>
-                            @foreach ($action->sousActions as $sousAction)
-                                <option value="{{ $sousAction->id }}">Sous-action : {{ $sousAction->libelle }} - {{ optional($sousAction->date_fin)->format('d/m/Y') ?: '-' }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label for="requested_deadline">Nouvelle échéance demandée</label>
-                        <input id="requested_deadline" name="requested_deadline" type="date" required>
-                    </div>
-                    <div>
-                        <label for="report_attachment">Pièce justificative</label>
-                        <input id="report_attachment" name="report_attachment" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}" required>
-                    </div>
-                </div>
-                <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
-                    <div>
-                        <label for="report_motif">Motif</label>
-                        <textarea id="report_motif" name="motif" rows="3" required>{{ old('motif') }}</textarea>
-                    </div>
-                    <div>
-                        <label for="report_justification">Justification détaillée</label>
-                        <textarea id="report_justification" name="justification" rows="3" required>{{ old('justification') }}</textarea>
+                        <label for="jf">Pièce justificative <span class="text-xs font-semibold text-red-600">*</span> <span class="text-xs text-slate-500">(obligatoire à la soumission)</span></label>
+                        <input id="jf" name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
+                        @if ($action->justificatifs->whereIn('categorie', ['execution_quantitative','execution_non_quantitative','final'])->count() > 0)
+                            <p class="mt-1 text-xs text-emerald-600">✓ Pièce déjà déposée — vous pouvez soumettre sans en rajouter.</p>
+                        @endif
                     </div>
                 </div>
-                <button class="btn btn-primary justify-self-start" type="submit">Demander report d'échéance</button>
+                <div class="mt-3">
+                    <label for="cmt" class="font-semibold">Commentaire @if ($action->requires_comment)<span class="text-xs font-semibold text-red-600">*</span>@else<span class="text-xs font-normal text-slate-400">(optionnel)</span>@endif</label>
+                    <textarea id="cmt" name="commentaire" rows="3" class="w-full" placeholder="Décrivez l'avancement.">{{ old('commentaire') }}</textarea>
+                </div>
+                </fieldset>
+                @unless ($v2FormFrozen)
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <button class="btn btn-secondary" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
+                        <button class="btn btn-primary" type="submit" name="tracking_action" value="submit">Soumettre au chef</button>
+                    </div>
+                @endunless
             </form>
         @endif
 
-        <div class="mt-4 overflow-x-auto">
-            <table class="min-w-full text-left text-sm">
-                <thead>
-                    <tr class="border-b text-slate-500">
-                        <th class="py-2 pr-3">Élément</th>
-                        <th class="py-2 pr-3">Ancienne date</th>
-                        <th class="py-2 pr-3">Date demandée</th>
-                        <th class="py-2 pr-3">Statut</th>
-                        <th class="py-2 pr-3">Circuit</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($action->deadlineExtensionRequests as $deadlineRequest)
-                        <tr class="border-b align-top">
-                            <td class="py-3 pr-3">
-                                {{ $deadlineRequest->sousAction?->libelle ?: $action->libelle }}
-                                @if ($deadlineRequest->is_critical)
-                                    <span class="anbg-badge anbg-badge-warning ml-1 px-2 py-0.5 text-[11px]">Critique</span>
-                                @endif
-                            </td>
-                            <td class="py-3 pr-3">{{ optional($deadlineRequest->old_deadline)->format('d/m/Y') }}</td>
-                            <td class="py-3 pr-3">{{ optional($deadlineRequest->requested_deadline)->format('d/m/Y') }}</td>
-                            <td class="py-3 pr-3">{{ str_replace('_', ' ', (string) $deadlineRequest->status) }}</td>
-                            <td class="py-3 pr-3">
-                                @if (($canReviewDeadlineExtensionBySciq ?? false) && in_array((string) $deadlineRequest->status, ['soumise', 'en_analyse', 'complement_demande'], true))
-                                    <form method="POST" action="{{ route('workspace.deadline-extension.sciq', $deadlineRequest) }}" class="mb-2 flex flex-wrap gap-2">
-                                        @csrf
-                                        <select name="sciq_avis" required>
-                                            <option value="avis_favorable">Avis favorable</option>
-                                            <option value="avis_defavorable">Avis défavorable</option>
-                                            <option value="demande_complement">Demander complément</option>
-                                        </select>
-                                        <input name="sciq_comment" type="text" placeholder="Commentaire SCIQ / Planification">
-                                        <button class="btn btn-secondary" type="submit">Enregistrer avis</button>
-                                    </form>
-                                @endif
-                                @if (($canReviewDeadlineExtensionByDg ?? false) && (string) $deadlineRequest->status === 'transmise_dg')
-                                    <form method="POST" action="{{ route('workspace.deadline-extension.dg', $deadlineRequest) }}" class="flex flex-wrap gap-2">
-                                        @csrf
-                                        <select name="dg_decision" required>
-                                            <option value="approuver">Approuver</option>
-                                            <option value="rejeter">Rejeter</option>
-                                            <option value="demander_complement">Demander complément</option>
-                                        </select>
-                                        <input name="approved_deadline" type="date" value="{{ optional($deadlineRequest->requested_deadline)->toDateString() }}">
-                                        <input name="dg_comment" type="text" placeholder="Commentaire DG">
-                                        <button class="btn btn-primary" type="submit">Décider</button>
-                                    </form>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="py-4 text-slate-500">Aucune demande de report enregistrée.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        {{-- FORMULAIRES AGENT — sous-actions (action composée) --}}
+        @if ($action->isComposee())
+            <div class="mt-2 space-y-3">
+                @forelse ($action->sousActions as $sa)
+                    @php
+                        $saPerf = app(\App\Services\Workflow\ActionPerformanceCalculator::class)->subActionPerformance($sa);
+                        $saValStatus = (string) ($sa->validation_status ?? 'non_soumise');
+                        // Éditable uniquement si non soumise ou rejetée (gel après soumission).
+                        $saEditable = ($canTrackSubActionsV2 ?? false)
+                            && in_array($saValStatus, ['non_soumise', 'rejetee'], true)
+                            && (int) $sa->agent_id === (int) auth()->id();
+                        $saFrozen = $saValStatus === 'soumise';
+                    @endphp
+                    <article class="rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <strong>{{ $sa->libelle }}</strong>
+                                <span class="ml-2 anbg-badge anbg-badge-info px-2 py-0.5 text-[11px]">{{ $sa->isQuantitative() ? 'Quantitative' : 'Non quantitative' }}</span>
+                                @if ($sa->weight !== null)<span class="ml-1 text-xs text-slate-500">poids {{ rtrim(rtrim(number_format((float) $sa->weight, 2, ',', ' '), '0'), ',') }}%</span>@endif
+                                <p class="text-sm text-slate-600">Perf : <strong>{{ number_format($saPerf, 0, ',', ' ') }}%</strong> · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
+                            </div>
+                        </div>
+
+                        @if ($saFrozen && (int) $sa->agent_id === (int) auth()->id())
+                            <p class="action-section-note mt-2">🔒 Sous-action soumise — figée jusqu'à la décision du chef.</p>
+                        @endif
+
+                        @if ($saEditable)
+                            <form class="mt-3 border-t border-slate-100 pt-3" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.sub-actions.update', [$action, $sa]) }}">
+                                @csrf
+                                <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+                                    @if ($sa->isQuantitative())
+                                        <div>
+                                            <label>Quantité réalisée — cible {{ number_format((float) ($sa->cible_prevue ?? 0), 0, ',', ' ') }} {{ $sa->unite }}</label>
+                                            <input name="quantite_realisee" type="number" step="1" min="0" value="{{ $sa->quantite_realisee !== null ? (int) $sa->quantite_realisee : '' }}">
+                                        </div>
+                                    @endif
+                                    @if ($sa->allows_difficulty)
+                                        <div><label>Difficulté <span class="text-xs text-slate-400">(opt.)</span></label><textarea name="difficulte" rows="2"></textarea></div>
+                                    @endif
+                                    <div>
+                                        <label>Pièce justificative @if ($sa->requires_proof)<span class="text-xs font-semibold text-red-600">*</span>@endif</label>
+                                        <input name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <label class="font-semibold">Commentaire @if ($sa->requires_comment)<span class="text-xs font-semibold text-red-600">*</span>@else<span class="text-xs text-slate-400">(opt.)</span>@endif</label>
+                                    <textarea name="commentaire" rows="2" class="w-full">{{ $sa->commentaire }}</textarea>
+                                </div>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <button class="btn btn-secondary btn-sm" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
+                                    <button class="btn btn-primary btn-sm" type="submit" name="tracking_action" value="submit">Soumettre</button>
+                                </div>
+                            </form>
+                        @endif
+
+                        {{-- VALIDATION CHEF par sous-action --}}
+                        @if (($canReviewByChefV2 ?? false) && $saValStatus === 'soumise')
+                            <div class="mt-3 border-t border-slate-100 pt-3">
+                                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="flex flex-wrap items-end gap-2">
+                                    @csrf
+                                    <input type="hidden" name="sous_action_id" value="{{ $sa->id }}">
+                                    <input type="hidden" name="decision" value="valider">
+                                    <button class="btn btn-primary btn-sm" type="submit">Valider la sous-action</button>
+                                </form>
+                                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-2 flex flex-wrap items-end gap-2">
+                                    @csrf
+                                    <input type="hidden" name="sous_action_id" value="{{ $sa->id }}">
+                                    <input type="hidden" name="decision" value="rejeter">
+                                    <input name="motif" type="text" placeholder="Motif (obligatoire)" required class="flex-1">
+                                    <button class="btn btn-secondary btn-sm" type="submit">Renvoyer</button>
+                                </form>
+                            </div>
+                        @endif
+                    </article>
+                @empty
+                    <p class="action-section-note">Aucune sous-action planifiée pour cette action composée.</p>
+                @endforelse
+            </div>
+        @endif
+
+        {{-- VALIDATION CHEF — action simple soumise --}}
+        @if (($canReviewByChefV2 ?? false) && ! $action->isComposee() && $v2IsSubmitted)
+            <div class="mt-3 rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm">
+                <strong class="text-sm text-[#17324a]">Décision du chef de service</strong>
+                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-2 flex flex-wrap items-end gap-2">
+                    @csrf
+                    <input type="hidden" name="decision" value="valider">
+                    <button class="btn btn-primary" type="submit">Valider l'action</button>
+                </form>
+                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-2 flex flex-wrap items-end gap-2">
+                    @csrf
+                    <input type="hidden" name="decision" value="rejeter">
+                    <input name="motif" type="text" placeholder="Motif de renvoi (obligatoire)" required class="flex-1">
+                    <button class="btn btn-secondary" type="submit">Renvoyer pour correction</button>
+                </form>
+            </div>
+        @endif
     </section>
 
     <section id="action-fiche" class="showcase-panel mb-4">
@@ -449,10 +528,10 @@
                 <dl class="action-fiche-dl mt-2">
                     <dt>Mode évaluation</dt><dd>{{ $modeEvaluationLabel }}</dd>
                     @if ($usesQuantitativeProgress)
-                        <dt>Cible attendue</dt><dd>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 1, ',', ' ') : '-' }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Cible attendue</dt><dd>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 0, ',', ' ') : '-' }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Unité</dt><dd>{{ $action->unite_cible ?: '-' }}</dd>
-                        <dt>Réalisé</dt><dd>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 1, ',', ' ') : '0,0' }} {{ $action->unite_cible ?: '' }}</dd>
-                        <dt>Reste</dt><dd>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 1, ',', ' ') }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Réalisé</dt><dd>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 0, ',', ' ') : '0' }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Reste</dt><dd>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 0, ',', ' ') }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Taux cible</dt><dd>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 1, ',', ' ') }}%</dd>
                         <dt>Dépassement</dt><dd>{{ $overachievementRate > 0 ? '+'.number_format($overachievementRate, 1, ',', ' ').'%' : '-' }}</dd>
                         <dt>Seuil minimum</dt><dd>{{ number_format((float) ($action->seuil_minimum ?? 80), 1, ',', ' ') }}%</dd>
@@ -609,380 +688,14 @@
             <p class="text-slate-600">Cette action ne nécessite pas de financement spécifique.</p>
         @endif
     </section>
-    <section id="action-status" class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">État d'avancement</h2>
-        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-            <article class="showcase-inline-stat">
-                <strong>Avancement réel</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($action->progression_reelle ?? 0), 1, ',', ' ') }}%</p>
-            </article>
-            <article class="showcase-inline-stat">
-                <strong>Progression théorique</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($action->progression_theorique ?? 0), 1, ',', ' ') }}%</p>
-            </article>
-            <article class="showcase-inline-stat">
-                <strong>{{ $metricLabel('delai') }}</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_delai ?? 0), 1, ',', ' ') }}%</p>
-            </article>
-            <article class="showcase-inline-stat">
-                <strong>{{ $metricLabel('performance') }}</strong>
-                <p class="mt-1 text-lg">{{ number_format((float) ($kpi?->kpi_performance ?? 0), 1, ',', ' ') }}%</p>
-            </article>
-            <article class="showcase-inline-stat">
-                <strong>Validation</strong>
-                <p class="mt-2 dd-badges"><span class="{{ $validationClass }}">{{ $validationLabel }}</span></p>
-            </article>
-            <article class="showcase-inline-stat">
-                <strong>Justificatif</strong>
-                <p class="mt-1 text-lg">{{ $action->justificatifs->count() }} piece(s)</p>
-            </article>
-        </div>
-        @if ($showActionExecutionForm)
-            <form class="mt-4 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.execution.update', $action) }}">
-                @csrf
-                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                        <h3 class="text-base font-bold text-[#1c203d]">{{ $isActionQuantifiable ? 'Saisie quantitative' : 'Soumission d execution' }}</h3>
-                        <p class="text-sm text-slate-600">Mode : {{ $modeEvaluationLabel }}. La cible est définie dans le PTA.</p>
-                    </div>
-                    @if ($isActionQuantifiable)
-                        <span class="rounded-full bg-[#3996d3]/10 px-3 py-1 text-xs font-semibold text-[#3996d3]">
-                            Cible {{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 1, ',', ' ') : '-' }} {{ $action->unite_cible }}
-                        </span>
-                    @endif
-                </div>
-                {{-- Ligne 1 (compacte) : quantité + difficultés + justificatif --}}
-                <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                    @if ($actionSubmissionRequirements['quantity'])
-                    <div>
-                        <label for="quantite_realisee_action">Quantité réalisée</label>
-                        <input id="quantite_realisee_action" name="quantite_realisee" type="number" step="0.0001" min="0" value="{{ old('quantite_realisee') }}">
-                    </div>
-                    @endif
-                    <div>
-                        <label for="difficultes_quantitatives">Difficultés rencontrées <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-                        <textarea id="difficultes_quantitatives" name="difficultes_quantitatives" rows="2" @if($actionSubmissionRequirements['difficulties']) required @endif>{{ old('difficultes_quantitatives') }}</textarea>
-                    </div>
-                    <div>
-                        <label for="justificatif_quantitatif">Pièce justificative <span class="text-xs font-semibold text-red-600">*</span> <span class="text-xs font-normal text-slate-500">(obligatoire à la soumission)</span></label>
-                        <input id="justificatif_quantitatif" name="justificatif_quantitatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
-                        @if ($action->justificatifs->count() > 0)
-                            <p class="mt-1 text-xs text-emerald-600">✓ {{ $action->justificatifs->count() }} pièce(s) déjà déposée(s) sur l'action — vous pouvez soumettre sans en ajouter une nouvelle.</p>
-                        @else
-                            <p class="mt-1 text-xs text-slate-500">Aucune pièce déposée. Une pièce est requise pour soumettre.</p>
-                        @endif
-                        @error('justificatif_quantitatif') <p class="field-error">{{ $message }}</p> @enderror
-                    </div>
-                </div>
-                {{-- Ligne 2 (pleine largeur) : commentaire — TOUJOURS visible. Workflow save→submit
-                     en plusieurs étapes : ce champ ne bloque JAMAIS la soumission s'il est vide. --}}
-                <div class="mt-3">
-                    <label for="commentaire_quantitatif" class="font-semibold">Commentaire d'avancement <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-                    <textarea id="commentaire_quantitatif" name="commentaire_quantitatif" rows="3" class="w-full" placeholder="Décrivez brièvement l'état d'avancement (facultatif).">{{ old('commentaire_quantitatif') }}</textarea>
-                    @error('commentaire_quantitatif') <p class="field-error">{{ $message }}</p> @enderror
-                </div>
-                <div class="mt-3 flex flex-wrap gap-2">
-                    <button class="btn btn-secondary" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
-                    <button class="btn btn-primary" type="submit" name="tracking_action" value="submit">Soumettre au chef</button>
-                </div>
-            </form>
-        @elseif ($usesStructuredProgress && ($usesQuantitativeProgress || $usesNoQuantityProgress || ($usesSubTasksProgress && $sousActionsTotal === 0)) && $agentLocked)
-            <p class="action-section-note mt-4">Saisie gelée : action soumise. Le formulaire de suivi sera de nouveau disponible après rejet motivé.</p>
-        @endif
-    </section>
 
-    @if ($showSubActionsPanel)
-    <section id="action-weeks" class="showcase-panel mb-4">
-        <h2 class="showcase-panel-title">{{ $usesHistoricalProgress ? "Suivi périodique de l'action" : 'Sous-actions de traitement' }}</h2>
-        @if ($agentLocked)
-            <p class="action-section-note mb-3">Saisie gelée : action soumise. Modifications possibles uniquement après rejet motivé.</p>
-        @endif
-        @if ($canTrackWeekly && $usesStructuredProgress && $action->sousActions->isEmpty())
-            <p class="action-section-note mb-3">Aucune sous-action planifiée. Les sous-actions doivent être ajoutées depuis le PTA ou la fiche action par un responsable habilité.</p>
-        @endif
-        @if (false)
-            <p class="action-section-note mb-3">Cette action est suivie en mode quantitatif. La saisie se fait dans le bloc « Quantité réalisée ».</p>
-        @endif
-        @if ($usesStructuredProgress)
-        @php
-            $viewerId = (int) auth()->id();
-            $viewerIsAgent = auth()->user()?->isAgent() ?? false;
-        @endphp
-        <div class="mb-4 space-y-3">
-            @forelse ($action->sousActions as $sousAction)
-                @php
-                    $subActionRules = app(\App\Services\Actions\ActionBusinessRules::class);
-                    $subActionRequirements = $subActionRules->subActionSubmissionRequirements($sousAction);
-                    $isOtherRmo = $viewerIsAgent && (int) $sousAction->agent_id !== $viewerId;
-                    $sousActionStatusLabel = match ((string) ($sousAction->statut ?? '')) {
-                        'en_attente_validation_chef' => 'En attente validation chef',
-                        'validee_chef' => 'Validee chef',
-                        'rejetee_a_corriger' => 'A corriger',
-                        'en_cours' => 'En cours',
-                        default => $sousAction->est_effectuee ? 'Realisee' : 'Non demarree',
-                    };
-                @endphp
-                <article class="action-week-card {{ $isOtherRmo ? 'is-other-rmo opacity-60' : '' }}" @if ($isOtherRmo) aria-label="Sous-action d'un autre RMO" @endif>
-                    <div class="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                            <strong>{{ $sousAction->libelle }}</strong>
-                            <span class="ml-2 rounded-full bg-[#3996d3]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3996d3]">Sous-action planifiée</span>
-                            @if ($isOtherRmo)
-                                <span class="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600" title="Cette sous-action est rattachée à un autre RMO. Lecture seule.">RMO différent</span>
-                            @endif
-                            <p class="text-slate-600">{{ optional($sousAction->date_debut)->format('d/m/Y') }} → {{ optional($sousAction->date_fin)->format('d/m/Y') }}</p>
-                            <p class="text-slate-600">Agent : <strong>{{ $sousAction->agent?->name ?? '-' }}</strong></p>
-                            <p class="text-slate-600">Statut : <strong>{{ $sousActionStatusLabel }}</strong> | Exécution : <strong>{{ number_format((float) ($sousAction->taux_execution ?? 0), 1, ',', ' ') }}%</strong></p>
-                            @if ($usesQuantitativeProgress || ($sousAction->cible_prevue !== null && (float) $sousAction->cible_prevue > 0))
-                                <p class="text-slate-600">Cible prévue : <strong>{{ $sousAction->cible_prevue !== null ? number_format((float) $sousAction->cible_prevue, 1, ',', ' ') : '-' }} {{ $sousAction->unite ?: $action->unite_cible }}</strong></p>
-                                <p class="text-slate-600">Quantité réalisée : <strong>{{ number_format((float) ($sousAction->quantite_realisee ?? 0), 1, ',', ' ') }} {{ $sousAction->unite ?: $action->unite_cible }}</strong> | Taux : <strong>{{ number_format((float) ($sousAction->taux_realisation ?? 0), 1, ',', ' ') }}%</strong></p>
-                                @if ($sousAction->resultat_obtenu)
-                                    <p class="text-slate-600">Résultat obtenu : <strong>{{ $sousAction->resultat_obtenu }}</strong></p>
-                                @endif
-                            @endif
-                            @if ($sousAction->resultat_attendu)
-                                <p class="text-slate-600">Résultat attendu : <strong>{{ $sousAction->resultat_attendu }}</strong></p>
-                            @endif
-                            @if ($sousAction->commentaire)
-                                <p class="text-slate-600">Commentaire : <strong>{{ $sousAction->commentaire }}</strong></p>
-                            @endif
-                        </div>
-                        <div class="text-right text-sm text-slate-500">
-                            <p>{{ $sousAction->justificatifs->count() }} justificatif(s)</p>
-                            @if ($sousAction->date_realisation)
-                                <p>Réalisée le {{ optional($sousAction->date_realisation)->format('d/m/Y H:i') }}</p>
-                            @endif
-                        </div>
-                    </div>
-                    @php
-                        $canEditSousAction = ($canSubmitAssignedSubActions ?? false)
-                            && $usesStructuredProgress
-                            && ! $sousAction->est_effectuee
-                            && (int) $sousAction->agent_id === (int) auth()->id();
-                    @endphp
-                    @if ($canEditSousAction)
-                        <form class="tracking-entry-form {{ $sousAction->cible_prevue !== null && (float) $sousAction->cible_prevue > 0 ? 'has-target' : 'no-target' }} mt-3 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.sub-actions.update', [$action, $sousAction]) }}">
-                            @csrf
-                            @method('PUT')
-                            <input type="hidden" name="execution_only" value="1">
-                            {{-- Ligne 1 (compacte) : quantite + difficultes + justificatif --}}
-                            <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                                @if ($subActionRequirements['quantity'])
-                                    <div>
-                                        <label for="quantite_realisee_sous_action_{{ $sousAction->id }}">Quantité effectuée</label>
-                                        <input id="quantite_realisee_sous_action_{{ $sousAction->id }}" name="quantite_realisee" type="number" step="0.0001" min="0" value="{{ old('quantite_realisee', $sousAction->quantite_realisee) }}">
-                                    </div>
-                                @endif
-                                <div>
-                                    <label for="difficultes_sous_action_{{ $sousAction->id }}">Difficultés rencontrées <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-                                    <textarea id="difficultes_sous_action_{{ $sousAction->id }}" name="difficultes" rows="2" placeholder="Optionnel">{{ old('difficultes') }}</textarea>
-                                </div>
-                                <div>
-                                    <label for="justificatif_sous_action_{{ $sousAction->id }}">Pièce justificative <span class="text-xs font-semibold text-red-600">*</span> <span class="text-xs font-normal text-slate-500">(obligatoire à la soumission)</span></label>
-                                    <input id="justificatif_sous_action_{{ $sousAction->id }}" name="justificatif" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}">
-                                    @if ($sousAction->justificatifs->count() > 0)
-                                        <p class="mt-1 text-xs text-emerald-600">✓ {{ $sousAction->justificatifs->count() }} pièce(s) déjà déposée(s) — vous pouvez soumettre sans en ajouter une nouvelle.</p>
-                                    @else
-                                        <p class="mt-1 text-xs text-slate-500">Aucune pièce déposée pour l'instant. Une pièce est requise pour soumettre.</p>
-                                    @endif
-                                    @error('justificatif') <p class="field-error">{{ $message }}</p> @enderror
-                                </div>
-                            </div>
-                            {{-- Ligne 2 (pleine largeur) : commentaire — TOUJOURS visible pour TOUS types
-                                 (quantitatif/non-quantitatif). Optionnel — workflow save→submit sans contrainte. --}}
-                            @if ($subActionRequirements['quantity'])
-                                <div class="mt-3">
-                                    <label for="resultat_obtenu_sous_action_{{ $sousAction->id }}">Résultat obtenu <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-                                    <textarea id="resultat_obtenu_sous_action_{{ $sousAction->id }}" name="resultat_obtenu" rows="2">{{ old('resultat_obtenu', $sousAction->resultat_obtenu) }}</textarea>
-                                </div>
-                            @endif
-                            <div class="mt-3">
-                                <label for="commentaire_sous_action_{{ $sousAction->id }}" class="font-semibold">Commentaire de réalisation <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-                                <textarea id="commentaire_sous_action_{{ $sousAction->id }}" name="commentaire" rows="3" class="w-full" placeholder="Décrivez brièvement le résultat de votre travail (facultatif).">{{ old('commentaire', $sousAction->commentaire) }}</textarea>
-                                @error('commentaire') <p class="field-error">{{ $message }}</p> @enderror
-                            </div>
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <button class="btn btn-secondary" type="submit" name="tracking_action" value="save" formnovalidate>Enregistrer</button>
-                                <button class="btn btn-primary" type="submit" name="tracking_action" value="submit">Soumettre la sous-action</button>
-                            </div>
-                        </form>
-                    @endif
-                    @if (($canReviewClosure ?? false) && (string) ($sousAction->statut ?? '') === 'en_attente_validation_chef')
-                        <div class="mt-3 rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm">
-                            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                                <strong class="text-sm text-[#17324a]">Controle chef de service</strong>
-                                <span class="anbg-badge anbg-badge-warning px-2 py-0.5 text-xs">En attente</span>
-                            </div>
-                            <form method="POST" action="{{ route('workspace.actions.sub-actions.review', [$action, $sousAction]) }}" class="grid gap-3 [grid-template-columns:minmax(0,1fr)_auto]">
-                                @csrf
-                                <input type="hidden" name="decision_sous_action" value="valider">
-                                <label class="sr-only" for="commentaire_validation_sous_action_{{ $sousAction->id }}">Observation validation</label>
-                                <input id="commentaire_validation_sous_action_{{ $sousAction->id }}" name="commentaire_sous_action" type="text" maxlength="5000" placeholder="Observation facultative">
-                                <button class="btn btn-primary rounded-2xl px-4 py-2" type="submit">Valider</button>
-                            </form>
-                            <form method="POST" action="{{ route('workspace.actions.sub-actions.review', [$action, $sousAction]) }}" class="mt-3 grid gap-3 [grid-template-columns:minmax(0,1fr)_auto]">
-                                @csrf
-                                <input type="hidden" name="decision_sous_action" value="demander_correction">
-                                <label class="sr-only" for="commentaire_rejet_sous_action_{{ $sousAction->id }}">Motif correction</label>
-                                <input id="commentaire_rejet_sous_action_{{ $sousAction->id }}" name="commentaire_sous_action" type="text" maxlength="5000" placeholder="Motif obligatoire" required>
-                                <button class="btn btn-secondary rounded-2xl px-4 py-2" type="submit">Demander correction</button>
-                            </form>
-                        </div>
-                    @endif
-                </article>
-            @empty
-                <x-ui.empty-state
-                    title="Aucune sous-action planifiée"
-                    message="Aucune sous-action n'est planifiée pour cette action. Ajoutez-en depuis la fiche action ou le PTA."
-                    icon="filter"
-                    tone="neutral"
-                    class="mb-3"
-                />
-            @endforelse
-        </div>
+    {{-- Sections workflow opérationnel SUPPRIMÉES le 2026-05-31 (refonte en cours) :
+         - action-status (État d'avancement)
+         - action-weeks (Sous-actions / suivi périodique)
+         - action-review-chef (Vérification chef de service)
+         - action-controle (Contrôle et anomalies)
+         À reconstruire from scratch quand le nouveau workflow sera spécifié. --}}
 
-        @endif
-
-        {{-- Suivi periodique (semaines) supprime. Le suivi se fait desormais
-             via les sous-actions et la saisie quantitative globale. --}}
-    </section>
-    @endif
-
-    @if ($canReviewClosure)
-        <section id="action-review-chef" class="showcase-panel mb-4">
-            <h2 class="showcase-panel-title">Vérification chef de service</h2>
-            @if ($isAwaitingChef)
-                <form method="POST" action="{{ route('workspace.actions.review', $action) }}">
-                    @csrf
-                    <div class="mb-2">
-                        <div>
-                            <label for="decision_validation">Decision</label>
-                            <select id="decision_validation" name="decision_validation" required>
-                                <option value="valider" @selected(old('decision_validation') === 'valider')>Valider</option>
-                                <option value="demander_correction" @selected(old('decision_validation') === 'demander_correction')>Demander correction</option>
-                                <option value="rejeter" @selected(old('decision_validation') === 'rejeter')>Rejeter</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div>
-                        {{-- Spec v2 : le chef ne note plus. Seul le motif (obligatoire si rejet/correction) est conserve. --}}
-                        <label for="motif_validation_chef">Motif{{ $workflow['rejection_comment_required'] ? ' (obligatoire au rejet ou correction)' : '' }}</label>
-                        <textarea id="motif_validation_chef" name="motif_validation_chef" rows="4">{{ old('motif_validation_chef') }}</textarea>
-                    </div>
-                    <button class="btn btn-primary mt-2.5" type="submit">
-                        {{ $workflow['service_review_button_label'] }}
-                    </button>
-                </form>
-            @else
-                <x-ui.empty-state
-                    title="Aucune action en attente"
-                    message="Aucune action n'est en attente de revue chef pour le moment."
-                    icon="check"
-                    tone="success"
-                />
-            @endif
-        </section>
-    @endif
-
-    @if (($canSignalControlAnomaly ?? false) || $activeAnomalyLogs->isNotEmpty())
-        <section id="action-controle" class="showcase-panel mb-4">
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 class="showcase-panel-title">Controle et anomalies</h2>
-                @if ($activeAnomalyLogs->isNotEmpty())
-                    <span class="anbg-badge anbg-badge-warning px-3">{{ $activeAnomalyLogs->count() }} ouverte(s)</span>
-                @endif
-            </div>
-
-            @if ($activeAnomalyLogs->isNotEmpty())
-                <div class="mb-4 space-y-3">
-                    @foreach ($activeAnomalyLogs as $log)
-                        @php
-                            $details = is_array($log->details) ? $log->details : [];
-                            $levelClass = match ((string) $log->niveau) {
-                                'critical', 'urgence' => 'anbg-badge anbg-badge-danger',
-                                default => 'anbg-badge anbg-badge-warning',
-                            };
-                        @endphp
-                        <article class="rounded-2xl border border-[#f9b13c]/35 bg-[#fff8d6]/80 p-4">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <strong class="text-[#17324a]">{{ str_replace('_', ' ', (string) $log->type_evenement) }}</strong>
-                                        <span class="{{ $levelClass }} px-2 py-0.5 text-xs">{{ $log->niveau }}</span>
-                                        <span class="anbg-badge anbg-badge-neutral px-2 py-0.5 text-xs">{{ $log->cible_role ?: 'controle' }}</span>
-                                    </div>
-                                    <p class="mt-2 text-sm text-slate-700">{{ $log->message }}</p>
-                                    @if (!empty($details['correction_attendue']))
-                                        <p class="mt-2 text-xs font-semibold text-[#17324a]">Correction attendue : {{ $details['correction_attendue'] }}</p>
-                                    @endif
-                                    @if (!empty($details['blocked_scope']))
-                                        <p class="mt-1 text-xs text-[#667085]">Blocage : {{ $details['blocked_scope'] }}</p>
-                                    @endif
-                                </div>
-
-                                @if ($canResolveControlAnomaly ?? false)
-                                    <form method="POST" action="{{ route('workspace.actions.anomalies.resolve', [$action, $log]) }}" class="min-w-[220px]">
-                                        @csrf
-                                        <label for="commentaire_resolution_{{ $log->id }}" class="sr-only">Commentaire resolution</label>
-                                        <input id="commentaire_resolution_{{ $log->id }}" name="commentaire_resolution" type="text" maxlength="2000" placeholder="Commentaire">
-                                        <button class="btn btn-secondary mt-2 w-full rounded-2xl px-3 py-2 text-xs" type="submit">Cloturer</button>
-                                    </form>
-                                @endif
-                            </div>
-                        </article>
-                    @endforeach
-                </div>
-            @endif
-
-            @if ($canSignalControlAnomaly ?? false)
-                <form method="POST" action="{{ route('workspace.actions.anomalies.signal', $action) }}" class="rounded-2xl border border-slate-200/85 bg-white/95 p-4">
-                    @csrf
-                    <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                        <div>
-                            <label for="type_anomalie">Type</label>
-                            <select id="type_anomalie" name="type_anomalie" required>
-                                <option value="justificatif_manquant">Justificatif manquant</option>
-                                <option value="commentaire_absent">Commentaire absent</option>
-                                <option value="date_incoherente">Date incoherente</option>
-                                <option value="financement_incomplet">Financement incomplet</option>
-                                <option value="kpi_incoherent">KPI incoherent</option>
-                                <option value="autre">Autre anomalie</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="niveau_anomalie">Niveau</label>
-                            <select id="niveau_anomalie" name="niveau" required>
-                                <option value="warning">Avertissement</option>
-                                <option value="critical">Critique</option>
-                                <option value="info">Info</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="cible_role_anomalie">Responsable du traitement</label>
-                            <select id="cible_role_anomalie" name="cible_role" required>
-                                <option value="responsable">Agent / RMO</option>
-                                <option value="chef_service">Chef service</option>
-                                <option value="direction">Direction</option>
-                                <option value="planification">SCIQ / Planification</option>
-                                <option value="dg">DG</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
-                        <div>
-                            <label for="message_anomalie">Cause</label>
-                            <textarea id="message_anomalie" name="message" rows="3" required>{{ old('message') }}</textarea>
-                        </div>
-                        <div>
-                            <label for="correction_attendue">Correction attendue</label>
-                            <textarea id="correction_attendue" name="correction_attendue" rows="3">{{ old('correction_attendue') }}</textarea>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary mt-3" type="submit">Signaler</button>
-                </form>
-            @endif
-        </section>
-    @endif
 
     <section id="action-discussion" class="showcase-panel mb-4">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">

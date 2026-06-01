@@ -87,10 +87,11 @@ class PlanningModificationLockWorkflowTest extends TestCase
         $this->assertNotNull($pta->modification_locked_at, 'Le verrou est ressanctuarise apres save.');
     }
 
-    public function test_chef_service_in_scope_bypasses_lock_on_action_quick_status(): void
+    public function test_chef_service_cannot_modify_locked_action_without_unlock_circuit(): void
     {
-        // Idem pour les actions : le chef de service peut changer le statut
-        // d'une action de son service sans demande de deverrouillage.
+        // RÈGLE V2 (2026-05-31) : une ACTION verrouillée n'est PLUS modifiable
+        // directement par le chef de service. Il doit passer par le circuit
+        // chef → directeur → planification → DG. Toute modif directe est refusée.
         $fixture = $this->fixture();
         $action = $fixture['action'];
 
@@ -98,13 +99,11 @@ class PlanningModificationLockWorkflowTest extends TestCase
             ->patch(route('workspace.actions.quick-status', $action), [
                 'statut' => ActionTrackingService::STATUS_SUSPENDU,
             ])
-            ->assertOk()
-            ->assertJsonPath('statut', ActionTrackingService::STATUS_SUSPENDU);
+            ->assertStatus(409);
 
         $action->refresh();
-        $this->assertSame(ActionTrackingService::STATUS_SUSPENDU, $action->statut_dynamique);
+        $this->assertNotSame(ActionTrackingService::STATUS_SUSPENDU, $action->statut_dynamique);
         $this->assertNotNull($action->modification_locked_at);
-        $this->assertNull($action->modification_unlocked_at);
     }
 
     /**

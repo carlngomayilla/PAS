@@ -7915,6 +7915,32 @@
         border-color: rgba(148, 163, 184, 0.28);
     }
 
+/* ─── MODAL « Demande de modification » ──────────────────────────────── */
+.modif-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+}
+.modif-modal-overlay[hidden] { display: none; }
+.modif-modal-card {
+    width: 100%;
+    max-width: 32rem;
+    background: #fff;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.35);
+}
+.dark .modif-modal-card {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
 /* ─── ACCESSIBILITY BASELINE (a11y) ──────────────────────────────────── */
 /* Focus visible global — bordure bleue claire visible sur tous les éléments
    interactifs, y compris ceux qui surchargent l'outline natif. */

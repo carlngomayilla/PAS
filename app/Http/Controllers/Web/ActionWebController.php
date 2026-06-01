@@ -592,14 +592,8 @@ class ActionWebController extends Controller
         }
 
         // Si la mise a jour a fait passer l'action en statut metier `termine`,
-        // ou si toutes les sous-actions sont marquees effectuees, ou si la
-        // progression atteint 100 %, on tente la bascule auto vers le chef de
-        // service. Cf. ActionTrackingService::maybeAutoSubmitClosureToChef().
-        if ((string) ($action->statut ?? '') !== (string) ($before['statut'] ?? '')
-            || (string) $action->statut === 'termine') {
-            $trackingService->attemptAutoSubmitClosure($action, $user);
-            $action->refresh();
-        }
+        // Bascule auto vers chef SUPPRIMÉE le 2026-05-31 (refonte workflow suivi en cours).
+        // À reconstruire avec le nouveau workflow opérationnel.
 
         $this->recordAudit($request, 'action', 'update', $action, $before, $action->toArray());
 

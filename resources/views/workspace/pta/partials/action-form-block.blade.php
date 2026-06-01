@@ -21,7 +21,22 @@
     if (! array_key_exists($modeEvaluation, \App\Models\Action::evaluationModeOptions())) {
         $modeEvaluation = \App\Models\Action::MODE_SANS_QUANTITE;
     }
-    $showTargetFields = $modeEvaluation === \App\Models\Action::MODE_QUANTITATIF;
+
+    // ── Workflow V2 : type_action pilote le formulaire (cf. docs/WORKFLOW-SUIVI-V2.md).
+    // Si rowData fournit déjà type_action on l'utilise, sinon on le dérive du mode_evaluation.
+    $typeActionMap = [
+        \App\Models\Action::MODE_QUANTITATIF => \App\Models\Action::TYPE_QUANTITATIVE,
+        \App\Models\Action::MODE_SANS_QUANTITE => \App\Models\Action::TYPE_NON_QUANTITATIVE,
+        \App\Models\Action::MODE_SOUS_ACTIONS => \App\Models\Action::TYPE_COMPOSEE,
+    ];
+    $typeAction = $rowData['type_action'] ?? ($typeActionMap[$modeEvaluation] ?? \App\Models\Action::TYPE_NON_QUANTITATIVE);
+    if (! array_key_exists($typeAction, \App\Models\Action::typeActionOptions())) {
+        $typeAction = \App\Models\Action::TYPE_NON_QUANTITATIVE;
+    }
+    $requiresComment = filter_var($rowData['requires_comment'] ?? false, FILTER_VALIDATE_BOOL);
+    $allowsDifficulty = filter_var($rowData['allows_difficulty'] ?? true, FILTER_VALIDATE_BOOL);
+
+    $showTargetFields = $typeAction === \App\Models\Action::TYPE_QUANTITATIVE;
     $thresholdMode = in_array(($rowData['seuil_mode'] ?? 'unique'), ['unique', 'trimestriel'], true)
         ? (string) $rowData['seuil_mode']
         : 'unique';
@@ -31,7 +46,7 @@
     if ($subActionRows->isEmpty()) {
         $subActionRows = collect([[]]);
     }
-    $showSubActionForm = $modeEvaluation === \App\Models\Action::MODE_SOUS_ACTIONS;
+    $showSubActionForm = $typeAction === \App\Models\Action::TYPE_COMPOSEE;
     $errorBag = $errors->getBag('default');
     $errorKeys = collect($errorBag->keys());
     $hasActionErrors = ! $isTemplate && $errorKeys->contains(fn (string $key): bool => str_starts_with($key, "actions.$index."));
@@ -200,16 +215,23 @@
             <div class="form-step-body">
             <div class="form-grid">
                 <div>
-                    <label>Mode de suivi</label>
-                    <select name="actions[{{ $index }}][mode_evaluation]" data-mode-select>
-                        <option value="quantitatif" @selected($modeEvaluation === 'quantitatif')>Cible quantitative</option>
-                        <option value="sans_quantite" @selected($modeEvaluation === 'sans_quantite')>Sans quantite</option>
-                        <option value="sous_actions" @selected($modeEvaluation === 'sous_actions')>Cible par sous-action</option>
+                    <label>Type d'action</label>
+                    <select name="actions[{{ $index }}][type_action]" data-type-action-select data-mode-select>
+                        <option value="quantitative" @selected($typeAction === 'quantitative')>Action simple quantitative</option>
+                        <option value="non_quantitative" @selected($typeAction === 'non_quantitative')>Action simple non quantitative</option>
+                        <option value="composee" @selected($typeAction === 'composee')>Action composée (sous-actions)</option>
                     </select>
+                    <p class="mt-1 text-xs text-slate-500" data-type-action-hint>
+                        @switch($typeAction)
+                            @case('quantitative') Cible chiffrée + unité + seuils numériques. @break
+                            @case('composee') Performance calculée depuis les sous-actions (poids Σ=100%). @break
+                            @default Pièce justificative attendue (réalisé = 0 % ou 100 %).
+                        @endswitch
+                    </p>
                 </div>
                 <div class="{{ $showTargetFields ? '' : 'hidden' }}" data-target-wrapper>
                     <label>Valeur cible</label>
-                    <input name="actions[{{ $index }}][quantite_cible]" data-target-input type="number" step="0.0001" min="0" value="{{ $rowData['quantite_cible'] ?? '' }}" @disabled(! $showTargetFields)>
+                    <input name="actions[{{ $index }}][quantite_cible]" data-target-input type="number" step="1" min="0" value="{{ isset($rowData['quantite_cible']) && $rowData['quantite_cible'] !== '' && $rowData['quantite_cible'] !== null ? (int) $rowData['quantite_cible'] : '' }}" @disabled(! $showTargetFields)>
                     @error("actions.$index.quantite_cible") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div class="{{ $showTargetFields ? '' : 'hidden' }}" data-target-wrapper>
@@ -243,6 +265,16 @@
                     <input type="checkbox" name="actions[{{ $index }}][justificatif_obligatoire]" value="1" @checked($justificatifObligatoire)>
                     Justificatif obligatoire
                 </label>
+                <label class="checkbox-pill self-end">
+                    <input type="hidden" name="actions[{{ $index }}][requires_comment]" value="0">
+                    <input type="checkbox" name="actions[{{ $index }}][requires_comment]" value="1" @checked($requiresComment)>
+                    Commentaire obligatoire à la soumission
+                </label>
+                <label class="checkbox-pill self-end">
+                    <input type="hidden" name="actions[{{ $index }}][allows_difficulty]" value="0">
+                    <input type="checkbox" name="actions[{{ $index }}][allows_difficulty]" value="1" @checked($allowsDifficulty)>
+                    Activer le champ « difficulté rencontrée »
+                </label>
             </div>
             </div>
         </details>
@@ -252,10 +284,20 @@
             <div class="form-step-body">
             <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h4 class="text-sm font-extrabold text-[#3996d3]">Sous-actions prévues</h4>
-                <button class="btn btn-secondary" type="button" data-add-sub-action>+ Ajouter une sous-action</button>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs font-semibold" data-weight-counter>Σ poids : <strong data-weight-total>0</strong> %</span>
+                    <button class="btn btn-secondary" type="button" data-add-sub-action>+ Ajouter une sous-action</button>
+                </div>
             </div>
+            <p class="mb-2 text-xs text-slate-500" data-weight-hint>La somme des poids des sous-actions doit être égale à 100 % (laissez vide pour une moyenne simple).</p>
             <div class="space-y-3" data-sub-actions-list>
                 @foreach ($subActionRows as $subIndex => $subAction)
+                    @php
+                        $saType = $subAction['sub_action_type'] ?? ((filled($subAction['cible_prevue'] ?? null) && (float) ($subAction['cible_prevue'] ?? 0) > 0) ? 'quantitative' : 'non_quantitative');
+                        $saRequiresProof = filter_var($subAction['requires_proof'] ?? true, FILTER_VALIDATE_BOOL);
+                        $saRequiresComment = filter_var($subAction['requires_comment'] ?? false, FILTER_VALIDATE_BOOL);
+                        $saAllowsDifficulty = filter_var($subAction['allows_difficulty'] ?? true, FILTER_VALIDATE_BOOL);
+                    @endphp
                     <div class="rounded-lg border border-[#e5e7eb] bg-[#f8fbfe] p-3" data-sub-action-row>
                         <input type="hidden" name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][id]" value="{{ $subAction['id'] ?? '' }}">
                         <div class="mb-2 flex items-center justify-between gap-2">
@@ -266,6 +308,13 @@
                             <div class="md:col-span-2">
                                 <label>Libellé</label>
                                 <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][libelle]" type="text" value="{{ $subAction['libelle'] ?? '' }}">
+                            </div>
+                            <div>
+                                <label>Type</label>
+                                <select name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][sub_action_type]" data-sub-type-select>
+                                    <option value="quantitative" @selected($saType === 'quantitative')>Quantitative</option>
+                                    <option value="non_quantitative" @selected($saType === 'non_quantitative')>Non quantitative</option>
+                                </select>
                             </div>
                             <div>
                                 <label>RMO en charge</label>
@@ -284,14 +333,35 @@
                                 <label>Date de fin</label>
                                 <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][date_fin]" type="date" value="{{ $subAction['date_fin'] ?? ($rowData['date_fin'] ?? '') }}">
                             </div>
-                            <div>
+                            <div data-sub-target-wrapper class="{{ $saType === 'quantitative' ? '' : 'hidden' }}">
                                 <label>Cible prévue</label>
-                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][cible_prevue]" type="number" step="0.0001" min="0" value="{{ $subAction['cible_prevue'] ?? '' }}">
+                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][cible_prevue]" type="number" step="1" min="0" value="{{ isset($subAction['cible_prevue']) && $subAction['cible_prevue'] !== '' && $subAction['cible_prevue'] !== null ? (int) $subAction['cible_prevue'] : '' }}">
                             </div>
-                            <div>
+                            <div data-sub-target-wrapper class="{{ $saType === 'quantitative' ? '' : 'hidden' }}">
                                 <label>Unité</label>
                                 <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][unite]" type="text" value="{{ $subAction['unite'] ?? ($rowData['unite_cible'] ?? '') }}">
                             </div>
+                            <div>
+                                <label>Poids (%)</label>
+                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][weight]" type="number" step="0.01" min="0" max="100" value="{{ $subAction['weight'] ?? '' }}" data-sub-weight-input placeholder="ex. 25">
+                            </div>
+                        </div>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <label class="checkbox-pill text-xs">
+                                <input type="hidden" name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][requires_proof]" value="0">
+                                <input type="checkbox" name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][requires_proof]" value="1" @checked($saRequiresProof)>
+                                Justificatif obligatoire
+                            </label>
+                            <label class="checkbox-pill text-xs">
+                                <input type="hidden" name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][requires_comment]" value="0">
+                                <input type="checkbox" name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][requires_comment]" value="1" @checked($saRequiresComment)>
+                                Commentaire obligatoire
+                            </label>
+                            <label class="checkbox-pill text-xs">
+                                <input type="hidden" name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][allows_difficulty]" value="0">
+                                <input type="checkbox" name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][allows_difficulty]" value="1" @checked($saAllowsDifficulty)>
+                                Champ difficulté
+                            </label>
                         </div>
                     </div>
                 @endforeach

@@ -477,12 +477,21 @@ class PtaWebController extends Controller
                 'resultat_attendu' => ['nullable', 'string'],
                 'date_debut' => ['required', 'date', 'date_format:Y-m-d'],
                 'date_fin' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_debut'],
-                'mode_evaluation' => ['required', \Illuminate\Validation\Rule::in([
+                // Workflow V2 : type_action pilote. mode_evaluation devient optionnel
+                // (dérivé ci-dessous) pour compat avec l'ancien front éventuel.
+                'type_action' => ['required', \Illuminate\Validation\Rule::in([
+                    Action::TYPE_QUANTITATIVE,
+                    Action::TYPE_NON_QUANTITATIVE,
+                    Action::TYPE_COMPOSEE,
+                ])],
+                'mode_evaluation' => ['nullable', \Illuminate\Validation\Rule::in([
                     Action::MODE_SOUS_ACTIONS,
                     Action::MODE_QUANTITATIF,
                     Action::MODE_SANS_QUANTITE,
                     Action::MODE_MIXTE,
                 ])],
+                'requires_comment' => ['nullable', 'boolean'],
+                'allows_difficulty' => ['nullable', 'boolean'],
                 'rmo_ids' => ['required', 'array', 'min:1'],
                 'rmo_ids.*' => ['integer', 'exists:users,id'],
                 'quantite_cible' => ['nullable', 'numeric', 'min:0.0001'],
@@ -503,6 +512,15 @@ class PtaWebController extends Controller
                 'message' => 'Donnees invalides.',
                 'errors' => $e->errors(),
             ], 422);
+        }
+
+        // Workflow V2 : dérive mode_evaluation depuis type_action si non fourni.
+        if (empty($validated['mode_evaluation'])) {
+            $validated['mode_evaluation'] = match ($validated['type_action'] ?? '') {
+                Action::TYPE_QUANTITATIVE => Action::MODE_QUANTITATIF,
+                Action::TYPE_COMPOSEE => Action::MODE_SOUS_ACTIONS,
+                default => Action::MODE_SANS_QUANTITE,
+            };
         }
 
         try {
@@ -979,6 +997,14 @@ class PtaWebController extends Controller
             'objectif_operationnel_id' => $actionObjectifId,
             'unite_dg_id' => $primaryRmoUniteId !== null ? (int) $primaryRmoUniteId : $existingAction?->unite_dg_id,
             'mode_evaluation' => $modeEvaluation,
+            // Workflow V2 : type_action + conditions de conformité.
+            'type_action' => match ($modeEvaluation) {
+                Action::MODE_QUANTITATIF => Action::TYPE_QUANTITATIVE,
+                Action::MODE_SOUS_ACTIONS => Action::TYPE_COMPOSEE,
+                default => Action::TYPE_NON_QUANTITATIVE,
+            },
+            'requires_comment' => filter_var($actionPayload['requires_comment'] ?? $existingAction?->requires_comment ?? false, FILTER_VALIDATE_BOOL),
+            'allows_difficulty' => filter_var($actionPayload['allows_difficulty'] ?? $existingAction?->allows_difficulty ?? true, FILTER_VALIDATE_BOOL),
             'libelle' => trim((string) ($actionPayload['libelle'] ?? '')),
             'description' => ($value = trim((string) ($actionPayload['description'] ?? ''))) !== ''
                 ? $value
@@ -1120,12 +1146,25 @@ class PtaWebController extends Controller
                     ->first()
                 : null;
 
+            // Workflow V2 : type + poids + conditions de la sous-action.
+            $saType = trim((string) ($subActionPayload['sub_action_type'] ?? ''));
+            if (! in_array($saType, [SousAction::TYPE_QUANTITATIVE, SousAction::TYPE_NON_QUANTITATIVE], true)) {
+                $saType = $this->nullableFloat($subActionPayload['cible_prevue'] ?? null) !== null
+                    ? SousAction::TYPE_QUANTITATIVE
+                    : SousAction::TYPE_NON_QUANTITATIVE;
+            }
+
             $payload = [
                 'agent_id' => $this->resolveSubActionAgentId($subActionPayload, $subAction, $rmoIds, (int) $defaultAgentId, (int) $subActionIndex),
                 'libelle' => $label,
+                'sub_action_type' => $saType,
+                'weight' => $this->nullableFloat($subActionPayload['weight'] ?? null),
+                'requires_proof' => filter_var($subActionPayload['requires_proof'] ?? true, FILTER_VALIDATE_BOOL),
+                'requires_comment' => filter_var($subActionPayload['requires_comment'] ?? false, FILTER_VALIDATE_BOOL),
+                'allows_difficulty' => filter_var($subActionPayload['allows_difficulty'] ?? true, FILTER_VALIDATE_BOOL),
                 'description' => ($value = trim((string) ($subActionPayload['description'] ?? ''))) !== '' ? $value : null,
                 'resultat_attendu' => ($value = trim((string) ($subActionPayload['resultat_attendu'] ?? ''))) !== '' ? $value : null,
-                'cible_prevue' => $this->nullableFloat($subActionPayload['cible_prevue'] ?? null),
+                'cible_prevue' => $saType === SousAction::TYPE_QUANTITATIVE ? $this->nullableFloat($subActionPayload['cible_prevue'] ?? null) : null,
                 'unite' => ($value = trim((string) ($subActionPayload['unite'] ?? ''))) !== '' ? $value : $action->unite_cible,
                 'commentaire' => ($value = trim((string) ($subActionPayload['commentaire'] ?? ''))) !== '' ? $value : null,
                 'date_debut' => $subActionPayload['date_debut'] ?? optional($action->date_debut)->format('Y-m-d') ?? now()->toDateString(),
