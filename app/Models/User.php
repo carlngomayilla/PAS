@@ -45,6 +45,34 @@ class User extends Authenticatable
     public const ROLE_INVITE_LECTURE = 'invite_lecture';
 
     /**
+     * @return array<int, string>
+     */
+    public static function serviceOrUnitChiefRoles(): array
+    {
+        return [
+            self::ROLE_SERVICE,
+            self::ROLE_CHEF_UNITE,
+            self::ROLE_CHEF_UNITE_SCIQ,
+            self::ROLE_CHEF_UNITE_DGA,
+            self::ROLE_CHEF_UNITE_CABINET,
+            self::ROLE_CHEF_UNITE_UCAS,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function serviceOrUnitChiefBlockedPermissions(): array
+    {
+        return [
+            'scope.global.read',
+            'scope.global.write',
+            'planning.write.global',
+            'planning.strategic.manage',
+        ];
+    }
+
+    /**
      * Champs mass-assignables : UNIQUEMENT les champs modifiables par l utilisateur
      * lui-meme depuis son propre profil.
      *
@@ -253,6 +281,13 @@ class User extends Authenticatable
             return true;
         }
 
+        if (
+            in_array(self::ROLE_SERVICE, $roles, true)
+            && in_array((string) $this->role, self::serviceOrUnitChiefRoles(), true)
+        ) {
+            return true;
+        }
+
         $customCode = trim((string) ($this->custom_role_code ?? ''));
         if ($customCode === '') {
             return false;
@@ -263,6 +298,12 @@ class User extends Authenticatable
         }
 
         $baseRole = app(\App\Services\RoleRegistryService::class)->baseRole($customCode);
+        if (
+            in_array(self::ROLE_SERVICE, $roles, true)
+            && in_array($baseRole, self::serviceOrUnitChiefRoles(), true)
+        ) {
+            return true;
+        }
 
         return in_array($baseRole, $roles, true);
     }
@@ -299,13 +340,26 @@ class User extends Authenticatable
      */
     public function grantedPermissions(): array
     {
-        return app(\App\Services\RolePermissionSettings::class)->forUser($this);
+        $permissions = app(\App\Services\RolePermissionSettings::class)->forUser($this);
+
+        if (! $this->isServiceOrUnitChief()) {
+            return $permissions;
+        }
+
+        return array_values(array_diff($permissions, self::serviceOrUnitChiefBlockedPermissions()));
     }
 
     public function hasPermission(string $permission): bool
     {
         if ($this->isSuperAdmin()) {
             return true;
+        }
+
+        if (
+            $this->isServiceOrUnitChief()
+            && in_array($permission, self::serviceOrUnitChiefBlockedPermissions(), true)
+        ) {
+            return false;
         }
 
         return app(\App\Services\RolePermissionSettings::class)->has($this, $permission);
@@ -342,10 +396,36 @@ class User extends Authenticatable
         return $this->role === self::ROLE_AGENT;
     }
 
+    public function isServiceOrUnitChief(): bool
+    {
+        if (in_array((string) $this->role, self::serviceOrUnitChiefRoles(), true)) {
+            return true;
+        }
+
+        $customCode = trim((string) ($this->custom_role_code ?? ''));
+        if ($customCode === '') {
+            return false;
+        }
+
+        if (in_array($customCode, self::serviceOrUnitChiefRoles(), true)) {
+            return true;
+        }
+
+        return in_array(
+            app(\App\Services\RoleRegistryService::class)->baseRole($customCode),
+            self::serviceOrUnitChiefRoles(),
+            true
+        );
+    }
+
     public function profileScopeLabel(): string
     {
         if ($this->isSuperAdmin()) {
             return 'Portée globale plateforme';
+        }
+
+        if ($this->isServiceOrUnitChief()) {
+            return 'Portée direction et service';
         }
 
         if ($this->hasGlobalWriteAccess()) {

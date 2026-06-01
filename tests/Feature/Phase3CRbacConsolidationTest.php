@@ -19,8 +19,8 @@ use Tests\TestCase;
 
 /**
  * Couvre la sous-phase 3.C :
- *   - A36 : SCIQ, SCIQ_SUIVI_GLOBAL et CHEF_UNITE_SCIQ portent strictement la
- *     meme matrice de permissions (alias fonctionnels).
+ *   - A36 : SCIQ et SCIQ_SUIVI_GLOBAL portent strictement la meme matrice.
+ *     CHEF_UNITE_SCIQ reste limite au perimetre service/unite.
  *   - A35 : les totaux globaux du dashboard et du reporting concordent pour un
  *     meme user et un meme exercice (anti-divergence chiffres).
  */
@@ -39,7 +39,6 @@ class Phase3CRbacConsolidationTest extends TestCase
 
         sort($sciq);
         sort($sciqSuiviGlobal);
-        sort($chefUniteSciq);
 
         $this->assertSame(
             $sciq,
@@ -47,10 +46,14 @@ class Phase3CRbacConsolidationTest extends TestCase
             'A36 — ROLE_SCIQ_SUIVI_GLOBAL doit avoir EXACTEMENT les memes permissions que ROLE_SCIQ.'
         );
 
-        $this->assertSame(
+        $this->assertContains('planning.write.service', $chefUniteSciq);
+        $this->assertNotContains('scope.global.read', $chefUniteSciq);
+        $this->assertNotContains('planning.write.global', $chefUniteSciq);
+        $this->assertNotContains('planning.strategic.manage', $chefUniteSciq);
+        $this->assertNotEqualsCanonicalizing(
             $sciq,
             $chefUniteSciq,
-            'A36 — ROLE_CHEF_UNITE_SCIQ doit avoir EXACTEMENT les memes permissions que ROLE_SCIQ.'
+            'A36 — ROLE_CHEF_UNITE_SCIQ doit rester distinct de ROLE_SCIQ.'
         );
     }
 

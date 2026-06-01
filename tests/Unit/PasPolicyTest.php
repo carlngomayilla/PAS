@@ -56,6 +56,12 @@ class PasPolicyTest extends TestCase
         $this->assertFalse($this->policy->update($fixture['service_user'], $fixture['pas']));
         $this->assertFalse($this->policy->delete($fixture['service_user'], $fixture['pas']));
 
+        $this->assertTrue($this->policy->viewAny($fixture['chef_sciq_user']));
+        $this->assertTrue($this->policy->view($fixture['chef_sciq_user'], $fixture['pas']));
+        $this->assertFalse($this->policy->create($fixture['chef_sciq_user']));
+        $this->assertFalse($this->policy->update($fixture['chef_sciq_user'], $fixture['pas']));
+        $this->assertFalse($this->policy->delete($fixture['chef_sciq_user'], $fixture['pas']));
+
         // Nouvelle regle de perimetre (2026-05-28) : un directeur d'une AUTRE
         // direction n'a pas de PAO/OO/PTA dans ce PAS, donc il ne doit pas le voir.
         // viewAny reste true (il a planning.read) mais view sur un PAS hors perimetre
@@ -73,6 +79,12 @@ class PasPolicyTest extends TestCase
             $this->policy->view($fixture['other_service_user'], $fixture['pas']),
             'Un chef de service sans PTA/OO dans ce PAS ne doit pas le voir.'
         );
+
+        $this->assertTrue($this->policy->viewAny($fixture['other_chef_sciq_user']));
+        $this->assertFalse(
+            $this->policy->view($fixture['other_chef_sciq_user'], $fixture['pas']),
+            'Un chef unite SCIQ rattache a un autre service ne doit pas voir ce PAS.'
+        );
     }
 
     /**
@@ -83,6 +95,8 @@ class PasPolicyTest extends TestCase
      *     other_direction_user: User,
      *     service_user: User,
      *     other_service_user: User,
+     *     chef_sciq_user: User,
+     *     other_chef_sciq_user: User,
      *     pas: Pas
      * }
      */
@@ -150,6 +164,20 @@ class PasPolicyTest extends TestCase
             'password_changed_at' => now(),
         ]);
 
+        $chefSciqUser = User::factory()->create([
+            'role' => User::ROLE_CHEF_UNITE_SCIQ,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'password_changed_at' => now(),
+        ]);
+
+        $otherChefSciqUser = User::factory()->create([
+            'role' => User::ROLE_CHEF_UNITE_SCIQ,
+            'direction_id' => $direction->id,
+            'service_id' => $otherService->id,
+            'password_changed_at' => now(),
+        ]);
+
         $pas = Pas::query()->create([
             'titre' => 'PAS politique',
             'periode_debut' => 2026,
@@ -187,6 +215,8 @@ class PasPolicyTest extends TestCase
             'other_direction_user' => $otherDirectionUser,
             'service_user' => $serviceUser,
             'other_service_user' => $otherServiceUser,
+            'chef_sciq_user' => $chefSciqUser,
+            'other_chef_sciq_user' => $otherChefSciqUser,
             'pas' => $pas,
         ];
     }

@@ -242,6 +242,10 @@ trait AuthorizesPlanningScope
 
     protected function canWriteStrategicPlanning(User $user): bool
     {
+        if ($user->isServiceOrUnitChief()) {
+            return false;
+        }
+
         return $user->hasPermission('planning.strategic.manage');
     }
 
@@ -494,11 +498,19 @@ trait AuthorizesPlanningScope
 
     protected function canReadAllPlanning(User $user): bool
     {
+        if ($user->isServiceOrUnitChief()) {
+            return false;
+        }
+
         return $user->hasGlobalReadAccess() && $user->hasPermission('planning.read');
     }
 
     protected function canWriteAllPlanning(User $user): bool
     {
+        if ($user->isServiceOrUnitChief()) {
+            return false;
+        }
+
         return $user->hasPermission('planning.write.global');
     }
 
@@ -516,6 +528,7 @@ trait AuthorizesPlanningScope
             || $user->hasRole(
                 User::ROLE_SERVICE,
                 User::ROLE_CHEF_UNITE,
+                User::ROLE_CHEF_UNITE_SCIQ,
                 User::ROLE_CHEF_UNITE_DGA,
                 User::ROLE_CHEF_UNITE_CABINET,
                 User::ROLE_CHEF_UNITE_UCAS,

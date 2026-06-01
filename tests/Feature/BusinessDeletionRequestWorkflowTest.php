@@ -206,6 +206,56 @@ class BusinessDeletionRequestWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_super_admin_can_delete_pas_with_full_tree_cascades_immediately(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        [$direction, $service] = $this->makeScope('BDRPAS-SA');
+        [$pas, $pao, $pta] = $this->makePlanningTree($direction, $service, 'PAS supprime par SA');
+        $action = $this->makeAction($pta, 'Action cascade SA');
+
+        $this->actingAs($superAdmin)
+            ->delete(route('workspace.pas.destroy', $pas), [
+                'motif' => 'Suppression directe du PAS complet par Super Admin.',
+            ])
+            ->assertRedirect(route('workspace.pas.index'));
+
+        $this->assertTrue((bool) Pas::withTrashed()->findOrFail($pas->id)->trashed());
+        $this->assertTrue((bool) Pao::withTrashed()->findOrFail($pao->id)->trashed());
+        $this->assertTrue((bool) Pta::withTrashed()->findOrFail($pta->id)->trashed());
+        $this->assertTrue((bool) Action::withTrashed()->findOrFail($action->id)->trashed());
+        $this->assertDatabaseMissing('deletion_requests', [
+            'entity_type' => Pas::class,
+            'entity_id' => $pas->id,
+        ]);
+    }
+
+    public function test_dg_can_delete_pas_with_full_tree_cascades_immediately(): void
+    {
+        $dg = User::factory()->create([
+            'role' => User::ROLE_DG,
+            'is_active' => true,
+            'password_changed_at' => now(),
+        ]);
+        [$direction, $service] = $this->makeScope('BDRPAS-DG');
+        [$pas, $pao, $pta] = $this->makePlanningTree($direction, $service, 'PAS supprime par DG');
+        $action = $this->makeAction($pta, 'Action cascade DG');
+
+        $this->actingAs($dg)
+            ->delete(route('workspace.pas.destroy', $pas), [
+                'motif' => 'Suppression directe du PAS complet par DG.',
+            ])
+            ->assertRedirect(route('workspace.pas.index'));
+
+        $this->assertTrue((bool) Pas::withTrashed()->findOrFail($pas->id)->trashed());
+        $this->assertTrue((bool) Pao::withTrashed()->findOrFail($pao->id)->trashed());
+        $this->assertTrue((bool) Pta::withTrashed()->findOrFail($pta->id)->trashed());
+        $this->assertTrue((bool) Action::withTrashed()->findOrFail($action->id)->trashed());
+        $this->assertDatabaseMissing('deletion_requests', [
+            'entity_type' => Pas::class,
+            'entity_id' => $pas->id,
+        ]);
+    }
+
     /**
      * @return array{0:Direction,1:Service}
      */
@@ -253,5 +303,29 @@ class BusinessDeletionRequestWorkflowTest extends TestCase
         ]);
 
         return [$pas, $pao, $pta];
+    }
+
+    private function makeAction(Pta $pta, string $label): Action
+    {
+        $agent = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'is_agent' => true,
+            'is_active' => true,
+            'direction_id' => $pta->direction_id,
+            'service_id' => $pta->service_id,
+            'password_changed_at' => now(),
+        ]);
+
+        return Action::query()->create([
+            'pta_id' => $pta->id,
+            'pao_id' => $pta->pao_id,
+            'libelle' => $label,
+            'date_debut' => now()->subWeek()->toDateString(),
+            'date_fin' => now()->addWeek()->toDateString(),
+            'responsable_id' => $agent->id,
+            'statut' => 'en_cours',
+            'statut_dynamique' => 'en_cours',
+            'financement_requis' => false,
+        ]);
     }
 }

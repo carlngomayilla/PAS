@@ -14,6 +14,7 @@ class PaoPolicy
     {
         return $user->hasGlobalReadAccess()
             || $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE)
+            || $user->isServiceOrUnitChief()
             || $user->hasDelegatedPermission('planning_read')
             || $user->hasDelegatedPermission('planning_write');
     }

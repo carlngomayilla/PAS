@@ -41,7 +41,7 @@ class AlertRoutingService
             $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
             $this->delegationService->delegatedDirectionReviewers($directionId)
         );
-        $planificationRecipients = $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ]);
+        $planificationRecipients = $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL]);
         $dgRecipients = $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG]);
 
         if (in_array($targetRole, ['responsable', 'agent'], true)) {
@@ -120,6 +120,7 @@ class AlertRoutingService
     {
         return User::query()
             ->whereIn('role', $roles)
+            ->whereNotIn('role', User::serviceOrUnitChiefRoles())
             ->get();
     }
 
@@ -149,6 +150,7 @@ class AlertRoutingService
             User::ROLE_SERVICE,
             User::ROLE_CHEF_UNITE,
             User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,
             User::ROLE_CHEF_UNITE_UCAS,
         ];
@@ -228,7 +230,7 @@ class AlertRoutingService
                 'responsable' => $this->agentRecipient($action),
                 'service' => $serviceRecipients,
                 'direction' => $directionRecipients,
-                'planification' => $this->globalUsers([User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ]),
+                'planification' => $this->globalUsers([User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL]),
                 'dg' => $this->globalUsers([User::ROLE_DG]),
                 User::ROLE_ADMIN => $this->globalUsers([User::ROLE_ADMIN]),
                 User::ROLE_SUPER_ADMIN => $this->globalUsers([User::ROLE_SUPER_ADMIN]),

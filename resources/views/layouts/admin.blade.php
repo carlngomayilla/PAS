@@ -36,8 +36,6 @@
     <title>@yield('title', 'Dashboard') - {{ $platformSettings->get('app_short_name', 'ANBG') }}</title>
     @stack('head')
     @include('partials.vite-assets')
-    {{-- ANBG Glass theme — chargé après Vite pour gagner la cascade --}}
-    <link rel="stylesheet" href="{{ asset('css/anbg-glass.css') }}?v={{ filemtime(public_path('css/anbg-glass.css')) }}">
     <style>
         :root { --app-sidebar-width: 232px; --app-sidebar-collapsed-width: 72px; }
 

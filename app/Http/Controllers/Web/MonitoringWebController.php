@@ -1739,11 +1739,15 @@ class MonitoringWebController extends Controller
             return 'dg';
         }
 
-        if ($user->hasRole(User::ROLE_CABINET, User::ROLE_COLLABORATEUR, User::ROLE_CABINET_SUPERVISION, User::ROLE_CHEF_UNITE_CABINET)) {
+        if ($user->isServiceOrUnitChief() || $user->hasRole(User::ROLE_UCAS)) {
+            return 'service';
+        }
+
+        if ($user->hasRole(User::ROLE_CABINET, User::ROLE_COLLABORATEUR, User::ROLE_CABINET_SUPERVISION)) {
             return 'cabinet';
         }
 
-        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ)) {
+        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL)) {
             return 'planification';
         }
 

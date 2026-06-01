@@ -65,6 +65,7 @@ class AccessScopeService
         // 2) Chef d'unité UCAS — limité à son unité DG.
         if ($user->hasRole(
             User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_CABINET,
             User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_UCAS
@@ -179,6 +180,10 @@ class AccessScopeService
 
     public function hasDualInterface(User $user): bool
     {
+        if ($user->isServiceOrUnitChief()) {
+            return false;
+        }
+
         if ($user->hasRole(User::ROLE_UCAS, User::ROLE_CHEF_UNITE_UCAS)) {
             return false;
         }
@@ -187,11 +192,9 @@ class AccessScopeService
             User::ROLE_PLANIFICATION,
             User::ROLE_SCIQ,
             User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_COLLABORATEUR,
             User::ROLE_CABINET,
             User::ROLE_CABINET_SUPERVISION,
-            User::ROLE_CHEF_UNITE_CABINET,
         )) {
             return true;
         }
@@ -247,7 +250,6 @@ class AccessScopeService
                 User::ROLE_PLANIFICATION,
                 User::ROLE_SCIQ,
                 User::ROLE_SCIQ_SUIVI_GLOBAL,
-                User::ROLE_CHEF_UNITE_SCIQ,
             );
     }
 

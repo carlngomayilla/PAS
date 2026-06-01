@@ -90,7 +90,10 @@ class RolePermissionSettings
                     continue;
                 }
 
-                $settings[$role] = $this->sanitizePermissionList($decoded);
+                $settings[$role] = $this->enforceServiceOrUnitChiefBoundary(
+                    $role,
+                    $this->sanitizePermissionList($decoded)
+                );
             }
         }
 
@@ -154,7 +157,10 @@ class RolePermissionSettings
 
             $permissions = $role === User::ROLE_SUPER_ADMIN
                 ? array_keys($this->permissions())
-                : $this->sanitizePermissionList($submittedPermissions);
+                : $this->enforceServiceOrUnitChiefBoundary(
+                    $role,
+                    $this->sanitizePermissionList($submittedPermissions)
+                );
 
             PlatformSetting::query()->updateOrCreate(
                 ['group' => 'role_permissions', 'key' => 'role_permissions_'.$role],
@@ -363,17 +369,13 @@ class RolePermissionSettings
                 'messagerie.read',
             ],
 
-            // A36 — Alias fonctionnel de SCIQ (cf. ci-dessus). Aligne sur SCIQ.
+            // Chef d'unite SCIQ : portee service/unite, pas globale.
             User::ROLE_CHEF_UNITE_SCIQ => [
-                'scope.global.read',
                 'planning.read',
-                'planning.write.global',
-                'planning.strategic.manage',
+                'planning.write.service',
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'referentiel.write',
-                'delegations.manage',
                 'messagerie.read',
             ],
 
@@ -492,6 +494,19 @@ class RolePermissionSettings
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * @param array<int, string> $permissions
+     * @return array<int, string>
+     */
+    private function enforceServiceOrUnitChiefBoundary(string $role, array $permissions): array
+    {
+        if (! in_array($role, User::serviceOrUnitChiefRoles(), true)) {
+            return $permissions;
+        }
+
+        return array_values(array_diff($permissions, User::serviceOrUnitChiefBlockedPermissions()));
     }
 
     /**

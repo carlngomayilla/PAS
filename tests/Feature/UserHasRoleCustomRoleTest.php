@@ -81,4 +81,18 @@ class UserHasRoleCustomRoleTest extends TestCase
         $this->assertTrue($user->hasRole(User::ROLE_SERVICE));
         $this->assertTrue($user->hasRole(User::ROLE_CHEF_UNITE_SCIQ));
     }
+
+    public function test_unit_chief_roles_are_treated_as_service_scoped_profiles(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_CHEF_UNITE_SCIQ,
+            'custom_role_code' => null,
+        ]);
+
+        $this->assertTrue($user->hasRole(User::ROLE_SERVICE));
+        $this->assertTrue($user->isServiceOrUnitChief());
+        $this->assertFalse($user->hasPermission('scope.global.read'));
+        $this->assertFalse($user->hasPermission('planning.write.global'));
+        $this->assertFalse($user->hasPermission('planning.strategic.manage'));
+    }
 }

@@ -1427,7 +1427,6 @@ class WorkspaceNotificationService
             User::ROLE_PLANIFICATION,
             User::ROLE_SCIQ,
             User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_UNITE_SCIQ,
         ]);
     }
 
@@ -1498,7 +1497,7 @@ class WorkspaceNotificationService
         if (in_array($unitCode, [UniteDg::CODE_DGA, UniteDg::CODE_CABINET], true)) {
             return $this->mergeRecipients(
                 $targets,
-                $this->globalUsers([User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_CHEF_UNITE_SCIQ])
+                $this->globalUsers([User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL])
             );
         }
 
@@ -1624,6 +1623,7 @@ class WorkspaceNotificationService
     {
         return User::query()
             ->whereIn('role', $roles)
+            ->whereNotIn('role', User::serviceOrUnitChiefRoles())
             ->get();
     }
 
@@ -1636,6 +1636,7 @@ class WorkspaceNotificationService
             User::ROLE_SERVICE,
             User::ROLE_CHEF_UNITE,
             User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,
             User::ROLE_CHEF_UNITE_UCAS,
         ];

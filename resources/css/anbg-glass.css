@@ -1,11 +1,9 @@
 /* ============================================================
-   ANBG GLASS PREMIUM THEME — standalone v2 (2026-05-30)
-   Chargé directement via <link> dans admin.blade.php
-   Indépendant du build Vite — modifs visibles au prochain refresh
+   ANBG GLASS PREMIUM THEME - Vite entry (2026-05-30)
+   Charge via resources/css/anbg-glass.css apres app.css.
+   Deploiement prod: npm run build pour generer un asset hashe.
 
-   v2 : transparence réellement visible (le fond mesh passe à travers),
-   moins de blanc opaque, plus de teinte couleur (bleu/vert/orange) sur
-   les surfaces, support dark mode renforcé.
+   v2 : transparence visible, teintes ANBG, support dark mode renforce.
    ============================================================ */
 
 /* ========================================================
@@ -16,9 +14,9 @@ body.anbg-glass-theme {
     --glass-blue: #3996d3;
     --glass-blue-deep: #1c5f91;
     --glass-navy: #1c203d;
-    --glass-green: #8fc043;
-    --glass-orange: #f9b13c;
-    --glass-yellow: #f8e932;
+    --glass-green: #3996d3;
+    --glass-orange: #245f99;
+    --glass-yellow: #dbeafe;
 
     /* Surfaces — opacité réduite pour laisser passer le fond */
     --glass-surface: rgba(255, 255, 255, 0.38);
@@ -39,15 +37,15 @@ body.anbg-glass-theme {
 
     /* Surfaces teintées (subtil rappel de la couleur de fond) */
     --glass-tint-blue: rgba(57, 150, 211, 0.12);
-    --glass-tint-green: rgba(143, 192, 67, 0.10);
-    --glass-tint-orange: rgba(249, 177, 60, 0.10);
+    --glass-tint-green: rgba(57, 150, 211, 0.10);
+    --glass-tint-orange: rgba(36, 95, 153, 0.10);
 
     /* Fond mesh ANBG — plus saturé et vivant */
     min-height: 100vh !important;
     background:
         radial-gradient(900px 700px at 8% 0%, rgba(57, 150, 211, 0.52), transparent 60%),
-        radial-gradient(1000px 800px at 95% 12%, rgba(143, 192, 67, 0.48), transparent 58%),
-        radial-gradient(1100px 900px at 50% 110%, rgba(249, 177, 60, 0.36), transparent 55%),
+        radial-gradient(1000px 800px at 95% 12%, rgba(57, 150, 211, 0.34), transparent 58%),
+        radial-gradient(1100px 900px at 50% 110%, rgba(36, 95, 153, 0.28), transparent 55%),
         radial-gradient(800px 600px at 50% 50%, rgba(124, 58, 237, 0.10), transparent 70%),
         linear-gradient(135deg, #c8def4 0%, #e0eef9 35%, #ddf0c5 70%, #fde7ce 100%) !important;
     background-attachment: fixed !important;
@@ -133,7 +131,7 @@ body.anbg-glass-theme .workspace-header {
         135deg,
         rgba(255, 255, 255, 0.48),
         rgba(57, 150, 211, 0.10) 50%,
-        rgba(143, 192, 67, 0.10)
+        rgba(57, 150, 211, 0.10)
     ) !important;
     backdrop-filter: blur(24px) saturate(160%) !important;
     -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
@@ -164,7 +162,7 @@ body.anbg-glass-theme .page-header::after {
     width: 300px !important;
     height: 300px !important;
     border-radius: 999px !important;
-    background: radial-gradient(circle, rgba(143, 192, 67, 0.30), transparent 70%) !important;
+    background: radial-gradient(circle, rgba(57, 150, 211, 0.30), transparent 70%) !important;
     pointer-events: none !important;
 }
 
@@ -241,16 +239,16 @@ body.anbg-glass-theme .glass-btn-primary:hover {
     box-shadow: 0 12px 28px rgba(57, 150, 211, 0.38) !important;
 }
 body.anbg-glass-theme .btn-success {
-    background: linear-gradient(135deg, var(--glass-green), #6da32f) !important;
+    background: linear-gradient(135deg, var(--glass-navy), var(--glass-blue)) !important;
     color: #fff !important;
     border-color: transparent !important;
-    box-shadow: 0 8px 22px rgba(143, 192, 67, 0.28) !important;
+    box-shadow: 0 8px 22px rgba(36, 95, 153, 0.28) !important;
 }
 body.anbg-glass-theme .btn-warning {
-    background: linear-gradient(135deg, var(--glass-orange), #d9881f) !important;
+    background: linear-gradient(135deg, var(--glass-navy), var(--glass-sky)) !important;
     color: #fff !important;
     border-color: transparent !important;
-    box-shadow: 0 8px 22px rgba(249, 177, 60, 0.28) !important;
+    box-shadow: 0 8px 22px rgba(57, 150, 211, 0.28) !important;
 }
 body.anbg-glass-theme .btn-danger {
     background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
@@ -340,15 +338,15 @@ body.anbg-glass-theme .anbg-badge {
 /* === ALERTS / FLASH MESSAGES === */
 body.anbg-glass-theme .alert-success,
 body.anbg-glass-theme [role="status"].success {
-    background: linear-gradient(135deg, rgba(143, 192, 67, 0.22), rgba(143, 192, 67, 0.10)) !important;
-    border: 1px solid rgba(143, 192, 67, 0.45) !important;
+    background: linear-gradient(135deg, rgba(28, 32, 61, 0.18), rgba(57, 150, 211, 0.12)) !important;
+    border: 1px solid rgba(57, 150, 211, 0.45) !important;
     color: #355c0f !important;
     backdrop-filter: blur(16px) !important;
 }
 body.anbg-glass-theme .alert-warning,
 body.anbg-glass-theme [role="status"].warning {
-    background: linear-gradient(135deg, rgba(249, 177, 60, 0.22), rgba(249, 177, 60, 0.10)) !important;
-    border: 1px solid rgba(249, 177, 60, 0.45) !important;
+    background: linear-gradient(135deg, rgba(28, 32, 61, 0.18), rgba(36, 95, 153, 0.12)) !important;
+    border: 1px solid rgba(36, 95, 153, 0.45) !important;
     color: #7a3f00 !important;
     backdrop-filter: blur(16px) !important;
 }
@@ -376,8 +374,8 @@ body.anbg-glass-theme.dark {
 
     background:
         radial-gradient(900px 700px at 10% 4%, rgba(57, 150, 211, 0.30), transparent 60%),
-        radial-gradient(1000px 800px at 95% 12%, rgba(143, 192, 67, 0.22), transparent 58%),
-        radial-gradient(1100px 900px at 50% 110%, rgba(249, 177, 60, 0.18), transparent 55%),
+        radial-gradient(1000px 800px at 95% 12%, rgba(57, 150, 211, 0.22), transparent 58%),
+        radial-gradient(1100px 900px at 50% 110%, rgba(36, 95, 153, 0.18), transparent 55%),
         linear-gradient(135deg, #0a0f1f 0%, #111827 45%, #1a2240 100%) !important;
     color: #e2e8f0 !important;
 }
@@ -900,4 +898,739 @@ html.dark body.anbg-glass-theme .charts-top-action-row {
 html.dark body.anbg-glass-theme .charts-status-item:hover,
 html.dark body.anbg-glass-theme .charts-top-action-row:hover {
     background: rgba(30, 41, 59, 0.65) !important;
+}
+
+/* ============================================================
+   ANBG UX FINAL PASS - dashboard/tableau/suivi prototypes
+   Keep at EOF: this wins over the older glass theme and Vite layer.
+   ============================================================ */
+@layer components {
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme {
+        --anbg-navy: #1c203d;
+        --anbg-blue: #3996d3;
+        --anbg-blue-deep: #245f99;
+        --anbg-green: #3996d3;
+        --anbg-yellow: #dbeafe;
+        --anbg-orange: #245f99;
+        --anbg-violet: #1c203d;
+        --anbg-bg: #f4f7fb;
+        --anbg-surface: #ffffff;
+        --anbg-surface-soft: #f1f5f9;
+        --anbg-line: #e5eaf3;
+        --anbg-muted: #6b7290;
+        --anbg-shadow: 0 8px 28px rgba(28,32,61,0.08);
+        --anbg-shadow-strong: 0 22px 54px rgba(28,32,61,0.16);
+        background:
+            radial-gradient(760px 520px at 11% -5%, rgba(57,150,211,0.18), transparent 62%),
+            radial-gradient(720px 500px at 94% 7%, rgba(28,32,61,0.10), transparent 60%),
+            linear-gradient(180deg, #f6f9fd 0%, var(--anbg-bg) 100%) !important;
+        color: var(--anbg-navy) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .admin-page-root,
+        .admin-content-shell,
+        .admin-shell-frame,
+        .app-shell,
+        .app-main,
+        main
+    ) {
+        background: transparent !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        #admin-sidebar,
+        #admin-sidebar .app-sidebar-panel,
+        #admin-sidebar > div
+    ) {
+        background: #3996d3 !important;
+        background-image: none !important;
+        color: #ffffff !important;
+        border-color: rgba(255,255,255,0.20) !important;
+        box-shadow: 12px 0 28px rgba(57,150,211,0.18) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .app-page-header,
+        .showcase-hero,
+        .page-header,
+        .workspace-header,
+        .page-heading,
+        .workspace-heading
+    ) {
+        position: relative !important;
+        overflow: hidden !important;
+        padding: clamp(1.35rem, 2.6vw, 2.45rem) clamp(1.25rem, 3vw, 2.75rem) !important;
+        background-color: var(--anbg-navy) !important;
+        background-image: linear-gradient(135deg, #1c203d 0%, #273f63 36%, #3377a8 70%, #43a2dc 100%) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255,255,255,0.16) !important;
+        border-left: 0 !important;
+        border-radius: 28px !important;
+        box-shadow: var(--anbg-shadow-strong) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .app-page-header,
+        .showcase-hero,
+        .page-header,
+        .workspace-header,
+        .page-heading,
+        .workspace-heading
+    )::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        border-radius: inherit !important;
+        background:
+            linear-gradient(90deg, rgba(255,255,255,0.08), transparent 42%, rgba(57,150,211,0.10)),
+            linear-gradient(180deg, rgba(255,255,255,0.10), transparent 48%) !important;
+        pointer-events: none !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .app-page-header,
+        .showcase-hero,
+        .page-header,
+        .workspace-header,
+        .page-heading,
+        .workspace-heading
+    )::after {
+        content: none !important;
+        display: none !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .app-page-header,
+        .showcase-hero,
+        .page-header,
+        .workspace-header,
+        .page-heading,
+        .workspace-heading
+    ) > *,
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .app-page-header,
+        .showcase-hero,
+        .page-header,
+        .workspace-header,
+        .page-heading,
+        .workspace-heading
+    ) :where(.showcase-hero-body, .showcase-action-row) {
+        position: relative !important;
+        z-index: 1 !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-hero .showcase-title,
+        .showcase-hero h1,
+        .app-page-header .app-title,
+        .app-page-header h1,
+        .page-header h1,
+        .workspace-header h1,
+        .page-heading h1,
+        .workspace-heading h1
+    ) {
+        color: #ffffff !important;
+        text-shadow: 0 2px 14px rgba(10,18,38,0.20) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-hero .showcase-subtitle,
+        .showcase-hero p,
+        .app-page-header p,
+        .page-header p,
+        .workspace-header p,
+        .page-heading p,
+        .workspace-heading p
+    ) {
+        color: rgba(255,255,255,0.84) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-hero .showcase-eyebrow,
+        .app-page-header .app-eyebrow,
+        .showcase-hero .showcase-chip,
+        .app-page-header .showcase-chip,
+        .page-header .showcase-chip,
+        .workspace-header .showcase-chip,
+        .showcase-hero .showcase-nav-pill,
+        .showcase-hero .btn-secondary,
+        .app-page-header .btn-secondary
+    ) {
+        background: rgba(255,255,255,0.13) !important;
+        border: 1px solid rgba(255,255,255,0.30) !important;
+        color: #ffffff !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.16) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-hero .showcase-chip-dot,
+        .app-page-header .showcase-chip-dot
+    ) {
+        background: #dbeafe !important;
+        box-shadow: 0 0 0 3px rgba(57,150,211,0.18) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-panel,
+        .showcase-toolbar,
+        .app-card,
+        .ui-card,
+        .card,
+        .panel,
+        .action-detail-card,
+        .form-section,
+        .form-shell,
+        .pta-form-panel,
+        .pta-form-shell,
+        .pta-scope-section,
+        .pta-actions-section,
+        .pta-action-block,
+        .form-step-accordion,
+        .action-form-context-strip,
+        .action-form-context-strip article,
+        .form-actions-sticky,
+        .data-table-shell,
+        .app-table-wrapper,
+        .eas-section-card,
+        .showcase-chart-card,
+        .showcase-inline-stat,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-advanced-kpi,
+        .dashboard-gauge-card,
+        .dashboard-status-block,
+        .dashboard-summary-card,
+        .dashboard-synthesis-card,
+        .chart-card,
+        .chart-container,
+        .stat-card-link,
+        .app-stat-card,
+        .eas-stat-card,
+        .workspace-card,
+        .report-card,
+        .reporting-hub-kpi,
+        .monitoring-card,
+        .alert-card,
+        .referentiel-card,
+        .messaging-shell,
+        .messaging-layout,
+        .messaging-thread-panel,
+        .messaging-contact-card,
+        .messaging-empty-state,
+        .filter-panel,
+        .admin-dropdown-panel,
+        .admin-navbar-dropdown,
+        .anbg-dialog-panel,
+        .analytics-explorer-panel,
+        .spotlight-panel,
+        .kanban-column,
+        .kanban-card,
+        .justificatif-card,
+        .modif-modal-card,
+        .appearance-live-preview-card,
+        .appearance-live-preview-kpi,
+        .appearance-live-preview-login-hero,
+        .appearance-live-preview-login-card
+    ) {
+        background-color: #ffffff !important;
+        background-image: linear-gradient(135deg, #ffffff 0%, #fbfdff 62%, rgba(57,150,211,0.13) 100%) !important;
+        border: 1px solid var(--anbg-line) !important;
+        border-left: 4px solid var(--anbg-blue) !important;
+        border-radius: 16px !important;
+        color: var(--anbg-navy) !important;
+        box-shadow: var(--anbg-shadow) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-panel,
+        .app-card,
+        .ui-card,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-summary-card,
+        .eas-section-card,
+        .workspace-card,
+        .report-card,
+        .monitoring-card,
+        .alert-card,
+        .referentiel-card,
+        .messaging-contact-card,
+        .kanban-card,
+        .form-step-accordion
+    ):nth-of-type(3n+2) {
+        background-image: linear-gradient(135deg, #ffffff 0%, #f8fbff 62%, rgba(36,95,153,0.12) 100%) !important;
+        border-left-color: var(--anbg-blue-deep) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-panel,
+        .app-card,
+        .ui-card,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-summary-card,
+        .eas-section-card,
+        .workspace-card,
+        .report-card,
+        .monitoring-card,
+        .alert-card,
+        .referentiel-card,
+        .messaging-contact-card,
+        .kanban-card,
+        .form-step-accordion
+    ):nth-of-type(3n+3) {
+        background-image: linear-gradient(135deg, #ffffff 0%, #f6f9fd 62%, rgba(28,32,61,0.10) 100%) !important;
+        border-left-color: var(--anbg-navy) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .glass-kpi,
+        .showcase-kpi-card,
+        .dealdeck-kpi-card,
+        .stat-card,
+        .app-stat-card,
+        .eas-stat-card,
+        .anbg-kpi-stat-card,
+        .no-kpi-band.stat-card,
+        .dashboard-summary-card,
+        .dashboard-advanced-kpi,
+        .appearance-live-preview-kpi
+    ) {
+        background: #ffffff !important;
+        border: 1px solid var(--anbg-line) !important;
+        border-left: 4px solid var(--anbg-blue) !important;
+        border-radius: 16px !important;
+        color: var(--anbg-navy) !important;
+        box-shadow: var(--anbg-shadow) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .pta-action-heading,
+        .form-step-accordion > summary,
+        .app-collapsible > summary,
+        .data-table-header,
+        .app-card-header,
+        .form-section-header,
+        .appearance-live-preview-header,
+        .appearance-live-preview-section-head
+    ) {
+        background: linear-gradient(90deg, rgba(28,32,61,0.08), rgba(57,150,211,0.12)) !important;
+        border-color: var(--anbg-line) !important;
+        color: var(--anbg-navy) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .view-toggle,
+        .app-tabs,
+        [data-dashboard-tabs],
+        .dashboard-tabs,
+        .chart-period-bar,
+        .form-step-nav,
+        .appearance-live-preview-toolbar,
+        .appearance-live-preview-actions
+    ) {
+        background: #ffffff !important;
+        border: 1px solid var(--anbg-line) !important;
+        border-radius: 999px !important;
+        box-shadow: 0 8px 24px rgba(28,32,61,0.07) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .btn-primary,
+        .app-btn-primary,
+        .view-toggle-btn.active,
+        .app-tab.active,
+        .dashboard-tab-active,
+        .tab-link.active,
+        .chart-period-btn.active,
+        .appearance-live-preview-tab.is-active,
+        button[type="submit"]:not(.btn-red):not(.btn-delete):not(.btn-amber)
+    ) {
+        background: linear-gradient(135deg, #1c203d 0%, #245f99 48%, #3996d3 100%) !important;
+        border-color: rgba(57,150,211,0.60) !important;
+        color: #ffffff !important;
+        box-shadow: 0 10px 24px rgba(28,32,61,0.20) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-hero .btn-primary,
+        .app-page-header .btn-primary
+    ) {
+        background: linear-gradient(135deg, #1c203d 0%, #245f99 54%, #3996d3 100%) !important;
+        border-color: rgba(255,255,255,0.36) !important;
+        color: #ffffff !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        input:not([type="checkbox"]):not([type="radio"]),
+        select,
+        textarea,
+        .app-input,
+        .app-select,
+        .app-textarea,
+        .dashboard-tabs-search input
+    ) {
+        background: #ffffff !important;
+        border: 1px solid #d8ecf8 !important;
+        color: var(--anbg-navy) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.82) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        input:not([type="checkbox"]):not([type="radio"]):focus,
+        select:focus,
+        textarea:focus,
+        .app-input:focus,
+        .app-select:focus,
+        .app-textarea:focus,
+        .dashboard-tabs-search input:focus
+    ) {
+        border-color: var(--anbg-blue) !important;
+        box-shadow: 0 0 0 4px rgba(57,150,211,0.16) !important;
+        outline: none !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-panel-title,
+        .form-section-title,
+        .data-table-title,
+        .dashboard-summary-value,
+        .stat-card-value,
+        .eas-stat-card-value,
+        .showcase-kpi-number,
+        .appearance-live-preview-title,
+        .appearance-live-preview-kpi strong,
+        .appearance-live-preview-section-head h4
+    ) {
+        color: var(--anbg-navy) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .form-section-subtitle,
+        .showcase-panel-subtitle,
+        .dashboard-summary-meta,
+        .dashboard-summary-label,
+        .stat-card-meta,
+        .stat-card-label,
+        .eas-stat-card-meta,
+        .eas-stat-card-label,
+        .showcase-data-key
+    ) {
+        color: var(--anbg-muted) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .data-table thead th,
+        .app-table thead th,
+        table thead th
+    ) {
+        background: #f1f5f9 !important;
+        border-bottom: 1px solid var(--anbg-line) !important;
+        color: var(--anbg-muted) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .data-table tbody td,
+        .app-table tbody td,
+        table tbody td
+    ) {
+        background: #ffffff !important;
+        border-bottom: 1px solid var(--anbg-line) !important;
+        color: var(--anbg-navy) !important;
+    }
+
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-progress-fill,
+        .dashboard-gantt-progress,
+        .dashboard-critical-gantt-progress,
+        .kanban-card-progress-bar,
+        .charts-unit-bar-fill,
+        .charts-top-action-fill,
+        .appearance-live-preview-chart-bar i
+    ) {
+        background: linear-gradient(90deg, #1c203d 0%, #245f99 58%, #3996d3 100%) !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme {
+        --anbg-navy: #f8fafc;
+        --anbg-bg: #0f172a;
+        --anbg-surface: #131b2e;
+        --anbg-surface-soft: #1e293b;
+        --anbg-line: rgba(148,163,184,0.24);
+        --anbg-muted: #cbd5e1;
+        background:
+            radial-gradient(760px 520px at 11% -5%, rgba(57,150,211,0.20), transparent 62%),
+            radial-gradient(720px 500px at 94% 7%, rgba(28,32,61,0.20), transparent 60%),
+            linear-gradient(180deg, #0f172a 0%, #111827 100%) !important;
+        color: #f8fafc !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        .admin-page-root,
+        .admin-content-shell,
+        .admin-shell-frame,
+        .app-shell,
+        .app-main,
+        main
+    ) {
+        background: transparent !important;
+        color: #f8fafc !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        #admin-sidebar,
+        #admin-sidebar .app-sidebar-panel,
+        #admin-sidebar > div
+    ) {
+        background: #1f5f8e !important;
+        color: #ffffff !important;
+        border-color: rgba(148,163,184,0.22) !important;
+        box-shadow: 12px 0 32px rgba(0,0,0,0.32) !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        .app-page-header,
+        .showcase-hero,
+        .page-header,
+        .workspace-header,
+        .page-heading,
+        .workspace-heading
+    ) {
+        background-color: #10182d !important;
+        background-image: linear-gradient(135deg, #10182d 0%, #1c3155 42%, #245f99 76%, #3996d3 100%) !important;
+        border-color: rgba(148,163,184,0.24) !important;
+        color: #ffffff !important;
+        box-shadow: 0 22px 54px rgba(0,0,0,0.34) !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-panel,
+        .showcase-toolbar,
+        .app-card,
+        .ui-card,
+        .card,
+        .panel,
+        .action-detail-card,
+        .form-section,
+        .form-shell,
+        .pta-form-panel,
+        .pta-form-shell,
+        .pta-scope-section,
+        .pta-actions-section,
+        .pta-action-block,
+        .form-step-accordion,
+        .action-form-context-strip,
+        .action-form-context-strip article,
+        .form-actions-sticky,
+        .data-table-shell,
+        .app-table-wrapper,
+        .eas-section-card,
+        .showcase-chart-card,
+        .showcase-inline-stat,
+        .dashboard-card,
+        .dashboard-widget,
+        .dashboard-advanced-card,
+        .dashboard-advanced-kpi,
+        .dashboard-gauge-card,
+        .dashboard-status-block,
+        .dashboard-summary-card,
+        .chart-card,
+        .chart-container,
+        .stat-card,
+        .eas-stat-card,
+        .workspace-card,
+        .report-card,
+        .reporting-hub-kpi,
+        .monitoring-card,
+        .alert-card,
+        .referentiel-card,
+        .messaging-shell,
+        .messaging-layout,
+        .messaging-thread-panel,
+        .messaging-contact-card,
+        .messaging-empty-state,
+        .filter-panel,
+        .admin-dropdown-panel,
+        .admin-navbar-dropdown,
+        .anbg-dialog-panel,
+        .analytics-explorer-panel,
+        .spotlight-panel,
+        .kanban-column,
+        .kanban-card,
+        .justificatif-card
+    ) {
+        background-color: #131b2e !important;
+        background-image: linear-gradient(135deg, rgba(19,27,46,0.98), rgba(57,150,211,0.15)) !important;
+        border-color: rgba(148,163,184,0.24) !important;
+        border-left: 4px solid rgba(57,150,211,0.82) !important;
+        color: #f8fafc !important;
+        box-shadow: 0 16px 36px rgba(0,0,0,0.30) !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-panel-title,
+        .form-section-title,
+        .data-table-title,
+        .dashboard-summary-value,
+        .stat-card-value,
+        .eas-stat-card-value,
+        .showcase-kpi-number,
+        .showcase-kpi-label,
+        .form-section-subtitle,
+        .showcase-panel-subtitle,
+        .dashboard-summary-meta,
+        .dashboard-summary-label,
+        .stat-card-meta,
+        .stat-card-label,
+        .eas-stat-card-meta,
+        .eas-stat-card-label,
+        label
+    ) {
+        color: #f8fafc !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        input:not([type="checkbox"]):not([type="radio"]),
+        select,
+        textarea,
+        .app-input,
+        .app-select,
+        .app-textarea
+    ) {
+        background: #0f172a !important;
+        border-color: rgba(148,163,184,0.30) !important;
+        color: #f8fafc !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        .data-table thead th,
+        .app-table thead th,
+        table thead th
+    ) {
+        background: #1e293b !important;
+        color: #dbeafe !important;
+        border-bottom-color: rgba(148,163,184,0.24) !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        .data-table tbody td,
+        .app-table tbody td,
+        table tbody td
+    ) {
+        background: #131b2e !important;
+        color: #f8fafc !important;
+        border-bottom-color: rgba(148,163,184,0.18) !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        div,
+        section,
+        article,
+        li,
+        form
+    ):where(
+        [class*="bg-white"],
+        [class*="bg-slate-50"],
+        [class*="bg-slate-100"],
+        [class*="border-white"],
+        [class*="border-slate-200"]
+    ) {
+        background-color: #131b2e !important;
+        background-image: linear-gradient(135deg, rgba(19,27,46,0.98), rgba(57,150,211,0.15)) !important;
+        border-color: rgba(148,163,184,0.24) !important;
+        color: #f8fafc !important;
+    }
+
+    html.dark body.admin-theme-scope.anbg-glass-theme :where(
+        div,
+        section,
+        article,
+        li,
+        form
+    ):where(
+        [class*="bg-white"],
+        [class*="bg-slate-50"],
+        [class*="bg-slate-100"],
+        [class*="border-white"],
+        [class*="border-slate-200"]
+    ) :where(
+        [class*="text-slate-"],
+        [class*="text-gray-"],
+        p,
+        span,
+        strong,
+        small
+    ) {
+        color: #f8fafc !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme :where(
+        .alert-success,
+        .alert-warning,
+        [role="status"].success,
+        [role="status"].warning,
+        .badge-success,
+        .badge-warning,
+        .anbg-badge-success,
+        .anbg-badge-warning,
+        .chip-success,
+        .chip-warning,
+        .status-success,
+        .status-warning,
+        .bg-success,
+        .bg-warning,
+        .bg-anbg-green,
+        .bg-anbg-orange,
+        .btn-success,
+        .btn-warning
+    ) {
+        background-color: #213b62 !important;
+        background-image: linear-gradient(135deg, #1b2344 0%, #245f99 58%, #3996d3 100%) !important;
+        border-color: rgba(219,234,254,0.32) !important;
+        color: #ffffff !important;
+        box-shadow: 0 14px 30px rgba(28,32,61,0.22) !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme :where(
+        .alert-success *,
+        .alert-warning *,
+        .badge-success *,
+        .badge-warning *,
+        .anbg-badge-success *,
+        .anbg-badge-warning *,
+        .chip-success *,
+        .chip-warning *,
+        .status-success *,
+        .status-warning *,
+        .bg-success *,
+        .bg-warning *
+    ) {
+        color: #ffffff !important;
+    }
+
+    @media (max-width: 767px) {
+        body.admin-theme-scope.anbg-glass-theme :where(
+            .app-page-header,
+            .showcase-hero,
+            .page-header,
+            .workspace-header,
+            .page-heading,
+            .workspace-heading
+        ) {
+            border-radius: 20px !important;
+            padding: 1.15rem !important;
+        }
+    }
 }

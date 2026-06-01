@@ -1,5 +1,5 @@
 // ANBG PAS Service Worker — static asset cache
-const CACHE = 'anbg-static-v3';
+const CACHE = 'anbg-static-v4';
 const STATIC_EXTENSIONS = ['.css', '.js', '.woff2', '.woff', '.ttf', '.png', '.ico', '.svg', '.webp'];
 
 self.addEventListener('install', function (e) {
@@ -22,7 +22,7 @@ self.addEventListener('fetch', function (e) {
     if (e.request.method !== 'GET') return;
     if (url.origin !== self.location.origin) return;
 
-    if (url.pathname === '/sw.js' || url.pathname.indexOf('/build/') === 0) {
+    if (url.pathname === '/sw.js' || url.pathname === '/css/anbg-glass.css' || url.pathname.indexOf('/build/') === 0) {
         e.respondWith(
             fetch(e.request, { cache: 'no-store' }).then(function (response) {
                 if (response && response.status === 200) {

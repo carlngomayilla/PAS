@@ -313,7 +313,7 @@ class UserWorkspaceService
             return 'dga_cabinet';
         }
 
-        if (in_array($base, [User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ], true)) {
+        if (in_array($base, [User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_PLANIFICATION], true)) {
             return 'sciq_planif';
         }
 
@@ -329,6 +329,7 @@ class UserWorkspaceService
         if (in_array($base, [
             User::ROLE_SERVICE,
             User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,
         ], true)) {

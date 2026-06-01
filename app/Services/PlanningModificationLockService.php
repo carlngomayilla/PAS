@@ -82,7 +82,7 @@ class PlanningModificationLockService
      *
      * Regle metier ANBG (2026-05-29) — Bypass du verrou pour les operateurs habilites :
      *   1. SA et DG : pilotage complet, bypassent partout (cf. 2026-05-28).
-     *   2. Planification / SCIQ / SCIQ suivi global / Chef d'unite SCIQ / Admin
+     *   2. Planification / SCIQ / SCIQ suivi global / Admin
      *      fonctionnel : operateurs globaux, peuvent ecrire sans demande de
      *      deverrouillage pendant la phase d'edition.
      *   3. Direction : peut ecrire dans sa direction (PAO, PTAs et actions de sa
@@ -120,7 +120,6 @@ class PlanningModificationLockService
             User::ROLE_PLANIFICATION,
             User::ROLE_SCIQ,
             User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_ADMIN_FONCTIONNEL,
         )) {
             return true;
@@ -145,6 +144,7 @@ class PlanningModificationLockService
         if ($actor->hasRole(
             User::ROLE_SERVICE,
             User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_UCAS,
             User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,
@@ -171,8 +171,7 @@ class PlanningModificationLockService
         if ($user->hasRole(
             User::ROLE_PLANIFICATION,
             User::ROLE_SCIQ,
-            User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_UNITE_SCIQ
+            User::ROLE_SCIQ_SUIVI_GLOBAL
         )) {
             return true;
         }
@@ -186,6 +185,7 @@ class PlanningModificationLockService
         if ($user->hasRole(
             User::ROLE_SERVICE,
             User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,
             User::ROLE_CHEF_UNITE_UCAS,
@@ -367,8 +367,7 @@ class PlanningModificationLockService
         return $user->hasRole(
             User::ROLE_PLANIFICATION,
             User::ROLE_SCIQ,
-            User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_UNITE_SCIQ
+            User::ROLE_SCIQ_SUIVI_GLOBAL
         );
     }
 

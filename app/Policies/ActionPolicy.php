@@ -19,6 +19,7 @@ class ActionPolicy
     {
         return $user->hasGlobalReadAccess()
             || $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE)
+            || $user->isServiceOrUnitChief()
             || $user->isAgent()
             || $user->hasDelegatedPermission('action_review')
             || $user->hasDelegatedPermission('planning_write');
@@ -128,7 +129,7 @@ class ActionPolicy
             return false;
         }
 
-        if ($user->hasRole(User::ROLE_SERVICE)
+        if ($user->isServiceOrUnitChief()
             && $this->canManageAction(
                 $user,
                 (int) $action->pta?->direction_id,

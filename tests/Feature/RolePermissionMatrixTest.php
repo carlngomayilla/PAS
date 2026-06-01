@@ -91,6 +91,14 @@ class RolePermissionMatrixTest extends TestCase
                 'referentiel.read',
                 'messagerie.read',
             ],
+            User::ROLE_CHEF_UNITE_SCIQ => [
+                'planning.read',
+                'planning.write.service',
+                'reporting.read',
+                'alerts.read',
+                'referentiel.read',
+                'messagerie.read',
+            ],
             User::ROLE_CHEF_UNITE_DGA => [
                 'planning.read',
                 'planning.write.service',
@@ -173,6 +181,7 @@ class RolePermissionMatrixTest extends TestCase
             // (label "Action") qui couvre les deux vues via les onglets de la page.
             User::ROLE_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
             User::ROLE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
+            User::ROLE_CHEF_UNITE_SCIQ => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
             User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'alertes', 'notifications'],
             User::ROLE_CHEF_UNITE_CABINET => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
             User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'alertes', 'notifications'],

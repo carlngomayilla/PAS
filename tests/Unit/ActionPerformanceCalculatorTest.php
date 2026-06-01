@@ -6,6 +6,7 @@ use App\Models\Action;
 use App\Models\SousAction;
 use App\Services\Workflow\ActionPerformanceCalculator;
 use Illuminate\Support\Carbon;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -22,7 +23,7 @@ class ActionPerformanceCalculatorTest extends TestCase
         $this->calc = new ActionPerformanceCalculator();
     }
 
-    /** @dataProvider performanceStatusProvider */
+    #[DataProvider('performanceStatusProvider')]
     public function test_performance_status_paliers(float $percent, string $expected): void
     {
         $this->assertSame($expected, $this->calc->performanceStatus($percent));
