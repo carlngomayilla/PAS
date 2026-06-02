@@ -82,10 +82,10 @@
                 <div class="grid gap-4 md:grid-cols-2">
                     @foreach ($events as $eventCode => $definition)
                         @php($selectedChannels = is_array($settings['event_'.$eventCode.'_channels'] ?? null) ? ($settings['event_'.$eventCode.'_channels'] ?? []) : (json_decode((string) ($settings['event_'.$eventCode.'_channels'] ?? '[]'), true) ?: []))
-                        <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
+                        <div class="rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/55 px-4 py-4 text-sm text-slate-700">
                             <label class="flex items-start gap-3">
                                 <input
-                                    class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                    class="mt-1 h-4 w-4 rounded border-[#3996d3]/35 text-[#3996d3] focus:ring-[#3996d3]"
                                     type="checkbox"
                                     name="event_{{ $eventCode }}_enabled"
                                     value="1"
@@ -129,11 +129,11 @@
                 <div class="space-y-4">
                     @foreach ($alertLevels as $level => $definition)
                         @php($selectedRoles = is_array($settings['alert_'.$level.'_roles'] ?? null) ? ($settings['alert_'.$level.'_roles'] ?? []) : (json_decode((string) ($settings['alert_'.$level.'_roles'] ?? '[]'), true) ?: []))
-                        <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
+                        <div class="rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/55 px-4 py-4">
                             <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                 <label class="flex items-start gap-3 text-sm text-slate-700">
                                     <input
-                                        class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        class="mt-1 h-4 w-4 rounded border-[#3996d3]/35 text-[#3996d3] focus:ring-[#3996d3]"
                                         type="checkbox"
                                         name="alert_{{ $level }}_enabled"
                                         value="1"
@@ -168,7 +168,7 @@
                 <p class="form-section-subtitle">Chaque règle ajoute des destinataires au circuit natif et peut surcharger le message envoyé. Variables supportées : <code>{action_label}</code>, <code>{level}</code>, <code>{event}</code>, <code>{message}</code>.</p>
                 <div class="space-y-4">
                     @foreach ($ruleRows as $index => $rule)
-                        <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
+                        <div class="rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/55 px-4 py-4">
                             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                 <div>
                                     <label for="rule_level_{{ $index }}">Niveau</label>
@@ -208,7 +208,7 @@
                 <p class="form-section-subtitle">Chaque règle se déclenche à une distance exacte de l'échéance. Exemple : <code>-3</code> pour J-3, <code>7</code> pour J+7. Variables supportées : <code>{action_label}</code>, <code>{level}</code>, <code>{message}</code>, <code>{offset_days}</code>.</p>
                 <div class="space-y-4">
                     @foreach ($timelineRows as $index => $rule)
-                        <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
+                        <div class="rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/55 px-4 py-4">
                             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                 <div>
                                     <label for="timeline_offset_{{ $index }}">Offset jours</label>

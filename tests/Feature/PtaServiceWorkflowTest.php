@@ -11,6 +11,7 @@ use App\Models\PasAxe;
 use App\Models\PasObjectif;
 use App\Models\Pta;
 use App\Models\Service;
+use App\Models\SousAction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -141,6 +142,73 @@ class PtaServiceWorkflowTest extends TestCase
         $this->assertSame('qualitative', $action->type_cible);
         $this->assertSame('binary_completion', $action->methode_calcul);
         $this->assertDatabaseCount('sous_actions', 0);
+    }
+
+    public function test_pta_edit_preserves_workflow_v2_options_for_direct_actions(): void
+    {
+        $fixture = $this->fixture();
+
+        $this->actingAs($fixture['serviceUser'])
+            ->post(route('workspace.pta.store'), [
+                'objectif_operationnel_id' => $fixture['ownObjective']->id,
+                'actions' => [
+                    [
+                        'libelle' => 'Action composee avec options',
+                        'date_debut' => '2026-03-01',
+                        'date_fin' => '2026-06-30',
+                        'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+                        'type_action' => Action::TYPE_COMPOSEE,
+                        'requires_comment' => '1',
+                        'allows_difficulty' => '0',
+                        'rmo_ids' => [$fixture['agent']->id],
+                        'financement_requis' => '0',
+                        'sous_actions' => [
+                            [
+                                'agent_id' => $fixture['agent']->id,
+                                'libelle' => 'Sous-action avec options',
+                                'date_debut' => '2026-03-01',
+                                'date_fin' => '2026-04-30',
+                                'sub_action_type' => SousAction::TYPE_QUANTITATIVE,
+                                'cible_prevue' => '10',
+                                'unite' => 'dossiers',
+                                'weight' => '100',
+                                'requires_proof' => '0',
+                                'requires_comment' => '1',
+                                'allows_difficulty' => '0',
+                            ],
+                        ],
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('workspace.pta.index'));
+
+        $pta = Pta::query()->firstOrFail();
+        $action = Action::query()->where('libelle', 'Action composee avec options')->firstOrFail();
+        $sousAction = SousAction::query()->where('libelle', 'Sous-action avec options')->firstOrFail();
+
+        $this->assertSame(Action::TYPE_COMPOSEE, $action->type_action);
+        $this->assertTrue((bool) $action->requires_comment);
+        $this->assertFalse((bool) $action->allows_difficulty);
+        $this->assertSame(SousAction::TYPE_QUANTITATIVE, $sousAction->sub_action_type);
+        $this->assertEquals(100, (float) $sousAction->weight);
+        $this->assertFalse((bool) $sousAction->requires_proof);
+        $this->assertTrue((bool) $sousAction->requires_comment);
+        $this->assertFalse((bool) $sousAction->allows_difficulty);
+
+        $response = $this->actingAs($fixture['serviceUser'])
+            ->get(route('workspace.pta.edit', $pta))
+            ->assertOk();
+
+        $html = $response->getContent();
+
+        $this->assertMatchesRegularExpression('/<span[^>]*data-action-title-label[^>]*>\s*Action composee avec options\s*<\/span>/', $html);
+        $this->assertMatchesRegularExpression('/<span[^>]*data-action-summary[^>]*>\s*Action composee avec options\s*<\/span>/', $html);
+        $this->assertMatchesRegularExpression('/<input[^>]+name="actions\\[0\\]\\[requires_comment\\]"[^>]+value="1"[^>]+checked/', $html);
+        $this->assertDoesNotMatchRegularExpression('/<input[^>]+name="actions\\[0\\]\\[allows_difficulty\\]"[^>]+value="1"[^>]+checked/', $html);
+        $this->assertMatchesRegularExpression('/name="actions\\[0\\]\\[sous_actions\\]\\[0\\]\\[weight\\]"[^>]+value="100(?:\\.00)?"/', $html);
+        $this->assertDoesNotMatchRegularExpression('/<input[^>]+name="actions\\[0\\]\\[sous_actions\\]\\[0\\]\\[requires_proof\\]"[^>]+value="1"[^>]+checked/', $html);
+        $this->assertMatchesRegularExpression('/<input[^>]+name="actions\\[0\\]\\[sous_actions\\]\\[0\\]\\[requires_comment\\]"[^>]+value="1"[^>]+checked/', $html);
+        $this->assertDoesNotMatchRegularExpression('/<input[^>]+name="actions\\[0\\]\\[sous_actions\\]\\[0\\]\\[allows_difficulty\\]"[^>]+value="1"[^>]+checked/', $html);
     }
 
     public function test_pta_action_date_fin_cannot_exceed_operational_objective_deadline(): void

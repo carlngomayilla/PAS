@@ -122,7 +122,7 @@
 
             <div class="showcase-action-row">
                 <span class="showcase-chip">
-                    <span class="showcase-chip-dot bg-blue-600"></span>
+                    <span class="showcase-chip-dot bg-[#3996d3]"></span>
                     Limite d'affichage : {{ $limit }} éléments
                 </span>
                 <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ route('dashboard') }}">
@@ -173,7 +173,7 @@
 
     <section class="showcase-toolbar mb-4 app-screen-block">
         <div class="flex flex-wrap items-center gap-3">
-            <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+            <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/55 p-1.5">
                 <button class="{{ $filterButtonBase }} border-[#3996d3]/40 bg-[#3996d3] text-white" data-level-filter="all" type="button">
                     Tous
                     <span class="anbg-badge anbg-badge-neutral px-2 py-0.5 text-[10px] leading-none">{{ $summary['total'] ?? 0 }}</span>
@@ -189,7 +189,7 @@
                 @endforeach
             </div>
 
-            <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+            <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/55 p-1.5">
                 <button class="{{ $filterButtonBase }} border-[#3996d3]/40 bg-[#3996d3] text-white" data-state-filter="all" type="button">
                     Toutes
                 </button>
@@ -260,7 +260,7 @@
                         </div>
 
                         @if (!empty($alert['action']))
-                            <div class="mt-3 rounded-2xl border border-slate-200/80 bg-slate-50/90 px-3 py-2 text-sm text-slate-700">
+                            <div class="mt-3 rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/70 px-3 py-2 text-sm text-slate-700">
                                 <strong>Action:</strong> {{ $alert['action']['libelle'] }}
                                 <span class="mx-2 text-slate-400">|</span>
                                 <strong>PTA:</strong> {{ $alert['action']['pta'] }}
@@ -299,12 +299,12 @@
                 </div>
             </a>
         @empty
-            <div class="rounded-2xl border border-dashed border-slate-300 bg-white/90 px-6 py-10 text-center text-sm text-slate-500">
+            <div class="rounded-2xl border border-dashed border-[#3996d3]/35 bg-[#eef6fc]/70 px-6 py-10 text-center text-sm text-slate-500">
                 Aucune alerte sur le périmètre courant.
             </div>
         @endforelse
 
-        <div id="alert-empty-state" class="hidden rounded-2xl border border-dashed border-slate-300 bg-white/90 px-6 py-10 text-center text-sm text-slate-500">
+        <div id="alert-empty-state" class="hidden rounded-2xl border border-dashed border-[#3996d3]/35 bg-[#eef6fc]/70 px-6 py-10 text-center text-sm text-slate-500">
             Aucune alerte ne correspond aux filtres sélectionnés.
         </div>
     </section>
@@ -329,8 +329,10 @@
                 buttons.forEach(function (button) {
                     var isActive = button.getAttribute(attribute) === activeValue;
                     button.classList.toggle('bg-[#3996d3]', isActive);
+                    button.classList.toggle('border-[#3996d3]/40', isActive);
                     button.classList.toggle('text-white', isActive);
                     if (!isActive) {
+                        button.classList.remove('border-[#3996d3]/40');
                         button.classList.remove('border-slate-300');
                     }
                 });

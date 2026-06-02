@@ -369,6 +369,18 @@ class RolePermissionSettings
                 'messagerie.read',
             ],
 
+            // Chef planification : meme niveau de droits que Chef d'unite SCIQ.
+            // Profil chef distinct de Planification globale : portee service/unite,
+            // sans ecriture globale ni pilotage strategique global.
+            User::ROLE_CHEF_PLANIFICATION => [
+                'planning.read',
+                'planning.write.service',
+                'reporting.read',
+                'alerts.read',
+                'referentiel.read',
+                'messagerie.read',
+            ],
+
             // Chef d'unite SCIQ : portee service/unite, pas globale.
             User::ROLE_CHEF_UNITE_SCIQ => [
                 'planning.read',

@@ -1336,9 +1336,10 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         .app-table thead th,
         table thead th
     ) {
-        background: #f1f5f9 !important;
-        border-bottom: 1px solid var(--anbg-line) !important;
-        color: var(--anbg-muted) !important;
+        background: #3996d3 !important;
+        background-image: none !important;
+        border-bottom: 1px solid #3996d3 !important;
+        color: #ffffff !important;
     }
 
     html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
@@ -1519,9 +1520,10 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         .app-table thead th,
         table thead th
     ) {
-        background: #1e293b !important;
-        color: #dbeafe !important;
-        border-bottom-color: rgba(148,163,184,0.24) !important;
+        background: #3996d3 !important;
+        background-image: none !important;
+        color: #ffffff !important;
+        border-bottom-color: #3996d3 !important;
     }
 
     html.dark body.admin-theme-scope.anbg-glass-theme :where(

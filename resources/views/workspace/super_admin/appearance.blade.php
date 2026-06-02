@@ -794,16 +794,16 @@
             }
 
             .appearance-live-preview-table th {
-                background: var(--app-table-head-bg-light);
-                color: var(--app-muted-text-color);
+                background: rgb(var(--app-secondary-rgb, 57 150 211));
+                color: rgb(255 255 255);
                 font-size: 0.64rem;
                 letter-spacing: 0.12em;
                 text-transform: uppercase;
             }
 
             .appearance-live-preview[data-theme='dark'] .appearance-live-preview-table th {
-                background: var(--app-table-head-bg-dark);
-                color: var(--app-dark-strong-text-color, rgb(248 250 252));
+                background: rgb(var(--app-secondary-rgb, 57 150 211));
+                color: rgb(255 255 255);
             }
 
             .appearance-live-preview-table tbody tr:hover td {

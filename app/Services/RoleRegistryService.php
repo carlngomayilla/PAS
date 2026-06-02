@@ -33,6 +33,7 @@ class RoleRegistryService
             // Rôles attachés à la Direction Générale (DG).
             User::ROLE_DG => ['label' => 'Directeur Général', 'base_role' => User::ROLE_DG, 'system' => true],
             User::ROLE_PLANIFICATION => ['label' => 'Planification', 'base_role' => User::ROLE_PLANIFICATION, 'system' => true],
+            User::ROLE_CHEF_PLANIFICATION => ['label' => 'Chef planification', 'base_role' => User::ROLE_CHEF_PLANIFICATION, 'system' => true],
             User::ROLE_CABINET => ['label' => 'Cabinet DG', 'base_role' => User::ROLE_CABINET, 'system' => true],
             User::ROLE_CHEF_UNITE_CABINET => ['label' => "Chef d'unité Cabinet", 'base_role' => User::ROLE_CHEF_UNITE_CABINET, 'system' => true],
             User::ROLE_DGA_SUPERVISION => ['label' => 'Supervision DGA', 'base_role' => User::ROLE_DGA_SUPERVISION, 'system' => true],

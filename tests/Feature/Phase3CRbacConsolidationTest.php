@@ -36,6 +36,7 @@ class Phase3CRbacConsolidationTest extends TestCase
         $sciq = $registry->forRole(User::ROLE_SCIQ);
         $sciqSuiviGlobal = $registry->forRole(User::ROLE_SCIQ_SUIVI_GLOBAL);
         $chefUniteSciq = $registry->forRole(User::ROLE_CHEF_UNITE_SCIQ);
+        $chefPlanification = $registry->forRole(User::ROLE_CHEF_PLANIFICATION);
 
         sort($sciq);
         sort($sciqSuiviGlobal);
@@ -47,9 +48,17 @@ class Phase3CRbacConsolidationTest extends TestCase
         );
 
         $this->assertContains('planning.write.service', $chefUniteSciq);
+        $this->assertEqualsCanonicalizing(
+            $chefUniteSciq,
+            $chefPlanification,
+            'ROLE_CHEF_PLANIFICATION doit avoir la meme matrice que ROLE_CHEF_UNITE_SCIQ.'
+        );
         $this->assertNotContains('scope.global.read', $chefUniteSciq);
+        $this->assertNotContains('scope.global.read', $chefPlanification);
         $this->assertNotContains('planning.write.global', $chefUniteSciq);
+        $this->assertNotContains('planning.write.global', $chefPlanification);
         $this->assertNotContains('planning.strategic.manage', $chefUniteSciq);
+        $this->assertNotContains('planning.strategic.manage', $chefPlanification);
         $this->assertNotEqualsCanonicalizing(
             $sciq,
             $chefUniteSciq,

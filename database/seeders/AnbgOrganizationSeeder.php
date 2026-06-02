@@ -574,6 +574,7 @@ class AnbgOrganizationSeeder extends Seeder
                 ? User::ROLE_DGA_SUPERVISION
                 : User::ROLE_DIRECTION,
             'chef_service', 'service' => User::ROLE_SERVICE,
+            'chef_planification', 'chef_de_planification' => User::ROLE_CHEF_PLANIFICATION,
             'chef_unite_sciq', 'chef_d_unite_sciq' => User::ROLE_CHEF_UNITE_SCIQ,
             'chef_unite_ucas', 'chef_d_unite_ucas' => User::ROLE_CHEF_UNITE_UCAS,
             'chef_unite', 'chef_d_unite' => $serviceCode === 'UCAS'

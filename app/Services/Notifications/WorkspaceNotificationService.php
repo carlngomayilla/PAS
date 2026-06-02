@@ -1464,6 +1464,7 @@ class WorkspaceNotificationService
         }
 
         if (! $actor->hasRole(
+            User::ROLE_CHEF_PLANIFICATION,
             User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE,
             User::ROLE_CHEF_UNITE_DGA,
@@ -1525,6 +1526,7 @@ class WorkspaceNotificationService
         $roleRecipients = User::query()
             ->where('unite_dg_id', $unitId)
             ->whereIn('role', [
+                User::ROLE_CHEF_PLANIFICATION,
                 User::ROLE_CHEF_UNITE_SCIQ,
                 User::ROLE_CHEF_UNITE_DGA,
                 User::ROLE_CHEF_UNITE_CABINET,
@@ -1635,6 +1637,7 @@ class WorkspaceNotificationService
         return [
             User::ROLE_SERVICE,
             User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_PLANIFICATION,
             User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,

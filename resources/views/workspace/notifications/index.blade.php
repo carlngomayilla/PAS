@@ -13,7 +13,7 @@
 
                 <div class="showcase-action-row">
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
+                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
                         {{ $unreadCount }} non lue(s)
                     </span>
 
@@ -44,11 +44,11 @@
                         };
                     @endphp
 
-                    <article class="rounded-2xl border border-slate-200/85 bg-white/95 p-4">
+                    <article class="rounded-2xl border border-[#3996d3]/20 bg-[#eef6fc]/70 p-4 shadow-sm transition hover:border-[#3996d3]/45 hover:bg-white/95">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <strong class="text-[#17324a]">{{ $title }}</strong>
+                                    <strong class="text-[#1c203d]">{{ $title }}</strong>
                                     <span class="{{ $badgeClass }} px-2 py-0.5 text-xs">
                                         {{ $level }}
                                     </span>

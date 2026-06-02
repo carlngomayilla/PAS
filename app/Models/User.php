@@ -35,6 +35,7 @@ class User extends Authenticatable
     // Profils ajoutés (Lot 2) — pour aligner l'application sur l'organisation réelle ANBG.
     public const ROLE_ADMIN_FONCTIONNEL = 'admin_fonctionnel';
     public const ROLE_SCIQ_SUIVI_GLOBAL = 'sciq_suivi_global';
+    public const ROLE_CHEF_PLANIFICATION = 'chef_planification';
     public const ROLE_CHEF_UNITE_SCIQ = 'chef_unite_sciq';
     public const ROLE_CHEF_UNITE_DGA = 'chef_unite_dga';
     public const ROLE_CHEF_UNITE_CABINET = 'chef_unite_cabinet';
@@ -52,6 +53,7 @@ class User extends Authenticatable
         return [
             self::ROLE_SERVICE,
             self::ROLE_CHEF_UNITE,
+            self::ROLE_CHEF_PLANIFICATION,
             self::ROLE_CHEF_UNITE_SCIQ,
             self::ROLE_CHEF_UNITE_DGA,
             self::ROLE_CHEF_UNITE_CABINET,
@@ -449,6 +451,7 @@ class User extends Authenticatable
             self::ROLE_CHEF_UNITE,
             self::ROLE_SCIQ,
             self::ROLE_SCIQ_SUIVI_GLOBAL,
+            self::ROLE_CHEF_PLANIFICATION,
             self::ROLE_CHEF_UNITE_SCIQ,
             self::ROLE_CHEF_UNITE_DGA,
             self::ROLE_CHEF_UNITE_CABINET,

@@ -220,6 +220,17 @@ class WebWorkspaceTest extends TestCase
             ->assertSee('statut_validation_min=validee_chef', false);
     }
 
+    public function test_admin_layout_disables_global_content_auto_refresh(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get('/dashboard?dashboardTab=charts')
+            ->assertOk()
+            ->assertSee('data-auto-refresh="0"', false)
+            ->assertSee('data-auto-refresh-region', false);
+    }
+
     public function test_pilotage_stat_cards_expose_drilldown_links(): void
     {
         $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
@@ -650,6 +661,22 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringNotContainsString('Officiel', $html);
         $this->assertStringContainsString('Base statistique : Validation chef de service', $html);
         $this->assertStringNotContainsString('level-badge level-officiel', $html);
+    }
+
+    public function test_glass_theme_keeps_admin_table_headers_blue(): void
+    {
+        $css = file_get_contents(resource_path('css/anbg-glass.css'));
+        $this->assertIsString($css);
+        $normalizedCss = str_replace("\r\n", "\n", $css);
+
+        $this->assertStringContainsString('.data-table thead th', $normalizedCss);
+        $this->assertStringContainsString('background: #3996d3 !important;', $normalizedCss);
+        $this->assertStringNotContainsString('table thead th
+    ) {
+        background: #f1f5f9 !important;', $normalizedCss);
+        $this->assertStringNotContainsString('table thead th
+    ) {
+        background: #1e293b !important;', $normalizedCss);
     }
 
     public function test_reporting_exports_display_super_admin_official_basis(): void

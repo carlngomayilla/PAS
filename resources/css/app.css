@@ -6538,18 +6538,47 @@
     }
 
     .pta-registration-screen .pta-action-heading {
-        cursor: default;
+        cursor: default !important;
+        caret-color: transparent;
         padding: 1rem 1rem 0.35rem !important;
+        user-select: none;
+    }
+
+    .pta-registration-screen .pta-action-heading :where(span, strong, svg),
+    .pta-registration-screen .form-step-accordion > summary {
+        cursor: default !important;
+        caret-color: transparent;
+        user-select: none;
     }
 
     .pta-registration-screen [data-action-title] {
+        display: flex !important;
+        min-width: 0;
         color: #071238 !important;
         font-size: 1rem !important;
         font-weight: 850 !important;
         letter-spacing: 0 !important;
     }
 
-    .pta-registration-screen [data-action-summary],
+    .pta-registration-screen [data-action-title-label] {
+        color: #3996d3 !important;
+        font-weight: 850 !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-transform: none !important;
+        white-space: nowrap;
+    }
+
+    .pta-registration-screen [data-action-summary] {
+        display: block !important;
+        margin-top: 0.15rem;
+        color: #64748b !important;
+        font-size: 0.82rem !important;
+        font-weight: 750 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+    }
+
     .pta-registration-screen .pta-action-heading .app-collapsible-chevron {
         display: none !important;
     }
@@ -6572,8 +6601,7 @@
     }
 
     .pta-registration-screen .form-step-accordion > summary {
-        pointer-events: none;
-        cursor: default;
+        cursor: default !important;
         padding: 1rem 1rem 0.5rem !important;
         color: #3996d3 !important;
         font-size: 0.98rem !important;
@@ -7208,29 +7236,32 @@
     .table-wrap thead,
     .showcase-panel thead,
     table.app-table thead {
-        background: linear-gradient(180deg, rgba(28, 32, 61, 0.06) 0%, rgba(57, 150, 211, 0.10) 100%);
+        background: var(--app-blue, #3996d3) !important;
     }
     html.dark .table-wrap thead,
     html.dark .showcase-panel thead,
     html.dark table.app-table thead {
-        background: linear-gradient(180deg, rgba(28, 32, 61, 0.35) 0%, rgba(57, 150, 211, 0.18) 100%);
+        background: var(--app-blue, #3996d3) !important;
     }
     .table-wrap thead th,
     .showcase-panel thead th,
     table.app-table thead th {
+        background: var(--app-blue, #3996d3) !important;
         text-align: left;
         font-weight: 800;
         font-size: 0.72rem;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: var(--app-primary);
+        color: #ffffff !important;
         padding: 0.7rem 0.95rem;
-        border-bottom: 1px solid var(--app-border);
+        border-bottom: 1px solid var(--app-blue, #3996d3) !important;
         white-space: nowrap;
     }
     html.dark .table-wrap thead th,
     html.dark .showcase-panel thead th {
-        color: #cfe6f7;
+        background: var(--app-blue, #3996d3) !important;
+        color: #ffffff !important;
+        border-bottom-color: var(--app-blue, #3996d3) !important;
     }
     .table-wrap tbody td,
     .showcase-panel tbody td,
@@ -8033,6 +8064,29 @@ form.is-submitting {
 @media (prefers-reduced-motion: reduce) {
     .ui-spinner svg,
     .ui-topbar-progress.is-active { animation: none; }
+}
+
+/* Final table header guard: every admin table keeps the ANBG blue header. */
+body.admin-theme-scope table thead,
+body.admin-theme-scope table thead tr {
+    background: var(--app-blue, #3996d3) !important;
+}
+
+body.admin-theme-scope table thead th,
+body.admin-theme-scope :is(.app-table, .data-table, .dashboard-table, .glass-table) thead th,
+body.admin-theme-scope :is(.app-table-wrapper, .data-table-shell, .table-wrap, .showcase-panel, .ui-card, .app-card) table thead th {
+    background-color: var(--app-blue, #3996d3) !important;
+    background-image: none !important;
+    color: #ffffff !important;
+    border-color: var(--app-blue, #3996d3) !important;
+}
+
+html.dark body.admin-theme-scope table thead th,
+html.dark body.admin-theme-scope :is(.app-table, .data-table, .dashboard-table, .glass-table) thead th,
+html.dark body.admin-theme-scope :is(.app-table-wrapper, .data-table-shell, .table-wrap, .showcase-panel, .ui-card, .app-card) table thead th {
+    background-color: var(--app-blue, #3996d3) !important;
+    color: #ffffff !important;
+    border-color: var(--app-blue, #3996d3) !important;
 }
 
 }

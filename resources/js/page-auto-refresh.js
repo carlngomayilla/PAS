@@ -56,7 +56,19 @@
     );
 
     const hasBlockedPageContext = () => Boolean(
-        document.querySelector('[data-messaging-page], [data-disable-soft-refresh="1"]'),
+        document.querySelector([
+            '[data-messaging-page]',
+            '[data-disable-soft-refresh="1"]',
+            '#anbg-dashboard-payload',
+            '#analytics-explorer',
+            '.dashboard-chart-host',
+            '.dashboard-canvas',
+            '.dashboard-gauge-card',
+            '.chart-disclosure-panel',
+            'canvas',
+            'iframe',
+            'video',
+        ].join(', ')),
     );
 
     const isScrollingRecently = () => (Date.now() - lastScrollAt) < 1500;
@@ -254,6 +266,20 @@
         });
     };
 
+    const restoreScrollStateAfterLayout = (state) => {
+        restoreScrollState(state);
+
+        window.requestAnimationFrame(() => {
+            restoreScrollState(state);
+
+            window.requestAnimationFrame(() => {
+                restoreScrollState(state);
+            });
+        });
+
+        window.setTimeout(() => restoreScrollState(state), 120);
+    };
+
     const captureFocusState = () => {
         const active = document.activeElement;
         if (!(active instanceof HTMLElement) || active === document.body) {
@@ -333,7 +359,7 @@
 
         morphNode(currentMain, nextMain);
 
-        restoreScrollState(scrollState);
+        restoreScrollStateAfterLayout(scrollState);
         restoreFocusState(focusState);
 
         lastSnapshot = snapshotOf(currentMain);

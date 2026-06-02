@@ -220,9 +220,14 @@ class SessionController extends Controller
 
     private function databaseUnavailableResponse(Request $request): RedirectResponse
     {
+        $driver = (string) config('database.connections.'.config('database.default').'.driver');
+        $message = $driver === 'pgsql'
+            ? 'Base de donnees indisponible. Verifiez que PostgreSQL sur la VM est demarre et accessible, puis reessayez.'
+            : 'Base de donnees locale indisponible. Verifiez la configuration Laravel et l etat du fichier de base, puis reessayez.';
+
         return back()
             ->withErrors([
-                'email' => 'Base de donnees indisponible. Verifiez que PostgreSQL sur la VM est demarre et accessible, puis reessayez.',
+                'email' => $message,
             ])
             ->onlyInput('email');
     }

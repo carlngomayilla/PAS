@@ -144,6 +144,7 @@ class PlanningModificationLockService
         if ($actor->hasRole(
             User::ROLE_SERVICE,
             User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_PLANIFICATION,
             User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_UCAS,
             User::ROLE_CHEF_UNITE_DGA,
@@ -185,6 +186,7 @@ class PlanningModificationLockService
         if ($user->hasRole(
             User::ROLE_SERVICE,
             User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_PLANIFICATION,
             User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,

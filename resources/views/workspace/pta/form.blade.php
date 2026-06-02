@@ -29,6 +29,10 @@
                     'date_fin' => optional($action->date_fin)->format('Y-m-d'),
                     'statut' => $action->statut ?: 'non_demarre',
                     'mode_evaluation' => $action->mode_evaluation ?: ((int) ($action->nombre_sous_actions_prevu ?? 0) > 0 ? \App\Models\Action::MODE_SOUS_ACTIONS : \App\Models\Action::MODE_SANS_QUANTITE),
+                    'type_action' => $action->type_action,
+                    'requires_comment' => (bool) $action->requires_comment,
+                    'allows_difficulty' => (bool) $action->allows_difficulty,
+                    'official_progress_percent' => $action->official_progress_percent,
                     'priorite' => $action->priorite,
                     'montant_estime' => $action->montant_estime,
                     'nature_financement' => $action->nature_financement ?: $action->description_financement,
@@ -48,6 +52,13 @@
                             'id' => $sousAction->id,
                             'agent_id' => $sousAction->agent_id,
                             'libelle' => $sousAction->libelle,
+                            'sub_action_type' => $sousAction->sub_action_type,
+                            'weight' => $sousAction->weight,
+                            'requires_proof' => (bool) $sousAction->requires_proof,
+                            'requires_comment' => (bool) $sousAction->requires_comment,
+                            'allows_difficulty' => (bool) $sousAction->allows_difficulty,
+                            'official_progress_percent' => $sousAction->official_progress_percent,
+                            'validation_status' => $sousAction->validation_status,
                             'description' => $sousAction->description,
                             'resultat_attendu' => $sousAction->resultat_attendu,
                             'date_debut' => optional($sousAction->date_debut)->format('Y-m-d'),
@@ -95,6 +106,10 @@
                 'date_fin' => '',
                 'statut' => 'non_demarre',
                 'mode_evaluation' => \App\Models\Action::MODE_SANS_QUANTITE,
+                'type_action' => \App\Models\Action::TYPE_NON_QUANTITATIVE,
+                'requires_comment' => false,
+                'allows_difficulty' => true,
+                'official_progress_percent' => 0,
                 'priorite' => 'normale',
                 'montant_estime' => '',
                 'nature_financement' => '',
@@ -326,6 +341,10 @@
                 'date_fin' => '',
                 'statut' => 'non_demarre',
                 'mode_evaluation' => \App\Models\Action::MODE_SANS_QUANTITE,
+                'type_action' => \App\Models\Action::TYPE_NON_QUANTITATIVE,
+                'requires_comment' => false,
+                'allows_difficulty' => true,
+                'official_progress_percent' => 0,
                 'priorite' => 'normale',
                 'montant_estime' => '',
                 'nature_financement' => '',
@@ -749,9 +768,7 @@
                 var blocks = actionsList.querySelectorAll('[data-action-block]');
                 blocks.forEach(function (block, index) {
                     block.setAttribute('data-action-index', String(index));
-                    var title = block.querySelector('[data-action-title]');
-                    if (title) title.textContent = 'Action ' + (index + 1);
-                    syncActionSummary(block);
+                    syncActionHeading(block);
 
                     block.querySelectorAll('[name]').forEach(function (field) {
                         field.name = field.name.replace(/actions\[(?:\d+|__INDEX__|__ACTION_INDEX__)\]/, 'actions[' + index + ']');
@@ -805,10 +822,27 @@
                 if (!block) return;
 
                 var labelInput = block.querySelector('input[name$="[libelle]"]');
+                var titleLabel = block.querySelector('[data-action-title-label]');
+                var number = block.querySelector('[data-action-number]');
                 var summary = block.querySelector('[data-action-summary]');
-                if (summary) {
-                    summary.textContent = labelInput && labelInput.value.trim() ? labelInput.value.trim() : 'Nouvelle action';
+                var index = parseInt(block.getAttribute('data-action-index') || '0', 10);
+                var label = labelInput && labelInput.value.trim() ? labelInput.value.trim() : 'Nouvelle action';
+
+                if (number && !Number.isNaN(index)) {
+                    number.textContent = 'Action ' + (index + 1);
                 }
+                if (titleLabel) {
+                    titleLabel.textContent = label;
+                    titleLabel.title = label;
+                }
+                if (summary) {
+                    summary.textContent = label;
+                    summary.title = label;
+                }
+            }
+
+            function syncActionHeading(block) {
+                syncActionSummary(block);
             }
 
             function closeOtherActions(activeBlock) {
@@ -1041,6 +1075,13 @@
                     var target = event.target;
                     if (!(target instanceof HTMLElement)) return;
 
+                    var readOnlySummary = target.closest('.pta-action-heading, .form-step-accordion > summary');
+                    if (readOnlySummary && ! target.closest('button, a, input, select, textarea')) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                    }
+
                     // Bouton "Demande de modification" : ouvre le modal (motif + justificatif).
                     if (target.matches('[data-request-modification]')) {
                         event.preventDefault();
@@ -1122,9 +1163,12 @@
                                         if (subIdInputs[idx]) subIdInputs[idx].value = saId;
                                     });
                                 }
-                                // Mettre a jour le titre/summary du heading
-                                var summarySpan = blockSave.querySelector('[data-action-summary]');
-                                if (summarySpan && result.data.action) summarySpan.textContent = result.data.action.libelle;
+                                // Mettre a jour le titre/summary du heading.
+                                if (result.data.action && result.data.action.libelle) {
+                                    var actionLabelInput = blockSave.querySelector('input[name$="[libelle]"]');
+                                    if (actionLabelInput) actionLabelInput.value = result.data.action.libelle;
+                                }
+                                syncActionHeading(blockSave);
                             } else {
                                 var msg = (result.data && result.data.message) || 'Erreur lors de la sauvegarde.';
                                 if (result.data && result.data.errors) {

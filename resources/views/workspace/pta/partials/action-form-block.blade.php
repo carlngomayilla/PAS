@@ -3,6 +3,8 @@
     $index = $index ?? 0;
     $number = $isTemplate ? '__NUMBER__' : ((int) $index + 1);
     $rowData = is_array($rowData ?? null) ? $rowData : [];
+    $actionHeadingLabel = trim((string) ($rowData['libelle'] ?? ''));
+    $actionHeadingLabel = $actionHeadingLabel !== '' ? $actionHeadingLabel : 'Nouvelle action';
     $selectedRmos = collect($selectedRmos ?? [null]);
     if ($selectedRmos->isEmpty()) {
         $selectedRmos = collect([null]);
@@ -82,15 +84,17 @@
     $isFrozen = $hasPersistedId && $isParametre && ! empty($rowData['modification_locked_at']) && ! $hasOpenUnlock && ! $viewerCanBypassFreeze;
 @endphp
 <details @if ($hasPersistedId) id="action-{{ $rowData['id'] }}" @endif class="pta-action-block rounded-lg border border-[#d8ecf8] bg-white shadow-sm @if ($isFrozen) is-frozen @endif" data-action-block data-action-index="{{ $index }}" data-action-id="{{ $rowData['id'] ?? '' }}" data-action-frozen="{{ $isFrozen ? '1' : '0' }}" @if ($accordionOpen) open @endif>
-    <summary class="pta-action-heading flex list-none items-center justify-between gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors">
+    <summary class="pta-action-heading flex list-none items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
         <span class="min-w-0">
-            <span class="block text-sm font-extrabold uppercase tracking-wide text-[#1c203d]" data-action-title>
-                Action {{ $number }}
+            <span class="flex min-w-0 items-baseline gap-1 text-sm font-extrabold tracking-wide text-[#1c203d]" data-action-title>
+                <span class="shrink-0 uppercase" data-action-number>Action {{ $number }}</span>
+                <span class="shrink-0 text-slate-400" aria-hidden="true">-</span>
+                <span class="min-w-0 truncate normal-case text-[#3996d3]" data-action-title-label>{{ $actionHeadingLabel }}</span>
                 @if ($isFrozen)
                     <span class="ml-2 anbg-badge anbg-badge-info px-2 py-0.5 text-[10px]" title="Action enregistree et figee. Demandez une modification au DG pour la modifier.">🔒 Enregistree</span>
                 @endif
             </span>
-            <span class="block truncate text-xs font-semibold text-slate-500" data-action-summary>{{ $rowData['libelle'] ?? 'Nouvelle action' }}</span>
+            <span class="block truncate text-xs font-semibold text-slate-500" data-action-summary>{{ $actionHeadingLabel }}</span>
         </span>
         <span class="flex shrink-0 items-center gap-2">
             {{-- Boutons par action : Enregistrer / Modifier / Supprimer. --}}

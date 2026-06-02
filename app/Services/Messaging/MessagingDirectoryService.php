@@ -259,7 +259,7 @@ class MessagingDirectoryService
             return $dg;
         }
 
-        if ($subject->hasRole(User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SERVICE, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_UNITE_SCIQ, User::ROLE_CHEF_UNITE_CABINET, User::ROLE_CHEF_UNITE_UCAS)) {
+        if ($subject->hasRole(User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SERVICE, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ, User::ROLE_CHEF_UNITE_CABINET, User::ROLE_CHEF_UNITE_UCAS)) {
             /** @var User|null $directionLead */
             $directionLead = $users->first(function (User $user) use ($subject): bool {
                 return $user->id !== $subject->id
@@ -275,7 +275,7 @@ class MessagingDirectoryService
             return $user->id !== $subject->id
                 && $subject->service_id !== null
                 && $user->service_id === $subject->service_id
-                && $user->hasRole(User::ROLE_SERVICE, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_UNITE_SCIQ, User::ROLE_CHEF_UNITE_CABINET, User::ROLE_CHEF_UNITE_UCAS);
+                && $user->hasRole(User::ROLE_SERVICE, User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_CHEF_UNITE, User::ROLE_CHEF_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ, User::ROLE_CHEF_UNITE_CABINET, User::ROLE_CHEF_UNITE_UCAS);
         });
 
         if ($serviceLead instanceof User) {

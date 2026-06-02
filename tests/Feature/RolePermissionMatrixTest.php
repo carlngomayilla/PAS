@@ -91,6 +91,14 @@ class RolePermissionMatrixTest extends TestCase
                 'referentiel.read',
                 'messagerie.read',
             ],
+            User::ROLE_CHEF_PLANIFICATION => [
+                'planning.read',
+                'planning.write.service',
+                'reporting.read',
+                'alerts.read',
+                'referentiel.read',
+                'messagerie.read',
+            ],
             User::ROLE_CHEF_UNITE_SCIQ => [
                 'planning.read',
                 'planning.write.service',
@@ -182,6 +190,7 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
             User::ROLE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
             User::ROLE_CHEF_UNITE_SCIQ => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
+            User::ROLE_CHEF_PLANIFICATION => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
             User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'alertes', 'notifications'],
             User::ROLE_CHEF_UNITE_CABINET => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
             User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'alertes', 'notifications'],
@@ -205,6 +214,24 @@ class RolePermissionMatrixTest extends TestCase
                 'Modules visibles du role '.$role
             );
         }
+    }
+
+    public function test_chef_planification_has_same_menu_as_chef_sciq(): void
+    {
+        $chefPlanification = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'is_active' => true,
+        ]);
+        $chefSciq = User::factory()->create([
+            'role' => User::ROLE_CHEF_UNITE_SCIQ,
+            'is_active' => true,
+        ]);
+
+        $this->assertSame(
+            $chefSciq->workspaceModules(),
+            $chefPlanification->workspaceModules(),
+            'Le menu chef_planification doit rester identique au menu chef_unite_sciq.'
+        );
     }
 
     public function test_seeded_agent_ossa_uses_agent_visibility_matrix(): void

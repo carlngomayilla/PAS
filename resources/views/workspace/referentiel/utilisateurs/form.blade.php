@@ -17,6 +17,7 @@
 
             // Transverse — disponible sur toute direction ou sans direction.
             'planification' => ['none', 'dg', 'op'],    // Typiquement DS ou DG
+            'chef_planification' => ['dg', 'op'],       // Profil chef rattache a une entite
 
             // Réservés à la DG (Direction Générale).
             'dg' => ['dg'],

@@ -65,6 +65,7 @@ class AccessScopeService
         // 2) Chef d'unité UCAS — limité à son unité DG.
         if ($user->hasRole(
             User::ROLE_CHEF_UNITE,
+            User::ROLE_CHEF_PLANIFICATION,
             User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_CABINET,
             User::ROLE_CHEF_UNITE_DGA,
@@ -263,6 +264,7 @@ class AccessScopeService
                 User::ROLE_PLANIFICATION,
                 User::ROLE_COLLABORATEUR,
                 User::ROLE_CABINET,
+                User::ROLE_CHEF_PLANIFICATION,
                 User::ROLE_CHEF_UNITE,
                 User::ROLE_CHEF_UNITE_UCAS,
                 User::ROLE_CHEF_UNITE_SCIQ,
