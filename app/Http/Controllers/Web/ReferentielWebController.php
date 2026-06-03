@@ -813,6 +813,83 @@ class ReferentielWebController extends Controller
             return;
         }
 
+        if ($role === User::ROLE_CHEF_PLANIFICATION) {
+            if ($directionId === null) {
+                throw ValidationException::withMessages([
+                    'direction_id' => 'La direction est obligatoire pour le profil Chef planification.',
+                ]);
+            }
+
+            $direction = Direction::query()->find($directionId);
+            if ($direction === null) {
+                throw ValidationException::withMessages([
+                    'direction_id' => 'La direction selectionnee est invalide.',
+                ]);
+            }
+
+            if ((string) $direction->code === 'DG') {
+                if ($serviceId !== null) {
+                    throw ValidationException::withMessages([
+                        'service_id' => 'Le service doit etre vide pour un rattachement DG.',
+                    ]);
+                }
+
+                return;
+            }
+
+            $this->ensureOperationalDirectionAllowed($directionId);
+
+            if ($serviceId === null) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Le service est obligatoire pour un Chef planification hors DG.',
+                ]);
+            }
+
+            $service = Service::query()->find($serviceId);
+            if ($service === null || (int) $service->direction_id !== $directionId) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Le service doit appartenir a la direction selectionnee.',
+                ]);
+            }
+
+            return;
+        }
+
+        if (in_array($role, [
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_CHEF_UNITE_CABINET,
+            User::ROLE_CHEF_UNITE_DGA,
+            User::ROLE_CHEF_UNITE_UCAS,
+        ], true)) {
+            if ($directionId === null) {
+                throw ValidationException::withMessages([
+                    'direction_id' => 'La direction DG est obligatoire pour ce profil chef.',
+                ]);
+            }
+
+            $direction = Direction::query()->find($directionId);
+            if (! $direction || (string) $direction->code !== 'DG') {
+                throw ValidationException::withMessages([
+                    'direction_id' => 'Ce profil chef doit etre rattache a la direction DG.',
+                ]);
+            }
+
+            if ($serviceId !== null) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Le service doit etre vide pour ce profil chef DG.',
+                ]);
+            }
+
+            $uniteDgId = isset($validated['unite_dg_id']) ? (int) $validated['unite_dg_id'] : null;
+            if ($uniteDgId === null || ! \App\Models\UniteDg::query()->whereKey($uniteDgId)->exists()) {
+                throw ValidationException::withMessages([
+                    'unite_dg_id' => 'L unite DG est obligatoire pour ce profil chef.',
+                ]);
+            }
+
+            return;
+        }
+
         if ($directionId !== null || $serviceId !== null) {
             throw ValidationException::withMessages([
                 'direction_id' => 'Direction/service doivent etre vides pour ce profil global.',

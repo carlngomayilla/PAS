@@ -75,6 +75,17 @@ class User extends Authenticatable
     }
 
     /**
+     * @return array<int, string>
+     */
+    public static function planningControlChiefRoles(): array
+    {
+        return [
+            self::ROLE_CHEF_PLANIFICATION,
+            self::ROLE_CHEF_UNITE_SCIQ,
+        ];
+    }
+
+    /**
      * Champs mass-assignables : UNIQUEMENT les champs modifiables par l utilisateur
      * lui-meme depuis son propre profil.
      *
@@ -348,7 +359,7 @@ class User extends Authenticatable
             return $permissions;
         }
 
-        return array_values(array_diff($permissions, self::serviceOrUnitChiefBlockedPermissions()));
+        return array_values(array_diff($permissions, $this->blockedPermissionsForChiefProfile()));
     }
 
     public function hasPermission(string $permission): bool
@@ -359,7 +370,7 @@ class User extends Authenticatable
 
         if (
             $this->isServiceOrUnitChief()
-            && in_array($permission, self::serviceOrUnitChiefBlockedPermissions(), true)
+            && in_array($permission, $this->blockedPermissionsForChiefProfile(), true)
         ) {
             return false;
         }
@@ -420,10 +431,36 @@ class User extends Authenticatable
         );
     }
 
+    public function isPlanningControlChief(): bool
+    {
+        if (in_array((string) $this->role, self::planningControlChiefRoles(), true)) {
+            return true;
+        }
+
+        $customCode = trim((string) ($this->custom_role_code ?? ''));
+        if ($customCode === '') {
+            return false;
+        }
+
+        if (in_array($customCode, self::planningControlChiefRoles(), true)) {
+            return true;
+        }
+
+        return in_array(
+            app(\App\Services\RoleRegistryService::class)->baseRole($customCode),
+            self::planningControlChiefRoles(),
+            true
+        );
+    }
+
     public function profileScopeLabel(): string
     {
         if ($this->isSuperAdmin()) {
             return 'Portée globale plateforme';
+        }
+
+        if ($this->isPlanningControlChief()) {
+            return 'Portée globale de contrôle et pilotage stratégique';
         }
 
         if ($this->isServiceOrUnitChief()) {
@@ -477,6 +514,24 @@ class User extends Authenticatable
         }
 
         return 'Portée non définie';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function blockedPermissionsForChiefProfile(): array
+    {
+        $blocked = self::serviceOrUnitChiefBlockedPermissions();
+
+        if ($this->isPlanningControlChief()) {
+            $blocked = array_diff($blocked, [
+                'scope.global.read',
+                'planning.write.global',
+                'planning.strategic.manage',
+            ]);
+        }
+
+        return array_values($blocked);
     }
 
     public function activeDelegations(?string $permission = null)

@@ -242,7 +242,7 @@ trait AuthorizesPlanningScope
 
     protected function canWriteStrategicPlanning(User $user): bool
     {
-        if ($user->isServiceOrUnitChief()) {
+        if ($user->isServiceOrUnitChief() && ! $user->isPlanningControlChief()) {
             return false;
         }
 
@@ -498,7 +498,7 @@ trait AuthorizesPlanningScope
 
     protected function canReadAllPlanning(User $user): bool
     {
-        if ($user->isServiceOrUnitChief()) {
+        if ($user->isServiceOrUnitChief() && ! $user->isPlanningControlChief()) {
             return false;
         }
 
@@ -507,7 +507,7 @@ trait AuthorizesPlanningScope
 
     protected function canWriteAllPlanning(User $user): bool
     {
-        if ($user->isServiceOrUnitChief()) {
+        if ($user->isServiceOrUnitChief() && ! $user->isPlanningControlChief()) {
             return false;
         }
 

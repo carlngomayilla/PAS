@@ -16,6 +16,32 @@ class PlanningExcelImportServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_planning_control_chiefs_can_import_planning_workbooks(): void
+    {
+        $service = app(PlanningExcelImportService::class);
+
+        foreach ([User::ROLE_CHEF_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ] as $role) {
+            $user = User::factory()->create([
+                'role' => $role,
+                'is_active' => true,
+            ]);
+
+            $this->assertTrue($service->canImport($user), 'Role '.$role);
+        }
+
+        $serviceUser = User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+            'is_active' => true,
+        ]);
+        $adminFonctionnel = User::factory()->create([
+            'role' => User::ROLE_ADMIN_FONCTIONNEL,
+            'is_active' => true,
+        ]);
+
+        $this->assertFalse($service->canImport($serviceUser));
+        $this->assertFalse($service->canImport($adminFonctionnel));
+    }
+
     public function test_valid_import_creates_grouped_planning_tree_and_action_to_configure(): void
     {
         $fixture = $this->fixture();

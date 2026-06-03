@@ -1367,6 +1367,10 @@ class DashboardController extends Controller
             return 'planification';
         }
 
+        if ($user->isPlanningControlChief()) {
+            return 'planification';
+        }
+
         if ($user->hasRole(User::ROLE_AUDITEUR)) {
             return 'global';
         }
@@ -1401,6 +1405,7 @@ class DashboardController extends Controller
             User::ROLE_PLANIFICATION,
             User::ROLE_SCIQ,
             User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_PLANIFICATION,
             User::ROLE_CHEF_UNITE,
             User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_DGA,

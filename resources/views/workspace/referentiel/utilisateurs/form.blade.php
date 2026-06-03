@@ -17,13 +17,14 @@
 
             // Transverse — disponible sur toute direction ou sans direction.
             'planification' => ['none', 'dg', 'op'],    // Typiquement DS ou DG
-            'chef_planification' => ['dg', 'op'],       // Profil chef rattache a une entite
+            'chef_planification' => ['dg', 'op'],       // Controle principal rattache a une entite
 
             // Réservés à la DG (Direction Générale).
             'dg' => ['dg'],
             'cabinet' => ['dg'],
             'chef_unite_cabinet' => ['dg'],
             'dga_supervision' => ['dg'],
+            'chef_unite_dga' => ['dg'],
             'chef_unite_ucas' => ['dg'],
             'ucas' => ['dg'],
             'sciq' => ['dg'],

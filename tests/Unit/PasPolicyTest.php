@@ -37,7 +37,8 @@ class PasPolicyTest extends TestCase
 
         // A06 — Cabinet voit tout mais ne pilote plus le PAS strategique
         // (planning.strategic.manage retiree). Seuls SUPER_ADMIN / ADMIN /
-        // PLANIFICATION / SCIQ peuvent creer / modifier / supprimer un PAS.
+        // PLANIFICATION / SCIQ et les chefs de controle principal peuvent
+        // creer / modifier / supprimer un PAS.
         $this->assertTrue($this->policy->viewAny($fixture['cabinet']));
         $this->assertTrue($this->policy->view($fixture['cabinet'], $fixture['pas']));
         $this->assertFalse($this->policy->create($fixture['cabinet']));
@@ -58,9 +59,15 @@ class PasPolicyTest extends TestCase
 
         $this->assertTrue($this->policy->viewAny($fixture['chef_sciq_user']));
         $this->assertTrue($this->policy->view($fixture['chef_sciq_user'], $fixture['pas']));
-        $this->assertFalse($this->policy->create($fixture['chef_sciq_user']));
-        $this->assertFalse($this->policy->update($fixture['chef_sciq_user'], $fixture['pas']));
-        $this->assertFalse($this->policy->delete($fixture['chef_sciq_user'], $fixture['pas']));
+        $this->assertTrue($this->policy->create($fixture['chef_sciq_user']));
+        $this->assertTrue($this->policy->update($fixture['chef_sciq_user'], $fixture['pas']));
+        $this->assertTrue($this->policy->delete($fixture['chef_sciq_user'], $fixture['pas']));
+
+        $this->assertTrue($this->policy->viewAny($fixture['chef_planification_user']));
+        $this->assertTrue($this->policy->view($fixture['chef_planification_user'], $fixture['pas']));
+        $this->assertTrue($this->policy->create($fixture['chef_planification_user']));
+        $this->assertTrue($this->policy->update($fixture['chef_planification_user'], $fixture['pas']));
+        $this->assertTrue($this->policy->delete($fixture['chef_planification_user'], $fixture['pas']));
 
         // Nouvelle regle de perimetre (2026-05-28) : un directeur d'une AUTRE
         // direction n'a pas de PAO/OO/PTA dans ce PAS, donc il ne doit pas le voir.
@@ -81,9 +88,9 @@ class PasPolicyTest extends TestCase
         );
 
         $this->assertTrue($this->policy->viewAny($fixture['other_chef_sciq_user']));
-        $this->assertFalse(
+        $this->assertTrue(
             $this->policy->view($fixture['other_chef_sciq_user'], $fixture['pas']),
-            'Un chef unite SCIQ rattache a un autre service ne doit pas voir ce PAS.'
+            'Un chef unite SCIQ de controle principal doit voir les PAS globalement.'
         );
     }
 
@@ -96,6 +103,7 @@ class PasPolicyTest extends TestCase
      *     service_user: User,
      *     other_service_user: User,
      *     chef_sciq_user: User,
+     *     chef_planification_user: User,
      *     other_chef_sciq_user: User,
      *     pas: Pas
      * }
@@ -171,6 +179,13 @@ class PasPolicyTest extends TestCase
             'password_changed_at' => now(),
         ]);
 
+        $chefPlanificationUser = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'password_changed_at' => now(),
+        ]);
+
         $otherChefSciqUser = User::factory()->create([
             'role' => User::ROLE_CHEF_UNITE_SCIQ,
             'direction_id' => $direction->id,
@@ -216,6 +231,7 @@ class PasPolicyTest extends TestCase
             'service_user' => $serviceUser,
             'other_service_user' => $otherServiceUser,
             'chef_sciq_user' => $chefSciqUser,
+            'chef_planification_user' => $chefPlanificationUser,
             'other_chef_sciq_user' => $otherChefSciqUser,
             'pas' => $pas,
         ];

@@ -85,7 +85,13 @@ class PlanningExcelImportService
 
     public function canImport(User $user): bool
     {
-        return $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_SCIQ, User::ROLE_PLANIFICATION);
+        return $user->hasRole(
+            User::ROLE_SUPER_ADMIN,
+            User::ROLE_SCIQ,
+            User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_PLANIFICATION,
+            User::ROLE_CHEF_UNITE_SCIQ
+        );
     }
 
     public function createPreview(UploadedFile $file, User $user, string $ipAddress): PlanningImport

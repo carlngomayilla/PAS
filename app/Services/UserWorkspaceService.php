@@ -313,7 +313,13 @@ class UserWorkspaceService
             return 'dga_cabinet';
         }
 
-        if (in_array($base, [User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL, User::ROLE_PLANIFICATION], true)) {
+        if (in_array($base, [
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_PLANIFICATION,
+            User::ROLE_CHEF_UNITE_SCIQ,
+        ], true)) {
             return 'sciq_planif';
         }
 
@@ -329,8 +335,6 @@ class UserWorkspaceService
         if (in_array($base, [
             User::ROLE_SERVICE,
             User::ROLE_CHEF_UNITE,
-            User::ROLE_CHEF_PLANIFICATION,
-            User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,
         ], true)) {
@@ -494,7 +498,13 @@ class UserWorkspaceService
         }
 
         return match ((string) ($module['code'] ?? '')) {
-            'imports_excel' => $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_SCIQ, User::ROLE_PLANIFICATION),
+            'imports_excel' => $user->hasRole(
+                User::ROLE_SUPER_ADMIN,
+                User::ROLE_SCIQ,
+                User::ROLE_PLANIFICATION,
+                User::ROLE_CHEF_PLANIFICATION,
+                User::ROLE_CHEF_UNITE_SCIQ
+            ),
             'reporting', 'rapports_consolides' => $user->hasPermission('reporting.read'),
             'alertes', 'financements_critiques' => $user->hasPermission('alerts.read'),
             'audit' => $user->hasPermission('audit.read'),

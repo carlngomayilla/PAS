@@ -370,21 +370,27 @@ class RolePermissionSettings
             ],
 
             // Chef planification : meme niveau de droits que Chef d'unite SCIQ.
-            // Profil chef distinct de Planification globale : portee service/unite,
-            // sans ecriture globale ni pilotage strategique global.
+            // Profil de controle principal : suivi global, imports et pilotage
+            // strategique, sans les droits referentiel/delegation du profil SCIQ.
             User::ROLE_CHEF_PLANIFICATION => [
+                'scope.global.read',
                 'planning.read',
+                'planning.write.global',
                 'planning.write.service',
+                'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
                 'messagerie.read',
             ],
 
-            // Chef d'unite SCIQ : portee service/unite, pas globale.
+            // Chef d'unite SCIQ : controle principal global + suivi strategique.
             User::ROLE_CHEF_UNITE_SCIQ => [
+                'scope.global.read',
                 'planning.read',
+                'planning.write.global',
                 'planning.write.service',
+                'planning.strategic.manage',
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
@@ -514,11 +520,43 @@ class RolePermissionSettings
      */
     private function enforceServiceOrUnitChiefBoundary(string $role, array $permissions): array
     {
-        if (! in_array($role, User::serviceOrUnitChiefRoles(), true)) {
+        $baseRole = $this->roleRegistry->baseRole($role);
+        $isServiceOrUnitChief = in_array($role, User::serviceOrUnitChiefRoles(), true)
+            || in_array($baseRole, User::serviceOrUnitChiefRoles(), true);
+
+        if (! $isServiceOrUnitChief) {
             return $permissions;
         }
 
-        return array_values(array_diff($permissions, User::serviceOrUnitChiefBlockedPermissions()));
+        $blocked = User::serviceOrUnitChiefBlockedPermissions();
+
+        if (
+            in_array($role, User::planningControlChiefRoles(), true)
+            || in_array($baseRole, User::planningControlChiefRoles(), true)
+        ) {
+            $blocked = array_diff($blocked, [
+                'scope.global.read',
+                'planning.write.global',
+                'planning.strategic.manage',
+            ]);
+
+            return array_values(array_unique(array_merge(
+                array_diff($permissions, $blocked),
+                [
+                    'scope.global.read',
+                    'planning.read',
+                    'planning.write.global',
+                    'planning.write.service',
+                    'planning.strategic.manage',
+                    'reporting.read',
+                    'alerts.read',
+                    'referentiel.read',
+                    'messagerie.read',
+                ]
+            )));
+        }
+
+        return array_values(array_diff($permissions, $blocked));
     }
 
     /**

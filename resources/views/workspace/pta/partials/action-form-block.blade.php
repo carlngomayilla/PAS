@@ -78,7 +78,7 @@
     // une action parametree ET non deverrouillee se fige en lecture seule
     // jusqu'a ce que le DG approuve une demande de modification.
     $viewer = auth()->user();
-    $viewerCanBypassFreeze = $viewer && ($viewer->isSuperAdmin() || $viewer->hasRole(\App\Models\User::ROLE_DG, \App\Models\User::ROLE_PLANIFICATION, \App\Models\User::ROLE_SCIQ));
+    $viewerCanBypassFreeze = $viewer && ($viewer->isSuperAdmin() || $viewer->hasRole(\App\Models\User::ROLE_DG) || $viewer->hasPermission('planning.write.global'));
     $isParametre = ($rowData['statut_parametrage'] ?? null) === 'parametre';
     $hasOpenUnlock = ! empty($rowData['modification_unlocked_at']) && (empty($rowData['modification_unlock_expires_at']) || strtotime($rowData['modification_unlock_expires_at']) > time());
     $isFrozen = $hasPersistedId && $isParametre && ! empty($rowData['modification_locked_at']) && ! $hasOpenUnlock && ! $viewerCanBypassFreeze;

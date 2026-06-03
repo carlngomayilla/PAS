@@ -20,7 +20,8 @@ use Tests\TestCase;
 /**
  * Couvre la sous-phase 3.C :
  *   - A36 : SCIQ et SCIQ_SUIVI_GLOBAL portent strictement la meme matrice.
- *     CHEF_UNITE_SCIQ reste limite au perimetre service/unite.
+ *     CHEF_UNITE_SCIQ et CHEF_PLANIFICATION ont le controle principal global
+ *     de planification sans les droits referentiel/delegation du profil SCIQ.
  *   - A35 : les totaux globaux du dashboard et du reporting concordent pour un
  *     meme user et un meme exercice (anti-divergence chiffres).
  */
@@ -53,12 +54,14 @@ class Phase3CRbacConsolidationTest extends TestCase
             $chefPlanification,
             'ROLE_CHEF_PLANIFICATION doit avoir la meme matrice que ROLE_CHEF_UNITE_SCIQ.'
         );
-        $this->assertNotContains('scope.global.read', $chefUniteSciq);
-        $this->assertNotContains('scope.global.read', $chefPlanification);
-        $this->assertNotContains('planning.write.global', $chefUniteSciq);
-        $this->assertNotContains('planning.write.global', $chefPlanification);
-        $this->assertNotContains('planning.strategic.manage', $chefUniteSciq);
-        $this->assertNotContains('planning.strategic.manage', $chefPlanification);
+        $this->assertContains('scope.global.read', $chefUniteSciq);
+        $this->assertContains('scope.global.read', $chefPlanification);
+        $this->assertContains('planning.write.global', $chefUniteSciq);
+        $this->assertContains('planning.write.global', $chefPlanification);
+        $this->assertContains('planning.strategic.manage', $chefUniteSciq);
+        $this->assertContains('planning.strategic.manage', $chefPlanification);
+        $this->assertNotContains('referentiel.write', $chefUniteSciq);
+        $this->assertNotContains('delegations.manage', $chefUniteSciq);
         $this->assertNotEqualsCanonicalizing(
             $sciq,
             $chefUniteSciq,

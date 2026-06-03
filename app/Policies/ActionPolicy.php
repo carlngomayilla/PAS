@@ -89,7 +89,8 @@ class ActionPolicy
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
-            return $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL) || $user->hasRole(User::ROLE_PLANIFICATION);
+            return $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL)
+                || $user->hasPermission('planning.write.global');
         }
 
         return $this->canManageAction(

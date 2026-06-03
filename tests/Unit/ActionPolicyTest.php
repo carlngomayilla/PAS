@@ -98,6 +98,28 @@ class ActionPolicyTest extends TestCase
         $this->assertFalse($this->policy->reviewByDirection($cabinetUser, $action));
     }
 
+    public function test_planning_control_chief_can_update_validated_action(): void
+    {
+        $fixture = $this->createActionFixture();
+        $action = $fixture['action'];
+        $action->forceFill([
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ]);
+
+        $chefPlanification = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'password_changed_at' => now(),
+        ]);
+        $chefSciq = User::factory()->create([
+            'role' => User::ROLE_CHEF_UNITE_SCIQ,
+            'password_changed_at' => now(),
+        ]);
+
+        $this->assertTrue($this->policy->update($chefPlanification, $action));
+        $this->assertTrue($this->policy->update($chefSciq, $action));
+        $this->assertFalse($this->policy->update($fixture['service_user'], $action));
+    }
+
     /**
      * @return array{
      *     action: Action,

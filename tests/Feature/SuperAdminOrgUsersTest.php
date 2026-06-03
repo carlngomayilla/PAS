@@ -117,6 +117,36 @@ class SuperAdminOrgUsersTest extends TestCase
         ]);
     }
 
-}
+    public function test_super_admin_can_create_chef_planification_with_operational_scope(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $direction = Direction::query()
+            ->whereIn('code', ['DAF', 'DSIC', 'DS'])
+            ->firstOrFail();
+        $service = Service::query()
+            ->where('direction_id', $direction->id)
+            ->firstOrFail();
 
+        $this->actingAs($superAdmin)
+            ->post(route('workspace.referentiel.utilisateurs.store'), [
+                'name' => 'Chef Planification Test',
+                'email' => 'chef.planification.test@anbg.test',
+                'role' => User::ROLE_CHEF_PLANIFICATION,
+                'direction_id' => $direction->id,
+                'service_id' => $service->id,
+                'is_active' => '1',
+                'password' => 'Password-Test@123',
+                'password_confirmation' => 'Password-Test@123',
+            ])
+            ->assertRedirect(route('workspace.referentiel.utilisateurs.index'));
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'chef.planification.test@anbg.test',
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+        ]);
+    }
+
+}
 
