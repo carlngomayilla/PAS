@@ -247,15 +247,16 @@ class RolePermissionMatrixTest extends TestCase
 
     public function test_legacy_stored_planning_control_chief_permissions_are_upgraded(): void
     {
-        PlatformSetting::query()->create([
-            'group' => 'role_permissions',
-            'key' => 'role_permissions_'.User::ROLE_CHEF_PLANIFICATION,
-            'value' => json_encode([
-                'planning.read',
-                'planning.write.service',
-                'scope.global.write',
-            ], JSON_UNESCAPED_SLASHES),
-        ]);
+        PlatformSetting::query()->updateOrCreate(
+            ['group' => 'role_permissions', 'key' => 'role_permissions_'.User::ROLE_CHEF_PLANIFICATION],
+            [
+                'value' => json_encode([
+                    'planning.read',
+                    'planning.write.service',
+                    'scope.global.write',
+                ], JSON_UNESCAPED_SLASHES),
+            ]
+        );
 
         $settings = app(RolePermissionSettings::class);
         $settings->flush();
