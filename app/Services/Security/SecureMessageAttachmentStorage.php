@@ -110,4 +110,65 @@ class SecureMessageAttachmentStorage
             ])
         );
     }
+
+    public function preview(Message $message): StreamedResponse
+    {
+        $path = (string) $message->attachment_path;
+        if ($path === '' || ! Storage::disk('local')->exists($path)) {
+            abort(404, 'Piece jointe introuvable.');
+        }
+
+        if (! $message->attachment_is_encrypted) {
+            $stream = Storage::disk('local')->readStream($path);
+            if ($stream === false) {
+                abort(500, 'La piece jointe ne peut pas etre ouverte.');
+            }
+
+            return Response::stream(
+                static function () use ($stream): void {
+                    fpassthru($stream);
+                    if (is_resource($stream)) {
+                        fclose($stream);
+                    }
+                },
+                200,
+                $this->previewHeaders($message)
+            );
+        }
+
+        try {
+            $encryptedContent = Storage::disk('local')->get($path);
+            $payload = Crypt::decryptString($encryptedContent);
+            $binary = base64_decode($payload, true);
+        } catch (DecryptException) {
+            abort(500, 'La piece jointe chiffree ne peut pas etre dechiffree.');
+        }
+
+        if ($binary === false) {
+            abort(500, 'La piece jointe chiffree est corrompue.');
+        }
+
+        return Response::stream(
+            static function () use ($binary): void {
+                echo $binary;
+            },
+            200,
+            $this->previewHeaders($message)
+        );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function previewHeaders(Message $message): array
+    {
+        $fileName = str_replace(['"', "\r", "\n"], '', (string) ($message->attachment_original_name ?: 'piece-jointe'));
+
+        return array_filter([
+            'Content-Type' => (string) ($message->attachment_mime_type ?: 'application/octet-stream'),
+            'Content-Length' => (string) $message->attachment_size_bytes,
+            'Content-Disposition' => 'inline; filename="'.$fileName.'"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
 }

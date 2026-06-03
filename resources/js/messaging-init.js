@@ -42,10 +42,19 @@ function renderAttachment(attachment) {
 
     return `
         <div class="mt-3">
-            <a class="messaging-attachment-link" href="${attachment.download_url}">
+            <button
+                class="messaging-attachment-link"
+                type="button"
+                data-preview-file
+                data-preview-title="${escapeHtml(attachment.name)}"
+                data-preview-subtitle="${escapeHtml(attachment.mime_type || 'Piece jointe')}"
+                data-preview-mime="${escapeHtml(attachment.mime_type || '')}"
+                data-preview-url="${escapeHtml(attachment.preview_url || attachment.download_url)}"
+                data-download-url="${escapeHtml(attachment.download_url)}"
+            >
                 <span class="font-medium">${escapeHtml(attachment.name)}</span>
                 <span class="text-xs opacity-80">${escapeHtml(attachment.size_label)}</span>
-            </a>
+            </button>
         </div>
     `;
 }

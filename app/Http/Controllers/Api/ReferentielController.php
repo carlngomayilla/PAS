@@ -100,6 +100,14 @@ class ReferentielController extends Controller
             $query->where('role', '!=', User::ROLE_SUPER_ADMIN);
         }
 
+        if ($user->isPlanningControlChief()) {
+            $query->whereIn('role', [
+                User::ROLE_DIRECTION,
+                User::ROLE_SERVICE,
+                User::ROLE_AGENT,
+            ]);
+        }
+
         if (! $user->hasGlobalReadAccess()) {
             if ($user->direction_id !== null) {
                 $query->where('direction_id', (int) $user->direction_id);

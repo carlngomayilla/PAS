@@ -138,7 +138,16 @@
                                 <td><span class="anbg-badge anbg-badge-info px-2 py-1 text-xs">{{ $statusLabel }}</span></td>
                                 <td>
                                     @if ($doc)
-                                        <a class="text-[#3996d3] font-semibold" href="{{ route('workspace.actions.justificatifs.download', [$action, $doc]) }}">Ouvrir</a>
+                                        <button
+                                            class="text-[#3996d3] font-semibold"
+                                            type="button"
+                                            data-preview-file
+                                            data-preview-title="{{ $doc->nom_original }}"
+                                            data-preview-subtitle="{{ $doc->mime_type ?: 'Justificatif financement' }}"
+                                            data-preview-mime="{{ $doc->mime_type }}"
+                                            data-preview-url="{{ route('workspace.actions.justificatifs.preview', [$action, $doc]) }}"
+                                            data-download-url="{{ route('workspace.actions.justificatifs.download', [$action, $doc]) }}"
+                                        >Voir</button>
                                     @else
                                         -
                                     @endif

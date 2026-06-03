@@ -370,8 +370,9 @@ class RolePermissionSettings
             ],
 
             // Chef planification : meme niveau de droits que Chef d'unite SCIQ.
-            // Profil de controle principal : suivi global, imports et pilotage
-            // strategique, sans les droits referentiel/delegation du profil SCIQ.
+            // Profil de controle principal : suivi global, imports, pilotage
+            // strategique et gestion des utilisateurs direction/service, sans
+            // les droits referentiel/delegation du profil SCIQ.
             User::ROLE_CHEF_PLANIFICATION => [
                 'scope.global.read',
                 'planning.read',
@@ -381,10 +382,13 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
+                'users.manage',
+                'users.manage_roles',
                 'messagerie.read',
             ],
 
-            // Chef d'unite SCIQ : controle principal global + suivi strategique.
+            // Chef d'unite SCIQ : controle principal global + suivi strategique
+            // et gestion des utilisateurs direction/service.
             User::ROLE_CHEF_UNITE_SCIQ => [
                 'scope.global.read',
                 'planning.read',
@@ -394,6 +398,8 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
+                'users.manage',
+                'users.manage_roles',
                 'messagerie.read',
             ],
 
@@ -551,6 +557,8 @@ class RolePermissionSettings
                     'reporting.read',
                     'alerts.read',
                     'referentiel.read',
+                    'users.manage',
+                    'users.manage_roles',
                     'messagerie.read',
                 ]
             )));

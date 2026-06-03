@@ -8,4 +8,5 @@ import './messaging-init';
 import './page-auto-refresh';
 import './super-admin-menu';
 import './super-admin-preview';
+import './preview-modal';
 import './ui-enhancements';

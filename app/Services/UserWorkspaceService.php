@@ -397,6 +397,9 @@ class UserWorkspaceService
                 $m('execution', 'Action', '/workspace/actions'),
                 // 'controle' → vue "Pilotage" des actions filtree sur validations a faire.
                 $m('controle', 'Contrôle', '/workspace/actions?vue=pilotage&statut_validation=soumise_chef', ['can_write' => true, 'actions' => ['Signaler', 'Bloquer', 'Lever blocage']]),
+                ...($user->isPlanningControlChief()
+                    ? [$m('referentiel', 'Utilisateurs', '/workspace/referentiel/utilisateurs', ['can_write' => true, 'actions' => ['Consulter', 'Administrer utilisateurs']])]
+                    : []),
                 $m('reporting', 'Reporting global', '/workspace/reporting'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),
             ],

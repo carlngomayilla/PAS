@@ -101,6 +101,8 @@ class RolePermissionMatrixTest extends TestCase
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
+                'users.manage',
+                'users.manage_roles',
                 'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE_SCIQ => [
@@ -112,6 +114,8 @@ class RolePermissionMatrixTest extends TestCase
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
+                'users.manage',
+                'users.manage_roles',
                 'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE_DGA => [
@@ -196,8 +200,8 @@ class RolePermissionMatrixTest extends TestCase
             // (label "Action") qui couvre les deux vues via les onglets de la page.
             User::ROLE_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
             User::ROLE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
-            User::ROLE_CHEF_UNITE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
-            User::ROLE_CHEF_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
+            User::ROLE_CHEF_UNITE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'referentiel', 'reporting', 'notifications'],
+            User::ROLE_CHEF_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'referentiel', 'reporting', 'notifications'],
             User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'alertes', 'notifications'],
             User::ROLE_CHEF_UNITE_CABINET => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
             User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'alertes', 'notifications'],
@@ -261,7 +265,10 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertContains('scope.global.read', $permissions);
         $this->assertContains('planning.write.global', $permissions);
         $this->assertContains('planning.strategic.manage', $permissions);
+        $this->assertContains('users.manage', $permissions);
+        $this->assertContains('users.manage_roles', $permissions);
         $this->assertNotContains('scope.global.write', $permissions);
+        $this->assertNotContains('referentiel.write', $permissions);
     }
 
     public function test_seeded_agent_ossa_uses_agent_visibility_matrix(): void

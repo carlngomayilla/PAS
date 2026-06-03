@@ -356,6 +356,10 @@ class ReferentielWebController extends Controller
             $query->where('role', '!=', User::ROLE_SUPER_ADMIN);
         }
 
+        if ($user->isPlanningControlChief()) {
+            $query->whereIn('role', $this->planningControlChiefManagedRoles());
+        }
+
         if (! $user->hasGlobalReadAccess()) {
             if ($user->direction_id !== null) {
                 $query->where('direction_id', (int) $user->direction_id);
@@ -1036,6 +1040,10 @@ class ReferentielWebController extends Controller
             return $subject instanceof User ? [$subject->role] : [User::ROLE_AGENT];
         }
 
+        if ($actor->isPlanningControlChief()) {
+            return $this->planningControlChiefManagedRoles();
+        }
+
         if ($actor->hasGlobalReadAccess()) {
             return $globalManagerRoles;
         }
@@ -1058,6 +1066,10 @@ class ReferentielWebController extends Controller
      */
     private function acceptedRoleOptions(?User $actor = null, ?User $subject = null): array
     {
+        if ($actor?->isPlanningControlChief()) {
+            return $this->planningControlChiefManagedRoles();
+        }
+
         return array_values(array_unique([
             ...$this->roleOptions($actor, $subject),
             ...array_keys($this->roleRegistry->deprecatedRoleMap()),
@@ -1066,6 +1078,14 @@ class ReferentielWebController extends Controller
 
     private function denyUnlessManagedUserAccessible(User $actor, User $target): void
     {
+        if ($actor->isPlanningControlChief()) {
+            if (in_array($this->roleRegistry->baseRole((string) $target->role), $this->planningControlChiefManagedRoles(), true)) {
+                return;
+            }
+
+            abort(403, 'Acces non autorise.');
+        }
+
         if ($actor->hasGlobalReadAccess()) {
             return;
         }
@@ -1082,6 +1102,18 @@ class ReferentielWebController extends Controller
         }
 
         abort(403, 'Acces non autorise.');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function planningControlChiefManagedRoles(): array
+    {
+        return [
+            User::ROLE_DIRECTION,
+            User::ROLE_SERVICE,
+            User::ROLE_AGENT,
+        ];
     }
 
     /**

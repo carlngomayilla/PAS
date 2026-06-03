@@ -239,6 +239,22 @@ class MessagingWebController extends Controller
         return $attachmentStorage->download($message);
     }
 
+    public function previewAttachment(
+        Request $request,
+        Conversation $conversation,
+        Message $message,
+        SecureMessageAttachmentStorage $attachmentStorage
+    ): StreamedResponse {
+        $user = $this->authUser($request);
+        $this->denyUnlessMessagingReader($user);
+        $activeConversation = $this->messagingService->findAccessibleConversation($user, $conversation->id);
+        if (! $activeConversation instanceof Conversation || (int) $message->conversation_id !== (int) $activeConversation->id) {
+            abort(403, 'Piece jointe non autorisee.');
+        }
+
+        return $attachmentStorage->preview($message);
+    }
+
     public function toggleFavorite(Request $request, Conversation $conversation): RedirectResponse
     {
         $user = $this->authUser($request);
@@ -347,6 +363,8 @@ class MessagingWebController extends Controller
                 'is_seen' => $isMine && $otherLastReadAt && $message->sent_at && $message->sent_at->lte($otherLastReadAt),
                 'attachment' => $message->hasAttachment() ? [
                     'name' => $message->attachment_original_name,
+                    'mime_type' => $message->attachment_mime_type,
+                    'preview_url' => route('workspace.messaging.attachment.preview', [$conversation ?? $message->conversation_id, $message]),
                     'download_url' => route('workspace.messaging.attachment.download', [$conversation ?? $message->conversation_id, $message]),
                     'size_label' => $this->formatBytes((int) $message->attachment_size_bytes),
                 ] : null,

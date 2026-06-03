@@ -272,10 +272,19 @@
                             @endif
                             @if ($message->hasAttachment())
                                 <div class="mt-3">
-                                    <a class="messaging-attachment-link" href="{{ route('workspace.messaging.attachment.download', [$activeConversation, $message]) }}">
+                                    <button
+                                        class="messaging-attachment-link"
+                                        type="button"
+                                        data-preview-file
+                                        data-preview-title="{{ $message->attachment_original_name }}"
+                                        data-preview-subtitle="{{ $message->attachment_mime_type ?: 'Piece jointe' }}"
+                                        data-preview-mime="{{ $message->attachment_mime_type }}"
+                                        data-preview-url="{{ route('workspace.messaging.attachment.preview', [$activeConversation, $message]) }}"
+                                        data-download-url="{{ route('workspace.messaging.attachment.download', [$activeConversation, $message]) }}"
+                                    >
                                         <span class="font-medium">{{ $message->attachment_original_name }}</span>
                                         <span class="text-xs opacity-80">{{ number_format(((int) $message->attachment_size_bytes) / 1024, 1, ',', ' ') }} Ko</span>
-                                    </a>
+                                    </button>
                                 </div>
                             @endif
                         </article>

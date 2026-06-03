@@ -37,6 +37,10 @@ class DeletionRequestService
             return false;
         }
 
+        if ($actor->isPlanningControlChief()) {
+            return $target->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE, User::ROLE_AGENT);
+        }
+
         if ($actor->isSuperAdmin()
             || $actor->hasGlobalReadAccess()
             || $actor->hasRole(

@@ -8089,4 +8089,182 @@ html.dark body.admin-theme-scope :is(.app-table-wrapper, .data-table-shell, .tab
     border-color: var(--app-blue, #3996d3) !important;
 }
 
+/* Global preview modal for secure files and table previews. */
+.preview-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.preview-modal.hidden { display: none; }
+.preview-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(10px);
+}
+.preview-modal-panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(1120px, calc(100vw - 2rem));
+    height: min(82vh, 780px);
+    overflow: hidden;
+    border: 1px solid var(--app-border, #d8ecf8);
+    border-radius: 0.75rem;
+    background: var(--app-surface, #fff);
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+}
+.preview-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--app-border, #d8ecf8);
+    background: #f8fcff;
+}
+.preview-modal-heading { min-width: 0; }
+.preview-modal-eyebrow {
+    margin: 0 0 0.2rem;
+    color: var(--app-blue, #3996d3);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+.preview-modal-title {
+    margin: 0;
+    color: #1c203d;
+    font-size: 1rem;
+    font-weight: 800;
+}
+.preview-modal-subtitle {
+    margin: 0.2rem 0 0;
+    color: #667085;
+    font-size: 0.8rem;
+}
+.preview-modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.45rem;
+}
+.preview-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 1rem;
+    background: #f6fbff;
+}
+.preview-file-frame {
+    display: block;
+    width: 100%;
+    min-height: 100%;
+    height: calc(82vh - 8rem);
+    border: 0;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+.preview-image-shell {
+    display: grid;
+    min-height: 100%;
+    place-items: center;
+}
+.preview-image {
+    max-width: 100%;
+    max-height: calc(82vh - 8rem);
+    border-radius: 0.5rem;
+    object-fit: contain;
+    background: #fff;
+    box-shadow: 0 1px 8px rgba(15, 23, 42, 0.12);
+}
+.preview-empty-state {
+    display: grid;
+    min-height: 15rem;
+    place-items: center;
+    align-content: center;
+    gap: 0.5rem;
+    border: 1px dashed #b9dff4;
+    border-radius: 0.75rem;
+    background: #fff;
+    color: #667085;
+    text-align: center;
+}
+.preview-empty-title {
+    color: #1c203d;
+    font-weight: 800;
+}
+.preview-table-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 0.5rem;
+}
+.preview-table-wrapper {
+    overflow: auto;
+    border: 1px solid var(--app-border, #d8ecf8);
+    border-radius: 0.5rem;
+    background: #fff;
+}
+.preview-table { min-width: 760px; }
+body.preview-modal-open { overflow: hidden; }
+
+button.messaging-attachment-link {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 100%;
+    border: 1px solid rgba(57, 150, 211, 0.28);
+    border-radius: 0.65rem;
+    padding: 0.45rem 0.7rem;
+    background: rgba(232, 243, 251, 0.85);
+    color: #1c203d;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+}
+
+button.messaging-attachment-link:hover {
+    background: rgba(57, 150, 211, 0.16);
+}
+
+@media (max-width: 640px) {
+    .preview-modal { padding: 0.5rem; }
+    .preview-modal-panel {
+        width: calc(100vw - 1rem);
+        height: calc(100vh - 1rem);
+    }
+    .preview-modal-header {
+        flex-direction: column;
+        padding: 0.85rem;
+    }
+    .preview-modal-actions { justify-content: flex-start; }
+}
+
+@media print {
+    body.preview-modal-open > *:not(#preview-modal) { display: none !important; }
+    body.preview-modal-open #preview-modal {
+        position: static !important;
+        display: block !important;
+        padding: 0 !important;
+    }
+    body.preview-modal-open .preview-modal-backdrop,
+    body.preview-modal-open .preview-modal-actions { display: none !important; }
+    body.preview-modal-open .preview-modal-panel {
+        width: 100% !important;
+        height: auto !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+    body.preview-modal-open .preview-modal-body {
+        overflow: visible !important;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+}
+
 }

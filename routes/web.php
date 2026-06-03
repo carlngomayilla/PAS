@@ -104,6 +104,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.messaging.updates');
         Route::get('/workspace/messagerie/conversations/{conversation}/messages/{message}/attachment', [MessagingWebController::class, 'downloadAttachment'])
             ->name('workspace.messaging.attachment.download');
+        Route::get('/workspace/messagerie/conversations/{conversation}/messages/{message}/attachment/preview', [MessagingWebController::class, 'previewAttachment'])
+            ->name('workspace.messaging.attachment.preview');
         Route::post('/workspace/messagerie/conversations/{conversation}/favorite', [MessagingWebController::class, 'toggleFavorite'])
             ->name('workspace.messaging.favorite');
         Route::get('/workspace/notifications', [NotificationWebController::class, 'index'])

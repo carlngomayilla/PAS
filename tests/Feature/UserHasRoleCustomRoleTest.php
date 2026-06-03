@@ -95,6 +95,8 @@ class UserHasRoleCustomRoleTest extends TestCase
             $this->assertTrue($user->hasPermission('scope.global.read'), 'Role '.$role);
             $this->assertTrue($user->hasPermission('planning.write.global'), 'Role '.$role);
             $this->assertTrue($user->hasPermission('planning.strategic.manage'), 'Role '.$role);
+            $this->assertTrue($user->hasPermission('users.manage'), 'Role '.$role);
+            $this->assertTrue($user->hasPermission('users.manage_roles'), 'Role '.$role);
             $this->assertFalse($user->hasPermission('scope.global.write'), 'Role '.$role);
         }
     }

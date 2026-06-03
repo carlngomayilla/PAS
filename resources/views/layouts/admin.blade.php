@@ -573,6 +573,8 @@
         </div>
     </div>
 
+    <x-preview-modal />
+
     <div id="anbg-dialog" class="anbg-dialog hidden" aria-hidden="true">
         <div class="anbg-dialog-backdrop" data-dialog-dismiss></div>
         <div class="anbg-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="anbg-dialog-title">

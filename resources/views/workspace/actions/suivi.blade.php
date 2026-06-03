@@ -600,7 +600,16 @@
                     <p class="text-slate-600">Commentaire : <strong>{{ $action->commentaire_financement ?: '-' }}</strong></p>
                     <p class="text-slate-600">Pièce justificative : <strong>
                         @if ($financingJustificatif)
-                            <a class="text-[#3996d3]" target="_blank" rel="noopener" href="{{ route('workspace.actions.justificatifs.preview', [$action, $financingJustificatif]) }}">Visualiser</a>
+                            <button
+                                class="text-[#3996d3] font-semibold"
+                                type="button"
+                                data-preview-file
+                                data-preview-title="{{ $financingJustificatif->nom_original }}"
+                                data-preview-subtitle="{{ $financingJustificatif->mime_type ?: 'Document justificatif' }}"
+                                data-preview-mime="{{ $financingJustificatif->mime_type }}"
+                                data-preview-url="{{ route('workspace.actions.justificatifs.preview', [$action, $financingJustificatif]) }}"
+                                data-download-url="{{ route('workspace.actions.justificatifs.download', [$action, $financingJustificatif]) }}"
+                            >Visualiser</button>
                         @else
                             -
                         @endif
@@ -877,10 +886,19 @@
                     </p>
                 </div>
                 <div class="justificatif-card-actions">
-                    <a class="btn btn-primary btn-sm rounded-xl" target="_blank" rel="noopener" href="{{ $previewUrl }}">
+                    <button
+                        class="btn btn-primary btn-sm rounded-xl"
+                        type="button"
+                        data-preview-file
+                        data-preview-title="{{ $doc->nom_original }}"
+                        data-preview-subtitle="{{ $docCategory }}"
+                        data-preview-mime="{{ $doc->mime_type }}"
+                        data-preview-url="{{ $previewUrl }}"
+                        data-download-url="{{ $downloadUrl }}"
+                    >
                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                         Visualiser
-                    </a>
+                    </button>
                     <a class="rounded-xl border border-[#3996d3]/30 px-3 py-1.5 text-xs font-bold text-[#3996d3] hover:bg-[#e8f3fb] flex items-center gap-1" href="{{ $downloadUrl }}">
                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Télécharger
@@ -937,4 +955,3 @@
         </div>
     </section>
 @endsection
-
