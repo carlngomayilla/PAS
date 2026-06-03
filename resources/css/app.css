@@ -8094,12 +8094,18 @@ html.dark body.admin-theme-scope :is(.app-table-wrapper, .data-table-shell, .tab
     position: fixed;
     inset: 0;
     z-index: 9998;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     padding: 1rem;
 }
-.preview-modal.hidden { display: none; }
+.preview-modal.is-open {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9998 !important;
+    display: flex !important;
+}
+.preview-modal.hidden { display: none !important; }
 .preview-modal-backdrop {
     position: absolute;
     inset: 0;
@@ -8210,6 +8216,37 @@ html.dark body.admin-theme-scope :is(.app-table-wrapper, .data-table-shell, .tab
     background: #fff;
 }
 .preview-table { min-width: 760px; }
+.preview-table-clickable { cursor: zoom-in; }
+.preview-table-clickable:hover {
+    outline: 2px solid rgba(57, 150, 211, 0.24);
+    outline-offset: 2px;
+}
+.preview-chart-clickable {
+    cursor: zoom-in;
+}
+.preview-chart-clickable:not(.dashboard-chart-host) { position: relative; }
+.preview-chart-inline-btn {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.9rem;
+    border: 1px solid rgba(57, 150, 211, 0.32);
+    border-radius: 0.45rem;
+    padding: 0.35rem 0.6rem;
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--app-blue, #3996d3);
+    font-size: 0.72rem;
+    font-weight: 800;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+}
+.preview-chart-inline-btn:hover {
+    border-color: var(--app-blue, #3996d3);
+    background: #fff;
+}
 body.preview-modal-open { overflow: hidden; }
 
 button.messaging-attachment-link {

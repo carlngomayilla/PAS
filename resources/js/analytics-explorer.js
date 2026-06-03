@@ -246,6 +246,11 @@ function initAnalyticsExplorer() {
   };
 
   const openTable = (table) => {
+    if (window.PasPreviewModal && typeof window.PasPreviewModal.openTable === 'function') {
+      window.PasPreviewModal.openTable(table);
+      return;
+    }
+
     const title = closestPanelTitle(table);
     const subtitle = closestPanelSubtitle(table);
     const wrapper = document.createElement('div');
@@ -265,6 +270,11 @@ function initAnalyticsExplorer() {
   };
 
   const openChart = async (target) => {
+    if (window.PasPreviewModal && typeof window.PasPreviewModal.openChart === 'function') {
+      await window.PasPreviewModal.openChart(target);
+      return;
+    }
+
     const title = target.classList.contains('dashboard-gauge-card')
       ? `${closestPanelTitle(target)} - ${(target.querySelector('strong')?.textContent || 'Jauge').trim()}`
       : closestPanelTitle(target);
