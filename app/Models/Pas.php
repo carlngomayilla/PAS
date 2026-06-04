@@ -21,6 +21,13 @@ class Pas extends Model
     protected $table = 'pas';
 
     /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'statut' => self::STATUS_ACTIF,
+    ];
+
+    /**
      * @var list<string>
      */
     protected $fillable = [

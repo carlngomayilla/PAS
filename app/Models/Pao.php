@@ -22,6 +22,13 @@ class Pao extends Model
     protected $table = 'paos';
 
     /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'statut' => self::STATUS_EN_COURS,
+    ];
+
+    /**
      * @var list<string>
      */
     protected $fillable = [

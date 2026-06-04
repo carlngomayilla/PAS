@@ -13,17 +13,20 @@ class Pta extends Model
 {
     use HasFactory, SoftDeletes;
 
-    // STATUS_BROUILLON : etat initial apres import Excel ou creation. Le PTA
-    // existe en BDD mais ses actions doivent etre parametrees individuellement
-    // par le chef de service avant que le PTA soit considere comme "enregistre"
-    // (transition automatique vers STATUS_EN_COURS quand toutes les actions ont
-    // statut_parametrage = 'parametre').
+    // Statuts historiques conserves pour compatibilite de lecture/import.
     public const STATUS_BROUILLON = 'brouillon';
     public const STATUS_EN_COURS = 'en_cours';
     public const STATUS_CLOTURE = 'cloture';
     public const STATUS_ARCHIVE = 'archive';
     public const STATUS_VALIDE = 'valide';
     public const STATUS_VERROUILLE = 'verrouille';
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'statut' => self::STATUS_EN_COURS,
+    ];
 
     /**
      * @var list<string>
