@@ -53,10 +53,9 @@ class ActionLog extends Model
         return $this->belongsTo(Action::class, 'action_id');
     }
 
-    // Relation week() supprimee : la colonne action_week_id est droppee.
-    public function week(): BelongsTo
+    public function getWeekAttribute(): null
     {
-        return $this->belongsTo(self::class, 'id', 'id');
+        return null;
     }
 
     public function utilisateur(): BelongsTo

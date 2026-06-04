@@ -36,9 +36,9 @@ class ActionProgressService
     {
         $referenceDate = $referenceDate?->copy() ?? Carbon::today();
         if ($action->exists) {
-            $action->load('sousActions.justificatifs', 'weeks');
+            $action->load('sousActions.justificatifs');
         } else {
-            $action->loadMissing('sousActions.justificatifs', 'weeks');
+            $action->loadMissing('sousActions.justificatifs');
         }
 
         $target = $action->usesQuantitativeProgress()

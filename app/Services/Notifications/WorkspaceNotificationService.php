@@ -441,8 +441,7 @@ class WorkspaceNotificationService
 
         $log->loadMissing(
             'action:id,pta_id,libelle,responsable_id',
-            'action.pta:id,direction_id,service_id',
-            'week:id,action_id,numero_semaine'
+            'action.pta:id,direction_id,service_id'
         );
 
         $action = $log->action;
@@ -1336,10 +1335,6 @@ class WorkspaceNotificationService
         $action = $log->action;
         if (! $action instanceof Action) {
             return route('workspace.alertes');
-        }
-
-        if ($log->week !== null) {
-            return route('workspace.actions.suivi', $action).'#action-week-'.$log->week->id;
         }
 
         if (Str::startsWith((string) $log->type_evenement, 'alerte_temporelle_')) {

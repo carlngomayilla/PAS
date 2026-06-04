@@ -1089,10 +1089,6 @@ class MonitoringWebController extends Controller
             return null;
         }
 
-        if ($log->week !== null) {
-            return route('workspace.actions.suivi', $action).'#action-week-'.$log->week->id;
-        }
-
         return route('workspace.actions.suivi', $action).'#action-logs';
     }
 

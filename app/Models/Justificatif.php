@@ -68,10 +68,9 @@ class Justificatif extends Model
         return $this->belongsTo(User::class, 'ajoute_par');
     }
 
-    // Relation actionWeek() supprimee : la colonne action_week_id est droppee.
-    public function actionWeek(): BelongsTo
+    public function getActionWeekAttribute(): null
     {
-        return $this->belongsTo(self::class, 'id', 'id');
+        return null;
     }
 
     public function sousAction(): BelongsTo

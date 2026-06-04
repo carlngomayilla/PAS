@@ -219,7 +219,6 @@ class AlertCenterService
                 'action.pta:id,direction_id,service_id,titre',
                 'action.pta.direction:id,code,libelle',
                 'action.pta.service:id,code,libelle',
-                'week:id,action_id,numero_semaine',
                 'utilisateur:id,name',
             ])
             ->activeAlert();
@@ -439,7 +438,6 @@ class AlertCenterService
                 'action.pta:id,direction_id,service_id,titre',
                 'action.pta.direction:id,code,libelle',
                 'action.pta.service:id,code,libelle',
-                'week:id,action_id,numero_semaine',
                 'utilisateur:id,name',
             ])
             ->whereKey($id)
@@ -636,13 +634,11 @@ class AlertCenterService
         $isManualAnomaly = str_starts_with((string) $log->type_evenement, 'anomalie_');
         $sectionLabel = match (true) {
             $isManualAnomaly => 'Controle et anomalies',
-            $log->week !== null => 'Suivi '.$this->typeLabel('periode_manquante'),
             default => 'Journal et validation',
         };
         $targetUrl = $action instanceof Action
             ? route('workspace.actions.suivi', $action).match (true) {
                 $isManualAnomaly => '#action-controle',
-                $log->week !== null => '#action-week-'.$log->week->id,
                 default => '#action-logs',
             }
             : route('workspace.alertes');

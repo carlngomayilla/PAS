@@ -400,7 +400,6 @@ class ActionController extends Controller
             'pta:id,pao_id,direction_id,service_id,titre,statut',
             'pao:id,pas_id,annee,titre,statut,objectif_operationnel,echeance',
             'responsable:id,name,email',
-            'weeks:id,action_id,numero_semaine,date_debut,date_fin,est_renseignee',
             'primaryKpi:id,action_id,libelle,unite,cible,seuil_alerte,periodicite,est_a_renseigner',
             'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,progression_reelle,progression_theorique,statut_calcule',
         ];

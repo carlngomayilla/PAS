@@ -186,7 +186,6 @@ class AlertDigestBuilder
             ->with([
                 'action:id,pta_id,libelle,statut_dynamique',
                 'action.pta:id,direction_id,service_id,titre',
-                'week:id,action_id,numero_semaine',
             ])
             ->whereIn('niveau', ['warning', 'critical', 'urgence']);
 

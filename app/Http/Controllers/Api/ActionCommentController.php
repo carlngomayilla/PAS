@@ -54,7 +54,7 @@ class ActionCommentController extends Controller
 
         return response()->json([
             'data' => $action->actionLogs()
-                ->with(['week:id,action_id,numero_semaine', 'utilisateur:id,name,email'])
+                ->with(['utilisateur:id,name,email'])
                 ->latest()
                 ->paginate(max(1, min(100, (int) $request->integer('per_page', 20))))
                 ->withQueryString(),
