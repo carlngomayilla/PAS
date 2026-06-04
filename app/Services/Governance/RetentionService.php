@@ -238,7 +238,7 @@ class RetentionService
 
         return DB::table('notifications')
             ->where('created_at', '<=', $cutoff)
-            ->whereNotIn('id', function ($query): void {
+            ->whereNotIn(DB::raw('notifications.id::text'), function ($query): void {
                 $query->select('scope_label')
                     ->from('data_archives')
                     ->where('source_table', 'notifications')
@@ -246,3 +246,4 @@ class RetentionService
             });
     }
 }
+
