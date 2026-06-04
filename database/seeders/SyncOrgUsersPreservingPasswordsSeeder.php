@@ -67,7 +67,7 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
 
         foreach ($this->users() as $index => $rawUser) {
             $user = $this->normalizeUserOrganization($rawUser);
-            $email = strtolower((string) $user['email']);
+            $email = $this->normalizeOrganizationEmail((string) $user['email']);
             $syncedEmails[] = $email;
             $directionId = $directionIds[$user['direction_code']] ?? null;
             $serviceId = null;

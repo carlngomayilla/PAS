@@ -63,9 +63,9 @@ class OfficialOrganizationScopeTest extends TestCase
 
         $scopeService = app(AccessScopeService::class);
 
-        $sciq = User::query()->with(['direction', 'service'])->where('email', 'kassirath.angue@anbg.ga')->firstOrFail();
-        $collaborateur = User::query()->with(['direction', 'service'])->where('email', 'loick.adan@anbg.ga')->firstOrFail();
-        $ucas = User::query()->with(['direction', 'service'])->where('email', 'ismene.lekosso@anbg.ga')->firstOrFail();
+        $sciq = User::query()->with(['direction', 'service'])->where('email', 'k.angue.anbg@gmail.com')->firstOrFail();
+        $collaborateur = User::query()->with(['direction', 'service'])->where('email', 'l.adan.anbg@gmail.com')->firstOrFail();
+        $ucas = User::query()->with(['direction', 'service'])->where('email', 'i.lekosso.anbg@gmail.com')->firstOrFail();
 
         $this->assertSame(User::ROLE_SCIQ, $sciq->role);
         $this->assertSame('DG', $sciq->direction?->code);

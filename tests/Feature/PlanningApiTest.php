@@ -87,7 +87,7 @@ class PlanningApiTest extends TestCase
 
     public function test_service_user_sees_pao_transmitted_through_operational_objective(): void
     {
-        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $serviceUser = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
         $year = app(\App\Services\ExerciceContext::class)->selectedYear();
         $pas = Pas::query()->create([
             'titre' => 'PAS test transmission service',
@@ -167,7 +167,7 @@ class PlanningApiTest extends TestCase
     public function test_service_user_cannot_create_pao_for_another_direction(): void
     {
         $loginResponse = $this->postJson('/api/v1/login', [
-            'email' => 'arnold.mindzeli@anbg.ga',
+            'email' => 'a.mindzeli.anbg@gmail.com',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-service',
         ]);
@@ -194,13 +194,13 @@ class PlanningApiTest extends TestCase
     public function test_service_user_cannot_create_pao_even_for_his_own_service(): void
     {
         $loginResponse = $this->postJson('/api/v1/login', [
-            'email' => 'robert.ekomi@anbg.ga',
+            'email' => 'r.ekomi.anbg@gmail.com',
             'password' => 'Pass@12345',
             'device_name' => 'phpunit-service-own-pao',
         ]);
 
         $token = (string) $loginResponse->json('access_token');
-        $serviceUser = \App\Models\User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $serviceUser = \App\Models\User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
         $objectifId = (int) PasObjectif::query()->value('id');
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")

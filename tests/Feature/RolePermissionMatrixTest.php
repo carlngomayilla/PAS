@@ -277,7 +277,7 @@ class RolePermissionMatrixTest extends TestCase
         $this->seed(ProductionSafeSeeder::class);
 
         $ossa = User::query()
-            ->where('email', 'charles.ossa@anbg.ga')
+            ->where('email', 'c.ossa.anbg@gmail.com')
             ->firstOrFail();
 
         $this->assertSame(User::ROLE_AGENT, $ossa->role);

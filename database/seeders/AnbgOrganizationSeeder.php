@@ -88,7 +88,7 @@ class AnbgOrganizationSeeder extends Seeder
                 $serviceId = $serviceIds[$user['direction_code'].'.'.$user['service_code']] ?? null;
             }
 
-            $email = strtolower((string) $user['email']);
+            $email = $this->normalizeOrganizationEmail((string) $user['email']);
             $matricule = $this->resolveMatricule($user, $index + 1);
             $existing = DB::table('users')->where('email', $email)->first(['id', 'password']);
 
@@ -661,6 +661,44 @@ class AnbgOrganizationSeeder extends Seeder
         }
 
         return $user;
+    }
+
+    /**
+     * Convention d email de l organisation : {initiale_prenom}.{nom}.anbg@gmail.com.
+     *
+     * La donnee brute du classeur reste en `prenom.nom@anbg.ga` ; cette convention
+     * est appliquee au moment du seed (source unique de la regle). Sont laisses
+     * inchanges : les comptes de fonction (`directeur.*`), les emails sans
+     * `prenom.nom` (ex : `ingrid`, comptes systeme) et ceux deja en `@gmail.com`.
+     *
+     * En environnement de tests on conserve l email brut du classeur (`@anbg.ga`)
+     * pour ne pas casser les fixtures de connexion (meme logique que le mot de
+     * passe `Pass@12345`).
+     */
+    protected function normalizeOrganizationEmail(string $email): string
+    {
+        $email = strtolower(trim($email));
+
+        if (app()->environment('testing')) {
+            return $email;
+        }
+
+        [$local, $domain] = array_pad(explode('@', $email, 2), 2, '');
+
+        if ($domain === 'gmail.com'
+            || ! str_contains($local, '.')
+            || str_starts_with($local, 'directeur.')) {
+            return $email;
+        }
+
+        $firstName = Str::before($local, '.');
+        $lastName = Str::after($local, '.');
+
+        if ($firstName === '' || $lastName === '') {
+            return $email;
+        }
+
+        return $firstName[0].'.'.$lastName.'.anbg@gmail.com';
     }
 
     protected function deleteLegacyOrganizationEntries(mixed $now): void

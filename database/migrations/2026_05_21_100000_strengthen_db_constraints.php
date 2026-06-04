@@ -33,6 +33,9 @@ return new class extends Migration
         }
 
         // ─── A24 — CHECK constraints PG sur les enums "varchar" ──────────
+        // NB : ces contraintes sont desormais creees directement par les
+        // migrations de creation de tables. addCheckIfMissing() detecte leur
+        // presence et ne les rajoute pas (cf. correctif transaction PG ci-dessous).
         $this->addCheckIfMissing(
             'pas',
             'pas_statut_check',
@@ -113,6 +116,13 @@ return new class extends Migration
             return;
         }
 
+        // Sur PostgreSQL, un ADD CONSTRAINT en echec avorte toute la transaction
+        // de migration (SQLSTATE 25P02). On verifie donc l existence de la FK
+        // AVANT de l ajouter, au lieu de compter sur le try/catch ci-dessous.
+        if ($this->isPgsql() && $this->constraintExists($table, "{$table}_{$column}_foreign")) {
+            return;
+        }
+
         try {
             Schema::table($table, function (Blueprint $blueprint) use ($column, $references, $onDelete): void {
                 $foreign = $blueprint->foreign($column)->references('id')->on($references);
@@ -146,11 +156,23 @@ return new class extends Migration
 
     private function addCheckIfMissing(string $table, string $constraintName, string $expression): void
     {
-        try {
-            DB::statement("ALTER TABLE {$table} ADD CONSTRAINT {$constraintName} CHECK ({$expression})");
-        } catch (\Throwable) {
-            // Constraint deja presente : on ignore.
+        // Idempotent et sans empoisonnement de transaction PG : on verifie
+        // l existence de la contrainte avant de l ajouter (un ADD CONSTRAINT
+        // en echec avorterait toute la transaction de migration).
+        if ($this->constraintExists($table, $constraintName)) {
+            return;
         }
+
+        DB::statement("ALTER TABLE {$table} ADD CONSTRAINT {$constraintName} CHECK ({$expression})");
+    }
+
+    private function constraintExists(string $table, string $constraintName): bool
+    {
+        // pg_constraint : appele uniquement sur la connexion pgsql.
+        return DB::selectOne(
+            'select 1 from pg_constraint where conname = ? and conrelid = ?::regclass',
+            [$constraintName, $table]
+        ) !== null;
     }
 
     private function dropCheckIfExists(string $table, string $constraintName): void

@@ -281,7 +281,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_service_user_has_no_audit_access_and_removed_modules_are_unavailable(): void
     {
-        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $serviceUser = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $this->actingAs($serviceUser)
             ->get('/workspace/pilotage')
@@ -444,7 +444,7 @@ class WebWorkspaceTest extends TestCase
         // ecritures (create/update/delete) sont restreintes a users.manage.
         $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
         $planification = User::query()->where('role', User::ROLE_PLANIFICATION)->firstOrFail();
-        $cabinet = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
+        $cabinet = User::query()->where('email', 'l.adan.anbg@gmail.com')->firstOrFail();
 
         // DG : peut LIRE la liste mais pas CREER (pas users.manage).
         $this->actingAs($dg)
@@ -470,7 +470,7 @@ class WebWorkspaceTest extends TestCase
 
     public function test_cabinet_cannot_access_removed_justificatifs_module(): void
     {
-        $cabinet = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
+        $cabinet = User::query()->where('email', 'l.adan.anbg@gmail.com')->firstOrFail();
 
         $response = $this->actingAs($cabinet)
             ->get('/workspace/justificatifs');
@@ -487,7 +487,7 @@ class WebWorkspaceTest extends TestCase
         // A06 — Cabinet a perdu planning.strategic.manage : il consulte le PAS
         // mais ne peut plus le creer / modifier. La gestion du PAS revient a
         // PLANIFICATION, SCIQ, SUPER_ADMIN, ADMIN.
-        $cabinet = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
+        $cabinet = User::query()->where('email', 'l.adan.anbg@gmail.com')->firstOrFail();
 
         $this->actingAs($cabinet)
             ->get(route('workspace.pas.create'))

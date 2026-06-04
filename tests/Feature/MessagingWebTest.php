@@ -26,7 +26,7 @@ class MessagingWebTest extends TestCase
         $admin = $this->createAdminUser([
             'email' => 'admin.messaging@anbg.test',
         ]);
-        $recipient = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $recipient = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $response = $this->actingAs($admin)
             ->post(route('workspace.messaging.direct', $recipient));
@@ -74,7 +74,7 @@ class MessagingWebTest extends TestCase
         // directeur DAF et le DG, et ne JAMAIS voir un utilisateur d'une autre
         // direction (DSIC). NB : depuis le retrait de l'organigramme, seuls les
         // 18 premiers alphabetiques apparaissent — MATTEYA passe au-dela.
-        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $serviceUser = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $response = $this->actingAs($serviceUser)->get('/workspace/messagerie');
 
@@ -91,7 +91,7 @@ class MessagingWebTest extends TestCase
         $admin = $this->createAdminUser([
             'email' => 'admin.orgtree@anbg.test',
         ]);
-        $target = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $target = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $response = $this->actingAs($admin)
             ->get(route('workspace.messaging.index', ['contact' => $target->id]));
@@ -111,7 +111,7 @@ class MessagingWebTest extends TestCase
         $admin = $this->createAdminUser([
             'email' => 'admin.profilecard@anbg.test',
         ]);
-        $target = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $target = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $response = $this->actingAs($admin)
             ->getJson(route('workspace.messaging.profile.card', ['target' => $target->id]));
@@ -129,7 +129,7 @@ class MessagingWebTest extends TestCase
         $admin = $this->createAdminUser([
             'email' => 'admin.read@anbg.test',
         ]);
-        $recipient = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $recipient = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
         $conversation = Conversation::query()->create([
             'type' => Conversation::TYPE_DIRECT,
             'direct_key' => collect([$admin->id, $recipient->id])->sort()->implode(':'),
@@ -180,7 +180,7 @@ class MessagingWebTest extends TestCase
         $admin = $this->createAdminUser([
             'email' => 'admin.attach@anbg.test',
         ]);
-        $recipient = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $recipient = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $this->actingAs($admin)->post(route('workspace.messaging.direct', $recipient))->assertRedirect();
 
@@ -212,7 +212,7 @@ class MessagingWebTest extends TestCase
         $admin = $this->createAdminUser([
             'email' => 'admin.updates@anbg.test',
         ]);
-        $recipient = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $recipient = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $conversation = Conversation::query()->create([
             'type' => Conversation::TYPE_DIRECT,

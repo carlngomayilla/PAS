@@ -23,7 +23,7 @@ class SuperAdminDashboardProfilesTest extends TestCase
     {
         $superAdmin = $this->createSuperAdminUser();
         $admin = $this->createAdminUser();
-        $serviceUser = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $serviceUser = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.dashboard-profiles.edit'))

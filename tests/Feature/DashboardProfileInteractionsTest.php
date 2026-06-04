@@ -29,7 +29,7 @@ class DashboardProfileInteractionsTest extends TestCase
     {
         $this->seed();
 
-        $user = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $user = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $overview = $this->actingAs($user)->get('/dashboard');
         $overview->assertOk();
@@ -53,7 +53,7 @@ class DashboardProfileInteractionsTest extends TestCase
     {
         $this->seed();
 
-        $user = User::query()->where('email', 'melissa.abogo@anbg.ga')->firstOrFail();
+        $user = User::query()->where('email', 'm.abogo.anbg@gmail.com')->firstOrFail();
 
         $overview = $this->actingAs($user)->get('/dashboard');
         $overview->assertOk();
@@ -95,7 +95,7 @@ class DashboardProfileInteractionsTest extends TestCase
     {
         $this->seed();
 
-        $user = User::query()->where('email', 'raphaelle.dogui@anbg.ga')->firstOrFail();
+        $user = User::query()->where('email', 'r.dogui.anbg@gmail.com')->firstOrFail();
 
         $overview = $this->actingAs($user)->get('/dashboard');
         $overview->assertOk();
@@ -141,7 +141,7 @@ class DashboardProfileInteractionsTest extends TestCase
     {
         $this->seed();
 
-        $user = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
+        $user = User::query()->where('email', 'l.adan.anbg@gmail.com')->firstOrFail();
 
         $response = $this->actingAs($user)->get('/dashboard');
 
@@ -156,7 +156,7 @@ class DashboardProfileInteractionsTest extends TestCase
     {
         $this->seed();
 
-        $user = User::query()->where('email', 'robert.ekomi@anbg.ga')->firstOrFail();
+        $user = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
 
         $this->actingAs($user)->get('/workspace/pilotage')->assertRedirect('/dashboard');
 
@@ -204,7 +204,7 @@ class DashboardProfileInteractionsTest extends TestCase
     {
         $this->seed();
 
-        $user = User::query()->where('email', 'loick.adan@anbg.ga')->firstOrFail();
+        $user = User::query()->where('email', 'l.adan.anbg@gmail.com')->firstOrFail();
 
         $response = $this->actingAs($user)->get('/workspace/reporting');
 

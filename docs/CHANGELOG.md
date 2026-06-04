@@ -5,6 +5,256 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-04 — Convention d'email organisation : `{initiale}.{nom}.anbg@gmail.com` (seeder + classeur + tests)
+
+### Demande
+
+Normaliser les adresses des utilisateurs au format de l'exemple du chef de service SIRS
+(`a.mindzeli.anbg@gmail.com`), et rendre ce format **durable** (qu'un re-seed ne réintroduise
+pas les anciennes adresses `@anbg.ga`). Mise à jour appliquée **partout** : base, classeur source
+ET seeder.
+
+### Périmètre
+
+Transformation `prenom.nom@anbg.ga → {initiale}.{nom}.anbg@gmail.com` pour les **75 comptes
+personnels**. Laissés inchangés : comptes de fonction `directeur.daf/ds/dsic` et comptes
+système/sans nom `admin`, `superadmin`, `dga`, `ingrid`.
+
+### Corrections
+
+1. **`database/seeders/AnbgOrganizationSeeder.php`** — nouvelle méthode `normalizeOrganizationEmail()`,
+appliquée dans `AnbgOrganizationSeeder::run()` et `SyncOrgUsersPreservingPasswordsSeeder::run()`.
+Elle agit comme filet de sécurité (un futur ajout `@anbg.ga` au classeur serait normalisé) et
+neutralise le risque de doublons au re-seed :
+
+```php
+protected function normalizeOrganizationEmail(string $email): string
+{
+    $email = strtolower(trim($email));
+    if (app()->environment('testing')) {
+        return $email; // fixtures de test conservent @anbg.ga
+    }
+    [$local, $domain] = array_pad(explode('@', $email, 2), 2, '');
+    if ($domain === 'gmail.com' || ! str_contains($local, '.') || str_starts_with($local, 'directeur.')) {
+        return $email; // deja normalise, comptes systeme, comptes de fonction
+    }
+    $firstName = Str::before($local, '.');
+    $lastName = Str::after($local, '.');
+    if ($firstName === '' || $lastName === '') {
+        return $email;
+    }
+    return $firstName[0].'.'.$lastName.'.anbg@gmail.com';
+}
+```
+
+2. **`docs/base_utilisateurs_pas_anbg_refaite_nouvelle_logique.xlsx`** — les 75 emails personnels
+réécrits dans `xl/sharedStrings.xml` au nouveau format (les 7 comptes exclus restent `@anbg.ga`).
+La donnée source porte donc directement les bonnes adresses.
+
+3. **Tests** — 28 références d'emails mises à jour sur 8 fichiers (`DashboardProfileInteractionsTest`,
+`MessagingWebTest`, `OfficialOrganizationScopeTest`, `PlanningApiTest`, `ProductionSafeSeederTest`,
+`RolePermissionMatrixTest`, `SuperAdminDashboardProfilesTest`, `WebWorkspaceTest`). Les comptes
+créés directement par les tests (`chef.digest`, `*.escalade`, `agent.service`, `admin.fonctionnel`,
+`*@anbg.test`) et les comptes de fonction `directeur.*`/`ingrid` sont laissés inchangés.
+
+Vérification : `php artisan test` sur les 8 fichiers → **67 passés, 576 assertions** (1 skip
+préexistant sans rapport).
+
+### Mise à jour des données existantes
+
+La base déjà en service (`pas_anbg`) a aussi été mise à jour : 75 emails personnels basculés en
+`@gmail.com` (transaction, sans toucher aux mots de passe).
+
+---
+
+## 2026-06-04 — Migration `strengthen_db_constraints` : fin de l'échec `migrate:fresh` sur PostgreSQL
+
+### Contexte
+
+`php artisan migrate:fresh` échouait sur PostgreSQL à la migration
+`2026_05_21_100000_strengthen_db_constraints` avec une erreur trompeuse
+`SQLSTATE[25P02]: current transaction is aborted`. Les tests ne le détectaient pas
+car ils tournent sur **SQLite**, qui saute toute la branche `pgsql` de cette migration.
+
+### Diagnostic
+
+Les contraintes CHECK `pas_statut_check`, `paos_statut_check`, `ptas_statut_check`
+sont désormais créées directement par les migrations de création de tables.
+`addCheckIfMissing()` tentait quand même un `ALTER TABLE … ADD CONSTRAINT …`, qui
+échouait en `constraint … already exists`. Sur PostgreSQL, **une instruction en échec
+avorte toute la transaction** : le `try/catch` du code ne protégeait pas, et
+l'instruction suivante remontait l'erreur `25P02`.
+
+### Correction
+
+`database/migrations/2026_05_21_100000_strengthen_db_constraints.php` — vérification
+d'existence (via `pg_constraint`) **avant** tout `ADD CONSTRAINT`, au lieu de s'appuyer
+sur un `try/catch` inefficace sous PostgreSQL.
+
+```php
+private function addCheckIfMissing(string $table, string $constraintName, string $expression): void
+{
+    if ($this->constraintExists($table, $constraintName)) {
+        return;
+    }
+    DB::statement("ALTER TABLE {$table} ADD CONSTRAINT {$constraintName} CHECK ({$expression})");
+}
+
+private function constraintExists(string $table, string $constraintName): bool
+{
+    return DB::selectOne(
+        'select 1 from pg_constraint where conname = ? and conrelid = ?::regclass',
+        [$constraintName, $table]
+    ) !== null;
+}
+```
+
+Même garde d'existence ajoutée dans `ensureForeignKey()` (sur la connexion `pgsql`).
+
+---
+
+## 2026-06-04 — Module Suivi des actions : tri par trimestre/échéance + cartes Kanban/Calendrier/Gantt réparées
+
+### Demande utilisateur
+
+> *« Les actions doivent se lister par trimestre et dans l'ordre de l'échéance la plus proche
+> à la plus lointaine lorsqu'elles sont importées dans le PTA, en fonction de leurs dates début
+> et fin. Et arrange la vue des cartes du module suivi des actions car certaines cartes ne sont
+> pas présentables comme les autres. »*
+
+### Diagnostic
+
+1. **Tri** : l'index des actions (`workspace.actions.index`, module « Suivi des actions »)
+   triait par défaut sur `orderByDesc('id')` — aucun rapport avec l'échéance ni le trimestre.
+
+2. **Cartes « pas présentables »** : les vues **Kanban**, **Calendrier** et **Gantt**
+   filtraient/affichaient sur `date_fin_prevue` / `date_debut_prevue`, **colonnes inexistantes**
+   sur le modèle `Action` (qui porte `date_debut`, `date_fin`, `date_echeance`). Conséquences :
+   - Kanban : l'échéance ne s'affichait jamais → cartes incomplètes/inégales.
+   - Calendrier : toujours vide.
+   - Gantt : toujours « Aucune action planifiée ».
+   La vue **Liste** (par défaut), elle, utilisait correctement `date_echeance`.
+
+### Corrections
+
+1. **`app/Http/Controllers/Web/ActionWebController.php`** — tri par défaut chronologique :
+
+```php
+default => $query
+    ->orderByRaw('CASE WHEN date_echeance IS NULL AND date_fin IS NULL THEN 1 ELSE 0 END')
+    ->orderByRaw('COALESCE(date_echeance, date_fin) ASC') // echeance la plus proche d'abord
+    ->orderBy('date_debut')
+    ->orderBy('id'),
+```
+
+   L'ordre chronologique sur l'échéance regroupe naturellement les actions par trimestre.
+
+2. **`resources/views/workspace/actions/index.blade.php`**
+   - Helpers dérivés des vraies colonnes : `$echeanceOf` (`date_echeance ?? date_fin`),
+     `$debutOf` (`date_debut ?? …`), `$trimestreLabel` (ex. « T1 2026 »).
+   - Calendrier, Gantt (setup + barres) et Kanban basculés sur ces helpers (plus aucune
+     référence `*_prevue`).
+   - **Carte Kanban uniformisée** : pied de carte cohérent (pourcentage à gauche ; chip
+     trimestre + échéance réelle à droite, avec repli explicite « Échéance non définie ») ;
+     méta plus lisible (« Responsable non assigné » / « PTA non rattaché » au lieu de « - »).
+   - **Vue Liste** : badge trimestre ajouté à côté de l'échéance.
+
+### Tests
+
+`tests/Feature/ActionIndexLayoutsTest.php` (nouveau) :
+- liste par défaut triée T1 → T2 → T3 (échéance la plus proche d'abord) + badges trimestre ;
+- Kanban : cartes avec échéance réelle (`15/02/2026`) et chip trimestre ;
+- Calendrier : actions listées sur le mois d'échéance ;
+- Gantt : actions tracées (plus de « Aucune action planifiée »).
+
+### Validation
+
+- `ActionIndexLayoutsTest` : 4 passés (17 assertions) ✓
+- Suites rendant l'index (WebWorkspace, ActionFinancing, TableOverflow, NotificationWeb,
+  BusinessDeletion) : 34 passés, 1 skipped (pré-existant), 0 régression ✓
+
+---
+
+## 2026-06-04 — Règle métier dashboard : statut « À paramétrer » distinct de « Non démarrée »
+
+### Demande utilisateur
+
+> *« "À paramétrer" ne doit pas vouloir dire simplement "pas encore démarrée". Une action
+> est à paramétrer uniquement lorsqu'elle vient de l'importation mais n'a pas encore été
+> enregistrée officiellement dans le PTA. Si les 5 actions sont déjà enregistrées dans le
+> PTA, elles ne doivent pas être "à paramétrer" : elles sont "non démarrées" tant qu'aucun
+> suivi n'a commencé. »*
+
+### Diagnostic
+
+Le marqueur métier existait déjà : la colonne `actions.statut_parametrage` vaut
+`a_parametrer` (ligne importée via Excel, pas encore enregistrée par le chef de service) ou
+`parametre` (enregistrée officiellement dans le PTA — cf.
+`PlanningExcelImportService` et `PtaWebController::syncPtaActions`).
+
+**Mais `ActionStatusService::dashboardStatus()` ignorait ce champ** : toute action non
+démarrée (`isNotStarted()`) tombait dans `non_demarre`, sans distinction entre une action
+réellement enregistrée et une action importée encore à paramétrer. Il n'existait aucun
+bucket « À paramétrer » sur le dashboard, et le compteur « Non démarrées » était gonflé par
+les imports. Par ailleurs, « Achevées » ne reconnaissait pas `statut_validation = validee_chef`
+(étape terminale du workflow ANBG) tant que le statut dynamique n'avait pas basculé.
+
+### Règle métier correcte (4 buckets)
+
+```text
+À paramétrer = statut_parametrage = 'a_parametrer' (importée, pas encore enregistrée PTA)
+Non démarrée = enregistrée PTA (parametre) mais aucun suivi d'exécution engagé
+En cours     = enregistrée PTA + suivi commencé
+Achevée      = statut termine / statut_dynamique cloturee/acheve / 100% / validee_chef|direction
+```
+
+### Corrections
+
+1. **`app/Services/Actions/ActionStatusService.php`** (source canonique)
+   - Ajout `isPendingSetup(Action)` : `statut_parametrage === 'a_parametrer'`.
+   - `isCompleted()` reconnaît désormais aussi `statut_validation` ∈
+     {`validee_chef`, `validee_direction`}.
+   - `dashboardStatus()` réordonné : `a_parametrer` → `acheve` (via `isCompleted`) →
+     `non_demarre` (via `isNotStarted`) → statut dynamique fin.
+
+```php
+public function dashboardStatus(Action $action): string
+{
+    if ($this->isPendingSetup($action)) { return 'a_parametrer'; }
+    if ($this->isCompleted($action))    { return 'acheve'; }
+    if ($this->isNotStarted($action))   { return 'non_demarre'; }
+    // ... a_risque / en_avance / en_retard / suspendu / annule / en_cours
+}
+```
+
+2. **`app/Http/Controllers/DashboardController.php`**
+   - `statusCounts()` : nouvelle clé `a_parametrer`.
+   - `buildStatusCards()` : nouvelle carte « À paramétrer » (violet `#A855F7`, drill-down
+     `statut=a_parametrer`).
+   - `statusLabel()` / `statusColor()` : libellé + couleur du bucket.
+
+3. **`app/Http/Controllers/Web/ActionWebController.php`** (cohérence du drill-down)
+   - Filtre `statut=a_parametrer` → `where('statut_parametrage', 'a_parametrer')`.
+   - Filtre `statut=non_demarre` exclut désormais les imports `a_parametrer`.
+   - `buildActionIndexSummary()` : compteur `a_parametrer` distinct, retiré de `non_demarre`.
+
+### Tests
+
+`tests/Unit/ActionStatusServiceTest.php` — 4 cas ajoutés :
+- importée non enregistrée PTA ⇒ `a_parametrer`
+- enregistrée PTA sans suivi ⇒ `non_demarre`
+- enregistrée PTA avec progression ⇒ `en_cours`
+- validée chef ⇒ `acheve`
+
+### Validation
+
+- `ActionStatusServiceTest` : 10 passés (27 assertions) ✓
+- Suites Dashboard/Reporting/WorkflowV2/Import/Monitoring/ActionTracking : 99 passés (554 assertions) ✓
+- Suite complète : 390 passés, 3 skipped, 0 régression. (1 échec **pré-existant** non lié :
+  `GovernanceWebTest` — cast PostgreSQL `::text` incompatible SQLite dans la requête de rétention.)
+
+---
+
 ## 2026-05-31 — Fix workflow save→submit sous-action (commentaire toujours optionnel + plus visible)
 
 ### Demande utilisateur

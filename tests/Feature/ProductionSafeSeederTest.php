@@ -34,8 +34,8 @@ class ProductionSafeSeederTest extends TestCase
                 ->pluck('services.code')
                 ->all()
         );
-        $this->assertDatabaseHas('users', ['email' => 'claude.azizet@anbg.ga']);
-        $this->assertDatabaseHas('users', ['email' => 'belinda.magnangani@anbg.ga']);
+        $this->assertDatabaseHas('users', ['email' => 'c.azizet.anbg@gmail.com']);
+        $this->assertDatabaseHas('users', ['email' => 'b.magnangani.anbg@gmail.com']);
 
         $this->assertGreaterThan(0, DB::table('platform_settings')->count());
         $this->assertSame(2, DB::table('export_templates')->count());
