@@ -75,6 +75,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Durcissement securite : en production, APP_DEBUG ne doit JAMAIS rester
+        // actif. Sinon les pages d erreur exposent stack traces, chemins serveur,
+        // identifiants de connexion DB et cookies de session. On force la
+        // desactivation (fail-secure) et on trace l incident de configuration.
+        if ($this->app->environment('production') && (bool) config('app.debug')) {
+            config(['app.debug' => false]);
+            logger()->critical('Securite: APP_DEBUG etait actif en production -> force a false. Corrigez APP_DEBUG=false dans le .env du serveur.');
+        }
+
         $platformSettings = $this->app->make(PlatformSettings::class);
         app()->setLocale($platformSettings->locale());
         config(['app.timezone' => $platformSettings->timezone()]);

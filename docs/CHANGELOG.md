@@ -5,6 +5,52 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-04 — Durcissement sécurité (audit offensif)
+
+### Contexte
+
+Audit de sécurité « comme un attaquant ». L'applicatif s'est révélé solide (autorisations
+scopées, `SafeSql`, requêtes paramétrées, CSP à nonce, en-têtes de sécurité, throttling,
+uploads validés). Les correctifs ci-dessous ferment les derniers angles morts.
+
+### Corrections de code
+
+1. **`app/Providers/AppServiceProvider.php`** — garde *fail-secure* : en environnement
+   `production`, `APP_DEBUG` est forcé à `false` (+ log critique). Empêche la fuite de stack
+   traces / identifiants DB / cookies via les pages d'erreur même si le `.env` du serveur est
+   mal configuré.
+
+```php
+if ($this->app->environment('production') && (bool) config('app.debug')) {
+    config(['app.debug' => false]);
+    logger()->critical('Securite: APP_DEBUG etait actif en production -> force a false.');
+}
+```
+
+2. **`resources/views/partials/dashboard-analytics.blade.php`** — durcissement XSS défense en
+   profondeur sur le payload JSON injecté en page : `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS
+   | JSON_HEX_QUOT` (empêche toute évasion `</script>`), en remplacement de `JSON_UNESCAPED_SLASHES`.
+
+3. **`app/Http/Controllers/Web/SuperAdminWebController.php`** — retrait de `svg` des types
+   acceptés pour les logos/favicon (branding). Le SVG peut embarquer du JavaScript et les fichiers
+   statiques échappent à la CSP → XSS stocké potentiel. Restent : `png,jpg,jpeg,webp` et `png,ico`.
+
+### Durcissement environnement / opérationnel (hors dépôt)
+
+- `.env` local : `SESSION_ENCRYPT=true` (chiffrement du payload de session).
+- Cluster PostgreSQL **local** (5433) : `pg_hba.conf` remis en `scram-sha-256` (annulation d'un
+  `trust` temporaire posé pendant la restauration de la base).
+
+### Recommandations restantes (non appliquées — à valider)
+
+- **`APP_DEBUG=false` sur le serveur de prod** (le `.env` doit aussi avoir `APP_ENV=production`).
+- **`DB_SSLMODE=require`** (actuellement `prefer` → connexion à la prod distante chiffrable mais
+  non garantie). À tester car nécessite le SSL côté serveur.
+- **`ANTIVIRUS_SCAN_ENABLED=true`** si `clamscan` est disponible (scan des uploads).
+- Mots de passe DB **distincts** local/prod + rotation de celui exposé.
+
+---
+
 ## 2026-06-04 — Convention d'email organisation : `{initiale}.{nom}.anbg@gmail.com` (seeder + classeur + tests)
 
 ### Demande

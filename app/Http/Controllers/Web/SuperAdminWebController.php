@@ -178,10 +178,10 @@ class SuperAdminWebController extends Controller
             'login_identifier_placeholder' => ['required', 'string', 'max:120'],
             'login_helper_text' => ['required', 'string', 'max:255'],
             'footer_text' => ['required', 'string', 'max:255'],
-            'logo_mark' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp,svg'],
-            'logo_wordmark' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp,svg'],
-            'logo_full' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp,svg'],
-            'favicon' => ['nullable', 'file', 'max:1024', 'mimes:png,ico,svg'],
+            'logo_mark' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp'],
+            'logo_wordmark' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp'],
+            'logo_full' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp'],
+            'favicon' => ['nullable', 'file', 'max:1024', 'mimes:png,ico'],
         ]);
 
         $before = $this->platformSettings->all();
@@ -229,10 +229,10 @@ class SuperAdminWebController extends Controller
             'login_identifier_placeholder' => ['required', 'string', 'max:120'],
             'login_helper_text' => ['required', 'string', 'max:255'],
             'footer_text' => ['required', 'string', 'max:255'],
-            'logo_mark' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp,svg'],
-            'logo_wordmark' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp,svg'],
-            'logo_full' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp,svg'],
-            'favicon' => ['nullable', 'file', 'max:1024', 'mimes:png,ico,svg'],
+            'logo_mark' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp'],
+            'logo_wordmark' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp'],
+            'logo_full' => ['nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp'],
+            'favicon' => ['nullable', 'file', 'max:1024', 'mimes:png,ico'],
         ]);
 
         $before = $this->platformSettings->editable();

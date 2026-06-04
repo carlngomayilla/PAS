@@ -1032,7 +1032,7 @@
                 'reportingAnalytics' => $reportingClientAnalytics ?? ['charts' => (($reportingAnalytics ?? [])['charts'] ?? [])],
                 'dgPayload' => $dgPayload ?? [],
                 'ganttRows' => $ganttRows ?? [],
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+            ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}
         </script>
         <script @cspNonce>
             document.dispatchEvent(new CustomEvent('anbg:dashboard-payload-ready'));
