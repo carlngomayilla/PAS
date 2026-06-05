@@ -371,7 +371,7 @@ class UserWorkspaceService
                 $m('pilotage', 'Dashboard', '/dashboard'),
                 $m('execution', 'Action', '/workspace/actions?vue=mes_actions', ['can_write' => true, 'actions' => ['Consulter', 'Saisir suivi']]),
                 // 'corrections' → vue "Mes actions" filtree sur les corrections demandees.
-                $m('corrections', 'Corrections demandées', '/workspace/actions?vue=mes_actions&statut_validation=demande_correction'),
+                $m('corrections', 'Corrections demandées', '/workspace/actions?vue=mes_actions&statut=a_corriger'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),
             ],
 
@@ -380,7 +380,7 @@ class UserWorkspaceService
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
                 $m('execution', 'Action', '/workspace/actions', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier']]),
-                $m('validations', 'Validations', '/workspace/actions?statut_validation=soumise_chef', ['can_write' => true, 'actions' => ['Consulter', 'Valider', 'Rejeter']]),
+                $m('validations', 'Validations', '/workspace/actions?vue=pilotage&statut_validation=soumise_chef', ['can_write' => true, 'actions' => ['Consulter', 'Valider', 'Rejeter']]),
                 // 'agents' → liste des utilisateurs du referentiel (deja filtree par scope).
                 $m('agents', 'Agents / RMO', '/workspace/referentiel/utilisateurs'),
                 $m('reporting', 'Reporting service', '/workspace/reporting'),
@@ -461,7 +461,7 @@ class UserWorkspaceService
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier']]),
                 $m('execution', 'Action', '/workspace/actions', ['can_write' => true]),
-                $m('validations', 'Validations', '/workspace/actions?statut_validation=soumise_chef', ['can_write' => true]),
+                $m('validations', 'Validations', '/workspace/actions?vue=pilotage&statut_validation=soumise_chef', ['can_write' => true]),
                 $m('agents', 'Agents / RMO', '/workspace/referentiel/utilisateurs'),
                 $m('reporting', 'Reporting unité', '/workspace/reporting'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),

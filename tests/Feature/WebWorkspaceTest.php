@@ -10,6 +10,7 @@ use App\Models\KpiMesure;
 use App\Models\Kpi;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pta;
+use App\Models\Service;
 use App\Models\User;
 use App\Services\ActionCalculationSettings;
 use App\Services\Actions\ActionTrackingService;
@@ -158,6 +159,53 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/admin/quotas')
             ->assertNotFound();
+    }
+
+    public function test_legacy_workspace_modules_redirect_to_functional_pages(): void
+    {
+        $direction = Direction::query()->create([
+            'code' => 'DMOD',
+            'libelle' => 'Direction modules',
+            'actif' => true,
+        ]);
+        $service = Service::query()->create([
+            'direction_id' => $direction->id,
+            'code' => 'SMOD',
+            'libelle' => 'Service modules',
+            'actif' => true,
+        ]);
+        $chef = User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'is_active' => true,
+        ]);
+        $agent = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'is_active' => true,
+        ]);
+        $dg = User::factory()->create([
+            'role' => User::ROLE_DG,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($agent)
+            ->get('/workspace/corrections')
+            ->assertRedirect(route('workspace.actions.index', ['vue' => 'mes_actions', 'statut' => 'a_corriger']));
+
+        $this->actingAs($chef)
+            ->get('/workspace/agents')
+            ->assertRedirect(route('workspace.referentiel.utilisateurs.index'));
+
+        $this->actingAs($dg)
+            ->get('/workspace/financements-critiques')
+            ->assertRedirect(route('workspace.daf.financements.index'));
+
+        $this->actingAs($dg)
+            ->get('/workspace/synthese-agence')
+            ->assertRedirect(route('workspace.reporting'));
     }
 
     public function test_referentiel_directions_hides_inactive_entries_by_default(): void

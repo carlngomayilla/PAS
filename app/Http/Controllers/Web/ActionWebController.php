@@ -1217,10 +1217,16 @@ class ActionWebController extends Controller
             }
         }
 
-        $query->when(
-            $request->filled('statut_validation'),
-            fn (Builder $q) => $q->where('statut_validation', (string) $request->string('statut_validation'))
-        );
+        $query->when($request->filled('statut_validation'), function (Builder $q) use ($request): void {
+            $status = trim((string) $request->string('statut_validation'));
+            if ($status === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
+                $this->wherePendingChefValidation($q);
+
+                return;
+            }
+
+            $q->where('statut_validation', $status);
+        });
         $query->when($request->filled('statut_validation_min'), function (Builder $q) use ($request): void {
             $threshold = trim((string) $request->string('statut_validation_min'));
             $settings = app(ActionCalculationSettings::class);
@@ -1532,6 +1538,15 @@ class ActionWebController extends Controller
         });
     }
 
+    private function wherePendingChefValidation(Builder $query): Builder
+    {
+        return $query->where(function (Builder $pendingQuery): void {
+            $pendingQuery->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)
+                ->orWhereHas('sousActions', fn (Builder $subActionQuery) => $subActionQuery
+                    ->where('validation_status', SousAction::VALIDATION_SOUMISE));
+        });
+    }
+
     /**
      * @return array{total:int, avg_progression:float, avg_kpi_global:float, avg_quality:float, funded_count:int, validated_count:int, pending_validation_count:int, pending_justificatif_count:int, status_counts:array<string, int>}
      */
@@ -1575,15 +1590,11 @@ class ActionWebController extends Controller
             }
         }
 
-        $pendingValidationStatuses = [
-            ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-        ];
         $validatedStatuses = [
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ];
 
-        $pendingValidationCount = (int) (clone $baseQuery)
-            ->whereIn('statut_validation', $pendingValidationStatuses)
+        $pendingValidationCount = (int) $this->wherePendingChefValidation(clone $query)
             ->count();
         $validatedCount = (int) (clone $baseQuery)
             ->whereIn('statut_validation', $validatedStatuses)

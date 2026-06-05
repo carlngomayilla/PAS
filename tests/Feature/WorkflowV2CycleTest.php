@@ -157,6 +157,31 @@ class WorkflowV2CycleTest extends TestCase
             ->assertSee('Décision du chef de service', false);
     }
 
+    public function test_validation_module_lists_composite_actions_with_submitted_sub_actions(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_COMPOSEE);
+        $fixture['action']->sousActions()->create([
+            'agent_id' => $fixture['agent']->id,
+            'libelle' => 'Sous-action envoyee chef',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-06-30',
+            'sub_action_type' => SousAction::TYPE_NON_QUANTITATIVE,
+            'weight' => 100,
+            'requires_proof' => false,
+            'statut' => 'en_attente_validation_chef',
+            'validation_status' => SousAction::VALIDATION_SOUMISE,
+            'est_effectuee' => true,
+        ]);
+
+        $this->actingAs($fixture['chef'])
+            ->get(route('workspace.actions.index', [
+                'vue' => 'pilotage',
+                'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            ]))
+            ->assertOk()
+            ->assertSee('Action WF '.Action::TYPE_COMPOSEE);
+    }
+
     /**
      * @return array{action: Action, agent: User, chef: User}
      */
