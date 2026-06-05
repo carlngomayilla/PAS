@@ -969,7 +969,7 @@ class MonitoringWebController extends Controller
             ],
             'kpi_summary' => $reportingPayload['kpiSummary'] ?? [],
             'items' => $items,
-            'center_url' => route('workspace.alertes'),
+            'center_url' => route('workspace.notifications.index', ['tab' => 'alertes']),
         ]);
     }
 
@@ -991,7 +991,7 @@ class MonitoringWebController extends Controller
         $this->alertReadService->markAlertAsRead($user, $alert);
         $this->markAlertNotificationsAsRead($user);
 
-        return redirect()->to((string) ($alert['target_url'] ?? route('workspace.alertes')));
+        return redirect()->to((string) ($alert['target_url'] ?? route('workspace.notifications.index', ['tab' => 'alertes'])));
     }
 
     public function readAllAlertes(Request $request): RedirectResponse

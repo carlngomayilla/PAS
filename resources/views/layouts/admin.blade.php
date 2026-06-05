@@ -435,7 +435,7 @@
                                         </p>
                                     </div>
                                     <a
-                                        href="{{ route('workspace.alertes') }}"
+                                        href="{{ route('workspace.notifications.index', ['tab' => 'alertes']) }}"
                                         class="admin-dropdown-link border border-[#d8ecf8] px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#eaf6fd]"
                                     >
                                         Centre

@@ -42,14 +42,25 @@ class PlanningUnlockWebController extends Controller
             ->orderByRaw("CASE WHEN status = 'soumise' THEN 0 ELSE 1 END")
             ->orderByDesc('id');
 
-        if (! $this->locks->isUnlockReviewer($user) && ! $user->hasGlobalReadAccess()) {
-            $query->where('requested_by', (int) $user->id);
+        $canReview = $this->locks->isUnlockReviewer($user);
+        $canGivePlanifAvis = $this->locks->canGivePlanifAvis($user);
+
+        if (! $canReview && ! $canGivePlanifAvis && ! $user->hasGlobalReadAccess()) {
+            if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
+                $query->where(function ($scopedQuery) use ($user): void {
+                    $scopedQuery
+                        ->where('direction_id', (int) $user->direction_id)
+                        ->orWhere('requested_by', (int) $user->id);
+                });
+            } else {
+                $query->where('requested_by', (int) $user->id);
+            }
         }
 
         return view('workspace.planning-unlocks.index', [
             'rows' => $query->paginate(20)->withQueryString(),
-            'canReview' => $this->locks->isUnlockReviewer($user),
-            'canGivePlanifAvis' => $this->locks->canGivePlanifAvis($user),
+            'canReview' => $canReview,
+            'canGivePlanifAvis' => $canGivePlanifAvis,
             'currentUser' => $user,
         ]);
     }

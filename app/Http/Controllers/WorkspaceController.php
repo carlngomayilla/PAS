@@ -93,7 +93,7 @@ class WorkspaceController extends Controller
             'arbitrages', 'deverrouillages' => route('workspace.planning-unlocks.index'),
             'referentiel' => route('workspace.referentiel.directions.index'),
             'reporting' => route('workspace.reporting'),
-            'alertes' => route('workspace.alertes'),
+            'alertes' => route('workspace.notifications.index', ['tab' => 'alertes']),
             'super_admin' => route('workspace.super-admin.index'),
             'roles_permissions' => route('workspace.super-admin.roles.edit'),
             'organisation' => route('workspace.super-admin.organization.index'),

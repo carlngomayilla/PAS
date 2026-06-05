@@ -1614,6 +1614,16 @@
         --app-success: #178f5f;
         --app-warning: #b7791f;
         --app-danger: #c2413b;
+        --app-info: #3996d3;
+        /* ── Échelle d'espacement (grille 8px) ── */
+        --space-1: 0.25rem;  /* 4px  */
+        --space-2: 0.5rem;   /* 8px  */
+        --space-3: 0.75rem;  /* 12px */
+        --space-4: 1rem;     /* 16px */
+        --space-5: 1.5rem;   /* 24px */
+        --space-6: 2rem;     /* 32px */
+        --space-7: 3rem;     /* 48px */
+        --space-8: 4rem;     /* 64px */
         --app-radius-sm: 0.75rem;
         --app-radius: 1rem;
         --app-radius-lg: 1.25rem;
@@ -1633,6 +1643,10 @@
         --app-white: #1e293b;
         --app-primary-light: #1e3a52;
         --app-primary-soft: rgba(57, 150, 211, 0.15);
+        --app-success: #34d399;
+        --app-warning: #fbbf24;
+        --app-danger: #f87171;
+        --app-info: #5ab0e6;
     }
 
     html,
@@ -7444,6 +7458,31 @@
     button[disabled] {
         opacity: 0.55 !important;
         cursor: not-allowed !important;
+        transform: none !important;
+        filter: grayscale(0.2);
+    }
+
+    /* ─── États :active — retour tactile au clic (pressed) ──────────── */
+    .app-btn:active,
+    .btn:active,
+    .btn-sm:active,
+    .btn-primary:active,
+    .btn-blue:active,
+    .btn-secondary:active,
+    .btn-outline:active,
+    .btn-danger:active,
+    .btn-green:active,
+    .btn-follow:active,
+    .admin-theme-scope button[type="submit"]:active,
+    .admin-theme-scope a[role="button"]:active {
+        transform: translateY(0) scale(0.97) !important;
+        filter: brightness(0.96);
+        transition-duration: 60ms;
+    }
+    /* Les boutons désactivés ne réagissent pas au clic */
+    .btn:disabled:active,
+    .btn[disabled]:active,
+    button[disabled]:active {
         transform: none !important;
         filter: grayscale(0.2);
     }

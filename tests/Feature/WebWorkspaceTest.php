@@ -392,6 +392,18 @@ class WebWorkspaceTest extends TestCase
 
         $response->assertJsonPath('summary.total', (int) ($expectedSummary['total'] ?? 0));
         $response->assertJsonPath('summary.unread', (int) ($expectedSummary['unread'] ?? 0));
+        $response->assertJsonPath('center_url', route('workspace.notifications.index', ['tab' => 'alertes']));
+    }
+
+    public function test_notifications_page_exposes_alert_center_tab(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.notifications.index', ['tab' => 'alertes']))
+            ->assertOk()
+            ->assertSee('Alertes')
+            ->assertSee('Notifications');
     }
 
     public function test_sidebar_alert_badge_is_only_on_alertes_entry_not_pilotage(): void

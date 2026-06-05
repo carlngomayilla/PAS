@@ -169,6 +169,10 @@ class PlanningModificationLockService
             return true;
         }
 
+        if ($user->isPlanningControlChief()) {
+            return true;
+        }
+
         if ($user->hasRole(
             User::ROLE_PLANIFICATION,
             User::ROLE_SCIQ,
@@ -366,6 +370,10 @@ class PlanningModificationLockService
 
     public function canGivePlanifAvis(User $user): bool
     {
+        if ($user->isPlanningControlChief()) {
+            return true;
+        }
+
         return $user->hasRole(
             User::ROLE_PLANIFICATION,
             User::ROLE_SCIQ,
@@ -462,7 +470,14 @@ class PlanningModificationLockService
     private function notifyPlanifAndDg(PlanningUnlockRequest $unlockRequest, User $directeur): void
     {
         $recipients = User::query()
-            ->whereIn('role', [User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_SCIQ])
+            ->whereIn('role', [
+                User::ROLE_DG,
+                User::ROLE_PLANIFICATION,
+                User::ROLE_SCIQ,
+                User::ROLE_SCIQ_SUIVI_GLOBAL,
+                User::ROLE_CHEF_PLANIFICATION,
+                User::ROLE_CHEF_UNITE_SCIQ,
+            ])
             ->where('is_active', true)
             ->get();
 

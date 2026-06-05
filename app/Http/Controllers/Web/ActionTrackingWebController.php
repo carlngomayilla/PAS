@@ -16,6 +16,7 @@ use App\Services\DocumentPolicySettings;
 use App\Services\DynamicReferentialSettings;
 use App\Services\Governance\DelegationService;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\PlanningModificationLockService;
 use App\Services\Security\SecureJustificatifStorage;
 use App\Services\Workflow\ActionWorkflowService;
 use App\Services\WorkflowSettings;
@@ -87,6 +88,11 @@ class ActionTrackingWebController extends Controller
         $calculator = app(\App\Services\Workflow\ActionPerformanceCalculator::class);
         $provisional = $calculator->provisionalPerformance($action);
         $official = (float) ($action->official_progress_percent ?? 0);
+        $lockService = app(PlanningModificationLockService::class);
+        $isActionModificationLocked = $lockService->isLocked($action);
+        $canRequestActionUnlock = $isActionModificationLocked && $lockService->canRequestUnlock($user, $action);
+        $canProcessActionUnlock = $isActionModificationLocked
+            && ($lockService->isUnlockReviewer($user) || $lockService->canGivePlanifAvis($user));
 
         return view('workspace.actions.suivi', [
             'action' => $action,
@@ -108,6 +114,9 @@ class ActionTrackingWebController extends Controller
             'canTrackWeekly' => false,
             'canSubmitAssignedSubActions' => false,
             'canManageAction' => $this->canManageAction($user, $action),
+            'isActionModificationLocked' => $isActionModificationLocked,
+            'canRequestActionUnlock' => $canRequestActionUnlock,
+            'canProcessActionUnlock' => $canProcessActionUnlock,
             'canReviewClosure' => false,
             'canRequestDeadlineExtension' => false,
             'canReviewDeadlineExtensionBySciq' => false,
@@ -681,6 +690,11 @@ class ActionTrackingWebController extends Controller
         }
 
         if ((bool) $action->financement_requis && ($this->isDafFinanceReviewer($user) || $user->hasRole(User::ROLE_DG))) {
+            return true;
+        }
+
+        $lockService = app(PlanningModificationLockService::class);
+        if ($lockService->isUnlockReviewer($user) || $lockService->canGivePlanifAvis($user)) {
             return true;
         }
 

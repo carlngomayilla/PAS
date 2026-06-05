@@ -187,7 +187,7 @@ class UserWorkspaceService
                 'code' => 'alertes',
                 'label' => 'Alertes',
                 'description' => 'Centre des alertes et écarts de suivi',
-                'endpoint' => '/workspace/alertes',
+                'endpoint' => '/workspace/notifications?tab=alertes',
                 'can_write' => false,
                 'actions' => ['Consulter', 'Marquer comme lu'],
             ];
@@ -440,7 +440,7 @@ class UserWorkspaceService
                 $m('financements_critiques', 'Financements critiques', '/workspace/daf/financements-actions'),
                 // 'rapports_consolides' → reporting global avec exports.
                 $m('rapports_consolides', 'Rapports consolidés', '/workspace/reporting'),
-                $m('alertes', 'Alertes critiques', '/workspace/alertes'),
+                $m('alertes', 'Alertes critiques', '/workspace/notifications?tab=alertes'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),
             ],
 
@@ -452,7 +452,7 @@ class UserWorkspaceService
                 $m('supervision', 'Supervision', '/workspace/reporting'),
                 $m('rapports_consolides', 'Rapports', '/workspace/reporting'),
                 $m('execution', 'Action', '/workspace/actions?vue=mes_actions'),
-                $m('alertes', 'Alertes importantes', '/workspace/alertes'),
+                $m('alertes', 'Alertes importantes', '/workspace/notifications?tab=alertes'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),
             ],
 

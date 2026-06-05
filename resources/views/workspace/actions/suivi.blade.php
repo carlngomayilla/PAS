@@ -203,15 +203,21 @@
                 </div>
             </div>
             <div class="showcase-action-row">
-                @if ($canManageAction)
-                    @php
-                        $lockService = app(\App\Services\PlanningModificationLockService::class);
-                        $isModificationLocked = $lockService->isLocked($action);
-                        $canRequestUnlock = auth()->check() && $lockService->canRequestUnlock(auth()->user(), $action);
-                    @endphp
-                    @if (! $isModificationLocked)
-                        <a class="btn btn-warning rounded-2xl px-4 py-2.5" href="{{ $action->pta_id ? route('workspace.pta.edit', $action->pta_id).'#action-'.$action->id : route('workspace.actions.edit', $action) }}">Modifier action</a>
-                    @elseif ($canRequestUnlock)
+                @php
+                    $isModificationLocked = (bool) ($isActionModificationLocked ?? false);
+                    $canRequestUnlock = (bool) ($canRequestActionUnlock ?? false);
+                    $canProcessUnlock = (bool) ($canProcessActionUnlock ?? false);
+                @endphp
+                @if (! $isModificationLocked && $canManageAction)
+                    <a class="btn btn-warning rounded-2xl px-4 py-2.5" href="{{ $action->pta_id ? route('workspace.pta.edit', $action->pta_id).'#action-'.$action->id : route('workspace.actions.edit', $action) }}">Modifier action</a>
+                @elseif ($isModificationLocked)
+                    @if ($canProcessUnlock)
+                        <a class="btn btn-warning rounded-2xl px-4 py-2.5" href="{{ route('workspace.planning-unlocks.index') }}">
+                            Traiter le deverrouillage
+                        </a>
+                    @endif
+
+                    @if ($canRequestUnlock)
                         @include('workspace.planning-unlocks._request-inline', [
                             'target' => $action,
                             'route' => route('workspace.actions.unlock-requests.store', $action),

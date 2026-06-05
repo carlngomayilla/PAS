@@ -77,21 +77,87 @@ class PlanningUnlockCircuitV2Test extends TestCase
         $this->assertFalse($locks->canTransfer($otherDirecteur, $req));
     }
 
+    public function test_directeur_sees_direction_unlock_requests_to_transfer(): void
+    {
+        $f = $this->fixture('DIRVIEW');
+        $locks = app(PlanningModificationLockService::class);
+
+        $req = $locks->requestUnlock($f['action'], $f['chef'], 'Motif valable.');
+
+        $this->actingAs($f['directeur'])
+            ->get(route('workspace.planning-unlocks.index'))
+            ->assertOk()
+            ->assertSee('Demande #'.$req->id)
+            ->assertSee('Planif + DG');
+    }
+
+    public function test_planning_control_chiefs_can_see_and_give_planif_avis(): void
+    {
+        foreach ([User::ROLE_CHEF_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ] as $index => $role) {
+            $f = $this->fixture('AVIS'.$index);
+            $locks = app(PlanningModificationLockService::class);
+            $req = $locks->requestUnlock($f['action'], $f['chef'], 'Motif valable.');
+            $locks->transferByDirecteur($req, $f['directeur'], 'Transfert.');
+            $req->refresh();
+
+            $controller = User::factory()->create([
+                'role' => $role,
+                'is_active' => true,
+            ]);
+
+            $this->assertTrue($locks->canGivePlanifAvis($controller));
+
+            $this->actingAs($controller)
+                ->get(route('workspace.planning-unlocks.index'))
+                ->assertOk()
+                ->assertSee('Demande #'.$req->id)
+                ->assertSee("Enregistrer l'avis", false);
+
+            $this->actingAs($controller)
+                ->post(route('workspace.planning-unlocks.planif', $req), [
+                    'planif_avis' => PlanningUnlockRequest::AVIS_FAVORABLE,
+                    'planif_comment' => 'Avis controle principal.',
+                ])
+                ->assertRedirect(route('workspace.planning-unlocks.index'));
+
+            $req->refresh();
+            $this->assertSame(PlanningUnlockRequest::AVIS_FAVORABLE, $req->planif_avis);
+            $this->assertSame((int) $controller->id, (int) $req->planif_avis_by);
+        }
+    }
+
+    public function test_action_tracking_exposes_unlock_processing_button_for_dg_and_control_chiefs(): void
+    {
+        $f = $this->fixture('BTN');
+
+        foreach ([User::ROLE_DG, User::ROLE_CHEF_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ] as $role) {
+            $actor = User::factory()->create([
+                'role' => $role,
+                'is_active' => true,
+            ]);
+
+            $this->actingAs($actor)
+                ->get(route('workspace.actions.suivi', $f['action']))
+                ->assertOk()
+                ->assertSee('Traiter le deverrouillage');
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function fixture(): array
+    private function fixture(string $suffix = 'U'): array
     {
-        $direction = Direction::query()->create(['code' => 'DIRU', 'libelle' => 'Direction Unlock']);
-        $service = Service::query()->create(['direction_id' => $direction->id, 'code' => 'SRVU', 'libelle' => 'Service Unlock']);
+        $direction = Direction::query()->create(['code' => 'DIR'.$suffix, 'libelle' => 'Direction Unlock '.$suffix]);
+        $service = Service::query()->create(['direction_id' => $direction->id, 'code' => 'SRV'.$suffix, 'libelle' => 'Service Unlock '.$suffix]);
         $chef = User::factory()->create(['role' => User::ROLE_SERVICE, 'direction_id' => $direction->id, 'service_id' => $service->id]);
         $directeur = User::factory()->create(['role' => User::ROLE_DIRECTION, 'direction_id' => $direction->id]);
         $planif = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
         $dg = User::factory()->create(['role' => User::ROLE_DG]);
 
-        $pas = Pas::query()->create(['titre' => 'PAS U', 'periode_debut' => '2026-01-01', 'periode_fin' => '2030-12-31']);
-        $pao = Pao::query()->create(['pas_id' => $pas->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PAO U', 'annee' => 2026]);
-        $pta = Pta::query()->create(['pao_id' => $pao->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PTA U']);
+        $pas = Pas::query()->create(['titre' => 'PAS '.$suffix, 'periode_debut' => '2026-01-01', 'periode_fin' => '2030-12-31']);
+        $pao = Pao::query()->create(['pas_id' => $pas->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PAO '.$suffix, 'annee' => 2026]);
+        $pta = Pta::query()->create(['pao_id' => $pao->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PTA '.$suffix]);
         $action = Action::query()->create([
             'pta_id' => $pta->id, 'libelle' => 'Action verrouillée', 'type_action' => Action::TYPE_QUANTITATIVE,
             'statut_parametrage' => 'parametre', 'modification_locked_at' => now(),
