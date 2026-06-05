@@ -5,6 +5,21 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-05 — Contraintes PostgreSQL : statuts applicatifs complets
+
+### Correction
+
+Ajout d'une migration PostgreSQL qui remplace les contraintes CHECK de statut
+par les listes completes utilisees par l'application : PAS/PAO/PTA, actions,
+statuts dynamiques, validation, financement, sous-actions, imports, demandes
+de suppression/prolongation/deverrouillage, delegations, exercices et exports.
+
+Cette migration evite les erreurs prod du type `actions_statut_check` viole par
+une ligne existante lorsque le workflow contient un statut legitime non prevu
+par une contrainte manuelle trop courte.
+
+---
+
 ## 2026-06-05 — Dashboard : carte « À paramétrer » visible pour tous les profils
 
 ### Demande
