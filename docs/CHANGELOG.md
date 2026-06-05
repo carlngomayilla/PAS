@@ -5,6 +5,46 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-05 — Dashboard : carte « À paramétrer » visible pour tous les profils
+
+### Demande
+
+La carte du statut **« À paramétrer »** (actions importées, pas encore enregistrées
+officiellement dans le PTA — `statut_parametrage = 'a_parametrer'`) n'apparaissait dans le
+dashboard d'**aucun** profil.
+
+### Diagnostic
+
+La rangée KPI du haut du dashboard (`$kpiStatCards` dans
+`resources/views/partials/dashboard-analytics/_panel-overview.blade.php`) est codée en dur
+(*Actions totales, Indicateur global, En retard, Non démarrées, Achevées*) et n'incluait pas
+« À paramétrer ». Les `summary_cards` propres à chaque rôle non plus. Le statut n'existait que
+dans le panneau « Répartition des statuts », moins visible.
+
+### Correction
+
+Ajout d'une carte **« À paramétrer »** à la rangée KPI, alimentée par le compteur déjà calculé
+(`$statusCards`), pour **tous les profils**, mais affichée **uniquement quand le compteur > 0** :
+
+```php
+$aParametrerCount = (int) (
+    collect($statusCards)->firstWhere('key', 'a_parametrer')['count']
+    ?? collect($statusCards)->firstWhere('label', 'À paramétrer')['count']
+    ?? 0
+);
+if ($aParametrerCount > 0) {
+    $kpiStatCards[] = [
+        'label' => 'À paramétrer', 'value' => $aParametrerCount, 'accent' => '#a855f7',
+        'href' => route('workspace.actions.index', ['statut' => 'a_parametrer']), /* ... */
+    ];
+}
+```
+
+Vérifié : 11 tests dashboard verts ; en prod les 66 actions sont actuellement `a_parametrer`
+(DAF 18, DG 18, DS 12, DSIC 18) → la carte s'affiche pour les profils concernés.
+
+---
+
 ## 2026-06-04 — Durcissement sécurité (audit offensif)
 
 ### Contexte

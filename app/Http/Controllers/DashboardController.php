@@ -2503,6 +2503,11 @@ class DashboardController extends Controller
             $rows[$status]['count']++;
         }
 
+        foreach ($rows as $key => &$row) {
+            $row['key'] = $key;
+        }
+        unset($row);
+
         return array_values($rows);
     }
 

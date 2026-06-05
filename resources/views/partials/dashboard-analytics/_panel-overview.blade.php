@@ -47,6 +47,28 @@
                 'href'    => route('workspace.actions.index', ['statut' => 'achevees']),
             ],
         ];
+
+        // Carte "À paramétrer" : actions importees non encore enregistrees
+        // officiellement dans le PTA (statut_parametrage = 'a_parametrer').
+        // Affichee pour tous les profils, mais uniquement si le perimetre de
+        // l utilisateur en contient au moins une (compteur > 0).
+        $aParametrerCount = (int) (
+            collect($statusCards)->firstWhere('key', 'a_parametrer')['count']
+            ?? collect($statusCards)->firstWhere('label', 'À paramétrer')['count']
+            ?? 0
+        );
+        if ($aParametrerCount > 0) {
+            $kpiStatCards[] = [
+                'label'      => 'À paramétrer',
+                'value'      => $aParametrerCount,
+                'accent'     => '#a855f7',
+                'icon'       => '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="10" y1="8" x2="14" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+                'trend'      => 'neutral',
+                'trendLabel' => 'À configurer',
+                'href'       => route('workspace.actions.index', ['statut' => 'a_parametrer']),
+            ];
+        }
+
         if ($dashboardRole === 'agent' && (int) ($personalActionsSummary['total'] ?? 0) > 0) {
             array_unshift($kpiStatCards, [
                 'label'  => 'Mes actions',
