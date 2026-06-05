@@ -124,4 +124,75 @@ class ActionStatusServiceTest extends TestCase
         $this->assertTrue($service->isOfficiallyValidated($chefValidated));
         $this->assertTrue($service->isOfficiallyValidated($directionValidated));
     }
+
+    public function test_imported_action_not_yet_registered_is_a_parametrer(): void
+    {
+        // Action importee via Excel : statut_parametrage='a_parametrer' tant que le
+        // chef de service ne l'a pas enregistree officiellement dans le PTA.
+        $action = new Action([
+            'statut_parametrage' => 'a_parametrer',
+            'statut' => ActionTrackingService::STATUS_NON_DEMARRE,
+            'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
+            'statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE,
+            'progression_reelle' => 0,
+        ]);
+
+        $service = app(ActionStatusService::class);
+
+        $this->assertTrue($service->isPendingSetup($action));
+        $this->assertSame('a_parametrer', $service->dashboardStatus($action));
+    }
+
+    public function test_registered_action_without_tracking_is_non_demarre(): void
+    {
+        // Action enregistree dans le PTA (statut_parametrage='parametre') mais aucun
+        // suivi d'execution n'a encore commence => non demarree.
+        $action = new Action([
+            'statut_parametrage' => 'parametre',
+            'statut' => ActionTrackingService::STATUS_NON_DEMARRE,
+            'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
+            'statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE,
+            'progression_reelle' => 0,
+        ]);
+
+        $service = app(ActionStatusService::class);
+
+        $this->assertFalse($service->isPendingSetup($action));
+        $this->assertTrue($service->isNotStarted($action));
+        $this->assertSame('non_demarre', $service->dashboardStatus($action));
+    }
+
+    public function test_registered_action_with_progress_is_en_cours(): void
+    {
+        $action = new Action([
+            'statut_parametrage' => 'parametre',
+            'statut' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE,
+            'progression_reelle' => 40,
+        ]);
+
+        $service = app(ActionStatusService::class);
+
+        $this->assertTrue($service->isStarted($action));
+        $this->assertSame('en_cours', $service->dashboardStatus($action));
+    }
+
+    public function test_chef_validated_action_is_acheve(): void
+    {
+        // Validation chef de service = etape terminale ANBG => achevee, meme si le
+        // statut dynamique n'a pas (encore) bascule sur un statut acheve.
+        $action = new Action([
+            'statut_parametrage' => 'parametre',
+            'statut' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'progression_reelle' => 80,
+        ]);
+
+        $service = app(ActionStatusService::class);
+
+        $this->assertTrue($service->isCompleted($action));
+        $this->assertSame('acheve', $service->dashboardStatus($action));
+    }
 }

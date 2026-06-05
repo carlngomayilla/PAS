@@ -97,7 +97,17 @@ class ActionWebController extends Controller
             'kpi_global_desc' => $query->orderByDesc(
                 ActionKpi::query()->select('kpi_global')->whereColumn('action_id', 'actions.id')->limit(1)
             )->orderByDesc('id'),
-            default => $query->orderByDesc('id'),
+            // Tri par defaut (demande metier ANBG) : les actions importees dans le
+            // PTA se listent par trimestre et de l'echeance la plus proche a la plus
+            // lointaine. On ordonne donc chronologiquement sur l'echeance (a defaut
+            // la date de fin), ce qui regroupe naturellement par trimestre. Les
+            // actions sans date sont rejetees en fin de liste. COALESCE est portable
+            // SQLite/PostgreSQL.
+            default => $query
+                ->orderByRaw('CASE WHEN date_echeance IS NULL AND date_fin IS NULL THEN 1 ELSE 0 END')
+                ->orderByRaw('COALESCE(date_echeance, date_fin) ASC')
+                ->orderBy('date_debut')
+                ->orderBy('id'),
         };
 
         $perPage = max(15, min(100, (int) $request->integer('per_page', 15)));
@@ -1188,8 +1198,20 @@ class ActionWebController extends Controller
 
         $statusFilter = trim((string) $request->string('statut'));
         if ($statusFilter !== '') {
-            if ($statusFilter === 'achevees') {
+            if ($statusFilter === 'a_parametrer') {
+                // Actions importees mais pas encore enregistrees officiellement dans le PTA.
+                $query->where('statut_parametrage', 'a_parametrer');
+            } elseif ($statusFilter === 'achevees') {
                 $query->whereIn('statut_dynamique', $this->completedActionStatuses());
+            } elseif ($statusFilter === 'non_demarre') {
+                // "Non demarree" = enregistree dans le PTA (donc PAS 'a_parametrer')
+                // mais sans suivi d'execution engage. On exclut les imports a parametrer
+                // pour rester aligne avec le dashboard.
+                $query->where('statut_dynamique', 'non_demarre')
+                    ->where(function (Builder $parametrageQuery): void {
+                        $parametrageQuery->whereNull('statut_parametrage')
+                            ->orWhere('statut_parametrage', '!=', 'a_parametrer');
+                    });
             } else {
                 $query->where('statut_dynamique', $statusFilter);
             }
@@ -1538,6 +1560,20 @@ class ActionWebController extends Controller
             ->pluck('total', 'status_label')
             ->map(fn ($value): int => (int) $value)
             ->toArray();
+
+        // Aligne l'index sur le dashboard : les actions importees pas encore
+        // enregistrees dans le PTA (statut_parametrage='a_parametrer') forment un
+        // compteur "À paramétrer" distinct et sont retirees du "non démarré"
+        // (elles sont importees avec statut_dynamique='non_demarre').
+        $aParametrerCount = (int) (clone $baseQuery)
+            ->where('statut_parametrage', 'a_parametrer')
+            ->count();
+        if ($aParametrerCount > 0) {
+            $statusCounts['a_parametrer'] = $aParametrerCount;
+            if (isset($statusCounts['non_demarre'])) {
+                $statusCounts['non_demarre'] = max(0, $statusCounts['non_demarre'] - $aParametrerCount);
+            }
+        }
 
         $pendingValidationStatuses = [
             ActionTrackingService::VALIDATION_SOUMISE_CHEF,

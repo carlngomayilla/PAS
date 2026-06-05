@@ -1465,6 +1465,7 @@ class DashboardController extends Controller
     private function statusCounts(Collection $actions): array
     {
         $counts = [
+            'a_parametrer' => 0,
             'non_demarre' => 0,
             'en_cours' => 0,
             'a_risque' => 0,
@@ -2483,6 +2484,7 @@ class DashboardController extends Controller
     private function buildStatusCards(Collection $actions): array
     {
         $rows = [
+            'a_parametrer' => ['label' => 'À paramétrer', 'color' => '#A855F7', 'bg' => '#F5EBFF', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'a_parametrer'])],
             'en_avance' => ['label' => 'En avance', 'color' => '#8FC043', 'bg' => '#EEF6E1', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_avance'])],
             'en_cours' => ['label' => 'En cours', 'color' => '#3996D3', 'bg' => '#E8F3FB', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_cours'])],
             'a_risque' => ['label' => 'A surveiller', 'color' => '#F0E509', 'bg' => '#FFF8D6', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'a_risque'])],
@@ -4027,6 +4029,7 @@ class DashboardController extends Controller
     private function statusLabel(string $status): string
     {
         return match ($status) {
+            'a_parametrer' => 'À paramétrer',
             'acheve' => 'Achevé',
             'a_risque' => 'A surveiller',
             'en_avance' => 'En avance',
@@ -4041,6 +4044,7 @@ class DashboardController extends Controller
     private function statusColor(string $status): string
     {
         return match ($status) {
+            'a_parametrer' => '#A855F7',
             'acheve' => '#1C203D',
             'a_risque' => '#F0E509',
             'en_avance' => '#8FC043',

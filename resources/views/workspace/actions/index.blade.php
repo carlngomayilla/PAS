@@ -97,6 +97,18 @@
         $baseCalendarUrl = request()->fullUrlWithQuery(['layout' => 'calendar']);
         $baseGanttUrl    = request()->fullUrlWithQuery(['layout' => 'gantt']);
 
+        // Dates reelles du modele Action : date_debut / date_fin / date_echeance
+        // (il n'existe PAS de colonnes *_prevue). On derive l'echeance effective
+        // (echeance sinon date de fin), la date de debut et le libelle de trimestre
+        // depuis ces champs reels — utilises par le calendrier, le Gantt et le Kanban.
+        $echeanceOf = fn ($row) => $row->date_echeance ?? $row->date_fin;
+        $debutOf = fn ($row) => $row->date_debut ?? $row->date_echeance ?? $row->date_fin;
+        $trimestreLabel = function ($date): ?string {
+            if (!$date) return null;
+            $c = \Carbon\Carbon::parse($date);
+            return 'T' . $c->quarter . ' ' . $c->year;
+        };
+
         // Calendar: group actions by échéance month/day
         $today = \Carbon\Carbon::today();
         $calYear  = (int) request()->query('cal_year',  $today->year);
@@ -105,8 +117,9 @@
         $calEnd   = $calStart->copy()->endOfMonth();
         $calGrid  = []; // day => [actions]
         foreach ($listing as $row) {
-            if (!$row->date_fin_prevue) continue;
-            $d = \Carbon\Carbon::parse($row->date_fin_prevue);
+            $echeance = $echeanceOf($row);
+            if (!$echeance) continue;
+            $d = \Carbon\Carbon::parse($echeance);
             if ($d->year === $calYear && $d->month === $calMonth) {
                 $calGrid[$d->day][] = $row;
             }
@@ -123,11 +136,13 @@
             default             => '#94a3b8',
         };
 
-        // Gantt: actions with date_debut_prevue and date_fin_prevue
-        $ganttRows = $listing->filter(fn ($r) => $r->date_debut_prevue && $r->date_fin_prevue)
-            ->sortBy('date_debut_prevue')->values();
-        $ganttMin = $ganttRows->isNotEmpty() ? \Carbon\Carbon::parse($ganttRows->first()->date_debut_prevue) : $today->copy()->startOfMonth();
-        $ganttMax = $ganttRows->isNotEmpty() ? \Carbon\Carbon::parse($ganttRows->max('date_fin_prevue')) : $today->copy()->addMonths(3);
+        // Gantt: actions avec une date de debut ET une echeance (date_echeance/date_fin)
+        $ganttRows = $listing->filter(fn ($r) => $debutOf($r) && $echeanceOf($r))
+            ->sortBy(fn ($r) => \Carbon\Carbon::parse($debutOf($r))->timestamp)->values();
+        $ganttMin = $ganttRows->isNotEmpty() ? \Carbon\Carbon::parse($debutOf($ganttRows->first())) : $today->copy()->startOfMonth();
+        $ganttMax = $ganttRows->isNotEmpty()
+            ? \Carbon\Carbon::createFromTimestamp($ganttRows->max(fn ($r) => \Carbon\Carbon::parse($echeanceOf($r))->timestamp))
+            : $today->copy()->addMonths(3);
         $ganttSpanDays = max(1, $ganttMin->diffInDays($ganttMax) + 1);
     @endphp
 
@@ -345,15 +360,21 @@
                                data-patch-url="{{ route('workspace.actions.quick-status', $row) }}">
                                 <div class="kanban-card-id">ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }}</div>
                                 <div class="kanban-card-title">{{ $row->libelle }}</div>
-                                <div class="kanban-card-meta">{{ $row->responsable?->name ?? '-' }} · {{ $row->pta?->titre ?? '-' }}</div>
+                                <div class="kanban-card-meta">{{ $row->responsable?->name ?: 'Responsable non assigné' }} · {{ $row->pta?->titre ?: 'PTA non rattaché' }}</div>
                                 <div class="kanban-card-progress">
                                     <div class="kanban-card-progress-bar" style="width: {{ $pct }}%; background: {{ $pctColor }};"></div>
                                 </div>
+                                @php $kEcheance = $echeanceOf($row); @endphp
                                 <div class="kanban-card-footer">
                                     <span class="kanban-card-pct" style="color: {{ $pctColor }};">{{ number_format($pct, 1, ',', ' ') }}%</span>
-                                    @if ($row->date_fin_prevue)
-                                        <span style="font-size:0.68rem; color: var(--app-muted);">{{ \Carbon\Carbon::parse($row->date_fin_prevue)->format('d/m/Y') }}</span>
-                                    @endif
+                                    <span style="display:flex; align-items:center; gap:0.3rem; min-width:0; font-size:0.68rem; color: var(--app-muted);">
+                                        @if ($kEcheance)
+                                            <span style="display:inline-block; padding:0.05rem 0.32rem; border-radius:0.4rem; background: rgba(148,163,184,0.16); color: var(--app-text); font-weight:700; font-size:0.62rem;">{{ $trimestreLabel($kEcheance) }}</span>
+                                            <span style="white-space:nowrap;">{{ \Carbon\Carbon::parse($kEcheance)->format('d/m/Y') }}</span>
+                                        @else
+                                            <span style="font-style:italic;">Échéance non définie</span>
+                                        @endif
+                                    </span>
                                 </div>
                             </a>
                         @empty
@@ -558,8 +579,8 @@
                     <div class="gantt-rows">
                         @foreach ($ganttRows as $ganttRow)
                             @php
-                                $gStart = \Carbon\Carbon::parse($ganttRow->date_debut_prevue);
-                                $gEnd   = \Carbon\Carbon::parse($ganttRow->date_fin_prevue);
+                                $gStart = \Carbon\Carbon::parse($debutOf($ganttRow));
+                                $gEnd   = \Carbon\Carbon::parse($echeanceOf($ganttRow));
                                 $gLeft  = round(($ganttMin->diffInDays($gStart) / $ganttSpanDays) * 100, 3);
                                 $gDays  = max(1, (int) $gStart->diffInDays($gEnd) + 1);
                                 $gWidth = round(($gDays / $ganttSpanDays) * 100, 3);
@@ -656,8 +677,10 @@
                                 <p class="mt-1 text-xs text-slate-500">{{ $row->responsable?->agent_matricule ?? $row->responsable?->email ?? '-' }}</p>
                             </td>
                             <td class="min-w-[140px] text-sm text-slate-700">
-                                @if ($row->date_echeance)
-                                    <span class="font-semibold text-slate-900">{{ \Illuminate\Support\Carbon::parse($row->date_echeance)->format('d/m/Y') }}</span>
+                                @php $rowEcheance = $echeanceOf($row); @endphp
+                                @if ($rowEcheance)
+                                    <span class="font-semibold text-slate-900">{{ \Illuminate\Support\Carbon::parse($rowEcheance)->format('d/m/Y') }}</span>
+                                    <span class="anbg-badge anbg-badge-neutral ml-1 align-middle" style="font-size:0.62rem;">{{ $trimestreLabel($rowEcheance) }}</span>
                                 @else
                                     <span class="text-slate-500">Non définie</span>
                                 @endif

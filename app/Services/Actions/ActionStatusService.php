@@ -97,9 +97,24 @@ class ActionStatusService
         return ! $this->isStarted($action);
     }
 
+    /**
+     * Regle metier ANBG : une action importee reste "A parametrer" tant que le
+     * chef de service ne l'a pas enregistree officiellement dans le PTA. Le flux
+     * d'import (PlanningExcelImportService) cree les lignes avec
+     * `statut_parametrage = 'a_parametrer'`; le passage a 'parametre' marque
+     * l'enregistrement officiel dans le plan (cf. PtaWebController::syncPtaActions).
+     * Tant qu'elle est 'a_parametrer', l'action n'est ni "non demarree" ni
+     * "en cours" : elle n'existe pas encore officiellement dans le PTA.
+     */
+    public function isPendingSetup(Action $action): bool
+    {
+        return strtolower(trim((string) ($action->statut_parametrage ?? ''))) === 'a_parametrer';
+    }
+
     public function isCompleted(Action $action): bool
     {
         $dynamicStatus = strtolower(trim((string) ($action->statut_dynamique ?? $action->statut ?? '')));
+        $validationStatus = strtolower(trim((string) ($action->statut_validation ?? '')));
 
         return in_array($dynamicStatus, [
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
@@ -110,6 +125,12 @@ class ActionStatusService
             'termine',
             'terminee',
         ], true)
+            // Validation finale chef de service (etape terminale du workflow ANBG)
+            // ou validation direction historique : l'action est consideree achevee.
+            || in_array($validationStatus, [
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ], true)
             || $action->date_fin_reelle !== null
             || $action->cloture_le !== null
             || (float) ($action->progression_reelle ?? $action->taux_global ?? 0) >= 100.0;
@@ -126,20 +147,29 @@ class ActionStatusService
 
     public function dashboardStatus(Action $action): string
     {
+        // 1) A parametrer : action importee pas encore enregistree officiellement
+        //    dans le PTA. Prioritaire sur tout autre etat — elle ne compte ni
+        //    comme "non demarree" ni comme "en cours".
+        if ($this->isPendingSetup($action)) {
+            return 'a_parametrer';
+        }
+
+        // 2) Achevee / validee : statut termine, cloturee, date de fin reelle,
+        //    100% atteint, ou validation chef/direction.
+        if ($this->isCompleted($action)) {
+            return 'acheve';
+        }
+
+        // 3) Non demarree : action enregistree dans le PTA mais aucun suivi
+        //    d'execution n'a encore commence.
         if ($this->isNotStarted($action)) {
             return 'non_demarre';
         }
 
+        // 4) Suivi engage : on derive l'etat fin a partir du statut dynamique.
         $dynamicStatus = strtolower(trim((string) ($action->statut_dynamique ?? $action->statut ?? '')));
 
         return match ($dynamicStatus) {
-            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
-            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
-            ActionTrackingService::STATUS_CLOTUREE,
-            'acheve',
-            'achevee',
-            'termine',
-            'terminee' => 'acheve',
             ActionTrackingService::STATUS_A_RISQUE => 'a_risque',
             ActionTrackingService::STATUS_EN_AVANCE => 'en_avance',
             ActionTrackingService::STATUS_EN_RETARD => 'en_retard',
