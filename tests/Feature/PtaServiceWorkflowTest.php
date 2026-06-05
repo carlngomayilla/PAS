@@ -211,6 +211,59 @@ class PtaServiceWorkflowTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/<input[^>]+name="actions\\[0\\]\\[sous_actions\\]\\[0\\]\\[allows_difficulty\\]"[^>]+value="1"[^>]+checked/', $html);
     }
 
+    public function test_pta_edit_lists_actions_by_quarter_and_deadline(): void
+    {
+        $fixture = $this->fixture();
+        $pta = Pta::query()->create([
+            'pao_id' => $fixture['pao']->id,
+            'objectif_operationnel_id' => $fixture['ownObjective']->id,
+            'direction_id' => $fixture['ownService']->direction_id,
+            'service_id' => $fixture['ownService']->id,
+            'titre' => 'PTA ordre trimestriel',
+        ]);
+
+        $makeAction = function (string $libelle, string $dateDebut, string $dateFin) use ($fixture, $pta): Action {
+            $action = Action::query()->create([
+                'pta_id' => $pta->id,
+                'pao_id' => $fixture['pao']->id,
+                'objectif_operationnel_id' => $fixture['ownObjective']->id,
+                'responsable_id' => $fixture['agent']->id,
+                'libelle' => $libelle,
+                'date_debut' => $dateDebut,
+                'date_fin' => $dateFin,
+                'date_echeance' => $dateFin,
+                'statut' => 'non_demarre',
+                'statut_parametrage' => 'parametre',
+                'contexte_action' => Action::CONTEXT_PILOTAGE,
+                'origine_action' => Action::ORIGIN_PTA,
+            ]);
+            $action->responsables()->attach($fixture['agent']->id, ['is_primary' => true]);
+
+            return $action;
+        };
+
+        $makeAction('Action PTA T3', '2026-07-01', '2026-09-10');
+        $makeAction('Action PTA T1', '2026-01-10', '2026-02-15');
+        $makeAction('Action PTA T2', '2026-03-01', '2026-05-20');
+
+        $html = $this->actingAs($fixture['serviceUser'])
+            ->get(route('workspace.pta.edit', $pta))
+            ->assertOk()
+            ->assertSee('T1 2026')
+            ->assertSee('T2 2026')
+            ->assertSee('T3 2026')
+            ->getContent();
+
+        $posT1 = strpos($html, 'Action PTA T1');
+        $posT2 = strpos($html, 'Action PTA T2');
+        $posT3 = strpos($html, 'Action PTA T3');
+
+        $this->assertNotFalse($posT1);
+        $this->assertNotFalse($posT2);
+        $this->assertNotFalse($posT3);
+        $this->assertTrue($posT1 < $posT2 && $posT2 < $posT3, 'Les actions du PTA doivent etre triees par trimestre, de l echeance la plus proche a la plus lointaine.');
+    }
+
     public function test_pta_action_date_fin_cannot_exceed_operational_objective_deadline(): void
     {
         $fixture = $this->fixture();

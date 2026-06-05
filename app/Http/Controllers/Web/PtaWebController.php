@@ -302,9 +302,75 @@ class PtaWebController extends Controller
         );
 
         $pta->loadMissing([
+            'actions' => fn ($query) => $query
+                ->select([
+                    'id',
+                    'pta_id',
+                    'pao_id',
+                    'objectif_operationnel_id',
+                    'mode_evaluation',
+                    'type_action',
+                    'requires_comment',
+                    'allows_difficulty',
+                    'official_progress_percent',
+                    'libelle',
+                    'description',
+                    'date_debut',
+                    'date_fin',
+                    'date_echeance',
+                    'statut',
+                    'priorite',
+                    'intitule_cible',
+                    'unite_cible',
+                    'quantite_cible',
+                    'seuil_minimum',
+                    'seuil_mode',
+                    'seuil_t1',
+                    'seuil_t2',
+                    'seuil_t3',
+                    'seuil_t4',
+                    'methode_calcul',
+                    'justificatif_obligatoire',
+                    'echeance_cible',
+                    'resultat_attendu',
+                    'observations',
+                    'montant_estime',
+                    'nature_financement',
+                    'description_financement',
+                    'source_financement',
+                    'commentaire_financement',
+                    'justificatif_financement_path',
+                    'ressources_necessaires',
+                    'ressources_details',
+                    'ressource_main_oeuvre',
+                    'ressource_equipement',
+                    'ressource_partenariat',
+                    'ressource_autres',
+                    'ressource_autres_details',
+                    'risque_potentiel',
+                    'niveau_risque',
+                    'mesures_preventives',
+                    'financement_requis',
+                    'financement_statut',
+                    'financement_soumis_le',
+                    'financement_notifie_le',
+                    'responsable_id',
+                    'nombre_sous_actions_prevu',
+                    'statut_parametrage',
+                    'modification_locked_at',
+                    'modification_unlocked_at',
+                    'modification_unlock_expires_at',
+                ])
+                ->orderByRaw('CASE WHEN date_echeance IS NULL AND date_fin IS NULL AND date_debut IS NULL THEN 1 ELSE 0 END')
+                ->orderByRaw('COALESCE(date_echeance, date_fin, date_debut) ASC')
+                ->orderBy('date_debut')
+                ->orderBy('id'),
             'actions.responsables:id,name,email',
-            'actions.sousActions:id,action_id,agent_id,libelle,sub_action_type,weight,requires_proof,requires_comment,allows_difficulty,official_progress_percent,validation_status,description,resultat_attendu,cible_prevue,unite,commentaire,date_debut,date_fin,statut,est_effectuee',
-            'actions:id,pta_id,pao_id,objectif_operationnel_id,mode_evaluation,type_action,requires_comment,allows_difficulty,official_progress_percent,libelle,description,date_debut,date_fin,statut,priorite,intitule_cible,unite_cible,quantite_cible,seuil_minimum,seuil_mode,seuil_t1,seuil_t2,seuil_t3,seuil_t4,methode_calcul,justificatif_obligatoire,echeance_cible,resultat_attendu,observations,montant_estime,nature_financement,source_financement,commentaire_financement,justificatif_financement_path,ressources_necessaires,ressources_details,ressource_main_oeuvre,ressource_equipement,ressource_partenariat,ressource_autres,ressource_autres_details,risque_potentiel,niveau_risque,mesures_preventives,financement_requis,financement_statut,financement_soumis_le,financement_notifie_le,responsable_id,nombre_sous_actions_prevu,statut_parametrage,modification_locked_at,modification_unlocked_at,modification_unlock_expires_at',
+            'actions.sousActions' => fn ($query) => $query
+                ->select('id', 'action_id', 'agent_id', 'libelle', 'sub_action_type', 'weight', 'requires_proof', 'requires_comment', 'allows_difficulty', 'official_progress_percent', 'validation_status', 'description', 'resultat_attendu', 'cible_prevue', 'unite', 'commentaire', 'date_debut', 'date_fin', 'statut', 'est_effectuee')
+                ->orderBy('date_debut')
+                ->orderBy('date_fin')
+                ->orderBy('id'),
         ]);
 
         return view('workspace.pta.form', [

@@ -37,6 +37,28 @@
     }
     $requiresComment = filter_var($rowData['requires_comment'] ?? false, FILTER_VALIDATE_BOOL);
     $allowsDifficulty = filter_var($rowData['allows_difficulty'] ?? true, FILTER_VALIDATE_BOOL);
+    $quarterOf = static function ($date): ?string {
+        $value = trim((string) $date);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            $carbon = \Carbon\CarbonImmutable::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return 'T'.$carbon->quarter.' '.$carbon->year;
+    };
+    $startQuarter = $quarterOf($rowData['date_debut'] ?? null);
+    $endQuarter = $quarterOf($rowData['date_fin'] ?? null);
+    $actionQuarterLabel = match (true) {
+        $startQuarter !== null && $endQuarter !== null && $startQuarter !== $endQuarter => $startQuarter.' - '.$endQuarter,
+        $startQuarter !== null => $startQuarter,
+        $endQuarter !== null => $endQuarter,
+        default => 'Trimestre a definir',
+    };
 
     $showTargetFields = $typeAction === \App\Models\Action::TYPE_QUANTITATIVE;
     $thresholdMode = in_array(($rowData['seuil_mode'] ?? 'unique'), ['unique', 'trimestriel'], true)
@@ -94,7 +116,10 @@
                     <span class="ml-2 anbg-badge anbg-badge-info px-2 py-0.5 text-[10px]" title="Action enregistree et figee. Demandez une modification au DG pour la modifier.">🔒 Enregistree</span>
                 @endif
             </span>
-            <span class="block truncate text-xs font-semibold text-slate-500" data-action-summary>{{ $actionHeadingLabel }}</span>
+            <span class="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+                <span class="min-w-0 truncate" data-action-summary>{{ $actionHeadingLabel }}</span>
+                <span class="anbg-badge {{ $actionQuarterLabel === 'Trimestre a definir' ? 'anbg-badge-neutral' : 'anbg-badge-info' }} px-2 py-0.5 text-[10px]" data-action-quarter title="{{ $actionQuarterLabel === 'Trimestre a definir' ? '' : 'Periode '.$actionQuarterLabel }}">{{ $actionQuarterLabel }}</span>
+            </span>
         </span>
         <span class="flex shrink-0 items-center gap-2">
             {{-- Boutons par action : Enregistrer / Modifier / Supprimer. --}}

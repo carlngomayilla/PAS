@@ -739,6 +739,7 @@
                     preview.value = dateFin.value;
                 }
 
+                syncActionQuarter(block);
                 syncSubActionEcheances(block);
             }
 
@@ -843,6 +844,47 @@
 
             function syncActionHeading(block) {
                 syncActionSummary(block);
+                syncActionQuarter(block);
+            }
+
+            function quarterLabelFromIso(value) {
+                var match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((value || '').trim());
+                if (!match) return '';
+
+                var month = parseInt(match[2], 10);
+                if (Number.isNaN(month) || month < 1 || month > 12) return '';
+
+                return 'T' + Math.ceil(month / 3) + ' ' + match[1];
+            }
+
+            function actionQuarterLabel(block) {
+                if (!block) return 'Trimestre a definir';
+
+                var startInput = block.querySelector('input[name$="[date_debut]"]:not([name*="[sous_actions]"])');
+                var endInput = block.querySelector('input[name$="[date_fin]"]:not([name*="[sous_actions]"])');
+                var startQuarter = quarterLabelFromIso(startInput ? startInput.value : '');
+                var endQuarter = quarterLabelFromIso(endInput ? endInput.value : '');
+
+                if (startQuarter && endQuarter && startQuarter !== endQuarter) {
+                    return startQuarter + ' - ' + endQuarter;
+                }
+
+                return startQuarter || endQuarter || 'Trimestre a definir';
+            }
+
+            function syncActionQuarter(block) {
+                if (!block) return;
+
+                var quarter = block.querySelector('[data-action-quarter]');
+                if (!quarter) return;
+
+                var label = actionQuarterLabel(block);
+                var isMissing = label === 'Trimestre a definir';
+
+                quarter.textContent = label;
+                quarter.title = isMissing ? '' : 'Periode ' + label;
+                quarter.classList.toggle('anbg-badge-info', !isMissing);
+                quarter.classList.toggle('anbg-badge-neutral', isMissing);
             }
 
             function closeOtherActions(activeBlock) {
@@ -902,11 +944,15 @@
                         syncSubActionAgentOptions(target.closest('[data-action-block]'));
                     }
 
-                    if (target.matches('input[name$="[date_fin]"]')) {
+                    if (target.matches('input[name$="[date_debut]"], input[name$="[date_fin]"]')) {
                         var targetBlock = target.closest('[data-action-block]');
                         if (target.name.indexOf('[sous_actions]') === -1) {
-                            syncActionEcheance(targetBlock);
-                        } else {
+                            if (target.name.indexOf('[date_fin]') !== -1) {
+                                syncActionEcheance(targetBlock);
+                            } else {
+                                syncActionQuarter(targetBlock);
+                            }
+                        } else if (target.name.indexOf('[date_fin]') !== -1) {
                             syncSubActionEcheances(targetBlock);
                         }
                     }
@@ -929,11 +975,15 @@
                         syncActionSummary(target.closest('[data-action-block]'));
                     }
 
-                    if (target.matches('input[name$="[date_fin]"]')) {
+                    if (target.matches('input[name$="[date_debut]"], input[name$="[date_fin]"]')) {
                         var targetBlock = target.closest('[data-action-block]');
                         if (target.name.indexOf('[sous_actions]') === -1) {
-                            syncActionEcheance(targetBlock);
-                        } else {
+                            if (target.name.indexOf('[date_fin]') !== -1) {
+                                syncActionEcheance(targetBlock);
+                            } else {
+                                syncActionQuarter(targetBlock);
+                            }
+                        } else if (target.name.indexOf('[date_fin]') !== -1) {
                             syncSubActionEcheances(targetBlock);
                         }
                     }
