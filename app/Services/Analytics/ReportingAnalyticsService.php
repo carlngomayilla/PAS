@@ -1539,10 +1539,29 @@ class ReportingAnalyticsService
             'ptas.service_id',
         ]);
 
+        // A41 — Aligne le graphe reporting sur les 9 buckets dashboardStatus()
+        // (cf. ActionStatusService) : inclut 'a_parametrer' (via statut_parametrage,
+        // prioritaire) et fond les 11 valeurs de statut_dynamique dans le meme
+        // vocabulaire que le dashboard. Corrige les statuts manquants/illisibles
+        // signales sur les graphiques (notamment l'absence de "A parametrer").
+        $bucketExpr = "CASE "
+            ."WHEN actions.statut_parametrage = 'a_parametrer' THEN 'a_parametrer' "
+            ."WHEN actions.statut_dynamique IN ('acheve_dans_delai','acheve_hors_delai','cloturee') THEN 'acheve' "
+            ."WHEN actions.statut_dynamique = 'en_retard' THEN 'en_retard' "
+            ."WHEN actions.statut_dynamique = 'a_risque' THEN 'a_risque' "
+            ."WHEN actions.statut_dynamique = 'en_avance' THEN 'en_avance' "
+            ."WHEN actions.statut_dynamique = 'suspendu' THEN 'suspendu' "
+            ."WHEN actions.statut_dynamique = 'annule' THEN 'annule' "
+            ."WHEN actions.statut_dynamique = 'non_demarre' THEN 'non_demarre' "
+            ."ELSE 'en_cours' END";
+
+        // NB: l'alias est `status_bucket` (et non `status_label`) car le modele
+        // Action expose un accessor `status_label` (cf. $appends) qui ecraserait
+        // la valeur SQL brute lors de l'hydratation Eloquent -> buckets vides.
         $statusRows = Action::query()
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
-            ->selectRaw("{$unitColumn} as unit_id, actions.statut_dynamique as status_label, COUNT(*) as total")
-            ->groupBy($unitColumn, 'actions.statut_dynamique');
+            ->selectRaw("{$unitColumn} as unit_id, {$bucketExpr} as status_bucket, COUNT(*) as total")
+            ->groupByRaw("{$unitColumn}, {$bucketExpr}");
         $this->scopeJoinedPta($statusRows, $user, 'ptas.direction_id', 'ptas.service_id');
 
         $statusMatrix = [];
@@ -1553,7 +1572,7 @@ class ReportingAnalyticsService
             if ($unitId <= 0) {
                 continue;
             }
-            $status = trim((string) ($row->status_label ?? 'inconnu'));
+            $status = trim((string) ($row->status_bucket ?? 'inconnu'));
             if ($status === '') {
                 $status = 'inconnu';
             }
@@ -1577,18 +1596,42 @@ class ReportingAnalyticsService
         }
 
         $statusLabels = array_map(fn (int $id): string => $unitNames[$id] ?? ('#'.$id), $unitIds);
-        $statusNames = array_slice(array_keys($statusTotals), 0, 6);
+
+        // A41 — Ordre, libelles et filtres alignes sur les buckets dashboardStatus().
+        // Plus de plafond a 6 : on affiche tous les buckets presents (max 9), dans
+        // l'ordre canonique du dashboard, avec des libelles lisibles.
+        $statusOrder = ['a_parametrer', 'en_avance', 'en_cours', 'a_risque', 'en_retard', 'suspendu', 'annule', 'non_demarre', 'acheve'];
+        $statusLabelMap = [
+            'a_parametrer' => 'À paramétrer',
+            'en_avance' => 'En avance',
+            'en_cours' => 'En cours',
+            'a_risque' => 'À surveiller',
+            'en_retard' => 'En retard',
+            'suspendu' => 'Suspendu',
+            'annule' => 'Annulé',
+            'non_demarre' => 'Non démarré',
+            'acheve' => 'Achevé',
+        ];
+        // Le bucket 'acheve' se filtre via 'achevees' cote index actions (cf.
+        // ActionWebController::applyStatusFilter) ; les autres correspondent
+        // directement a la valeur de statut_dynamique / statut_parametrage.
+        $statusFilterMap = ['acheve' => 'achevees'];
+
+        $statusNames = array_values(array_filter(
+            $statusOrder,
+            fn (string $status): bool => array_key_exists($status, $statusTotals)
+        ));
         $statusDatasets = [];
         $statusUrls = [];
         foreach ($statusNames as $statusName) {
             $statusDatasets[] = [
-                'label' => $statusName,
+                'label' => $statusLabelMap[$statusName] ?? $statusName,
                 'data' => array_map(fn (int $unitId): int => (int) ($statusMatrix[$statusName][$unitId] ?? 0), $unitIds),
             ];
             $statusUrls[] = array_map(
                 fn (int $unitId): string => $this->actionIndexRoute([
                     $unitFilterKey => $unitId,
-                    'statut' => $statusName,
+                    'statut' => $statusFilterMap[$statusName] ?? $statusName,
                 ]),
                 $unitIds
             );

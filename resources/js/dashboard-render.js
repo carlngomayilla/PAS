@@ -279,14 +279,35 @@ function bootDashboardRender(force = false) {
   }
 
   function colorForStatus(label, index) {
-    const status = String(label || '').toLowerCase();
+    // Normalise + retire les accents pour matcher aussi bien les codes bruts
+    // (acheve_dans_delai) que les libelles lisibles (Achevé, À paramétrer…).
+    const status = String(label || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    if (status.includes('parametr')) {
+      return '#A855F7';
+    }
 
     if (status.includes('retard')) {
       return ANBG.danger;
     }
 
-    if (status.includes('avance') || status.includes('valide') || status.includes('acheve')) {
+    if (status.includes('risque') || status.includes('surveiller')) {
+      return ANBG.warning;
+    }
+
+    if (status.includes('avance') || status.includes('valide') || status.includes('acheve') || status.includes('cloture')) {
       return ANBG.success;
+    }
+
+    if (status.includes('suspendu')) {
+      return '#7C3AED';
+    }
+
+    if (status.includes('annul')) {
+      return '#475569';
     }
 
     if (status.includes('non') || status.includes('rejet')) {
