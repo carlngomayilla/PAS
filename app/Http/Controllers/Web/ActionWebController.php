@@ -74,9 +74,8 @@ class ActionWebController extends Controller
             ->withCount([
                 'kpis',
                 'justificatifs as justificatifs_total',
-                'weeks as semaines_total',
-                'weeks as semaines_renseignees' => fn (Builder $q) => $q->where('est_renseignee', true),
             ]);
+        $this->addLegacyWeekCounters($query);
 
         $viewMode = $this->applyActionFilters($query, $request, $user);
 
@@ -146,6 +145,33 @@ class ActionWebController extends Controller
                 'per_page' => $perPage,
                 'sort' => $sort,
             ],
+        ]);
+    }
+
+    /** Ajoute les compteurs herites du suivi hebdomadaire supprime. */
+    private function addLegacyWeekCounters(Builder $query): void
+    {
+        if (! Schema::hasTable('action_weeks')) {
+            $query->addSelect([
+                'semaines_total' => DB::raw('0'),
+                'semaines_renseignees' => DB::raw('0'),
+            ]);
+
+            return;
+        }
+
+        $query->addSelect([
+            'semaines_total' => DB::table('action_weeks')
+                ->selectRaw('count(*)')
+                ->whereColumn('action_weeks.action_id', 'actions.id'),
+            'semaines_renseignees' => DB::table('action_weeks')
+                ->selectRaw('count(*)')
+                ->whereColumn('action_weeks.action_id', 'actions.id')
+                ->when(
+                    Schema::hasColumn('action_weeks', 'est_renseignee'),
+                    fn ($weekQuery) => $weekQuery->where('est_renseignee', true),
+                    fn ($weekQuery) => $weekQuery->whereRaw('1 = 0')
+                ),
         ]);
     }
 
