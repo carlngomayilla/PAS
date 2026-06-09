@@ -23,6 +23,10 @@ class AlertCenterService
 
     private const CACHE_TTL_SECONDS = 60;
 
+    // A40 — Une action importee qui reste "a_parametrer" au-dela de ce delai
+    // passe d'info a warning pour relancer le chef de service.
+    private const PENDING_SETUP_WARNING_DAYS = 7;
+
     public function __construct(
         private readonly AlertRoutingService $alertRoutingService,
         private readonly DynamicReferentialSettings $dynamicReferentialSettings
@@ -97,6 +101,7 @@ class AlertCenterService
             now()->addSeconds(self::CACHE_TTL_SECONDS),
             fn (): ?array => match ($type) {
                 'action_overdue' => $this->findOverdueActionItem($user, $id),
+                'action_pending_setup' => $this->findPendingSetupItem($user, $id),
                 'kpi_breach' => $this->findKpiItem($user, $id),
                 'action_log' => $this->findActionLogItem($user, $id),
                 'missing_pao_coverage' => $this->findMissingPaoCoverageItem($user, $id),
@@ -161,6 +166,40 @@ class AlertCenterService
         return $query
             ->get()
             ->map(fn (Action $action): array => $this->mapOverdueAction($action));
+    }
+
+    /**
+     * A40 — Actions importees encore "a_parametrer" : elles ne sont pas encore
+     * affectees a l'agent (le RMO n'est notifie qu'a la bascule vers 'parametre',
+     * cf. PtaWebController::syncPtaActions). On les remonte au chef de service /
+     * direction / profils globaux pour relancer le parametrage.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildPendingSetupItems(User $user, ?int $limit): Collection
+    {
+        if (! $this->canSeePendingSetup($user)) {
+            return collect();
+        }
+
+        $query = Action::query()
+            ->with([
+                'pta:id,direction_id,service_id,titre',
+                'pta.direction:id,code,libelle',
+                'pta.service:id,code,libelle',
+            ])
+            ->where('statut_parametrage', 'a_parametrer');
+
+        $this->scopeAction($query, $user);
+
+        $query->orderBy('created_at');
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        return $query
+            ->get()
+            ->map(fn (Action $action): array => $this->mapPendingSetupAction($action));
     }
 
     /**
@@ -334,6 +373,7 @@ class AlertCenterService
     {
         $items = collect()
             ->merge($this->buildOverdueActionItems($user, $limit))
+            ->merge($this->buildPendingSetupItems($user, $limit))
             ->merge($this->buildKpiItems($user, $limit))
             ->merge($this->buildActionLogItems($user, $limit))
             ->merge($this->buildMissingPaoCoverageItems($user, $limit))
@@ -390,6 +430,37 @@ class AlertCenterService
         $action = $query->first();
 
         return $action instanceof Action ? $this->mapOverdueAction($action) : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function findPendingSetupItem(User $user, int $id): ?array
+    {
+        if (! $this->canSeePendingSetup($user)) {
+            return null;
+        }
+
+        $query = Action::query()
+            ->with([
+                'pta:id,direction_id,service_id,titre',
+                'pta.direction:id,code,libelle',
+                'pta.service:id,code,libelle',
+            ])
+            ->whereKey($id)
+            ->where('statut_parametrage', 'a_parametrer');
+
+        $this->scopeAction($query, $user);
+
+        $action = $query->first();
+
+        return $action instanceof Action ? $this->mapPendingSetupAction($action) : null;
+    }
+
+    private function canSeePendingSetup(User $user): bool
+    {
+        return $user->hasGlobalReadAccess()
+            || $user->hasRole(User::ROLE_DIRECTION, User::ROLE_SERVICE);
     }
 
     /**
@@ -575,6 +646,49 @@ class AlertCenterService
             'section_label' => 'Statut et avancement',
             'target_url' => route('workspace.actions.suivi', $action).'#action-status',
             'fingerprint' => 'action_overdue:'.$action->id.':'.$deadline->format('Ymd').':'.$type,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapPendingSetupAction(Action $action): array
+    {
+        $createdAt = $action->created_at ? Carbon::parse($action->created_at) : Carbon::today();
+        $daysWaiting = max(0, $createdAt->diffInDays(Carbon::today()));
+        $level = $daysWaiting >= self::PENDING_SETUP_WARNING_DAYS ? 'warning' : 'info';
+        $serviceId = (int) ($action->pta?->service_id ?? 0);
+
+        return [
+            'source_type' => 'action_pending_setup',
+            'source_id' => (int) $action->id,
+            'module' => 'pta',
+            'niveau' => $level,
+            'niveau_label' => $this->levelLabel($level),
+            'type' => 'action_a_parametrer',
+            'type_label' => $this->typeLabel('action_a_parametrer'),
+            'titre' => 'Action importee a parametrer',
+            'message' => sprintf(
+                'L action "%s" est importee depuis %d jour(s) et attend son parametrage dans le PTA avant affectation a l agent.',
+                (string) $action->libelle,
+                $daysWaiting
+            ),
+            'date' => $createdAt->toIso8601String(),
+            'date_label' => $createdAt->format('d/m/Y'),
+            'sort_timestamp' => $createdAt->timestamp,
+            'direction' => $this->directionLabel($action->pta?->direction),
+            'service' => $this->serviceLabel($action->pta?->service),
+            'action' => [
+                'id' => (int) $action->id,
+                'libelle' => (string) $action->libelle,
+                'pta' => (string) ($action->pta?->titre ?? '-'),
+            ],
+            'metrics' => null,
+            'section_label' => 'Parametrage PTA',
+            'target_url' => $serviceId > 0
+                ? route('workspace.pta.index', ['service_id' => $serviceId])
+                : route('workspace.pta.index'),
+            'fingerprint' => 'action_pending_setup:'.$action->id.':'.$createdAt->format('Ymd'),
         ];
     }
 
@@ -841,6 +955,7 @@ class AlertCenterService
     {
         return match ($type) {
             'retard' => 'Retard',
+            'action_a_parametrer' => 'A parametrer',
             'action_a_surveiller' => 'A surveiller',
             'action_non_demarre' => 'Non demarree',
             'alerte_combinee_critique' => 'Escalade DG',

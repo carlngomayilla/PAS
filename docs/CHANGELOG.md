@@ -5,6 +5,69 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-09 — Reporting : graphique des statuts aligné sur le dashboard
+
+### Demande
+
+Des statuts manquaient dans les graphiques. Le graphe reporting « Statuts empilés
+par unité » comptait sur `statut_dynamique` brut (11 codes), ce qui : (1) **excluait
+totalement « À paramétrer »** (porté par `statut_parametrage`), (2) **plafonnait à 6
+statuts** (`array_slice(…, 0, 6)`) — les plus rares (`suspendu`, `annulé`, `cloturee`…)
+disparaissaient, (3) affichait des **codes bruts** illisibles, incohérents avec le
+dashboard.
+
+### Modification
+
+Alignement du graphe reporting sur les **9 buckets `dashboardStatus()`** :
+- regroupement SQL (CASE) en buckets, avec `a_parametrer` prioritaire via
+  `statut_parametrage` ;
+- suppression du plafond de 6 → tous les buckets présents (max 9), dans l'ordre
+  canonique du dashboard ;
+- libellés lisibles + URL de filtrage correcte (`acheve` → `achevees`) ;
+- `colorForStatus` (JS) rendu insensible aux accents et étendu aux buckets
+  `a_parametrer` / `a_risque` / `suspendu` / `annule`.
+
+Fichiers : `app/Services/Analytics/ReportingAnalyticsService.php`,
+`resources/js/dashboard-render.js`.
+
+### Correction connexe (collision d'alias)
+
+La requête agrégée utilisait l'alias SQL `status_label`, qui **entre en collision
+avec l'accessor `Action::getStatusLabelAttribute()`** (déclaré dans `$appends`) :
+lors de l'hydratation Eloquent, l'accessor écrasait la valeur SQL brute, vidant
+tous les buckets (0 dataset). Alias renommé en `status_bucket`. Vérifié en local
+(migrate + seed + jeu de 11 statuts bruts) : les 9 buckets s'affichent dans l'ordre
+canonique avec les bons libellés (« En cours » et « Achevé » regroupent bien 2
+statuts bruts chacun).
+
+---
+
+## 2026-06-09 — Centre d'alertes : action importée « à paramétrer »
+
+### Demande
+
+Les actions importées qui restent `statut_parametrage = 'a_parametrer'` ne sont pas
+encore affectées à l'agent (le RMO n'est notifié qu'à la bascule vers `parametre`,
+cf. `PtaWebController::syncPtaActions`). Aucune alerte ne relançait le chef de service
+pour les paramétrer : seule la carte dashboard « À paramétrer » les signalait.
+
+### Modification
+
+Ajout d'une nouvelle source d'alerte `action_pending_setup` (type `action_a_parametrer`)
+dans `AlertCenterService`. Elle remonte au **chef de service / direction / profils à
+lecture globale** (pas aux agents simples — l'action ne leur est pas encore affectée),
+en respectant le périmètre direction/service. Niveau `info`, escaladé en `warning`
+au-delà de `PENDING_SETUP_WARNING_DAYS` (7 jours) sans paramétrage — sert de relance.
+
+Fichiers : `app/Services/Alerting/AlertCenterService.php`.
+
+```php
+// Escalade info -> warning apres 7 jours sans parametrage
+$level = $daysWaiting >= self::PENDING_SETUP_WARNING_DAYS ? 'warning' : 'info';
+```
+
+---
+
 ## 2026-06-05 — Contraintes PostgreSQL : statuts applicatifs complets
 
 ### Correction
