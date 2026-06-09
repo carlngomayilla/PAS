@@ -235,10 +235,13 @@ class RetentionService
     private function notificationCandidates()
     {
         $cutoff = Carbon::today()->subDays((int) config('retention.notifications_days', 365));
+        $notificationId = DB::connection()->getDriverName() === 'pgsql'
+            ? DB::raw('notifications.id::text')
+            : 'notifications.id';
 
         return DB::table('notifications')
             ->where('created_at', '<=', $cutoff)
-            ->whereNotIn(DB::raw('notifications.id::text'), function ($query): void {
+            ->whereNotIn($notificationId, function ($query): void {
                 $query->select('scope_label')
                     ->from('data_archives')
                     ->where('source_table', 'notifications')

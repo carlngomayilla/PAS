@@ -97,6 +97,82 @@ function bootDashboardRender(force = false) {
     },
   };
 
+  // Crosshair vertical au survol (opt-in via options.plugins.anbgCrosshair.enabled).
+  const crosshairPlugin = {
+    id: 'anbgCrosshair',
+    afterDraw(chart, _args, options) {
+      if (!options || options.enabled !== true || !chart.chartArea) {
+        return;
+      }
+
+      const active = (chart.tooltip && typeof chart.tooltip.getActiveElements === 'function')
+        ? chart.tooltip.getActiveElements()
+        : [];
+
+      if (!active.length) {
+        return;
+      }
+
+      const x = active[0].element?.x;
+      if (!Number.isFinite(x)) {
+        return;
+      }
+
+      const { ctx, chartArea } = chart;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = options.color || 'rgba(57,150,211,0.40)';
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.restore();
+    },
+  };
+
+  // Ombre douce sous les barres (opt-in via options.plugins.anbgBarShadow.enabled).
+  const barShadowPlugin = {
+    id: 'anbgBarShadow',
+    beforeDatasetDraw(chart, args, options) {
+      if (!options || options.enabled !== true || args?.meta?.type !== 'bar') {
+        return;
+      }
+      const { ctx } = chart;
+      ctx.save();
+      ctx.shadowColor = options.color || 'rgba(28,32,61,0.16)';
+      ctx.shadowBlur = options.blur || 10;
+      ctx.shadowOffsetY = options.offsetY || 4;
+    },
+    afterDatasetDraw(chart, args, options) {
+      if (!options || options.enabled !== true || args?.meta?.type !== 'bar') {
+        return;
+      }
+      chart.ctx.restore();
+    },
+  };
+
+  // Graduations 0 / 100 sous l'arc des demi-jauges (opt-in via anbgGaugeTicks.enabled).
+  const gaugeTicksPlugin = {
+    id: 'anbgGaugeTicks',
+    afterDraw(chart, _args, options) {
+      if (!options || options.enabled !== true || !chart.chartArea) {
+        return;
+      }
+      const { ctx, chartArea } = chart;
+      const baseY = chartArea.top + chartArea.height * 0.80;
+      ctx.save();
+      ctx.fillStyle = options.color || '#94a3b8';
+      ctx.font = '700 9px Manrope, ui-sans-serif, system-ui, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillText('0', chartArea.left + 4, baseY);
+      ctx.textAlign = 'right';
+      ctx.fillText('100', chartArea.right - 4, baseY);
+      ctx.restore();
+    },
+  };
+
   function isObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
@@ -305,21 +381,110 @@ function bootDashboardRender(force = false) {
   }
 
   function ensurePlugins() {
-    if (
-      typeof window.Chart !== 'undefined' &&
-      window.Chart.registry?.plugins?.get &&
-      !window.Chart.registry.plugins.get('anbgCenterText')
-    ) {
-      window.Chart.register(centerTextPlugin);
+    if (typeof window.Chart === 'undefined' || !window.Chart.registry?.plugins?.get) {
+      return;
+    }
+
+    [centerTextPlugin, crosshairPlugin, barShadowPlugin, gaugeTicksPlugin].forEach((plugin) => {
+      if (!window.Chart.registry.plugins.get(plugin.id)) {
+        window.Chart.register(plugin);
+      }
+    });
+  }
+
+  // Plugins optionnels (value-labels + lignes de seuil) — chargés une seule fois.
+  let optionalPluginsRegistered = false;
+  async function registerOptionalChartPlugins() {
+    const Chart = window.Chart;
+    if (!Chart || typeof Chart.register !== 'function' || optionalPluginsRegistered) {
+      return;
+    }
+
+    try {
+      const [dataLabelsMod, annotationMod] = await Promise.all([
+        import('chartjs-plugin-datalabels'),
+        import('chartjs-plugin-annotation'),
+      ]);
+
+      const dataLabels = dataLabelsMod?.default || dataLabelsMod;
+      const annotation = annotationMod?.default || annotationMod;
+
+      if (dataLabels && !Chart.registry.plugins.get('datalabels')) {
+        Chart.register(dataLabels);
+        // Désactivé globalement : activé au cas par cas via barDataLabels().
+        Chart.defaults.set('plugins.datalabels', { display: false });
+      }
+
+      if (annotation && !Chart.registry.plugins.get('annotation')) {
+        Chart.register(annotation);
+      }
+
+      optionalPluginsRegistered = true;
+    } catch (error) {
+      console.error('Plugins graphiques optionnels indisponibles.', error);
     }
   }
 
-  function kpiAnnotations() {
-    return {};
+  // Ligne de seuil qualité (annotation) — pour les graphiques à échelle 0-100.
+  function kpiAnnotations(threshold = 60) {
+    if (typeof window.Chart === 'undefined' || !window.Chart.registry?.plugins?.get('annotation')) {
+      return {};
+    }
+
+    return {
+      annotation: {
+        clip: false,
+        annotations: {
+          seuilQualite: {
+            type: 'line',
+            yMin: threshold,
+            yMax: threshold,
+            borderColor: alphaColor(ANBG.warning, 0.85),
+            borderWidth: 1.5,
+            borderDash: [6, 5],
+            label: {
+              display: true,
+              content: `Seuil qualité ${threshold}`,
+              position: 'end',
+              backgroundColor: alphaColor(ANBG.warning, 0.92),
+              color: '#1c203d',
+              font: { size: 10, weight: '700' },
+              padding: { x: 6, y: 3 },
+              borderRadius: 6,
+            },
+          },
+        },
+      },
+    };
   }
 
   function barDataLabels(formatFn) {
-    return false;
+    if (typeof window.Chart === 'undefined' || !window.Chart.registry?.plugins?.get('datalabels')) {
+      return false;
+    }
+
+    const theme = dashboardTheme();
+
+    return {
+      display(context) {
+        const value = Number(context.dataset?.data?.[context.dataIndex] ?? 0);
+        return Number.isFinite(value) && value > 0;
+      },
+      anchor: 'end',
+      align: 'end',
+      offset: 2,
+      clamp: true,
+      clip: false,
+      color: theme.emphasis || theme.text,
+      font: { size: 10, weight: '800' },
+      formatter(value) {
+        const numeric = Number(value);
+        if (typeof formatFn === 'function') {
+          return formatFn(numeric);
+        }
+        return Number.isFinite(numeric) ? formatNumber(numeric) : '';
+      },
+    };
   }
 
   function destroyChart(id) {
@@ -328,6 +493,54 @@ function bootDashboardRender(force = false) {
     }
 
     delete chartInstances[id];
+  }
+
+  function prefersReducedMotion() {
+    return typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  // Table de données masquée (lecteurs d'écran) — Chart.js n'expose rien d'accessible.
+  function appendChartA11yTable(host, config, id) {
+    try {
+      const data = config && config.data;
+      const labels = (data && Array.isArray(data.labels)) ? data.labels : [];
+      const datasets = (data && Array.isArray(data.datasets)) ? data.datasets : [];
+
+      if (labels.length === 0 || datasets.length === 0) {
+        return;
+      }
+
+      const esc = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const head = ['<th scope="col">Libellé</th>']
+        .concat(datasets.map((ds) => `<th scope="col">${esc(ds.label || 'Valeur')}</th>`))
+        .join('');
+
+      const body = labels.map((label, rowIndex) => {
+        const cells = datasets.map((ds) => {
+          const value = Array.isArray(ds.data) ? ds.data[rowIndex] : '';
+          const num = (value && typeof value === 'object') ? (value.y ?? value.v ?? value.value ?? '') : value;
+          return `<td>${esc(num)}</td>`;
+        }).join('');
+        return `<tr><th scope="row">${esc(label)}</th>${cells}</tr>`;
+      }).join('');
+
+      const table = document.createElement('table');
+      table.className = 'chart-a11y-table';
+      table.innerHTML = `<caption>Données du graphique</caption><thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
+      host.appendChild(table);
+
+      const canvas = host.querySelector('canvas');
+      if (canvas) {
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-hidden', 'true');
+      }
+    } catch (error) {
+      // Une table manquante ne doit jamais casser le rendu du graphique.
+      console.debug('Table accessible non générée pour', id, error);
+    }
   }
 
   function rememberHostFallback(host) {
@@ -543,6 +756,7 @@ function bootDashboardRender(force = false) {
     }
 
     host.dataset.chartState = 'ready';
+    appendChartA11yTable(host, config, id);
     bindChartDrilldown(chartInstances[id], drilldownResolver);
 
     // Inject export button into the closest showcase-panel header
@@ -595,6 +809,8 @@ function bootDashboardRender(force = false) {
         window.getAnbgChartTheme = chartTheme.getAnbgChartTheme;
         window.applyAnbgChartDefaults = chartTheme.applyAnbgChartDefaults;
       }
+
+      await registerOptionalChartPlugins();
     } catch (error) {
       console.error('Impossible de preparer Chart.js.', error);
     }
@@ -662,6 +878,8 @@ function bootDashboardRender(force = false) {
             window.Chart = Chart;
             window.getAnbgChartTheme = chartTheme.getAnbgChartTheme;
             window.applyAnbgChartDefaults = chartTheme.applyAnbgChartDefaults;
+
+            await registerOptionalChartPlugins();
 
             if (d3Module) {
               window.d3 = d3Module;
@@ -821,7 +1039,7 @@ function bootDashboardRender(force = false) {
             left: 4,
           },
         },
-        animation: {
+        animation: prefersReducedMotion() ? false : {
           duration: 600,
           easing: 'easeOutCubic',
           delay(context) {
@@ -953,6 +1171,20 @@ function bootDashboardRender(force = false) {
     }, extra || {});
   }
 
+  // Échelles pour graphiques en pourcentage (axe Y 0-100, ticks suffixés « % »).
+  function percentScales(extra) {
+    return cartesianScales(mergeObjects({
+      y: {
+        max: 100,
+        ticks: {
+          callback(value) {
+            return `${value} %`;
+          },
+        },
+      },
+    }, extra || {}));
+  }
+
   function mountGauge(id, label, value, href = '') {
     const theme = dashboardTheme();
     const numeric = Math.max(0, Math.min(100, finiteNumber(value, 0)));
@@ -978,6 +1210,7 @@ function bootDashboardRender(force = false) {
         cutout: '78%',
         plugins: {
           legend: { display: false },
+          anbgGaugeTicks: { enabled: true },
           tooltip: {
             filter: (item) => item.dataIndex === 0,
             callbacks: {
@@ -1217,6 +1450,16 @@ function bootDashboardRender(force = false) {
       .attr('viewBox', `0 0 ${width} ${height}`)
       .attr('preserveAspectRatio', 'xMidYMid meet');
 
+    // Tooltip glass au survol (cohérent avec les tooltips Chart.js).
+    d3.select(host).style('position', 'relative');
+    const ganttTooltip = d3.select(host)
+      .append('div')
+      .attr('class', 'dashboard-gantt-tooltip')
+      .style('opacity', 0);
+    const fmtGanttDate = d3.timeFormat('%d/%m/%Y');
+    const escHtml = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
     const axis = d3.axisTop(x)
       .ticks(meta.axisTicks || d3.timeMonth.every(1))
       .tickFormat(meta.tickFormat || d3.timeFormat('%b'));
@@ -1246,6 +1489,25 @@ function bootDashboardRender(force = false) {
       .attr('transform', (_item, index) => `translate(0,${index * rowHeight})`)
       .each(function drawRow(item) {
         const group = d3.select(this);
+
+        const planFill = (typeof item.color === 'string' && item.color.charAt(0) === '#')
+          ? alphaColor(item.color, 0.20)
+          : item.color;
+
+        group
+          .on('mousemove', (event) => {
+            const [mx, my] = d3.pointer(event, host);
+            ganttTooltip
+              .style('opacity', 1)
+              .style('left', `${mx + 14}px`)
+              .style('top', `${my + 12}px`)
+              .html(
+                `<div class="ggt-title">${escHtml(item.label)}</div>`
+                + `<div class="ggt-row">${fmtGanttDate(item.start)} &rarr; ${fmtGanttDate(item.end)}</div>`
+                + `<div class="ggt-row">Avancement : <b>${Math.round(item.progress)} %</b></div>`
+              );
+          })
+          .on('mouseleave', () => ganttTooltip.style('opacity', 0));
 
         if (item.url) {
           group.style('cursor', 'pointer').on('click', () => {
@@ -1290,7 +1552,7 @@ function bootDashboardRender(force = false) {
           .attr('ry', 999)
           .attr('width', widthValue)
           .attr('height', 16)
-          .attr('fill', item.color);
+          .attr('fill', planFill);
 
         group.append('rect')
           .attr('class', 'dashboard-gantt-real')
@@ -1351,6 +1613,7 @@ function bootDashboardRender(force = false) {
 
   function mountStatusDonut(hostId = 'dashboard-status-mix-chart', cards = statusCards, total = (payload.totals && payload.totals.actions_total) || 0) {
     const theme = dashboardTheme();
+    const resolvedTotal = total || cards.reduce((sum, item) => sum + Number(item.count || 0), 0);
 
     mountChart(hostId, baseConfig('doughnut', {
       data: {
@@ -1367,10 +1630,11 @@ function bootDashboardRender(force = false) {
       options: {
         cutout: '74%',
         plugins: {
+          legend: { position: 'right' },
           anbgCenterText: {
             lines: [
               {
-                text: String(total || 0),
+                text: String(resolvedTotal || 0),
                 color: theme.emphasis,
                 font: '800 28px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
                 offsetY: -8,
@@ -1416,8 +1680,9 @@ function bootDashboardRender(force = false) {
         })),
       },
       options: {
-        scales: cartesianScales({ y: { max: 100 } }),
+        scales: percentScales(),
         plugins: {
+          anbgCrosshair: { enabled: true },
           ...kpiAnnotations(),
           tooltip: {
             callbacks: {
@@ -1485,21 +1750,20 @@ function bootDashboardRender(force = false) {
             label: 'Indicateur KPI moyen',
             data: unitRows.map((item) => Number(item.kpi_global || 0)),
             backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
-            borderRadius: 10,
             maxBarThickness: 34,
           },
           {
             label: 'Progression moyenne',
             data: unitRows.map((item) => Number(item.progression_moyenne || 0)),
             backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
-            borderRadius: 10,
             maxBarThickness: 34,
           },
         ],
       },
       options: {
-        scales: cartesianScales({ y: { max: 100 } }),
+        scales: percentScales(),
         plugins: {
+          anbgBarShadow: { enabled: true },
           datalabels: barDataLabels(percentLabel),
           ...kpiAnnotations(),
           tooltip: {
@@ -1535,7 +1799,6 @@ function bootDashboardRender(force = false) {
           backgroundColor: alphaColor(colorForStatus(dataset.label, index), 0.86),
           borderColor: colorForStatus(dataset.label, index),
           borderWidth: 1,
-          borderRadius: 6,
           maxBarThickness: 28,
           stack: 'statuses',
         })),
@@ -1587,8 +1850,9 @@ function bootDashboardRender(force = false) {
           ],
         },
         options: {
-          scales: cartesianScales({ y: { max: 100 } }),
+          scales: percentScales(),
           plugins: {
+            anbgCrosshair: { enabled: true },
             ...kpiAnnotations(),
             tooltip: {
               callbacks: {
@@ -1635,7 +1899,6 @@ function bootDashboardRender(force = false) {
               label: 'Valeur',
               data: data.valeurs,
               backgroundColor: (context) => barGradient(context.chart, ANBG.secondary),
-              borderRadius: 9,
               maxBarThickness: 32,
             },
             {
@@ -1669,8 +1932,12 @@ function bootDashboardRender(force = false) {
           ],
         },
         options: {
-          scales: cartesianScales({ y: { max: 100 } }),
-          plugins: { ...kpiAnnotations() },
+          scales: percentScales(),
+          plugins: {
+            anbgCrosshair: { enabled: true },
+            anbgBarShadow: { enabled: true },
+            ...kpiAnnotations(),
+          },
         },
       });
     }
@@ -1739,6 +2006,7 @@ function bootDashboardRender(force = false) {
           bindPeriodButtons('[data-period-chart="kpi-line"]', (n) => mountMonthlyKpiLine('dashboard-kpi-line-chart', monthly, n));
         });
         safeRenderStep('unit summary', mountUnitSummary);
+        safeRenderStep('status donut', () => mountStatusDonut('dashboard-status-mix-chart', statusCards, (payload.totals && payload.totals.actions_total) || 0));
         safeRenderStep('reporting charts', mountReportingCharts);
       }
 

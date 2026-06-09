@@ -195,6 +195,36 @@
             })
             ->implode(' ');
     };
+    // Lisse une suite de points "x,y x,y …" en courbe Bézier (Catmull-Rom).
+    // Retourne le corps du path SANS préfixe (ni M ni L) pour être réutilisable
+    // en ligne (M {body}) comme en aire (M base L {body} L base Z).
+    $smoothPath = static function (string $points): string {
+        $pairs = [];
+        foreach (preg_split('/\s+/', trim($points)) as $pt) {
+            if ($pt === '') { continue; }
+            $xy = explode(',', $pt);
+            if (count($xy) !== 2) { continue; }
+            $pairs[] = [(float) $xy[0], (float) $xy[1]];
+        }
+        $n = count($pairs);
+        if ($n === 0) { return ''; }
+        $fmt = static fn (float $v): string => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+        if ($n === 1) { return $fmt($pairs[0][0]).','.$fmt($pairs[0][1]); }
+        $t = 0.18;
+        $d = $fmt($pairs[0][0]).','.$fmt($pairs[0][1]);
+        for ($i = 0; $i < $n - 1; $i++) {
+            $p0 = $pairs[$i === 0 ? 0 : $i - 1];
+            $p1 = $pairs[$i];
+            $p2 = $pairs[$i + 1];
+            $p3 = $pairs[$i + 2 < $n ? $i + 2 : $n - 1];
+            $c1x = $p1[0] + ($p2[0] - $p0[0]) * $t;
+            $c1y = $p1[1] + ($p2[1] - $p0[1]) * $t;
+            $c2x = $p2[0] - ($p3[0] - $p1[0]) * $t;
+            $c2y = $p2[1] - ($p3[1] - $p1[1]) * $t;
+            $d .= ' C '.$fmt($c1x).','.$fmt($c1y).' '.$fmt($c2x).','.$fmt($c2y).' '.$fmt($p2[0]).','.$fmt($p2[1]);
+        }
+        return $d;
+    };
     $unitFallbackRows = collect($unitRows)->values();
     $actionStatusCounts = (array) ($metrics['status_breakdown']['actions'] ?? []);
     $actionValidationCounts = (array) ($metrics['status_breakdown']['actions_validation'] ?? []);

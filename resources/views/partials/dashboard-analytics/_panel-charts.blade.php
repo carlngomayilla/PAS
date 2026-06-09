@@ -81,8 +81,8 @@
                     <svg class="min-w-[520px]" viewBox="0 0 360 150" role="img" aria-label="Courbes trimestrielles">
                         <line x1="24" y1="118" x2="336" y2="118" stroke="#d8ecf8" stroke-width="1" />
                         <line x1="24" y1="28" x2="336" y2="28" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
-                        <polyline points="{{ $executionCurvePoints }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                        <polyline points="{{ $scoreCurvePoints }}" fill="none" stroke="#8FC043" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M {{ $smoothPath($executionCurvePoints) }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M {{ $smoothPath($scoreCurvePoints) }}" fill="none" stroke="#8FC043" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
                         @foreach ($curveRows as $row)
                             @php
                                 $x = 24 + (($loop->index * 312) / $curveSteps);
@@ -146,7 +146,7 @@
             @if ($monthlyOfficial !== [])
                 <div class="charts-hero-sparkline" aria-hidden="true">
                     <svg viewBox="0 0 200 40" preserveAspectRatio="none">
-                        <polyline points="{{ $chartFallbackPoints($monthlyOfficial, 'global') }}" fill="none" stroke="{{ $scoreTone }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
+                        <path d="M {{ $smoothPath($chartFallbackPoints($monthlyOfficial, 'global')) }}" fill="none" stroke="{{ $scoreTone }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
                     </svg>
                 </div>
             @endif
@@ -204,8 +204,8 @@
                                 <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
                                 <line x1="20" y1="84" x2="340" y2="84" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="3 4" opacity="0.6" />
                                 <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
-                                <polygon points="20,120 {{ $chartFallbackPoints($monthlyOfficial, 'global') }} 340,120" fill="url(#charts-area-grad)" />
-                                <polyline points="{{ $chartFallbackPoints($monthlyOfficial, 'global') }}" fill="none" stroke="#3996D3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M 20,120 L {{ $smoothPath($chartFallbackPoints($monthlyOfficial, 'global')) }} L 340,120 Z" fill="url(#charts-area-grad)" />
+                                <path d="M {{ $smoothPath($chartFallbackPoints($monthlyOfficial, 'global')) }}" fill="none" stroke="#3996D3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
                                 @foreach (collect($monthlyOfficial)->values() as $row)
                                     @php
                                         $x = 20 + (($loop->index * 320) / max(1, count($monthlyOfficial) - 1));
@@ -215,7 +215,7 @@
                                 @endforeach
                             </svg>
                         @else
-                            <div class="dashboard-chart-empty">Aucune donnée disponible pour ce graphique.</div>
+                            <x-ui.empty-state title="Aucune donnée" message="Les données apparaîtront dès que des actions seront enregistrées." icon="chart" tone="info" />
                         @endif
                     </div>
                 </div>
@@ -228,22 +228,28 @@
                 <span class="showcase-chip">{{ collect($statusCards)->sum('count') }} actions</span>
             </div>
             @if (! empty($statusCards) && collect($statusCards)->sum('count') > 0)
-                <div class="charts-status-grid">
-                    @foreach ($statusCards as $card)
-                        @php $cardTotal = collect($statusCards)->sum('count'); @endphp
-                        @php $cardPct = $cardTotal > 0 ? round(((float) $card['count'] / $cardTotal) * 100, 1) : 0; @endphp
-                        <div class="charts-status-item" style="--tone: {{ $card['color'] }};">
-                            <div class="charts-status-item-head">
-                                <span class="charts-status-dot" style="background: {{ $card['color'] }};"></span>
-                                <span class="charts-status-item-name">{{ $card['label'] }}</span>
-                                <span class="charts-status-item-count" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span>
+                <div class="dashboard-canvas">
+                    <div id="dashboard-status-mix-chart" class="dashboard-chart-host">
+                        <div class="dashboard-chart-fallback" aria-hidden="true">
+                            <div class="charts-status-grid">
+                                @foreach ($statusCards as $card)
+                                    @php $cardTotal = collect($statusCards)->sum('count'); @endphp
+                                    @php $cardPct = $cardTotal > 0 ? round(((float) $card['count'] / $cardTotal) * 100, 1) : 0; @endphp
+                                    <div class="charts-status-item" style="--tone: {{ $card['color'] }};">
+                                        <div class="charts-status-item-head">
+                                            <span class="charts-status-dot" style="background: {{ $card['color'] }};"></span>
+                                            <span class="charts-status-item-name">{{ $card['label'] }}</span>
+                                            <span class="charts-status-item-count" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span>
+                                        </div>
+                                        <div class="charts-status-item-track">
+                                            <div class="charts-status-item-fill" style="width: {{ $cardPct }}%; background: {{ $card['color'] }};"></div>
+                                        </div>
+                                        <span class="charts-status-item-pct">{{ number_format($cardPct, 1, ',', ' ') }}%</span>
+                                    </div>
+                                @endforeach
                             </div>
-                            <div class="charts-status-item-track">
-                                <div class="charts-status-item-fill" style="width: {{ $cardPct }}%; background: {{ $card['color'] }};"></div>
-                            </div>
-                            <span class="charts-status-item-pct">{{ number_format($cardPct, 1, ',', ' ') }}%</span>
                         </div>
-                    @endforeach
+                    </div>
                 </div>
             @else
                 <x-ui.empty-state title="Aucun statut à afficher" message="Importez des actions pour voir la répartition." icon="chart" tone="info" />
@@ -278,7 +284,7 @@
                                 @endforeach
                             </div>
                         @else
-                            <div class="dashboard-chart-empty">Aucune donnée disponible pour ce graphique.</div>
+                            <x-ui.empty-state title="Aucune donnée" message="Les données apparaîtront dès que des actions seront enregistrées." icon="chart" tone="info" />
                         @endif
                     </div>
                 </div>

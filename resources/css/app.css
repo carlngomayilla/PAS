@@ -106,6 +106,20 @@
         }
     }
 
+    /* Table de données accessible, injectée sous chaque canvas Chart.js.
+       Visuellement masquée mais lue par les lecteurs d'écran. */
+    .chart-a11y-table {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+
     /* ══════════════════════════════════════════════════════════════════════
        SKELETON LOADERS
        Usage: <div class="skeleton skeleton-text"></div>
@@ -3975,6 +3989,52 @@
     .dashboard-gantt-label,
     .dashboard-gantt-right {
         fill: var(--app-text);
+        font-weight: 800;
+    }
+
+    /* Rail de fond des barres Gantt (sans fill = noir par défaut). */
+    .dashboard-gantt-bg {
+        fill: rgba(148, 163, 184, 0.16);
+    }
+    html.dark .dashboard-gantt-bg {
+        fill: rgba(148, 163, 184, 0.12);
+    }
+
+    /* Repère « aujourd'hui ». */
+    .dashboard-gantt-today-line {
+        stroke: var(--app-blue, #3996d3);
+        stroke-width: 1.5;
+        stroke-dasharray: 4 4;
+        opacity: 0.7;
+    }
+
+    /* Tooltip glass au survol des lignes Gantt. */
+    .dashboard-gantt-tooltip {
+        position: absolute;
+        z-index: 30;
+        pointer-events: none;
+        max-width: 16rem;
+        padding: 0.55rem 0.7rem;
+        border-radius: 0.75rem;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        box-shadow: 0 14px 32px -12px rgba(15, 23, 42, 0.30);
+        color: var(--app-text);
+        font-size: 0.76rem;
+        line-height: 1.35;
+        transition: opacity 0.12s ease;
+    }
+    .dashboard-gantt-tooltip .ggt-title {
+        font-weight: 800;
+        margin-bottom: 0.2rem;
+        color: var(--app-text);
+    }
+    .dashboard-gantt-tooltip .ggt-row {
+        color: var(--app-muted);
+        font-weight: 600;
+    }
+    .dashboard-gantt-tooltip .ggt-row b {
+        color: var(--app-text);
         font-weight: 800;
     }
 

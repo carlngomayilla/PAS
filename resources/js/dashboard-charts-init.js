@@ -34,6 +34,25 @@ async function bootDashboardCharts() {
 
   Chart.register(...registerables);
 
+  // Plugins optionnels : value-labels (datalabels) + lignes de seuil (annotation).
+  try {
+    const [dataLabelsMod, annotationMod] = await Promise.all([
+      import('chartjs-plugin-datalabels'),
+      import('chartjs-plugin-annotation'),
+    ]);
+    const dataLabels = dataLabelsMod?.default || dataLabelsMod;
+    const annotation = annotationMod?.default || annotationMod;
+    if (dataLabels && !Chart.registry.plugins.get('datalabels')) {
+      Chart.register(dataLabels);
+      Chart.defaults.set('plugins.datalabels', { display: false });
+    }
+    if (annotation && !Chart.registry.plugins.get('annotation')) {
+      Chart.register(annotation);
+    }
+  } catch (error) {
+    console.error('Plugins graphiques optionnels indisponibles.', error);
+  }
+
   chartTheme.applyAnbgChartDefaults(Chart);
 
   window.Chart = Chart;
