@@ -7,7 +7,6 @@ use App\Models\DeletionRequest;
 use App\Models\Direction;
 use App\Models\Pao;
 use App\Models\Pas;
-use App\Models\PasAxe;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\SousAction;
@@ -44,9 +43,10 @@ class BusinessDeletionRequestWorkflowTest extends TestCase
             ])
             ->assertRedirect(route('workspace.pao.index'));
 
-        // PAO et son PTA enfant doivent etre soft-deletes immediatement (cascade).
-        $this->assertTrue((bool) $pao->fresh()->trashed(), 'Le PAO doit etre soft-delete par le SA.');
-        $this->assertTrue((bool) $pta->fresh()->trashed(), 'Le PTA enfant doit etre soft-delete en cascade.');
+        // PAO et son PTA enfant doivent etre supprimes definitivement pour
+        // liberer les contraintes uniques metier (codes PAO/PTA).
+        $this->assertDatabaseMissing('paos', ['id' => $pao->id]);
+        $this->assertDatabaseMissing('ptas', ['id' => $pta->id]);
 
         // Aucune DeletionRequest ne doit avoir ete creee : suppression directe.
         $this->assertSame(0, DeletionRequest::query()
@@ -77,8 +77,8 @@ class BusinessDeletionRequestWorkflowTest extends TestCase
             ])
             ->assertRedirect(route('workspace.pao.index'));
 
-        $this->assertTrue((bool) $pao->fresh()->trashed());
-        $this->assertTrue((bool) $pta->fresh()->trashed());
+        $this->assertDatabaseMissing('paos', ['id' => $pao->id]);
+        $this->assertDatabaseMissing('ptas', ['id' => $pta->id]);
         $this->assertSame(0, DeletionRequest::query()
             ->where('entity_type', Pao::class)
             ->where('entity_id', $pao->id)
@@ -168,7 +168,7 @@ class BusinessDeletionRequestWorkflowTest extends TestCase
             ])
             ->assertRedirect(route('workspace.pas.index'));
 
-        $this->assertTrue((bool) Pas::withTrashed()->findOrFail($pas->id)->trashed());
+        $this->assertDatabaseMissing('pas', ['id' => $pas->id]);
         $this->assertDatabaseMissing('deletion_requests', [
             'entity_type' => Pas::class,
             'entity_id' => $pas->id,
@@ -198,8 +198,8 @@ class BusinessDeletionRequestWorkflowTest extends TestCase
             ])
             ->assertRedirect(route('workspace.pas.index'));
 
-        $this->assertTrue((bool) Pas::withTrashed()->findOrFail($pas->id)->trashed());
-        $this->assertTrue((bool) PasAxe::withTrashed()->where('pas_id', $pas->id)->firstOrFail()->trashed());
+        $this->assertDatabaseMissing('pas', ['id' => $pas->id]);
+        $this->assertDatabaseMissing('pas_axes', ['pas_id' => $pas->id]);
         $this->assertDatabaseMissing('deletion_requests', [
             'entity_type' => Pas::class,
             'entity_id' => $pas->id,
@@ -219,10 +219,10 @@ class BusinessDeletionRequestWorkflowTest extends TestCase
             ])
             ->assertRedirect(route('workspace.pas.index'));
 
-        $this->assertTrue((bool) Pas::withTrashed()->findOrFail($pas->id)->trashed());
-        $this->assertTrue((bool) Pao::withTrashed()->findOrFail($pao->id)->trashed());
-        $this->assertTrue((bool) Pta::withTrashed()->findOrFail($pta->id)->trashed());
-        $this->assertTrue((bool) Action::withTrashed()->findOrFail($action->id)->trashed());
+        $this->assertDatabaseMissing('pas', ['id' => $pas->id]);
+        $this->assertDatabaseMissing('paos', ['id' => $pao->id]);
+        $this->assertDatabaseMissing('ptas', ['id' => $pta->id]);
+        $this->assertDatabaseMissing('actions', ['id' => $action->id]);
         $this->assertDatabaseMissing('deletion_requests', [
             'entity_type' => Pas::class,
             'entity_id' => $pas->id,
@@ -246,10 +246,10 @@ class BusinessDeletionRequestWorkflowTest extends TestCase
             ])
             ->assertRedirect(route('workspace.pas.index'));
 
-        $this->assertTrue((bool) Pas::withTrashed()->findOrFail($pas->id)->trashed());
-        $this->assertTrue((bool) Pao::withTrashed()->findOrFail($pao->id)->trashed());
-        $this->assertTrue((bool) Pta::withTrashed()->findOrFail($pta->id)->trashed());
-        $this->assertTrue((bool) Action::withTrashed()->findOrFail($action->id)->trashed());
+        $this->assertDatabaseMissing('pas', ['id' => $pas->id]);
+        $this->assertDatabaseMissing('paos', ['id' => $pao->id]);
+        $this->assertDatabaseMissing('ptas', ['id' => $pta->id]);
+        $this->assertDatabaseMissing('actions', ['id' => $action->id]);
         $this->assertDatabaseMissing('deletion_requests', [
             'entity_type' => Pas::class,
             'entity_id' => $pas->id,

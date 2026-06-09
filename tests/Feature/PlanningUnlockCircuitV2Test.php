@@ -155,7 +155,7 @@ class PlanningUnlockCircuitV2Test extends TestCase
         $planif = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
         $dg = User::factory()->create(['role' => User::ROLE_DG]);
 
-        $pas = Pas::query()->create(['titre' => 'PAS '.$suffix, 'periode_debut' => '2026-01-01', 'periode_fin' => '2030-12-31']);
+        $pas = Pas::query()->create(['titre' => 'PAS '.$suffix, 'periode_debut' => 2026, 'periode_fin' => 2030]);
         $pao = Pao::query()->create(['pas_id' => $pas->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PAO '.$suffix, 'annee' => 2026]);
         $pta = Pta::query()->create(['pao_id' => $pao->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PTA '.$suffix]);
         $action = Action::query()->create([

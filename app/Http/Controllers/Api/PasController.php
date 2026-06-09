@@ -10,6 +10,7 @@ use App\Http\Requests\StorePasRequest;
 use App\Http\Requests\UpdatePasRequest;
 use App\Models\Pas;
 use App\Models\User;
+use App\Services\DeletionRequestService;
 use App\Services\PasStructureService;
 use App\Services\PlanningModificationLockService;
 use App\Support\UiLabel;
@@ -234,7 +235,7 @@ class PasController extends Controller
         }
 
         $before = $pas->toArray();
-        $pas->delete();
+        app(DeletionRequestService::class)->deleteBusinessTarget($pas);
 
         $this->recordAudit($request, 'pas', 'delete', $pas, $before, null);
 

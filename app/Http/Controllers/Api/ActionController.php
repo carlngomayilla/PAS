@@ -18,6 +18,7 @@ use App\Services\ExerciceContext;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\PlanningModificationLockService;
 use App\Services\Security\SecureJustificatifStorage;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -48,9 +49,8 @@ class ActionController extends Controller
             ])
             ->withCount([
                 'kpis',
-                'weeks as semaines_total',
-                'weeks as semaines_renseignees' => fn ($q) => $q->where('est_renseignee', true),
             ]);
+        $this->addLegacyWeekCounters($query);
 
         $this->scopeActionQuery($query, $user);
         app(ExerciceContext::class)->applyToAction($query);
@@ -116,6 +116,32 @@ class ActionController extends Controller
             ->withQueryString();
 
         return ActionResource::collection($result)->response();
+    }
+
+    private function addLegacyWeekCounters(Builder $query): void
+    {
+        if (! Schema::hasTable('action_weeks')) {
+            $query->addSelect([
+                'semaines_total' => DB::raw('0'),
+                'semaines_renseignees' => DB::raw('0'),
+            ]);
+
+            return;
+        }
+
+        $query->addSelect([
+            'semaines_total' => DB::table('action_weeks')
+                ->selectRaw('count(*)')
+                ->whereColumn('action_weeks.action_id', 'actions.id'),
+            'semaines_renseignees' => DB::table('action_weeks')
+                ->selectRaw('count(*)')
+                ->whereColumn('action_weeks.action_id', 'actions.id')
+                ->when(
+                    Schema::hasColumn('action_weeks', 'est_renseignee'),
+                    fn ($weekQuery) => $weekQuery->where('est_renseignee', true),
+                    fn ($weekQuery) => $weekQuery->whereRaw('1 = 0')
+                ),
+        ]);
     }
 
     public function store(
