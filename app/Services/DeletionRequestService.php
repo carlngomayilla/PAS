@@ -5,9 +5,12 @@ namespace App\Services;
 use App\Models\Action;
 use App\Models\DeletionRequest;
 use App\Models\JournalAudit;
+use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\PaoObjectifOperationnel;
 use App\Models\Pas;
+use App\Models\PasAxe;
+use App\Models\PasObjectif;
 use App\Models\Pta;
 use App\Models\User;
 use App\Notifications\WorkspaceModuleNotification;
@@ -316,17 +319,17 @@ class DeletionRequestService
     }
 
     /**
-     * Suppression cascade SOFT-DELETE complete d'une entite metier.
+     * Suppression cascade definitive d'une entite metier.
      *
      * Ordre de suppression (bottom-up) :
-     *   Action : sous-actions + semaines puis Action
+     *   Action : justificatifs + sous-actions + semaines puis Action
      *   PTA    : Actions (recursif) puis PTA
      *   PAO    : PTAs (recursif) + Objectifs operationnels puis PAO
      *   PAS    : PAOs (recursif) + Objectifs strategiques + Axes puis PAS
      *
      * Tout est encapsule dans une transaction pour eviter les etats intermediaires.
-     * Les entites sont supprimees via leurs modeles Eloquent (et non DB::delete)
-     * pour que les events Eloquent (audit, observers) se declenchent normalement.
+     * Les entites sont forceDelete pour liberer les contraintes uniques metier
+     * (ex. paos.code) et permettre une recreation propre depuis l'application.
      */
     public function deleteBusinessTarget(Model $target): void
     {
@@ -347,45 +350,84 @@ class DeletionRequestService
 
     private function cascadeDeletePas(Pas $pas): void
     {
-        Pao::where('pas_id', $pas->id)->get()->each(fn (Pao $pao) => $this->cascadeDeletePao($pao));
+        Pao::withTrashed()
+            ->where('pas_id', $pas->id)
+            ->get()
+            ->each(fn (Pao $pao) => $this->cascadeDeletePao($pao));
 
         if (Schema::hasTable('pas_axes')) {
-            \App\Models\PasAxe::where('pas_id', $pas->id)
+            PasAxe::withTrashed()
+                ->where('pas_id', $pas->id)
                 ->get()
-                ->each(function (\App\Models\PasAxe $axe): void {
+                ->each(function (PasAxe $axe): void {
                     if (Schema::hasTable('pas_objectifs')) {
-                        \App\Models\PasObjectif::where('pas_axe_id', $axe->id)
+                        PasObjectif::withTrashed()
+                            ->where('pas_axe_id', $axe->id)
                             ->get()
-                            ->each(fn (\App\Models\PasObjectif $os) => $os->delete());
+                            ->each(fn (PasObjectif $os) => $this->deleteModelPermanently($os));
                     }
-                    $axe->delete();
+                    $this->deleteModelPermanently($axe);
                 });
         }
 
-        $pas->delete();
+        if (Schema::hasTable('pas_directions')) {
+            DB::table('pas_directions')->where('pas_id', (int) $pas->id)->delete();
+        }
+
+        $this->deleteModelPermanently($pas);
     }
 
     private function cascadeDeletePao(Pao $pao): void
     {
-        Pta::where('pao_id', $pao->id)->get()->each(fn (Pta $pta) => $this->cascadeDeletePta($pta));
+        Pta::withTrashed()
+            ->where('pao_id', $pao->id)
+            ->get()
+            ->each(fn (Pta $pta) => $this->cascadeDeletePta($pta));
+
+        Action::withTrashed()
+            ->where('pao_id', $pao->id)
+            ->get()
+            ->each(fn (Action $action) => $this->cascadeDeleteAction($action));
 
         if (Schema::hasTable('objectifs_operationnels')) {
-            \App\Models\ObjectifOperationnel::where('pao_id', $pao->id)
+            ObjectifOperationnel::withTrashed()
+                ->where('pao_id', $pao->id)
                 ->get()
-                ->each(fn (\App\Models\ObjectifOperationnel $oo) => $oo->delete());
+                ->each(fn (ObjectifOperationnel $oo) => $this->deleteModelPermanently($oo));
         }
 
-        $pao->delete();
+        $this->deleteModelPermanently($pao);
     }
 
     private function cascadeDeletePta(Pta $pta): void
     {
-        Action::where('pta_id', $pta->id)->get()->each(fn (Action $action) => $this->cascadeDeleteAction($action));
-        $pta->delete();
+        Action::withTrashed()
+            ->where('pta_id', $pta->id)
+            ->get()
+            ->each(fn (Action $action) => $this->cascadeDeleteAction($action));
+
+        $this->deleteModelPermanently($pta);
     }
 
     private function cascadeDeleteAction(Action $action): void
     {
+        $sousActionIds = Schema::hasTable('sous_actions')
+            ? DB::table('sous_actions')->where('action_id', $action->id)->pluck('id')->map(fn ($id): int => (int) $id)->all()
+            : [];
+
+        if (Schema::hasTable('justificatifs')) {
+            DB::table('justificatifs')
+                ->where('justifiable_type', Action::class)
+                ->where('justifiable_id', (int) $action->id)
+                ->delete();
+
+            if ($sousActionIds !== [] && Schema::hasColumn('justificatifs', 'sous_action_id')) {
+                DB::table('justificatifs')->whereIn('sous_action_id', $sousActionIds)->delete();
+            }
+        }
+        if (Schema::hasTable('deadline_extension_requests')) {
+            DB::table('deadline_extension_requests')->where('action_id', (int) $action->id)->delete();
+        }
         if (Schema::hasTable('sous_actions')) {
             DB::table('sous_actions')->where('action_id', $action->id)->delete();
         }
@@ -395,7 +437,19 @@ class DeletionRequestService
         if (Schema::hasTable('action_responsables')) {
             DB::table('action_responsables')->where('action_id', $action->id)->delete();
         }
-        $action->delete();
+
+        $this->deleteModelPermanently($action);
+    }
+
+    private function deleteModelPermanently(Model $model): void
+    {
+        if (in_array(SoftDeletes::class, class_uses_recursive($model), true) && method_exists($model, 'forceDelete')) {
+            $model->forceDelete();
+
+            return;
+        }
+
+        $model->delete();
     }
 
     private function resolveTarget(DeletionRequest $request): ?Model

@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\Action;
 use App\Models\Direction;
 use App\Models\PlanningImport;
+use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\DeletionRequestService;
 use App\Services\Imports\PlanningExcelImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -82,6 +84,29 @@ class PlanningExcelImportServiceTest extends TestCase
         ]);
         $action = Action::query()->where('libelle', 'Action 1')->firstOrFail();
         $this->assertSame((int) $fixture['agent']->id, (int) $action->responsable_id);
+    }
+
+    public function test_deleted_pas_clears_planning_tree_before_same_workbook_reimport(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(PlanningExcelImportService::class);
+
+        $this->executeSingleRowImport($service, $fixture['admin']);
+
+        $pas = Pas::query()->firstOrFail();
+        app(DeletionRequestService::class)->deleteBusinessTarget($pas);
+
+        $this->assertDatabaseCount('pas', 0);
+        $this->assertDatabaseCount('paos', 0);
+        $this->assertDatabaseCount('ptas', 0);
+        $this->assertDatabaseCount('actions', 0);
+
+        $this->executeSingleRowImport($service, $fixture['admin']);
+
+        $this->assertDatabaseCount('pas', 1);
+        $this->assertDatabaseCount('paos', 1);
+        $this->assertDatabaseCount('ptas', 1);
+        $this->assertDatabaseCount('actions', 1);
     }
 
     public function test_validation_rejects_missing_columns(): void
@@ -324,6 +349,24 @@ class PlanningExcelImportServiceTest extends TestCase
         ]);
 
         return compact('direction', 'service', 'admin', 'agent');
+    }
+
+    private function executeSingleRowImport(PlanningExcelImportService $service, User $admin): PlanningImport
+    {
+        $preview = $service->validateSheet($this->sheet([$this->row()]));
+        $this->assertFalse($preview['has_errors']);
+
+        $import = PlanningImport::query()->create([
+            'user_id' => $admin->id,
+            'filename' => 'import.csv',
+            'preview_payload' => $preview,
+            'total_rows' => 1,
+            'valid_rows' => 1,
+            'error_rows' => 0,
+            'status' => 'preview_ready',
+        ]);
+
+        return $service->execute($import, PlanningImport::MODE_CREATE_ONLY, $admin, '127.0.0.1');
     }
 
     private function sheet(array $rows): array

@@ -73,8 +73,8 @@ class SuperAdminNotificationsSmokeTest extends TestCase
 
         $pas = Pas::query()->create([
             'titre' => 'PAS Test',
-            'periode_debut' => '2026-01-01',
-            'periode_fin' => '2030-12-31',
+            'periode_debut' => 2026,
+            'periode_fin' => 2030,
         ]);
         $pao = Pao::query()->create([
             'pas_id' => $pas->id,
@@ -136,8 +136,8 @@ class SuperAdminNotificationsSmokeTest extends TestCase
         // L'action est attribuée au Super Admin -> il reçoit la notif (canal email actif).
         $pas = Pas::query()->create([
             'titre' => 'PAS Test Email',
-            'periode_debut' => '2026-01-01',
-            'periode_fin' => '2030-12-31',
+            'periode_debut' => 2026,
+            'periode_fin' => 2030,
         ]);
         $pao = Pao::query()->create([
             'pas_id' => $pas->id, 'direction_id' => $direction->id, 'service_id' => $service->id,
@@ -197,7 +197,7 @@ class SuperAdminNotificationsSmokeTest extends TestCase
             'direction_id' => $direction->id, 'code' => 'TST-API-SRV', 'libelle' => 'Service API Test',
         ]);
         $pas = Pas::query()->create([
-            'titre' => 'PAS Test API', 'periode_debut' => '2026-01-01', 'periode_fin' => '2030-12-31',
+            'titre' => 'PAS Test API', 'periode_debut' => 2026, 'periode_fin' => 2030,
         ]);
         $pao = Pao::query()->create([
             'pas_id' => $pas->id, 'direction_id' => $direction->id, 'service_id' => $service->id,
