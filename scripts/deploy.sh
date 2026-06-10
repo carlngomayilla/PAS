@@ -14,7 +14,7 @@
 # avec un worker systemd (cf. docs/optimisation-performance.md).
 #
 # Variables optionnelles :
-#   FPM_SERVICE=php8.3-fpm  service php-fpm à recharger (vide l'OPcache). Mettre
+#   FPM_SERVICE=php8.4-fpm  service php-fpm à recharger (vide l'OPcache). Mettre
 #                           FPM_SERVICE="" pour désactiver le rechargement.
 
 set -euo pipefail
@@ -64,7 +64,7 @@ php artisan queue:restart
 # Rechargement de php-fpm : vide l'OPcache pour que le nouveau code et le
 # config:cache soient pris en compte immédiatement. Sans effet si php-fpm n'est
 # pas géré par systemd ou si sudo non disponible (étape non bloquante).
-FPM_SERVICE="${FPM_SERVICE-php8.3-fpm}"
+FPM_SERVICE="${FPM_SERVICE-php8.4-fpm}"
 if [ -n "$FPM_SERVICE" ] && command -v systemctl >/dev/null 2>&1; then
     echo "==> rechargement de $FPM_SERVICE (purge OPcache)"
     sudo -n systemctl reload "$FPM_SERVICE" 2>/dev/null \

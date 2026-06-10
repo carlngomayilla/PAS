@@ -29,7 +29,7 @@ Puis, à **chaque déploiement**, lancer le script fourni (Ubuntu Server) :
 
 ```bash
 bash scripts/deploy.sh
-# Options : SKIP_GIT=1, SKIP_NPM=1, FPM_SERVICE=php8.3-fpm (ou "" pour désactiver)
+# Options : SKIP_GIT=1, SKIP_NPM=1, FPM_SERVICE=php8.4-fpm (ou "" pour désactiver)
 ```
 
 Le script enchaîne : garde-fou `APP_DEBUG`, mode maintenance, `composer install
@@ -40,7 +40,7 @@ events), `queue:restart`, puis `reload php-fpm` (purge OPcache). Équivalent man
 php artisan migrate --force
 php artisan optimize        # config:cache + event:cache + route:cache + view:cache
 php artisan queue:restart
-sudo systemctl reload php8.3-fpm
+sudo systemctl reload php8.4-fpm
 ```
 
 > ⚠️ Après un `config:cache`, toute modification du `.env` exige de relancer

@@ -145,7 +145,7 @@ bundles JS, latence DB). La table `jobs` existe déjà (migration `0001_01_01_00
 
 Nouveau script `scripts/deploy.sh` (Ubuntu Server, exécutable) : garde-fou
 `APP_DEBUG`, mode maintenance, `composer install --no-dev`, build assets,
-`migrate --force`, `php artisan optimize`, `queue:restart` et `reload php8.3-fpm`
+`migrate --force`, `php artisan optimize`, `queue:restart` et `reload php8.4-fpm`
 (purge OPcache). Options `SKIP_GIT` / `SKIP_NPM` / `FPM_SERVICE`.
 
 ### Vérification
