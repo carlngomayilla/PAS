@@ -115,6 +115,19 @@ Fichiers : `app/Services/Notifications/BrevoMailService.php`, `config/services.p
 
 Fichiers : `app/Services/PersonalTaskService.php`, `resources/views/layouts/admin.blade.php`.
 
+### Modification (dashboard — réduction des round-trips SQL)
+
+Mesure préalable : sur la base **locale vide (0 action)**, le build dashboard fait déjà
+**46 requêtes / ~338 ms** → la latence locale ne vient pas du volume de données mais du
+nombre de requêtes (+ mode debug + absence de cache config). Une réécriture complète en
+agrégations SQL n'aiderait pas en local et risquerait les tests d'alignement stricts ;
+écartée. À la place, les paires `total`/`actifs` de PAS, PAO et PTA sont calculées en
+**une requête `SUM(CASE…)`** chacune au lieu de deux `count()` séparés (compatible pgsql
+et sqlite, valeurs arithmétiquement identiques). **46 → 43 requêtes** par build, gain
+réseau réel sur la DB distante de prod.
+
+Fichier : `app/Http/Controllers/DashboardController.php`.
+
 ### Correctif annexe
 
 `resources/views/workspace/actions/index.blade.php` : commentaire Blade `{{-- --}}`
@@ -130,10 +143,16 @@ déploiement, service systemd du worker, et backlog d'optimisations (dashboard,
 bundles JS, latence DB). La table `jobs` existe déjà (migration `0001_01_01_000002`),
 `QUEUE_CONNECTION=database` est donc activable en prod sans nouvelle migration.
 
+Nouveau script `scripts/deploy.sh` (Ubuntu Server, exécutable) : garde-fou
+`APP_DEBUG`, mode maintenance, `composer install --no-dev`, build assets,
+`migrate --force`, `php artisan optimize`, `queue:restart` et `reload php8.4-fpm`
+(purge OPcache). Options `SKIP_GIT` / `SKIP_NPM` / `FPM_SERVICE`.
+
 ### Vérification
 
 `php artisan test --filter BrevoEmailChannelTest|BusinessWorkflowNotificationTest|`
 `WorkspaceNotificationFailSafeTest|SuperAdminNotificationsSmokeTest` → **10 passés**.
+`bash -n scripts/deploy.sh` → syntaxe OK.
 
 ---
 
