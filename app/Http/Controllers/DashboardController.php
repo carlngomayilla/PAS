@@ -168,13 +168,27 @@ class DashboardController extends Controller
         $actionStatusBreakdown = $this->statusCounts($dashboardActions);
         $actionValidationBreakdown = $this->countActionsByAttribute($dashboardActions, 'statut_validation');
 
+        // Perf : chaque paire total/actifs est calculee en UNE requete via
+        // SUM(CASE...) au lieu de deux count() separes (3 round-trips economises,
+        // gain reseau sur DB distante). Resultat arithmetiquement identique a
+        // count(*) + count(*) where statut=... — compatible pgsql et sqlite.
+        $pasAgg = (clone $pas)
+            ->selectRaw("count(*) as total, sum(case when statut = 'actif' then 1 else 0 end) as actifs")
+            ->first();
+        $paoAgg = (clone $paos)
+            ->selectRaw("count(*) as total, sum(case when statut in ('en_cours', 'valide') then 1 else 0 end) as actifs")
+            ->first();
+        $ptaAgg = (clone $ptas)
+            ->selectRaw("count(*) as total, sum(case when statut = 'en_cours' then 1 else 0 end) as actifs")
+            ->first();
+
         $totals = [
-            'pas_total'          => (clone $pas)->count(),
-            'pas_actifs'         => (clone $pas)->where('statut', 'actif')->count(),
-            'paos_total'         => (clone $paos)->count(),
-            'paos_actifs'        => (clone $paos)->whereIn('statut', ['en_cours', 'valide'])->count(),
-            'ptas_total'         => (clone $ptas)->count(),
-            'ptas_actifs'        => (clone $ptas)->where('statut', 'en_cours')->count(),
+            'pas_total'          => (int) ($pasAgg->total ?? 0),
+            'pas_actifs'         => (int) ($pasAgg->actifs ?? 0),
+            'paos_total'         => (int) ($paoAgg->total ?? 0),
+            'paos_actifs'        => (int) ($paoAgg->actifs ?? 0),
+            'ptas_total'         => (int) ($ptaAgg->total ?? 0),
+            'ptas_actifs'        => (int) ($ptaAgg->actifs ?? 0),
             'actions_total'      => $dashboardActions->count(),
             'actions_validees'   => $dashboardValidatedActions->count(),
             'kpis_total'         => (clone $kpis)->count(),
