@@ -845,6 +845,30 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringNotContainsString('socle officiel valide direction', $html);
     }
 
+    public function test_dashboard_status_distribution_exposes_all_status_filters(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $content = $this->actingAs($admin)
+            ->get('/dashboard?dashboardTab=charts')
+            ->assertOk()
+            ->getContent();
+
+        foreach ([
+            'statut=a_parametrer',
+            'statut=en_avance',
+            'statut=en_cours',
+            'statut=a_risque',
+            'statut=en_retard',
+            'statut=suspendu',
+            'statut=annule',
+            'statut=non_demarre',
+            'statut=achevees',
+        ] as $filter) {
+            $this->assertStringContainsString($filter, $content);
+        }
+    }
+
     /**
      * @return array{0: \App\Models\Pta, 1: \App\Models\User}
      */

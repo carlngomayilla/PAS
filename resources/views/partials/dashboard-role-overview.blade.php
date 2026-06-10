@@ -59,6 +59,15 @@
             default => 'neutral',
         };
     };
+    $roleStatusRows = collect($statusChart['labels'] ?? [])
+        ->values()
+        ->map(fn ($label, int $index): array => [
+            'label' => (string) $label,
+            'value' => (int) (($statusChart['values'] ?? [])[$index] ?? 0),
+            'color' => (string) (($statusChart['colors'] ?? [])[$index] ?? '#3996D3'),
+            'href' => (string) (($statusChart['urls'] ?? [])[$index] ?? '#'),
+        ]);
+    $roleStatusTotal = max(0, (int) $roleStatusRows->sum('value'));
 @endphp
 
 @if ($showHeroBlock)
@@ -123,6 +132,24 @@
                         </div>
                     </div>
                 </div>
+                @if ($roleStatusRows->isNotEmpty())
+                    <div class="mt-4 charts-status-grid" aria-label="Liste complète des statuts">
+                        @foreach ($roleStatusRows as $row)
+                            @php $rowPct = $roleStatusTotal > 0 ? round(((float) $row['value'] / $roleStatusTotal) * 100, 1) : 0; @endphp
+                            <a class="charts-status-item" href="{{ $row['href'] }}" style="--tone: {{ $row['color'] }};">
+                                <div class="charts-status-item-head">
+                                    <span class="charts-status-dot" style="background: {{ $row['color'] }};"></span>
+                                    <span class="charts-status-item-name">{{ $row['label'] }}</span>
+                                    <span class="charts-status-item-count" style="color: {{ $row['color'] }};">{{ $row['value'] }}</span>
+                                </div>
+                                <div class="charts-status-item-track">
+                                    <div class="charts-status-item-fill" style="width: {{ $rowPct }}%; background: {{ $row['color'] }};"></div>
+                                </div>
+                                <span class="charts-status-item-pct">{{ number_format($rowPct, 1, ',', ' ') }}%</span>
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
             </article>
         @endif
 

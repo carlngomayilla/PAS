@@ -1318,7 +1318,7 @@ function bootDashboardRender(force = false) {
           labels: status.labels,
           datasets: [{
             data: (status.values || []).map((value) => finiteNumber(value, 0)),
-            backgroundColor: (status.labels || []).map((label, index) => alphaColor(colorForStatus(label, index), 0.92)),
+            backgroundColor: (status.labels || []).map((label, index) => alphaColor((status.colors || [])[index] || colorForStatus(label, index), 0.92)),
             borderColor: theme.isDark ? '#0f172a' : '#ffffff',
             borderWidth: 3,
             hoverOffset: 12,

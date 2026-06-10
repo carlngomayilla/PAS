@@ -669,6 +669,9 @@ body.anbg-glass-theme .charts-status-grid {
     gap: 0.7rem !important;
 }
 body.anbg-glass-theme .charts-status-item {
+    display: block !important;
+    color: inherit !important;
+    text-decoration: none !important;
     padding: 0.65rem 0.85rem !important;
     background: rgba(255, 255, 255, 0.5) !important;
     border-radius: 14px !important;
