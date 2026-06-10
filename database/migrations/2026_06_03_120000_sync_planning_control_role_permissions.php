@@ -24,7 +24,6 @@ return new class extends Migration
             'referentiel.read',
             'users.manage',
             'users.manage_roles',
-            'messagerie.read',
         ];
 
         foreach ([User::ROLE_CHEF_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ] as $role) {

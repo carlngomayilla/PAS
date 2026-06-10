@@ -108,7 +108,36 @@
                                 </dl>
                             </div>
 
-                            <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ $task['url'] ?? route('dashboard') }}">Traiter</a>
+                            @if (! empty($task['can_validate']) && ! empty($task['action_id']))
+                                {{-- A42 — Validation deplacee dans Mes taches : acte direct (cf. actions.review). --}}
+                                <div class="flex w-full flex-col items-stretch gap-2 sm:w-56">
+                                    <form method="POST" action="{{ route('workspace.actions.review', $task['action_id']) }}">
+                                        @csrf
+                                        <input type="hidden" name="decision" value="valider">
+                                        @if (! empty($task['sous_action_id']))
+                                            <input type="hidden" name="sous_action_id" value="{{ $task['sous_action_id'] }}">
+                                        @endif
+                                        <button type="submit" class="btn btn-primary w-full rounded-2xl px-4 py-2.5">Valider</button>
+                                    </form>
+
+                                    <details class="rounded-2xl border border-slate-200/85 bg-white/95">
+                                        <summary class="cursor-pointer rounded-2xl px-4 py-2.5 text-center text-sm font-semibold text-[#B42318]">Renvoyer pour correction</summary>
+                                        <form method="POST" action="{{ route('workspace.actions.review', $task['action_id']) }}" class="space-y-2 p-3">
+                                            @csrf
+                                            <input type="hidden" name="decision" value="rejeter">
+                                            @if (! empty($task['sous_action_id']))
+                                                <input type="hidden" name="sous_action_id" value="{{ $task['sous_action_id'] }}">
+                                            @endif
+                                            <textarea name="motif" rows="2" required placeholder="Motif du renvoi (obligatoire)" class="w-full rounded-lg border border-slate-300 p-2 text-sm"></textarea>
+                                            <button type="submit" class="btn w-full rounded-2xl px-4 py-2 text-white" style="background:#B42318;">Confirmer le renvoi</button>
+                                        </form>
+                                    </details>
+
+                                    <a class="text-center text-xs text-[#3996D3] underline" href="{{ $task['url'] ?? route('dashboard') }}">Ouvrir la fiche</a>
+                                </div>
+                            @else
+                                <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ $task['url'] ?? route('dashboard') }}">Traiter</a>
+                            @endif
                         </div>
                     </article>
                 @empty

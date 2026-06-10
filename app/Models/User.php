@@ -6,7 +6,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -227,23 +226,6 @@ class User extends Authenticatable
     public function uniteDg(): BelongsTo
     {
         return $this->belongsTo(UniteDg::class, 'unite_dg_id');
-    }
-
-    public function conversations(): BelongsToMany
-    {
-        return $this->belongsToMany(Conversation::class, 'conversation_participants')
-            ->withPivot(['last_read_at', 'is_favorite', 'joined_at'])
-            ->withTimestamps();
-    }
-
-    public function conversationParticipants(): HasMany
-    {
-        return $this->hasMany(ConversationParticipant::class);
-    }
-
-    public function messagesSent(): HasMany
-    {
-        return $this->hasMany(Message::class, 'sender_id');
     }
 
     public function passwordHistories(): HasMany

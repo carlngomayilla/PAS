@@ -197,7 +197,7 @@ class GlobalSearchWebController extends Controller
             'title' => trim(($direction->code ? $direction->code.' - ' : '').$direction->libelle),
             'subtitle' => 'Direction',
             'meta' => $direction->services_count.' service(s) · '.$direction->users_count.' utilisateur(s)',
-            'href' => route('workspace.messaging.index', ['org_direction_id' => $direction->id]).'#messaging-orgchart',
+            'href' => route('workspace.referentiel.directions.index', ['direction' => $direction->id]),
         ])->values()->all();
 
         return $this->group('Directions', 'direction', $items);
@@ -225,7 +225,7 @@ class GlobalSearchWebController extends Controller
             'title' => trim(($service->code ? $service->code.' - ' : '').$service->libelle),
             'subtitle' => 'Service',
             'meta' => ($service->direction?->libelle ?: 'Direction non renseignée').' · '.$service->users_count.' utilisateur(s)',
-            'href' => route('workspace.messaging.index', ['org_service_id' => $service->id]).'#messaging-orgchart',
+            'href' => route('workspace.referentiel.services.index', ['service' => $service->id]),
         ])->values()->all();
 
         return $this->group('Services', 'service', $items);
@@ -253,7 +253,7 @@ class GlobalSearchWebController extends Controller
             'title' => (string) $user->name,
             'subtitle' => 'Utilisateur - '.$user->roleLabel(),
             'meta' => ($user->agent_fonction ?: 'Fonction non renseignée').' · '.($user->direction?->libelle ?: 'Direction non renseignée').' / '.($user->service?->libelle ?: 'Service non renseigné'),
-            'href' => route('workspace.messaging.index', ['contact' => $user->id]).'#messaging-profile-card',
+            'href' => route('workspace.referentiel.utilisateurs.index', ['utilisateur' => $user->id]),
         ])->values()->all();
 
         return $this->group('Utilisateurs', 'users', $items);

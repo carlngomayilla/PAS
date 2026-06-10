@@ -205,7 +205,6 @@ class WorkspaceModuleSettings
     private function defaults(): array
     {
         return [
-            'messagerie' => ['code' => 'messagerie', 'label' => 'Messagerie', 'description' => 'Annuaire interactif et échanges internes', 'enabled' => true, 'order' => 10, 'section' => 'communication'],
             'pilotage' => ['code' => 'pilotage', 'label' => 'Pilotage', 'description' => 'Tableau de bord et synthèse de pilotage', 'enabled' => true, 'order' => 20, 'section' => 'pilotage'],
             'pas' => ['code' => 'pas', 'label' => 'PAS', 'description' => 'Vision stratégique pluriannuelle', 'enabled' => true, 'order' => 30, 'section' => 'planification'],
             'pao' => ['code' => 'pao', 'label' => 'PAO', 'description' => 'Déclinaison annuelle par direction', 'enabled' => true, 'order' => 40, 'section' => 'planification'],

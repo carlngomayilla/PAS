@@ -4,7 +4,6 @@ import './visual-polish';
 import './dashboard-charts-init';
 import './dashboard-render';
 import './analytics-explorer';
-import './messaging-init';
 import './page-auto-refresh';
 import './super-admin-menu';
 import './super-admin-preview';

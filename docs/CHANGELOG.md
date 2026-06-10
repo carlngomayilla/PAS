@@ -5,6 +5,216 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-10 — Rendu premium : barre supérieure & en-têtes de page
+
+### Demande
+
+Améliorer le rendu des différentes pages, en particulier les en-têtes — à la
+fois la barre supérieure globale (navbar) et les en-têtes de contenu de chaque
+écran. Direction visuelle souhaitée : plus moderne / premium.
+
+### Modification
+
+1. **Harmonisation des en-têtes de page.** Deux systèmes coexistaient : le
+   composant `<x-ui.page-title>` (PAS, PAO, PTA, Actions, Déblocages) et le bloc
+   `showcase-hero` (Mes tâches, Notifications, Reporting, Alertes…). Ajout d'un
+   eyebrow optionnel au composant `x-ui.page-title` pour atteindre le même niveau
+   que les pages `showcase-hero`, et renseignement d'un eyebrow cohérent sur les
+   5 pages concernées.
+
+2. **Premium pass v3 (CSS).** Ajout, en fin de la couche `@layer components`
+   faisant autorité dans `resources/css/anbg-glass.css` (les `!important` en
+   couche nommée l'emportent sur les `!important` hors couche) :
+   - Navbar `#admin-shell-header` en verre clair cohérent avec le système de
+     cartes (fond translucide, blur, filet dégradé bleu sous la barre).
+   - Boutons-icônes et pills de contrôle (filtre exercice/trimestre, horloge,
+     bloc utilisateur) frostés et harmonisés, avec états :hover soignés.
+   - Héros de page : halo lumineux radial décoratif, eyebrow en pastille,
+     titre à l'échelle premium (`clamp`, graisse 800, letter-spacing négatif).
+
+### Fichiers modifiés
+
+- `resources/views/components/ui/page-title.blade.php` (prop `eyebrow`)
+- `resources/views/workspace/{pas,pao,pta,actions}/index.blade.php`,
+  `resources/views/workspace/planning-unlocks/index.blade.php` (eyebrows)
+- `resources/css/anbg-glass.css` (premium pass v3, fin de fichier)
+
+### Extrait clé
+
+```css
+/* PREMIUM PASS v3 — navbar verre clair + héros de page */
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme #admin-shell-header {
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(246,250,255,0.78)) !important;
+    backdrop-filter: blur(22px) saturate(165%) !important;
+}
+```
+
+---
+
+## 2026-06-10 — Mes tâches : badge chiffré dans le menu
+
+### Demande
+
+Le module « Mes tâches » doit afficher un point chiffré dans la navigation pour
+signaler qu'il y a des tâches à faire.
+
+### Modification
+
+Ajout d'une méthode légère `PersonalTaskService::openTaskCount()` (réutilise la
+collecte de `forUser()` sans le calcul du score), et branchement du compteur sur
+l'entrée sidebar `mes_taches` via `$headerSidebarBadges['mes_taches']` dans le
+layout. Le badge réutilise le rendu existant des pastilles de menu (≤ 99, sinon
+« 99+ »). Vérifié en local : 0 sans tâche, 1 après ajout d'une action `soumise_chef`.
+
+Le compteur est mis en **cache 60 s par utilisateur** (comme le centre d'alertes)
+pour ne pas recalculer les 8 sources à chaque chargement de page ; la clé intègre
+`AnalyticsCacheVersionService::alertsVersion()` afin que le badge réagisse aux
+changements d'actions sans attendre l'expiration du TTL.
+
+Fichiers : `app/Services/PersonalTaskService.php`,
+`resources/views/layouts/admin.blade.php`.
+
+---
+
+## 2026-06-10 — Performance : envoi e-mail Brevo non-bloquant + guide d'optimisation
+
+### Demande
+
+Analyser toute l'application pour identifier les causes de latence, puis appliquer
+les correctifs sûrs (locaux et serveur).
+
+### Analyse
+
+Causes principales identifiées : (1) e-mails/notifications Brevo envoyés en
+**synchrone** dans la requête (`QUEUE_CONNECTION=sync` + HTTP/SMTP, timeout 10 s) ;
+(2) `APP_DEBUG=true`/`LOG_LEVEL=debug` ; (3) absence de cache config/routes/vues ;
+(4) cache dashboard invalidé globalement à chaque modif d'action + chargement de
+toutes les actions sans pagination ; (5) requêtes non cachées du layout.
+
+### Modification (code — local + serveur, sans worker requis)
+
+`BrevoMailService::dispatch()` diffère désormais l'envoi des e-mails **après la
+réponse HTTP** (`dispatch($send)->afterResponse()`) en contexte web. La requête
+utilisateur ne bloque plus sur Brevo. En **console** (commandes, worker queue) et en
+**tests**, l'envoi reste synchrone (`app()->runningInConsole()`) pour un comportement
+déterministe. Timeout API Brevo par défaut abaissé `10s → 5s`.
+
+Fichiers : `app/Services/Notifications/BrevoMailService.php`, `config/services.php`.
+
+### Modification (suite — latence globale, chaque page / dashboard)
+
+- **`PersonalTaskService`** : la collecte des tâches (8 sous-requêtes) est désormais
+  mutualisée dans `collectCached()` (cache 60 s par utilisateur, clé sur
+  `alertsVersion`). Avant, `forUser()` (dashboard) rejouait les 8 requêtes **à chaque
+  chargement** alors que `openTaskCount()` (badge) avait son propre cache → la collecte
+  ne tourne plus qu'une fois par fenêtre, partagée badge + dashboard.
+- **Layout `admin.blade.php`** : les 2 comptages `whereHas` du badge « validation »,
+  exécutés à **chaque page authentifiée**, sont mis en cache 120 s par utilisateur
+  (clé sur `dashboardVersion`, bumpée à chaque changement de `statut_validation`
+  d'action → invalidation immédiate et correcte).
+
+Fichiers : `app/Services/PersonalTaskService.php`, `resources/views/layouts/admin.blade.php`.
+
+### Correctif annexe
+
+`resources/views/workspace/actions/index.blade.php` : commentaire Blade `{{-- --}}`
+placé par erreur **à l'intérieur** d'un tableau PHP dans un bloc `@php` (carte « A42 »)
+→ erreur de compilation « unexpected token `{` ». Converti en commentaire PHP `//`.
+La page Suivi des actions ne se compilait plus.
+
+### Documentation
+
+Nouveau guide `docs/optimisation-performance.md` : réglages `.env` **production**
+(APP_DEBUG=false, LOG_LEVEL, `QUEUE_CONNECTION=database`), commandes de cache au
+déploiement, service systemd du worker, et backlog d'optimisations (dashboard,
+bundles JS, latence DB). La table `jobs` existe déjà (migration `0001_01_01_000002`),
+`QUEUE_CONNECTION=database` est donc activable en prod sans nouvelle migration.
+
+### Vérification
+
+`php artisan test --filter BrevoEmailChannelTest|BusinessWorkflowNotificationTest|`
+`WorkspaceNotificationFailSafeTest|SuperAdminNotificationsSmokeTest` → **10 passés**.
+
+---
+
+## 2026-06-10 — Suppression complète du module Messagerie inter-agents
+
+### Demande
+
+Supprimer entièrement le module de messagerie entre agents (chat, annuaire,
+conversations) et son icône dans la barre de navigation. Ne **pas** toucher aux
+notifications ni aux alertes des actions (systèmes distincts, conservés).
+
+### Modification
+
+Retrait de tout le code dédié et de ses points d'intégration.
+
+Fichiers supprimés :
+- `app/Http/Controllers/Web/MessagingWebController.php`
+- `app/Models/Conversation.php`, `app/Models/ConversationParticipant.php`, `app/Models/Message.php`
+- `app/Services/Messaging/MessagingService.php`, `app/Services/Messaging/MessagingDirectoryService.php`
+- `app/Services/Security/SecureMessageAttachmentStorage.php`
+- `app/Events/MessageSent.php`, `app/Events/ConversationRead.php`
+- `resources/js/messaging-init.js`
+- `resources/views/workspace/messaging/` (index + partials/profile-card)
+- `tests/Feature/MessagingWebTest.php`
+- migrations de création : `create_conversations_table`, `create_conversation_participants_table`,
+  `create_messages_table`, `add_attachment_metadata_to_messages_table`
+
+Nettoyage des références :
+- `routes/web.php` (10 routes + import), `routes/channels.php` (canal `messaging.conversation.*`)
+- `app/Models/User.php` (relations `conversations`/`conversationParticipants`/`messagesSent`)
+- `app/Services/RolePermissionSettings.php` (permission `messagerie.read` retirée du catalogue
+  et de la matrice ; le filtre `sanitizePermissionList` purge automatiquement les overrides
+  stockés et les seeds de migration historiques)
+- `app/Services/UserWorkspaceService.php`, `app/Services/WorkspaceModuleSettings.php`,
+  `app/Services/UserProfileService.php` (module/permission messagerie retirés)
+- `app/Http/Controllers/WorkspaceController.php`, `SuperAdminWebController.php`
+- `app/Http/Controllers/Web/GlobalSearchWebController.php` (liens annuaire → pages référentiel)
+- `resources/views/layouts/admin.blade.php` (icône + dropdown header + chargement service),
+  `resources/views/layouts/workspace.blade.php` (titre de page)
+- `resources/js/app.js`, `resources/js/admin-shell.js`, `resources/js/page-auto-refresh.js`
+- tests : `RolePermissionMatrixTest`, `WebWorkspaceTest`
+
+Nouvelle migration `2026_06_10_120000_drop_messaging_module_tables.php` :
+`dropIfExists('messages' / 'conversation_participants' / 'conversations')` (ordre FK-safe).
+
+### Vérification
+
+`php artisan test --filter RolePermissionMatrixTest|AgentRbacNavigationTest|WebWorkspaceTest`
+→ 32 passés, 1 skip (données). Lint PHP OK sur tous les fichiers modifiés.
+
+---
+
+## 2026-06-10 — Mes tâches : validation des actions intégrée (acte inline)
+
+### Demande
+
+Déplacer la validation des actions dans le module « Mes tâches » pour faire plus
+propre (éviter le double point d'entrée Actions / Mes tâches).
+
+### Modification (partie A — intégration de l'acte)
+
+Les tâches de validation (`validation_chef`, `validation_sous_action_chef`) exposent
+désormais `action_id` / `sous_action_id` / `can_validate`, et la page Mes tâches
+affiche des boutons **Valider** et **Renvoyer pour correction** (motif obligatoire)
+qui postent directement vers `workspace.actions.review` — sans quitter Mes tâches
+pour aller sur la fiche action. Lien « Ouvrir la fiche » conservé pour les cas
+complexes.
+
+Fichiers : `app/Services/PersonalTaskService.php`,
+`resources/views/workspace/tasks/index.blade.php`.
+
+### Modification (partie B — retrait du doublon sur l'écran Actions)
+
+La carte « En attente validation » de l'écran Actions ne pointe plus vers un filtre
+local : elle devient un **raccourci vers Mes tâches** (meta « À valider dans Mes
+tâches »), point d'entrée unique de l'acte de validation. Le compteur reste visible.
+
+Fichier : `resources/views/workspace/actions/index.blade.php`.
+
+---
+
 ## 2026-06-09 — Reporting : graphique des statuts aligné sur le dashboard
 
 ### Demande

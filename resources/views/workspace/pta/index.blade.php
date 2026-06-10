@@ -22,6 +22,7 @@
 
     <div class="app-screen-flow">
     <x-ui.page-title
+        eyebrow="Exécution annuelle"
         title="Plan de travail annuel"
         subtitle="Suivi des plans de travail par service, avec rattachement aux objectifs opérationnels."
     >

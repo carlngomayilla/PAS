@@ -79,8 +79,6 @@
     $headerNotificationUnreadCount = 0;
     $headerUnreadByModule = [];
     $headerSidebarBadges = [];
-    $headerMessages = collect();
-    $headerMessageUnreadCount = 0;
     $headerAlertSummary = [
         'total' => 0,
         'unread' => 0,
@@ -134,51 +132,60 @@
         }
 
         // Count actions pending validation (for managers) and returned actions (for agents)
+        // Perf : ces 2 comptages whereHas sont mis en cache 120s par utilisateur.
+        // La cle integre dashboardVersion(), bumpee des qu'un statut_validation
+        // d'action change (ActionObserver) → invalidation immediate et correcte.
         $validationBadgeCount = 0;
         if (\Illuminate\Support\Facades\Schema::hasTable('actions')) {
-            $isGlobalReader = $layoutUser->hasGlobalReadAccess()
-                || $layoutUser->hasRole(\App\Models\User::ROLE_SUPER_ADMIN)
-                || $layoutUser->hasRole(\App\Models\User::ROLE_DG)
-                || $layoutUser->hasRole(\App\Models\User::ROLE_PLANIFICATION)
-                || $layoutUser->hasRole(\App\Models\User::ROLE_CABINET);
-            $pendingQ = \App\Models\Action::query()
-                ->where('statut_validation', \App\Services\Actions\ActionTrackingService::VALIDATION_SOUMISE_CHEF);
-            if (! $isGlobalReader) {
-                if ($layoutUser->hasRole(\App\Models\User::ROLE_DIRECTION) && $layoutUser->direction_id) {
-                    $pendingQ->whereHas('pta', fn ($q) => $q->where('direction_id', $layoutUser->direction_id));
-                } elseif ($layoutUser->hasRole(\App\Models\User::ROLE_SERVICE) && $layoutUser->service_id) {
-                    $pendingQ->whereHas('pta', fn ($q) => $q->where('service_id', $layoutUser->service_id));
-                } else {
-                    $pendingQ->whereRaw('0 = 1');
+            $dashboardVersion = app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->dashboardVersion();
+            $validationBadgeCount = (int) \Illuminate\Support\Facades\Cache::remember(
+                'header-validation-badge:'.$dashboardVersion.':'.(int) $layoutUser->id,
+                now()->addSeconds(120),
+                function () use ($layoutUser): int {
+                    $isGlobalReader = $layoutUser->hasGlobalReadAccess()
+                        || $layoutUser->hasRole(\App\Models\User::ROLE_SUPER_ADMIN)
+                        || $layoutUser->hasRole(\App\Models\User::ROLE_DG)
+                        || $layoutUser->hasRole(\App\Models\User::ROLE_PLANIFICATION)
+                        || $layoutUser->hasRole(\App\Models\User::ROLE_CABINET);
+                    $pendingQ = \App\Models\Action::query()
+                        ->where('statut_validation', \App\Services\Actions\ActionTrackingService::VALIDATION_SOUMISE_CHEF);
+                    if (! $isGlobalReader) {
+                        if ($layoutUser->hasRole(\App\Models\User::ROLE_DIRECTION) && $layoutUser->direction_id) {
+                            $pendingQ->whereHas('pta', fn ($q) => $q->where('direction_id', $layoutUser->direction_id));
+                        } elseif ($layoutUser->hasRole(\App\Models\User::ROLE_SERVICE) && $layoutUser->service_id) {
+                            $pendingQ->whereHas('pta', fn ($q) => $q->where('service_id', $layoutUser->service_id));
+                        } else {
+                            $pendingQ->whereRaw('0 = 1');
+                        }
+                    }
+                    $count = (int) $pendingQ->count();
+                    $count += (int) \App\Models\Action::query()
+                        ->whereIn('statut_validation', [
+                            \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_CHEF,
+                            \App\Services\Actions\ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+                            \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+                        ])
+                        ->where(static fn ($q) => $q
+                            ->where('responsable_id', $layoutUser->id)
+                            ->orWhereHas('responsables', fn ($q2) => $q2->where('users.id', $layoutUser->id))
+                        )
+                        ->count();
+
+                    return $count;
                 }
-            }
-            $validationBadgeCount += (int) $pendingQ->count();
-            $returnedCount = \App\Models\Action::query()
-                ->whereIn('statut_validation', [
-                    \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_CHEF,
-                    \App\Services\Actions\ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
-                    \App\Services\Actions\ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
-                ])
-                ->where(static fn ($q) => $q
-                    ->where('responsable_id', $layoutUser->id)
-                    ->orWhereHas('responsables', fn ($q2) => $q2->where('users.id', $layoutUser->id))
-                )
-                ->count();
-            $validationBadgeCount += (int) $returnedCount;
+            );
             if ($validationBadgeCount > 0) {
                 $headerSidebarBadges['actions'] = (int) ($headerSidebarBadges['actions'] ?? 0) + $validationBadgeCount;
             }
         }
 
-        if (
-            \Illuminate\Support\Facades\Schema::hasTable('conversations')
-            && \Illuminate\Support\Facades\Schema::hasTable('conversation_participants')
-            && \Illuminate\Support\Facades\Schema::hasTable('messages')
-        ) {
-            $messagingService = app(\App\Services\Messaging\MessagingService::class);
-            $headerMessages = $messagingService->recentConversations($layoutUser, 6);
-            $headerMessageUnreadCount = $messagingService->unreadCount($layoutUser);
+        // A43 — Badge "Mes taches" : nombre de taches ouvertes a traiter pour
+        // l'utilisateur (execution, validations, financements, alertes...).
+        $openTasksCount = (int) app(\App\Services\PersonalTaskService::class)->openTaskCount($layoutUser);
+        if ($openTasksCount > 0) {
+            $headerSidebarBadges['mes_taches'] = $openTasksCount;
         }
+
     }
 
     $headerBellUnreadCount = $headerNotificationUnreadCount + $headerAlertUnreadCount;
@@ -196,7 +203,7 @@
     };
 @endphp
 
-<body class="admin-theme-scope anbg-glass-theme h-full" data-auto-refresh="0" data-alert-unread="{{ (int) $headerAlertUnreadCount }}" data-notification-unread="{{ (int) $headerNotificationUnreadCount }}" data-message-unread="{{ (int) $headerMessageUnreadCount }}">
+<body class="admin-theme-scope anbg-glass-theme h-full" data-auto-refresh="0" data-alert-unread="{{ (int) $headerAlertUnreadCount }}" data-notification-unread="{{ (int) $headerNotificationUnreadCount }}">
     <a href="#admin-main-content" class="skip-to-content">Aller au contenu principal</a>
     <div class="admin-page-root app-shell min-h-screen">
         <div id="admin-overlay" class="fixed inset-0 z-40 hidden bg-white/70 backdrop-blur-sm lg:hidden"></div>
@@ -313,90 +320,6 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.364-6.364-1.591 1.591M7.227 16.773l-1.591 1.591m12.728 0-1.591-1.591M7.227 7.227 5.636 5.636M12 8.25A3.75 3.75 0 1 1 12 15.75a3.75 3.75 0 0 1 0-7.5Z" />
                             </svg>
                         </button>
-
-                        <div class="relative" id="header-messaging">
-                        <button
-                            type="button"
-                            id="header-messaging-toggle"
-                            class="admin-navbar-icon-button relative inline-flex items-center justify-center"
-                            aria-label="Messagerie"
-                        >
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8m-8 4h5m-9 5l1.2-3.6A8 8 0 014 12V7a3 3 0 013-3h10a3 3 0 013 3v5a3 3 0 01-3 3H9l-4 4z" />
-                            </svg>
-                            <span
-                                id="header-messaging-badge"
-                                class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#3996d3] px-1 text-[10px] font-semibold leading-none text-white {{ $headerMessageUnreadCount > 0 ? '' : 'hidden' }}"
-                            >
-                                {{ $headerMessageUnreadCount > 99 ? '99+' : $headerMessageUnreadCount }}
-                            </span>
-                        </button>
-
-                        <div
-                            id="header-messaging-menu"
-                            data-messages-endpoint="{{ route('workspace.messaging.dropdown') }}"
-                            class="admin-dropdown-panel admin-navbar-dropdown admin-navbar-messaging-dropdown absolute right-0 z-40 mt-2 hidden w-[min(22rem,calc(100vw-2rem))] max-h-[72vh] overflow-hidden border border-[#d8ecf8] bg-white"
-                        >
-                            <div class="admin-dropdown-head flex items-center justify-between border-b border-[#d8ecf8] px-3 py-2">
-                                <div>
-                                    <p class="text-sm font-semibold">Messagerie</p>
-                                    <p class="text-xs text-[#667085]">{{ $headerMessageUnreadCount }}</p>
-                                </div>
-                                <a
-                                    href="{{ route('workspace.messaging.index') }}"
-                                    class="admin-dropdown-link border border-[#d8ecf8] px-2 py-1 text-xs font-medium text-[#3996d3] hover:bg-[#eaf6fd]"
-                                >
-                                    Ouvrir
-                                </a>
-                            </div>
-
-                            <div class="admin-dropdown-shortcuts border-b border-[#d8ecf8] px-3 py-2">
-                                <div class="grid gap-2 text-xs">
-                                    <a href="{{ route('workspace.messaging.index') }}" class="admin-dropdown-shortcut border border-[#d8ecf8] px-3 py-2 font-medium text-[#17324a] transition hover:bg-[#eaf6fd]">
-                                        Messages récents
-                                    </a>
-                                </div>
-                            </div>
-
-                            <div class="admin-dropdown-scroll max-h-96 overflow-y-auto">
-                                @forelse ($headerMessages as $thread)
-                                    @php
-                                        $threadUser = $thread->getAttribute('other_user');
-                                    @endphp
-                                    <a
-                                        href="{{ route('workspace.messaging.index', ['conversation' => $thread->id]) }}"
-                                        class="admin-dropdown-item admin-message-item block border-b border-[#d8ecf8] px-3 py-2 transition last:border-b-0 hover:bg-[#eaf6fd] {{ (int) $thread->getAttribute('unread_messages_count') > 0 ? 'bg-[#eaf6fd]' : '' }}"
-                                    >
-                                        <div class="mb-1 flex items-start justify-between gap-2">
-                                            <div class="min-w-0">
-                                                <p class="truncate text-sm font-semibold text-[#17324a]">
-                                                    {{ $thread->getAttribute('display_name') }}
-                                                </p>
-                                                <p class="truncate text-[11px] text-[#667085]">
-                                                    {{ $threadUser?->agent_fonction ?: $thread->getAttribute('display_scope') }}
-                                                </p>
-                                            </div>
-                                            @if ((int) $thread->getAttribute('unread_messages_count') > 0)
-                                                <span class="app-badge app-badge-warning px-2 py-0.5 text-[10px]">
-                                                    {{ $thread->getAttribute('unread_messages_count') }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <p class="truncate text-xs text-[#667085]">
-                                            {{ $thread->latestMessage?->body ?: ($thread->latestMessage?->attachment_original_name ?: 'Conversation ouverte.') }}
-                                        </p>
-                                        <p class="mt-1 text-[11px] text-[#667085]">
-                                            {{ $thread->latestMessage?->sent_at?->diffForHumans() ?? 'Nouveau' }}
-                                        </p>
-                                    </a>
-                                @empty
-                                    <div class="admin-dropdown-empty px-3 py-6 text-center text-sm text-[#667085]">
-                                        Aucune conversation récente.
-                                    </div>
-                                @endforelse
-                            </div>
-                        </div>
-                    </div>
 
                         <div class="relative" id="header-notifications">
                         <button

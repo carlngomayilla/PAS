@@ -1638,4 +1638,119 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
             padding: 1.15rem !important;
         }
     }
+
+    /* ============================================================
+       PREMIUM PASS v3 (2026-06-10) — barre supérieure + en-têtes de page
+       Raffinement du rendu général : navbar frostée cohérente avec le
+       système de cartes, héros de page avec halo lumineux et typographie
+       soignée. Posé en fin de couche pour faire autorité.
+       ============================================================ */
+
+    /* ── Barre supérieure (navbar) : verre clair premium ── */
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme #admin-shell-header,
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme .admin-page-header {
+        background-color: rgba(255, 255, 255, 0.80) !important;
+        background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 250, 255, 0.78)) !important;
+        backdrop-filter: blur(22px) saturate(165%) !important;
+        -webkit-backdrop-filter: blur(22px) saturate(165%) !important;
+        border-bottom: 1px solid var(--anbg-line) !important;
+        box-shadow: 0 12px 32px -20px rgba(28, 32, 61, 0.34) !important;
+    }
+
+    /* Filet dégradé sous la navbar pour la détacher proprement du contenu */
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme #admin-shell-header::after {
+        content: "" !important;
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: -1px !important;
+        height: 1px !important;
+        background: linear-gradient(90deg, transparent, rgba(57, 150, 211, 0.38), transparent) !important;
+        pointer-events: none !important;
+    }
+
+    /* Titre & accroche de la navbar */
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme .admin-navbar-title {
+        color: var(--anbg-navy) !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.012em !important;
+    }
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme .starline-greeting {
+        color: var(--anbg-muted) !important;
+        font-weight: 600 !important;
+    }
+
+    /* Boutons icônes + pills de contrôle : verre clair cohérent */
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .admin-navbar-icon-button,
+        .admin-exercise-filter,
+        .admin-local-clock,
+        .admin-navbar-user
+    ) {
+        background: rgba(255, 255, 255, 0.70) !important;
+        border: 1px solid var(--anbg-line) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 2px 8px -5px rgba(28, 32, 61, 0.18) !important;
+    }
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme .admin-navbar-icon-button {
+        color: var(--anbg-blue-deep) !important;
+    }
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .admin-navbar-icon-button:hover,
+        .admin-exercise-filter:hover,
+        .admin-local-clock:hover,
+        .admin-navbar-user:hover
+    ) {
+        border-color: color-mix(in srgb, var(--anbg-blue) 55%, var(--anbg-line)) !important;
+        background: rgba(255, 255, 255, 0.94) !important;
+        box-shadow: 0 8px 20px -10px rgba(57, 150, 211, 0.45) !important;
+    }
+
+    /* ── Héros de page : halo lumineux décoratif ── */
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .app-page-header,
+        .showcase-hero,
+        .page-header,
+        .workspace-header,
+        .page-heading,
+        .workspace-heading
+    )::after {
+        content: "" !important;
+        display: block !important;
+        position: absolute !important;
+        top: -45% !important;
+        right: -8% !important;
+        width: 36% !important;
+        height: 190% !important;
+        background: radial-gradient(circle at center, rgba(57, 150, 211, 0.50), transparent 66%) !important;
+        opacity: 0.72 !important;
+        pointer-events: none !important;
+        z-index: 0 !important;
+    }
+
+    /* Eyebrow : pastille raffinée */
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-hero .showcase-eyebrow,
+        .app-page-header .app-eyebrow
+    ) {
+        padding: 0.28rem 0.72rem !important;
+        border-radius: 999px !important;
+        font-size: 0.68rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.08em !important;
+        -webkit-backdrop-filter: blur(6px) !important;
+        backdrop-filter: blur(6px) !important;
+    }
+
+    /* Titre du héros : échelle & graisse premium */
+    html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+        .showcase-hero .showcase-title,
+        .showcase-hero h1,
+        .app-page-header .app-title,
+        .app-page-header h1
+    ) {
+        font-size: clamp(1.6rem, 2.4vw, 2.15rem) !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.015em !important;
+        line-height: 1.1 !important;
+    }
 }
