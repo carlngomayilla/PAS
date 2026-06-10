@@ -882,35 +882,6 @@
     $decisionCharts = [
         [
             'title' => 'Graphique performance des services',
-            'rows' => collect($synthesisServiceRows)->take(8)->map(fn (array $row): array => [
-                'label' => $shortText($row['label'] ?? '-', 34),
-                'value' => (float) ($row['kpi_global'] ?? 0),
-                'meta' => $fmtCount($row['actions_total'] ?? 0).' actions',
-                'color' => '#3996D3',
-            ])->all(),
-        ],
-        [
-            'title' => 'Graphique performance des agents',
-            'rows' => collect($synthesisAgentRows)->take(8)->map(fn (array $row): array => [
-                'label' => $shortText($row['agent'] ?? '-', 34),
-                'value' => (float) ($row['taux_execution'] ?? 0),
-                'meta' => $fmtCount($row['actions_total'] ?? 0).' actions',
-                'color' => '#8FC043',
-            ])->all(),
-        ],
-        [
-            'title' => 'Graphique état des actions',
-            'rows' => [
-                ['label' => 'Actions terminées', 'value' => ($metrics['totals']['actions_total'] ?? 0) > 0 ? (($statusCount('acheve') / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100) : 0, 'meta' => $fmtCount($statusCount('acheve')).' actions', 'color' => '#8FC043'],
-                ['label' => 'Actions en cours', 'value' => ($metrics['totals']['actions_total'] ?? 0) > 0 ? (($statusCount('en_cours') / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100) : 0, 'meta' => $fmtCount($statusCount('en_cours')).' actions', 'color' => '#3996D3'],
-                ['label' => 'Actions en retard', 'value' => ($metrics['totals']['actions_total'] ?? 0) > 0 ? (((int) ($metrics['alerts']['actions_en_retard'] ?? $statusCount('en_retard')) / max(1, (int) ($metrics['totals']['actions_total'] ?? 0))) * 100) : 0, 'meta' => $fmtCount($metrics['alerts']['actions_en_retard'] ?? $statusCount('en_retard')).' actions', 'color' => '#B42318'],
-            ],
-        ],
-    ];
-
-    $decisionCharts = [
-        [
-            'title' => 'Graphique performance des services',
             'rows' => collect($decisionServiceRows)->take(8)->map(fn (array $row): array => [
                 'label' => $shortText($row['service'] ?? '-', 34),
                 'value' => (float) ($row['score'] ?? 0),

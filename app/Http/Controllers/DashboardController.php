@@ -1502,22 +1502,6 @@ class DashboardController extends Controller
      * @param Collection<int, Action> $actions
      * @return array<string, mixed>
      */
-    private function buildRoleStatusChart(Collection $actions): array
-    {
-        $rows = collect($this->buildStatusCards($actions))->values();
-
-        return [
-            'labels' => $rows->pluck('label')->all(),
-            'values' => $rows->map(fn (array $row): int => (int) ($row['count'] ?? 0))->all(),
-            'urls' => $rows->pluck('href')->all(),
-            'colors' => $rows->pluck('color')->all(),
-        ];
-    }
-
-    /**
-     * @param Collection<int, Action> $actions
-     * @return array<string, mixed>
-     */
     private function buildRoleTrendChart(Collection $actions): array
     {
         $currentYear = (int) now()->year;
@@ -1937,11 +1921,8 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Points de vigilance', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
                 $this->makeRoleCard('Directions en difficulté', $portfolio['directions_difficulte'], 'Score faible ou retards', route('workspace.reporting'), '#F9B13C', '#FFF8D6', null, 'warning'),
             ],
-            'status_chart' => [
-                'title' => 'Répartition globale des actions',
-                'subtitle' => 'Lecture transverse par statut opérationnel.',
-                ...$this->buildRoleStatusChart($actions),
-            ],
+            // Graphique « Repartition des statuts » retire pour tous les roles
+            // (demande metier 2026-06-10).
             'trend_chart' => [
                 'title' => 'Évolution globale du dispositif',
                 'subtitle' => 'Actions, achèvements et retards sur l\'année en cours.',
@@ -2010,11 +1991,9 @@ class DashboardController extends Controller
             'summary_cards' => $summaryCards,
             'overview_enabled' => true,
             'comparison_chart_enabled' => true,
-            'status_chart' => [
-                'title' => 'Repartition institutionnelle des statuts',
-                'subtitle' => 'Vision rapide du portefeuille total, sans filtrer sur la validation finale.',
-                ...$this->buildRoleStatusChart($actions),
-            ],
+            // Graphique « Repartition institutionnelle des statuts » retire (demande
+            // metier 2026-06-10). La repartition reste visible via les autres
+            // surfaces (status distribution global, reporting).
             'trend_chart' => [
                 'title' => 'Evolution institutionnelle',
                 'subtitle' => 'Lecture temporelle opérationnelle du portefeuille DG.',
@@ -2068,11 +2047,8 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Validations en attente', count($pendingRows), 'Actions a arbitrer', route('workspace.actions.index', ['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]), '#3996D3', '#E8F3FB', null, 'info'),
                 $this->makeRoleCard('Directions en difficulté', $portfolio['directions_difficulte'], 'Suivi prioritaire', route('workspace.reporting'), '#F9B13C', '#FFF8D6', null, 'warning'),
             ],
-            'status_chart' => [
-                'title' => 'Repartition des statuts',
-                'subtitle' => 'Vision transverse des statuts opérationnels.',
-                ...$this->buildRoleStatusChart($actions),
-            ],
+            // Graphique « Repartition des statuts » retire pour tous les roles
+            // (demande metier 2026-06-10).
             'trend_chart' => [
                 'title' => 'Évolution des alertes et retards',
                 'subtitle' => 'Lecture temporelle des tensions du portefeuille.',
@@ -2115,11 +2091,8 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Mes alertes actives', $alertCount, 'Actions a surveiller', route('workspace.alertes', ['niveau' => 'warning']), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Actions a mettre a jour', $updateCount, 'Ecarts de progression', route('workspace.actions.index', ['sort' => 'progression_desc']), '#1C203D', '#E8F3FB', null, 'info'),
             ],
-            'status_chart' => [
-                'title' => 'Repartition de mes actions',
-                'subtitle' => 'Lecture immediate du portefeuille personnel par statut.',
-                ...$this->buildRoleStatusChart($actions),
-            ],
+            // Graphique « Repartition des statuts » retire pour tous les roles
+            // (demande metier 2026-06-10).
             'trend_chart' => [
                 'title' => 'Evolution mensuelle de mes actions',
                 'subtitle' => 'Volume, achèvement et retards par mois de démarrage.',
@@ -2171,11 +2144,8 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Alertes actives', $alertCount, 'Actions critiques', route('workspace.alertes', ['niveau' => 'warning']), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Taux exécution service', number_format($completionRate, 0).'%', 'Actions achevées / total', route('workspace.actions.index', ['statut' => 'achevees']), '#8FC043', '#F2F8E8', null, 'success'),
             ],
-            'status_chart' => [
-                'title' => 'Repartition des actions du service',
-                'subtitle' => 'Lecture opérationnelle du service par statut.',
-                ...$this->buildRoleStatusChart($actions),
-            ],
+            // Graphique « Repartition des statuts » retire pour tous les roles
+            // (demande metier 2026-06-10).
             'trend_chart' => [
                 'title' => 'Evolution mensuelle du service',
                 'subtitle' => 'Volume, achèvement et retards sur les actions du service.',
@@ -2238,11 +2208,8 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Respect des delais', number_format($delayRate, 0).'%', 'Actions hors retard', route('workspace.actions.index', ['statut' => 'en_retard']), '#1C203D', '#E8F3FB', null, 'info'),
                 $this->makeRoleCard('Score global direction', number_format($globalScore, 0), 'Moyenne sur toutes les actions visibles', route('workspace.reporting'), '#1C203D', '#E8F3FB', null, 'info'),
             ],
-            'status_chart' => [
-                'title' => 'Repartition des actions de la direction',
-                'subtitle' => 'Lecture macro par statut opérationnel.',
-                ...$this->buildRoleStatusChart($actions),
-            ],
+            // Graphique « Repartition des statuts » retire pour tous les roles
+            // (demande metier 2026-06-10).
             'trend_chart' => [
                 'title' => 'Evolution mensuelle de la direction',
                 'subtitle' => 'Volume, achèvement et retards par mois de démarrage.',

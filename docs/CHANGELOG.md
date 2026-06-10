@@ -5,6 +5,128 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-10 — Dashboard graphiques : disposition 2 colonnes égales (côte à côte)
+
+### Demande
+
+Afficher les graphiques côte à côte, 2 par 2.
+
+### Modification
+
+Les 3 rangées « bento » de l'onglet Graphiques (`charts-bento-row-hero`, `-row-trend`,
+`-row-rank`) étaient en colonnes **asymétriques** (2fr/1.2fr, 1.8fr/1fr, 1.4fr/1fr).
+Passées en **2 colonnes égales** `repeat(2, minmax(0, 1fr))`, donnant une grille
+régulière 2-par-2. Les points de rupture responsive existants (stack < 1100 px)
+restent inchangés.
+
+Fichier : `resources/css/anbg-glass.css` (assets reconstruits via `npm run build`).
+
+---
+
+## 2026-06-10 — Dashboard graphiques : suppression du `$decisionCharts` mort
+
+### Constat
+
+`$decisionCharts` était assigné deux fois de suite dans le partial. La première
+définition (services via `$synthesisServiceRows`, agents, et un bloc « Graphique
+état des actions ») était immédiatement écrasée par la seconde — donc jamais
+rendue (code mort).
+
+### Modification
+
+Suppression de la première définition. Seule la version active (services/agents
+sur `decision_*_rows` + « Graphique evolution trimestrielle ») subsiste, ce qui
+correspond au chip « Services, agents et evolution ».
+
+- `resources/views/partials/dashboard-analytics.blade.php` : retrait du premier
+  bloc `$decisionCharts = [...]` (≈28 lignes).
+
+---
+
+## 2026-06-10 — Dashboard graphiques : renommage « Top actions à risque »
+
+### Constat
+
+Le panneau « Top actions à risque » de l'onglet graphiques affichait en réalité
+les **meilleures** actions : `top_action_bars` dérive de `$actionRows`, trié par
+score KPI **décroissant** (`->sortByDesc(kpi_global)`), avec une couleur de barre
+verte pour les scores élevés. Le titre contredisait donc la donnée (top
+performers présentés comme « à risque »).
+
+### Modification
+
+Titre renommé en « Top actions (meilleur score) » pour correspondre au tri réel
+(décroissant par `kpi_global`). Aucun changement de logique côté contrôleur.
+
+- `resources/views/partials/dashboard-analytics/_panel-charts.blade.php`
+  ```blade
+  <h2 class="chart-title">Top actions (meilleur score)</h2>
+  ```
+
+---
+
+## 2026-06-10 — Sidebar : fusion de « Validations » dans « Mes tâches »
+
+### Demande
+
+Pourquoi le module « Validations » n'a-t-il pas été fusionné avec « Mes tâches »
+dans la sidebar ? → Terminer la fusion en supprimant l'entrée distincte.
+
+### Constat
+
+La fusion A42 (« la validation se fait désormais dans Mes tâches », acte
+Valider/Renvoyer inline) n'avait été appliquée qu'au niveau des pages (carte
+« En attente validation » repointée vers Mes tâches). Le registre de navigation
+n'avait pas suivi : les rôles **chef** et **ucas** déclaraient encore un module
+`validations` distinct dans `UserWorkspaceService`, pointant qui plus est vers
+une vue filtrée de la page Actions (`/workspace/actions?vue=pilotage&…`) et non
+vers Mes tâches — donc redondant et incohérent.
+
+### Modification
+
+Suppression des entrées `validations` (rôles chef + ucas) dans
+`UserWorkspaceService`. La validation vit désormais uniquement dans « Mes
+tâches ». L'arm `'validations'` de `WorkspaceController::webRouteForModule()`
+est **conservé** comme repli (le `match` n'a pas de `default` : éviter un
+`UnhandledMatchError` si une config de modules persistée référence encore ce code).
+
+### Fichiers modifiés
+
+- `app/Services/UserWorkspaceService.php` (rôles `chef` et `ucas`)
+
+---
+
+## 2026-06-10 — Dashboard : suppression du graphique « Répartition des statuts » (tous rôles)
+
+### Demande
+
+Supprimer le premier graphique de statuts (« Répartition des statuts » / « Répartition
+institutionnelle des statuts ») du dashboard, **pour tous les rôles**.
+
+### Modification
+
+- `DashboardController` : retrait des **6 blocs `status_chart`** (DG, super_admin,
+  agent, service, direction, sciq) et suppression de la méthode devenue morte
+  `buildRoleStatusChart()`. Les autres graphiques (comparaison, tendance, support)
+  sont conservés.
+- `partials/dashboard-role-overview.blade.php` : rendu du graphique de statuts
+  conditionné à la présence de données
+  (`$showStatusChart = … && ! empty($statusChart['labels'])`) → aucune carte vide. Le JS
+  (`dashboard-render.js`) gardait déjà `if (status.labels?.length > 0)` → aucun mount.
+- `DashboardProfileInteractionsTest` : l'assertion de présence devient
+  `assertDontSee('dashboard-role-status-chart')`.
+
+Fichiers : `app/Http/Controllers/DashboardController.php`,
+`resources/views/partials/dashboard-role-overview.blade.php`,
+`tests/Feature/DashboardProfileInteractionsTest.php`.
+
+### Vérification
+
+`php artisan test --filter DashboardProfileInteractionsTest|SuperAdminDashboardProfilesTest|`
+`WebWorkspaceTest` → **36 passés**, 1 skip (données).
+
+---
+
 ## 2026-06-10 — Rendu premium : barre supérieure & en-têtes de page
 
 ### Demande

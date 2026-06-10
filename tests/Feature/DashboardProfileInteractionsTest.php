@@ -40,7 +40,8 @@ class DashboardProfileInteractionsTest extends TestCase
         $charts->assertOk();
         $charts->assertSee('Indicateurs KPI');
         $charts->assertDontSee('Analytique avancee');
-        $charts->assertSee('dashboard-role-status-chart', false);
+        // Graphique « Repartition des statuts » retire pour tous les roles (2026-06-10).
+        $charts->assertDontSee('dashboard-role-status-chart', false);
         $charts->assertSee('dashboard-role-support-chart', false);
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');

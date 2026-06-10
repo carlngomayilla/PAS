@@ -456,14 +456,11 @@ body.anbg-glass-theme .charts-bento {
     display: grid !important;
     gap: 1rem !important;
 }
-body.anbg-glass-theme .charts-bento-row-hero {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) !important;
-}
-body.anbg-glass-theme .charts-bento-row-trend {
-    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) !important;
-}
+/* Disposition 2 colonnes egales (cote a cote, 2 a 2) pour toutes les rangees. */
+body.anbg-glass-theme .charts-bento-row-hero,
+body.anbg-glass-theme .charts-bento-row-trend,
 body.anbg-glass-theme .charts-bento-row-rank {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 @media (max-width: 1100px) {
     body.anbg-glass-theme .charts-bento {

@@ -294,7 +294,7 @@
 
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Top actions à risque</h2>
+                <h2 class="chart-title">Top actions (meilleur score)</h2>
                 <span class="showcase-chip">Top {{ count($analytics['top_action_bars'] ?? []) }}</span>
             </div>
             @if ($analytics['top_action_bars'] ?? false)

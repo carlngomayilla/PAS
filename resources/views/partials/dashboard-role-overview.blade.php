@@ -11,7 +11,10 @@
     $supportChart = $roleDashboard['support_chart'] ?? [];
     $showOverview = (bool) ($roleDashboard['overview_enabled'] ?? true);
     $showComparisonChart = (bool) ($roleDashboard['comparison_chart_enabled'] ?? true);
-    $showStatusChart = (bool) ($roleDashboard['status_chart_enabled'] ?? true);
+    // Le graphique statuts ne s'affiche que si le profil l'autorise ET qu'il y a
+    // des donnees (certains roles, ex. DG, ne fournissent plus ce graphique).
+    $showStatusChart = (bool) ($roleDashboard['status_chart_enabled'] ?? true)
+        && ! empty($statusChart['labels']);
     $showTrendChart = (bool) ($roleDashboard['trend_chart_enabled'] ?? true);
     $showSupportChart = (bool) ($roleDashboard['support_chart_enabled'] ?? true);
     $statisticalPolicy = is_array(($statisticalPolicy ?? null)) ? $statisticalPolicy : [];
