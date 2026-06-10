@@ -25,15 +25,22 @@ QUEUE_CONNECTION=database
 BREVO_API_TIMEOUT=5
 ```
 
-Puis, à **chaque déploiement** (script post-deploy) :
+Puis, à **chaque déploiement**, lancer le script fourni (Ubuntu Server) :
+
+```bash
+bash scripts/deploy.sh
+# Options : SKIP_GIT=1, SKIP_NPM=1, FPM_SERVICE=php8.3-fpm (ou "" pour désactiver)
+```
+
+Le script enchaîne : garde-fou `APP_DEBUG`, mode maintenance, `composer install
+--no-dev`, build des assets, `migrate --force`, `optimize` (config + routes + vues +
+events), `queue:restart`, puis `reload php-fpm` (purge OPcache). Équivalent manuel :
 
 ```bash
 php artisan migrate --force
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-php artisan event:cache
+php artisan optimize        # config:cache + event:cache + route:cache + view:cache
 php artisan queue:restart
+sudo systemctl reload php8.3-fpm
 ```
 
 > ⚠️ Après un `config:cache`, toute modification du `.env` exige de relancer

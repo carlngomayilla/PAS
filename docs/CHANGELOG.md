@@ -143,10 +143,16 @@ déploiement, service systemd du worker, et backlog d'optimisations (dashboard,
 bundles JS, latence DB). La table `jobs` existe déjà (migration `0001_01_01_000002`),
 `QUEUE_CONNECTION=database` est donc activable en prod sans nouvelle migration.
 
+Nouveau script `scripts/deploy.sh` (Ubuntu Server, exécutable) : garde-fou
+`APP_DEBUG`, mode maintenance, `composer install --no-dev`, build assets,
+`migrate --force`, `php artisan optimize`, `queue:restart` et `reload php8.3-fpm`
+(purge OPcache). Options `SKIP_GIT` / `SKIP_NPM` / `FPM_SERVICE`.
+
 ### Vérification
 
 `php artisan test --filter BrevoEmailChannelTest|BusinessWorkflowNotificationTest|`
 `WorkspaceNotificationFailSafeTest|SuperAdminNotificationsSmokeTest` → **10 passés**.
+`bash -n scripts/deploy.sh` → syntaxe OK.
 
 ---
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Déploiement production PAS ANBG (serveur Linux).
+# Déploiement production PAS ANBG (Ubuntu Server).
 # Enchaîne dépendances, build des assets, migrations et mise en cache des
 # optimisations (config, routes, vues, events) + redémarrage du worker de file.
 #
