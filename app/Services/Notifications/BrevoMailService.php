@@ -62,9 +62,24 @@ class BrevoMailService
             return;
         }
 
-        foreach ($targets as $user) {
-            $this->sendOne($event, $user, $payload);
+        $send = function () use ($event, $targets, $payload): void {
+            foreach ($targets as $user) {
+                $this->sendOne($event, $user, $payload);
+            }
+        };
+
+        // Perf : en contexte web, l'envoi (HTTP API Brevo ou SMTP, plusieurs
+        // secondes possibles) est differe APRES l'envoi de la reponse HTTP afin
+        // de ne jamais bloquer la requete de l'utilisateur — sans dependre d'un
+        // worker de file d'attente. En console (commandes, worker) et en tests,
+        // l'envoi reste synchrone pour garder un comportement deterministe.
+        if (app()->runningInConsole()) {
+            $send();
+
+            return;
         }
+
+        dispatch($send)->afterResponse();
     }
 
     /**

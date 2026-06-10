@@ -11,7 +11,6 @@ use App\Http\Controllers\Web\GovernanceWebController;
 use App\Http\Controllers\Web\KpiMesureWebController;
 use App\Http\Controllers\Web\KpiWebController;
 use App\Http\Controllers\Web\MonitoringWebController;
-use App\Http\Controllers\Web\MessagingWebController;
 use App\Http\Controllers\Web\NotificationWebController;
 use App\Http\Controllers\Web\PaoWebController;
 use App\Http\Controllers\Web\PasWebController;
@@ -90,24 +89,6 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
 
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace.index');
         Route::get('/workspace/recherche', [GlobalSearchWebController::class, 'index'])->name('workspace.search');
-        Route::get('/workspace/messagerie', [MessagingWebController::class, 'index'])
-            ->name('workspace.messaging.index');
-        Route::get('/workspace/messagerie/dropdown', [MessagingWebController::class, 'dropdown'])
-            ->name('workspace.messaging.dropdown');
-        Route::get('/workspace/messagerie/profil/{target}/card', [MessagingWebController::class, 'profileCard'])
-            ->name('workspace.messaging.profile.card');
-        Route::post('/workspace/messagerie/direct/{target}', [MessagingWebController::class, 'startDirect'])
-            ->name('workspace.messaging.direct');
-        Route::post('/workspace/messagerie/conversations/{conversation}/messages', [MessagingWebController::class, 'send'])
-            ->name('workspace.messaging.send');
-        Route::get('/workspace/messagerie/conversations/{conversation}/updates', [MessagingWebController::class, 'updates'])
-            ->name('workspace.messaging.updates');
-        Route::get('/workspace/messagerie/conversations/{conversation}/messages/{message}/attachment', [MessagingWebController::class, 'downloadAttachment'])
-            ->name('workspace.messaging.attachment.download');
-        Route::get('/workspace/messagerie/conversations/{conversation}/messages/{message}/attachment/preview', [MessagingWebController::class, 'previewAttachment'])
-            ->name('workspace.messaging.attachment.preview');
-        Route::post('/workspace/messagerie/conversations/{conversation}/favorite', [MessagingWebController::class, 'toggleFavorite'])
-            ->name('workspace.messaging.favorite');
         Route::get('/workspace/notifications', [NotificationWebController::class, 'index'])
             ->name('workspace.notifications.index');
         Route::get('/workspace/notifications/{notification}/read', [NotificationWebController::class, 'read'])

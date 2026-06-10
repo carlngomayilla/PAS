@@ -75,7 +75,6 @@ class WorkspaceController extends Controller
     {
         return match ((string) ($module['code'] ?? '')) {
             'pilotage' => route('dashboard'),
-            'messagerie' => route('workspace.messaging.index'),
             'mes_taches' => route('workspace.tasks.index'),
             'mes_actions' => route('workspace.actions.index', ['vue' => 'mes_actions']),
             'corrections' => route('workspace.actions.index', ['vue' => 'mes_actions', 'statut' => 'a_corriger']),

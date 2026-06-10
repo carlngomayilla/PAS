@@ -69,7 +69,6 @@ class UserWorkspaceService
         $canManageDelegations = $user->hasPermission('delegations.manage');
         $canReadReporting = ($canReadPlanning || $isAgent) && $user->hasPermission('reporting.read');
         $canReadAlerts = $canReadPlanning && $user->hasPermission('alerts.read');
-        $canUseMessaging = $user->hasPermission('messagerie.read');
         $isTechnicalAdmin = in_array($matrixRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL], true);
         // Admin fonctionnel et SCIQ suivi global ont un rôle proche de Planification
         // pour la gestion des référentiels métier.
@@ -100,17 +99,6 @@ class UserWorkspaceService
             'can_write' => false,
             'actions' => ['Consulter'],
         ]];
-
-        if ($canUseMessaging) {
-            $modules[] = [
-                'code' => 'messagerie',
-                'label' => 'Messagerie',
-                'description' => 'Annuaire interactif et échanges internes',
-                'endpoint' => '/workspace/messagerie',
-                'can_write' => true,
-                'actions' => ['Consulter', 'Écrire', 'Suivre non lus'],
-            ];
-        }
 
         $isServiceOnly = $matrixRole === User::ROLE_SERVICE;
         $isDirectionOnly = $matrixRole === User::ROLE_DIRECTION;

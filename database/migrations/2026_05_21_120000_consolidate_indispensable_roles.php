@@ -162,7 +162,6 @@ return new class extends Migration
             'retention.manage',
             'api_docs.read',
             'audit.read',
-            'messagerie.read',
         ];
 
         return [
@@ -181,9 +180,8 @@ return new class extends Migration
                 'users.manage_roles',
                 'delegations.manage',
                 'audit.read',
-                'messagerie.read',
             ],
-            User::ROLE_DG => ['scope.global.read', 'planning.read', 'reporting.read', 'alerts.read', 'audit.read', 'messagerie.read'],
+            User::ROLE_DG => ['scope.global.read', 'planning.read', 'reporting.read', 'alerts.read', 'audit.read'],
             User::ROLE_PLANIFICATION => [
                 'scope.global.read',
                 'planning.read',
@@ -196,12 +194,11 @@ return new class extends Migration
                 'users.manage',
                 'users.manage_roles',
                 'delegations.manage',
-                'messagerie.read',
             ],
-            User::ROLE_DIRECTION => ['planning.read', 'planning.write.direction', 'reporting.read', 'alerts.read', 'messagerie.read'],
-            User::ROLE_SERVICE => ['planning.read', 'planning.write.service', 'reporting.read', 'alerts.read', 'messagerie.read'],
-            User::ROLE_AGENT => ['reporting.read', 'messagerie.read'],
-            User::ROLE_AUDITEUR => ['planning.read', 'reporting.read', 'audit.read', 'messagerie.read'],
+            User::ROLE_DIRECTION => ['planning.read', 'planning.write.direction', 'reporting.read', 'alerts.read'],
+            User::ROLE_SERVICE => ['planning.read', 'planning.write.service', 'reporting.read', 'alerts.read'],
+            User::ROLE_AGENT => ['reporting.read'],
+            User::ROLE_AUDITEUR => ['planning.read', 'reporting.read', 'audit.read'],
         ];
     }
 };

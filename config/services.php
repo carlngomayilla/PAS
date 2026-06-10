@@ -52,7 +52,7 @@ return [
         'transport' => env('BREVO_TRANSPORT', 'api'),
         'api_key' => env('BREVO_API_KEY'),
         'api_endpoint' => env('BREVO_API_ENDPOINT', 'https://api.brevo.com/v3/smtp/email'),
-        'api_timeout' => (int) env('BREVO_API_TIMEOUT', 10),
+        'api_timeout' => (int) env('BREVO_API_TIMEOUT', 5),
         // En local Windows PHP n'a souvent pas de bundle CA configuré (curl.cainfo
         // vide dans php.ini) → cURL error 60. En dev, on peut désactiver la vérif
         // SSL via BREVO_API_VERIFY_SSL=false. NE JAMAIS le faire en production.

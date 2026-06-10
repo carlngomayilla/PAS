@@ -3,6 +3,7 @@
 @section('content')
     <div class="app-screen-flow">
         <x-ui.page-title
+            eyebrow="Gouvernance du planning"
             title="Demandes de modification"
             subtitle="Circuit : Chef de service → Directeur → Planification (avis) → DG (décision). Une approbation rouvre l'action en écriture."
         />

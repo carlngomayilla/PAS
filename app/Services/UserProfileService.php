@@ -127,14 +127,7 @@ class UserProfileService
             'role'       => $user->role,
             'role_label' => $user->roleLabel(),
             'scope'      => $user->profileScopeLabel(),
-            'items'      => [
-                ...$items,
-                [
-                    'module'     => 'Messagerie interne',
-                    'operations' => ['Consulter annuaire', 'Envoyer messages directs'],
-                    'portee'     => $user->profileScopeLabel(),
-                ],
-            ],
+            'items'      => $items,
         ];
     }
 }

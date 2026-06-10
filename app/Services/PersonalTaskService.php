@@ -12,6 +12,7 @@ use App\Services\Alerting\AlertRoutingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class PersonalTaskService
 {
@@ -27,9 +28,55 @@ class PersonalTaskService
      */
     public function forUser(User $user, int $limit = 20): array
     {
+        $items = $this->collectCached($user);
+
+        return [
+            'items' => $items->take($limit)->all(),
+            'summary' => $this->summary($user, $items),
+        ];
+    }
+
+    /**
+     * Compteur leger des taches ouvertes (badge sidebar) : reutilise la meme
+     * collecte cachee que forUser() — un seul calcul des 8 sources de taches
+     * par fenetre de cache, partage entre le badge et le dashboard.
+     */
+    public function openTaskCount(User $user): int
+    {
+        return $this->collectCached($user)->count();
+    }
+
+    /**
+     * Collecte des taches mise en cache 60s par utilisateur (comme le centre
+     * d'alertes) pour ne pas rejouer les 8 requetes sources a chaque chargement
+     * de page (badge sidebar) ni a chaque ouverture du dashboard (forUser).
+     *
+     * La cle integre la version d'alertes, bumpee sur evenement metier
+     * (statut action, kpi_mesure, justificatif, suppression...), afin que la
+     * liste reagisse immediatement aux changements sans attendre l'expiration
+     * du TTL.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function collectCached(User $user): Collection
+    {
+        $version = app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->alertsVersion();
+
+        return Cache::remember(
+            'personal-tasks:collect:'.(int) $user->id.':'.$version,
+            now()->addSeconds(60),
+            fn (): Collection => $this->collect($user)
+        );
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function collect(User $user): Collection
+    {
         $role = $this->workspaceService->specSidebarRole($user);
 
-        $items = collect()
+        return collect()
             ->merge($this->executionTasks($user))
             ->merge($this->subActionExecutionTasks($user))
             ->merge($this->chefValidationTasks($user, $role))
@@ -47,11 +94,6 @@ class PersonalTaskService
                 (string) ($task['title'] ?? '')
             ))
             ->values();
-
-        return [
-            'items' => $items->take($limit)->all(),
-            'summary' => $this->summary($user, $items),
-        ];
     }
 
     /**
@@ -180,19 +222,25 @@ class PersonalTaskService
                 $received = $this->carbon($action->soumise_le) ?? $this->carbon($action->updated_at);
                 $deadline = $received?->copy()->addHours(48);
 
-                return $this->task(
-                    key: 'chef-validation:'.$action->id,
-                    type: 'validation_chef',
-                    title: 'Validation chef',
-                    subject: (string) $action->libelle,
-                    context: $this->actionContext($action),
-                    responsible: $action->responsable?->name,
-                    receivedAt: $received,
-                    deadlineAt: $deadline,
-                    url: route('workspace.actions.suivi', $action).'#action-validation',
-                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
-                    scoreImpact: 'Retard de validation impute au valideur, pas a l agent.'
-                );
+                return [
+                    ...$this->task(
+                        key: 'chef-validation:'.$action->id,
+                        type: 'validation_chef',
+                        title: 'Validation chef',
+                        subject: (string) $action->libelle,
+                        context: $this->actionContext($action),
+                        responsible: $action->responsable?->name,
+                        receivedAt: $received,
+                        deadlineAt: $deadline,
+                        url: route('workspace.actions.suivi', $action).'#action-validation',
+                        criticality: $this->criticalityFromDeadline($deadline, 'importante'),
+                        scoreImpact: 'Retard de validation impute au valideur, pas a l agent.'
+                    ),
+                    // A42 — Validation inline depuis Mes taches (cf. actions.review).
+                    'can_validate' => true,
+                    'action_id' => (int) $action->id,
+                    'sous_action_id' => null,
+                ];
             });
     }
 
@@ -223,21 +271,27 @@ class PersonalTaskService
                     ?? $this->carbon($subAction->updated_at);
                 $deadline = $received?->copy()->addHours(48);
 
-                return $this->task(
-                    key: 'chef-sub-action-validation:'.$subAction->id,
-                    type: 'validation_sous_action_chef',
-                    title: 'Validation sous-action',
-                    subject: (string) $subAction->libelle,
-                    context: $subAction->action?->libelle,
-                    responsible: $subAction->agent?->name,
-                    receivedAt: $received,
-                    deadlineAt: $deadline,
-                    url: $subAction->action
-                        ? route('workspace.actions.suivi', $subAction->action).'#action-weeks'
-                        : route('dashboard'),
-                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
-                    scoreImpact: 'Retard de validation impute au chef valideur.'
-                );
+                return [
+                    ...$this->task(
+                        key: 'chef-sub-action-validation:'.$subAction->id,
+                        type: 'validation_sous_action_chef',
+                        title: 'Validation sous-action',
+                        subject: (string) $subAction->libelle,
+                        context: $subAction->action?->libelle,
+                        responsible: $subAction->agent?->name,
+                        receivedAt: $received,
+                        deadlineAt: $deadline,
+                        url: $subAction->action
+                            ? route('workspace.actions.suivi', $subAction->action).'#action-weeks'
+                            : route('dashboard'),
+                        criticality: $this->criticalityFromDeadline($deadline, 'importante'),
+                        scoreImpact: 'Retard de validation impute au chef valideur.'
+                    ),
+                    // A42 — Validation inline depuis Mes taches (cf. actions.review).
+                    'can_validate' => $subAction->action !== null,
+                    'action_id' => (int) ($subAction->action?->id ?? 0),
+                    'sous_action_id' => (int) $subAction->id,
+                ];
             });
     }
 

@@ -99,13 +99,6 @@
     window.anbgPlayNotificationSound = playNotificationSound;
     window.addEventListener('pointerdown', unlockNotificationSound, { once: true, passive: true });
     window.addEventListener('keydown', unlockNotificationSound, { once: true });
-    window.addEventListener('anbg:message-received', function (event) {
-        var count = Number((event.detail || {}).count || 1);
-        if (count > 0) {
-            updateMessagingBadge(previousMessageUnreadCount + count);
-            playNotificationSound('message');
-        }
-    });
     window.addEventListener('anbg:alert-received', function () {
         playNotificationSound('alert');
     });
@@ -161,13 +154,6 @@
     var openButton = document.getElementById('admin-sidebar-open');
     var closeButton = document.getElementById('admin-sidebar-close');
     var overlay = document.getElementById('admin-overlay');
-    var messagingWrapper = document.getElementById('header-messaging');
-    var messagingToggle = document.getElementById('header-messaging-toggle');
-    var messagingMenu = document.getElementById('header-messaging-menu');
-    var messagingBadge = document.getElementById('header-messaging-badge');
-    var messagingEndpoint = messagingMenu ? messagingMenu.getAttribute('data-messages-endpoint') : null;
-    var messagingLoadedAt = 0;
-    var messagingPending = null;
     var notificationsWrapper = document.getElementById('header-notifications');
     var notificationsToggle = document.getElementById('header-notifications-toggle');
     var notificationsMenu = document.getElementById('header-notifications-menu');
@@ -180,7 +166,6 @@
     var notificationsAlertsPending = null;
     var previousAlertUnreadCount = Number(document.body.dataset.alertUnread || 0);
     var previousNotificationUnreadCount = Number(document.body.dataset.notificationUnread || 0);
-    var previousMessageUnreadCount = Number(document.body.dataset.messageUnread || 0);
     var notificationAudioContext = null;
     var notificationSoundUnlocked = false;
     var dialogRoot = document.getElementById('anbg-dialog');
@@ -249,17 +234,6 @@
         return 'anbg-badge anbg-badge-info';
     }
 
-    function updateMessagingBadge(unread) {
-        previousMessageUnreadCount = Math.max(0, Number(unread || 0));
-
-        if (!messagingBadge) {
-            return;
-        }
-
-        messagingBadge.textContent = previousMessageUnreadCount > 99 ? '99+' : String(previousMessageUnreadCount);
-        messagingBadge.classList.toggle('hidden', previousMessageUnreadCount <= 0);
-    }
-
     function updateNotificationsBadge(notificationUnread, alertUnread) {
         previousNotificationUnreadCount = Math.max(0, Number(notificationUnread || 0));
         previousAlertUnreadCount = Math.max(0, Number(alertUnread || 0));
@@ -287,61 +261,6 @@
         notificationsBadge.dataset.alertUnread = String(previousAlertUnreadCount);
         notificationsBadge.dataset.badgeKind = kind;
         notificationsBadge.title = previousNotificationUnreadCount + ' notification(s), ' + previousAlertUnreadCount + ' alerte(s)';
-    }
-
-    function renderNavbarMessageSummary(payload) {
-        var unread = Number((payload && payload.unread_count) || 0);
-
-        if (unread > previousMessageUnreadCount) {
-            window.dispatchEvent(new CustomEvent('anbg:message-received', {
-                detail: { count: unread - previousMessageUnreadCount }
-            }));
-            return;
-        }
-
-        updateMessagingBadge(unread);
-    }
-
-    function loadNavbarMessages(forceRefresh) {
-        if (!messagingEndpoint) {
-            return Promise.resolve();
-        }
-
-        var isFresh = messagingLoadedAt > 0 && (Date.now() - messagingLoadedAt) < 60000;
-        if (!forceRefresh && isFresh) {
-            return Promise.resolve();
-        }
-
-        if (messagingPending) {
-            return messagingPending;
-        }
-
-        messagingPending = window.fetch(messagingEndpoint, {
-            headers: {
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin'
-        })
-            .then(function (response) {
-                if (!response.ok) {
-                    throw new Error('messages_dropdown_failed');
-                }
-
-                return response.json();
-            })
-            .then(function (payload) {
-                messagingLoadedAt = Date.now();
-                renderNavbarMessageSummary(payload);
-            })
-            .catch(function () {
-                // messaging remains accessible even if real-time summary fails
-            })
-            .finally(function () {
-                messagingPending = null;
-            });
-
-        return messagingPending;
     }
 
     function renderNavbarAlertSummary(payload) {
@@ -489,17 +408,10 @@
         }, 60000);
     }
 
-    if (messagingEndpoint) {
-        window.setInterval(function () {
-            loadNavbarMessages(true);
-        }, 60000);
-    }
-
     function openNotificationsMenu() {
         if (!notificationsMenu) {
             return;
         }
-        closeMessagingMenu();
         notificationsMenu.classList.remove('hidden');
         loadNavbarAlerts(false);
     }
@@ -509,22 +421,6 @@
             return;
         }
         notificationsMenu.classList.add('hidden');
-    }
-
-    function openMessagingMenu() {
-        if (!messagingMenu) {
-            return;
-        }
-        closeNotificationsMenu();
-        messagingMenu.classList.remove('hidden');
-        loadNavbarMessages(false);
-    }
-
-    function closeMessagingMenu() {
-        if (!messagingMenu) {
-            return;
-        }
-        messagingMenu.classList.add('hidden');
     }
 
     function resetDialog() {
@@ -656,32 +552,7 @@
         });
     }
 
-    if (messagingToggle) {
-        messagingToggle.addEventListener('click', function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            if (!messagingMenu) {
-                return;
-            }
-            if (messagingMenu.classList.contains('hidden')) {
-                openMessagingMenu();
-            } else {
-                closeMessagingMenu();
-            }
-        });
-    }
-
     document.addEventListener('click', function (event) {
-        if (!notificationsWrapper || !notificationsMenu) {
-            if (!messagingWrapper || !messagingMenu) {
-                return;
-            }
-        }
-
-        if (messagingWrapper && messagingMenu && !messagingWrapper.contains(event.target)) {
-            closeMessagingMenu();
-        }
-
         if (!notificationsWrapper || !notificationsMenu) {
             return;
         }
@@ -790,7 +661,6 @@
                 resolveDialog({ confirmed: false, value: null });
             }
             closeSidebar();
-            closeMessagingMenu();
             closeNotificationsMenu();
         }
     });

@@ -32,7 +32,6 @@ return new class extends Migration {
             'alerts.read',
             'referentiel.read',
             'audit.read',
-            'messagerie.read',
         ];
 
         DB::table('platform_settings')->updateOrInsert(
@@ -58,7 +57,6 @@ return new class extends Migration {
             'alerts.read',
             'referentiel.read',
             'audit.read',
-            'messagerie.read',
         ];
 
         DB::table('platform_settings')

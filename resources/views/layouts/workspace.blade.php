@@ -12,7 +12,6 @@
         str_starts_with($routeName, 'workspace.imports.') => 'Imports Excel',
         str_starts_with($routeName, 'workspace.kpi-mesures.') => 'Mesures des indicateurs',
         str_starts_with($routeName, 'workspace.kpi.') => 'Indicateurs de performance',
-        str_starts_with($routeName, 'workspace.messaging.') => 'Messagerie',
         str_starts_with($routeName, 'workspace.audit.') => 'Audit',
         str_starts_with($routeName, 'workspace.profile.') => 'Profil',
         str_starts_with($routeName, 'workspace.referentiel.directions.') => 'Directions',

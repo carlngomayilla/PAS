@@ -57,7 +57,6 @@
 
     const hasBlockedPageContext = () => Boolean(
         document.querySelector([
-            '[data-messaging-page]',
             '[data-disable-soft-refresh="1"]',
             '#anbg-dashboard-payload',
             '#analytics-explorer',

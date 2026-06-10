@@ -36,7 +36,6 @@ class RolePermissionMatrixTest extends TestCase
                 'retention.manage',
                 'api_docs.read',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_AUDITEUR => [
                 'scope.global.read',
@@ -44,7 +43,6 @@ class RolePermissionMatrixTest extends TestCase
                 'reporting.read',
                 'alerts.read',
                 'audit.read',
-                'messagerie.read',
             ],
             // Regle metier ANBG : le DG pilote l'agence — autorite ecriture/suppression
             // globale sur PAS / PAO / PTA / Actions sans restriction de perimetre.
@@ -58,7 +56,6 @@ class RolePermissionMatrixTest extends TestCase
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_PLANIFICATION => [
                 'scope.global.read',
@@ -73,7 +70,6 @@ class RolePermissionMatrixTest extends TestCase
                 'users.manage_roles',
                 'delegations.manage',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_CABINET => [
                 'scope.global.read',
@@ -82,7 +78,6 @@ class RolePermissionMatrixTest extends TestCase
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE_CABINET => [
                 'planning.read',
@@ -90,7 +85,6 @@ class RolePermissionMatrixTest extends TestCase
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
             User::ROLE_CHEF_PLANIFICATION => [
                 'scope.global.read',
@@ -103,7 +97,6 @@ class RolePermissionMatrixTest extends TestCase
                 'referentiel.read',
                 'users.manage',
                 'users.manage_roles',
-                'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE_SCIQ => [
                 'scope.global.read',
@@ -116,7 +109,6 @@ class RolePermissionMatrixTest extends TestCase
                 'referentiel.read',
                 'users.manage',
                 'users.manage_roles',
-                'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE_DGA => [
                 'planning.read',
@@ -124,7 +116,6 @@ class RolePermissionMatrixTest extends TestCase
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
             User::ROLE_DGA_SUPERVISION => [
                 'scope.global.read',
@@ -132,20 +123,17 @@ class RolePermissionMatrixTest extends TestCase
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE_UCAS => [
                 'planning.read',
                 'planning.write.service',
                 'reporting.read',
                 'alerts.read',
-                'messagerie.read',
             ],
             User::ROLE_UCAS => [
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
-                'messagerie.read',
             ],
             User::ROLE_SCIQ => [
                 'scope.global.read',
@@ -157,7 +145,6 @@ class RolePermissionMatrixTest extends TestCase
                 'referentiel.read',
                 'referentiel.write',
                 'delegations.manage',
-                'messagerie.read',
             ],
             User::ROLE_DIRECTION => [
                 'planning.read',
@@ -166,7 +153,6 @@ class RolePermissionMatrixTest extends TestCase
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
-                'messagerie.read',
             ],
             User::ROLE_SERVICE => [
                 'planning.read',
@@ -175,13 +161,11 @@ class RolePermissionMatrixTest extends TestCase
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
-                'messagerie.read',
             ],
             User::ROLE_AGENT => [
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
-                'messagerie.read',
             ],
         ];
 

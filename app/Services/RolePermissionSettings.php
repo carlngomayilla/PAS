@@ -45,7 +45,6 @@ class RolePermissionSettings
             'retention.manage' => ['group' => 'Gouvernance', 'label' => 'Piloter la rétention', 'description' => 'Exécuter les actions de rétention.', 'sensitive' => true],
             'api_docs.read' => ['group' => 'Gouvernance', 'label' => 'Voir l’API', 'description' => 'Accéder à la documentation API.', 'sensitive' => false],
             'audit.read' => ['group' => 'Audit', 'label' => 'Voir l’audit', 'description' => 'Consulter les journaux d’audit.', 'sensitive' => true],
-            'messagerie.read' => ['group' => 'Communication', 'label' => 'Utiliser la messagerie', 'description' => 'Accéder à la messagerie interne.', 'sensitive' => false],
         ];
     }
 
@@ -215,7 +214,6 @@ class RolePermissionSettings
                 'retention.manage',
                 'api_docs.read',
                 'audit.read',
-                'messagerie.read',
             ],
             // A06 — DG en lecture seule pure : supervision + indicateurs consolides
             // + audit, mais aucune ecriture ni validation directe. La validation
@@ -235,7 +233,6 @@ class RolePermissionSettings
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
-                'messagerie.read',
             ],
             // A37 — Planification : retire `scope.global.write` (trop large).
             // `planning.write.global` reste suffisant pour son metier (gerer la
@@ -255,7 +252,6 @@ class RolePermissionSettings
                 'users.manage_roles',
                 'delegations.manage',
                 'audit.read',
-                'messagerie.read',
             ],
             // A37 — SCIQ : retire `scope.global.write` (trop large) ; conserve
             // `planning.write.global` et `referentiel.write` pour son metier.
@@ -269,7 +265,6 @@ class RolePermissionSettings
                 'referentiel.read',
                 'referentiel.write',
                 'delegations.manage',
-                'messagerie.read',
             ],
             User::ROLE_DIRECTION => [
                 'planning.read',
@@ -278,7 +273,6 @@ class RolePermissionSettings
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
-                'messagerie.read',
             ],
             User::ROLE_SERVICE => [
                 'planning.read',
@@ -287,7 +281,6 @@ class RolePermissionSettings
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
-                'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE => [
                 'planning.read',
@@ -295,13 +288,11 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
             User::ROLE_AGENT => [
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
-                'messagerie.read',
             ],
             // A06 — Cabinet et Collaborateurs voient tout mais ne pilotent plus
             // le strategique. La gestion du PAS officiel passe par PLANIFICATION,
@@ -313,7 +304,6 @@ class RolePermissionSettings
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_COLLABORATEUR => [
                 'scope.global.read',
@@ -321,7 +311,6 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'audit.read',
-                'messagerie.read',
             ],
 
             // Profils ajoutés (Lot 2) — alignement organisation ANBG.
@@ -346,7 +335,6 @@ class RolePermissionSettings
                 'retention.manage',
                 'api_docs.read',
                 'audit.read',
-                'messagerie.read',
             ],
 
             // A36 — SCIQ_SUIVI_GLOBAL et CHEF_UNITE_SCIQ sont des ALIAS
@@ -366,7 +354,6 @@ class RolePermissionSettings
                 'referentiel.read',
                 'referentiel.write',
                 'delegations.manage',
-                'messagerie.read',
             ],
 
             // Chef planification : meme niveau de droits que Chef d'unite SCIQ.
@@ -384,7 +371,6 @@ class RolePermissionSettings
                 'referentiel.read',
                 'users.manage',
                 'users.manage_roles',
-                'messagerie.read',
             ],
 
             // Chef d'unite SCIQ : controle principal global + suivi strategique
@@ -400,7 +386,6 @@ class RolePermissionSettings
                 'referentiel.read',
                 'users.manage',
                 'users.manage_roles',
-                'messagerie.read',
             ],
 
             // DGA — supervision vue globale (lecture). A06 : retire le pilotage
@@ -411,7 +396,6 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
 
             // Chef d'unité DGA — gère son unité (portée service, pas globale).
@@ -421,7 +405,6 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
 
             // Cabinet — supervision (équivalent au Cabinet actuel, vue globale lecture).
@@ -433,7 +416,6 @@ class RolePermissionSettings
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
-                'messagerie.read',
             ],
 
             // Chef d'unité Cabinet — gère son unité (portée service, pas globale).
@@ -443,7 +425,6 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
 
             // Chef d'unité UCAS — portée limitée à son unité uniquement.
@@ -452,7 +433,6 @@ class RolePermissionSettings
                 'planning.write.service',
                 'reporting.read',
                 'alerts.read',
-                'messagerie.read',
             ],
 
             // UCAS — lecture pilotage + alertes.
@@ -460,7 +440,6 @@ class RolePermissionSettings
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
-                'messagerie.read',
             ],
             // Auditeur — lecture globale pour audit + reporting + alertes.
             User::ROLE_AUDITEUR => [
@@ -469,13 +448,11 @@ class RolePermissionSettings
                 'reporting.read',
                 'alerts.read',
                 'audit.read',
-                'messagerie.read',
             ],
 
             // Invité — lecture très limitée.
             User::ROLE_INVITE_LECTURE => [
                 'reporting.read',
-                'messagerie.read',
             ],
         ];
     }
@@ -559,7 +536,6 @@ class RolePermissionSettings
                     'referentiel.read',
                     'users.manage',
                     'users.manage_roles',
-                    'messagerie.read',
                 ]
             )));
         }

@@ -15,6 +15,7 @@
 
     <div class="app-screen-flow">
     <x-ui.page-title
+        eyebrow="Déclinaison opérationnelle"
         title="Plan d'actions opérationnel"
         subtitle="Organisation annuelle des objectifs stratégiques par direction."
     >

@@ -3543,7 +3543,6 @@ class SuperAdminWebController extends Controller
 
                 return match ((string) ($module['code'] ?? '')) {
                     'super_admin' => $baseRole === User::ROLE_SUPER_ADMIN,
-                    'messagerie' => in_array('messagerie.read', $permissions, true),
                     'pas' => in_array('planning.read', $permissions, true)
                         && ! in_array($baseRole, [User::ROLE_DIRECTION, User::ROLE_SERVICE], true),
                     'pao' => in_array('planning.read', $permissions, true)

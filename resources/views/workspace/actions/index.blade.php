@@ -75,7 +75,9 @@
             ['label' => 'Total actions', 'value' => $summaryTotal, 'meta' => null, 'href' => route('workspace.actions.index'), 'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Actions en cours', 'value' => $statusCounts['en_cours'] + $statusCounts['a_risque'] + $statusCounts['en_avance'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_cours']), 'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Actions en retard', 'value' => $statusCounts['en_retard'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => null, 'badge_tone' => $statusCounts['en_retard'] > 0 ? 'danger' : 'neutral'],
-            ['label' => 'En attente validation', 'value' => $pendingValidationCount, 'meta' => null, 'href' => route('workspace.actions.index', ['statut_validation_min' => 'soumise_chef']), 'badge' => null, 'badge_tone' => $pendingValidationCount > 0 ? 'warning' : 'neutral'],
+            // A42 — La validation se fait desormais dans Mes taches : la carte
+            // devient un raccourci vers ce module (acte Valider/Renvoyer inline).
+            ['label' => 'En attente validation', 'value' => $pendingValidationCount, 'meta' => 'À valider dans Mes tâches', 'href' => route('workspace.tasks.index'), 'badge' => null, 'badge_tone' => $pendingValidationCount > 0 ? 'warning' : 'neutral'],
             ['label' => 'Performance moyenne', 'value' => number_format($avgKpi, 1).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
         ];
         $layoutMode = request()->query('layout', 'list');
@@ -148,6 +150,7 @@
 
     <div class="app-screen-flow">
     <x-ui.page-title
+        eyebrow="Pilotage opérationnel"
         title="Suivi des actions"
         subtitle="Pilotage opérationnel des actions, validations, justificatifs et performances d'exécution."
     />

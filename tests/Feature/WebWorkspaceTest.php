@@ -53,11 +53,6 @@ class WebWorkspaceTest extends TestCase
             ->assertSee('Espace de travail');
 
         $this->actingAs($admin)
-            ->get('/workspace/messagerie')
-            ->assertOk()
-            ->assertSee('Messagerie interne');
-
-        $this->actingAs($admin)
             ->get('/workspace/pilotage')
             ->assertRedirect('/dashboard');
 

@@ -53,7 +53,6 @@ return new class extends Migration
             'retention.manage',
             'api_docs.read',
             'audit.read',
-            'messagerie.read',
         ];
 
         return [
@@ -75,7 +74,6 @@ return new class extends Migration
                 'retention.manage',
                 'api_docs.read',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_AUDITEUR => [
                 'scope.global.read',
@@ -83,7 +81,6 @@ return new class extends Migration
                 'reporting.read',
                 'alerts.read',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_DG => [
                 'scope.global.read',
@@ -92,7 +89,6 @@ return new class extends Migration
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_PLANIFICATION => [
                 'scope.global.read',
@@ -107,7 +103,6 @@ return new class extends Migration
                 'users.manage_roles',
                 'delegations.manage',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_CABINET => [
                 'scope.global.read',
@@ -116,7 +111,6 @@ return new class extends Migration
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
-                'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE_CABINET => [
                 'planning.read',
@@ -124,7 +118,6 @@ return new class extends Migration
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE_DGA => [
                 'planning.read',
@@ -132,7 +125,6 @@ return new class extends Migration
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
             User::ROLE_DGA_SUPERVISION => [
                 'scope.global.read',
@@ -140,20 +132,17 @@ return new class extends Migration
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
-                'messagerie.read',
             ],
             User::ROLE_CHEF_UNITE_UCAS => [
                 'planning.read',
                 'planning.write.service',
                 'reporting.read',
                 'alerts.read',
-                'messagerie.read',
             ],
             User::ROLE_UCAS => [
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
-                'messagerie.read',
             ],
             User::ROLE_SCIQ => [
                 'scope.global.read',
@@ -165,7 +154,6 @@ return new class extends Migration
                 'referentiel.read',
                 'referentiel.write',
                 'delegations.manage',
-                'messagerie.read',
             ],
             User::ROLE_DIRECTION => [
                 'planning.read',
@@ -174,7 +162,6 @@ return new class extends Migration
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
-                'messagerie.read',
             ],
             User::ROLE_SERVICE => [
                 'planning.read',
@@ -183,13 +170,11 @@ return new class extends Migration
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
-                'messagerie.read',
             ],
             User::ROLE_AGENT => [
                 'planning.read',
                 'reporting.read',
                 'alerts.read',
-                'messagerie.read',
             ],
         ];
     }

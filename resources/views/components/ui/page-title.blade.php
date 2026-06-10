@@ -1,10 +1,14 @@
 @props([
     'title',
     'subtitle' => null,
+    'eyebrow' => null,
 ])
 
 <header {{ $attributes->merge(['class' => 'app-page-header mb-6']) }}>
     <div class="min-w-0">
+        @if ($eyebrow)
+            <span class="app-eyebrow">{{ $eyebrow }}</span>
+        @endif
         <h1 class="app-title">{{ $title }}</h1>
         @if ($subtitle)
             <p class="mt-2 text-sm font-medium text-[var(--app-muted)]">{{ $subtitle }}</p>

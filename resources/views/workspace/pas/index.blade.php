@@ -16,6 +16,7 @@
 
     <div class="app-screen-flow">
     <x-ui.page-title
+        eyebrow="Pilotage institutionnel"
         title="Pilotage stratégique"
         subtitle="Suivi des plans stratégiques, des axes et des objectifs institutionnels."
     >
