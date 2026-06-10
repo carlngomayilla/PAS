@@ -1490,18 +1490,13 @@ class DashboardController extends Controller
      */
     private function buildRoleStatusChart(Collection $actions): array
     {
-        $rows = collect($this->buildStatusCards($actions))
-            ->filter(fn (array $row): bool => (int) ($row['count'] ?? 0) > 0)
-            ->values();
-
-        if ($rows->isEmpty()) {
-            $rows = collect($this->buildStatusCards($actions))->take(4)->values();
-        }
+        $rows = collect($this->buildStatusCards($actions))->values();
 
         return [
             'labels' => $rows->pluck('label')->all(),
             'values' => $rows->map(fn (array $row): int => (int) ($row['count'] ?? 0))->all(),
             'urls' => $rows->pluck('href')->all(),
+            'colors' => $rows->pluck('color')->all(),
         ];
     }
 

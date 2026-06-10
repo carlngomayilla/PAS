@@ -228,28 +228,29 @@
                 <span class="showcase-chip">{{ collect($statusCards)->sum('count') }} actions</span>
             </div>
             @if (! empty($statusCards) && collect($statusCards)->sum('count') > 0)
+                @php $statusCardsTotal = collect($statusCards)->sum('count'); @endphp
                 <div class="dashboard-canvas">
                     <div id="dashboard-status-mix-chart" class="dashboard-chart-host">
                         <div class="dashboard-chart-fallback" aria-hidden="true">
-                            <div class="charts-status-grid">
-                                @foreach ($statusCards as $card)
-                                    @php $cardTotal = collect($statusCards)->sum('count'); @endphp
-                                    @php $cardPct = $cardTotal > 0 ? round(((float) $card['count'] / $cardTotal) * 100, 1) : 0; @endphp
-                                    <div class="charts-status-item" style="--tone: {{ $card['color'] }};">
-                                        <div class="charts-status-item-head">
-                                            <span class="charts-status-dot" style="background: {{ $card['color'] }};"></span>
-                                            <span class="charts-status-item-name">{{ $card['label'] }}</span>
-                                            <span class="charts-status-item-count" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span>
-                                        </div>
-                                        <div class="charts-status-item-track">
-                                            <div class="charts-status-item-fill" style="width: {{ $cardPct }}%; background: {{ $card['color'] }};"></div>
-                                        </div>
-                                        <span class="charts-status-item-pct">{{ number_format($cardPct, 1, ',', ' ') }}%</span>
-                                    </div>
-                                @endforeach
-                            </div>
+                            <x-ui.empty-state title="Graphique en cours de chargement" message="La liste complète des statuts reste disponible ci-dessous." icon="chart" tone="info" />
                         </div>
                     </div>
+                </div>
+                <div class="mt-4 charts-status-grid" aria-label="Liste complète des statuts">
+                    @foreach ($statusCards as $card)
+                        @php $cardPct = $statusCardsTotal > 0 ? round(((float) $card['count'] / $statusCardsTotal) * 100, 1) : 0; @endphp
+                        <a class="charts-status-item" href="{{ $card['href'] ?? '#' }}" style="--tone: {{ $card['color'] }};">
+                            <div class="charts-status-item-head">
+                                <span class="charts-status-dot" style="background: {{ $card['color'] }};"></span>
+                                <span class="charts-status-item-name">{{ $card['label'] }}</span>
+                                <span class="charts-status-item-count" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span>
+                            </div>
+                            <div class="charts-status-item-track">
+                                <div class="charts-status-item-fill" style="width: {{ $cardPct }}%; background: {{ $card['color'] }};"></div>
+                            </div>
+                            <span class="charts-status-item-pct">{{ number_format($cardPct, 1, ',', ' ') }}%</span>
+                        </a>
+                    @endforeach
                 </div>
             @else
                 <x-ui.empty-state title="Aucun statut à afficher" message="Importez des actions pour voir la répartition." icon="chart" tone="info" />
