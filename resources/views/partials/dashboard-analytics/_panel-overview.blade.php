@@ -11,6 +11,14 @@
                 'href'    => route('workspace.actions.index'),
             ],
             [
+                'label'   => 'Actions en cours',
+                'value'   => $statusCount('en_cours'),
+                'accent'  => '#3996d3',
+                'icon'    => '<path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/>',
+                'tone'    => 'info',
+                'href'    => route('workspace.actions.index', ['statut' => 'en_cours']),
+            ],
+            [
                 'label'   => 'Indicateur global',
                 'value'   => number_format((float) ($globalScores['global'] ?? 0), 0, ',', ' ') . '%',
                 'accent'  => '#178f5f',
