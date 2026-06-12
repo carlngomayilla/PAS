@@ -1878,11 +1878,7 @@ class WorkspaceNotificationService
         try {
             $notification = new WorkspaceModuleNotification($payload);
 
-            if ((string) config('queue.default') === 'sync') {
-                Notification::sendNow($targets, $notification);
-            } else {
-                Notification::send($targets, $notification);
-            }
+            Notification::sendNow($targets, $notification);
         } catch (Throwable $exception) {
             Log::critical('Workspace notification dispatch failed (A07).', [
                 'recipient_count' => $targets->count(),

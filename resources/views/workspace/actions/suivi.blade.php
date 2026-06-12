@@ -168,51 +168,60 @@
         $statusClass = $statusStyles[$status] ?? $statusStyles['non_demarre'];
         $validationClass = $validationStyles[$validationStatus] ?? $validationStyles['non_soumise'];
         $financingClass = $financingStyles[$financingStatus] ?? $financingStyles[\App\Models\Action::FINANCEMENT_A_TRAITER_DAF];
+        $responsableDisplay = $rmoNames !== []
+            ? implode(', ', array_slice($rmoNames, 0, 2))
+            : (string) ($action->responsable?->name ?? 'Non attribue');
+        if (count($rmoNames) > 2) {
+            $responsableDisplay .= ' +'.(count($rmoNames) - 2);
+        }
+        $periodDisplay = (optional($action->date_debut)->format('d/m/Y') ?: '-')
+            .' au '
+            .(optional($action->date_fin)->format('d/m/Y') ?: '-');
     @endphp
 
-    <section id="action-header" class="showcase-hero mb-4">
-        <div class="showcase-hero-body">
-            <div class="max-w-4xl">
-                <span class="showcase-eyebrow">Action {{ $action->code ?? $action->id }}</span>
-                <h1 class="showcase-title">{{ $action->libelle }}</h1>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
-                        Fréquence : {{ $frequenceLabel }}
+    <section id="action-header" class="action-detail-hero mb-4">
+        <div class="action-detail-hero-body">
+            <div class="action-detail-copy">
+                <span class="action-detail-eyebrow">Action {{ $action->code ?? $action->id }}</span>
+                <h1 class="action-detail-title">{{ $action->libelle }}</h1>
+                <div class="action-detail-meta-grid">
+                    <span class="action-detail-meta">
+                        <span class="action-detail-meta-label">Periode</span>
+                        <strong>{{ $periodDisplay }}</strong>
                     </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
-                        Période : {{ optional($action->date_debut)->format('d/m/Y') ?: '-' }} → {{ optional($action->date_fin)->format('d/m/Y') ?: '-' }}
+                    <span class="action-detail-meta">
+                        <span class="action-detail-meta-label">Responsable</span>
+                        <strong>{{ $responsableDisplay }}</strong>
                     </span>
-                    <span class="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold {{ $statusClass }}">
+                    <span class="action-detail-status {{ $statusClass }}">
                         {{ $actionStatusLabel($status) }}
                     </span>
-                    <span class="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold {{ $validationClass }}">
+                    <span class="action-detail-status {{ $validationClass }}">
                         {{ $validationLabel }}
                     </span>
                     @if ($action->financement_requis)
-                        <span class="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold {{ $financingClass }}">
+                        <span class="action-detail-status {{ $financingClass }}">
                             Financement: {{ $financingLabel }}
                         </span>
                     @endif
                 </div>
-                <div class="showcase-nav-pills">
+                <nav class="action-detail-tabs no-print" aria-label="Sections de l'action">
                     @foreach ($detailSections as $anchor => $label)
-                        <a class="showcase-nav-pill" href="#{{ $anchor }}">{{ $label }}</a>
+                        <a class="action-detail-tab" href="#{{ $anchor }}">{{ $label }}</a>
                     @endforeach
-                </div>
+                </nav>
             </div>
-            <div class="showcase-action-row">
+            <div class="action-detail-actions no-print">
                 @php
                     $isModificationLocked = (bool) ($isActionModificationLocked ?? false);
                     $canRequestUnlock = (bool) ($canRequestActionUnlock ?? false);
                     $canProcessUnlock = (bool) ($canProcessActionUnlock ?? false);
                 @endphp
                 @if (! $isModificationLocked && $canManageAction)
-                    <a class="btn btn-warning rounded-2xl px-4 py-2.5" href="{{ $action->pta_id ? route('workspace.pta.edit', $action->pta_id).'#action-'.$action->id : route('workspace.actions.edit', $action) }}">Modifier action</a>
+                    <a class="btn btn-warning" href="{{ $action->pta_id ? route('workspace.pta.edit', $action->pta_id).'#action-'.$action->id : route('workspace.actions.edit', $action) }}">Modifier action</a>
                 @elseif ($isModificationLocked)
                     @if ($canProcessUnlock)
-                        <a class="btn btn-warning rounded-2xl px-4 py-2.5" href="{{ route('workspace.planning-unlocks.index') }}">
+                        <a class="btn btn-warning" href="{{ route('workspace.planning-unlocks.index') }}">
                             Traiter le deverrouillage
                         </a>
                     @endif
@@ -225,11 +234,11 @@
                         ])
                     @endif
                 @endif
-                <button type="button" onclick="window.print()" class="btn btn-secondary rounded-2xl px-4 py-2.5 flex items-center gap-2 no-print" title="Imprimer la fiche action">
+                <button type="button" onclick="window.print()" class="btn btn-secondary flex items-center gap-2" title="Imprimer la fiche action">
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                     Imprimer
                 </button>
-                <a class="btn btn-secondary rounded-2xl px-4 py-2.5 no-print" href="{{ route('workspace.actions.index') }}">Retour liste</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.actions.index') }}">Retour liste</a>
             </div>
         </div>
     </section>
@@ -291,30 +300,34 @@
         $v2IsValidated = $v2ValidationStatus === 'validee_chef';
     @endphp
 
-    <section id="action-suivi" class="showcase-panel mb-4">
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 class="showcase-panel-title">Suivi de l'action</h2>
-            <div class="flex flex-wrap items-center gap-2">
+    <section id="action-suivi" class="action-tracking-panel mb-4">
+        <div class="action-tracking-head">
+            <div>
+                <span class="action-tracking-kicker">Execution</span>
+                <h2 class="action-tracking-title">Suivi de l'action</h2>
+            </div>
+            <div class="action-tracking-badges">
                 <span class="anbg-badge {{ $perfClass }} px-3 py-1">{{ $perfLabel }}</span>
                 <span class="anbg-badge {{ $tempClass }} px-3 py-1">{{ $tempLabel }}</span>
             </div>
         </div>
 
         {{-- Performances : officielle en avant, provisoire en complément --}}
-        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))] mb-4">
-            <article class="showcase-inline-stat">
-                <strong>Performance officielle</strong>
-                <p class="mt-1 text-3xl font-extrabold text-[#17324a]">{{ number_format((float) $v2OfficialPerf, 0, ',', ' ') }}%</p>
-                <p class="text-xs text-slate-500">{{ $v2IsValidated ? 'Validée par le chef' : 'En attente de validation' }}</p>
+        <div class="action-tracking-metrics">
+            <article class="action-tracking-stat action-tracking-stat-main">
+                <span class="action-tracking-stat-label">Performance officielle</span>
+                <strong class="action-tracking-stat-value">{{ number_format((float) $v2OfficialPerf, 0, ',', ' ') }}%</strong>
+                <span class="action-tracking-stat-note">{{ $v2IsValidated ? 'Validée par le chef' : 'En attente de validation' }}</span>
             </article>
-            <article class="showcase-inline-stat">
-                <strong>Performance provisoire</strong>
-                <p class="mt-1 text-xl font-bold text-[#3996d3]">{{ number_format((float) $v2ProvisionalPerf, 0, ',', ' ') }}%</p>
-                <p class="text-xs text-slate-500">Calculée à chaque enregistrement</p>
+            <article class="action-tracking-stat">
+                <span class="action-tracking-stat-label">Performance provisoire</span>
+                <strong class="action-tracking-stat-value">{{ number_format((float) $v2ProvisionalPerf, 0, ',', ' ') }}%</strong>
+                <span class="action-tracking-stat-note">Calculée à chaque enregistrement</span>
             </article>
-            <article class="showcase-inline-stat">
-                <strong>Type d'action</strong>
-                <p class="mt-2 dd-badges"><span class="anbg-badge anbg-badge-info px-3 py-1">{{ $action->typeActionLabel() }}</span></p>
+            <article class="action-tracking-stat">
+                <span class="action-tracking-stat-label">Type d'action</span>
+                <strong class="action-tracking-type">{{ $action->typeActionLabel() }}</strong>
+                <span class="action-tracking-stat-note">{{ $action->isComposee() ? $sousActionsTotal.' sous-action(s)' : 'Action simple' }}</span>
             </article>
         </div>
 

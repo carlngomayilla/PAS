@@ -22,6 +22,7 @@ class AgentRbacNavigationTest extends TestCase
         // pour les agents. L'URL reste pointee sur ?vue=mes_actions cote sidebar.
         $this->assertEqualsCanonicalizing([
             'pilotage',
+            'mes_taches',
             'execution',
             'corrections',
             'notifications',

@@ -357,6 +357,7 @@ class UserWorkspaceService
             // filtres URL, evitant l'ecran placeholder "en cours de raccordement".
             'agent' => [
                 $m('pilotage', 'Dashboard', '/dashboard'),
+                $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('execution', 'Action', '/workspace/actions?vue=mes_actions', ['can_write' => true, 'actions' => ['Consulter', 'Saisir suivi']]),
                 // 'corrections' → vue "Mes actions" filtree sur les corrections demandees.
                 $m('corrections', 'Corrections demandées', '/workspace/actions?vue=mes_actions&statut=a_corriger'),

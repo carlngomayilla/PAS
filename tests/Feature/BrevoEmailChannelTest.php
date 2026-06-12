@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendBrevoNotificationEmailsJob;
 use App\Models\Action;
 use App\Models\Direction;
 use App\Models\ObjectifOperationnel;
@@ -31,6 +32,20 @@ use Tests\TestCase;
 class BrevoEmailChannelTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_brevo_notification_job_uses_configured_queue_target(): void
+    {
+        config()->set('services.brevo.queue.connection', 'database');
+        config()->set('services.brevo.queue.name', 'default');
+
+        $job = new SendBrevoNotificationEmailsJob('action_assigned', [1, 2], [
+            'title' => 'Test',
+            'message' => 'Payload',
+        ]);
+
+        $this->assertSame('database', $job->connection);
+        $this->assertSame('default', $job->queue);
+    }
 
     public function test_rec14_brevo_failure_does_not_block_internal_notification(): void
     {

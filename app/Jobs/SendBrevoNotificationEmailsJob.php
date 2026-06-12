@@ -27,8 +27,15 @@ class SendBrevoNotificationEmailsJob implements ShouldQueue
         public readonly array $recipientIds,
         public readonly array $payload
     ) {
-        $this->onConnection('database');
-        $this->onQueue('notifications');
+        $connection = trim((string) config('services.brevo.queue.connection', ''));
+        if ($connection !== '') {
+            $this->onConnection($connection);
+        }
+
+        $queue = trim((string) config('services.brevo.queue.name', 'default'));
+        if ($queue !== '') {
+            $this->onQueue($queue);
+        }
     }
 
     public function handle(BrevoMailService $brevoMailService): void

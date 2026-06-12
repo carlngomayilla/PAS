@@ -2,28 +2,16 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
-class WorkspaceModuleNotification extends Notification implements ShouldQueue
+class WorkspaceModuleNotification extends Notification
 {
-    use Queueable;
-
-    public int $tries = 3;
-
-    /**
-     * @var array<int, int>
-     */
-    public array $backoff = [60, 300, 900];
-
     /**
      * @param array<string, mixed> $payload
      */
     public function __construct(
         private readonly array $payload
     ) {
-        $this->onQueue('notifications');
     }
 
     /**

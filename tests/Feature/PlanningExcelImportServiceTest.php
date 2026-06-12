@@ -352,7 +352,7 @@ class PlanningExcelImportServiceTest extends TestCase
             ->assertSee('Sous-action 2');
     }
 
-    public function test_quantitative_parametrage_columns_import_ready_action_as_in_progress(): void
+    public function test_quantitative_parametrage_columns_prefill_pending_action(): void
     {
         $fixture = $this->fixture();
         $this->muteNotifications();
@@ -377,9 +377,9 @@ class PlanningExcelImportServiceTest extends TestCase
 
         $this->assertDatabaseHas('actions', [
             'libelle' => 'Action quantitative',
-            'statut' => ActionTrackingService::STATUS_EN_COURS,
-            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
-            'statut_parametrage' => 'parametre',
+            'statut' => ActionTrackingService::STATUS_NON_DEMARRE,
+            'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
+            'statut_parametrage' => 'a_parametrer',
             'mode_evaluation' => Action::MODE_QUANTITATIF,
             'type_action' => Action::TYPE_QUANTITATIVE,
             'seuil_mode' => 'trimestriel',
@@ -389,8 +389,9 @@ class PlanningExcelImportServiceTest extends TestCase
         $this->assertSame('dossiers', $action->unite_cible);
         $this->assertSame(100.0, (float) $action->seuil_t4);
 
-        // Toutes les actions du PTA sont deja parametrees par l'import.
-        $this->assertDatabaseHas('ptas', ['statut' => Pta::STATUS_EN_COURS]);
+        // Le PTA reste brouillon tant que l'action importee n'est pas enregistree
+        // officiellement depuis le formulaire PTA.
+        $this->assertDatabaseHas('ptas', ['statut' => Pta::STATUS_BROUILLON]);
     }
 
     public function test_composee_parametrage_columns_create_planned_sub_actions(): void
@@ -412,10 +413,10 @@ class PlanningExcelImportServiceTest extends TestCase
         $this->executePreview($service, $fixture['admin'], $preview);
 
         $action = Action::query()->where('libelle', 'Action composee')->firstOrFail();
-        $this->assertSame('parametre', $action->statut_parametrage);
-        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
+        $this->assertSame('a_parametrer', $action->statut_parametrage);
+        $this->assertSame(ActionTrackingService::STATUS_NON_DEMARRE, $action->statut_dynamique);
         $this->assertSame(Action::TYPE_COMPOSEE, $action->type_action);
-        $this->assertDatabaseHas('ptas', ['statut' => Pta::STATUS_EN_COURS]);
+        $this->assertDatabaseHas('ptas', ['statut' => Pta::STATUS_BROUILLON]);
         $this->assertDatabaseCount('sous_actions', 2);
         $this->assertDatabaseHas('sous_actions', [
             'action_id' => $action->id,
@@ -489,7 +490,7 @@ class PlanningExcelImportServiceTest extends TestCase
         ]);
     }
 
-    public function test_typed_import_queues_assigned_rmo_notifications_without_pta_save(): void
+    public function test_typed_import_does_not_queue_assigned_rmo_notifications_before_pta_save(): void
     {
         $fixture = $this->fixture();
         Bus::fake([NotifyImportedParametreActionsJob::class]);
@@ -501,11 +502,7 @@ class PlanningExcelImportServiceTest extends TestCase
 
         $this->executePreview($service, $fixture['admin'], $preview);
 
-        $action = Action::query()->where('libelle', 'Action importee')->firstOrFail();
-        Bus::assertDispatched(
-            NotifyImportedParametreActionsJob::class,
-            fn (NotifyImportedParametreActionsJob $job): bool => $job->actionIds === [$action->id]
-        );
+        Bus::assertNotDispatched(NotifyImportedParametreActionsJob::class);
     }
 
     public function test_imported_action_assigned_to_current_profile_is_counted_in_dashboard_cards(): void
@@ -542,8 +539,7 @@ class PlanningExcelImportServiceTest extends TestCase
         $statusCards = collect($dashboardData['status_cards'] ?? []);
 
         $this->assertSame(1, (int) ($dashboardData['decision_counts']['actions_total'] ?? 0));
-        $this->assertSame(1, (int) ($statusCards->firstWhere('key', 'en_cours')['count'] ?? 0));
-        $this->assertSame(0, (int) ($statusCards->firstWhere('key', 'a_parametrer')['count'] ?? 0));
+        $this->assertSame(1, (int) ($statusCards->firstWhere('key', 'a_parametrer')['count'] ?? 0));
     }
 
     private function muteNotifications(): void

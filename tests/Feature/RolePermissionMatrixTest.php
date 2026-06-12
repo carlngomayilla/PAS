@@ -193,8 +193,8 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
             User::ROLE_DIRECTION => ['pilotage', 'mes_taches', 'pao', 'pta', 'execution', 'services_agents', 'reporting', 'notifications'],
             User::ROLE_SERVICE => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
-            User::ROLE_AGENT => ['pilotage', 'execution', 'corrections', 'notifications'],
-            User::ROLE_AUDITEUR => ['pilotage', 'execution', 'corrections', 'notifications'],
+            User::ROLE_AGENT => ['pilotage', 'mes_taches', 'execution', 'corrections', 'notifications'],
+            User::ROLE_AUDITEUR => ['pilotage', 'mes_taches', 'execution', 'corrections', 'notifications'],
         ];
 
         foreach ($expected as $role => $modules) {
@@ -268,7 +268,7 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertTrue((bool) $ossa->is_agent);
         $this->assertEqualsCanonicalizing(
             // Fusion 2026-05-28 : mes_actions remplace par execution (label "Action").
-            ['pilotage', 'execution', 'corrections', 'notifications'],
+            ['pilotage', 'mes_taches', 'execution', 'corrections', 'notifications'],
             collect($ossa->workspaceModules())->pluck('code')->all()
         );
     }

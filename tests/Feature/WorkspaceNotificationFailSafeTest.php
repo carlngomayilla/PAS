@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
@@ -21,6 +22,37 @@ use Tests\TestCase;
 class WorkspaceNotificationFailSafeTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_internal_notification_is_written_immediately_when_queue_connection_is_database(): void
+    {
+        config()->set('queue.default', 'database');
+
+        $user = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'is_active' => true,
+        ]);
+
+        $service = app(WorkspaceNotificationService::class);
+        $this->invokePrivate($service, 'dispatch', [
+            collect([$user]),
+            [
+                'title' => 'Nouvelle action attribuee',
+                'message' => 'Une action vous attend.',
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => 42,
+                'url' => route('dashboard'),
+            ],
+            null,
+        ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'type' => WorkspaceModuleNotification::class,
+        ]);
+        $this->assertSame(1, $user->fresh()->unreadNotifications()->count());
+    }
 
     public function test_dispatch_failure_is_logged_and_does_not_throw(): void
     {
