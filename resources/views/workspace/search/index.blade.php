@@ -80,8 +80,23 @@
                                         <p class="text-base font-black text-slate-950">{{ $item['title'] }}</p>
                                         <p class="mt-1 text-sm font-semibold text-[#3996d3]">{{ $item['subtitle'] }}</p>
                                         <p class="mt-1 text-sm text-slate-600">{{ $item['meta'] }}</p>
+                                        @if (! empty($item['details']) && is_array($item['details']))
+                                            <dl class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                                @foreach ($item['details'] as $detail)
+                                                    <div class="rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2">
+                                                        <dt class="text-[11px] font-bold uppercase tracking-wide text-slate-500">{{ $detail['label'] ?? '' }}</dt>
+                                                        <dd class="mt-0.5 break-words text-sm font-semibold text-slate-800">{{ $detail['value'] ?? '-' }}</dd>
+                                                    </div>
+                                                @endforeach
+                                            </dl>
+                                        @endif
                                     </div>
-                                    <span class="anbg-badge anbg-badge-info px-3 py-1 text-[11px]">Ouvrir</span>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        @if (! empty($item['badge']))
+                                            <span class="anbg-badge anbg-badge-{{ $item['badge_tone'] ?? 'neutral' }} px-3 py-1 text-[11px]">{{ $item['badge'] }}</span>
+                                        @endif
+                                        <span class="anbg-badge anbg-badge-info px-3 py-1 text-[11px]">Ouvrir</span>
+                                    </div>
                                 </div>
                             </a>
                         @endforeach

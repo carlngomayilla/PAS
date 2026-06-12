@@ -391,13 +391,13 @@
         </div>
     </template>
 
-    {{-- Modal « Demande de modification » : motif + justificatif (circuit Chef→Directeur→Planif→DG). --}}
+    {{-- Modal « Demande de modification » : motif + justificatif (circuit Controleur→DG). --}}
     <div id="modif-request-modal" class="modif-modal-overlay" hidden>
         <div class="modif-modal-card" role="dialog" aria-modal="true" aria-labelledby="modif-modal-title">
             <h3 id="modif-modal-title" class="text-lg font-bold text-[#17324a]">Demande de modification</h3>
             <p class="mt-1 text-sm text-slate-600">
-                Votre demande part au <strong>directeur</strong>, qui la transfère à la <strong>Planification</strong> (avis)
-                puis à la <strong>DG</strong> (décision). Si accord, l'action redevient modifiable.
+                Votre demande part aux <strong>contrôleurs SCIQ/Planification</strong>, qui la transmettent à la
+                <strong>DG</strong> pour décision. Si accord, l'action redevient modifiable.
             </p>
             <form id="modif-request-form" enctype="multipart/form-data" class="mt-3 grid gap-3">
                 <input type="hidden" name="action_id" value="">
@@ -1108,7 +1108,7 @@
                             var blockReq = document.querySelector('[data-action-block][data-action-id="' + actionId + '"]');
                             if (resp.ok || resp.redirected) {
                                 closeModifModal();
-                                if (blockReq) flashActionMessage(blockReq, false, 'Demande envoyée au directeur (transfert Planification + DG).');
+                                if (blockReq) flashActionMessage(blockReq, false, 'Demande envoyée aux contrôleurs SCIQ/Planification.');
                             } else if (errEl) {
                                 errEl.textContent = 'Échec de l\'envoi (HTTP ' + resp.status + ').';
                                 errEl.hidden = false;

@@ -78,7 +78,7 @@
             // A42 — La validation se fait desormais dans Mes taches : la carte
             // devient un raccourci vers ce module (acte Valider/Renvoyer inline).
             ['label' => 'En attente validation', 'value' => $pendingValidationCount, 'meta' => 'À valider dans Mes tâches', 'href' => route('workspace.tasks.index'), 'badge' => null, 'badge_tone' => $pendingValidationCount > 0 ? 'warning' : 'neutral'],
-            ['label' => 'Performance moyenne', 'value' => number_format($avgKpi, 1).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Performance moyenne', 'value' => number_format($avgKpi, 0).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
         ];
         $layoutMode = request()->query('layout', 'list');
         $kanbanColumns = [
@@ -369,7 +369,7 @@
                                 </div>
                                 @php $kEcheance = $echeanceOf($row); @endphp
                                 <div class="kanban-card-footer">
-                                    <span class="kanban-card-pct" style="color: {{ $pctColor }};">{{ number_format($pct, 1, ',', ' ') }}%</span>
+                                    <span class="kanban-card-pct" style="color: {{ $pctColor }};">{{ number_format($pct, 0, ',', ' ') }}%</span>
                                     <span style="display:flex; align-items:center; gap:0.3rem; min-width:0; font-size:0.68rem; color: var(--app-muted);">
                                         @if ($kEcheance)
                                             <span style="display:inline-block; padding:0.05rem 0.32rem; border-radius:0.4rem; background: rgba(148,163,184,0.16); color: var(--app-text); font-weight:700; font-size:0.62rem;">{{ $trimestreLabel($kEcheance) }}</span>
@@ -596,7 +596,7 @@
                                 <div style="position:absolute; left:{{ $gLeft }}%; width:{{ $gWidth }}%; top:50%; transform:translateY(-50%); height:1.25rem; border-radius:5px; background:{{ $gColor }}; opacity:0.16; pointer-events:none;"></div>
                                 {{-- Progress fill --}}
                                 <div style="position:absolute; left:{{ $gLeft }}%; width:{{ max(0.3, $gFillW) }}%; top:50%; transform:translateY(-50%); height:1.25rem; border-radius:5px; background:{{ $gColor }};"
-                                     title="{{ $ganttRow->libelle }} — {{ number_format($gPct, 1) }}%">
+                                     title="{{ $ganttRow->libelle }} — {{ number_format($gPct, 0) }}%">
                                     @if ($gWidth > 4)
                                         <span style="position:absolute; left:5px; top:50%; transform:translateY(-50%); font-size:0.6rem; color:#fff; font-weight:700; white-space:nowrap; text-shadow:0 1px 2px rgba(0,0,0,0.3); pointer-events:none;">{{ number_format($gPct, 0) }}%</span>
                                     @endif
@@ -701,8 +701,8 @@
                             </td>
                             <td class="min-w-[180px]">
                                 <div class="mb-2 flex items-center justify-between gap-2 text-xs">
-                                    <span class="font-semibold text-slate-700">{{ number_format($progressValue, 1) }}%</span>
-                                    <span class="text-slate-500">Théo. {{ number_format((float) ($row->progression_theorique ?? 0), 1) }}%</span>
+                                    <span class="font-semibold text-slate-700">{{ number_format($progressValue, 0) }}%</span>
+                                    <span class="text-slate-500">Théo. {{ number_format((float) ($row->progression_theorique ?? 0), 0) }}%</span>
                                 </div>
                                 <div class="showcase-progress-track">
                                     <span class="showcase-progress-bar {{ $progressColor }}" style="width: {{ $progressValue }}%"></span>
@@ -722,7 +722,7 @@
                                     {{ $validationStatusLabel($rowValidationStatus) }}
                                 </span>
                                 <p class="mt-1 text-xs text-slate-500">
-                                    Performance {{ $kpiPerformance !== null ? number_format((float) $kpiPerformance, 1).'%' : '-' }}
+                                    Performance {{ $kpiPerformance !== null ? number_format((float) $kpiPerformance, 0).'%' : '-' }}
                                 </p>
                             </td>
                             <td>

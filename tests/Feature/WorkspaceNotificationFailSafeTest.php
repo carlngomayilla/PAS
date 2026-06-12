@@ -15,7 +15,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * Couvre A07 : si Notification::send ou la trace d audit echoue, le service
+ * Couvre A07 : si l envoi Notification ou la trace d audit echoue, le service
  * doit logger en `critical` sans casser le workflow metier appelant.
  */
 class WorkspaceNotificationFailSafeTest extends TestCase
@@ -29,7 +29,7 @@ class WorkspaceNotificationFailSafeTest extends TestCase
             'is_active' => true,
         ]);
 
-        Notification::shouldReceive('send')
+        Notification::shouldReceive('sendNow')
             ->once()
             ->andThrow(new RuntimeException('queue connection refused'));
 

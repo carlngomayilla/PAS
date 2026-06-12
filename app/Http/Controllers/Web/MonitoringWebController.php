@@ -2366,7 +2366,7 @@ class MonitoringWebController extends Controller
                     $cible = '';
                     if ($action->type_cible === 'quantitative') {
                         $quantite = $action->quantite_cible !== null
-                            ? number_format((float) $action->quantite_cible, 2, '.', '')
+                            ? number_format((float) $action->quantite_cible, 0, '.', '')
                             : '';
                         $unite = trim((string) ($action->unite_cible ?? ''));
                         $cible = trim($quantite.' '.$unite);
@@ -2390,7 +2390,7 @@ class MonitoringWebController extends Controller
                         'debut' => optional($action->date_debut)->format('Y-m-d') ?? '',
                         'fin' => optional($action->date_fin)->format('Y-m-d') ?? '',
                         'etat_realisation' => (string) $action->statut_dynamique,
-                        'progression' => number_format((float) ($action->progression_reelle ?? 0), 2, '.', '').'%',
+                        'progression' => number_format((float) ($action->progression_reelle ?? 0), 0, '.', '').'%',
                         'ressources_requises' => implode(' | ', $ressources),
                         'indicateurs_performance' => (string) $indicateurs,
                     ];

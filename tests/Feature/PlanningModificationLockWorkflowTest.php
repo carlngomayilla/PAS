@@ -91,7 +91,7 @@ class PlanningModificationLockWorkflowTest extends TestCase
     {
         // RÈGLE V2 (2026-05-31) : une ACTION verrouillée n'est PLUS modifiable
         // directement par le chef de service. Il doit passer par le circuit
-        // chef → directeur → planification → DG. Toute modif directe est refusée.
+        // demandeur -> controleur SCIQ/Planification -> DG. Toute modif directe est refusée.
         $fixture = $this->fixture();
         $action = $fixture['action'];
 

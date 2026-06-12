@@ -1876,7 +1876,13 @@ class WorkspaceNotificationService
         // logge en critical mais on n interrompt PAS le metier appelant. Les
         // alertes perdues doivent etre surveillees via le canal logs.
         try {
-            Notification::send($targets, new WorkspaceModuleNotification($payload));
+            $notification = new WorkspaceModuleNotification($payload);
+
+            if ((string) config('queue.default') === 'sync') {
+                Notification::sendNow($targets, $notification);
+            } else {
+                Notification::send($targets, $notification);
+            }
         } catch (Throwable $exception) {
             Log::critical('Workspace notification dispatch failed (A07).', [
                 'recipient_count' => $targets->count(),

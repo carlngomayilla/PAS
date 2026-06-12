@@ -131,7 +131,7 @@
                                 <td>{{ $action->pta?->service?->code ?: '-' }}</td>
                                 <td>{{ $action->pta?->direction?->code ?: '-' }}</td>
                                 <td>{{ $rmoNames }}</td>
-                                <td>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 2) : '-' }}</td>
+                                <td>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 0) : '-' }}</td>
                                 <td>{{ $action->nature_financement ?: $action->description_financement ?: '-' }}</td>
                                 <td>{{ $action->source_financement ?: '-' }}</td>
                                 <td>{{ $action->commentaire_financement ?: '-' }}</td>
@@ -161,7 +161,7 @@
                                                     @csrf
                                                     <input type="hidden" name="decision_financement" value="valider">
                                                     <label>Montant valide</label>
-                                                    <input name="montant_valide" type="number" step="0.01" min="0" value="{{ $action->montant_estime }}">
+                                                    <input name="montant_valide" type="number" step="1" min="0" value="{{ $action->montant_estime !== null ? (int) round((float) $action->montant_estime) : '' }}">
                                                     <label>Reference financement</label>
                                                     <input name="reference_financement" type="text" value="{{ $action->financement_reference }}">
                                                     <label>Commentaire DAF</label>
@@ -186,7 +186,7 @@
                                                         <option value="{{ \App\Models\Action::FINANCEMENT_NON_FINANCE }}">Non finance</option>
                                                     </select>
                                                     <label>Montant valide</label>
-                                                    <input name="montant_valide" type="number" step="0.01" min="0" value="{{ $action->financement_montant_valide ?: $action->montant_estime }}">
+                                                    <input name="montant_valide" type="number" step="1" min="0" value="{{ ($action->financement_montant_valide ?: $action->montant_estime) !== null ? (int) round((float) ($action->financement_montant_valide ?: $action->montant_estime)) : '' }}">
                                                     <label>Commentaire DAF</label>
                                                     <textarea name="commentaire_financement">{{ $action->financement_daf_commentaire }}</textarea>
                                                     <button class="btn btn-secondary mt-2" type="submit">Mettre à jour le statut</button>

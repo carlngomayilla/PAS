@@ -94,7 +94,7 @@
         $kpiCards = [
             [
                 'label' => $metricLabel('performance'),
-                'value' => number_format((float) ($kpiSummary['performance'] ?? 0), 1, ',', ' '),
+                'value' => number_format((float) ($kpiSummary['performance'] ?? 0), 0, ',', ' '),
                 'meta' => null,
                 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']),
                 'valueClass' => 'showcase-kpi-number text-[#3996d3]',
@@ -103,7 +103,7 @@
             ],
             [
                 'label' => 'Progression',
-                'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 1, ',', ' '),
+                'value' => number_format((float) ($kpiSummary['progression'] ?? 0), 0, ',', ' '),
                 'meta' => null,
                 'href' => route('workspace.actions.index', ['sort' => 'progression_desc']),
                 'valueClass' => 'showcase-kpi-number text-[#3996d3]',
@@ -279,7 +279,7 @@
                                     @endphp
                                     @if (array_key_exists($metricKey, (array) ($alert['metrics'] ?? [])))
                                         <span class="anbg-badge anbg-badge-{{ $metricTone }} px-3 py-1 text-[11px]">
-                                            {{ $metricLabel }} {{ number_format($metricValue, 1, ',', ' ') }}
+                                            {{ $metricLabel }} {{ number_format($metricValue, 0, ',', ' ') }}
                                         </span>
                                     @endif
                                 @endforeach

@@ -19,7 +19,7 @@
         <div class="showcase-action-row">
             <span class="showcase-chip">
                 <span class="showcase-chip-dot {{ (int) ($summary['overdue'] ?? 0) > 0 ? 'bg-red-600' : 'bg-green-600' }}"></span>
-                Score {{ number_format((float) ($summary['score'] ?? 100), 1, ',', ' ') }}%
+                Score {{ number_format((float) ($summary['score'] ?? 100), 0, ',', ' ') }}%
             </span>
             <span class="showcase-chip">Qualite {{ $summary['quality_label'] ?? 'Excellent' }}</span>
             <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.tasks.index') }}">Ouvrir</a>
@@ -47,7 +47,7 @@
                 <div class="rounded-lg border border-slate-200/85 bg-white/90 p-3">
                     <span class="block text-[0.68rem] font-bold uppercase text-[#667085]">{{ $component['label'] ?? 'Composante' }}</span>
                     <div class="mt-1 flex items-baseline justify-between gap-2">
-                        <strong class="text-sm text-[#17324a]">{{ number_format((float) ($component['score'] ?? 0), 1, ',', ' ') }}%</strong>
+                        <strong class="text-sm text-[#17324a]">{{ number_format((float) ($component['score'] ?? 0), 0, ',', ' ') }}%</strong>
                         <span class="text-[0.68rem] font-bold text-[#667085]">{{ (int) ($component['weight'] ?? 0) }}%</span>
                     </div>
                 </div>

@@ -56,7 +56,7 @@
                 $x = 20 + (($index * 320) / $steps);
                 $y = 120 - ($value * 0.9);
 
-                return number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+                return number_format($x, 0, '.', '').','.number_format($y, 0, '.', '');
             })
             ->implode(' ');
     };
@@ -117,7 +117,7 @@
                     <x-stat-card-link
                         :href="route('workspace.super-admin.kpis.edit')"
                         :label="$metric['label']"
-                        :value="number_format((float) ($metric['value'] ?? 0), 1)"
+                        :value="number_format((float) ($metric['value'] ?? 0), 0)"
                         :meta="collect([
                             ($metric['description'] ?? '') !== '' ? $metric['description'] : null,
                             $metric['formula_summary'] ?? null,
@@ -250,7 +250,7 @@
                                 <td>{{ $row['ptas_total'] }}</td>
                                 <td>{{ $row['actions_total'] }}</td>
                                 <td>{{ $row['actions_validees'] }}</td>
-                                <td>{{ number_format((float) $row['taux_realisation'], 1, ',', ' ') }}%</td>
+                                <td>{{ number_format((float) $row['taux_realisation'], 0, ',', ' ') }}%</td>
                             </tr>
                         @empty
                             <tr>
@@ -297,8 +297,8 @@
                                 <td>{{ $row['actions_total'] }}</td>
                                 <td>{{ $row['actions_validees'] }}</td>
                                 <td>{{ $row['actions_retard'] }}</td>
-                                <td>{{ number_format((float) $row['progression_moyenne'], 1, ',', ' ') }}%</td>
-                                <td>{{ number_format((float) $row['taux_validation'], 1, ',', ' ') }}%</td>
+                                <td>{{ number_format((float) $row['progression_moyenne'], 0, ',', ' ') }}%</td>
+                                <td>{{ number_format((float) $row['taux_validation'], 0, ',', ' ') }}%</td>
                             </tr>
                         @empty
                             <tr>

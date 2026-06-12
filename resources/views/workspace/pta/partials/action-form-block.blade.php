@@ -125,8 +125,8 @@
             {{-- Boutons par action : Enregistrer / Modifier / Supprimer. --}}
             {{-- onclick stopPropagation pour ne pas declencher le toggle de l'accordeon. --}}
             @if ($isFrozen)
-                {{-- Action figee : remplacer Enregistrer par Demande de modification (workflow DG/Planification). --}}
-                <button class="btn btn-warning btn-sm" type="button" data-request-modification onclick="event.preventDefault(); event.stopPropagation();" title="Demander au DG l'autorisation de modifier cette action">Demande de modification</button>
+                {{-- Action figee : remplacer Enregistrer par Demande de modification (workflow Controleur/DG). --}}
+                <button class="btn btn-warning btn-sm" type="button" data-request-modification onclick="event.preventDefault(); event.stopPropagation();" title="Demander aux contrôleurs l'autorisation de modifier cette action">Demande de modification</button>
             @else
                 <button class="btn btn-success btn-sm" type="button" data-save-action onclick="event.preventDefault(); event.stopPropagation();" title="Enregistrer cette action seule">Enregistrer</button>
             @endif
@@ -144,7 +144,7 @@
 
     @if ($isFrozen)
         <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
-            <strong>Action enregistree et figee.</strong> Les champs sont en lecture seule. Pour les modifier, utilisez le bouton <em>Demande de modification</em> ci-dessus — la demande sera transmise au DG (et au service Planification).
+            <strong>Action enregistree et figee.</strong> Les champs sont en lecture seule. Pour les modifier, utilisez le bouton <em>Demande de modification</em> ci-dessus — la demande sera transmise aux contrôleurs SCIQ/Planification, puis à la DG.
         </div>
     @endif
 
@@ -277,16 +277,16 @@
                 </div>
                 <div data-threshold-unique>
                     <label>Seuil minimum attendu (%)</label>
-                    <input name="actions[{{ $index }}][seuil_minimum]" type="number" step="0.01" min="0" max="100" value="{{ $rowData['seuil_minimum'] ?? 80 }}">
+                    <input name="actions[{{ $index }}][seuil_minimum]" type="number" step="1" min="0" max="100" value="{{ isset($rowData['seuil_minimum']) && $rowData['seuil_minimum'] !== '' && $rowData['seuil_minimum'] !== null ? (int) round((float) $rowData['seuil_minimum']) : 80 }}">
                     @error("actions.$index.seuil_minimum") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div class="md:col-span-2 {{ $thresholdMode === 'trimestriel' ? '' : 'hidden' }}" data-threshold-quarterly>
                     <label>Seuils trimestriels (%)</label>
                     <div class="form-grid-compact">
-                        <input name="actions[{{ $index }}][seuil_t1]" type="number" step="0.01" min="0" max="100" value="{{ $rowData['seuil_t1'] ?? '' }}" placeholder="T1">
-                        <input name="actions[{{ $index }}][seuil_t2]" type="number" step="0.01" min="0" max="100" value="{{ $rowData['seuil_t2'] ?? '' }}" placeholder="T2">
-                        <input name="actions[{{ $index }}][seuil_t3]" type="number" step="0.01" min="0" max="100" value="{{ $rowData['seuil_t3'] ?? '' }}" placeholder="T3">
-                        <input name="actions[{{ $index }}][seuil_t4]" type="number" step="0.01" min="0" max="100" value="{{ $rowData['seuil_t4'] ?? '' }}" placeholder="T4">
+                        <input name="actions[{{ $index }}][seuil_t1]" type="number" step="1" min="0" max="100" value="{{ isset($rowData['seuil_t1']) && $rowData['seuil_t1'] !== '' && $rowData['seuil_t1'] !== null ? (int) round((float) $rowData['seuil_t1']) : '' }}" placeholder="T1">
+                        <input name="actions[{{ $index }}][seuil_t2]" type="number" step="1" min="0" max="100" value="{{ isset($rowData['seuil_t2']) && $rowData['seuil_t2'] !== '' && $rowData['seuil_t2'] !== null ? (int) round((float) $rowData['seuil_t2']) : '' }}" placeholder="T2">
+                        <input name="actions[{{ $index }}][seuil_t3]" type="number" step="1" min="0" max="100" value="{{ isset($rowData['seuil_t3']) && $rowData['seuil_t3'] !== '' && $rowData['seuil_t3'] !== null ? (int) round((float) $rowData['seuil_t3']) : '' }}" placeholder="T3">
+                        <input name="actions[{{ $index }}][seuil_t4]" type="number" step="1" min="0" max="100" value="{{ isset($rowData['seuil_t4']) && $rowData['seuil_t4'] !== '' && $rowData['seuil_t4'] !== null ? (int) round((float) $rowData['seuil_t4']) : '' }}" placeholder="T4">
                     </div>
                 </div>
                 <label class="checkbox-pill self-end">
@@ -372,7 +372,7 @@
                             </div>
                             <div>
                                 <label>Poids (%)</label>
-                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][weight]" type="number" step="0.01" min="0" max="100" value="{{ $subAction['weight'] ?? '' }}" data-sub-weight-input placeholder="ex. 25">
+                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][weight]" type="number" step="1" min="0" max="100" value="{{ isset($subAction['weight']) && $subAction['weight'] !== '' && $subAction['weight'] !== null ? (int) round((float) $subAction['weight']) : '' }}" data-sub-weight-input placeholder="ex. 25">
                             </div>
                         </div>
                         <div class="mt-2 flex flex-wrap gap-2">
@@ -468,7 +468,7 @@
             <div class="mt-3 form-grid {{ $financementRequis ? '' : 'hidden' }}" data-financing-fields>
                 <div>
                     <label>Montant</label>
-                    <input name="actions[{{ $index }}][montant_estime]" type="number" step="0.01" min="0" value="{{ $rowData['montant_estime'] ?? '' }}">
+                    <input name="actions[{{ $index }}][montant_estime]" type="number" step="1" min="0" value="{{ isset($rowData['montant_estime']) && $rowData['montant_estime'] !== '' && $rowData['montant_estime'] !== null ? (int) round((float) $rowData['montant_estime']) : '' }}">
                     @error("actions.$index.montant_estime") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div>

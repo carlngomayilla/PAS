@@ -5,14 +5,14 @@
         <x-ui.page-title
             eyebrow="Gouvernance du planning"
             title="Demandes de modification"
-            subtitle="Circuit : Chef de service → Directeur → Planification (avis) → DG (décision). Une approbation rouvre l'action en écriture."
+            subtitle="Circuit : demandeur → contrôleur SCIQ/Planification → DG (décision). Une approbation rouvre l'action en écriture."
         />
 
         <section class="showcase-panel mb-4 app-screen-block">
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 class="showcase-panel-title">Demandes</h2>
-                    <p class="form-section-subtitle">Chaque étape notifie l'acteur suivant. L'avis de la Planification est consultatif ; seul le DG tranche.</p>
+                    <p class="form-section-subtitle">Les contrôleurs examinent la demande, donnent un avis, puis transmettent à la DG. Seul le DG tranche.</p>
                 </div>
                 <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
             </div>
@@ -33,14 +33,12 @@
                         @forelse ($rows as $row)
                             @php
                                 $statusMeta = [
-                                    'soumise' => ['Attente directeur', 'anbg-badge-warning'],
-                                    'transmise' => ['Attente Planif / DG', 'anbg-badge-info'],
+                                    'soumise' => ['Attente contrôleur', 'anbg-badge-warning'],
+                                    'transmise' => ['Transmise à la DG', 'anbg-badge-info'],
                                     'approuvee' => ['Approuvée (DG)', 'anbg-badge-success'],
                                     'rejetee' => ['Rejetée (DG)', 'anbg-badge-danger'],
                                 ];
                                 [$stLabel, $stClass] = $statusMeta[(string) $row->status] ?? [str_replace('_', ' ', (string) $row->status), 'anbg-badge-neutral'];
-                                $isDirecteurOfRow = $currentUser->hasRole(\App\Models\User::ROLE_DIRECTION)
-                                    && (int) ($currentUser->direction_id ?? 0) === (int) ($row->direction_id ?? -1);
                             @endphp
                             <tr>
                                 <td>
@@ -62,10 +60,10 @@
                                 </td>
                                 <td class="text-xs text-slate-600 space-y-1">
                                     @if ($row->transferred_by)
-                                        <p>↳ Transférée par <strong>{{ $row->transferredBy?->name ?? 'directeur' }}</strong></p>
+                                        <p>↳ Transmise par <strong>{{ $row->transferredBy?->name ?? 'contrôleur' }}</strong></p>
                                     @endif
                                     @if ($row->planif_avis)
-                                        <p>↳ Avis Planif : <strong>{{ $row->planif_avis }}</strong>{{ $row->planif_comment ? ' — '.$row->planif_comment : '' }}</p>
+                                        <p>↳ Avis contrôleur : <strong>{{ $row->planif_avis }}</strong>{{ $row->planif_comment ? ' — '.$row->planif_comment : '' }}</p>
                                     @endif
                                     @if ($row->reviewer)
                                         <p>↳ DG : <strong>{{ $row->reviewer?->name }}</strong>{{ $row->review_comment ? ' — '.$row->review_comment : '' }}</p>
@@ -75,25 +73,18 @@
                                     @endif
                                 </td>
                                 <td class="min-w-[260px]">
-                                    {{-- ÉTAPE 1 : Directeur transfère --}}
-                                    @if ($row->status === 'soumise' && $isDirecteurOfRow)
-                                        <form method="POST" action="{{ route('workspace.planning-unlocks.transfer', $row) }}" class="grid gap-2">
-                                            @csrf
-                                            <textarea name="transfer_comment" rows="2" placeholder="Commentaire (optionnel)"></textarea>
-                                            <button class="btn btn-primary btn-sm" type="submit">Transférer à la Planif + DG</button>
-                                        </form>
-                                    {{-- ÉTAPE 2 : Planification avis (consultatif) --}}
-                                    @elseif ($row->status === 'transmise' && ($canGivePlanifAvis ?? false) && ! $row->planif_avis)
+                                    {{-- ÉTAPE 1 : Contrôleur SCIQ/Planification transmet à la DG --}}
+                                    @if ($row->status === 'soumise' && ($canGivePlanifAvis ?? false))
                                         <form method="POST" action="{{ route('workspace.planning-unlocks.planif', $row) }}" class="grid gap-2">
                                             @csrf
                                             <select name="planif_avis" required>
                                                 <option value="favorable">Avis favorable</option>
                                                 <option value="defavorable">Avis défavorable</option>
                                             </select>
-                                            <textarea name="planif_comment" rows="2" placeholder="Commentaire Planification"></textarea>
-                                            <button class="btn btn-secondary btn-sm" type="submit">Enregistrer l'avis</button>
+                                            <textarea name="planif_comment" rows="2" placeholder="Commentaire contrôleur"></textarea>
+                                            <button class="btn btn-primary btn-sm" type="submit">Transmettre à la DG</button>
                                         </form>
-                                    {{-- ÉTAPE 3 : DG décide --}}
+                                    {{-- ÉTAPE 2 : DG décide --}}
                                     @elseif ($row->status === 'transmise' && ($canReview ?? false))
                                         <form method="POST" action="{{ route('workspace.planning-unlocks.dg', $row) }}" class="grid gap-2">
                                             @csrf

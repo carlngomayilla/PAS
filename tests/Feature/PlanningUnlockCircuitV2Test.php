@@ -11,40 +11,37 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\PlanningModificationLockService;
+use App\Services\PersonalTaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Circuit de modification d'action V2 :
- * Chef → Directeur (transfère) → Planification (avis) → DG (décision).
- * Voir docs/WORKFLOW-SUIVI-V2.md.
+ * Circuit de modification d'action :
+ * Demandeur -> controleur SCIQ/Planification -> DG (decision).
  */
 class PlanningUnlockCircuitV2Test extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_full_circuit_chef_directeur_planif_dg(): void
+    public function test_full_circuit_chef_controller_dg(): void
     {
         $f = $this->fixture();
         $locks = app(PlanningModificationLockService::class);
 
-        // 1. Le chef demande la modification → statut soumise (attente directeur).
+        // 1. Le chef demande la modification -> statut soumise (attente controleur).
         $req = $locks->requestUnlock($f['action'], $f['chef'], 'Besoin de corriger la cible.');
         $this->assertSame(PlanningUnlockRequest::STATUS_SOUMISE, $req->status);
+        $this->assertNull($req->transferred_by);
 
-        // 2. Le directeur transfère → statut transmise.
-        $locks->transferByDirecteur($req, $f['directeur'], 'Transfert validé.');
-        $req->refresh();
-        $this->assertSame(PlanningUnlockRequest::STATUS_TRANSMISE, $req->status);
-        $this->assertSame((int) $f['directeur']->id, (int) $req->transferred_by);
-
-        // 3. La planification rend un avis consultatif (ne change pas le statut décisif).
+        // 2. Le controleur SCIQ/Planification donne un avis et transmet a la DG.
         $locks->recordPlanifAvis($req, $f['planif'], PlanningUnlockRequest::AVIS_FAVORABLE, 'RAS.');
         $req->refresh();
-        $this->assertSame('favorable', $req->planif_avis);
-        $this->assertSame(PlanningUnlockRequest::STATUS_TRANSMISE, $req->status, 'L\'avis ne tranche pas.');
+        $this->assertSame(PlanningUnlockRequest::STATUS_TRANSMISE, $req->status);
+        $this->assertSame((int) $f['planif']->id, (int) $req->transferred_by);
+        $this->assertSame(PlanningUnlockRequest::AVIS_FAVORABLE, $req->planif_avis);
+        $this->assertSame((int) $f['planif']->id, (int) $req->planif_avis_by);
 
-        // 4. Le DG approuve → action déverrouillée.
+        // 3. Le DG approuve -> action deverrouillee.
         $locks->approve($req, $f['dg'], 'Accord DG.');
         $req->refresh();
         $f['action']->refresh();
@@ -53,52 +50,47 @@ class PlanningUnlockCircuitV2Test extends TestCase
         $this->assertFalse($locks->isLocked($f['action']), 'L\'action est rouverte en écriture.');
     }
 
-    public function test_dg_cannot_decide_before_directeur_transfer(): void
+    public function test_dg_cannot_decide_before_controller_transmission(): void
     {
         $f = $this->fixture();
         $locks = app(PlanningModificationLockService::class);
 
         $req = $locks->requestUnlock($f['action'], $f['chef'], 'Motif valable.');
 
-        // Le DG tente de décider alors que le directeur n'a pas transféré → 409.
-        $this->expectExceptionMessage('transférée par le directeur');
+        // Le DG tente de decider alors que le controleur n'a pas transmis -> 409.
+        $this->expectExceptionMessage('transmise par un controleur');
         $locks->approve($req, $f['dg'], 'Trop tôt.');
     }
 
-    public function test_directeur_of_another_direction_cannot_transfer(): void
+    public function test_directeur_cannot_transmit_to_dg(): void
     {
         $f = $this->fixture();
         $locks = app(PlanningModificationLockService::class);
         $req = $locks->requestUnlock($f['action'], $f['chef'], 'Motif valable.');
 
-        $otherDir = Direction::query()->create(['code' => 'OTH', 'libelle' => 'Autre direction']);
-        $otherDirecteur = User::factory()->create(['role' => User::ROLE_DIRECTION, 'direction_id' => $otherDir->id]);
-
-        $this->assertFalse($locks->canTransfer($otherDirecteur, $req));
+        $this->assertFalse($locks->canTransfer($f['directeur'], $req));
     }
 
-    public function test_directeur_sees_direction_unlock_requests_to_transfer(): void
+    public function test_controller_sees_unlock_requests_to_transmit(): void
     {
-        $f = $this->fixture('DIRVIEW');
+        $f = $this->fixture('CTRLVIEW');
         $locks = app(PlanningModificationLockService::class);
 
         $req = $locks->requestUnlock($f['action'], $f['chef'], 'Motif valable.');
 
-        $this->actingAs($f['directeur'])
+        $this->actingAs($f['planif'])
             ->get(route('workspace.planning-unlocks.index'))
             ->assertOk()
             ->assertSee('Demande #'.$req->id)
-            ->assertSee('Planif + DG');
+            ->assertSee('Transmettre à la DG');
     }
 
-    public function test_planning_control_chiefs_can_see_and_give_planif_avis(): void
+    public function test_planning_control_chiefs_can_see_and_transmit_to_dg(): void
     {
         foreach ([User::ROLE_CHEF_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ] as $index => $role) {
-            $f = $this->fixture('AVIS'.$index);
+            $f = $this->fixture('TRANS'.$index);
             $locks = app(PlanningModificationLockService::class);
             $req = $locks->requestUnlock($f['action'], $f['chef'], 'Motif valable.');
-            $locks->transferByDirecteur($req, $f['directeur'], 'Transfert.');
-            $req->refresh();
 
             $controller = User::factory()->create([
                 'role' => $role,
@@ -111,7 +103,7 @@ class PlanningUnlockCircuitV2Test extends TestCase
                 ->get(route('workspace.planning-unlocks.index'))
                 ->assertOk()
                 ->assertSee('Demande #'.$req->id)
-                ->assertSee("Enregistrer l'avis", false);
+                ->assertSee('Transmettre à la DG');
 
             $this->actingAs($controller)
                 ->post(route('workspace.planning-unlocks.planif', $req), [
@@ -121,9 +113,44 @@ class PlanningUnlockCircuitV2Test extends TestCase
                 ->assertRedirect(route('workspace.planning-unlocks.index'));
 
             $req->refresh();
+            $this->assertSame(PlanningUnlockRequest::STATUS_TRANSMISE, $req->status);
             $this->assertSame(PlanningUnlockRequest::AVIS_FAVORABLE, $req->planif_avis);
+            $this->assertSame((int) $controller->id, (int) $req->transferred_by);
             $this->assertSame((int) $controller->id, (int) $req->planif_avis_by);
         }
+    }
+
+    public function test_unlock_requests_move_between_controller_and_dg_personal_tasks(): void
+    {
+        $f = $this->fixture('TASKS');
+        $locks = app(PlanningModificationLockService::class);
+        $tasks = app(PersonalTaskService::class);
+
+        $req = $locks->requestUnlock($f['action'], $f['chef'], 'Motif valable.');
+
+        $controllerTasks = collect($tasks->forUser($f['planif'])['items'] ?? []);
+        $this->assertTrue(
+            $controllerTasks->contains(fn (array $task): bool => (string) ($task['type'] ?? '') === 'controle_modification'
+                && str_contains((string) ($task['subject'] ?? ''), 'Action verrouill')
+            ),
+            'La demande soumise doit apparaitre chez le controleur.'
+        );
+
+        $dgTasksBefore = collect($tasks->forUser($f['dg'])['items'] ?? []);
+        $this->assertFalse(
+            $dgTasksBefore->contains(fn (array $task): bool => (string) ($task['type'] ?? '') === 'decision_modification_dg'),
+            'La DG ne doit pas recevoir la tache avant transmission controleur.'
+        );
+
+        $locks->recordPlanifAvis($req, $f['planif'], PlanningUnlockRequest::AVIS_FAVORABLE, 'Transmission DG.');
+
+        $dgTasksAfter = collect($tasks->forUser($f['dg'])['items'] ?? []);
+        $this->assertTrue(
+            $dgTasksAfter->contains(fn (array $task): bool => (string) ($task['type'] ?? '') === 'decision_modification_dg'
+                && str_contains((string) ($task['subject'] ?? ''), 'Action verrouill')
+            ),
+            'La demande transmise doit apparaitre chez la DG.'
+        );
     }
 
     public function test_action_tracking_exposes_unlock_processing_button_for_dg_and_control_chiefs(): void

@@ -22,6 +22,26 @@
         themeToggle.addEventListener('click', window.anbgToggleTheme);
     }
 
+    var backButton = document.getElementById('admin-back-button');
+    if (backButton) {
+        backButton.addEventListener('click', function () {
+            var fallback = backButton.getAttribute('data-fallback-url') || '/';
+            var sameOriginReferrer = false;
+            try {
+                sameOriginReferrer = !!document.referrer
+                    && new URL(document.referrer).origin === window.location.origin;
+            } catch (e) {
+                sameOriginReferrer = false;
+            }
+
+            if (window.history.length > 1 && sameOriginReferrer) {
+                window.history.back();
+            } else {
+                window.location.href = fallback;
+            }
+        });
+    }
+
     function updateLocalClock() {
         if (!localClock) {
             return;

@@ -738,29 +738,36 @@ import { gsap } from 'gsap';
         if (!box) return;
         var html = '';
         var hasAny = false;
+        var escapeSpotlight = function (value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        };
         groups.forEach(function (group) {
             var items = group.items || [];
             if (!items.length) return;
             hasAny = true;
-            html += '<div class="spotlight-group-label">' + group.title + '</div>';
+            html += '<div class="spotlight-group-label">' + escapeSpotlight(group.title) + '</div>';
             items.forEach(function (item) {
-                html += '<a href="' + item.href + '" class="spotlight-item" role="option" tabindex="-1">'
+                html += '<a href="' + escapeSpotlight(item.href) + '" class="spotlight-item" role="option" tabindex="-1">'
                     + '<span class="spotlight-item-dot"></span>'
                     + '<span class="spotlight-item-body">'
-                    +   '<span class="spotlight-item-title">' + item.title + '</span>'
-                    +   '<span class="spotlight-item-sub">' + (item.subtitle || '') + (item.meta ? ' · ' + item.meta : '') + '</span>'
+                    +   '<span class="spotlight-item-title">' + escapeSpotlight(item.title) + '</span>'
+                    +   '<span class="spotlight-item-sub">' + escapeSpotlight(item.subtitle || '') + (item.meta ? ' - ' + escapeSpotlight(item.meta) : '') + '</span>'
                     + '</span>'
-                    + '<span class="spotlight-item-arrow">›</span>'
+                    + '<span class="spotlight-item-arrow">&rsaquo;</span>'
                     + '</a>';
             });
         });
         if (!hasAny) {
-            html = '<div class="spotlight-empty">Aucun résultat trouvé.</div>';
+            html = '<div class="spotlight-empty">Aucun resultat trouve.</div>';
         }
         box.innerHTML = html;
         _spotlightActiveIdx = -1;
     }
-
     function spotlightNavigate(dir) {
         var box = document.getElementById('spotlight-results');
         if (!box) return;

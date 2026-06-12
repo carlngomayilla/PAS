@@ -21,6 +21,11 @@
                     <a class="btn btn-secondary" href="{{ route('workspace.imports.error-report', $import) }}">Telecharger le rapport d'erreurs</a>
                 @endif
                 <a class="btn btn-outline" href="{{ route('workspace.imports.index') }}">Historique</a>
+                <form method="POST" action="{{ route('workspace.imports.destroy', $import) }}" data-confirm-message="Supprimer cet import et tout son historique ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
+                    @csrf
+                    @method('DELETE')
+                    <button class="btn btn-danger" type="submit">Supprimer</button>
+                </form>
             </div>
         </div>
 

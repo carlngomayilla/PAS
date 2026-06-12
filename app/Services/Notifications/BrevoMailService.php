@@ -2,6 +2,7 @@
 
 namespace App\Services\Notifications;
 
+use App\Jobs\SendBrevoNotificationEmailsJob;
 use App\Mail\BrevoNotificationMail;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -39,6 +40,19 @@ class BrevoMailService
     }
 
     /**
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $targets
+     * @param  array<string, mixed>  $payload
+     */
+    private function sendToTargets(string $event, Collection|EloquentCollection $targets, array $payload): void
+    {
+        foreach ($targets as $user) {
+            if ($user instanceof User) {
+                $this->sendOne($event, $user, $payload);
+            }
+        }
+    }
+
+    /**
      * @param  Collection<int, User>|EloquentCollection<int, User>  $recipients
      * @param  array<string, mixed>  $payload Notification rendue (title, message, url, module, entity_*).
      */
@@ -62,24 +76,28 @@ class BrevoMailService
             return;
         }
 
-        $send = function () use ($event, $targets, $payload): void {
-            foreach ($targets as $user) {
-                $this->sendOne($event, $user, $payload);
-            }
-        };
-
-        // Perf : en contexte web, l'envoi (HTTP API Brevo ou SMTP, plusieurs
-        // secondes possibles) est differe APRES l'envoi de la reponse HTTP afin
-        // de ne jamais bloquer la requete de l'utilisateur — sans dependre d'un
-        // worker de file d'attente. En console (commandes, worker) et en tests,
-        // l'envoi reste synchrone pour garder un comportement deterministe.
+        // En contexte web, on enfile un job dedie : un envoi Brevo lent ne doit
+        // jamais ajouter une erreur PHP apres une reponse JSON deja emise.
+        // En console (commandes, workers, tests), l'envoi reste synchrone.
         if (app()->runningInConsole()) {
-            $send();
+            $this->sendToTargets($event, $targets, $payload);
 
             return;
         }
 
-        dispatch($send)->afterResponse();
+        try {
+            app(\Illuminate\Contracts\Bus\Dispatcher::class)->dispatch(new SendBrevoNotificationEmailsJob(
+                $event,
+                $targets->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+                $payload
+            ));
+        } catch (Throwable $exception) {
+            Log::warning('Brevo email queue dispatch failed (non-blocking).', [
+                'event' => $event,
+                'recipient_count' => $targets->count(),
+                'exception' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**

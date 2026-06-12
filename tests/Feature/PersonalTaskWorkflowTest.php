@@ -242,6 +242,7 @@ class PersonalTaskWorkflowTest extends TestCase
             'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
             'validation_sans_correction' => true,
             'taux_performance' => 72,
+            'taux_delai' => 90,
             'evalue_par' => $fixture['chef']->id,
             'evalue_le' => now(),
         ])->save();
@@ -249,19 +250,20 @@ class PersonalTaskWorkflowTest extends TestCase
         $summary = app(PersonalTaskService::class)
             ->forUser($fixture['agent'], 10)['summary'];
 
-        $this->assertEquals(93.0, (float) $summary['score']);
-        $this->assertSame('Bon', $summary['quality_label']);
-        $this->assertSame(35, $summary['components']['processed']['weight']);
-        $this->assertSame(30, $summary['components']['deadlines']['weight']);
-        $this->assertSame(25, $summary['components']['quality']['weight']);
-        $this->assertSame(10, $summary['components']['criticality']['weight']);
-        $this->assertEquals(72.0, (float) $summary['components']['quality']['score']);
+        // Spec v3 : score = Performance (60 %) + Delai (40 %) tires des KPI de l'action.
+        // 72 * 0.6 + 90 * 0.4 = 43.2 + 36 = 79.2.
+        $this->assertEquals(79.2, (float) $summary['score']);
+        $this->assertSame('Tres bon', $summary['quality_label']);
+        $this->assertSame(60, $summary['components']['performance']['weight']);
+        $this->assertSame(40, $summary['components']['deadlines']['weight']);
+        $this->assertEquals(72.0, (float) $summary['components']['performance']['score']);
+        $this->assertEquals(90.0, (float) $summary['components']['deadlines']['score']);
 
         $this->actingAs($fixture['agent'])
             ->get(route('workspace.tasks.index'))
             ->assertOk()
             ->assertSee('Composantes du score personnel')
-            ->assertSee('Qualite Bon');
+            ->assertSee('Qualite Tres bon');
     }
 
     public function test_personal_score_quality_labels_follow_canonical_scale(): void
@@ -284,10 +286,13 @@ class PersonalTaskWorkflowTest extends TestCase
             ]);
 
             $action = $this->makeAction($fixture['pta'], $agent, 'Action qualite '.$note);
+            // Performance et Delai egaux a la note : le score global vaut la note,
+            // ce qui isole le mapping label/score.
             $action->forceFill([
                 'statut_dynamique' => ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
                 'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
                 'taux_performance' => $note,
+                'taux_delai' => $note,
                 'evalue_par' => $fixture['chef']->id,
                 'evalue_le' => now(),
             ])->save();
@@ -295,7 +300,7 @@ class PersonalTaskWorkflowTest extends TestCase
             $summary = app(PersonalTaskService::class)->forUser($agent, 10)['summary'];
 
             $this->assertSame($expectedLabel, $summary['quality_label']);
-            $this->assertEquals((float) $note, (float) $summary['components']['quality']['score']);
+            $this->assertEquals((float) $note, (float) $summary['components']['performance']['score']);
         }
     }
 

@@ -246,7 +246,7 @@ class ReportingAnalyticsService
                     $cible = '';
                     if ($action->type_cible === 'quantitative') {
                         $quantite = $action->quantite_cible !== null
-                            ? number_format((float) $action->quantite_cible, 2, '.', '')
+                            ? number_format((float) $action->quantite_cible, 0, '.', '')
                             : '';
                         $unite = trim((string) ($action->unite_cible ?? ''));
                         $cible = trim($quantite.' '.$unite);
@@ -279,7 +279,7 @@ class ReportingAnalyticsService
                         'debut' => optional($action->date_debut)->format('Y-m-d') ?? '',
                         'fin' => optional($action->date_fin)->format('Y-m-d') ?? '',
                         'etat_realisation' => (string) $action->statut_dynamique,
-                        'progression' => number_format((float) ($action->progression_reelle ?? 0), 2, '.', '').'%',
+                        'progression' => number_format((float) ($action->progression_reelle ?? 0), 0, '.', '').'%',
                         'kpi_global' => round((float) ($action->actionKpi?->kpi_global ?? 0), 2),
                         'ressources_requises' => implode(' | ', $ressources),
                         'indicateurs_performance' => (string) $indicateurs,
@@ -833,13 +833,13 @@ class ReportingAnalyticsService
             'realise' => $this->reportActionActualLabel($action),
             'debut' => $action->date_debut?->format('Y-m-d') ?? '',
             'fin' => $action->date_fin?->format('Y-m-d') ?? '',
-            'taux' => number_format($progression, 2, '.', '').'%',
+            'taux' => number_format($progression, 0, '.', '').'%',
             'statut' => $statut,
             'statut_validation' => (string) ($action->validation_status_label ?? $validationStatus ?: '-'),
-            'kpi_global' => number_format($kpiGlobal, 2, '.', ''),
-            'kpi_delai' => number_format((float) ($action->actionKpi?->kpi_delai ?? 0), 2, '.', ''),
-            'kpi_performance' => number_format((float) ($action->actionKpi?->kpi_performance ?? 0), 2, '.', ''),
-            'kpi_conformite' => number_format($kpiConformite, 2, '.', ''),
+            'kpi_global' => number_format($kpiGlobal, 0, '.', ''),
+            'kpi_delai' => number_format((float) ($action->actionKpi?->kpi_delai ?? 0), 0, '.', ''),
+            'kpi_performance' => number_format((float) ($action->actionKpi?->kpi_performance ?? 0), 0, '.', ''),
+            'kpi_conformite' => number_format($kpiConformite, 0, '.', ''),
             'progression_value' => $progression,
             'kpi_global_value' => $kpiGlobal,
             'kpi_delai_value' => (float) ($action->actionKpi?->kpi_delai ?? 0),
@@ -909,7 +909,7 @@ class ReportingAnalyticsService
             $parts[] = 'Nature: '.$nature;
         }
         if ($amount > 0) {
-            $parts[] = 'Montant: '.number_format($amount, 2, '.', ' ');
+            $parts[] = 'Montant: '.number_format($amount, 0, '.', ' ');
         }
         if ($source !== '') {
             $parts[] = 'Source: '.$source;
@@ -952,7 +952,7 @@ class ReportingAnalyticsService
             return $labels;
         }
 
-        return 'Indicateur global: '.number_format((float) ($action->actionKpi?->kpi_global ?? 0), 2, '.', '');
+        return 'Indicateur global: '.number_format((float) ($action->actionKpi?->kpi_global ?? 0), 0, '.', '');
     }
 
     private function reportActionPlannedLabel(Action $action): string
@@ -973,7 +973,7 @@ class ReportingAnalyticsService
 
     private function reportActionActualLabel(Action $action): string
     {
-        $parts = ['Progression: '.number_format((float) ($action->progression_reelle ?? 0), 2, '.', '').'%'];
+        $parts = ['Progression: '.number_format((float) ($action->progression_reelle ?? 0), 0, '.', '').'%'];
 
         if ($action->date_fin_reelle !== null) {
             $parts[] = 'Fin reelle: '.$action->date_fin_reelle->format('Y-m-d');
@@ -991,7 +991,7 @@ class ReportingAnalyticsService
     {
         if ($action->type_cible === 'quantitative') {
             $quantite = $action->quantite_cible !== null
-                ? number_format((float) $action->quantite_cible, 2, '.', '')
+                ? number_format((float) $action->quantite_cible, 0, '.', '')
                 : '';
             $unite = trim((string) ($action->unite_cible ?? ''));
 

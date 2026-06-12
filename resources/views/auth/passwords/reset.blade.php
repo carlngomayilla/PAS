@@ -102,7 +102,7 @@
         </div>
         <p class="footer"><strong>ANBG Pilotage</strong> - PAS / PAO / PTA</p>
     </main>
-    <script>
+    <script @cspNonce>
         document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
             button.addEventListener('click', function () {
                 var input = document.getElementById(button.dataset.passwordToggle);

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\NotifyImportedParametreActionsJob;
 use App\Models\Action;
 use App\Models\Direction;
 use App\Models\PlanningImport;
@@ -9,9 +10,11 @@ use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
+use App\Models\SousAction;
 use App\Services\DeletionRequestService;
 use App\Services\Imports\PlanningExcelImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class PlanningExcelImportServiceTest extends TestCase
@@ -119,6 +122,21 @@ class PlanningExcelImportServiceTest extends TestCase
 
         $this->assertTrue($preview['has_errors']);
         $this->assertStringContainsString('Colonnes manquantes', $preview['rows'][0]['message']);
+    }
+
+    public function test_validation_accepts_new_template_column_order_with_optional_guide_sheet(): void
+    {
+        $this->fixture();
+
+        $preview = app(PlanningExcelImportService::class)->validateSheet([
+            'sheet_count' => 2,
+            'sheet_name' => 'IMPORT_GLOBAL',
+            'sheet_names' => ['IMPORT_GLOBAL', 'GUIDE'],
+            'headers' => PlanningExcelImportService::IMPORT_COLUMNS,
+            'rows' => [$this->row(['type_action' => 'NQ']) + ['_row_number' => 2]],
+        ]);
+
+        $this->assertFalse($preview['has_errors']);
     }
 
     public function test_column_mapping_allows_custom_source_headers_before_preview(): void
@@ -331,6 +349,178 @@ class PlanningExcelImportServiceTest extends TestCase
             ->assertOk()
             ->assertSee('Sous-action 1')
             ->assertSee('Sous-action 2');
+    }
+
+    public function test_quantitative_parametrage_columns_import_a_configured_action(): void
+    {
+        $fixture = $this->fixture();
+        $this->muteNotifications();
+        $service = app(PlanningExcelImportService::class);
+
+        $preview = $service->validateSheet($this->sheet([
+            $this->row([
+                'libelle_action' => 'Action quantitative',
+                'type_action' => 'Q',
+                'quantite_cible' => 120,
+                'unite_cible' => 'dossiers',
+                'seuil_mode' => 'trimestriel',
+                'seuil_t1' => 25,
+                'seuil_t2' => 50,
+                'seuil_t3' => 75,
+                'seuil_t4' => 100,
+            ]),
+        ]));
+        $this->assertFalse($preview['has_errors']);
+
+        $this->executePreview($service, $fixture['admin'], $preview);
+
+        $this->assertDatabaseHas('actions', [
+            'libelle' => 'Action quantitative',
+            'statut_parametrage' => 'parametre',
+            'mode_evaluation' => Action::MODE_QUANTITATIF,
+            'type_action' => Action::TYPE_QUANTITATIVE,
+            'seuil_mode' => 'trimestriel',
+        ]);
+        $action = Action::query()->where('libelle', 'Action quantitative')->firstOrFail();
+        $this->assertSame(120.0, (float) $action->quantite_cible);
+        $this->assertSame('dossiers', $action->unite_cible);
+        $this->assertSame(100.0, (float) $action->seuil_t4);
+
+        // PTA sans action restante a parametrer → bascule automatique en cours.
+        $this->assertDatabaseHas('ptas', ['statut' => Pta::STATUS_EN_COURS]);
+    }
+
+    public function test_composee_parametrage_columns_create_planned_sub_actions(): void
+    {
+        $fixture = $this->fixture();
+        $this->muteNotifications();
+        $service = app(PlanningExcelImportService::class);
+
+        $preview = $service->validateSheet($this->sheet([
+            $this->row([
+                'libelle_action' => 'Action composee',
+                'nombre_sous_actions' => 2,
+                'type_action' => 'M',
+                'sous_actions' => 'Former 20 agents|Q|60|20|agents ; Rediger le guide|NQ|40||',
+            ]),
+        ]));
+        $this->assertFalse($preview['has_errors']);
+
+        $this->executePreview($service, $fixture['admin'], $preview);
+
+        $action = Action::query()->where('libelle', 'Action composee')->firstOrFail();
+        $this->assertSame('parametre', $action->statut_parametrage);
+        $this->assertSame(Action::TYPE_COMPOSEE, $action->type_action);
+        $this->assertDatabaseCount('sous_actions', 2);
+        $this->assertDatabaseHas('sous_actions', [
+            'action_id' => $action->id,
+            'libelle' => 'Former 20 agents',
+            'sub_action_type' => SousAction::TYPE_QUANTITATIVE,
+            'weight' => 60,
+        ]);
+        $this->assertDatabaseHas('sous_actions', [
+            'libelle' => 'Rediger le guide',
+            'sub_action_type' => SousAction::TYPE_NON_QUANTITATIVE,
+            'weight' => 40,
+        ]);
+    }
+
+    public function test_quantitative_parametrage_requires_target_value(): void
+    {
+        $this->fixture();
+
+        $preview = app(PlanningExcelImportService::class)->validateSheet($this->sheet([
+            $this->row(['type_action' => 'Q', 'quantite_cible' => '', 'unite_cible' => '']),
+        ]));
+
+        $this->assertTrue($preview['has_errors']);
+        $this->assertStringContainsString('quantite_cible', $preview['rows'][0]['message']);
+        $this->assertStringContainsString('unite_cible', $preview['rows'][0]['message']);
+    }
+
+    public function test_trimestriel_threshold_requires_quarter_values(): void
+    {
+        $this->fixture();
+
+        $preview = app(PlanningExcelImportService::class)->validateSheet($this->sheet([
+            $this->row(['type_action' => 'NQ', 'seuil_mode' => 'trimestriel']),
+        ]));
+
+        $this->assertTrue($preview['has_errors']);
+        $this->assertStringContainsString('seuil_t1', $preview['rows'][0]['message']);
+    }
+
+    public function test_composee_rejects_sub_action_weights_not_summing_to_100(): void
+    {
+        $this->fixture();
+
+        $preview = app(PlanningExcelImportService::class)->validateSheet($this->sheet([
+            $this->row([
+                'type_action' => 'M',
+                'sous_actions' => 'A|NQ|30|| ; B|NQ|30||',
+            ]),
+        ]));
+
+        $this->assertTrue($preview['has_errors']);
+        $this->assertStringContainsString('somme des poids', $preview['rows'][0]['message']);
+    }
+
+    public function test_empty_type_action_keeps_action_to_configure(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(PlanningExcelImportService::class);
+
+        // Ligne avec colonnes de parametrage presentes mais type_action vide.
+        $preview = $service->validateSheet($this->sheet([
+            $this->row(['type_action' => '', 'quantite_cible' => '', 'sous_actions' => '']),
+        ]));
+        $this->assertFalse($preview['has_errors']);
+
+        $this->executePreview($service, $fixture['admin'], $preview);
+
+        $this->assertDatabaseHas('actions', [
+            'libelle' => 'Action importee',
+            'statut_parametrage' => 'a_parametrer',
+        ]);
+    }
+
+    public function test_complete_import_queues_assigned_rmo_notifications(): void
+    {
+        $fixture = $this->fixture();
+        Bus::fake([NotifyImportedParametreActionsJob::class]);
+
+        $service = app(PlanningExcelImportService::class);
+        $preview = $service->validateSheet($this->sheet([
+            $this->row(['type_action' => 'NQ']),
+        ]));
+
+        $this->executePreview($service, $fixture['admin'], $preview);
+
+        $action = Action::query()->where('libelle', 'Action importee')->firstOrFail();
+        Bus::assertDispatched(NotifyImportedParametreActionsJob::class, fn (NotifyImportedParametreActionsJob $job): bool =>
+            $job->actorId === (int) $fixture['admin']->id
+            && $job->actionIds === [(int) $action->id]
+        );
+    }
+
+    private function muteNotifications(): void
+    {
+        Bus::fake([NotifyImportedParametreActionsJob::class]);
+    }
+
+    private function executePreview(PlanningExcelImportService $service, User $admin, array $preview): PlanningImport
+    {
+        $import = PlanningImport::query()->create([
+            'user_id' => $admin->id,
+            'filename' => 'import.csv',
+            'preview_payload' => $preview,
+            'total_rows' => count($preview['rows']),
+            'valid_rows' => count($preview['rows']),
+            'error_rows' => 0,
+            'status' => 'preview_ready',
+        ]);
+
+        return $service->execute($import, PlanningImport::MODE_CREATE_ONLY, $admin, '127.0.0.1');
     }
 
     private function fixture(): array

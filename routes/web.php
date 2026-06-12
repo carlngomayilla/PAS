@@ -184,6 +184,7 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::get('imports-excel/{import}/resultat', [PlanningImportWebController::class, 'result'])->name('imports.result');
             Route::get('imports-excel/{import}/erreurs', [PlanningImportWebController::class, 'errors'])->name('imports.errors');
             Route::get('imports-excel/{import}/rapport-erreurs', [PlanningImportWebController::class, 'errorReport'])->name('imports.error-report');
+            Route::delete('imports-excel/{import}', [PlanningImportWebController::class, 'destroy'])->name('imports.destroy');
 
             Route::get('demandes-deverrouillage', [PlanningUnlockWebController::class, 'index'])
                 ->name('planning-unlocks.index');
@@ -237,7 +238,7 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.quick-status');
             Route::post('actions/{action}/demandes-deverrouillage', [PlanningUnlockWebController::class, 'storeAction'])
                 ->name('actions.unlock-requests.store');
-            // Circuit V2 : directeur transfère → planification donne avis → DG décide.
+            // Circuit V3 : controleur SCIQ/Planification transmet -> DG decide.
             Route::post('demandes-deverrouillage/{planningUnlockRequest}/transfert', [PlanningUnlockWebController::class, 'transferByDirecteur'])
                 ->name('planning-unlocks.transfer');
             Route::post('demandes-deverrouillage/{planningUnlockRequest}/avis-planif', [PlanningUnlockWebController::class, 'reviewByPlanification'])

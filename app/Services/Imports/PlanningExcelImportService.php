@@ -2,6 +2,7 @@
 
 namespace App\Services\Imports;
 
+use App\Jobs\NotifyImportedParametreActionsJob;
 use App\Models\Action;
 use App\Models\Direction;
 use App\Models\Exercice;
@@ -14,6 +15,7 @@ use App\Models\PasObjectif;
 use App\Models\PlanningImport;
 use App\Models\Pta;
 use App\Models\Service;
+use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\PlanningModificationLockService;
@@ -54,6 +56,76 @@ class PlanningExcelImportService
         'ressources_materielles',
         'main_oeuvre',
         'autres_ressources',
+    ];
+
+    /**
+     * Colonnes OPTIONNELLES de parametrage (workflow V2). Quand elles sont
+     * presentes et que `type_action` est renseigne sur une ligne, l'action est
+     * importee deja PARAMETREE (statut_parametrage = 'parametre') au lieu de
+     * 'a_parametrer' : le chef de service n'a plus a la finir dans l'appli.
+     *
+     * Format de `sous_actions` (cellule unique) : sous-actions separees par ';',
+     * champs par '|' dans l'ordre  libelle|type|poids|cible|unite.
+     * Codes import : Q = quantitative, NQ = non quantitative, M = composee.
+     *   Ex: "Former 20 agents|Q|50|20|agents ; Rediger guide|NQ|50||"
+     */
+    public const PARAMETRAGE_COLUMNS = [
+        'type_action',
+        'quantite_cible',
+        'unite_cible',
+        'seuil_mode',
+        'seuil_t1',
+        'seuil_t2',
+        'seuil_t3',
+        'seuil_t4',
+        'niveau_risque',
+        'mesures_preventives',
+        'commentaire_obligatoire',
+        'champ_difficulte',
+        'sous_actions',
+    ];
+
+    public const IMPORT_COLUMNS = [
+        'annee_debut_pas',
+        'annee_fin_pas',
+        'ordre_axe',
+        'libelle_axe',
+        'ordre_objectif_strategique',
+        'libelle_objectif_strategique',
+        'date_echeance_objectif_strategique',
+        'direction',
+        'service_unite',
+        'ordre_objectif_operationnel',
+        'libelle_objectif_operationnel',
+        'date_echeance_objectif_operationnel',
+        'ordre_action',
+        'libelle_action',
+        'date_debut_action',
+        'date_fin_action',
+        'codes_agents_rmo',
+        'cible_minimum_execution',
+        'justificatif_attendu',
+        'type_action',
+        'quantite_cible',
+        'unite_cible',
+        'seuil_mode',
+        'seuil_t1',
+        'seuil_t2',
+        'seuil_t3',
+        'seuil_t4',
+        'nombre_sous_actions',
+        'sous_actions',
+        'niveau_risque',
+        'risque',
+        'mesures_preventives',
+        'ressources_materielles',
+        'main_oeuvre',
+        'autres_ressources',
+        'financement',
+        'nature_financement',
+        'montant_financement',
+        'commentaire_obligatoire',
+        'champ_difficulte',
     ];
 
     public const FORBIDDEN_COLUMNS = [
@@ -245,7 +317,7 @@ class PlanningExcelImportService
     public function validateSheet(array $sheet): array
     {
         $globalErrors = [];
-        if ((int) $sheet['sheet_count'] !== 1) {
+        if ((int) $sheet['sheet_count'] !== 1 && ! $this->hasOptionalGuideSheet($sheet)) {
             $globalErrors[] = 'Le fichier doit contenir une seule feuille.';
         }
 
@@ -387,6 +459,8 @@ class PlanningExcelImportService
                 }
             }
 
+            $this->validateParametrage($normalized, $errors, $warnings);
+
             $this->detectOrderConflict($seenLabels['axes'], $startYear.'-'.$endYear.'|'.$normalized['ordre_axe'], $normalized['libelle_axe'], $errors, 'ordre_axe');
             $this->detectOrderConflict($seenLabels['strategic'], $startYear.'-'.$endYear.'|'.$normalized['ordre_axe'].'|'.$normalized['ordre_objectif_strategique'], $normalized['libelle_objectif_strategique'], $errors, 'ordre_objectif_strategique');
             $this->detectOrderConflict($seenLabels['operational'], $directionKey.'|'.$serviceKey.'|'.$startYear.'|'.$normalized['ordre_objectif_operationnel'], $normalized['libelle_objectif_operationnel'], $errors, 'ordre_objectif_operationnel');
@@ -438,7 +512,7 @@ class PlanningExcelImportService
     private function strictWorkbookErrors(array $sheet): array
     {
         $errors = [];
-        if ((int) $sheet['sheet_count'] !== 1) {
+        if ((int) $sheet['sheet_count'] !== 1 && ! $this->hasOptionalGuideSheet($sheet)) {
             $errors[] = 'Le fichier doit contenir une seule feuille.';
         }
 
@@ -468,7 +542,167 @@ class PlanningExcelImportService
      */
     private function hasExactRequiredHeaders(array $headers): bool
     {
-        return array_values($headers) === self::REQUIRED_COLUMNS;
+        $headers = array_values($headers);
+
+        return $headers === self::REQUIRED_COLUMNS
+            || $headers === array_merge(self::REQUIRED_COLUMNS, self::PARAMETRAGE_COLUMNS)
+            || $headers === self::IMPORT_COLUMNS;
+    }
+
+    /**
+     * @param array{sheet_count:int,sheet_name:string,sheet_names?:list<string>} $sheet
+     */
+    private function hasOptionalGuideSheet(array $sheet): bool
+    {
+        $sheetNames = array_values(array_map('strval', $sheet['sheet_names'] ?? [$sheet['sheet_name'] ?? '']));
+
+        return (int) $sheet['sheet_count'] === 2
+            && ($sheetNames[0] ?? '') === 'IMPORT_GLOBAL'
+            && in_array('GUIDE', $sheetNames, true);
+    }
+
+    /**
+     * Valide les colonnes de parametrage d'une ligne UNIQUEMENT si `type_action`
+     * est renseigne. Une cellule `type_action` vide signifie "je parametrerai
+     * dans l'appli" : la ligne reste valide et l'action sera 'a_parametrer'.
+     *
+     * @param array<string,mixed> $normalized
+     * @param list<string> $errors
+     * @param list<string> $warnings
+     */
+    private function validateParametrage(array $normalized, array &$errors, array &$warnings): void
+    {
+        $type = $this->normalizeImportActionType($normalized['type_action'] ?? '');
+        if ($type === '') {
+            return;
+        }
+
+        $validTypes = [Action::TYPE_QUANTITATIVE, Action::TYPE_NON_QUANTITATIVE, Action::TYPE_COMPOSEE];
+        if (! in_array($type, $validTypes, true)) {
+            $errors[] = 'type_action doit valoir Q, NQ ou M (Q=quantitative, NQ=non quantitative, M=composee).';
+
+            return;
+        }
+
+        if ($type === Action::TYPE_QUANTITATIVE) {
+            if (! is_numeric($normalized['quantite_cible'] ?? null) || (float) $normalized['quantite_cible'] <= 0) {
+                $errors[] = 'quantite_cible doit etre numerique et positive lorsque type_action = Q.';
+            }
+            if (trim((string) ($normalized['unite_cible'] ?? '')) === '') {
+                $errors[] = 'unite_cible est obligatoire lorsque type_action = Q.';
+            }
+        }
+
+        if ($type === Action::TYPE_COMPOSEE) {
+            $subErrors = [];
+            $subWarnings = [];
+            $subItems = $this->parseSousActions((string) ($normalized['sous_actions'] ?? ''), $subWarnings, $subErrors);
+            if ($subItems === []) {
+                $errors[] = 'sous_actions doit contenir au moins une sous-action lorsque type_action = M.';
+            }
+            $errors = array_merge($errors, $subErrors);
+            $warnings = array_merge($warnings, $subWarnings);
+
+            $declared = (int) ($normalized['nombre_sous_actions'] ?? 0);
+            if ($subItems !== [] && $declared > 0 && $declared !== count($subItems)) {
+                $warnings[] = 'nombre_sous_actions ('.$declared.') differe du nombre de sous-actions fournies ('.count($subItems).').';
+            }
+        }
+
+        $thresholdMode = strtolower(trim((string) ($normalized['seuil_mode'] ?? '')));
+        if ($thresholdMode !== '' && ! in_array($thresholdMode, ['unique', 'trimestriel'], true)) {
+            $errors[] = 'seuil_mode doit valoir unique ou trimestriel.';
+        }
+        if ($thresholdMode === 'trimestriel') {
+            foreach (['seuil_t1', 'seuil_t2', 'seuil_t3', 'seuil_t4'] as $column) {
+                $value = $normalized[$column] ?? null;
+                if (! is_numeric($value) || (float) $value < 0 || (float) $value > 100) {
+                    $errors[] = $column.' doit etre compris entre 0 et 100 lorsque seuil_mode = trimestriel.';
+                }
+            }
+        }
+
+        $riskLevel = strtolower(trim((string) ($normalized['niveau_risque'] ?? '')));
+        if ($riskLevel !== '' && ! in_array($riskLevel, ['faible', 'modere', 'eleve', 'critique'], true)) {
+            $errors[] = 'niveau_risque doit valoir faible, modere, eleve ou critique.';
+        }
+    }
+
+    /**
+     * Parse la cellule `sous_actions`. Format : sous-actions separees par ';',
+     * champs par '|' dans l'ordre  libelle|type|poids|cible|unite.
+     * Le type de sous-action attend les codes Q ou NQ (anciens libelles acceptes).
+     *
+     * @param list<string> $warnings
+     * @param list<string> $errors
+     * @return list<array{libelle:string,type:string,weight:?float,cible:?float,unite:string}>
+     */
+    private function parseSousActions(string $value, array &$warnings = [], array &$errors = []): array
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return [];
+        }
+
+        $items = [];
+        $weightSum = 0.0;
+        $hasWeight = false;
+        foreach (explode(';', $value) as $chunk) {
+            $chunk = trim($chunk);
+            if ($chunk === '') {
+                continue;
+            }
+
+            $parts = array_map('trim', explode('|', $chunk));
+            $libelle = $parts[0] ?? '';
+            if ($libelle === '') {
+                $errors[] = 'Chaque sous-action doit avoir un libelle (format attendu: libelle|type|poids|cible|unite).';
+                continue;
+            }
+
+            $typeRaw = $parts[1] ?? '';
+            $cibleRaw = $parts[3] ?? '';
+            $type = $this->normalizeImportSubActionType($typeRaw);
+            if (! in_array($type, [SousAction::TYPE_QUANTITATIVE, SousAction::TYPE_NON_QUANTITATIVE], true)) {
+                if (trim((string) $typeRaw) !== '') {
+                    $errors[] = 'Le type de la sous-action "'.$libelle.'" doit valoir Q ou NQ.';
+                }
+                $type = ($cibleRaw !== '' && is_numeric($cibleRaw))
+                    ? SousAction::TYPE_QUANTITATIVE
+                    : SousAction::TYPE_NON_QUANTITATIVE;
+            }
+
+            $weight = null;
+            $weightRaw = $parts[2] ?? '';
+            if ($weightRaw !== '') {
+                if (! is_numeric($weightRaw) || (float) $weightRaw < 0 || (float) $weightRaw > 100) {
+                    $errors[] = 'Le poids de la sous-action "'.$libelle.'" doit etre compris entre 0 et 100.';
+                } else {
+                    $weight = (float) $weightRaw;
+                    $weightSum += $weight;
+                    $hasWeight = true;
+                }
+            }
+
+            $cible = ($cibleRaw !== '' && is_numeric($cibleRaw)) ? (float) $cibleRaw : null;
+            if ($type === SousAction::TYPE_QUANTITATIVE && $cible === null) {
+                $warnings[] = 'La sous-action "'.$libelle.'" est quantitative sans cible numerique.';
+            }
+
+            $items[] = [
+                'libelle' => $libelle,
+                'type' => $type,
+                'weight' => $weight,
+                'cible' => $cible,
+                'unite' => $parts[4] ?? '',
+            ];
+        }
+
+        if ($hasWeight && abs($weightSum - 100.0) > 0.01) {
+            $errors[] = 'La somme des poids des sous-actions doit etre egale a 100 (actuel: '.number_format($weightSum, 0, '.', '').').';
+        }
+
+        return $items;
     }
 
     /**
@@ -558,11 +792,18 @@ class PlanningExcelImportService
         }
 
         $stats = ['created' => 0, 'updated' => 0, 'skipped' => 0];
-        DB::transaction(function () use ($rows, $mode, $user, $ipAddress, &$stats): void {
+        $parametreActionIds = [];
+        $touchedPtaIds = [];
+        DB::transaction(function () use ($rows, $mode, $user, $ipAddress, &$stats, &$parametreActionIds, &$touchedPtaIds): void {
             foreach ($rows as $row) {
-                $this->persistRow($row['data'], $mode, $user, $ipAddress, $stats);
+                $this->persistRow($row['data'], $mode, $user, $ipAddress, $stats, $parametreActionIds, $touchedPtaIds);
             }
         });
+
+        // Hors transaction : on bascule les PTA entierement parametres en cours,
+        // puis on notifie les RMO des actions devenues 'parametre' a l'import.
+        $this->promoteFullyParametrePtas($touchedPtaIds);
+        $this->notifyParametreActions($parametreActionIds, $user);
 
         $import->forceFill([
             'mode' => $mode,
@@ -577,8 +818,10 @@ class PlanningExcelImportService
 
     /**
      * @param array<string,mixed> $stats
+     * @param list<int> $parametreActionIds
+     * @param list<int> $touchedPtaIds
      */
-    private function persistRow(array $row, string $mode, User $user, ?string $ipAddress, array &$stats): void
+    private function persistRow(array $row, string $mode, User $user, ?string $ipAddress, array &$stats, array &$parametreActionIds = [], array &$touchedPtaIds = []): void
     {
         $year = (int) $row['annee_debut_pas'];
         $endYear = (int) $row['annee_fin_pas'];
@@ -677,6 +920,7 @@ class PlanningExcelImportService
             ]
         );
         // PTA volontairement NON verrouille apres import.
+        $touchedPtaIds[] = (int) $pta->id;
 
         $actionOrder = (int) $row['ordre_action'];
         $action = Action::query()
@@ -739,13 +983,26 @@ class PlanningExcelImportService
             'ressources_details' => collect([$row['ressources_materielles'] ?? null, $row['main_oeuvre'] ?? null, $row['autres_ressources'] ?? null])->filter()->implode("\n"),
         ];
 
+        // Workflow V2 : si `type_action` est renseigne, la ligne est importee deja
+        // parametree (champs de cible/seuil/risque/suivi remplis) et passera
+        // 'parametre' au lieu de 'a_parametrer'. Cellule vide → comportement actuel.
+        $isParametre = $this->normalizeImportActionType($row['type_action'] ?? '') !== '';
+        if ($isParametre) {
+            $payload = array_merge($payload, $this->parametragePayload($row));
+        }
+
         if ($action instanceof Action) {
             $before = $action->getAttributes();
+            $wasUnparametre = (string) ($before['statut_parametrage'] ?? '') === 'a_parametrer';
             $action->fill($payload)->save();
             // Action volontairement NON verrouillee : le chef de service doit pouvoir
             // la parametrer (statut_parametrage = 'a_parametrer' tant qu'elle est incomplete).
             $stats['updated']++;
             $this->audit($user, 'update', $action, $before, $action->getAttributes(), $ipAddress);
+            // Notifie le RMO uniquement a la PREMIERE bascule vers 'parametre'.
+            if ($isParametre && $wasUnparametre) {
+                $parametreActionIds[] = (int) $action->id;
+            }
         } else {
             $action = Action::query()->create($payload);
             $action->forceFill([
@@ -758,6 +1015,9 @@ class PlanningExcelImportService
             // la verrouillera apres parametrage complet, action par action.
             $stats['created']++;
             $this->audit($user, 'create', $action, null, $action->getAttributes(), $ipAddress);
+            if ($isParametre) {
+                $parametreActionIds[] = (int) $action->id;
+            }
         }
 
         if ($rmos->isNotEmpty() && Schema::hasTable('action_responsables')) {
@@ -767,16 +1027,200 @@ class PlanningExcelImportService
             }
             $action->responsables()->sync($sync);
         }
+
+        // Sous-actions planifiees (action composee parametree depuis l'import).
+        if ($isParametre && $this->normalizeImportActionType($row['type_action'] ?? '') === Action::TYPE_COMPOSEE) {
+            $this->persistImportedSubActions($action, $row, $primaryRmo);
+        }
+    }
+
+    /**
+     * Construit les surcharges de paramatrage (workflow V2) a fusionner dans le
+     * payload de l'action quand `type_action` est renseigne. Mappe type ↔ mode ↔
+     * methode_calcul comme PtaWebController::normalizePtaActionPayload.
+     *
+     * @param array<string,mixed> $row
+     * @return array<string,mixed>
+     */
+    private function parametragePayload(array $row): array
+    {
+        $type = $this->normalizeImportActionType($row['type_action'] ?? '');
+        $mode = match ($type) {
+            Action::TYPE_QUANTITATIVE => Action::MODE_QUANTITATIF,
+            Action::TYPE_COMPOSEE => Action::MODE_SOUS_ACTIONS,
+            default => Action::MODE_SANS_QUANTITE,
+        };
+        $isQuantitative = $mode === Action::MODE_QUANTITATIF;
+        $thresholdMode = strtolower(trim((string) ($row['seuil_mode'] ?? '')));
+        $thresholdMode = in_array($thresholdMode, ['unique', 'trimestriel'], true) ? $thresholdMode : 'unique';
+        $riskLevel = strtolower(trim((string) ($row['niveau_risque'] ?? '')));
+
+        return [
+            'statut_parametrage' => 'parametre',
+            'mode_evaluation' => $mode,
+            'type_action' => $type,
+            'type_cible' => $isQuantitative ? 'quantitative' : 'qualitative',
+            'methode_calcul' => match ($mode) {
+                Action::MODE_QUANTITATIF => 'cumulative_quantity',
+                Action::MODE_SANS_QUANTITE => 'binary_completion',
+                default => 'sum_sous_actions',
+            },
+            'quantite_cible' => $isQuantitative ? (float) $row['quantite_cible'] : null,
+            'unite_cible' => $isQuantitative ? (trim((string) ($row['unite_cible'] ?? '')) ?: null) : null,
+            'seuil_mode' => $thresholdMode,
+            'seuil_t1' => $thresholdMode === 'trimestriel' ? $this->nullableNumber($row['seuil_t1'] ?? null) : null,
+            'seuil_t2' => $thresholdMode === 'trimestriel' ? $this->nullableNumber($row['seuil_t2'] ?? null) : null,
+            'seuil_t3' => $thresholdMode === 'trimestriel' ? $this->nullableNumber($row['seuil_t3'] ?? null) : null,
+            'seuil_t4' => $thresholdMode === 'trimestriel' ? $this->nullableNumber($row['seuil_t4'] ?? null) : null,
+            'requires_comment' => $this->boolFromCell($row['commentaire_obligatoire'] ?? null, false),
+            'allows_difficulty' => $this->boolFromCell($row['champ_difficulte'] ?? null, true),
+            'niveau_risque' => $riskLevel !== '' ? $riskLevel : null,
+            'mesures_preventives' => (trim((string) ($row['mesures_preventives'] ?? '')) ?: null),
+        ];
+    }
+
+    /**
+     * Cree les sous-actions planifiees d'une action composee a partir de la
+     * cellule `sous_actions`. Reprend (en version allegee) la logique de
+     * PtaWebController::syncPlannedSubActions.
+     *
+     * @param array<string,mixed> $row
+     */
+    private function persistImportedSubActions(Action $action, array $row, ?User $primaryRmo): void
+    {
+        $warnings = [];
+        $errors = [];
+        $items = $this->parseSousActions((string) ($row['sous_actions'] ?? ''), $warnings, $errors);
+
+        // Re-import : on repart d'une base propre pour eviter les doublons.
+        SousAction::query()->where('action_id', (int) $action->id)->delete();
+
+        $defaultAgentId = (int) ($primaryRmo?->id ?? $action->responsable_id ?? 0);
+        if ($defaultAgentId <= 0 || $items === []) {
+            return;
+        }
+
+        $startDate = optional($action->date_debut)->format('Y-m-d') ?? now()->toDateString();
+        $endDate = optional($action->date_fin)->format('Y-m-d') ?? $startDate;
+        foreach ($items as $item) {
+            $isQuantitative = $item['type'] === SousAction::TYPE_QUANTITATIVE;
+            $action->sousActions()->create([
+                'agent_id' => $defaultAgentId,
+                'libelle' => $item['libelle'],
+                'sub_action_type' => $item['type'],
+                'weight' => $item['weight'],
+                'requires_proof' => true,
+                'requires_comment' => false,
+                'allows_difficulty' => true,
+                'cible_prevue' => $isQuantitative ? $item['cible'] : null,
+                'unite' => $item['unite'] !== '' ? $item['unite'] : $action->unite_cible,
+                'date_debut' => $startDate,
+                'date_fin' => $endDate,
+                'quantite_realisee' => 0,
+                'resultat_obtenu' => null,
+                'taux_realisation' => 0,
+                'statut' => 'non_demarre',
+                'est_effectuee' => false,
+                'taux_execution' => 0,
+            ]);
+        }
+
+        $action->refresh()->recalculateRealization();
+    }
+
+    /**
+     * Bascule en EN_COURS les PTA en brouillon dont plus aucune action n'est
+     * 'a_parametrer'. Mirroir de PtaWebController::maybePromoteBrouillonToEnCours.
+     *
+     * @param list<int> $ptaIds
+     */
+    private function promoteFullyParametrePtas(array $ptaIds): void
+    {
+        foreach (array_unique($ptaIds) as $ptaId) {
+            $pta = Pta::query()->find($ptaId);
+            if (! $pta instanceof Pta || $pta->statut !== Pta::STATUS_BROUILLON) {
+                continue;
+            }
+
+            $pending = Action::query()
+                ->where('pta_id', $pta->id)
+                ->where('statut_parametrage', 'a_parametrer')
+                ->count();
+            if ($pending === 0) {
+                $pta->forceFill(['statut' => Pta::STATUS_EN_COURS])->save();
+            }
+        }
+    }
+
+    /**
+     * Planifie les notifications RMO hors requete web. Sur les gros imports,
+     * l'envoi synchrone peut depasser le timeout PHP.
+     *
+     * @param list<int> $actionIds
+     */
+    private function notifyParametreActions(array $actionIds, User $actor): void
+    {
+        $ids = array_values(array_unique(array_map('intval', $actionIds)));
+        if ($ids === []) {
+            return;
+        }
+
+        NotifyImportedParametreActionsJob::dispatch($ids, (int) $actor->id);
     }
 
     private function normalizeRow(array $row): array
     {
         $normalized = [];
-        foreach (self::REQUIRED_COLUMNS as $column) {
+        foreach (array_merge(self::REQUIRED_COLUMNS, self::PARAMETRAGE_COLUMNS) as $column) {
             $normalized[$column] = is_string($row[$column] ?? null) ? trim((string) $row[$column]) : ($row[$column] ?? null);
         }
+        $normalized['type_action'] = $this->normalizeImportActionType($normalized['type_action'] ?? '');
 
         return $normalized;
+    }
+
+    private function normalizeImportActionType(mixed $value): string
+    {
+        return match ($this->normalizeImportTypeToken($value)) {
+            'q', 'quantitative' => Action::TYPE_QUANTITATIVE,
+            'nq', 'non_quantitative', 'nonquantitative' => Action::TYPE_NON_QUANTITATIVE,
+            'm', 'composee', 'compose', 'composite', 'sous_actions' => Action::TYPE_COMPOSEE,
+            default => $this->normalizeImportTypeToken($value),
+        };
+    }
+
+    private function normalizeImportSubActionType(mixed $value): string
+    {
+        return match ($this->normalizeImportTypeToken($value)) {
+            'q', 'quantitative' => SousAction::TYPE_QUANTITATIVE,
+            'nq', 'non_quantitative', 'nonquantitative' => SousAction::TYPE_NON_QUANTITATIVE,
+            default => $this->normalizeImportTypeToken($value),
+        };
+    }
+
+    private function normalizeImportTypeToken(mixed $value): string
+    {
+        return Str::of((string) $value)
+            ->ascii()
+            ->lower()
+            ->trim()
+            ->replaceMatches('/[^a-z0-9]+/', '_')
+            ->trim('_')
+            ->toString();
+    }
+
+    private function boolFromCell(mixed $value, bool $default): bool
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return $default;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOL);
+    }
+
+    private function nullableNumber(mixed $value): ?float
+    {
+        return is_numeric($value) ? (float) $value : null;
     }
 
     private function findDirection(string $value): ?Direction

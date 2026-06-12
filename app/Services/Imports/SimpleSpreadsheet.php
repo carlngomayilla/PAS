@@ -49,8 +49,22 @@ class SimpleSpreadsheet
      */
     public function downloadXlsx(string $filename, array $headers, array $rows, string $sheetName = 'IMPORT_GLOBAL'): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse
     {
+        return $this->downloadXlsxWorkbook($filename, [[
+            'name' => $sheetName,
+            'headers' => $headers,
+            'rows' => $rows,
+        ]]);
+    }
+
+    /**
+     * @param list<array{name:string,headers:list<string>,rows:list<array<string,mixed>>}> $sheets
+     */
+    public function downloadXlsxWorkbook(string $filename, array $sheets): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse
+    {
         if (! class_exists(ZipArchive::class)) {
-            return $this->downloadCsv(str_replace('.xlsx', '.csv', $filename), $headers, $rows);
+            $firstSheet = $sheets[0] ?? ['headers' => [], 'rows' => []];
+
+            return $this->downloadCsv(str_replace('.xlsx', '.csv', $filename), $firstSheet['headers'], $firstSheet['rows']);
         }
 
         $path = tempnam(sys_get_temp_dir(), 'planning-import-');
@@ -60,11 +74,19 @@ class SimpleSpreadsheet
 
         $zip = new ZipArchive();
         $zip->open($path, ZipArchive::OVERWRITE);
-        $zip->addFromString('[Content_Types].xml', $this->contentTypesXml());
+        $zip->addFromString('[Content_Types].xml', $this->contentTypesXml(count($sheets)));
         $zip->addFromString('_rels/.rels', $this->relsXml());
-        $zip->addFromString('xl/workbook.xml', $this->workbookXml($sheetName));
-        $zip->addFromString('xl/_rels/workbook.xml.rels', $this->workbookRelsXml());
-        $zip->addFromString('xl/worksheets/sheet1.xml', $this->sheetXml($headers, $rows));
+        $zip->addFromString('xl/workbook.xml', $this->workbookXml(array_map(
+            static fn (array $sheet): string => (string) ($sheet['name'] ?? 'Sheet'),
+            $sheets
+        )));
+        $zip->addFromString('xl/_rels/workbook.xml.rels', $this->workbookRelsXml(count($sheets)));
+        foreach ($sheets as $index => $sheet) {
+            $zip->addFromString(
+                'xl/worksheets/sheet'.($index + 1).'.xml',
+                $this->sheetXml($sheet['headers'], $sheet['rows'])
+            );
+        }
         $zip->close();
 
         return response()->download($path, $filename, [
@@ -103,7 +125,7 @@ class SimpleSpreadsheet
         }
         fclose($handle);
 
-        return ['sheet_count' => 1, 'sheet_name' => 'IMPORT_GLOBAL', 'headers' => $headers, 'rows' => $rows];
+        return ['sheet_count' => 1, 'sheet_name' => 'IMPORT_GLOBAL', 'sheet_names' => ['IMPORT_GLOBAL'], 'headers' => $headers, 'rows' => $rows];
     }
 
     private const SS_NAMESPACE = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
@@ -144,7 +166,11 @@ class SimpleSpreadsheet
             $zip->close();
             throw new RuntimeException('Le classeur ne contient aucune feuille.');
         }
-        $sheetName = (string) ($sheetNodes[0]->attributes()['name'] ?? 'IMPORT_GLOBAL');
+        $sheetNames = [];
+        foreach ($sheetNodes ?? [] as $sheetNode) {
+            $sheetNames[] = (string) ($sheetNode->attributes()['name'] ?? 'Sheet');
+        }
+        $sheetName = $sheetNames[0] ?? 'IMPORT_GLOBAL';
 
         $sharedStrings = [];
         $sharedXml = $zip->getFromName('xl/sharedStrings.xml');
@@ -210,7 +236,7 @@ class SimpleSpreadsheet
             $rows[] = $row;
         }
 
-        return ['sheet_count' => $sheetCount, 'sheet_name' => $sheetName, 'headers' => $headers, 'rows' => $rows];
+        return ['sheet_count' => $sheetCount, 'sheet_name' => $sheetName, 'sheet_names' => $sheetNames, 'headers' => $headers, 'rows' => $rows];
     }
 
     private function cellValue(\SimpleXMLElement $cell, array $sharedStrings): ?string
@@ -254,14 +280,19 @@ class SimpleSpreadsheet
         return collect($row)->every(fn ($value): bool => trim((string) $value) === '');
     }
 
-    private function contentTypesXml(): string
+    private function contentTypesXml(int $sheetCount = 1): string
     {
+        $overrides = '';
+        for ($index = 1; $index <= $sheetCount; $index++) {
+            $overrides .= '<Override PartName="/xl/worksheets/sheet'.$index.'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+        }
+
         return '<?xml version="1.0" encoding="UTF-8"?>'
             .'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
             .'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
             .'<Default Extension="xml" ContentType="application/xml"/>'
             .'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-            .'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            .$overrides
             .'</Types>';
     }
 
@@ -273,19 +304,33 @@ class SimpleSpreadsheet
             .'</Relationships>';
     }
 
-    private function workbookXml(string $sheetName): string
+    /**
+     * @param list<string> $sheetNames
+     */
+    private function workbookXml(array $sheetNames): string
     {
+        $sheets = '';
+        foreach ($sheetNames as $index => $sheetName) {
+            $sheetId = $index + 1;
+            $sheets .= '<sheet name="'.htmlspecialchars($sheetName, ENT_XML1).'" sheetId="'.$sheetId.'" r:id="rId'.$sheetId.'"/>';
+        }
+
         return '<?xml version="1.0" encoding="UTF-8"?>'
             .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            .'<sheets><sheet name="'.htmlspecialchars($sheetName, ENT_XML1).'" sheetId="1" r:id="rId1"/></sheets>'
+            .'<sheets>'.$sheets.'</sheets>'
             .'</workbook>';
     }
 
-    private function workbookRelsXml(): string
+    private function workbookRelsXml(int $sheetCount = 1): string
     {
+        $rels = '';
+        for ($index = 1; $index <= $sheetCount; $index++) {
+            $rels .= '<Relationship Id="rId'.$index.'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'.$index.'.xml"/>';
+        }
+
         return '<?xml version="1.0" encoding="UTF-8"?>'
             .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+            .$rels
             .'</Relationships>';
     }
 

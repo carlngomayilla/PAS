@@ -237,24 +237,24 @@
     <section class="showcase-summary-grid mb-4">
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Avancement déclaré</p>
-            <p class="showcase-kpi-number">{{ number_format($progressionDeclaree, 1) }}%</p>
+            <p class="showcase-kpi-number">{{ number_format($progressionDeclaree, 0) }}%</p>
             <div class="mt-3 showcase-progress-track">
                 <span class="showcase-progress-bar {{ $progressionDeclaree >= 80 ? 'bg-[#8fc043]' : ($progressionDeclaree >= 50 ? 'bg-blue-500' : 'bg-[#f0e509]') }}" style="width: {{ $progressionDeclaree }}%"></span>
             </div>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Progression théorique</p>
-            <p class="showcase-kpi-number">{{ number_format($progressionTheorique, 1) }}%</p>
+            <p class="showcase-kpi-number">{{ number_format($progressionTheorique, 0) }}%</p>
             <div class="mt-3 showcase-progress-track">
                 <span class="showcase-progress-bar bg-slate-400" style="width: {{ $progressionTheorique }}%"></span>
             </div>
         </article>
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Performance d'exécution</p>
-            <p class="showcase-kpi-number">{{ number_format((float) ($kpi?->kpi_performance ?? 0), 1) }}%</p>
+            <p class="showcase-kpi-number">{{ number_format((float) ($kpi?->kpi_performance ?? 0), 0) }}%</p>
             <p class="showcase-kpi-meta">
-                Délai {{ number_format((float) ($kpi?->kpi_delai ?? 0), 1) }} |
-                Global {{ number_format((float) ($kpi?->kpi_global ?? 0), 1) }}
+                Délai {{ number_format((float) ($kpi?->kpi_delai ?? 0), 0) }} |
+                Global {{ number_format((float) ($kpi?->kpi_global ?? 0), 0) }}
             </p>
         </article>
         <article class="showcase-kpi-card">
@@ -304,12 +304,12 @@
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))] mb-4">
             <article class="showcase-inline-stat">
                 <strong>Performance officielle</strong>
-                <p class="mt-1 text-3xl font-extrabold text-[#17324a]">{{ number_format((float) $v2OfficialPerf, 1, ',', ' ') }}%</p>
+                <p class="mt-1 text-3xl font-extrabold text-[#17324a]">{{ number_format((float) $v2OfficialPerf, 0, ',', ' ') }}%</p>
                 <p class="text-xs text-slate-500">{{ $v2IsValidated ? 'Validée par le chef' : 'En attente de validation' }}</p>
             </article>
             <article class="showcase-inline-stat">
                 <strong>Performance provisoire</strong>
-                <p class="mt-1 text-xl font-bold text-[#3996d3]">{{ number_format((float) $v2ProvisionalPerf, 1, ',', ' ') }}%</p>
+                <p class="mt-1 text-xl font-bold text-[#3996d3]">{{ number_format((float) $v2ProvisionalPerf, 0, ',', ' ') }}%</p>
                 <p class="text-xs text-slate-500">Calculée à chaque enregistrement</p>
             </article>
             <article class="showcase-inline-stat">
@@ -391,7 +391,7 @@
                             <div>
                                 <strong>{{ $sa->libelle }}</strong>
                                 <span class="ml-2 anbg-badge anbg-badge-info px-2 py-0.5 text-[11px]">{{ $sa->isQuantitative() ? 'Quantitative' : 'Non quantitative' }}</span>
-                                @if ($sa->weight !== null)<span class="ml-1 text-xs text-slate-500">poids {{ rtrim(rtrim(number_format((float) $sa->weight, 2, ',', ' '), '0'), ',') }}%</span>@endif
+                                @if ($sa->weight !== null)<span class="ml-1 text-xs text-slate-500">poids {{ number_format((float) $sa->weight, 0, ',', ' ') }}%</span>@endif
                                 <p class="text-sm text-slate-600">Perf : <strong>{{ number_format($saPerf, 0, ',', ' ') }}%</strong> · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
                             </div>
                         </div>
@@ -538,19 +538,19 @@
                         <dt>Unité</dt><dd>{{ $action->unite_cible ?: '-' }}</dd>
                         <dt>Réalisé</dt><dd>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 0, ',', ' ') : '0' }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Reste</dt><dd>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 0, ',', ' ') }} {{ $action->unite_cible ?: '' }}</dd>
-                        <dt>Taux cible</dt><dd>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 1, ',', ' ') }}%</dd>
-                        <dt>Dépassement</dt><dd>{{ $overachievementRate > 0 ? '+'.number_format($overachievementRate, 1, ',', ' ').'%' : '-' }}</dd>
-                        <dt>Seuil minimum</dt><dd>{{ number_format((float) ($action->seuil_minimum ?? 80), 1, ',', ' ') }}%</dd>
+                        <dt>Taux cible</dt><dd>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 0, ',', ' ') }}%</dd>
+                        <dt>Dépassement</dt><dd>{{ $overachievementRate > 0 ? '+'.number_format($overachievementRate, 0, ',', ' ').'%' : '-' }}</dd>
+                        <dt>Seuil minimum</dt><dd>{{ number_format((float) ($action->seuil_minimum ?? 80), 0, ',', ' ') }}%</dd>
                         <dt>Statut perf.</dt><dd>{{ $performanceLabels[$action->statut_performance ?? 'non_evaluee'] ?? ($action->statut_performance ?: '-') }}</dd>
                     @else
                         <dt>Résultat attendu</dt><dd>{{ $action->resultat_attendu ?: '-' }}</dd>
                         <dt>Critères</dt><dd>{{ $action->criteres_validation ?: '-' }}</dd>
                         <dt>Livrable</dt><dd>{{ $action->livrable_attendu ?: '-' }}</dd>
-                        <dt>Avancement sous-act.</dt><dd>{{ number_format((float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0), 1, ',', ' ') }}%</dd>
+                        <dt>Avancement sous-act.</dt><dd>{{ number_format((float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0), 0, ',', ' ') }}%</dd>
                     @endif
-                    <dt>Seuil alerte</dt><dd>{{ number_format((float) ($action->seuil_alerte_progression ?? 0), 1, ',', ' ') }}%</dd>
-                    <dt>Avancement réel</dt><dd>{{ number_format((float) ($action->progression_reelle ?? 0), 1, ',', ' ') }}%</dd>
-                    <dt>Progression théor.</dt><dd>{{ number_format((float) ($action->progression_theorique ?? 0), 1, ',', ' ') }}%</dd>
+                    <dt>Seuil alerte</dt><dd>{{ number_format((float) ($action->seuil_alerte_progression ?? 0), 0, ',', ' ') }}%</dd>
+                    <dt>Avancement réel</dt><dd>{{ number_format((float) ($action->progression_reelle ?? 0), 0, ',', ' ') }}%</dd>
+                    <dt>Progression théor.</dt><dd>{{ number_format((float) ($action->progression_theorique ?? 0), 0, ',', ' ') }}%</dd>
                 </dl>
             </article>
 
@@ -568,7 +568,7 @@
                 <h3 class="form-section-title">Financement</h3>
                 <dl class="action-fiche-dl mt-2">
                     <dt>Requis</dt><dd>{{ $action->financement_requis ? 'Oui' : 'Non' }}</dd>
-                    <dt>Montant estimé</dt><dd>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 2, ',', ' ') : '-' }}</dd>
+                    <dt>Montant estimé</dt><dd>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 0, ',', ' ') : '-' }}</dd>
                     <dt>Nature</dt><dd>{{ $action->nature_financement ?: $action->description_financement ?: '-' }}</dd>
                     <dt>Source</dt><dd>{{ $action->source_financement ?: '-' }}</dd>
                     <dt>Statut</dt>
@@ -576,7 +576,7 @@
                         <span class="{{ $financingStyles[$financingStatus] ?? 'anbg-badge anbg-badge-neutral' }}">{{ $financingLabel }}</span>
                     </dd>
                     <dt>Commentaire DAF</dt><dd>{{ $action->financement_daf_commentaire ?: '-' }}</dd>
-                    <dt>Montant validé DAF</dt><dd>{{ $action->financement_montant_valide !== null ? number_format((float) $action->financement_montant_valide, 2, ',', ' ') : '-' }}</dd>
+                    <dt>Montant validé DAF</dt><dd>{{ $action->financement_montant_valide !== null ? number_format((float) $action->financement_montant_valide, 0, ',', ' ') : '-' }}</dd>
                 </dl>
             </article>
 
@@ -600,7 +600,7 @@
                 <article class="showcase-inline-stat action-detail-card">
                     <h3 class="form-section-title">Besoin déclaré</h3>
                     <p class="mt-2 text-slate-600">Statut financement : <strong>{{ $financingLabel }}</strong></p>
-                    <p class="text-slate-600">Montant estimé : <strong>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 2) : '-' }}</strong></p>
+                    <p class="text-slate-600">Montant estimé : <strong>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 0) : '-' }}</strong></p>
                     <p class="text-slate-600">Nature : <strong>{{ $action->nature_financement ?: $action->description_financement ?: '-' }}</strong></p>
                     <p class="text-slate-600">Source : <strong>{{ $action->source_financement ?: '-' }}</strong></p>
                     <p class="text-slate-600">Commentaire : <strong>{{ $action->commentaire_financement ?: '-' }}</strong></p>
@@ -628,7 +628,7 @@
                     <p class="mt-2 text-slate-600">Responsable DAF : <strong>{{ $action->financementDafPar?->name ?? '-' }}</strong></p>
                     <p class="text-slate-600">Date de décision : <strong>{{ optional($action->financement_daf_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                     <p class="text-slate-600">Décision : <strong>{{ $action->financement_daf_decision ?: '-' }}</strong></p>
-                    <p class="text-slate-600">Montant validé : <strong>{{ $action->financement_montant_valide !== null ? number_format((float) $action->financement_montant_valide, 2) : '-' }}</strong></p>
+                    <p class="text-slate-600">Montant validé : <strong>{{ $action->financement_montant_valide !== null ? number_format((float) $action->financement_montant_valide, 0) : '-' }}</strong></p>
                     <p class="text-slate-600">Référence : <strong>{{ $action->financement_reference ?: '-' }}</strong></p>
                     <p class="text-slate-600">Commentaire : <strong>{{ $action->financement_daf_commentaire ?: '-' }}</strong></p>
                 </article>
@@ -656,7 +656,7 @@
                         </div>
                         <div>
                             <label for="montant_valide">Montant validé</label>
-                            <input id="montant_valide" name="montant_valide" type="number" step="0.01" min="0" value="{{ old('montant_valide', $action->montant_estime) }}">
+                            <input id="montant_valide" name="montant_valide" type="number" step="1" min="0" value="{{ old('montant_valide', $action->montant_estime !== null ? (int) round((float) $action->montant_estime) : '') }}">
                         </div>
                         <div>
                             <label for="reference_financement">Référence financement</label>

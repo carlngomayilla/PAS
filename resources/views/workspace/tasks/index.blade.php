@@ -28,7 +28,7 @@
                         {{ (int) ($summary['total'] ?? 0) }} ouverte(s)
                     </span>
                     <span class="showcase-chip">
-                        Score {{ number_format((float) ($summary['score'] ?? 100), 1, ',', ' ') }}%
+                        Score {{ number_format((float) ($summary['score'] ?? 100), 0, ',', ' ') }}%
                     </span>
                     <span class="showcase-chip">Qualite {{ $summary['quality_label'] ?? 'Excellent' }}</span>
                 </div>
@@ -65,7 +65,7 @@
                                     <span class="text-xs font-bold uppercase text-[#667085]">{{ $component['label'] ?? 'Composante' }}</span>
                                     <span class="anbg-badge anbg-badge-info px-2 py-0.5 text-xs">{{ (int) ($component['weight'] ?? 0) }}%</span>
                                 </div>
-                                <strong class="mt-2 block text-2xl text-[#17324a]">{{ number_format((float) ($component['score'] ?? 0), 1, ',', ' ') }}%</strong>
+                                <strong class="mt-2 block text-2xl text-[#17324a]">{{ number_format((float) ($component['score'] ?? 0), 0, ',', ' ') }}%</strong>
                             </article>
                         @endforeach
                     </div>

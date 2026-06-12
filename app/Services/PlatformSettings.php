@@ -58,7 +58,7 @@ class PlatformSettings
             'default_timezone' => 'Africa/Libreville',
             'date_format' => 'd/m/Y',
             'datetime_format' => 'd/m/Y H:i',
-            'number_precision' => '2',
+            'number_precision' => '0',
             'number_decimal_separator' => ',',
             'number_thousands_separator' => ' ',
             'sidebar_caption' => 'PILOTAGE',
@@ -134,9 +134,6 @@ class PlatformSettings
     {
         return [
             '0' => '0 decimale',
-            '1' => '1 decimale',
-            '2' => '2 decimales',
-            '3' => '3 decimales',
         ];
     }
 
@@ -177,7 +174,7 @@ class PlatformSettings
 
     public function numberPrecision(): int
     {
-        return max(0, min(3, (int) $this->get('number_precision', '2')));
+        return 0;
     }
 
     public function numberDecimalSeparator(): string

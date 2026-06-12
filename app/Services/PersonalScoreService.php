@@ -3,197 +3,111 @@
 namespace App\Services;
 
 use App\Models\Action;
-use App\Models\SousAction;
 use App\Models\User;
-use App\Services\Actions\ActionTrackingService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 
 class PersonalScoreService
 {
     /**
+     * Spec v3 (2026-06-11) : le score personnel reprend EXACTEMENT les deux KPI
+     * portes par l'action elle-meme — taux_performance et taux_delai — sans
+     * indicateur derive de la file de taches (« taches traitees » et
+     * « criticite » supprimes). Performance pese 60 %, Delai 40 %.
+     *
+     * Le score s'applique au RMO (responsable de l'action) et au chef de service
+     * (cf. {@see self::scopedActions()} pour le perimetre).
+     *
      * @var array<string, int>
      */
     private const WEIGHTS = [
-        'processed' => 35,
-        'deadlines' => 30,
-        'quality' => 25,
-        'criticality' => 10,
+        'performance' => 60,
+        'deadlines' => 40,
     ];
 
     /**
-     * @param Collection<int, array<string, mixed>> $openTasks
+     * @param  string  $role  Role sidebar canonique (cf. UserWorkspaceService::specSidebarRole).
      * @return array{score: float, quality_label: string, components: array<string, array<string, mixed>>}
      */
-    public function summarize(User $user, Collection $openTasks): array
+    public function summarize(User $user, string $role): array
     {
+        $actions = $this->scopedActions($user, $role);
+
         $components = [
-            'processed' => $this->component(
-                label: 'Taches traitees',
-                score: $this->processedScore($user, $openTasks),
-                weight: self::WEIGHTS['processed']
+            'performance' => $this->component(
+                label: 'Performance',
+                score: $this->averageKpi($actions, 'taux_performance'),
+                weight: self::WEIGHTS['performance']
             ),
             'deadlines' => $this->component(
                 label: 'Respect des delais',
-                score: $this->deadlineScore($openTasks),
+                score: $this->averageKpi($actions, 'taux_delai'),
                 weight: self::WEIGHTS['deadlines']
-            ),
-            'quality' => $this->component(
-                label: 'Qualite du traitement',
-                score: $this->qualityScore($user),
-                weight: self::WEIGHTS['quality']
-            ),
-            'criticality' => $this->component(
-                label: 'Criticite / importance',
-                score: $this->criticalityScore($openTasks),
-                weight: self::WEIGHTS['criticality']
             ),
         ];
 
-        $score = collect($components)
-            ->sum(fn (array $component): float => (float) $component['weighted']);
-
-        $qualityScore = (float) ($components['quality']['score'] ?? 100.0);
+        $score = round($this->bound(
+            collect($components)->sum(fn (array $component): float => (float) $component['weighted'])
+        ), 1);
 
         return [
-            'score' => round($this->bound($score), 1),
-            'quality_label' => $this->qualityLabel($qualityScore),
+            'score' => $score,
+            'quality_label' => $this->qualityLabel($score),
             'components' => $components,
         ];
     }
 
     /**
-     * @param Collection<int, array<string, mixed>> $openTasks
+     * Actions servant de base au score :
+     *   - tout le monde : les actions dont l'utilisateur est RMO ;
+     *   - chef de service : EN PLUS, les actions des PTA de son service
+     *     (perimetre d'encadrement). Le chef cumule donc ses propres actions et
+     *     celles de son service.
+     *
+     * @return Collection<int, Action>
      */
-    private function processedScore(User $user, Collection $openTasks): float
+    private function scopedActions(User $user, string $role): Collection
     {
-        $open = $openTasks->count();
-        $processed = $this->processedTaskCount($user);
-        $total = $open + $processed;
+        return Action::query()
+            ->where(function (Builder $query) use ($user, $role): void {
+                $query->forResponsable((int) $user->id);
 
-        if ($total === 0) {
-            return 100.0;
-        }
-
-        return round($this->bound(($processed / $total) * 100), 1);
-    }
-
-    private function processedTaskCount(User $user): int
-    {
-        $since = now()->subDays(90);
-
-        $count = Action::query()
-            ->forResponsable((int) $user->id)
-            ->where(function ($query): void {
-                $query
-                    ->whereIn('statut_validation', [
-                        ActionTrackingService::VALIDATION_SOUMISE_CHEF,
-                        ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-                        ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
-                    ])
-                    ->orWhereIn('statut_dynamique', ActionTrackingService::completedActionStatuses());
+                if ($role === 'chef' && $user->service_id !== null) {
+                    $query->orWhereHas('pta', fn (Builder $ptaQuery) => $ptaQuery
+                        ->where('service_id', (int) $user->service_id));
+                }
             })
-            ->where('updated_at', '>=', $since)
-            ->count();
-
-        $count += SousAction::query()
-            ->where('agent_id', (int) $user->id)
-            ->whereIn('statut', ['realisee', 'en_attente_validation_chef', 'validee_chef', 'validee', 'cloturee'])
-            ->where('updated_at', '>=', $since)
-            ->count();
-
-        foreach ([
-            'evalue_par',
-            'financement_daf_par',
-            'financement_dg_par',
-        ] as $column) {
-            if (! Schema::hasColumn('actions', $column)) {
-                continue;
-            }
-
-            $count += Action::query()
-                ->where($column, (int) $user->id)
-                ->where('updated_at', '>=', $since)
-                ->count();
-        }
-
-        return $count;
+            ->where(function (Builder $query): void {
+                $query->whereNotNull('taux_performance')
+                    ->orWhereNotNull('taux_delai');
+            })
+            ->latest('updated_at')
+            ->limit(100)
+            ->get(['id', 'taux_performance', 'taux_delai']);
     }
 
     /**
-     * @param Collection<int, array<string, mixed>> $openTasks
+     * Moyenne d'un KPI d'action (taux_performance / taux_delai) sur les actions
+     * du perimetre. Les actions sans valeur sur ce KPI sont ignorees ; en
+     * l'absence totale de donnee, on neutralise a 100 (pas de penalite par
+     * defaut).
+     *
+     * @param  Collection<int, Action>  $actions
      */
-    private function deadlineScore(Collection $openTasks): float
+    private function averageKpi(Collection $actions, string $column): float
     {
-        $deadlinedTasks = $openTasks->filter(fn (array $task): bool => ($task['deadline_at'] ?? null) !== null);
-        $total = $deadlinedTasks->count();
-
-        if ($total === 0) {
-            return 100.0;
-        }
-
-        $overdue = $deadlinedTasks->where('is_overdue', true)->count();
-
-        return round($this->bound(100 - (($overdue / $total) * 100)), 1);
-    }
-
-    private function qualityScore(User $user): float
-    {
-        // Spec v2 (2026-05-28) : la note du chef et le KPI conformite sont supprimes.
-        // Le score qualite agent retombe sur taux_performance uniquement.
-        $scores = Action::query()
-            ->forResponsable((int) $user->id)
-            ->whereNotNull('taux_performance')
-            ->latest('updated_at')
-            ->limit(50)
-            ->get(['taux_performance'])
-            ->map(fn (Action $action): ?float => $action->taux_performance !== null
-                ? (float) $action->taux_performance
+        $values = $actions
+            ->map(fn (Action $action): ?float => $action->{$column} !== null
+                ? (float) $action->{$column}
                 : null)
-            ->filter(fn (?float $score): bool => $score !== null)
+            ->filter(fn (?float $value): bool => $value !== null)
             ->values();
 
-        if ($scores->isEmpty()) {
+        if ($values->isEmpty()) {
             return 100.0;
         }
 
-        return round($this->bound((float) $scores->avg()), 1);
-    }
-
-    /**
-     * @param Collection<int, array<string, mixed>> $openTasks
-     */
-    private function criticalityScore(Collection $openTasks): float
-    {
-        if ($openTasks->isEmpty()) {
-            return 100.0;
-        }
-
-        $weights = [
-            'normale' => 1.0,
-            'importante' => 2.0,
-            'critique' => 3.0,
-        ];
-
-        $totalWeight = 0.0;
-        $lostWeight = 0.0;
-
-        foreach ($openTasks as $task) {
-            $taskWeight = $weights[(string) ($task['criticality'] ?? 'normale')] ?? 1.0;
-            $totalWeight += $taskWeight;
-
-            if ((bool) ($task['is_overdue'] ?? false)) {
-                $lostWeight += $taskWeight;
-            } elseif (($task['remaining_minutes'] ?? null) !== null && (int) $task['remaining_minutes'] <= 240) {
-                $lostWeight += $taskWeight * 0.25;
-            }
-        }
-
-        if ($totalWeight <= 0.0) {
-            return 100.0;
-        }
-
-        return round($this->bound(100 - (($lostWeight / $totalWeight) * 100)), 1);
+        return round($this->bound((float) $values->avg()), 1);
     }
 
     /**

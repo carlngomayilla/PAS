@@ -99,10 +99,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div>
-                        <label for="number_decimal_separator">Separateur decimal</label>
-                        <input id="number_decimal_separator" name="number_decimal_separator" type="text" maxlength="2" value="{{ old('number_decimal_separator', $settings['number_decimal_separator']) }}" required>
-                    </div>
+                    <input name="number_decimal_separator" type="hidden" value="{{ old('number_decimal_separator', $settings['number_decimal_separator']) }}">
                     <div>
                         <label for="number_thousands_separator">Separateur milliers</label>
                         <input id="number_thousands_separator" name="number_thousands_separator" type="text" maxlength="2" value="{{ old('number_thousands_separator', $settings['number_thousands_separator']) }}" required>

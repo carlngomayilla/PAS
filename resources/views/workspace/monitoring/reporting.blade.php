@@ -202,8 +202,8 @@
                             </div>
                             <div class="flex flex-wrap gap-2 text-xs">
                                 <span class="anbg-badge anbg-badge-neutral px-3">{{ $directionSummary['actions_total'] ?? 0 }} actions</span>
-                                <span class="anbg-badge anbg-badge-success px-3">{{ number_format((float) ($directionSummary['taux_realisation'] ?? 0), 1) }}% réalisation</span>
-                                <span class="anbg-badge anbg-badge-warning px-3">{{ number_format((float) ($directionSummary['taux_retard'] ?? 0), 1) }}% retard</span>
+                                <span class="anbg-badge anbg-badge-success px-3">{{ number_format((float) ($directionSummary['taux_realisation'] ?? 0), 0) }}% réalisation</span>
+                                <span class="anbg-badge anbg-badge-warning px-3">{{ number_format((float) ($directionSummary['taux_retard'] ?? 0), 0) }}% retard</span>
                             </div>
                         </div>
 
@@ -221,8 +221,8 @@
                                         </div>
                                         <div class="flex flex-wrap gap-2 text-xs">
                                             <span class="anbg-badge anbg-badge-neutral px-3">{{ $serviceSummary['actions_total'] ?? 0 }} actions</span>
-                                            <span class="anbg-badge anbg-badge-success px-3">{{ number_format((float) ($serviceSummary['taux_realisation'] ?? 0), 1) }}%</span>
-                                            <span class="anbg-badge anbg-badge-info px-3">Performance d'exécution {{ number_format((float) ($serviceSummary['kpi_global'] ?? 0), 1) }}</span>
+                                            <span class="anbg-badge anbg-badge-success px-3">{{ number_format((float) ($serviceSummary['taux_realisation'] ?? 0), 0) }}%</span>
+                                            <span class="anbg-badge anbg-badge-info px-3">Performance d'exécution {{ number_format((float) ($serviceSummary['kpi_global'] ?? 0), 0) }}</span>
                                         </div>
                                     </div>
                                 </div>

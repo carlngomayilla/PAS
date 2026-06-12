@@ -26,6 +26,13 @@ class ReferentielWebController extends Controller
     use AuthorizesPlanningScope;
     use RecordsAuditTrail;
 
+    /**
+     * Mot de passe par defaut applique aux nouveaux comptes lorsque l admin
+     * ne saisit rien dans le formulaire de creation. Conforme a la policy
+     * (12+ caracteres, majuscules/minuscules, chiffres, symboles).
+     */
+    private const DEFAULT_NEW_USER_PASSWORD = 'Anbg@2026!Pas';
+
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy,
         private readonly AntivirusScanner $scanner,
@@ -482,7 +489,10 @@ class ReferentielWebController extends Controller
                 'password_changed_at' => now(),
             ]);
 
-            $this->passwordPolicy->persistPassword($created, (string) $validated['password']);
+            $plainPassword = trim((string) ($validated['password'] ?? '')) !== ''
+                ? (string) $validated['password']
+                : self::DEFAULT_NEW_USER_PASSWORD;
+            $this->passwordPolicy->persistPassword($created, $plainPassword);
 
             return $created->fresh();
         });
@@ -663,8 +673,10 @@ class ReferentielWebController extends Controller
             'unite_dg_id' => ['nullable', 'integer', 'exists:unites_dg,id'],
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
             'remove_profile_photo' => ['nullable', 'boolean'],
+            // A la creation, le mot de passe est optionnel : si l admin ne saisit
+            // rien, on applique le mot de passe par defaut (cf. utilisateursStore).
             'password' => $creating
-                ? ['required', 'string', $this->passwordPolicy->rule(), 'confirmed']
+                ? ['nullable', 'string', $this->passwordPolicy->rule(), 'confirmed']
                 : ['nullable', 'string', $this->passwordPolicy->rule(false), 'confirmed'],
         ]);
 

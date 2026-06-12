@@ -128,7 +128,14 @@
                             <td>{{ $import->valid_rows }} valides / {{ $import->error_rows }} erreurs</td>
                             <td><span class="anbg-badge anbg-badge-info px-2 py-0.5 text-xs">{{ str_replace('_', ' ', $import->status) }}</span></td>
                             <td class="text-right">
-                                <a class="btn btn-outline" href="{{ route('workspace.imports.show', $import) }}">Voir</a>
+                                <div class="flex flex-wrap justify-end gap-1.5">
+                                    <a class="btn btn-outline" href="{{ route('workspace.imports.show', $import) }}">Voir</a>
+                                    <form method="POST" action="{{ route('workspace.imports.destroy', $import) }}" data-confirm-message="Supprimer cet import et tout son historique ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="btn btn-danger" type="submit">Supprimer</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @empty

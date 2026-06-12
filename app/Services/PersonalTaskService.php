@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\DeletionRequest;
+use App\Models\PlanningUnlockRequest;
 use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
@@ -84,6 +85,7 @@ class PersonalTaskService
             ->merge($this->dafFinancingTasks($user, $role))
             ->merge($this->dgFinancingTasks($user, $role))
             ->merge($this->actionAlertTasks($user, $role))
+            ->merge($this->planningUnlockTasks($user, $role))
             ->merge($this->deletionRequestTasks($user, $role))
             ->unique('key')
             ->sortBy(fn (array $task): string => sprintf(
@@ -488,6 +490,49 @@ class PersonalTaskService
         return $tasks;
     }
 
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function planningUnlockTasks(User $user, string $role): Collection
+    {
+        if (! in_array($role, ['sciq_planif', 'dg'], true)) {
+            return collect();
+        }
+
+        $status = $role === 'sciq_planif'
+            ? PlanningUnlockRequest::STATUS_SOUMISE
+            : PlanningUnlockRequest::STATUS_TRANSMISE;
+
+        return PlanningUnlockRequest::query()
+            ->with(['requester:id,name'])
+            ->where('status', $status)
+            ->latest('updated_at')
+            ->limit(80)
+            ->get()
+            ->map(function (PlanningUnlockRequest $request) use ($role): array {
+                $received = $role === 'dg'
+                    ? ($this->carbon($request->transferred_at) ?? $this->carbon($request->planif_avis_at) ?? $this->carbon($request->updated_at))
+                    : $this->carbon($request->created_at);
+                $deadline = $received?->copy()->addHours(48);
+
+                return $this->task(
+                    key: 'planning-unlock:'.$role.':'.$request->id,
+                    type: $role === 'dg' ? 'decision_modification_dg' : 'controle_modification',
+                    title: $role === 'dg' ? 'Decision DG modification' : 'Controle modification',
+                    subject: (string) ($request->target_label ?? 'Demande de modification'),
+                    context: strtoupper((string) $request->module).' / '.(string) $request->reason,
+                    responsible: $request->requester?->name,
+                    receivedAt: $received,
+                    deadlineAt: $deadline,
+                    url: route('workspace.planning-unlocks.index'),
+                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
+                    scoreImpact: $role === 'dg'
+                        ? 'Retard de decision impute au DG.'
+                        : 'Retard de controle impute au profil SCIQ/Planification.'
+                );
+            });
+    }
+
     private function scopeToUserUnit(Builder $query, User $user): void
     {
         if ($user->service_id !== null) {
@@ -627,7 +672,10 @@ class PersonalTaskService
                 && $task['deadline_at']->lessThanOrEqualTo(now()->addDay()))
             ->count();
 
-        $scoreSummary = $this->personalScoreService->summarize($user, $items);
+        $scoreSummary = $this->personalScoreService->summarize(
+            $user,
+            $this->workspaceService->specSidebarRole($user)
+        );
 
         return [
             'total' => $total,

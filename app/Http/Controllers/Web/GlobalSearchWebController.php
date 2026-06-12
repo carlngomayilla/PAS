@@ -35,13 +35,13 @@ class GlobalSearchWebController extends Controller
 
         if (mb_strlen($query) >= 2) {
             $groups = [
+                $this->users($query, $user),
                 $this->actions($query, $exerciceContext, $user),
                 $this->pas($query, $exerciceContext, $user),
                 $this->paos($query, $exerciceContext, $user),
                 $this->ptas($query, $exerciceContext, $user),
                 $this->directions($query, $user),
                 $this->services($query, $user),
-                $this->users($query, $user),
             ];
         }
 
@@ -237,26 +237,62 @@ class GlobalSearchWebController extends Controller
     private function users(string $query, User $viewer): array
     {
         if (! Schema::hasTable('users')) {
-            return $this->group('Utilisateurs', 'users', []);
+            return $this->group('Profils utilisateurs', 'users', []);
         }
 
         $builder = User::query()
             ->with(['direction:id,code,libelle', 'service:id,code,libelle'])
-            ->select(['id', 'name', 'email', 'role', 'agent_matricule', 'agent_fonction', 'direction_id', 'service_id', 'is_active'])
-            ->where('is_active', true)
+            ->select([
+                'id',
+                'name',
+                'email',
+                'role',
+                'custom_role_code',
+                'agent_matricule',
+                'agent_fonction',
+                'agent_telephone',
+                'direction_id',
+                'service_id',
+                'is_active',
+                'suspended_until',
+            ])
+            ->orderByDesc('is_active')
             ->orderBy('name');
 
         $this->scopePlanningUsers($builder, $viewer);
-        $this->applySearch($builder, ['name', 'email', 'agent_matricule', 'agent_fonction', 'role'], $query);
+        if (! $viewer->isSuperAdmin()) {
+            $builder->where('role', '!=', User::ROLE_SUPER_ADMIN);
+        }
+        $this->applyUserSearch($builder, $query);
 
-        $items = $builder->limit(10)->get()->map(fn (User $user): array => [
-            'title' => (string) $user->name,
-            'subtitle' => 'Utilisateur - '.$user->roleLabel(),
-            'meta' => ($user->agent_fonction ?: 'Fonction non renseignée').' · '.($user->direction?->libelle ?: 'Direction non renseignée').' / '.($user->service?->libelle ?: 'Service non renseigné'),
-            'href' => route('workspace.referentiel.utilisateurs.index', ['utilisateur' => $user->id]),
-        ])->values()->all();
+        $items = $builder->limit(20)->get()->map(function (User $user): array {
+            $direction = $user->direction
+                ? trim(($user->direction->code ? $user->direction->code.' - ' : '').$user->direction->libelle)
+                : 'Direction non renseignee';
+            $service = $user->service
+                ? trim(($user->service->code ? $user->service->code.' - ' : '').$user->service->libelle)
+                : 'Service non renseigne';
+            $status = $user->isSuspended() ? 'Suspendu' : ((bool) $user->is_active ? 'Actif' : 'Inactif');
 
-        return $this->group('Utilisateurs', 'users', $items);
+            return [
+                'title' => (string) $user->name,
+                'subtitle' => 'Profil utilisateur - '.$user->roleLabel(),
+                'meta' => trim(($user->agent_fonction ?: 'Fonction non renseignee').' - '.$direction.' / '.$service),
+                'href' => route('workspace.referentiel.utilisateurs.index', ['q' => $user->email]),
+                'badge' => $status,
+                'badge_tone' => $status === 'Actif' ? 'success' : ($status === 'Suspendu' ? 'warning' : 'danger'),
+                'details' => [
+                    ['label' => 'Email', 'value' => (string) $user->email],
+                    ['label' => 'Matricule', 'value' => (string) ($user->agent_matricule ?: '-')],
+                    ['label' => 'Fonction', 'value' => (string) ($user->agent_fonction ?: '-')],
+                    ['label' => 'Telephone', 'value' => (string) ($user->agent_telephone ?: '-')],
+                    ['label' => 'Direction', 'value' => $direction],
+                    ['label' => 'Service', 'value' => $service],
+                ],
+            ];
+        })->values()->all();
+
+        return $this->group('Profils utilisateurs', 'users', $items);
     }
 
     /**
@@ -271,6 +307,30 @@ class GlobalSearchWebController extends Controller
             foreach ($columns as $column) {
                 $subQuery->orWhere($column, $operator, $needle);
             }
+        });
+    }
+
+    private function applyUserSearch(Builder $builder, string $query): void
+    {
+        $needle = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $query).'%';
+        $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
+        $builder->where(function (Builder $subQuery) use ($needle, $operator): void {
+            foreach (['name', 'email', 'agent_matricule', 'agent_fonction', 'agent_telephone', 'role', 'custom_role_code'] as $column) {
+                $subQuery->orWhere($column, $operator, $needle);
+            }
+
+            $subQuery
+                ->orWhereHas('direction', function (Builder $directionQuery) use ($needle, $operator): void {
+                    $directionQuery
+                        ->where('code', $operator, $needle)
+                        ->orWhere('libelle', $operator, $needle);
+                })
+                ->orWhereHas('service', function (Builder $serviceQuery) use ($needle, $operator): void {
+                    $serviceQuery
+                        ->where('code', $operator, $needle)
+                        ->orWhere('libelle', $operator, $needle);
+                });
         });
     }
 

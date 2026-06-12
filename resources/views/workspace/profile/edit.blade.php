@@ -2,37 +2,61 @@
 
 @section('content')
     <div class="app-screen-flow">
-    <section class="showcase-hero mb-4 app-screen-block">
-        <div class="showcase-hero-body">
-            <div class="max-w-3xl">
-                <span class="showcase-eyebrow">Mon profil</span>
-                <h1 class="showcase-title">Paramètres personnels et sécurité</h1>
-                <p class="showcase-subtitle">Règles de mot de passe : {{ $passwordPolicyHelp }}</p>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-blue-600"></span>
-                        {{ $profil['role_label'] }}
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
-                        {{ $profil['scope'] }}
-                    </span>
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#8fc043]"></span>
-                        {{ $user->direction?->libelle ?? 'Sans direction' }} / {{ $user->service?->libelle ?? 'Sans service' }}
-                    </span>
+    <section class="mb-4 app-screen-block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_48px_rgba(23,50,74,0.10)]">
+        <div class="h-1.5 bg-[linear-gradient(90deg,#1c203d_0%,#3996d3_52%,#8fc043_100%)]"></div>
+
+        <div class="bg-[linear-gradient(135deg,#ffffff_0%,#f8fbfd_58%,#eef6f9_100%)] px-5 py-5">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
+                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#17324a] text-lg font-bold text-white shadow-sm ring-4 ring-white">
+                        {{ $user->profile_initials }}
+                    </div>
+
+                    <div class="min-w-0">
+                        <span class="inline-flex rounded-full border border-[#3996d3]/25 bg-[#3996d3]/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[#1f6f9f]">Mon profil</span>
+                        <h1 class="mt-3 text-2xl font-bold leading-tight text-[#17324a] md:text-3xl">Paramètres personnels et sécurité</h1>
+                        <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+                            Règles de mot de passe : {{ $passwordPolicyHelp }}
+                        </p>
+                    </div>
                 </div>
-                @if ($passwordExpired)
-                    <p class="mt-4 rounded-2xl border border-[#f9b13c]/40 bg-[#fff8d6] px-4 py-3 text-sm text-[#1c203d]">
-                        Mot de passe expire. Le renouvellement est obligatoire pour acceder aux autres modules.
-                    </p>
-                @endif
-            </div>
-            <div class="showcase-action-row">
-                <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('dashboard') }}">
+
+                <a class="btn btn-primary shrink-0 rounded-lg px-4 py-2.5 shadow-sm" href="{{ route('dashboard') }}">
                     Retour dashboard
                 </a>
             </div>
+
+            <div class="mt-5 grid gap-3 md:grid-cols-3">
+                <div class="rounded-lg border border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-[#3996d3]"></span>
+                        <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Profil</p>
+                    </div>
+                    <p class="mt-2 truncate text-sm font-semibold text-[#17324a]">{{ $profil['role_label'] }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-[#8fc043]"></span>
+                        <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Portée</p>
+                    </div>
+                    <p class="mt-2 truncate text-sm font-semibold text-[#17324a]">{{ $profil['scope'] }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-[#f9b13c]"></span>
+                        <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Rattachement</p>
+                    </div>
+                    <p class="mt-2 truncate text-sm font-semibold text-[#17324a]">
+                        {{ $user->direction?->libelle ?? 'Sans direction' }} / {{ $user->service?->libelle ?? 'Sans service' }}
+                    </p>
+                </div>
+            </div>
+
+            @if ($passwordExpired)
+                <p class="mt-4 rounded-lg border border-[#f9b13c]/40 bg-[#fff8d6] px-4 py-3 text-sm text-[#1c203d]">
+                    Mot de passe expire. Le renouvellement est obligatoire pour acceder aux autres modules.
+                </p>
+            @endif
         </div>
     </section>
 
@@ -222,7 +246,7 @@
     </section>
     </div>
 
-    <script>
+    <script @cspNonce>
         document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
             button.addEventListener('click', function () {
                 var input = document.getElementById(button.dataset.passwordToggle);

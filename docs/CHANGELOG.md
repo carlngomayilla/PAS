@@ -5,6 +5,234 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-11 — Bouton de retour global + suppression des imports Excel
+
+### Demande
+
+Ajouter des boutons de retour sur les pages qui n'en ont pas, et un bouton
+« Supprimer » pour chaque import de l'application.
+
+### Changement
+
+- **Bouton « Retour » global** dans l'en-tête partagé (`layouts/admin.blade.php`),
+  affiché sur toutes les pages workspace/admin sauf l'accueil (`dashboard`,
+  `workspace.index`). Logique câblée dans `admin-shell.js` : `history.back()` si la
+  page précédente est de même origine, sinon repli vers le tableau de bord.
+- **Suppression d'un import** : nouvelle route `DELETE imports-excel/{import}`
+  (`workspace.imports.destroy`) + méthode `PlanningImportWebController::destroy()`.
+  Bouton « Supprimer » (avec confirmation `data-confirm-message`) sur chaque ligne
+  de l'historique (`imports/index`) et sur la page de détail (`imports/show`).
+- Lien contextuel « Retour a l'import » ajouté sur la page d'erreurs d'import
+  (`imports/errors`) qui n'avait aucune navigation de retour.
+
+### Fichiers modifiés
+
+- `routes/web.php`
+- `app/Http/Controllers/Web/PlanningImportWebController.php`
+- `resources/views/layouts/admin.blade.php`
+- `resources/js/admin-shell.js`
+- `resources/views/workspace/imports/index.blade.php`
+- `resources/views/workspace/imports/show.blade.php`
+- `resources/views/workspace/imports/errors.blade.php`
+
+---
+
+## 2026-06-11 — Mot de passe par défaut pour les nouveaux comptes
+
+### Demande
+
+À la création d'un utilisateur, ne plus obliger l'admin à saisir un mot de passe :
+appliquer automatiquement un mot de passe par défaut quand le champ est laissé vide.
+
+### Changement
+
+- **Mot de passe par défaut** : `Anbg@2026!Pas` (conforme à la policy : 12+ caractères,
+  majuscules/minuscules, chiffres, symboles).
+- Le champ mot de passe devient **optionnel à la création** (validation `required` → `nullable`)
+  dans les deux voies de création de comptes. Si l'admin saisit un mot de passe, il est utilisé ;
+  sinon le défaut est appliqué via `PasswordPolicyService::persistPassword`.
+- Bascule `.env` sur **SQLite** local (`database/database.sqlite`) ; PostgreSQL commenté.
+
+### Fichiers modifiés
+
+- `app/Http/Controllers/Web/ReferentielWebController.php` — constante `DEFAULT_NEW_USER_PASSWORD`,
+  règle `password` nullable à la création, fallback dans `utilisateursStore`.
+- `app/Http/Controllers/Web/SuperAdminWebController.php` — idem dans `organizationUserStore` /
+  `validateOrganizationUserPayload`.
+- `resources/views/workspace/referentiel/utilisateurs/form.blade.php` — champ optionnel + aide.
+- `resources/views/workspace/super_admin/organization.blade.php` — champ optionnel + aide.
+- `.env` — `DB_CONNECTION=sqlite`.
+
+---
+
+## 2026-06-11 — Import Excel : actions importées déjà paramétrées (plus de paramétrage manuel)
+
+### Demande
+
+Ajouter des colonnes au fichier d'import pour ne plus avoir à **finir le paramétrage de
+l'action dans l'appli** : quand la ligne est complète, l'action doit être importée directement
+en « paramétré » et affectée au RMO.
+
+### Changement
+
+- Nouvelle constante **`PlanningExcelImportService::PARAMETRAGE_COLUMNS`** (13 colonnes
+  OPTIONNELLES) : `type_action`, `quantite_cible`, `unite_cible`, `seuil_mode`,
+  `seuil_t1..t4`, `niveau_risque`, `mesures_preventives`, `commentaire_obligatoire`,
+  `champ_difficulte`, `sous_actions`.
+- **Pilotage par `type_action`** : cellule vide → comportement inchangé (`a_parametrer`) ;
+  cellule renseignée → validation stricte des champs du type puis import en **`parametre`**
+  (mode_evaluation / type_cible / methode_calcul / cible / seuils / risque / options de suivi
+  remplis), notification RMO via `WorkspaceNotificationService::notifyActionAssigned`, et
+  bascule auto du PTA `brouillon → en_cours` quand plus aucune action n'est `a_parametrer`.
+- **Sous-actions** (action composée) saisies dans une cellule unique `sous_actions` :
+  `libellé|type|poids|cible|unité` séparées par `;` (somme des poids = 100 si fournis).
+- Rétro-compatibilité : un fichier sans les nouvelles colonnes importe exactement comme avant.
+- Le **modèle Excel** téléchargeable inclut désormais les nouvelles colonnes + **3 lignes
+  d'exemple, une par type d'action** (quantitative, non quantitative, composée) déjà
+  paramétrées.
+
+### Fichiers modifiés
+
+- `app/Services/Imports/PlanningExcelImportService.php` — colonnes, validation par ligne
+  (`validateParametrage`), parseur `parseSousActions`, payload `parametragePayload`, création
+  des sous-actions `persistImportedSubActions`, promotion PTA + notifications hors transaction.
+- `app/Http/Controllers/Web/PlanningImportWebController.php` — `template()` : en-tête étendu
+  + 2 lignes d'exemple.
+- `tests/Feature/PlanningExcelImportServiceTest.php` — nouveaux cas (quantitative, composée,
+  validations, non-régression `a_parametrer`, notification RMO).
+
+### Extrait clé
+
+```php
+// type_action vide → 'a_parametrer' (inchangé) ; renseigné → import déjà 'parametre'.
+$isParametre = trim((string) ($row['type_action'] ?? '')) !== '';
+if ($isParametre) {
+    $payload = array_merge($payload, $this->parametragePayload($row));
+}
+```
+
+---
+
+## 2026-06-11 — Score personnel « Mes tâches » : 2 indicateurs (Performance / Délai)
+
+### Demande
+
+Simplifier le score personnel pour ne garder que **le Délai et la Performance**, alignés sur
+les indicateurs portés par l'action elle-même, et l'appliquer aussi bien au **RMO de l'action**
+qu'au **chef de service**.
+
+### Changement
+
+- `PersonalScoreService` réécrit : suppression des composantes « Tâches traitées » (35 %) et
+  « Criticité » (10 %). Le score ne repose plus que sur deux composantes tirées directement des
+  KPI de l'action : **Performance (`taux_performance`) pondérée à 60 %** et **Délai (`taux_delai`)
+  pondéré à 40 %**.
+- Périmètre du score : les actions dont l'utilisateur est RMO ; **pour un chef de service**, en
+  plus, les actions des PTA de son service (cumul service + actions propres). Le périmètre est
+  résolu via le rôle sidebar canonique (`UserWorkspaceService::specSidebarRole`).
+- `quality_label` désormais dérivé du **score global** (et non de la seule performance).
+- Les vues `tasks/index.blade.php` et `tasks/_dashboard-card.blade.php` itèrent déjà les
+  composantes dynamiquement : aucun changement d'affichage requis.
+
+### Fichiers modifiés
+
+- `app/Services/PersonalScoreService.php` — refonte (2 composantes, périmètre RMO + chef).
+- `app/Services/PersonalTaskService.php` — `summary()` passe le rôle à `summarize()`.
+- `tests/Feature/PersonalTaskWorkflowTest.php` — assertions alignées (poids 60/40, `taux_delai`).
+
+### Extrait clé
+
+```php
+private const WEIGHTS = [
+    'performance' => 60,
+    'deadlines' => 40,
+];
+
+// Chef de service : actions propres (RMO) + actions des PTA de son service
+$query->forResponsable((int) $user->id);
+if ($role === 'chef' && $user->service_id !== null) {
+    $query->orWhereHas('pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
+}
+```
+
+---
+
+## 2026-06-11 — Boutons « Voir » du mot de passe : réparation (CSP) et ajout
+
+### Demande
+
+Le mot de passe ne pouvait pas être révélé à la connexion ni dans les champs de modification
+du mot de passe : activer les boutons « Voir ».
+
+### Cause
+
+La politique de sécurité du contenu (`AddSecurityHeaders`) impose
+`script-src 'self' 'nonce-{nonce}'` sans `'unsafe-inline'`. Le bouton « VOIR » de la page de
+connexion (`lamp-login.blade.php`) utilisait un gestionnaire `onclick` en ligne, bloqué par la CSP.
+Les scripts de bascule de `profile/edit.blade.php` et `passwords/reset.blade.php` étaient déclarés
+sans nonce (`<script>`) et donc également bloqués. Les formulaires admin (création/édition
+d'utilisateurs et organisation) n'avaient aucun bouton.
+
+### Modification
+
+- `resources/views/auth/lamp-login.blade.php` — remplacement du `onclick` en ligne par
+  `data-password-toggle` + script `@cspNonce` poussé dans `@push('scripts')`.
+- `resources/views/workspace/profile/edit.blade.php` — script de bascule passé en `<script @cspNonce>`.
+- `resources/views/auth/passwords/reset.blade.php` — script de bascule passé en `<script @cspNonce>`.
+- `resources/views/auth/login.blade.php` — ajout du bouton « Voir » + script `@cspNonce`.
+- `resources/views/workspace/referentiel/utilisateurs/form.blade.php` — boutons « Voir » sur les
+  champs mot de passe / confirmation + logique de bascule ajoutée au script existant.
+- `resources/views/workspace/super_admin/organization.blade.php` — boutons « Voir » sur les champs
+  mot de passe géré / confirmation + logique de bascule ajoutée au script existant.
+
+```js
+// Modèle commun (compatible CSP via nonce)
+document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+    button.addEventListener('click', function () {
+        var input = document.getElementById(button.dataset.passwordToggle);
+        if (! input) { return; }
+        var isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        button.textContent = isHidden ? 'Cacher' : 'Voir';
+    });
+});
+```
+
+---
+
+## 2026-06-11 — Mode clair : lisibilité du texte des cartes et badges
+
+### Demande
+
+En mode clair, certaines écritures (texte des cartes/encadrés et badges de statut) ne se voyaient pas.
+
+### Cause
+
+Le thème « glass » (`anbg-glass-theme`, toujours actif sur `body`) utilisait en mode clair des
+surfaces très transparentes (`--glass-surface: rgba(255,255,255,0.38)`) posées sur un fond mesh
+coloré et saturé. Le fond bariolé transparaissait à travers les cartes et brouillait le texte
+foncé comme les libellés gris clair, les rendant illisibles.
+
+### Modification
+
+`resources/css/anbg-glass.css` — opacité des surfaces du mode clair renforcée et bordures teintées :
+
+```css
+--glass-surface: rgba(255, 255, 255, 0.78);        /* avant 0.38 */
+--glass-surface-soft: rgba(255, 255, 255, 0.66);   /* avant 0.28 */
+--glass-surface-strong: rgba(255, 255, 255, 0.90); /* avant 0.62 */
+--glass-surface-hover: rgba(255, 255, 255, 0.86);  /* avant 0.55 */
+--glass-border: rgba(57, 150, 211, 0.28);          /* avant rgba(255,255,255,0.55) */
+--glass-border-soft: rgba(57, 150, 211, 0.16);     /* avant rgba(255,255,255,0.32) */
+```
+
+L'effet verre est conservé (backdrop-filter + translucidité résiduelle) mais le fond blanc des
+cartes est désormais suffisant pour que le texte ressorte partout. Le mode sombre n'est pas affecté.
+
+### Build
+
+`npm run build` requis pour régénérer l'asset CSS hashé en production.
+
 ## 2026-06-10 — Dashboard graphiques : disposition 2 colonnes égales (côte à côte)
 
 ### Demande

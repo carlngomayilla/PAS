@@ -5,9 +5,9 @@
 @endphp
 
 @if ($unlockTarget && $unlockRoute)
-    <form method="POST" action="{{ $unlockRoute }}" data-confirm-message="Transmettre une demande de deverrouillage au DG ?" data-confirm-tone="warning" data-confirm-label="Transmettre">
+    <form method="POST" action="{{ $unlockRoute }}" data-confirm-message="Transmettre une demande de modification aux contrôleurs ?" data-confirm-tone="warning" data-confirm-label="Transmettre">
         @csrf
         <input type="hidden" name="reason" value="{{ $unlockContext }}">
-        <button class="btn btn-secondary btn-sm" type="submit">Demander deverrouillage DG</button>
+        <button class="btn btn-secondary btn-sm" type="submit">Demander modification</button>
     </form>
 @endif

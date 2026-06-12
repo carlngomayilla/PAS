@@ -18,15 +18,18 @@ body.anbg-glass-theme {
     --glass-orange: #245f99;
     --glass-yellow: #dbeafe;
 
-    /* Surfaces — opacité réduite pour laisser passer le fond */
-    --glass-surface: rgba(255, 255, 255, 0.38);
-    --glass-surface-soft: rgba(255, 255, 255, 0.28);
-    --glass-surface-strong: rgba(255, 255, 255, 0.62);
-    --glass-surface-hover: rgba(255, 255, 255, 0.55);
+    /* Surfaces — opacité renforcée en mode clair pour garantir la lisibilité
+       du texte des cartes/badges (le fond mesh coloré ne transparaît plus
+       assez pour brouiller les écritures). L'effet verre reste présent via le
+       backdrop-filter et la translucidité résiduelle. */
+    --glass-surface: rgba(255, 255, 255, 0.78);
+    --glass-surface-soft: rgba(255, 255, 255, 0.66);
+    --glass-surface-strong: rgba(255, 255, 255, 0.90);
+    --glass-surface-hover: rgba(255, 255, 255, 0.86);
 
-    /* Bordures translucides */
-    --glass-border: rgba(255, 255, 255, 0.55);
-    --glass-border-soft: rgba(255, 255, 255, 0.32);
+    /* Bordures translucides — teinte légère pour délimiter les cartes sur fond clair */
+    --glass-border: rgba(57, 150, 211, 0.28);
+    --glass-border-soft: rgba(57, 150, 211, 0.16);
 
     /* Ombres profondes pour donner du relief */
     --glass-shadow-sm: 0 4px 14px rgba(28, 32, 61, 0.08);
@@ -1750,4 +1753,164 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         letter-spacing: -0.015em !important;
         line-height: 1.1 !important;
     }
+}
+
+/* Final override: unified clean headers across workspace pages. */
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .app-page-header,
+    .showcase-hero,
+    .page-header,
+    .workspace-header,
+    .page-heading,
+    .workspace-heading
+) {
+    position: relative !important;
+    overflow: hidden !important;
+    padding: clamp(1.15rem, 2vw, 1.5rem) clamp(1.1rem, 2.4vw, 1.65rem) !important;
+    border: 1px solid rgba(203, 213, 225, 0.92) !important;
+    border-radius: 0.9rem !important;
+    background-color: #ffffff !important;
+    background-image: linear-gradient(135deg, #ffffff 0%, #f8fbfd 58%, #eef6f9 100%) !important;
+    color: #17324a !important;
+    box-shadow: 0 18px 48px rgba(23, 50, 74, 0.10) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .app-page-header,
+    .showcase-hero,
+    .page-header,
+    .workspace-header,
+    .page-heading,
+    .workspace-heading
+)::before {
+    content: "" !important;
+    display: block !important;
+    position: absolute !important;
+    inset: 0 0 auto 0 !important;
+    width: 100% !important;
+    height: 0.38rem !important;
+    border-radius: 0 !important;
+    background: linear-gradient(90deg, #1c203d 0%, #3996d3 52%, #8fc043 100%) !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+}
+
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .app-page-header,
+    .showcase-hero,
+    .page-header,
+    .workspace-header,
+    .page-heading,
+    .workspace-heading
+)::after {
+    content: none !important;
+    display: none !important;
+}
+
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .app-page-header,
+    .showcase-hero,
+    .page-header,
+    .workspace-header,
+    .page-heading,
+    .workspace-heading
+) > *,
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .app-page-header,
+    .showcase-hero,
+    .page-header,
+    .workspace-header,
+    .page-heading,
+    .workspace-heading
+) :where(.showcase-hero-body, .showcase-action-row) {
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .showcase-hero .showcase-title,
+    .showcase-hero h1,
+    .app-page-header .app-title,
+    .app-page-header h1,
+    .page-header h1,
+    .workspace-header h1,
+    .page-heading h1,
+    .workspace-heading h1
+) {
+    color: #17324a !important;
+    font-size: clamp(1.45rem, 2.15vw, 2rem) !important;
+    font-weight: 800 !important;
+    line-height: 1.12 !important;
+    letter-spacing: 0 !important;
+    text-shadow: none !important;
+}
+
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .showcase-hero .showcase-subtitle,
+    .showcase-hero p,
+    .app-page-header p,
+    .page-header p,
+    .workspace-header p,
+    .page-heading p,
+    .workspace-heading p
+) {
+    color: #667085 !important;
+}
+
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .showcase-hero .showcase-eyebrow,
+    .app-page-header .app-eyebrow
+) {
+    display: inline-flex !important;
+    align-items: center !important;
+    width: fit-content !important;
+    padding: 0.28rem 0.72rem !important;
+    border: 1px solid rgba(57, 150, 211, 0.25) !important;
+    border-radius: 999px !important;
+    background: rgba(57, 150, 211, 0.10) !important;
+    color: #1f6f9f !important;
+    font-size: 0.68rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    box-shadow: none !important;
+}
+
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .showcase-hero .showcase-chip,
+    .app-page-header .showcase-chip,
+    .page-header .showcase-chip,
+    .workspace-header .showcase-chip,
+    .showcase-hero .showcase-nav-pill,
+    .showcase-hero .btn-secondary,
+    .app-page-header .btn-secondary
+) {
+    border: 1px solid rgba(203, 213, 225, 0.92) !important;
+    background: rgba(255, 255, 255, 0.88) !important;
+    color: #17324a !important;
+    box-shadow: 0 8px 20px rgba(23, 50, 74, 0.06) !important;
+}
+
+html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
+    .showcase-hero .showcase-chip-dot,
+    .app-page-header .showcase-chip-dot
+) {
+    box-shadow: 0 0 0 3px rgba(57, 150, 211, 0.14) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-page-header,
+    .showcase-hero,
+    .page-header,
+    .workspace-header,
+    .page-heading,
+    .workspace-heading
+) {
+    border-color: rgba(148, 163, 184, 0.22) !important;
+    border-radius: 0.9rem !important;
+    background-color: rgba(15, 23, 42, 0.88) !important;
+    background-image: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.88)) !important;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24) !important;
 }

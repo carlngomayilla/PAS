@@ -57,13 +57,18 @@
 
                 <div>
                     <label for="password" class="mb-1 block text-sm font-medium text-slate-700">Mot de passe</label>
-                    <input
-                        id="password"
-                        name="password"
-                        type="password"
-                        class="w-full rounded-lg border border-slate-300/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.96)_100%)] px-3 py-2 text-slate-900 placeholder:text-slate-400 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#516B8B] focus:outline-none focus:ring-2 focus:ring-[#516B8B]/15 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.96)_0%,rgba(22,35,56,0.92)_100%)] dark:shadow-[inset_0_1px_2px_rgba(255,255,255,0.04),0_10px_24px_-24px_rgba(36,59,90,0.34)]"
-                        required
-                    >
+                    <div class="relative">
+                        <input
+                            id="password"
+                            name="password"
+                            type="password"
+                            class="w-full rounded-lg border border-slate-300/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.99)_0%,rgba(248,250,252,0.96)_100%)] px-3 py-2 pr-16 text-slate-900 placeholder:text-slate-400 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#516B8B] focus:outline-none focus:ring-2 focus:ring-[#516B8B]/15 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.96)_0%,rgba(22,35,56,0.92)_100%)] dark:shadow-[inset_0_1px_2px_rgba(255,255,255,0.04),0_10px_24px_-24px_rgba(36,59,90,0.34)]"
+                            required
+                        >
+                        <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="password">
+                            Voir
+                        </button>
+                    </div>
                 </div>
 
                 <div class="flex items-center justify-between gap-3">
@@ -85,5 +90,19 @@
             </form>
         </section>
     </main>
+    <script @cspNonce>
+        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var input = document.getElementById(button.dataset.passwordToggle);
+                if (! input) {
+                    return;
+                }
+
+                var isHidden = input.type === 'password';
+                input.type = isHidden ? 'text' : 'password';
+                button.textContent = isHidden ? 'Cacher' : 'Voir';
+            });
+        });
+    </script>
 </body>
 </html>

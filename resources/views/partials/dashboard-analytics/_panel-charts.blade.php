@@ -30,7 +30,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-[#17324a]">
                                         <span class="truncate">{{ $row['label'] }}</span>
-                                        <span class="whitespace-nowrap">{{ number_format($barValue, 1, ',', ' ') }}%</span>
+                                        <span class="whitespace-nowrap">{{ number_format($barValue, 0, ',', ' ') }}%</span>
                                     </div>
                                     <div class="h-2.5 overflow-hidden rounded-full bg-slate-200/80">
                                         <div class="h-full rounded-full" style="width: {{ $barValue }}%; background: {{ $barColor }};"></div>
@@ -59,7 +59,7 @@
                         $x = 24 + (($index * 312) / $curveSteps);
                         $y = 118 - ($value * 0.9);
 
-                        return number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+                        return number_format($x, 0, '.', '').','.number_format($y, 0, '.', '');
                     })
                     ->implode(' ');
                 $scoreCurvePoints = $curveRows
@@ -68,7 +68,7 @@
                         $x = 24 + (($index * 312) / $curveSteps);
                         $y = 118 - ($value * 0.9);
 
-                        return number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+                        return number_format($x, 0, '.', '').','.number_format($y, 0, '.', '');
                     })
                     ->implode(' ');
             @endphp
@@ -125,7 +125,7 @@
                 <span class="charts-hero-tone-badge" style="background: {{ $scoreTone }};">{{ $scoreToneLabel }}</span>
             </div>
             <div class="charts-hero-value-block">
-                <span class="charts-hero-value">{{ number_format($globalScore, 1, ',', ' ') }}</span>
+                <span class="charts-hero-value">{{ number_format($globalScore, 0, ',', ' ') }}</span>
                 <span class="charts-hero-unit">/100</span>
             </div>
             <div class="charts-hero-progress-track">
@@ -135,7 +135,7 @@
             <div class="charts-hero-meta">
                 <div class="charts-hero-meta-cell">
                     <span class="charts-hero-meta-label">Progression moy.</span>
-                    <span class="charts-hero-meta-value">{{ number_format($progressionScore, 1, ',', ' ') }}%</span>
+                    <span class="charts-hero-meta-value">{{ number_format($progressionScore, 0, ',', ' ') }}%</span>
                 </div>
                 <div class="charts-hero-meta-cell">
                     <span class="charts-hero-meta-label">Seuil qualité</span>
@@ -248,7 +248,7 @@
                             <div class="charts-status-item-track">
                                 <div class="charts-status-item-fill" style="width: {{ $cardPct }}%; background: {{ $card['color'] }};"></div>
                             </div>
-                            <span class="charts-status-item-pct">{{ number_format($cardPct, 1, ',', ' ') }}%</span>
+                            <span class="charts-status-item-pct">{{ number_format($cardPct, 0, ',', ' ') }}%</span>
                         </a>
                     @endforeach
                 </div>
@@ -280,7 +280,7 @@
                                         <span class="charts-unit-bar-track">
                                             <span class="charts-unit-bar-fill" style="width: {{ $unitValue }}%; background: linear-gradient(90deg, {{ $unitTone }}, {{ $unitTone }}cc);"></span>
                                         </span>
-                                        <span class="charts-unit-bar-value" style="color: {{ $unitTone }};">{{ number_format($unitValue, 1, ',', ' ') }}%</span>
+                                        <span class="charts-unit-bar-value" style="color: {{ $unitTone }};">{{ number_format($unitValue, 0, ',', ' ') }}%</span>
                                     </div>
                                 @endforeach
                             </div>
@@ -308,7 +308,7 @@
                                     <span class="charts-top-action-fill" style="width: {{ min(100, max(0, (float) $row['value'])) }}%; background: linear-gradient(90deg, {{ $row['color'] }}, {{ $row['color'] }}cc);"></span>
                                 </span>
                             </span>
-                            <span class="charts-top-action-value" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 1, ',', ' ') }}</span>
+                            <span class="charts-top-action-value" style="color: {{ $row['color'] }};">{{ number_format((float) $row['value'], 0, ',', ' ') }}</span>
                         </a>
                     @endforeach
                 </div>

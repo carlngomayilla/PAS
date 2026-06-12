@@ -12,7 +12,7 @@
             ],
             [
                 'label'   => 'Indicateur global',
-                'value'   => number_format((float) ($globalScores['global'] ?? 0), 1, ',', ' ') . '%',
+                'value'   => number_format((float) ($globalScores['global'] ?? 0), 0, ',', ' ') . '%',
                 'accent'  => '#178f5f',
                 'icon'    => '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
                 'trend'   => (float) ($globalScores['global'] ?? 0) >= 80 ? 'up' : ((float) ($globalScores['global'] ?? 0) >= 60 ? 'neutral' : 'down'),
@@ -292,7 +292,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-[#17324a]">
                                         <span class="truncate">{{ $row['label'] }}</span>
-                                        <span class="whitespace-nowrap">{{ number_format($barValue, 1, ',', ' ') }}%</span>
+                                        <span class="whitespace-nowrap">{{ number_format($barValue, 0, ',', ' ') }}%</span>
                                     </div>
                                     <div class="h-2.5 overflow-hidden rounded-full bg-slate-200/80">
                                         <div class="h-full rounded-full" style="width: {{ $barValue }}%; background: {{ $barColor }};"></div>

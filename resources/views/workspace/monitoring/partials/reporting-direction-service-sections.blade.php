@@ -130,7 +130,7 @@
                         <td>{{ $directionSummary['actions_terminees'] ?? 0 }}</td>
                         <td>{{ $directionSummary['actions_en_cours'] ?? 0 }}</td>
                         <td>{{ $directionSummary['actions_retard'] ?? 0 }}</td>
-                        <td>{{ number_format((float) ($directionSummary['taux_realisation'] ?? 0), 2) }}</td>
+                        <td>{{ number_format((float) ($directionSummary['taux_realisation'] ?? 0), 0) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -217,7 +217,7 @@
                                 <td>{{ $serviceSummary['actions_terminees'] ?? 0 }}</td>
                                 <td>{{ $serviceSummary['actions_en_cours'] ?? 0 }}</td>
                                 <td>{{ $serviceSummary['actions_retard'] ?? 0 }}</td>
-                                <td>{{ number_format((float) ($serviceSummary['taux_realisation'] ?? 0), 2) }}</td>
+                                <td>{{ number_format((float) ($serviceSummary['taux_realisation'] ?? 0), 0) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -362,7 +362,7 @@
                             <tr>
                                 <td>{{ $row['rmo'] }}</td>
                                 <td>{{ $row['total'] }}</td>
-                                <td>{{ number_format((float) $row['performance'], 2) }}</td>
+                                <td>{{ number_format((float) $row['performance'], 0) }}</td>
                             </tr>
                         @empty
                             <tr><td colspan="3" class="muted">Aucune performance RMO disponible pour ce service.</td></tr>

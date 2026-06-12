@@ -560,13 +560,13 @@ class PtaWebController extends Controller
                 'allows_difficulty' => ['nullable', 'boolean'],
                 'rmo_ids' => ['required', 'array', 'min:1'],
                 'rmo_ids.*' => ['integer', 'exists:users,id'],
-                'quantite_cible' => ['nullable', 'numeric', 'min:0.0001'],
+                'quantite_cible' => ['nullable', 'integer', 'min:1'],
                 'unite_cible' => ['nullable', 'string', 'max:100'],
                 'seuil_mode' => ['nullable', \Illuminate\Validation\Rule::in(['unique', 'trimestriel'])],
-                'seuil_minimum' => ['nullable', 'numeric', 'min:0', 'max:100'],
+                'seuil_minimum' => ['nullable', 'integer', 'min:0', 'max:100'],
                 'justificatif_obligatoire' => ['nullable', 'boolean'],
                 'financement_requis' => ['nullable', 'boolean'],
-                'montant_estime' => ['nullable', 'numeric', 'min:0'],
+                'montant_estime' => ['nullable', 'integer', 'min:0'],
                 'nature_financement' => ['nullable', 'string', 'max:255'],
                 'ressources_necessaires' => ['nullable', 'array'],
                 'ressources_necessaires.*' => ['string', 'max:255'],
@@ -1001,7 +1001,7 @@ class PtaWebController extends Controller
             : (string) ($existingAction?->statut_dynamique ?: ActionTrackingService::STATUS_NON_DEMARRE);
 
         $quantiteCible = $actionPayload['quantite_cible'] ?? null;
-        $quantiteCible = ($quantiteCible === '' || $quantiteCible === null) ? null : $quantiteCible;
+        $quantiteCible = ($quantiteCible === '' || $quantiteCible === null) ? null : (int) round((float) $quantiteCible);
         $modeEvaluation = trim((string) ($actionPayload['mode_evaluation'] ?? ''));
         if ($modeEvaluation === Action::MODE_MIXTE) {
             $modeEvaluation = filled($quantiteCible) ? Action::MODE_QUANTITATIF : Action::MODE_SOUS_ACTIONS;
@@ -1015,7 +1015,7 @@ class PtaWebController extends Controller
         }
 
         $montantEstime = $actionPayload['montant_estime'] ?? null;
-        $montantEstime = ($montantEstime === '' || $montantEstime === null) ? null : $montantEstime;
+        $montantEstime = ($montantEstime === '' || $montantEstime === null) ? null : (int) round((float) $montantEstime);
         $financementRequis = filter_var($actionPayload['financement_requis'] ?? false, FILTER_VALIDATE_BOOL);
         $selectedResources = collect($actionPayload['ressources_necessaires'] ?? [])
             ->filter(fn ($value): bool => is_string($value) && array_key_exists($value, Action::resourceOptions()))
@@ -1084,7 +1084,7 @@ class PtaWebController extends Controller
             'quantite_cible' => $isQuantitative
                 ? $quantiteCible
                 : null,
-            'seuil_minimum' => (float) ($actionPayload['seuil_minimum'] ?? $existingAction?->seuil_minimum ?? 80),
+            'seuil_minimum' => (int) round((float) ($actionPayload['seuil_minimum'] ?? $existingAction?->seuil_minimum ?? 80)),
             'seuil_mode' => in_array($thresholdMode, ['unique', 'trimestriel'], true)
                 ? $thresholdMode
                 : 'unique',
@@ -1257,7 +1257,7 @@ class PtaWebController extends Controller
 
     private function nullableFloat(mixed $value): ?float
     {
-        return $value === null || $value === '' ? null : (float) $value;
+        return $value === null || $value === '' ? null : (float) (int) round((float) $value);
     }
 
     /**

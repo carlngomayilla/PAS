@@ -93,7 +93,7 @@
 
     $summaryStrip = ($roleDashboard['summary_cards'] ?? []) !== [] ? $roleDashboard['summary_cards'] : [
         ['label' => 'Actions totales', 'value' => $metrics['totals']['actions_total'] ?? 0, 'accent' => '#1F2937', 'bg' => '#F8FBFF', 'meta' => null, 'href' => route('workspace.actions.index')],
-        ['label' => $metricLabel('global'), 'value' => number_format((float) ($globalScores['global'] ?? 0), 1, ',', ' '), 'accent' => '#8FC043', 'bg' => '#F2F8E8', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc'])],
+        ['label' => $metricLabel('global'), 'value' => number_format((float) ($globalScores['global'] ?? 0), 0, ',', ' '), 'accent' => '#8FC043', 'bg' => '#F2F8E8', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_global_desc'])],
         ['label' => 'En retard', 'value' => $metrics['alerts']['actions_en_retard'] ?? 0, 'accent' => '#B42318', 'bg' => '#FFF1EF', 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_retard'])],
         ['label' => 'Non démarrées', 'value' => collect($statusCards)->firstWhere('label', 'Non demarre')['count'] ?? 0, 'accent' => '#6B7280', 'bg' => '#F1F5F9', 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'non_demarre'])],
     ];
@@ -179,7 +179,7 @@
     };
 
     $fmtCount = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ');
-    $fmtPct = static fn ($value): string => number_format((float) ($value ?? 0), 1, ',', ' ').'%';
+    $fmtPct = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ').'%';
     $shortText = static fn ($value, int $limit = 42): string => \Illuminate\Support\Str::limit((string) ($value ?: '-'), $limit);
     $chartFallbackPoints = static function (array $rows, string $key = 'global'): string {
         $items = collect($rows)->values();
@@ -191,7 +191,7 @@
                 $x = 20 + (($index * 320) / $steps);
                 $y = 120 - ($value * 0.9);
 
-                return number_format($x, 1, '.', '').','.number_format($y, 1, '.', '');
+                return number_format($x, 0, '.', '').','.number_format($y, 0, '.', '');
             })
             ->implode(' ');
     };
@@ -208,7 +208,7 @@
         }
         $n = count($pairs);
         if ($n === 0) { return ''; }
-        $fmt = static fn (float $v): string => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+        $fmt = static fn (float $v): string => (string) (int) round($v);
         if ($n === 1) { return $fmt($pairs[0][0]).','.$fmt($pairs[0][1]); }
         $t = 0.18;
         $d = $fmt($pairs[0][0]).','.$fmt($pairs[0][1]);

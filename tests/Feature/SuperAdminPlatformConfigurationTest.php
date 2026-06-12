@@ -480,7 +480,7 @@ class SuperAdminPlatformConfigurationTest extends TestCase
             'default_timezone' => 'Africa/Libreville',
             'date_format' => 'd/m/Y',
             'datetime_format' => 'd/m/Y H:i',
-            'number_precision' => '2',
+            'number_precision' => '0',
             'number_decimal_separator' => ',',
             'number_thousands_separator' => '.',
             'sidebar_caption' => 'PILOTAGE',

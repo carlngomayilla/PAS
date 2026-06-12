@@ -60,6 +60,13 @@ class SuperAdminWebController extends Controller
 {
     use RecordsAuditTrail;
 
+    /**
+     * Mot de passe par defaut applique aux nouveaux comptes lorsque le
+     * super-admin ne saisit rien. Conforme a la policy (12+ caracteres,
+     * majuscules/minuscules, chiffres, symboles).
+     */
+    private const DEFAULT_NEW_USER_PASSWORD = 'Anbg@2026!Pas';
+
     public function __construct(
         private readonly ExportTemplatePublisher $templatePublisher,
         private readonly ActionCalculationSettings $actionCalculationSettings,
@@ -1060,7 +1067,9 @@ class SuperAdminWebController extends Controller
 
         $managedUser = DB::transaction(function () use ($validated, $request, $temporaryPlaceholder): User {
             $payload = $this->normalizeManagedUserPayload($validated, $request);
-            $plainPassword = (string) ($validated['password'] ?? '');
+            $plainPassword = trim((string) ($validated['password'] ?? '')) !== ''
+                ? (string) $validated['password']
+                : self::DEFAULT_NEW_USER_PASSWORD;
 
             // forceCreate : role / direction_id / service_id / unite_dg_id / is_active
             // ne sont plus mass-assignables (cf. A02). Voie reservee au super-admin.
@@ -1732,8 +1741,8 @@ class SuperAdminWebController extends Controller
             $rules['definitions.'.$code.'.label'] = ['required', 'string', 'max:60'];
             $rules['definitions.'.$code.'.description'] = ['nullable', 'string', 'max:180'];
             $rules['definitions.'.$code.'.weight'] = ['required', 'integer', 'min:0', 'max:100'];
-            $rules['definitions.'.$code.'.green_threshold'] = ['required', 'numeric', 'min:0', 'max:100'];
-            $rules['definitions.'.$code.'.orange_threshold'] = ['required', 'numeric', 'min:0', 'max:100'];
+            $rules['definitions.'.$code.'.green_threshold'] = ['required', 'integer', 'min:0', 'max:100'];
+            $rules['definitions.'.$code.'.orange_threshold'] = ['required', 'integer', 'min:0', 'max:100'];
             $rules['definitions.'.$code.'.visible'] = ['nullable', 'in:0,1'];
             $rules['definitions.'.$code.'.target_profiles'] = ['nullable', 'array'];
             $rules['definitions.'.$code.'.target_profiles.*'] = ['string', Rule::in($this->profileOptions())];
@@ -1743,8 +1752,8 @@ class SuperAdminWebController extends Controller
             $rules['definitions.'.$code.'.tertiary_metric'] = ['nullable', Rule::in(array_keys($this->managedKpiSettings->sourceMetricOptions()))];
             $rules['definitions.'.$code.'.secondary_weight'] = ['nullable', 'integer', 'min:0', 'max:100'];
             $rules['definitions.'.$code.'.tertiary_weight'] = ['nullable', 'integer', 'min:0', 'max:100'];
-            $rules['definitions.'.$code.'.target_value'] = ['nullable', 'numeric', 'min:0', 'max:100'];
-            $rules['definitions.'.$code.'.adjustment'] = ['nullable', 'numeric', 'min:-100', 'max:100'];
+            $rules['definitions.'.$code.'.target_value'] = ['nullable', 'integer', 'min:0', 'max:100'];
+            $rules['definitions.'.$code.'.adjustment'] = ['nullable', 'integer', 'min:-100', 'max:100'];
             $rules['definitions.'.$code.'.target_direction_ids'] = ['nullable', 'array'];
             $rules['definitions.'.$code.'.target_direction_ids.*'] = ['integer', 'exists:directions,id'];
             $rules['definitions.'.$code.'.target_service_ids'] = ['nullable', 'array'];
@@ -3023,8 +3032,10 @@ class SuperAdminWebController extends Controller
             'suspension_reason' => ['nullable', 'string', 'max:255'],
             'transfer_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'motif' => ['nullable', 'string', 'max:500'],
+            // A la creation, le mot de passe est optionnel : si rien n est saisi,
+            // on applique le mot de passe par defaut (cf. organizationUserStore).
             'password' => $creating
-                ? ['required', 'string', $this->passwordPolicy->rule(), 'confirmed']
+                ? ['nullable', 'string', $this->passwordPolicy->rule(), 'confirmed']
                 : ['nullable', 'string', $this->passwordPolicy->rule(false), 'confirmed'],
         ]);
 

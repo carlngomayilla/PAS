@@ -60,11 +60,11 @@
                                 </div>
                                 <div>
                                     <label for="kpi_green_{{ $code }}">Seuil vert</label>
-                                    <input id="kpi_green_{{ $code }}" name="definitions[{{ $code }}][green_threshold]" type="number" step="0.01" min="0" max="100" value="{{ old("definitions.$code.green_threshold", $definition['green_threshold'] ?? 80) }}" required>
+                                    <input id="kpi_green_{{ $code }}" name="definitions[{{ $code }}][green_threshold]" type="number" step="1" min="0" max="100" value="{{ (int) round((float) old("definitions.$code.green_threshold", $definition['green_threshold'] ?? 80)) }}" required>
                                 </div>
                                 <div>
                                     <label for="kpi_orange_{{ $code }}">Seuil orange</label>
-                                    <input id="kpi_orange_{{ $code }}" name="definitions[{{ $code }}][orange_threshold]" type="number" step="0.01" min="0" max="100" value="{{ old("definitions.$code.orange_threshold", $definition['orange_threshold'] ?? 60) }}" required>
+                                    <input id="kpi_orange_{{ $code }}" name="definitions[{{ $code }}][orange_threshold]" type="number" step="1" min="0" max="100" value="{{ (int) round((float) old("definitions.$code.orange_threshold", $definition['orange_threshold'] ?? 60)) }}" required>
                                 </div>
                                 <div class="md:col-span-2 xl:col-span-4">
                                     <label for="kpi_description_{{ $code }}">Description</label>
@@ -114,11 +114,11 @@
                                 </div>
                                 <div>
                                     <label for="kpi_target_value_{{ $code }}">Cible numérique</label>
-                                    <input id="kpi_target_value_{{ $code }}" name="definitions[{{ $code }}][target_value]" type="number" step="0.01" min="0" max="100" value="{{ old("definitions.$code.target_value", $definition['target_value'] ?? '') }}">
+                                    <input id="kpi_target_value_{{ $code }}" name="definitions[{{ $code }}][target_value]" type="number" step="1" min="0" max="100" value="{{ old("definitions.$code.target_value", $definition['target_value'] ?? '') !== '' ? (int) round((float) old("definitions.$code.target_value", $definition['target_value'] ?? 0)) : '' }}">
                                 </div>
                                 <div>
                                     <label for="kpi_adjustment_{{ $code }}">Ajustement final</label>
-                                    <input id="kpi_adjustment_{{ $code }}" name="definitions[{{ $code }}][adjustment]" type="number" step="0.01" min="-100" max="100" value="{{ old("definitions.$code.adjustment", $definition['adjustment'] ?? 0) }}">
+                                    <input id="kpi_adjustment_{{ $code }}" name="definitions[{{ $code }}][adjustment]" type="number" step="1" min="-100" max="100" value="{{ (int) round((float) old("definitions.$code.adjustment", $definition['adjustment'] ?? 0)) }}">
                                 </div>
                                 <div class="md:col-span-2 xl:col-span-4">
                                     <div class="rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">

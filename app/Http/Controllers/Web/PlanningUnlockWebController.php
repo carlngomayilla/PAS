@@ -38,7 +38,12 @@ class PlanningUnlockWebController extends Controller
         $this->denyUnlessPlanningReader($user);
 
         $query = PlanningUnlockRequest::query()
-            ->with(['requester:id,name,email,role', 'reviewer:id,name,email,role'])
+            ->with([
+                'requester:id,name,email,role',
+                'reviewer:id,name,email,role',
+                'transferredBy:id,name,email,role',
+                'planifReviewer:id,name,email,role',
+            ])
             ->orderByRaw("CASE WHEN status = 'soumise' THEN 0 ELSE 1 END")
             ->orderByDesc('id');
 
@@ -81,7 +86,7 @@ class PlanningUnlockWebController extends Controller
     }
 
     /**
-     * Circuit V2 — étape directeur : transfère la demande à Planif + DG.
+     * Route legacy : le transfert se fait desormais par un controleur.
      */
     public function transferByDirecteur(Request $request, PlanningUnlockRequest $planningUnlockRequest): RedirectResponse
     {
@@ -91,25 +96,31 @@ class PlanningUnlockWebController extends Controller
         }
 
         if (! $this->locks->canTransfer($user, $planningUnlockRequest)) {
-            abort(403, 'Seul le directeur de la direction concernée peut transférer cette demande.');
+            abort(403, 'Seul un controleur SCIQ/Planification peut transmettre cette demande.');
         }
 
         $validated = $request->validate([
+            'planif_avis' => ['nullable', 'in:favorable,defavorable'],
             'transfer_comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $before = $planningUnlockRequest->toArray();
-        $this->locks->transferByDirecteur($planningUnlockRequest, $user, $validated['transfer_comment'] ?? null);
+        $this->locks->transmitByController(
+            $planningUnlockRequest,
+            $user,
+            (string) ($validated['planif_avis'] ?? PlanningUnlockRequest::AVIS_FAVORABLE),
+            $validated['transfer_comment'] ?? null
+        );
         $planningUnlockRequest->refresh();
-        $this->recordAudit($request, 'planning_unlock', 'directeur_transfer', $planningUnlockRequest, $before, $planningUnlockRequest->toArray());
+        $this->recordAudit($request, 'planning_unlock', 'controller_transfer', $planningUnlockRequest, $before, $planningUnlockRequest->toArray());
 
         return redirect()
             ->route('workspace.planning-unlocks.index')
-            ->with('success', 'Demande transmise à la Planification et à la DG.');
+            ->with('success', 'Demande transmise à la DG pour décision.');
     }
 
     /**
-     * Circuit V2 — étape planification : avis consultatif.
+     * Circuit V3 — etape controleur : avis SCIQ/Planification puis transmission DG.
      */
     public function reviewByPlanification(Request $request, PlanningUnlockRequest $planningUnlockRequest): RedirectResponse
     {
@@ -119,7 +130,7 @@ class PlanningUnlockWebController extends Controller
         }
 
         if (! $this->locks->canGivePlanifAvis($user)) {
-            abort(403, 'Seule la Planification peut émettre un avis.');
+            abort(403, 'Seuls les controleurs SCIQ/Planification peuvent transmettre cette demande.');
         }
 
         $validated = $request->validate([
@@ -130,11 +141,11 @@ class PlanningUnlockWebController extends Controller
         $before = $planningUnlockRequest->toArray();
         $this->locks->recordPlanifAvis($planningUnlockRequest, $user, (string) $validated['planif_avis'], $validated['planif_comment'] ?? null);
         $planningUnlockRequest->refresh();
-        $this->recordAudit($request, 'planning_unlock', 'planif_avis', $planningUnlockRequest, $before, $planningUnlockRequest->toArray());
+        $this->recordAudit($request, 'planning_unlock', 'controller_transfer', $planningUnlockRequest, $before, $planningUnlockRequest->toArray());
 
         return redirect()
             ->route('workspace.planning-unlocks.index')
-            ->with('success', 'Avis de la Planification enregistré. La DG va statuer.');
+            ->with('success', 'Avis du controleur enregistré. La demande est transmise à la DG.');
     }
 
     public function reviewByDg(Request $request, PlanningUnlockRequest $planningUnlockRequest): RedirectResponse
@@ -217,6 +228,6 @@ class PlanningUnlockWebController extends Controller
             $unlockRequest->toArray()
         );
 
-        return back()->with('success', 'Demande de modification transmise au directeur pour transfert à la Planification et la DG.');
+        return back()->with('success', 'Demande de modification transmise aux controleurs SCIQ/Planification.');
     }
 }

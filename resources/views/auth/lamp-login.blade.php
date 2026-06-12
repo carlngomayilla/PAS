@@ -101,11 +101,7 @@
                         class="login-input"
                         required
                     >
-                    <button type="button" class="login-pwd-show" onclick="
-                        var f=document.getElementById('loginPwd');
-                        f.type=f.type==='password'?'text':'password';
-                        this.textContent=f.type==='password'?'VOIR':'CACHER';
-                    ">VOIR</button>
+                    <button type="button" class="login-pwd-show" data-password-toggle="loginPwd">VOIR</button>
                 </div>
 
                 {{-- Options --}}
@@ -132,4 +128,21 @@
     </main>
 </div>
 </div>
+
+@push('scripts')
+    <script @cspNonce>
+        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var input = document.getElementById(button.dataset.passwordToggle);
+                if (! input) {
+                    return;
+                }
+
+                var isHidden = input.type === 'password';
+                input.type = isHidden ? 'text' : 'password';
+                button.textContent = isHidden ? 'CACHER' : 'VOIR';
+            });
+        });
+    </script>
+@endpush
 @endsection

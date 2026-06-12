@@ -73,6 +73,7 @@
 </head>
 
 @php
+    $routeName = request()->route()?->getName() ?? '';
     $layoutUser = auth()->user();
     $headerNotifications = collect();
     $headerUnreadCount = 0;
@@ -224,6 +225,22 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                             </svg>
                         </button>
+
+                        @unless (in_array($routeName, ['dashboard', 'workspace.index'], true))
+                            <button
+                                type="button"
+                                id="admin-back-button"
+                                class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#d8ecf8] bg-white px-3 py-1.5 text-sm font-semibold text-[#17324a] transition hover:border-[#3996d3] hover:bg-[#eef6fc] hover:text-[#3996d3]"
+                                data-fallback-url="{{ route('dashboard') }}"
+                                title="Retour à la page précédente"
+                                aria-label="Retour à la page précédente"
+                            >
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                </svg>
+                                <span class="hidden sm:inline">Retour</span>
+                            </button>
+                        @endunless
 
                         <div class="flex min-w-0 flex-1 items-center gap-3">
                             <div class="min-w-0 flex-1">

@@ -49,10 +49,10 @@ function bootDashboardRender(force = false) {
   const chartInstances = {};
   const compactFormatter = new Intl.NumberFormat('fr-FR', {
     notation: 'compact',
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 0,
   });
   const decimalFormatter = new Intl.NumberFormat('fr-FR', {
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 0,
   });
   const ANBG = {
     primary: '#1C203D',
@@ -243,16 +243,14 @@ function bootDashboardRender(force = false) {
     return label.length > limit ? `${label.slice(0, limit - 1)}...` : label;
   }
 
-  function formatNumber(value, digits = 1) {
+  function formatNumber(value, digits = 0) {
     const numeric = Number(value ?? 0);
 
     if (!Number.isFinite(numeric)) {
       return '0';
     }
 
-    return digits === 0
-      ? new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(numeric)
-      : decimalFormatter.format(numeric);
+    return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(numeric);
   }
 
   function formatCompact(value) {
@@ -1625,7 +1623,7 @@ function bootDashboardRender(force = false) {
       subLabelAccèssor: (row) => `${row.start} - ${row.end} | ${row.status}`,
       progressAccèssor: (row) => row.progress,
       colorAccèssor: (row) => gaugeColor(Number(row.progress || 0)),
-      rightLabelAccèssor: (row) => `S ${Number(row.score || 0).toFixed(1)}`,
+      rightLabelAccèssor: (row) => `S ${Number(row.score || 0).toFixed(0)}`,
       urlAccèssor: (row) => row.url,
       axisTicks: window.d3 ? window.d3.timeWeek.every(1) : null,
       tickFormat: window.d3 ? window.d3.timeFormat('%d %b') : null,

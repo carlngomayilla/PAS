@@ -552,7 +552,7 @@ class ActionTrackingWebController extends Controller
                 Action::FINANCEMENT_NON_FINANCE,
             ])],
             'commentaire_financement' => ['nullable', 'string'],
-            'montant_valide' => ['nullable', 'numeric', 'min:0'],
+            'montant_valide' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $before = $action->toArray();
@@ -564,7 +564,7 @@ class ActionTrackingWebController extends Controller
             'financement_daf_le' => now(),
             'financement_daf_decision' => $status,
             'financement_daf_commentaire' => $validated['commentaire_financement'] ?? $action->financement_daf_commentaire,
-            'financement_montant_valide' => $validated['montant_valide'] ?? $action->financement_montant_valide,
+            'financement_montant_valide' => isset($validated['montant_valide']) ? (int) $validated['montant_valide'] : $action->financement_montant_valide,
         ])->save();
 
         $this->recordAudit($request, 'action', 'update_financing_status_daf', $action, $before, $action->toArray());
@@ -815,7 +815,7 @@ class ActionTrackingWebController extends Controller
                 ActionTrackingService::FINANCEMENT_DECISION_COMPLEMENT,
                 ActionTrackingService::FINANCEMENT_DECISION_REJETER,
             ])],
-            'montant_valide' => ['required_if:decision_financement,'.ActionTrackingService::FINANCEMENT_DECISION_VALIDER, 'nullable', 'numeric', 'min:0'],
+            'montant_valide' => ['required_if:decision_financement,'.ActionTrackingService::FINANCEMENT_DECISION_VALIDER, 'nullable', 'integer', 'min:0'],
             'reference_financement' => ['nullable', 'string', 'max:255'],
             'commentaire_financement' => $commentRules,
             'justificatif_financement_daf' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
