@@ -575,7 +575,7 @@ class PtaWebController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'ok' => false,
-                'message' => 'Donnees invalides.',
+                'message' => $this->validationErrorMessage($e),
                 'errors' => $e->errors(),
             ], 422);
         }
@@ -608,6 +608,7 @@ class PtaWebController extends Controller
             // doublons aux saves suivants.
             $action->refresh();
             $subActionIds = $action->sousActions()->orderBy('id')->pluck('id')->all();
+            $lockMessageAfterSave = $lockService->ensureUnlocked($action, $user);
 
             return response()->json([
                 'ok' => true,
@@ -617,12 +618,14 @@ class PtaWebController extends Controller
                     'code' => $action->code,
                     'libelle' => $action->libelle,
                     'sous_action_ids' => $subActionIds,
+                    'locked' => $lockMessageAfterSave !== null,
+                    'lock_message' => $lockMessageAfterSave,
                 ],
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'ok' => false,
-                'message' => 'Donnees invalides.',
+                'message' => $this->validationErrorMessage($e),
                 'errors' => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
@@ -631,6 +634,20 @@ class PtaWebController extends Controller
                 'message' => 'Erreur serveur : '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    private function validationErrorMessage(\Illuminate\Validation\ValidationException $exception): string
+    {
+        foreach ($exception->errors() as $messages) {
+            foreach ((array) $messages as $message) {
+                $message = trim((string) $message);
+                if ($message !== '') {
+                    return $message;
+                }
+            }
+        }
+
+        return 'Donnees invalides.';
     }
 
     public function close(Request $request, Pta $pta, PlanningClosureReportService $closureReportService): RedirectResponse

@@ -98,11 +98,9 @@ class ActionStatusService
     }
 
     /**
-     * Regle metier ANBG : une action importee reste "A parametrer" tant que le
-     * chef de service ne l'a pas enregistree officiellement dans le PTA. Le flux
-     * d'import (PlanningExcelImportService) cree les lignes avec
-     * `statut_parametrage = 'a_parametrer'`; le passage a 'parametre' marque
-     * l'enregistrement officiel dans le plan (cf. PtaWebController::syncPtaActions).
+     * Regle metier ANBG : une action importee sans `type_action` reste "A
+     * parametrer". Une ligne importee avec `type_action` valide (Q, NQ ou M)
+     * est deja officielle et passe `statut_parametrage = parametre`.
      * Tant qu'elle est 'a_parametrer', l'action n'est ni "non demarree" ni
      * "en cours" : elle n'existe pas encore officiellement dans le PTA.
      */

@@ -61,8 +61,8 @@ class PlanningExcelImportService
     /**
      * Colonnes OPTIONNELLES de parametrage (workflow V2). Quand elles sont
      * presentes et que `type_action` est renseigne sur une ligne, l'action est
-     * importee deja PARAMETREE (statut_parametrage = 'parametre') au lieu de
-     * 'a_parametrer' : le chef de service n'a plus a la finir dans l'appli.
+     * consideree comme deja parametree et entre directement dans le suivi
+     * operationnel. Sans `type_action`, elle reste 'a_parametrer'.
      *
      * Format de `sous_actions` (cellule unique) : sous-actions separees par ';',
      * champs par '|' dans l'ordre  libelle|type|poids|cible|unite.
@@ -792,16 +792,16 @@ class PlanningExcelImportService
         }
 
         $stats = ['created' => 0, 'updated' => 0, 'skipped' => 0];
-        $parametreActionIds = [];
         $touchedPtaIds = [];
-        DB::transaction(function () use ($rows, $mode, $user, $ipAddress, &$stats, &$parametreActionIds, &$touchedPtaIds): void {
+        $parametreActionIds = [];
+        DB::transaction(function () use ($rows, $mode, $user, $ipAddress, &$stats, &$touchedPtaIds, &$parametreActionIds): void {
             foreach ($rows as $row) {
-                $this->persistRow($row['data'], $mode, $user, $ipAddress, $stats, $parametreActionIds, $touchedPtaIds);
+                $this->persistRow($row['data'], $mode, $user, $ipAddress, $stats, $touchedPtaIds, $parametreActionIds);
             }
         });
 
-        // Hors transaction : on bascule les PTA entierement parametres en cours,
-        // puis on notifie les RMO des actions devenues 'parametre' a l'import.
+        // Hors transaction : les PTA entierement parametres a l'import entrent
+        // directement dans le suivi, et les RMO sont notifies.
         $this->promoteFullyParametrePtas($touchedPtaIds);
         $this->notifyParametreActions($parametreActionIds, $user);
 
@@ -818,10 +818,10 @@ class PlanningExcelImportService
 
     /**
      * @param array<string,mixed> $stats
-     * @param list<int> $parametreActionIds
      * @param list<int> $touchedPtaIds
+     * @param list<int> $parametreActionIds
      */
-    private function persistRow(array $row, string $mode, User $user, ?string $ipAddress, array &$stats, array &$parametreActionIds = [], array &$touchedPtaIds = []): void
+    private function persistRow(array $row, string $mode, User $user, ?string $ipAddress, array &$stats, array &$touchedPtaIds = [], array &$parametreActionIds = []): void
     {
         $year = (int) $row['annee_debut_pas'];
         $endYear = (int) $row['annee_fin_pas'];
@@ -911,11 +911,9 @@ class PlanningExcelImportService
                 'objectif_operationnel_id' => $operational->id,
                 'direction_id' => $direction->id,
                 'titre' => 'PTA - '.($service->code ?: $service->libelle),
-                // STATUS_BROUILLON (regle metier ANBG 2026-05-29) : le PTA n'est PAS
-                // considere comme "enregistre" tant que ses actions ne sont pas
-                // parametrees une par une par le chef de service. Le passage a
-                // STATUS_EN_COURS se fait automatiquement quand toutes les actions
-                // ont statut_parametrage = 'parametre'.
+                // STATUS_BROUILLON : le PTA passe automatiquement en EN_COURS
+                // quand toutes ses actions sont deja parametrees, y compris via
+                // l'import Excel complet (type_action renseigne).
                 'statut' => Pta::STATUS_BROUILLON,
             ]
         );
@@ -950,6 +948,7 @@ class PlanningExcelImportService
             ->values();
         $primaryRmo = $rmos->first();
         $financingRequired = (string) $row['financement'] === '1';
+        $hasParametrage = $this->normalizeImportActionType($row['type_action'] ?? '') !== '';
         $payload = [
             'code' => $this->codes->action($service, $year, $operationalOrder, $actionOrder),
             'exercice_id' => $exercise->id,
@@ -958,7 +957,9 @@ class PlanningExcelImportService
             'objectif_operationnel_id' => $operational->id,
             'ordre_import' => $actionOrder,
             'nombre_sous_actions_prevu' => (int) $row['nombre_sous_actions'],
-            'statut_parametrage' => 'a_parametrer',
+            'statut_parametrage' => $hasParametrage
+                ? 'parametre'
+                : ($action instanceof Action ? (string) ($action->statut_parametrage ?: 'a_parametrer') : 'a_parametrer'),
             'libelle' => $row['libelle_action'],
             'date_debut' => $this->parseDate($row['date_debut_action'])?->toDateString(),
             'date_fin' => $this->parseDate($row['date_fin_action'])?->toDateString(),
@@ -983,39 +984,42 @@ class PlanningExcelImportService
             'ressources_details' => collect([$row['ressources_materielles'] ?? null, $row['main_oeuvre'] ?? null, $row['autres_ressources'] ?? null])->filter()->implode("\n"),
         ];
 
-        // Workflow V2 : si `type_action` est renseigne, la ligne est importee deja
-        // parametree (champs de cible/seuil/risque/suivi remplis) et passera
-        // 'parametre' au lieu de 'a_parametrer'. Cellule vide → comportement actuel.
-        $isParametre = $this->normalizeImportActionType($row['type_action'] ?? '') !== '';
-        if ($isParametre) {
+        // Workflow V2 : si `type_action` est renseigne et valide, l'action est
+        // deja parametree a l'import et n'a plus besoin d'etre enregistree par le chef.
+        if ($hasParametrage) {
             $payload = array_merge($payload, $this->parametragePayload($row));
         }
 
         if ($action instanceof Action) {
             $before = $action->getAttributes();
-            $wasUnparametre = (string) ($before['statut_parametrage'] ?? '') === 'a_parametrer';
+            $wasParametre = (string) ($before['statut_parametrage'] ?? '') === 'parametre';
             $action->fill($payload)->save();
-            // Action volontairement NON verrouillee : le chef de service doit pouvoir
-            // la parametrer (statut_parametrage = 'a_parametrer' tant qu'elle est incomplete).
+            if ($hasParametrage) {
+                $action->forceFill([
+                    'statut' => ActionTrackingService::STATUS_EN_COURS,
+                    'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+                    'statut_validation' => $action->statut_validation ?: ActionTrackingService::VALIDATION_NON_SOUMISE,
+                ])->save();
+                if (! $wasParametre) {
+                    $parametreActionIds[] = (int) $action->id;
+                }
+            }
             $stats['updated']++;
             $this->audit($user, 'update', $action, $before, $action->getAttributes(), $ipAddress);
-            // Notifie le RMO uniquement a la PREMIERE bascule vers 'parametre'.
-            if ($isParametre && $wasUnparametre) {
-                $parametreActionIds[] = (int) $action->id;
-            }
         } else {
             $action = Action::query()->create($payload);
+            $initialStatus = $hasParametrage
+                ? ActionTrackingService::STATUS_EN_COURS
+                : ActionTrackingService::STATUS_NON_DEMARRE;
             $action->forceFill([
-                'statut' => ActionTrackingService::STATUS_NON_DEMARRE,
-                'statut_dynamique' => ActionTrackingService::STATUS_NON_DEMARRE,
+                'statut' => $initialStatus,
+                'statut_dynamique' => $initialStatus,
                 'statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE,
                 'financement_statut' => $financingRequired ? Action::FINANCEMENT_PRE_SIGNALE_DAF : Action::FINANCEMENT_NON_REQUIS,
             ])->save();
-            // Action volontairement NON verrouillee a la creation : le chef de service
-            // la verrouillera apres parametrage complet, action par action.
             $stats['created']++;
             $this->audit($user, 'create', $action, null, $action->getAttributes(), $ipAddress);
-            if ($isParametre) {
+            if ($hasParametrage) {
                 $parametreActionIds[] = (int) $action->id;
             }
         }
@@ -1028,8 +1032,8 @@ class PlanningExcelImportService
             $action->responsables()->sync($sync);
         }
 
-        // Sous-actions planifiees (action composee parametree depuis l'import).
-        if ($isParametre && $this->normalizeImportActionType($row['type_action'] ?? '') === Action::TYPE_COMPOSEE) {
+        // Sous-actions planifiees pour pre-remplir le formulaire PTA.
+        if ($hasParametrage && $this->normalizeImportActionType($row['type_action'] ?? '') === Action::TYPE_COMPOSEE) {
             $this->persistImportedSubActions($action, $row, $primaryRmo);
         }
     }
@@ -1129,6 +1133,25 @@ class PlanningExcelImportService
     }
 
     /**
+     * @param list<int> $actionIds
+     */
+    private function notifyParametreActions(array $actionIds, User $user): void
+    {
+        $ids = collect($actionIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return;
+        }
+
+        NotifyImportedParametreActionsJob::dispatch($ids, (int) $user->id);
+    }
+
+    /**
      * Bascule en EN_COURS les PTA en brouillon dont plus aucune action n'est
      * 'a_parametrer'. Mirroir de PtaWebController::maybePromoteBrouillonToEnCours.
      *
@@ -1150,22 +1173,6 @@ class PlanningExcelImportService
                 $pta->forceFill(['statut' => Pta::STATUS_EN_COURS])->save();
             }
         }
-    }
-
-    /**
-     * Planifie les notifications RMO hors requete web. Sur les gros imports,
-     * l'envoi synchrone peut depasser le timeout PHP.
-     *
-     * @param list<int> $actionIds
-     */
-    private function notifyParametreActions(array $actionIds, User $actor): void
-    {
-        $ids = array_values(array_unique(array_map('intval', $actionIds)));
-        if ($ids === []) {
-            return;
-        }
-
-        NotifyImportedParametreActionsJob::dispatch($ids, (int) $actor->id);
     }
 
     private function normalizeRow(array $row): array

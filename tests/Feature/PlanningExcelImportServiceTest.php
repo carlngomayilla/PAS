@@ -11,6 +11,7 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Models\SousAction;
+use App\Services\Actions\ActionTrackingService;
 use App\Services\DeletionRequestService;
 use App\Services\Imports\PlanningExcelImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -351,7 +352,7 @@ class PlanningExcelImportServiceTest extends TestCase
             ->assertSee('Sous-action 2');
     }
 
-    public function test_quantitative_parametrage_columns_import_a_configured_action(): void
+    public function test_quantitative_parametrage_columns_import_ready_action_as_in_progress(): void
     {
         $fixture = $this->fixture();
         $this->muteNotifications();
@@ -376,6 +377,8 @@ class PlanningExcelImportServiceTest extends TestCase
 
         $this->assertDatabaseHas('actions', [
             'libelle' => 'Action quantitative',
+            'statut' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
             'statut_parametrage' => 'parametre',
             'mode_evaluation' => Action::MODE_QUANTITATIF,
             'type_action' => Action::TYPE_QUANTITATIVE,
@@ -386,7 +389,7 @@ class PlanningExcelImportServiceTest extends TestCase
         $this->assertSame('dossiers', $action->unite_cible);
         $this->assertSame(100.0, (float) $action->seuil_t4);
 
-        // PTA sans action restante a parametrer → bascule automatique en cours.
+        // Toutes les actions du PTA sont deja parametrees par l'import.
         $this->assertDatabaseHas('ptas', ['statut' => Pta::STATUS_EN_COURS]);
     }
 
@@ -410,7 +413,9 @@ class PlanningExcelImportServiceTest extends TestCase
 
         $action = Action::query()->where('libelle', 'Action composee')->firstOrFail();
         $this->assertSame('parametre', $action->statut_parametrage);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
         $this->assertSame(Action::TYPE_COMPOSEE, $action->type_action);
+        $this->assertDatabaseHas('ptas', ['statut' => Pta::STATUS_EN_COURS]);
         $this->assertDatabaseCount('sous_actions', 2);
         $this->assertDatabaseHas('sous_actions', [
             'action_id' => $action->id,
@@ -484,7 +489,7 @@ class PlanningExcelImportServiceTest extends TestCase
         ]);
     }
 
-    public function test_complete_import_queues_assigned_rmo_notifications(): void
+    public function test_typed_import_queues_assigned_rmo_notifications_without_pta_save(): void
     {
         $fixture = $this->fixture();
         Bus::fake([NotifyImportedParametreActionsJob::class]);
@@ -497,10 +502,48 @@ class PlanningExcelImportServiceTest extends TestCase
         $this->executePreview($service, $fixture['admin'], $preview);
 
         $action = Action::query()->where('libelle', 'Action importee')->firstOrFail();
-        Bus::assertDispatched(NotifyImportedParametreActionsJob::class, fn (NotifyImportedParametreActionsJob $job): bool =>
-            $job->actorId === (int) $fixture['admin']->id
-            && $job->actionIds === [(int) $action->id]
+        Bus::assertDispatched(
+            NotifyImportedParametreActionsJob::class,
+            fn (NotifyImportedParametreActionsJob $job): bool => $job->actionIds === [$action->id]
         );
+    }
+
+    public function test_imported_action_assigned_to_current_profile_is_counted_in_dashboard_cards(): void
+    {
+        $fixture = $this->fixture();
+        $serviceUser = User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+            'agent_matricule' => 'CHF001',
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+            'is_active' => true,
+        ]);
+
+        $service = app(PlanningExcelImportService::class);
+        $preview = $service->validateSheet($this->sheet([
+            $this->row([
+                'codes_agents_rmo' => 'CHF001',
+                'type_action' => 'Q',
+                'quantite_cible' => 25,
+                'unite_cible' => 'dossiers',
+            ]),
+        ]));
+
+        $this->assertFalse($preview['has_errors']);
+        $this->executePreview($service, $fixture['admin'], $preview);
+
+        $content = $this->actingAs($serviceUser)
+            ->get('/dashboard?dashboardTab=charts')
+            ->assertOk()
+            ->getContent();
+
+        $payload = $this->dashboardPayloadFrom($content);
+        $dashboardData = $payload['dashboardData'] ?? [];
+        $statusCards = collect($dashboardData['status_cards'] ?? []);
+
+        $this->assertSame(1, (int) ($dashboardData['decision_counts']['actions_total'] ?? 0));
+        $this->assertSame(1, (int) ($statusCards->firstWhere('key', 'en_cours')['count'] ?? 0));
+        $this->assertSame(0, (int) ($statusCards->firstWhere('key', 'a_parametrer')['count'] ?? 0));
     }
 
     private function muteNotifications(): void
@@ -521,6 +564,18 @@ class PlanningExcelImportServiceTest extends TestCase
         ]);
 
         return $service->execute($import, PlanningImport::MODE_CREATE_ONLY, $admin, '127.0.0.1');
+    }
+
+    private function dashboardPayloadFrom(string $html): array
+    {
+        $this->assertMatchesRegularExpression(
+            '/<script[^>]+id="anbg-dashboard-payload"[^>]*>(.*?)<\/script>/s',
+            $html
+        );
+
+        preg_match('/<script[^>]+id="anbg-dashboard-payload"[^>]*>(.*?)<\/script>/s', $html, $matches);
+
+        return json_decode(trim((string) ($matches[1] ?? '')), true, 512, JSON_THROW_ON_ERROR);
     }
 
     private function fixture(): array

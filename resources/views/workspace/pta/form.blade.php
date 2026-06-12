@@ -1012,6 +1012,56 @@
                     if (! isError) setTimeout(function () { div.remove(); }, 4000);
                 }
 
+                function flattenValidationMessages(errors) {
+                    if (!errors || typeof errors !== 'object') return [];
+                    var messages = [];
+                    Object.keys(errors).forEach(function (key) {
+                        var value = errors[key];
+                        var list = Array.isArray(value) ? value : [value];
+                        list.forEach(function (message) {
+                            message = (message || '').toString().trim();
+                            if (message && messages.indexOf(message) === -1) {
+                                messages.push(message);
+                            }
+                        });
+                    });
+                    return messages;
+                }
+
+                function freezeActionBlockAfterSave(block, action) {
+                    if (!block || !action || !action.locked) return;
+
+                    block.classList.add('is-frozen');
+                    block.setAttribute('data-action-frozen', '1');
+
+                    var fieldset = block.querySelector('fieldset');
+                    if (fieldset) {
+                        fieldset.disabled = true;
+                        fieldset.classList.add('pta-action-fieldset-frozen', 'opacity-70');
+                    }
+
+                    var blockIndex = block.getAttribute('data-action-index');
+                    var actionIdInput = block.querySelector('input[name="actions[' + blockIndex + '][id]"]');
+                    if (actionIdInput) actionIdInput.disabled = true;
+
+                    var saveButton = block.querySelector('[data-save-action]');
+                    if (saveButton) {
+                        saveButton.removeAttribute('data-save-action');
+                        saveButton.setAttribute('data-request-modification', '');
+                        saveButton.classList.remove('btn-success');
+                        saveButton.classList.add('btn-warning');
+                        saveButton.textContent = 'Demande de modification';
+                        saveButton.title = "Demander aux contrôleurs l'autorisation de modifier cette action";
+                    }
+
+                    var removeButton = block.querySelector('[data-remove-action]');
+                    if (removeButton) removeButton.classList.add('hidden');
+
+                    if (action.lock_message) {
+                        flashActionMessage(block, false, action.lock_message);
+                    }
+                }
+
                 function collectActionPayload(block) {
                     var index = block.getAttribute('data-action-index');
                     var prefix = 'actions[' + index + ']';
@@ -1219,10 +1269,16 @@
                                     if (actionLabelInput) actionLabelInput.value = result.data.action.libelle;
                                 }
                                 syncActionHeading(blockSave);
+                                if (result.data.action && result.data.action.locked) {
+                                    freezeActionBlockAfterSave(blockSave, result.data.action);
+                                }
                             } else {
                                 var msg = (result.data && result.data.message) || 'Erreur lors de la sauvegarde.';
                                 if (result.data && result.data.errors) {
-                                    msg += ' Champs : ' + Object.keys(result.data.errors).join(', ');
+                                    var details = flattenValidationMessages(result.data.errors);
+                                    if (details.length && msg.indexOf(details[0]) === -1) {
+                                        msg += ' ' + details.slice(0, 3).join(' ');
+                                    }
                                 }
                                 flashActionMessage(blockSave, true, msg);
                             }

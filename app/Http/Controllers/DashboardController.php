@@ -213,7 +213,7 @@ class DashboardController extends Controller
             ->whereNotNull('kpis.seuil_alerte')
             ->whereColumn('kpi_mesures.valeur', '<', 'kpis.seuil_alerte');
         $this->scopeJoinedPta($kpiSousSeuilQuery, $user, 'ptas.direction_id', 'ptas.service_id');
-        $this->applyDashboardActionContextFilter($kpiSousSeuilQuery, $user, 'actions.responsable_id', 'actions.contexte_action');
+        $this->applyDashboardActionContextFilter($kpiSousSeuilQuery, $user, 'actions.contexte_action');
 
         $alerts = [
             'actions_en_retard' => $actionsRetard,
@@ -968,17 +968,12 @@ class DashboardController extends Controller
     private function isPilotageDashboardAction(Action $action, User $user): bool
     {
         $context = (string) ($action->contexte_action ?: Action::CONTEXT_PILOTAGE);
-        if ($context !== Action::CONTEXT_PILOTAGE) {
-            return false;
-        }
-
-        return (int) ($action->responsable_id ?? 0) !== (int) $user->id;
+        return $context === Action::CONTEXT_PILOTAGE;
     }
 
     private function applyDashboardActionContextFilter(
         Builder $query,
         User $user,
-        string $responsableColumn,
         string $contextColumn
     ): void {
         if ($user->isAgent()) {
@@ -990,10 +985,6 @@ class DashboardController extends Controller
                 ->orWhere($contextColumn, Action::CONTEXT_PILOTAGE);
         });
 
-        $query->where(function (Builder $responsableQuery) use ($responsableColumn, $user): void {
-            $responsableQuery->whereNull($responsableColumn)
-                ->orWhere($responsableColumn, '!=', (int) $user->id);
-        });
     }
 
     /**

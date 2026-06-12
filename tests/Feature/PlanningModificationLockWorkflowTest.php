@@ -87,6 +87,53 @@ class PlanningModificationLockWorkflowTest extends TestCase
         $this->assertNotNull($pta->modification_locked_at, 'Le verrou est ressanctuarise apres save.');
     }
 
+    public function test_pta_update_ignores_read_only_action_stub_from_frozen_form(): void
+    {
+        $fixture = $this->fixture();
+        $pta = $fixture['pta'];
+        $action = $fixture['action'];
+
+        $this->actingAs($fixture['serviceUser'])
+            ->put(route('workspace.pta.update', $pta), [
+                'objectif_operationnel_id' => $fixture['operational']->id,
+                'actions' => [
+                    ['id' => $action->id],
+                ],
+            ])
+            ->assertRedirect(route('workspace.pta.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('Action verrou', $action->fresh()->libelle);
+    }
+
+    public function test_inline_action_save_returns_explicit_lock_message(): void
+    {
+        $fixture = $this->fixture();
+        $pta = $fixture['pta'];
+        $action = $fixture['action'];
+
+        $response = $this->actingAs($fixture['serviceUser'])
+            ->postJson(route('workspace.pta.actions.upsert-inline', $pta), [
+                'id' => $action->id,
+                'libelle' => 'Action verrou modifiee',
+                'date_debut' => '2026-01-01',
+                'date_fin' => '2026-06-30',
+                'type_action' => Action::TYPE_QUANTITATIVE,
+                'mode_evaluation' => Action::MODE_QUANTITATIF,
+                'quantite_cible' => 10,
+                'unite_cible' => 'dossiers',
+                'rmo_ids' => [$fixture['agent']->id],
+                'financement_requis' => false,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('ok', false);
+
+        $payload = $response->json();
+        $this->assertStringContainsString('Action verrouille apres enregistrement', (string) ($payload['message'] ?? ''));
+        $this->assertArrayHasKey('actions', $payload['errors'] ?? []);
+        $this->assertSame('Action verrou', $action->fresh()->libelle);
+    }
+
     public function test_chef_service_cannot_modify_locked_action_without_unlock_circuit(): void
     {
         // RÈGLE V2 (2026-05-31) : une ACTION verrouillée n'est PLUS modifiable

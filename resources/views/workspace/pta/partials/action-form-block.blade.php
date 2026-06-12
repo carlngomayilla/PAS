@@ -139,8 +139,8 @@
     </summary>
 <div class="pta-action-body border-t border-[#d8ecf8] p-4">
 
-    {{-- Hidden input id : reste actif (hors fieldset disabled) pour etre soumis. --}}
-    <input type="hidden" name="actions[{{ $index }}][id]" value="{{ $rowData['id'] ?? '' }}">
+    {{-- Hidden input id : soumis uniquement quand le bloc est editable. --}}
+    <input type="hidden" name="actions[{{ $index }}][id]" value="{{ $rowData['id'] ?? '' }}" @disabled($isFrozen)>
 
     @if ($isFrozen)
         <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">

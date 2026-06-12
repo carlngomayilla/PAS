@@ -54,9 +54,9 @@ class UpdatePtaRequest extends FormRequest
             ];
         }
 
-        $actions = $this->normalizeActionsInput((array) $this->input('actions', []));
-        if ($actions !== []) {
-            $merge['actions'] = $actions;
+        if ($this->has('actions')) {
+            $actions = $this->normalizeActionsInput((array) $this->input('actions', []));
+            $merge['actions'] = $actions !== [] ? $actions : null;
         }
 
         if ($merge !== []) {
@@ -440,6 +440,7 @@ class UpdatePtaRequest extends FormRequest
     {
         return collect($actions)
             ->filter(fn ($action): bool => is_array($action))
+            ->reject(fn (array $action): bool => $this->isExistingActionStub($action))
             ->map(function (array $action): array {
                 $rmoInput = $action['rmo_ids'] ?? $action['rmos'] ?? [];
                 $rmoIds = collect(is_array($rmoInput) ? $rmoInput : [$rmoInput])
@@ -542,5 +543,27 @@ class UpdatePtaRequest extends FormRequest
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * Les actions verrouillees sont affichees en lecture seule. Dans certains
+     * navigateurs/anciens rendus, seul leur id cache peut encore etre soumis :
+     * on l'ignore pour ne pas valider une action incomplete.
+     *
+     * @param array<string, mixed> $action
+     */
+    private function isExistingActionStub(array $action): bool
+    {
+        if (! is_numeric($action['id'] ?? null) || (int) $action['id'] <= 0) {
+            return false;
+        }
+
+        $hasTitle = trim((string) ($action['libelle'] ?? '')) !== '';
+        $hasStartDate = trim((string) ($action['date_debut'] ?? '')) !== '';
+        $rmoInput = $action['rmo_ids'] ?? $action['rmos'] ?? [];
+        $hasRmo = collect(is_array($rmoInput) ? $rmoInput : [$rmoInput])
+            ->contains(fn ($id): bool => is_numeric($id) && (int) $id > 0);
+
+        return ! $hasTitle && ! $hasStartDate && ! $hasRmo;
     }
 }
