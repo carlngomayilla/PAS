@@ -68,7 +68,6 @@ class UserWorkspaceService
         $canManageRetention = $user->hasPermission('retention.manage');
         $canManageDelegations = $user->hasPermission('delegations.manage');
         $canReadReporting = ($canReadPlanning || $isAgent) && $user->hasPermission('reporting.read');
-        $canReadAlerts = $canReadPlanning && $user->hasPermission('alerts.read');
         $isTechnicalAdmin = in_array($matrixRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL], true);
         // Admin fonctionnel et SCIQ suivi global ont un rôle proche de Planification
         // pour la gestion des référentiels métier.
@@ -170,16 +169,6 @@ class UserWorkspaceService
             ];
         }
 
-        if ($canReadAlerts) {
-            $modules[] = [
-                'code' => 'alertes',
-                'label' => 'Alertes',
-                'description' => 'Centre des alertes et écarts de suivi',
-                'endpoint' => '/workspace/notifications?tab=alertes',
-                'can_write' => false,
-                'actions' => ['Consulter', 'Marquer comme lu'],
-            ];
-        }
 
         if ($matrixRole === User::ROLE_SUPER_ADMIN) {
             $modules[] = [
@@ -431,7 +420,6 @@ class UserWorkspaceService
                 $m('financements_critiques', 'Financements critiques', '/workspace/daf/financements-actions'),
                 // 'rapports_consolides' → reporting global avec exports.
                 $m('rapports_consolides', 'Rapports consolidés', '/workspace/reporting'),
-                $m('alertes', 'Alertes critiques', '/workspace/notifications?tab=alertes'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),
             ],
 
@@ -443,7 +431,6 @@ class UserWorkspaceService
                 $m('supervision', 'Supervision', '/workspace/reporting'),
                 $m('rapports_consolides', 'Rapports', '/workspace/reporting'),
                 $m('execution', 'Action', '/workspace/actions?vue=mes_actions'),
-                $m('alertes', 'Alertes importantes', '/workspace/notifications?tab=alertes'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),
             ],
 
@@ -501,7 +488,7 @@ class UserWorkspaceService
                 User::ROLE_CHEF_UNITE_SCIQ
             ),
             'reporting', 'rapports_consolides' => $user->hasPermission('reporting.read'),
-            'alertes', 'financements_critiques' => $user->hasPermission('alerts.read'),
+            'financements_critiques' => $user->hasPermission('alerts.read'),
             'audit' => $user->hasPermission('audit.read'),
             'referentiel', 'roles_permissions', 'organisation' => $user->hasAnyPermission(
                 'referentiel.read',

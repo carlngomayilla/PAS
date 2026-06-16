@@ -70,7 +70,7 @@
         ['label' => 'Périmètres PAS', 'value' => $reportingGlobal['pas_total'] ?? 0, 'tone' => 'navy', 'meta' => 'Stratégie couverte', 'href' => route('workspace.pas.index'), 'badge' => null, 'badge_tone' => 'info'],
         ['label' => 'Mesures d\'indicateur', 'value' => $reportingGlobal['kpi_mesures_total'] ?? 0, 'tone' => 'blue', 'meta' => 'Mesures suivies', 'href' => route('workspace.reporting'), 'badge' => null, 'badge_tone' => 'warning'],
         ['label' => 'Alertes retard', 'value' => $reportingAlerts['actions_en_retard'] ?? 0, 'tone' => 'amber', 'meta' => 'Suivi à traiter', 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => null, 'badge_tone' => 'danger'],
-        ['label' => 'Indicateurs sous seuil', 'value' => $reportingAlerts['mesures_kpi_sous_seuil'] ?? 0, 'tone' => 'green', 'meta' => 'Mesures critiques', 'href' => route('workspace.alertes', ['niveau' => 'warning', 'limit' => 100]), 'badge' => null, 'badge_tone' => 'success'],
+        ['label' => 'Indicateurs sous seuil', 'value' => $reportingAlerts['mesures_kpi_sous_seuil'] ?? 0, 'tone' => 'green', 'meta' => 'Mesures critiques', 'href' => route('workspace.notifications.index', ['tab' => 'alertes', 'niveau' => 'warning', 'limit' => 100]), 'badge' => null, 'badge_tone' => 'success'],
     ];
     $statusCards = collect($reportingStatuses)
         ->map(function (array $rows, string $module): array {

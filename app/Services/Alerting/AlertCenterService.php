@@ -734,7 +734,7 @@ class AlertCenterService
             ] : null,
             'metrics' => $this->actionMetrics($action),
             'section_label' => 'Indicateurs et performance',
-            'target_url' => $action instanceof Action ? route('workspace.actions.suivi', $action).'#action-status' : route('workspace.alertes'),
+            'target_url' => $action instanceof Action ? route('workspace.actions.suivi', $action).'#action-status' : route('workspace.notifications.index', ['tab' => 'alertes']),
             'fingerprint' => 'kpi_breach:'.$mesure->id.':'.number_format($value, 4, '.', ''),
         ];
     }
@@ -755,7 +755,7 @@ class AlertCenterService
                 $isManualAnomaly => '#action-controle',
                 default => '#action-logs',
             }
-            : route('workspace.alertes');
+            : route('workspace.notifications.index', ['tab' => 'alertes']);
 
         return [
             'source_type' => 'action_log',

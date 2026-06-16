@@ -27,11 +27,14 @@ class PlanningControlChiefUserManagementTest extends TestCase
             'password_changed_at' => now(),
         ]);
         $agent = User::factory()->create([
+            'name' => 'Agent Visible',
             'role' => User::ROLE_AGENT,
             'is_agent' => true,
             'email' => 'agent-visible@example.test',
             'direction_id' => $direction->id,
             'service_id' => $service->id,
+            'agent_matricule' => 'AG-777',
+            'agent_fonction' => 'Responsable suivi',
             'is_active' => true,
             'password_changed_at' => now(),
         ]);
@@ -46,7 +49,16 @@ class PlanningControlChiefUserManagementTest extends TestCase
         $this->actingAs($actor)
             ->get(route('workspace.referentiel.utilisateurs.index'))
             ->assertOk()
+            ->assertSee('Nom complet')
+            ->assertSee('Adresse email')
+            ->assertSee('Fonction')
+            ->assertSee('Matricule')
+            ->assertSee('Portée')
+            ->assertSee('Agent Visible')
             ->assertSee($agent->email)
+            ->assertSee('Responsable suivi')
+            ->assertSee('AG-777')
+            ->assertSee('Portée direction et service (agent)')
             ->assertDontSee($dgUser->email);
 
         $this->actingAs($actor)

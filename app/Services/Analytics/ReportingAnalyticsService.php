@@ -92,6 +92,7 @@ class ReportingAnalyticsService
     {
         $today = Carbon::today()->toDateString();
         $pas = $this->buildPasScopedQuery($user);
+        $this->applyPasReportingFilters($pas, $user);
 
         $paos = Pao::query();
         $ptas = Pta::query();
@@ -537,6 +538,33 @@ class ReportingAnalyticsService
         });
     }
 
+    private function applyPasReportingFilters(Builder $pasQuery, User $user): void
+    {
+        $filters = $this->currentReportingFilters();
+        $directionId = (int) ($filters['direction_id'] ?? 0);
+        $serviceId = (int) ($filters['service_id'] ?? 0);
+
+        if ($directionId > 0 && $this->canReadDirection($user, $directionId)) {
+            $pasQuery->where(function (Builder $query) use ($directionId): void {
+                $query
+                    ->whereHas('directions', fn (Builder $directionQuery) => $directionQuery->whereKey($directionId))
+                    ->orWhereHas('paos', fn (Builder $paoQuery) => $paoQuery->where('direction_id', $directionId));
+            });
+        }
+
+        if ($serviceId > 0) {
+            $service = Service::query()->find($serviceId);
+            if ($service instanceof Service && $this->canReadService($user, (int) $service->direction_id, (int) $service->id)) {
+                $pasQuery->whereHas('paos', function (Builder $paoQuery) use ($serviceId): void {
+                    $paoQuery
+                        ->where('service_id', $serviceId)
+                        ->orWhereHas('ptas', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId))
+                        ->orWhereHas('objectifsOperationnels', fn (Builder $objectiveQuery) => $objectiveQuery->where('service_id', $serviceId));
+                });
+            }
+        }
+    }
+
     private function applyReportingFilters(
         Builder $paos,
         Builder $ptas,
@@ -828,6 +856,7 @@ class ReportingAnalyticsService
             'rmo' => $responsables,
             'mode_execution' => (string) $action->mode_evaluation_label,
             'cible' => $this->reportActionTargetLabel($action) ?: '-',
+            'ratio' => $this->reportActionRatioLabel($action),
             'kpi' => $this->reportActionKpiLabel($action),
             'prevu' => $this->reportActionPlannedLabel($action),
             'realise' => $this->reportActionActualLabel($action),
@@ -842,12 +871,15 @@ class ReportingAnalyticsService
             'kpi_conformite' => number_format($kpiConformite, 0, '.', ''),
             'progression_value' => $progression,
             'kpi_global_value' => $kpiGlobal,
+            'performance_cible_value' => $kpiGlobal > 0.0 ? $kpiGlobal : $progression,
+            'ecart_value' => max(0.0, 100.0 - ($kpiGlobal > 0.0 ? $kpiGlobal : $progression)),
             'kpi_delai_value' => (float) ($action->actionKpi?->kpi_delai ?? 0),
             'kpi_performance_value' => (float) ($action->actionKpi?->kpi_performance ?? 0),
             'kpi_conformite_value' => $kpiConformite,
             'ressources_requises' => $this->reportActionResourcesLabel($action),
             'justificatif' => $this->reportActionJustificatifLabel($justificatifs),
             'justificatifs' => $justificatifs,
+            'observations' => $this->reportActionObservationLabel($action, $justificatifs),
             'financement_requis' => (bool) $action->financement_requis,
             'financement_nature' => (string) ($action->nature_financement ?: $action->description_financement ?: '-'),
             'financement_montant' => (float) ($action->montant_estime ?? 0),
@@ -985,6 +1017,56 @@ class ReportingAnalyticsService
         }
 
         return implode(' | ', $parts);
+    }
+
+    private function reportActionRatioLabel(Action $action): string
+    {
+        $target = $action->quantite_cible !== null ? (float) $action->quantite_cible : null;
+        $actual = $action->quantite_realisee !== null ? (float) $action->quantite_realisee : null;
+
+        if ($target !== null && $target > 0 && $actual !== null) {
+            return number_format($actual, 0, '.', '').'/'.number_format($target, 0, '.', '');
+        }
+
+        if ($target !== null && $target > 0) {
+            return '0/'.number_format($target, 0, '.', '');
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<int, array<string, string>> $justificatifs
+     */
+    private function reportActionObservationLabel(Action $action, array $justificatifs): string
+    {
+        $parts = [];
+
+        foreach ([
+            $action->observations ?? null,
+            $action->criteres_validation ?? null,
+            $action->rapport_final ?? null,
+            $action->observation_financement ?? null,
+            $action->commentaire_financement ?? null,
+        ] as $value) {
+            $text = trim((string) $value);
+            if ($text !== '') {
+                $parts[] = $text;
+            }
+        }
+
+        foreach ($justificatifs as $justificatif) {
+            $description = trim((string) ($justificatif['description'] ?? ''));
+            if ($description !== '') {
+                $parts[] = $description;
+            }
+        }
+
+        return collect($parts)
+            ->filter()
+            ->unique()
+            ->take(5)
+            ->implode("\n");
     }
 
     private function reportActionTargetLabel(Action $action): string
@@ -1485,19 +1567,26 @@ class ReportingAnalyticsService
         $todayDate = $today->toDateString();
         $completedStatuses = $this->completedActionStatuses();
 
-        $pasCount = $this->buildPasScopedQuery($user)->count();
+        $pasQuery = $this->buildPasScopedQuery($user);
+        $this->applyPasReportingFilters($pasQuery, $user);
 
         $paoQuery = Pao::query();
         $ptaQuery = Pta::query();
         $actionQuery = Action::query();
+        $mesureQuery = KpiMesure::query();
+        $objectifQuery = PaoObjectifOperationnel::query();
         $this->scopePao($paoQuery, $user);
         $this->scopePta($ptaQuery, $user);
         $this->scopeAction($actionQuery, $user);
+        $this->scopeMesure($mesureQuery, $user);
+        $this->scopeObjectifOperationnel($objectifQuery, $user);
+        $this->applyReportingFilters($paoQuery, $ptaQuery, $actionQuery, $mesureQuery, $objectifQuery, $user);
+        $filteredActionIds = (clone $actionQuery)->select('actions.id');
 
         $funnel = [
             'labels' => ['PAS', 'PAO', 'PTA', 'Actions'],
             'values' => [
-                (int) $pasCount,
+                (int) (clone $pasQuery)->count(),
                 (int) (clone $paoQuery)->count(),
                 (int) (clone $ptaQuery)->count(),
                 (int) (clone $actionQuery)->count(),
@@ -1561,6 +1650,7 @@ class ReportingAnalyticsService
         $statusRows = Action::query()
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
             ->selectRaw("{$unitColumn} as unit_id, {$bucketExpr} as status_bucket, COUNT(*) as total")
+            ->whereIn('actions.id', (clone $filteredActionIds))
             ->groupByRaw("{$unitColumn}, {$bucketExpr}");
         $this->scopeJoinedPta($statusRows, $user, 'ptas.direction_id', 'ptas.service_id');
 
@@ -1641,6 +1731,7 @@ class ReportingAnalyticsService
             ->select(['action_weeks.date_debut', 'action_weeks.progression_reelle', 'action_weeks.progression_theorique'])
             ->join('actions', 'actions.id', '=', 'action_weeks.action_id')
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
+            ->whereIn('actions.id', (clone $filteredActionIds))
             ->whereNotNull('action_weeks.date_debut')
             ->orderBy('action_weeks.date_debut');
         if ($progressRows instanceof Builder) {
@@ -1680,6 +1771,7 @@ class ReportingAnalyticsService
             ->join('kpis', 'kpis.id', '=', 'kpi_mesures.kpi_id')
             ->join('actions', 'actions.id', '=', 'kpis.action_id')
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
+            ->whereIn('actions.id', (clone $filteredActionIds))
             ->whereNotNull('kpi_mesures.periode')
             ->orderBy('kpi_mesures.id');
         $this->scopeActionStatistics($trendRows, 'actions.statut_validation');
@@ -1768,6 +1860,7 @@ class ReportingAnalyticsService
         $heatRows = Action::query()
             ->select(['actions.date_echeance', 'ptas.direction_id'])
             ->join('ptas', 'ptas.id', '=', 'actions.pta_id')
+            ->whereIn('actions.id', (clone $filteredActionIds))
             ->whereNotNull('actions.date_echeance')
             ->whereDate('actions.date_echeance', '<', $todayDate)
             ->whereDate('actions.date_echeance', '>=', $weekStarts[0]->toDateString())

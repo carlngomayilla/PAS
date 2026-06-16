@@ -962,7 +962,7 @@
         >
     </form>
     <div class="ml-auto flex flex-wrap gap-2 pr-1">
-        <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('workspace.alertes') }}">Alertes</a>
+        <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('workspace.notifications.index', ['tab' => 'alertes']) }}">Alertes</a>
         <a class="btn btn-primary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('workspace.reporting') }}">Rapports</a>
     </div>
 </div>

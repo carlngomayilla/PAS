@@ -118,6 +118,7 @@
             ->reject(static fn ($notification): bool => strtolower((string) ($notification->data['module'] ?? '')) === 'alertes')
             ->count();
         $headerSidebarBadges = $headerUnreadByModule;
+        $headerSidebarBadges['notifications'] = $headerNotificationUnreadCount;
 
         if ($layoutUser->hasPermission('alerts.read')) {
             $alertReadService = app(\App\Services\Alerting\AlertReadService::class);
@@ -127,9 +128,7 @@
                 $alertReadService->readFingerprintsForUser($layoutUser)
             );
             $headerAlertUnreadCount = (int) ($headerAlertSummary['unread'] ?? 0);
-            $headerSidebarBadges['alertes'] = $headerAlertUnreadCount;
-            // Le compteur d'alertes reste sur l'entrée Alertes uniquement.
-            // (Pas de duplication sur Pilotage pour éviter la pastille rouge confuse sur Dashboard.)
+            $headerSidebarBadges['notifications'] = $headerNotificationUnreadCount + $headerAlertUnreadCount;
         }
 
         // Count actions pending validation (for managers) and returned actions (for agents)

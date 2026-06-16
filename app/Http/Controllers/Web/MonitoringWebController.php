@@ -866,7 +866,7 @@ class MonitoringWebController extends Controller
         return $token !== '' ? $token : $fallback;
     }
 
-    public function alertes(Request $request): View
+    public function alertes(Request $request): RedirectResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -876,56 +876,12 @@ class MonitoringWebController extends Controller
         $this->denyUnlessPlanningReader($user);
         $this->denyUnlessAlertReader($user);
 
-        $limit = max(1, min(100, (int) $request->integer('limit', 20)));
-        $activeLevel = in_array((string) $request->string('niveau'), ['all', 'urgence', 'critical', 'warning', 'info'], true)
-            ? (string) $request->string('niveau')
-            : 'all';
-        $activeState = in_array((string) $request->string('etat'), ['all', 'unread', 'read'], true)
-            ? (string) $request->string('etat')
-            : 'all';
-        $fetchLimit = ($activeLevel !== 'all' || $activeState !== 'all')
-            ? max($limit, 100)
-            : $limit;
-        $readFingerprints = $this->alertReadService->readFingerprintsForUser($user);
-        $items = $this->alertCenter
-            ->buildForUser($user, $fetchLimit)
-            ->map(function (array $item) use ($readFingerprints, $limit, $activeLevel, $activeState): array {
-                $item['is_unread'] = ! in_array((string) $item['fingerprint'], $readFingerprints, true);
-                $item['read_url'] = route('workspace.alertes.read', [
-                    'type' => $item['source_type'],
-                    'id' => $item['source_id'],
-                    'limit' => $limit,
-                    'niveau' => $activeLevel !== 'all' ? $activeLevel : null,
-                    'etat' => $activeState !== 'all' ? $activeState : null,
-                ]);
+        $filters = array_filter(
+            $request->only(['limit', 'niveau', 'etat']),
+            static fn ($value): bool => $value !== null && $value !== ''
+        );
 
-                return $item;
-            })
-            ->values();
-
-        $reportingPayload = $this->reportingAnalyticsService->buildPayload($user, false, false);
-
-        return view('workspace.monitoring.alertes', [
-            'limit' => $limit,
-            'alertItems' => $items,
-            'kpiSummary' => $reportingPayload['kpiSummary'] ?? [],
-            'summary' => [
-                'total' => $items->count(),
-                'unread' => $items->where('is_unread', true)->count(),
-                'urgence' => $items->where('niveau', 'urgence')->count(),
-                'critical' => $items->where('niveau', 'critical')->count(),
-                'warning' => $items->where('niveau', 'warning')->count(),
-                'info' => $items->where('niveau', 'info')->count(),
-            ],
-            'levelUnreadCounts' => [
-                'urgence' => $items->where('niveau', 'urgence')->where('is_unread', true)->count(),
-                'critical' => $items->where('niveau', 'critical')->where('is_unread', true)->count(),
-                'warning' => $items->where('niveau', 'warning')->where('is_unread', true)->count(),
-                'info' => $items->where('niveau', 'info')->where('is_unread', true)->count(),
-            ],
-            'activeLevel' => $activeLevel,
-            'activeState' => $activeState,
-        ]);
+        return redirect()->route('workspace.notifications.index', array_merge(['tab' => 'alertes'], $filters));
     }
 
     public function alertesDropdown(Request $request): JsonResponse

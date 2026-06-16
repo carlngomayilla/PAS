@@ -179,16 +179,16 @@ class RolePermissionMatrixTest extends TestCase
         $expected = [
             User::ROLE_SUPER_ADMIN => ['pilotage', 'super_admin', 'imports_excel', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
             User::ROLE_ADMIN_FONCTIONNEL => ['pilotage', 'super_admin', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
-            User::ROLE_DG => ['pilotage', 'mes_taches', 'synthese_agence', 'arbitrages', 'deverrouillages', 'financements_critiques', 'rapports_consolides', 'alertes', 'notifications'],
+            User::ROLE_DG => ['pilotage', 'mes_taches', 'synthese_agence', 'arbitrages', 'deverrouillages', 'financements_critiques', 'rapports_consolides', 'notifications'],
             // Fusion modules 2026-05-28 : 'mes_actions' supprime — fusionne avec 'execution'
             // (label "Action") qui couvre les deux vues via les onglets de la page.
             User::ROLE_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
             User::ROLE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
             User::ROLE_CHEF_UNITE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'referentiel', 'reporting', 'notifications'],
             User::ROLE_CHEF_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'referentiel', 'reporting', 'notifications'],
-            User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'alertes', 'notifications'],
+            User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'notifications'],
             User::ROLE_CHEF_UNITE_CABINET => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
-            User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'alertes', 'notifications'],
+            User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'notifications'],
             User::ROLE_CHEF_UNITE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
             User::ROLE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'validations', 'agents', 'reporting', 'notifications'],
             User::ROLE_DIRECTION => ['pilotage', 'mes_taches', 'pao', 'pta', 'execution', 'services_agents', 'reporting', 'notifications'],

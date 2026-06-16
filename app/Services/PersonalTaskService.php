@@ -416,7 +416,7 @@ class PersonalTaskService
                     deadlineAt: $deadline,
                     url: $log->action
                         ? route('workspace.actions.suivi', $log->action).'#action-logs'
-                        : route('workspace.alertes'),
+                        : route('workspace.notifications.index', ['tab' => 'alertes']),
                     criticality: $isCritical ? 'critique' : $this->criticalityFromDeadline($deadline, 'importante'),
                     scoreImpact: 'Retard de traitement impute au profil de controle.'
                 );

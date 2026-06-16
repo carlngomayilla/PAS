@@ -167,20 +167,6 @@
             'display_order' => $moduleOrder('reporting', 70),
         ];
     }
-    if ($canSeeModule('alertes')) {
-        $pilotageItems[] = [
-            'code' => 'alertes',
-            'label' => $moduleLabel('alertes', 'Alertes'),
-            'route' => 'workspace.notifications.index',
-            'route_params' => ['tab' => 'alertes'],
-            'icon' => 'alertes',
-            'patterns' => ['workspace.alertes', 'workspace.alertes.*'],
-            'active_when' => static fn (): bool => request()->routeIs('workspace.alertes', 'workspace.alertes.*')
-                || (request()->routeIs('workspace.notifications.index') && request()->query('tab') === 'alertes'),
-            'badge' => (int) ($moduleBadges['alertes'] ?? 0),
-            'display_order' => $moduleOrder('alertes', 75),
-        ];
-    }
     if ($pilotageItems !== []) {
         $sections[] = ['title' => 'Pilotage', 'items' => $sortItems($pilotageItems)];
     }

@@ -33,12 +33,20 @@ class SchemaIntrospectionCache
     {
         $key = $table.'::'.$column;
 
-        return self::$columnCache[$key] ??= Schema::hasColumn($table, $column);
+        if (! array_key_exists($key, self::$columnCache) || self::$columnCache[$key] === false) {
+            self::$columnCache[$key] = Schema::hasColumn($table, $column);
+        }
+
+        return self::$columnCache[$key];
     }
 
     public static function hasTable(string $table): bool
     {
-        return self::$tableCache[$table] ??= Schema::hasTable($table);
+        if (! array_key_exists($table, self::$tableCache) || self::$tableCache[$table] === false) {
+            self::$tableCache[$table] = Schema::hasTable($table);
+        }
+
+        return self::$tableCache[$table];
     }
 
     public static function flush(): void

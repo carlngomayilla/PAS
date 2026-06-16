@@ -494,7 +494,7 @@ class DashboardProfileSettings
         return match ($targetRoute) {
             'dashboard' => route('dashboard', $filters),
             'actions' => route('workspace.actions.index', $filters),
-            'alertes' => route('workspace.alertes', $filters),
+            'alertes' => route('workspace.notifications.index', array_merge(['tab' => 'alertes'], $filters)),
             'reporting' => route('workspace.reporting', $filters),
             'pilotage' => route('dashboard', $filters),
             default => route('workspace.actions.index', $filters),

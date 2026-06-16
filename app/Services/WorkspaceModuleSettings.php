@@ -100,6 +100,10 @@ class WorkspaceModuleSettings
                 continue;
             }
 
+            if ($code === 'alertes') {
+                continue;
+            }
+
             $config = $settings[$code] ?? [
                 'enabled' => true,
                 'label' => (string) ($module['label'] ?? strtoupper($code)),
@@ -194,6 +198,8 @@ class WorkspaceModuleSettings
 
     public function flush(): void
     {
+        \App\Support\SchemaIntrospectionCache::flush();
+
         $this->resolved = null;
         $this->draftResolved = null;
         $this->tableAvailable = null;
@@ -212,7 +218,6 @@ class WorkspaceModuleSettings
             'imports_excel' => ['code' => 'imports_excel', 'label' => 'Imports Excel', 'description' => 'Chargement Excel global PAS, PAO, PTA et actions', 'enabled' => true, 'order' => 55, 'section' => 'planification'],
             'execution' => ['code' => 'execution', 'label' => 'Actions', 'description' => 'Exécution des tâches et suivi de progression', 'enabled' => true, 'order' => 60, 'section' => 'execution'],
             'reporting' => ['code' => 'reporting', 'label' => 'Reporting', 'description' => 'Reporting consolidé, exports et diffusion', 'enabled' => true, 'order' => 70, 'section' => 'pilotage'],
-            'alertes' => ['code' => 'alertes', 'label' => 'Alertes', 'description' => 'Centre des alertes et écarts de suivi', 'enabled' => true, 'order' => 75, 'section' => 'pilotage'],
             'referentiel' => ['code' => 'referentiel', 'label' => 'Référentiels', 'description' => 'Directions, services, utilisateurs', 'enabled' => true, 'order' => 80, 'section' => 'gouvernance'],
             'delegations' => ['code' => 'delegations', 'label' => 'Délégations', 'description' => 'Suppléance temporaire de validation', 'enabled' => true, 'order' => 90, 'section' => 'gouvernance'],
             'retention' => ['code' => 'retention', 'label' => 'Rétention', 'description' => 'Archivage et gouvernance des données', 'enabled' => true, 'order' => 100, 'section' => 'gouvernance'],

@@ -9,6 +9,9 @@ use App\Models\Action;
 use App\Models\KpiMesure;
 use App\Models\Kpi;
 use App\Models\ObjectifOperationnel;
+use App\Models\Pas;
+use App\Models\PasAxe;
+use App\Models\PasObjectif;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
@@ -401,7 +404,25 @@ class WebWorkspaceTest extends TestCase
             ->assertSee('Notifications');
     }
 
-    public function test_sidebar_alert_badge_is_only_on_alertes_entry_not_pilotage(): void
+    public function test_legacy_alert_center_redirects_to_notifications_alert_tab(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.alertes', [
+                'limit' => 50,
+                'niveau' => 'warning',
+                'etat' => 'unread',
+            ]))
+            ->assertRedirect(route('workspace.notifications.index', [
+                'tab' => 'alertes',
+                'limit' => 50,
+                'niveau' => 'warning',
+                'etat' => 'unread',
+            ]));
+    }
+
+    public function test_sidebar_alert_badge_is_folded_into_notifications_not_pilotage(): void
     {
         $admin = $this->createAdminUser();
         $expectedAlertUnreadCount = (int) (app(AlertCenterService::class)->summaryForUser(
@@ -443,17 +464,19 @@ class WebWorkspaceTest extends TestCase
         // Le menu Pilotage est présent dans la sidebar...
         $this->assertStringContainsString('data-sidebar-module="pilotage"', $content);
 
-        // ...mais ne doit JAMAIS porter de badge d'alertes (qui faisait double emploi avec le menu Alertes).
+        // ...mais ne doit JAMAIS porter de badge d'alertes.
         $this->assertDoesNotMatchRegularExpression(
             '/data-sidebar-module="pilotage"[\s\S]*?data-sidebar-badge-for="pilotage">/',
             $content
         );
 
-        // Le badge d'alertes reste sur l'entrée Alertes uniquement, basé sur le compteur réel d'alertes.
+        $this->assertStringNotContainsString('data-sidebar-module="alertes"', $content);
+
+        // Le badge d'alertes est désormais fusionné dans l'entrée Notifications.
         if ($expectedAlertUnreadCount > 0) {
             $expectedBadge = $expectedAlertUnreadCount > 99 ? '99+' : (string) $expectedAlertUnreadCount;
             $this->assertMatchesRegularExpression(
-                '/data-sidebar-module="alertes"[\s\S]*?data-sidebar-badge-for="alertes">' . preg_quote($expectedBadge, '/') . '<\/span>/',
+                '/data-sidebar-module="notifications"[\s\S]*?data-sidebar-badge-for="notifications">' . preg_quote($expectedBadge, '/') . '<\/span>/',
                 $content
             );
         }
@@ -592,6 +615,88 @@ class WebWorkspaceTest extends TestCase
     public function test_admin_can_export_reporting_in_xlsx_and_pdf(): void
     {
         $admin = $this->createAdminUser();
+        $service = Service::query()->with('direction')->whereNotNull('direction_id')->firstOrFail();
+        $direction = $service->direction ?? Direction::query()->findOrFail((int) $service->direction_id);
+        $pas = Pas::query()->create([
+            'titre' => 'PAS export service',
+            'periode_debut' => 2026,
+            'periode_fin' => 2026,
+            'created_by' => $admin->id,
+        ]);
+        $pas->directions()->syncWithoutDetaching([(int) $direction->id]);
+        $axe = PasAxe::query()->create([
+            'pas_id' => $pas->id,
+            'direction_id' => $direction->id,
+            'code' => 'I',
+            'libelle' => 'Elaboration d une offre de bourse adaptee',
+            'periode_debut' => '2026-01-01',
+            'periode_fin' => '2026-12-31',
+            'ordre' => 1,
+            'created_by' => $admin->id,
+        ]);
+        $objectifStrategique = PasObjectif::query()->create([
+            'pas_axe_id' => $axe->id,
+            'code' => '1',
+            'libelle' => 'Mettre en place des programmes de formations ciblees',
+            'date_echeance' => '2026-12-31',
+            'ordre' => 1,
+            'created_by' => $admin->id,
+        ]);
+        $pao = Pao::query()->create([
+            'pas_id' => $pas->id,
+            'pas_objectif_id' => $objectifStrategique->id,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'titre' => 'PAO export service',
+            'annee' => 2026,
+            'echeance' => '2026-12-31',
+            'objectif_operationnel' => 'Promouvoir les partenariats a date',
+        ]);
+        $objectifOperationnel = ObjectifOperationnel::query()->create([
+            'pao_id' => $pao->id,
+            'pas_id' => $pas->id,
+            'pas_axe_id' => $axe->id,
+            'pas_objectif_id' => $objectifStrategique->id,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'libelle' => 'Promouvoir les partenariats a date',
+            'echeance' => '2026-11-30',
+        ]);
+        $pta = Pta::query()->create([
+            'pao_id' => $pao->id,
+            'objectif_operationnel_id' => $objectifOperationnel->id,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'titre' => 'PTA export service',
+        ]);
+        $action = Action::query()->create([
+            'pta_id' => $pta->id,
+            'pao_id' => $pao->id,
+            'objectif_operationnel_id' => $objectifOperationnel->id,
+            'libelle' => 'Actualiser la base de donnees des offres et programmes de formation',
+            'description' => 'Actualiser la base de donnees des offres et programmes de formation dans eBourse',
+            'responsable_id' => $admin->id,
+            'type_cible' => Action::TYPE_QUANTITATIVE,
+            'quantite_cible' => 1,
+            'quantite_realisee' => 1,
+            'unite_cible' => 'programme',
+            'progression_reelle' => 100,
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-11-30',
+            'date_echeance' => '2026-11-30',
+            'statut_dynamique' => ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'observations' => 'Liste des formations fournie',
+        ]);
+        Kpi::query()->create([
+            'action_id' => $action->id,
+            'libelle' => 'Nombre de programmes ou offres inseres dans eBourse',
+            'unite' => '%',
+            'cible' => 100,
+            'seuil_alerte' => 80,
+            'periodicite' => 'mensuelle',
+            'est_a_renseigner' => true,
+        ]);
 
         $xlsxResponse = $this->actingAs($admin)
             ->get(route('workspace.reporting.export.excel'));
@@ -620,6 +725,16 @@ class WebWorkspaceTest extends TestCase
             $sheetEightXml = $zip->getFromName('xl/worksheets/sheet8.xml');
             $sheetNineXml = $zip->getFromName('xl/worksheets/sheet9.xml');
             $sheetTenXml = $zip->getFromName('xl/worksheets/sheet10.xml');
+            $serviceSheetXmls = [];
+            for ($sheetIndex = 10; $sheetIndex <= 80; $sheetIndex++) {
+                $sheetXml = $zip->getFromName('xl/worksheets/sheet'.$sheetIndex.'.xml');
+                if ($sheetXml === false) {
+                    continue;
+                }
+                if (str_contains((string) $sheetXml, 'SUIVI PTA')) {
+                    $serviceSheetXmls[] = (string) $sheetXml;
+                }
+            }
             $stylesXml = $zip->getFromName('xl/styles.xml');
             $zip->close();
         } else {
@@ -635,6 +750,10 @@ class WebWorkspaceTest extends TestCase
             $sheetEightXml = $entries['xl/worksheets/sheet8.xml'] ?? false;
             $sheetNineXml = $entries['xl/worksheets/sheet9.xml'] ?? false;
             $sheetTenXml = $entries['xl/worksheets/sheet10.xml'] ?? false;
+            $serviceSheetXmls = collect($entries)
+                ->filter(fn (string $content, string $path): bool => str_starts_with($path, 'xl/worksheets/sheet') && str_contains($content, 'SUIVI PTA'))
+                ->values()
+                ->all();
             $stylesXml = $entries['xl/styles.xml'] ?? false;
         }
         @unlink($tempFile);
@@ -684,10 +803,27 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringContainsString('Tableau 8 : Suivi des justificatifs', (string) $sheetNineXml);
         $this->assertStringContainsString('Statut validation', (string) $sheetNineXml);
         $this->assertStringContainsString('ANBG - RAPPORT PAS PAR DIRECTION ET SERVICE', (string) $sheetTenXml);
+        $this->assertStringContainsString('SUIVI PTA', (string) $sheetTenXml);
         $this->assertStringContainsString('Service :', (string) $sheetTenXml);
+        $this->assertNotEmpty($serviceSheetXmls);
+        foreach ($serviceSheetXmls as $serviceSheetXml) {
+            $this->assertStringContainsString('Indicateurs de mesure', (string) $serviceSheetXml);
+            $this->assertStringContainsString('Performance en fonction de la cible', (string) $serviceSheetXml);
+            $this->assertStringContainsString('TAUX DE REALISATION GLOBAL', (string) $serviceSheetXml);
+            $this->assertStringContainsString('Preuves transmises dans les délais définis', (string) $serviceSheetXml);
+            $this->assertStringContainsString('dimension ref="A1:L', (string) $serviceSheetXml);
+        }
+        $this->assertTrue(
+            collect($serviceSheetXmls)->contains(fn (string $sheetXml): bool => str_contains($sheetXml, 'AXE STRATEGIQUE')),
+            'Au moins une feuille service avec actions doit contenir un bloc Axe strategique.'
+        );
         $this->assertStringContainsString('FF7FB8E6', (string) $stylesXml);
         $this->assertStringContainsString('FF3996D3', (string) $stylesXml);
         $this->assertStringContainsString('FF1C203D', (string) $stylesXml);
+        $this->assertStringContainsString('FF00B050', (string) $stylesXml);
+        $this->assertStringContainsString('FFFF0000', (string) $stylesXml);
+        $this->assertStringContainsString('FFFFFF00', (string) $stylesXml);
+        $this->assertStringContainsString('FFFFC000', (string) $stylesXml);
 
         $pdfResponse = $this->actingAs($admin)
             ->get(route('workspace.reporting.export.pdf'));

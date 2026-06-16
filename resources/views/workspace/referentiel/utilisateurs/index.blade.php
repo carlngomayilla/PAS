@@ -97,12 +97,15 @@
             <table class="app-table data-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Profil</th>
-                        <th>Rôle</th>
-                        <th>Statut</th>
+                        <th>Nom complet</th>
                         <th>Direction</th>
+                        <th>Adresse email</th>
                         <th>Service</th>
+                        <th>Rôle</th>
+                        <th>Fonction</th>
+                        <th>Matricule</th>
+                        <th>Portée</th>
+                        <th>Statut</th>
                         @if ($canWrite || ($canRequestUserDeletion ?? false))
                             <th>Opérations</th>
                         @endif
@@ -111,9 +114,8 @@
                 <tbody>
                     @forelse ($rows as $row)
                         <tr>
-                            <td>{{ $row->id }}</td>
                             <td>
-                                <div class="flex min-w-[250px] items-center gap-2.5">
+                                <div class="flex min-w-[220px] items-center gap-2.5">
                                     @if ($row->profile_photo_url)
                                         <img src="{{ $row->profile_photo_url }}" alt="Photo de {{ $row->name }}" class="h-10 w-10 rounded-full object-cover ring-2 ring-white shadow-sm">
                                     @else
@@ -121,31 +123,28 @@
                                             {{ $row->profile_initials }}
                                         </span>
                                     @endif
-                                    <div>
+                                    <div class="min-w-0">
                                         <p class="font-medium text-slate-900">{{ $row->name }}</p>
-                                        <p class="text-xs text-slate-600">{{ $row->email }}</p>
-                                        @if ($row->isAgent())
-                                            <p class="mt-1 text-xs text-slate-500">
-                                                Matricule: {{ $row->agent_matricule ?: '-' }}
-                                                | Fonction: {{ $row->agent_fonction ?: '-' }}
-                                                | Tel: {{ $row->agent_telephone ?: '-' }}
-                                            </p>
-                                        @endif
+                                        <p class="text-xs text-slate-500">#{{ $row->id }}</p>
                                     </div>
                                 </div>
                             </td>
+                            <td class="min-w-[220px]">{{ $row->direction?->code ? $row->direction->code . ' - ' . $row->direction->libelle : '-' }}</td>
+                            <td class="min-w-[220px]">{{ $row->email }}</td>
+                            <td class="min-w-[220px]">{{ $row->service?->code ? $row->service->code . ' - ' . $row->service->libelle : '-' }}</td>
                             <td>
                                 <span class="anbg-badge anbg-badge-neutral px-3">
                                     {{ $row->roleLabel() }} ({{ $row->role }})
                                 </span>
                             </td>
+                            <td class="min-w-[180px]">{{ $row->agent_fonction ?: '-' }}</td>
+                            <td>{{ $row->agent_matricule ?: '-' }}</td>
+                            <td class="min-w-[220px]">{{ $row->profileScopeLabel() }}</td>
                             <td>
                                 <span class="anbg-badge {{ $row->is_active ? 'anbg-badge-success' : 'anbg-badge-danger' }} px-3">
                                     {{ $row->is_active ? 'Actif' : 'Inactif' }}
                                 </span>
                             </td>
-                            <td>{{ $row->direction?->code ? $row->direction->code . ' - ' . $row->direction->libelle : '-' }}</td>
-                            <td>{{ $row->service?->code ? $row->service->code . ' - ' . $row->service->libelle : '-' }}</td>
                             @if ($canWrite || ($canRequestUserDeletion ?? false))
                                 <td>
                                     <div class="flex flex-wrap gap-1.5">
@@ -172,7 +171,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ ($canWrite || ($canRequestUserDeletion ?? false)) ? 7 : 6 }}">
+                            <td colspan="{{ ($canWrite || ($canRequestUserDeletion ?? false)) ? 10 : 9 }}">
                                 <x-ui.empty-state
                                     title="Aucun utilisateur trouvé"
                                     message="Aucun compte ne correspond aux filtres courants."

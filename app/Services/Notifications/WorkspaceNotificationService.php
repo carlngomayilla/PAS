@@ -1390,7 +1390,7 @@ class WorkspaceNotificationService
     {
         $action = $log->action;
         if (! $action instanceof Action) {
-            return route('workspace.alertes');
+            return route('workspace.notifications.index', ['tab' => 'alertes']);
         }
 
         if (Str::startsWith((string) $log->type_evenement, 'alerte_temporelle_')) {

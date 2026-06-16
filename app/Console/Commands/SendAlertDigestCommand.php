@@ -92,7 +92,7 @@ class SendAlertDigestCommand extends Command
                     'module' => 'alertes',
                     'entity_type' => 'alert_digest',
                     'entity_id' => null,
-                    'url' => route('workspace.alertes', ['limit' => $limit]),
+                    'url' => route('workspace.notifications.index', ['tab' => 'alertes', 'limit' => $limit]),
                     'icon' => 'alert-triangle',
                     'status' => ((int) ($digest['totals']['actions_retard'] ?? 0) > 0
                         || (int) ($digest['totals']['action_logs'] ?? 0) > 0) ? 'warning' : 'info',

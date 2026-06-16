@@ -80,7 +80,7 @@
     @endif
 
     <p>
-        Accès direct : <a href="{{ url('/workspace/alertes') }}">{{ url('/workspace/alertes') }}</a>
+        Accès direct : <a href="{{ route('workspace.notifications.index', ['tab' => 'alertes']) }}">{{ route('workspace.notifications.index', ['tab' => 'alertes']) }}</a>
     </p>
     <p style="color: #6b7280; font-size: 12px;">
         Message automatique ANBG - PAS/PAO/PTA.

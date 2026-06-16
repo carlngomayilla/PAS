@@ -1909,7 +1909,7 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Actions validées', $portfolio['actions_valides_direction'], 'Clôturées dans le circuit de validation actif', $this->validatedActionIndexRoute(), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('Actions en retard', $portfolio['actions_en_retard'], 'Retards prioritaires', $this->actionIndexRoute(['statut' => 'en_retard']), '#B42318', '#FFF1EF', null, 'warning'),
                 $this->makeRoleCard('Indicateur global', number_format((float) $portfolio['global_score'], 0), 'Moyenne sur toutes les actions visibles', route('workspace.reporting'), '#1C203D', '#E8F3FB', null, 'info'),
-                $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Points de vigilance', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
+                $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Points de vigilance', $this->alertCenterRoute(['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
                 $this->makeRoleCard('Directions en difficulté', $portfolio['directions_difficulte'], 'Score faible ou retards', route('workspace.reporting'), '#F9B13C', '#FFF8D6', null, 'warning'),
             ],
             // Graphique « Repartition des statuts » retire pour tous les roles
@@ -1967,7 +1967,7 @@ class DashboardController extends Controller
             $this->makeRoleCard('Taux validation', number_format($this->completionRate($portfolio['actions_valides_direction'], $portfolio['actions_total']), 0).'%', 'Part des actions finalement validées', $this->validatedActionIndexRoute(), '#8FC043', '#F2F8E8', null, 'success'),
             $this->makeRoleCard('Exécution globale', number_format((float) $snapshot['completion_rate'], 0).'%', 'Achevées / portefeuille total', $this->actionIndexRoute(['statut' => 'achevees']), '#3996D3', '#E8F3FB', null, 'info'),
             $this->makeRoleCard('Score global', number_format((float) $snapshot['score'], 0), 'Moyenne sur toutes les actions visibles', route('workspace.reporting'), '#1C203D', '#E8F3FB', null, 'info'),
-            $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Points de decision', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
+            $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Points de decision', $this->alertCenterRoute(['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
             $this->makeRoleCard('Directions en difficulté', count($difficultyRows), 'Retards, faible score ou faible taux de validation', route('workspace.reporting'), '#F9B13C', '#FFF8D6', null, 'warning'),
         ];
 
@@ -2031,8 +2031,8 @@ class DashboardController extends Controller
                 'subtitle' => 'Lecture rapprochee des points bloquants, des validations en attente et des alertes critiques.',
             ],
             'summary_cards' => [
-                $this->makeRoleCard('Actions sensibles', $portfolio['alerts'], 'Actions a forte vigilance', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
-                $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Niveau d alerte courant', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
+                $this->makeRoleCard('Actions sensibles', $portfolio['alerts'], 'Actions a forte vigilance', $this->alertCenterRoute(['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
+                $this->makeRoleCard('Alertes critiques', $portfolio['alerts'], 'Niveau d alerte courant', $this->alertCenterRoute(['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
                 $this->makeRoleCard('Actions en retard', $portfolio['actions_en_retard'], 'Retards institutionnels', $this->actionIndexRoute(['statut' => 'en_retard']), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Actions validées', $portfolio['actions_valides_direction'], 'Clôturées dans le circuit de validation actif', $this->validatedActionIndexRoute(), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('Validations en attente', count($pendingRows), 'Actions a arbitrer', route('workspace.actions.index', ['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]), '#3996D3', '#E8F3FB', null, 'info'),
@@ -2079,7 +2079,7 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Mes actions en cours', $statusCounts['en_cours'], 'Exécution active', $this->actionIndexRoute(['statut' => 'en_cours']), '#3996D3', '#E8F3FB', null, 'info'),
                 $this->makeRoleCard('Mes actions achevées', $statusCounts['acheve'], 'Actions terminées', $this->actionIndexRoute(['statut' => 'achevees']), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('Mes actions en retard', $statusCounts['en_retard'], 'Retards à traiter', $this->actionIndexRoute(['statut' => 'en_retard']), '#B42318', '#FFF1EF', null, 'danger'),
-                $this->makeRoleCard('Mes alertes actives', $alertCount, 'Actions a surveiller', route('workspace.alertes', ['niveau' => 'warning']), '#F9B13C', '#FFF8D6', null, 'warning'),
+                $this->makeRoleCard('Mes alertes actives', $alertCount, 'Actions a surveiller', $this->alertCenterRoute(['niveau' => 'warning']), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Actions a mettre a jour', $updateCount, 'Ecarts de progression', route('workspace.actions.index', ['sort' => 'progression_desc']), '#1C203D', '#E8F3FB', null, 'info'),
             ],
             // Graphique « Repartition des statuts » retire pour tous les roles
@@ -2132,7 +2132,7 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Actions en retard', $statusCounts['en_retard'], 'Retards du service', $this->actionIndexRoute(['statut' => 'en_retard']), '#B42318', '#FFF1EF', null, 'danger'),
                 $this->makeRoleCard('Actions à valider', $pendingServiceValidation, 'Soumissions en attente', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Actions validées service', $validatedService, 'Validation chef effectuée', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]), '#1C203D', '#E8F3FB', null, 'info'),
-                $this->makeRoleCard('Alertes actives', $alertCount, 'Actions critiques', route('workspace.alertes', ['niveau' => 'warning']), '#F9B13C', '#FFF8D6', null, 'warning'),
+                $this->makeRoleCard('Alertes actives', $alertCount, 'Actions critiques', $this->alertCenterRoute(['niveau' => 'warning']), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Taux exécution service', number_format($completionRate, 0).'%', 'Actions achevées / total', route('workspace.actions.index', ['statut' => 'achevees']), '#8FC043', '#F2F8E8', null, 'success'),
             ],
             // Graphique « Repartition des statuts » retire pour tous les roles
@@ -2194,7 +2194,7 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Actions validées service', $validatedService, 'Niveau chef atteint', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]), '#3996D3', '#E8F3FB', null, 'info'),
                 $this->makeRoleCard('Actions validées', $validatedDirection, 'Clôturées dans le circuit de validation actif', $this->validatedActionIndexRoute(), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('En attente validation', $pendingValidation, 'Soumises au chef', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF]), '#F9B13C', '#FFF8D6', null, 'warning'),
-                $this->makeRoleCard('Alertes critiques', $alertCount, 'Actions à traiter', route('workspace.alertes', ['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
+                $this->makeRoleCard('Alertes critiques', $alertCount, 'Actions à traiter', $this->alertCenterRoute(['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
                 $this->makeRoleCard('Taux exécution direction', number_format($completionRate, 0).'%', 'Actions achevées / total', route('workspace.actions.index', ['statut' => 'achevees']), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('Respect des delais', number_format($delayRate, 0).'%', 'Actions hors retard', route('workspace.actions.index', ['statut' => 'en_retard']), '#1C203D', '#E8F3FB', null, 'info'),
                 $this->makeRoleCard('Score global direction', number_format($globalScore, 0), 'Moyenne sur toutes les actions visibles', route('workspace.reporting'), '#1C203D', '#E8F3FB', null, 'info'),
@@ -3874,7 +3874,7 @@ class DashboardController extends Controller
     private function resolveUnitMeta(User $user): array
     {
         if ($user->hasGlobalReadAccess()) {
-            return ['mode' => 'direction', 'label' => 'Directions'];
+            return ['mode' => 'service', 'label' => 'Services'];
         }
 
         if ($user->hasRole(User::ROLE_DIRECTION)) {
@@ -3974,6 +3974,14 @@ class DashboardController extends Controller
     {
         return route('workspace.actions.index', array_filter(
             $filters,
+            static fn ($value): bool => $value !== null && $value !== ''
+        ));
+    }
+
+    private function alertCenterRoute(array $filters = []): string
+    {
+        return route('workspace.notifications.index', array_filter(
+            array_merge(['tab' => 'alertes'], $filters),
             static fn ($value): bool => $value !== null && $value !== ''
         ));
     }

@@ -95,7 +95,7 @@ class AlerteController extends Controller
 
         return response()->json([
             'message' => 'Alerte marquée comme lue.',
-            'target_url' => (string) ($alert['target_url'] ?? route('workspace.alertes')),
+            'target_url' => (string) ($alert['target_url'] ?? route('workspace.notifications.index', ['tab' => 'alertes'])),
             'fingerprint' => (string) ($alert['fingerprint'] ?? ''),
         ]);
     }

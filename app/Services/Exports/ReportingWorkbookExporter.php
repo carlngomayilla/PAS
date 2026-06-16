@@ -2,6 +2,7 @@
 
 namespace App\Services\Exports;
 
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use App\Support\Zip\SimpleZipWriter;
 use Illuminate\Support\Collection;
@@ -1204,6 +1205,8 @@ class ReportingWorkbookExporter
             return [];
         }
 
+        return $this->buildPtaServiceSheets($reports, $payload);
+
         $generatedAt = $payload['generatedAt'] instanceof CarbonInterface
             ? $payload['generatedAt']->format('Y-m-d H:i:s')
             : (string) ($payload['generatedAt'] ?? '');
@@ -1296,6 +1299,322 @@ class ReportingWorkbookExporter
         }
 
         return $sheets;
+    }
+
+    /**
+     * @param Collection<int, array<string, mixed>> $reports
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildPtaServiceSheets(Collection $reports, array $payload): array
+    {
+        $usedSheetNames = [];
+        $sheets = [];
+
+        foreach ($reports as $direction) {
+            $direction = (array) $direction;
+            $directionLabel = $this->entityLabel($direction, 'Direction');
+
+            foreach ((array) ($direction['services'] ?? []) as $service) {
+                $service = (array) $service;
+                $serviceCode = trim((string) ($service['code'] ?? ''));
+                $serviceName = trim((string) ($service['libelle'] ?? 'Service'));
+                $serviceLabel = $this->entityLabel($service, 'Service');
+                $summary = (array) ($service['summary'] ?? []);
+                $actionRows = collect(array_values((array) ($service['actions'] ?? [])));
+                $maxColumns = 12;
+                $rows = [];
+                $merges = [];
+                $rowIndex = 1;
+
+                $titleToken = $serviceCode !== ''
+                    ? $serviceCode
+                    : (string) Str::of($serviceName)->ascii()->replaceMatches('/[^A-Za-z0-9]+/', ' ')->trim()->upper()->limit(16, '');
+
+                $rows[] = $this->makeRow($rowIndex, [
+                    $this->serviceCell(3, $rowIndex, trim('SUIVI PTA '.$titleToken), 21),
+                ], 32);
+                $merges[] = 'C'.$rowIndex.':H'.$rowIndex;
+                $rowIndex++;
+
+                $rows[] = $this->makeHiddenMergedRow($rowIndex, 'ANBG - RAPPORT PAS PAR DIRECTION ET SERVICE', $maxColumns, 2);
+                $merges[] = 'A'.$rowIndex.':'.$this->columnName($maxColumns).$rowIndex;
+                $rowIndex++;
+
+                $rows[] = $this->makeRow($rowIndex, [
+                    $this->serviceCell(10, $rowIndex, 'Légende', 30),
+                    $this->serviceCell(11, $rowIndex, 'Preuves transmises dans les délais définis', 26),
+                ], 20);
+                $merges[] = 'J'.$rowIndex.':J'.($rowIndex + 3);
+                $merges[] = 'K'.$rowIndex.':L'.$rowIndex;
+                $rowIndex++;
+                $rows[] = $this->makeRow($rowIndex, [
+                    $this->serviceCell(11, $rowIndex, 'Preuves non livrées', 27),
+                ], 20);
+                $merges[] = 'K'.$rowIndex.':L'.$rowIndex;
+                $rowIndex++;
+                $rows[] = $this->makeRow($rowIndex, [
+                    $this->serviceCell(1, $rowIndex, 'Service : '.$serviceLabel, 36),
+                    $this->serviceCell(11, $rowIndex, 'En attente', 28),
+                ], 20);
+                $merges[] = 'K'.$rowIndex.':L'.$rowIndex;
+                $rowIndex++;
+                $rows[] = $this->makeRow($rowIndex, [
+                    $this->serviceCell(1, $rowIndex, 'Direction : '.$directionLabel, 36),
+                    $this->serviceCell(11, $rowIndex, 'Preuves transmises hors délai', 29),
+                ], 20);
+                $merges[] = 'K'.$rowIndex.':L'.$rowIndex;
+                $rowIndex += 3;
+
+                $headerRows = [];
+                if ($actionRows->isEmpty()) {
+                    $headerRows[] = $rowIndex;
+                    $rows[] = $this->serviceTableHeaderRow($rowIndex);
+                    $rowIndex++;
+                    $rows[] = $this->makeRow($rowIndex, [
+                        $this->serviceCell(1, $rowIndex, 'Aucune action', 32),
+                    ], 28);
+                    $merges[] = 'A'.$rowIndex.':L'.$rowIndex;
+                    $rowIndex++;
+                } else {
+                    $axisGroups = $actionRows->groupBy(fn (array $action): string => ((string) ($action['axe_id'] ?? '0')).'|'.(string) ($action['axe_strategique'] ?? $action['axe'] ?? '-'));
+
+                    foreach ($axisGroups->values() as $axisIndex => $axisActions) {
+                        $firstAxisAction = (array) $axisActions->first();
+                        $axisLabel = (string) ($firstAxisAction['axe_strategique'] ?? $firstAxisAction['axe'] ?? '-');
+                        $axisNumber = trim((string) ($firstAxisAction['axe_numero'] ?? '')) ?: $this->romanNumeral($axisIndex + 1);
+
+                        $rows[] = $this->makeRow($rowIndex, [
+                            $this->serviceCell(1, $rowIndex, $axisNumber, 22),
+                            $this->serviceCell(2, $rowIndex, 'AXE STRATEGIQUE', 22),
+                            $this->serviceCell(4, $rowIndex, $axisLabel, 22),
+                            $this->serviceCell(8, $rowIndex, $this->servicePercentLabel($this->serviceGroupPerformance($axisActions)), 35),
+                        ], 28);
+                        $merges[] = 'B'.$rowIndex.':C'.$rowIndex;
+                        $merges[] = 'D'.$rowIndex.':G'.$rowIndex;
+                        $rowIndex++;
+
+                        $strategicGroups = $axisActions->groupBy(fn (array $action): string => ((string) ($action['objectif_strategique_id'] ?? '0')).'|'.(string) ($action['objectif_strategique'] ?? $action['objectif'] ?? '-'));
+                        foreach ($strategicGroups->values() as $strategicIndex => $strategicActions) {
+                            $firstStrategicAction = (array) $strategicActions->first();
+                            $strategicLabel = (string) ($firstStrategicAction['objectif_strategique'] ?? $firstStrategicAction['objectif'] ?? '-');
+                            $strategicNumber = trim((string) ($firstStrategicAction['objectif_strategique_numero'] ?? '')) ?: (string) ($strategicIndex + 1);
+
+                            $rows[] = $this->makeRow($rowIndex, [
+                                $this->serviceCell(1, $rowIndex, $strategicNumber, 23),
+                                $this->serviceCell(2, $rowIndex, 'Objectif stratégique', 23),
+                                $this->serviceCell(4, $rowIndex, $strategicLabel, 23),
+                                $this->serviceCell(8, $rowIndex, $this->servicePercentLabel($this->serviceGroupPerformance($strategicActions)), 34),
+                            ], 28);
+                            $merges[] = 'B'.$rowIndex.':C'.$rowIndex;
+                            $merges[] = 'D'.$rowIndex.':G'.$rowIndex;
+                            $rowIndex += 2;
+
+                            $operationalGroups = $strategicActions->groupBy(fn (array $action): string => ((string) ($action['objectif_operationnel_id'] ?? '0')).'|'.(string) ($action['objectif_operationnel'] ?? '-'));
+                            foreach ($operationalGroups->values() as $operationalIndex => $operationalActions) {
+                                $firstOperationalAction = (array) $operationalActions->first();
+                                $operationalLabel = (string) ($firstOperationalAction['objectif_operationnel'] ?? '-');
+
+                                $rows[] = $this->makeRow($rowIndex, [
+                                    $this->serviceCell(1, $rowIndex, (string) ($operationalIndex + 1), 24),
+                                    $this->serviceCell(2, $rowIndex, 'Objectif opérationnel', 24),
+                                    $this->serviceCell(4, $rowIndex, $operationalLabel, 24),
+                                    $this->serviceCell(8, $rowIndex, $this->servicePercentLabel($this->serviceGroupPerformance($operationalActions)), 34),
+                                ], 30);
+                                $merges[] = 'B'.$rowIndex.':C'.$rowIndex;
+                                $merges[] = 'D'.$rowIndex.':G'.$rowIndex;
+                                $rowIndex++;
+
+                                $headerRows[] = $rowIndex;
+                                $rows[] = $this->serviceTableHeaderRow($rowIndex);
+                                $rowIndex++;
+
+                                foreach ($operationalActions->values() as $actionIndex => $action) {
+                                    $action = (array) $action;
+                                    $status = $this->serviceActionProofStatus($action);
+                                    $targetValue = trim((string) ($action['cible'] ?? ''));
+                                    $target = $targetValue !== '' && $targetValue !== '-' ? $targetValue : '100%';
+
+                                    $rows[] = $this->makeRow($rowIndex, [
+                                        $this->serviceCell(1, $rowIndex, (string) ($actionIndex + 1), 32),
+                                        $this->serviceCell(2, $rowIndex, (string) ($action['action'] ?? '-'), 32),
+                                        $this->serviceCell(3, $rowIndex, $this->indicatorLabel((string) ($action['kpi'] ?? '-')), 32),
+                                        $this->serviceCell(4, $rowIndex, (string) ($action['rmo'] ?? $action['responsable'] ?? '-'), 33),
+                                        $this->serviceCell(5, $rowIndex, (string) ($action['ratio'] ?? ''), 32),
+                                        $this->serviceCell(6, $rowIndex, $this->servicePercentLabel((float) ($action['progression_value'] ?? 0)), 32),
+                                        $this->serviceCell(7, $rowIndex, $target, 32),
+                                        $this->serviceCell(8, $rowIndex, $this->servicePercentLabel((float) ($action['performance_cible_value'] ?? $action['kpi_global_value'] ?? $action['progression_value'] ?? 0)), 32),
+                                        $this->serviceCell(9, $rowIndex, $this->servicePercentLabel((float) ($action['ecart_value'] ?? 0)), 32),
+                                        $this->serviceCell(10, $rowIndex, (string) ($action['echeance'] ?? $action['fin'] ?? ''), 32),
+                                        $this->serviceCell(11, $rowIndex, $status['label'], (int) $status['style']),
+                                        $this->serviceCell(12, $rowIndex, $this->serviceActionObservation($action), 32),
+                                    ], 58);
+                                    $rowIndex++;
+                                }
+
+                                $rowIndex++;
+                            }
+                        }
+                    }
+                }
+
+                $globalPerformance = (float) ($summary['taux_realisation'] ?? $summary['progression_moyenne'] ?? 0);
+                $rows[] = $this->makeRow($rowIndex, [
+                    $this->serviceCell(1, $rowIndex, 'TAUX DE REALISATION GLOBAL', 30),
+                    $this->serviceCell(5, $rowIndex, $this->servicePercentLabel($globalPerformance), 31),
+                ], 34);
+                $merges[] = 'A'.$rowIndex.':D'.$rowIndex;
+                $merges[] = 'E'.$rowIndex.':L'.$rowIndex;
+
+                $firstHeaderRow = $headerRows[0] ?? null;
+                $lastDataRow = max($rowIndex, $firstHeaderRow ?? $rowIndex);
+                $sheets[] = [
+                    'name' => $this->uniqueSheetName($directionLabel.' - '.$serviceLabel, $usedSheetNames),
+                    'rows' => $rows,
+                    'merges' => $merges,
+                    'maxColumns' => $maxColumns,
+                    'widths' => [1 => 6, 2 => 40, 3 => 42, 4 => 18, 5 => 12, 6 => 17, 7 => 12, 8 => 19, 9 => 12, 10 => 15, 11 => 14, 12 => 58],
+                    'charts' => [],
+                    'freeze_header' => false,
+                    'auto_filter_ref' => $firstHeaderRow !== null ? 'A'.$firstHeaderRow.':'.$this->columnName($maxColumns).$lastDataRow : null,
+                ];
+            }
+        }
+
+        return $sheets;
+    }
+
+    private function serviceTableHeaderRow(int $rowIndex): array
+    {
+        return $this->makeRow($rowIndex, [
+            $this->serviceCell(1, $rowIndex, 'N°', 25),
+            $this->serviceCell(2, $rowIndex, 'Actions', 25),
+            $this->serviceCell(3, $rowIndex, 'Indicateurs de mesure', 25),
+            $this->serviceCell(4, $rowIndex, 'Responsable', 25),
+            $this->serviceCell(5, $rowIndex, 'Ratio', 25),
+            $this->serviceCell(6, $rowIndex, 'Taux de réalisation (%)', 25),
+            $this->serviceCell(7, $rowIndex, 'Cible', 25),
+            $this->serviceCell(8, $rowIndex, 'Performance en fonction de la cible', 25),
+            $this->serviceCell(9, $rowIndex, 'Ecart', 25),
+            $this->serviceCell(10, $rowIndex, 'Echéance', 25),
+            $this->serviceCell(11, $rowIndex, 'Statut', 25),
+            $this->serviceCell(12, $rowIndex, 'Observations', 25),
+        ], 34);
+    }
+
+    private function serviceCell(int $columnIndex, int $rowIndex, mixed $value, int $style, string $type = 'string'): array
+    {
+        return [
+            'ref' => $this->columnName($columnIndex).$rowIndex,
+            'type' => $type,
+            'value' => $value,
+            'style' => $style,
+        ];
+    }
+
+    /**
+     * @param Collection<int, array<string, mixed>> $rows
+     */
+    private function serviceGroupPerformance(Collection $rows): float
+    {
+        if ($rows->isEmpty()) {
+            return 0.0;
+        }
+
+        return round((float) $rows->avg(function (array $row): float {
+            $performance = (float) ($row['performance_cible_value'] ?? 0);
+
+            return $performance > 0.0
+                ? $performance
+                : (float) ($row['progression_value'] ?? 0);
+        }), 2);
+    }
+
+    private function servicePercentLabel(float $value): string
+    {
+        return number_format(max(0.0, min(100.0, $value)), 0, '.', '').'%';
+    }
+
+    /**
+     * @return array{label: string, style: int}
+     */
+    private function serviceActionProofStatus(array $action): array
+    {
+        $justificatifs = array_values((array) ($action['justificatifs'] ?? []));
+        $deadline = trim((string) ($action['echeance'] ?? $action['fin'] ?? ''));
+
+        if ($justificatifs !== []) {
+            $latestDate = collect($justificatifs)
+                ->pluck('date')
+                ->filter(fn ($date): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $date) === 1)
+                ->sortDesc()
+                ->first();
+
+            if (is_string($latestDate) && $latestDate !== '' && $deadline !== '' && $this->dateAfter($latestDate, $deadline)) {
+                return ['label' => 'Preuves transmises hors délai', 'style' => 29];
+            }
+
+            return ['label' => 'Preuves transmises dans les délais définis', 'style' => 26];
+        }
+
+        if ((bool) ($action['est_en_retard'] ?? false) || ($deadline !== '' && $this->dateAfter(now()->format('Y-m-d'), $deadline))) {
+            return ['label' => 'Preuves non livrées', 'style' => 27];
+        }
+
+        return ['label' => 'En attente', 'style' => 28];
+    }
+
+    private function dateAfter(string $left, string $right): bool
+    {
+        try {
+            return Carbon::parse($left)->startOfDay()->gt(Carbon::parse($right)->startOfDay());
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function serviceActionObservation(array $action): string
+    {
+        $parts = [];
+        $observations = trim((string) ($action['observations'] ?? ''));
+        if ($observations !== '') {
+            $parts[] = $observations;
+        }
+
+        $justificatif = trim((string) ($action['justificatif'] ?? ''));
+        if ($justificatif !== '' && $justificatif !== '-') {
+            $parts[] = 'Justificatifs : '.$justificatif;
+        }
+
+        $risk = trim((string) ($action['risque_resume'] ?? ''));
+        if ($risk !== '' && $risk !== 'Non signale') {
+            $parts[] = 'Risque : '.$risk;
+        }
+
+        $financing = trim((string) ($action['financement_observation'] ?? ''));
+        if ($financing !== '') {
+            $parts[] = 'Financement : '.$financing;
+        }
+
+        return implode("\n", array_slice(array_values(array_unique($parts)), 0, 6));
+    }
+
+    private function romanNumeral(int $value): string
+    {
+        $map = [
+            1000 => 'M', 900 => 'CM', 500 => 'D', 400 => 'CD',
+            100 => 'C', 90 => 'XC', 50 => 'L', 40 => 'XL',
+            10 => 'X', 9 => 'IX', 5 => 'V', 4 => 'IV', 1 => 'I',
+        ];
+        $result = '';
+
+        foreach ($map as $number => $roman) {
+            while ($value >= $number) {
+                $result .= $roman;
+                $value -= $number;
+            }
+        }
+
+        return $result !== '' ? $result : 'I';
     }
 
     private function buildSections(array $payload): array
@@ -1846,15 +2165,21 @@ class ReportingWorkbookExporter
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             .'<numFmts count="2"><numFmt numFmtId="164" formatCode="0.00"/><numFmt numFmtId="165" formatCode="0.00%"/></numFmts>'
-            .'<fonts count="6">'
+            .'<fonts count="12">'
             .'<font><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/><family val="2"/></font>'
             .'<font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>'
             .'<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>'
             .'<font><b/><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/><family val="2"/></font>'
             .'<font><b/><sz val="18"/><color rgb="FF1F2937"/><name val="Calibri"/><family val="2"/></font>'
             .'<font><b/><sz val="18"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><b/><sz val="14"/><color rgb="FF000000"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><sz val="11"/><color rgb="FFFF6600"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><b/><sz val="11"/><color rgb="FF0066CC"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><b/><sz val="20"/><color rgb="FF000000"/><name val="Calibri"/><family val="2"/></font>'
             .'</fonts>'
-            .'<fills count="11">'
+            .'<fills count="22">'
             .'<fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
             .'<fill><gradientFill degree="45"><stop position="0"><color rgb="FF7FB8E6"/></stop><stop position="0.45"><color rgb="FF3996D3"/></stop><stop position="1"><color rgb="FF1C203D"/></stop></gradientFill></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFE8F3FB"/><bgColor indexed="64"/></patternFill></fill>'
@@ -1865,10 +2190,21 @@ class ReportingWorkbookExporter
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFF2F8E8"/><bgColor indexed="64"/></patternFill></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFF9B13C"/><bgColor indexed="64"/></patternFill></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFF8D6"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF2F75B5"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF5B9BD5"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFBDD7EE"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF00B050"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFFF0000"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFC000"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFD0CECE"/><bgColor indexed="64"/></patternFill></fill>'
             .'</fills>'
-            .'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFDBFE"/></left><right style="thin"><color rgb="FFBFDBFE"/></right><top style="thin"><color rgb="FFBFDBFE"/></top><bottom style="thin"><color rgb="FFBFDBFE"/></bottom><diagonal/></border></borders>'
+            .'<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFDBFE"/></left><right style="thin"><color rgb="FFBFDBFE"/></right><top style="thin"><color rgb="FFBFDBFE"/></top><bottom style="thin"><color rgb="FFBFDBFE"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders>'
             .'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            .'<cellXfs count="21">'
+            .'<cellXfs count="37">'
             .'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
             .'<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
             .'<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
@@ -1890,6 +2226,22 @@ class ReportingWorkbookExporter
             .'<xf numFmtId="1" fontId="4" fillId="10" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
             .'<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
             .'<xf numFmtId="1" fontId="5" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            .'<xf numFmtId="0" fontId="6" fillId="13" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="2" fillId="11" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="12" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="14" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="15" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="17" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="18" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="19" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="20" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="11" fillId="21" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="11" fillId="16" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="8" fillId="5" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="9" fillId="5" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="11" fillId="14" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="5" fillId="11" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
             .'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
     }
 
