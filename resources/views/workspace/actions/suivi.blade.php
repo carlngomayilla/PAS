@@ -177,6 +177,54 @@
         $periodDisplay = (optional($action->date_debut)->format('d/m/Y') ?: '-')
             .' au '
             .(optional($action->date_fin)->format('d/m/Y') ?: '-');
+        $stepperStoppedStatuses = ['suspendu', 'annule'];
+        $stepperFinishedStatuses = ['acheve_dans_delai', 'acheve_hors_delai', 'cloturee'];
+        $stepperSubmittedStatuses = ['soumise_chef', 'validee_chef', 'correction_demandee', 'rejetee_chef', 'validee_direction', 'rejetee_direction'];
+        $stepperValidatedStatuses = ['validee_chef', 'validee_direction'];
+        $stepperCorrectionStatuses = ['correction_demandee', 'rejetee_chef', 'rejetee_direction'];
+        $stepperIsStopped = in_array($status, $stepperStoppedStatuses, true);
+        $stepperHasStarted = $progressionReelle > 0
+            || ! in_array($status, ['non_demarre'], true)
+            || $validationStatus !== 'non_soumise';
+        $stepperExecutionDone = $progressionReelle >= 100 || in_array($status, $stepperFinishedStatuses, true);
+        $stepperHasSubmitted = in_array($validationStatus, $stepperSubmittedStatuses, true);
+        $stepperIsValidated = in_array($validationStatus, $stepperValidatedStatuses, true);
+        $stepperNeedsCorrection = in_array($validationStatus, $stepperCorrectionStatuses, true) || $status === 'a_corriger';
+        $stepperIsClosed = in_array($status, $stepperFinishedStatuses, true) || $stepperIsValidated;
+        $actionStepperSteps = [
+            [
+                'label' => 'Planification',
+                'caption' => 'Action créée',
+                'state' => 'done',
+            ],
+            [
+                'label' => 'Exécution',
+                'caption' => number_format($progressionReelle, 0, ',', ' ').'% réalisé',
+                'state' => $stepperIsStopped
+                    ? 'blocked'
+                    : ($stepperExecutionDone || $stepperIsValidated ? 'done' : ($stepperHasStarted ? 'current' : 'pending')),
+            ],
+            [
+                'label' => 'Validation',
+                'caption' => $validationLabel,
+                'state' => $stepperNeedsCorrection
+                    ? 'warning'
+                    : ($stepperIsValidated ? 'done' : ($stepperHasSubmitted ? 'current' : 'pending')),
+            ],
+            [
+                'label' => 'Clôture',
+                'caption' => $stepperIsClosed ? 'Dossier finalisé' : 'À venir',
+                'state' => $stepperIsStopped
+                    ? 'blocked'
+                    : ($stepperIsClosed ? 'done' : (($stepperExecutionDone || $stepperIsValidated) ? 'current' : 'pending')),
+            ],
+        ];
+        $actionStepperActiveIndex = 0;
+        foreach ($actionStepperSteps as $stepIndex => $step) {
+            if ($step['state'] !== 'pending') {
+                $actionStepperActiveIndex = $stepIndex;
+            }
+        }
     @endphp
 
     <section id="action-header" class="action-detail-hero mb-4">
@@ -241,6 +289,29 @@
                 <a class="btn btn-secondary" href="{{ route('workspace.actions.index') }}">Retour liste</a>
             </div>
         </div>
+    </section>
+
+    <section class="action-stepper-panel mb-4" aria-label="Étapes dynamiques de l'action">
+        <div class="action-stepper-head">
+            <div>
+                <span class="action-tracking-kicker">Workflow</span>
+                <h2 class="action-stepper-title">Étapes de suivi</h2>
+            </div>
+            <span class="action-stepper-pill">
+                {{ number_format($progressionReelle, 0, ',', ' ') }}% réalisé
+            </span>
+        </div>
+        <ol class="action-stepper">
+            @foreach ($actionStepperSteps as $index => $step)
+                <li class="action-stepper-item is-{{ $step['state'] }} {{ $index <= $actionStepperActiveIndex ? 'is-line-active' : '' }}" @if (in_array($step['state'], ['current', 'warning', 'blocked'], true)) aria-current="step" @endif>
+                    <span class="action-stepper-marker">{{ $index + 1 }}</span>
+                    <span class="action-stepper-copy">
+                        <strong>{{ $step['label'] }}</strong>
+                        <small>{{ $step['caption'] }}</small>
+                    </span>
+                </li>
+            @endforeach
+        </ol>
     </section>
 
     <section class="showcase-summary-grid mb-4">

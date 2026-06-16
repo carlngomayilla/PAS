@@ -9,9 +9,9 @@ use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\User;
 use App\Services\Scope\UserScopeService;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Schema;
 
 class DashboardStatsService
 {
@@ -108,7 +108,7 @@ class DashboardStatsService
 
     private function average(Builder $query, string $column): float
     {
-        if (! Schema::hasColumn($query->getModel()->getTable(), $column)) {
+        if (! SchemaIntrospectionCache::hasColumn($query->getModel()->getTable(), $column)) {
             return 0.0;
         }
 
@@ -126,7 +126,7 @@ class DashboardStatsService
         };
 
         foreach (['statut', 'status'] as $column) {
-            if (Schema::hasColumn($table, $column)) {
+            if (SchemaIntrospectionCache::hasColumn($table, $column)) {
                 return (clone $query)->whereIn($column, $activeStatuses)->count();
             }
         }
@@ -136,7 +136,7 @@ class DashboardStatsService
 
     private function countByStatus(Builder $query, string $status): int
     {
-        if (! Schema::hasColumn($query->getModel()->getTable(), 'statut_dynamique')) {
+        if (! SchemaIntrospectionCache::hasColumn($query->getModel()->getTable(), 'statut_dynamique')) {
             return 0;
         }
 
@@ -155,7 +155,7 @@ class DashboardStatsService
         $completed = \App\Services\Actions\ActionTrackingService::completedActionStatuses();
         $today = Carbon::today();
 
-        if (Schema::hasColumn($table, 'date_echeance') && Schema::hasColumn($table, 'statut_dynamique')) {
+        if (SchemaIntrospectionCache::hasColumn($table, 'date_echeance') && SchemaIntrospectionCache::hasColumn($table, 'statut_dynamique')) {
             return (clone $query)
                 ->whereNotNull('date_echeance')
                 ->whereDate('date_echeance', '<', $today)
@@ -163,11 +163,11 @@ class DashboardStatsService
                 ->count();
         }
 
-        if (Schema::hasColumn($table, 'statut_dynamique')) {
+        if (SchemaIntrospectionCache::hasColumn($table, 'statut_dynamique')) {
             return (clone $query)->where('statut_dynamique', 'en_retard')->count();
         }
 
-        if (Schema::hasColumn($table, 'date_fin')) {
+        if (SchemaIntrospectionCache::hasColumn($table, 'date_fin')) {
             return (clone $query)
                 ->whereDate('date_fin', '<', $today)
                 ->count();
@@ -178,7 +178,7 @@ class DashboardStatsService
 
     private function pendingValidations(Builder $query): int
     {
-        if (! Schema::hasColumn($query->getModel()->getTable(), 'statut_validation')) {
+        if (! SchemaIntrospectionCache::hasColumn($query->getModel()->getTable(), 'statut_validation')) {
             return 0;
         }
 
@@ -203,7 +203,7 @@ class DashboardStatsService
         $table = $query->getModel()->getTable();
 
         foreach (['responsable_id', 'agent_id', 'user_id'] as $column) {
-            if (Schema::hasColumn($table, $column)) {
+            if (SchemaIntrospectionCache::hasColumn($table, $column)) {
                 return (clone $query)->where($column, $user->id)->count();
             }
         }
@@ -213,7 +213,7 @@ class DashboardStatsService
 
     private function distinctCount(Builder $query, string $column): int
     {
-        if (! Schema::hasColumn($query->getModel()->getTable(), $column)) {
+        if (! SchemaIntrospectionCache::hasColumn($query->getModel()->getTable(), $column)) {
             return 0;
         }
 

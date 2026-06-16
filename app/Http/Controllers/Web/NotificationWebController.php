@@ -9,6 +9,8 @@ use App\Services\Alerting\AlertReadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 
 class NotificationWebController extends Controller
 {
@@ -26,10 +28,15 @@ class NotificationWebController extends Controller
             ? 'alertes'
             : 'notifications';
 
-        $notifications = $user->notifications()
+        $notificationItems = $user->notifications()
             ->latest()
-            ->paginate(30)
-            ->withQueryString();
+            ->get()
+            ->reject(fn ($notification): bool => $this->isAlertNotification($notification))
+            ->values();
+        $notifications = $this->paginateNotifications($notificationItems, $request, 30);
+        $unreadCount = $notificationItems
+            ->filter(static fn ($notification): bool => $notification->read_at === null)
+            ->count();
 
         $canReadAlerts = $user->hasPermission('planning.read') && $user->hasPermission('alerts.read');
         $alertItems = collect();
@@ -54,7 +61,7 @@ class NotificationWebController extends Controller
 
         return view('workspace.notifications.index', [
             'notifications' => $notifications,
-            'unreadCount' => $user->unreadNotifications()->count(),
+            'unreadCount' => $unreadCount,
             'activeTab' => $activeTab,
             'canReadAlerts' => $canReadAlerts,
             'alertItems' => $alertItems,
@@ -89,9 +96,40 @@ class NotificationWebController extends Controller
             abort(401);
         }
 
-        $user->unreadNotifications()->update(['read_at' => now()]);
+        $user->unreadNotifications()
+            ->get()
+            ->reject(fn ($notification): bool => $this->isAlertNotification($notification))
+            ->each
+            ->markAsRead();
 
         return back()->with('success', 'Toutes les notifications ont été marquées comme lues.');
+    }
+
+    private function isAlertNotification(mixed $notification): bool
+    {
+        $data = is_array($notification->data ?? null) ? $notification->data : [];
+
+        return strtolower((string) ($data['module'] ?? '')) === 'alertes';
+    }
+
+    /**
+     * @param Collection<int, mixed> $items
+     * @return LengthAwarePaginator<int, mixed>
+     */
+    private function paginateNotifications(Collection $items, Request $request, int $perPage): LengthAwarePaginator
+    {
+        $page = max(1, (int) $request->integer('page', 1));
+
+        return new LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
     }
 
     /**

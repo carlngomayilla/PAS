@@ -121,7 +121,7 @@ class NotificationPolicySettings
                 'offset_days' => -3,
                 'level' => 'warning',
                 'target_role' => 'service',
-                'message_template' => 'J-3 avant echeance pour {action_label}. Acceleration demandee.',
+                'message_template' => 'Il reste 3 jours avant l\'échéance de {action_label}. Vérifiez l\'avancement maintenant.',
                 'active' => true,
             ],
             [
@@ -129,7 +129,7 @@ class NotificationPolicySettings
                 'offset_days' => 7,
                 'level' => 'critical',
                 'target_role' => 'direction',
-                'message_template' => 'J+7 après échéance pour {action_label}. Escalade direction requise.',
+                'message_template' => '{action_label} a dépassé son échéance de 7 jours. Une décision de la direction est nécessaire.',
                 'active' => true,
             ],
         ];
@@ -150,6 +150,7 @@ class NotificationPolicySettings
             'action_reviewed_by_direction' => ['group' => 'Actions', 'label' => 'Décision direction', 'description' => 'Notification après validation ou rejet par la direction.'],
             'action_finalized_by_chef' => ['group' => 'Actions', 'label' => 'Finalisation par le chef', 'description' => 'Notification finale lorsque le chef devient la dernière étape du circuit.'],
             'action_finalized_without_workflow' => ['group' => 'Actions', 'label' => 'Clôture sans workflow', 'description' => 'Notification finale quand aucune validation supplémentaire n’est active.'],
+            'action_comment_added' => ['group' => 'Actions', 'label' => 'Commentaire action', 'description' => 'Notification envoyée quand un utilisateur ajoute un commentaire sur une action.'],
             'action_alert_escalation' => ['group' => 'Alertes', 'label' => 'Escalade d’alerte action', 'description' => 'Notification issue des journaux d’action en warning, critique ou urgence.'],
             'action_financing_requested' => ['group' => 'Financement', 'label' => 'Besoin de financement', 'description' => 'Notification envoyée à la DAF et aux responsables de suivi lorsqu’une action demande un financement.'],
             'action_financing_reviewed_by_daf' => ['group' => 'Financement', 'label' => 'Décision DAF', 'description' => 'Notification après validation ou rejet DAF du financement.'],
@@ -186,9 +187,9 @@ class NotificationPolicySettings
     public function alertLevelDefinitions(): array
     {
         return [
-            'warning' => ['label' => 'Warning', 'description' => 'Escalade faible mais visible.'],
-            'critical' => ['label' => 'Critique', 'description' => 'Escalade forte sur les cas critiques.'],
-            'urgence' => ['label' => 'Urgence', 'description' => 'Escalade maximale sur les situations les plus sensibles.'],
+            'warning' => ['label' => 'Attention', 'description' => 'Problème à suivre rapidement.'],
+            'critical' => ['label' => 'Critique', 'description' => 'Problème important à traiter sans attendre.'],
+            'urgence' => ['label' => 'Urgence', 'description' => 'Situation très grave à traiter tout de suite.'],
         ];
     }
 
@@ -508,6 +509,7 @@ class NotificationPolicySettings
             'action_reviewed_by_direction' => ['title' => '', 'message' => '', 'channels' => ['in_app']],
             'action_finalized_by_chef' => ['title' => 'Action finalisée par le chef', 'message' => 'L’action « {action_label} » a été finalisée par le chef de service, sans étape direction supplémentaire.', 'channels' => ['in_app']],
             'action_finalized_without_workflow' => ['title' => 'Action clôturée', 'message' => 'L’action « {action_label} » a été clôturée sans circuit de validation supplémentaire.', 'channels' => ['in_app']],
+            'action_comment_added' => ['title' => 'Nouveau commentaire sur une action', 'message' => '{actor_name} a ajouté un commentaire sur l’action « {action_label} ».', 'channels' => ['in_app']],
             'action_alert_escalation' => ['title' => '', 'message' => '', 'channels' => ['in_app', 'audit', 'email']],
             'action_financing_requested' => ['title' => 'Demande de financement à instruire', 'message' => 'L’action « {action_label} » nécessite un financement estimé à {montant_estime}. Traitement DAF requis.', 'channels' => ['in_app', 'audit', 'email']],
             // Titres défaut variables (validé / refusé / complément) — gérés côté service.
@@ -689,7 +691,7 @@ class NotificationPolicySettings
         }
 
         try {
-            return $this->tableAvailable = Schema::hasTable('platform_settings');
+            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }

@@ -617,10 +617,10 @@ class AlertCenterService
         $isNotStarted = $progression <= 0.0;
         $level = $daysLate >= 7 || $isNotStarted ? 'critical' : 'warning';
         $type = $isNotStarted ? 'action_non_demarre' : 'retard';
-        $title = $isNotStarted ? 'Action non demarree - delai depasse' : 'Action hors delai';
+        $title = $isNotStarted ? 'Action non démarrée après l\'échéance' : 'Action en retard';
         $message = $isNotStarted
-            ? sprintf('L action "%s" devait demarrer le %s et aucune progression n a ete enregistree.', (string) $action->libelle, $deadline->format('d/m/Y'))
-            : sprintf('L action "%s" depasse l echeance de %d jour(s).', (string) $action->libelle, $daysLate);
+            ? sprintf('L\'action "%s" devait être terminée le %s. Aucune progression n\'a été enregistrée.', (string) $action->libelle, $deadline->format('d/m/Y'))
+            : sprintf('L\'action "%s" a dépassé son échéance de %d jour(s).', (string) $action->libelle, $daysLate);
 
         return [
             'source_type' => 'action_overdue',
@@ -667,9 +667,9 @@ class AlertCenterService
             'niveau_label' => $this->levelLabel($level),
             'type' => 'action_a_parametrer',
             'type_label' => $this->typeLabel('action_a_parametrer'),
-            'titre' => 'Action importee a parametrer',
+            'titre' => 'Action importée à paramétrer',
             'message' => sprintf(
-                'L action "%s" est importee depuis %d jour(s) et attend son parametrage dans le PTA avant affectation a l agent.',
+                'L\'action "%s" a été importée il y a %d jour(s). Elle doit être paramétrée dans le PTA avant d\'être confiée à un agent.',
                 (string) $action->libelle,
                 $daysWaiting
             ),
@@ -684,7 +684,7 @@ class AlertCenterService
                 'pta' => (string) ($action->pta?->titre ?? '-'),
             ],
             'metrics' => null,
-            'section_label' => 'Parametrage PTA',
+            'section_label' => 'Paramétrage PTA',
             'target_url' => $serviceId > 0
                 ? route('workspace.pta.index', ['service_id' => $serviceId])
                 : route('workspace.pta.index'),
@@ -703,10 +703,10 @@ class AlertCenterService
         $isCritical = $threshold > 0 && $value <= ($threshold * 0.8);
         $level = $isCritical ? 'critical' : 'warning';
         $isGlobal = str_contains(mb_strtolower((string) ($mesure->kpi?->libelle ?? '')), 'global');
-        $title = $isGlobal ? 'Performance d execution critique' : 'Indicateur sous seuil';
+        $title = $isGlobal ? 'Performance trop faible' : 'Indicateur sous le seuil';
         $message = sprintf(
-            '%s est a %.2f pour la periode %s, sous le seuil de %.2f.',
-            (string) ($mesure->kpi?->libelle ?? 'L indicateur'),
+            '%s est à %.2f pour la période %s. Le seuil attendu est %.2f.',
+            (string) ($mesure->kpi?->libelle ?? 'L\'indicateur suivi'),
             $value,
             (string) ($mesure->periode ?: '-'),
             $threshold
@@ -747,7 +747,7 @@ class AlertCenterService
         $action = $log->action;
         $isManualAnomaly = str_starts_with((string) $log->type_evenement, 'anomalie_');
         $sectionLabel = match (true) {
-            $isManualAnomaly => 'Controle et anomalies',
+            $isManualAnomaly => 'Contrôle et anomalies',
             default => 'Journal et validation',
         };
         $targetUrl = $action instanceof Action
@@ -766,7 +766,7 @@ class AlertCenterService
             'type' => (string) $log->type_evenement,
             'type_label' => $this->typeLabel((string) $log->type_evenement),
             'titre' => $this->logTitle($log),
-            'message' => (string) $log->message,
+            'message' => $this->logMessage($log),
             'date' => optional($log->created_at)?->toIso8601String() ?? now()->toIso8601String(),
             'date_label' => optional($log->created_at)->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
             'sort_timestamp' => optional($log->created_at)->timestamp ?? now()->timestamp,
@@ -803,9 +803,9 @@ class AlertCenterService
             'niveau_label' => $this->levelLabel($level),
             'type' => 'delegation_expiration',
             'type_label' => $this->typeLabel('delegation_expiration'),
-            'titre' => 'Delegation expirant bientot',
+            'titre' => 'Délégation bientôt terminée',
             'message' => sprintf(
-                'La delegation de %s vers %s expire le %s%s.',
+                'La délégation de %s vers %s se termine le %s%s.',
                 (string) ($delegation->delegant?->name ?? 'Utilisateur'),
                 (string) ($delegation->delegue?->name ?? 'Utilisateur'),
                 $endDate->format('d/m/Y'),
@@ -817,7 +817,7 @@ class AlertCenterService
             'direction' => $this->directionLabel($delegation->direction),
             'service' => $this->serviceLabel($delegation->service),
             'action' => null,
-            'section_label' => 'Delegations',
+            'section_label' => 'Délégations',
             'target_url' => route('workspace.delegations.index'),
             'fingerprint' => 'delegation_expiring:'.$delegation->id.':'.$endDate->format('Ymd'),
         ];
@@ -839,9 +839,9 @@ class AlertCenterService
             'niveau_label' => $this->levelLabel('warning'),
             'type' => 'pao_manquant',
             'type_label' => $this->typeLabel('pao_manquant'),
-            'titre' => 'Direction sans PAO sur OS',
+            'titre' => 'PAO manquant pour une direction',
             'message' => sprintf(
-                'La direction %s n a pas encore de PAO pour l objectif strategique "%s" (%s).',
+                'La direction %s n\'a pas encore de PAO pour l\'objectif stratégique "%s" (%s).',
                 $this->directionLabel($direction),
                 (string) $objectif->libelle,
                 (string) $objectif->code
@@ -850,7 +850,7 @@ class AlertCenterService
             'date_label' => $now->format('d/m/Y H:i'),
             'sort_timestamp' => $now->timestamp,
             'direction' => $this->directionLabel($direction),
-            'service' => 'Couverture strategique',
+            'service' => 'Couverture stratégique',
             'action' => [
                 'id' => (int) $objectif->id,
                 'libelle' => (string) ($objectif->pasAxe?->code.' / '.$objectif->code.' - '.$objectif->libelle),
@@ -931,19 +931,19 @@ class AlertCenterService
         $code = is_object($direction) ? (string) ($direction->code ?? '') : '';
         $label = is_object($direction) ? (string) ($direction->libelle ?? '') : '';
 
-        return trim($code !== '' ? $code.' - '.$label : $label) ?: 'Non renseignee';
+        return trim($code !== '' ? $code.' - '.$label : $label) ?: 'Non renseignée';
     }
 
     private function serviceLabel(mixed $service): string
     {
         if (! is_object($service)) {
-            return 'Non renseigne';
+            return 'Non renseigné';
         }
 
         $code = (string) ($service->code ?? '');
         $label = (string) ($service->libelle ?? '');
 
-        return trim($code !== '' ? $code.' - '.$label : $label) ?: 'Non renseigne';
+        return trim($code !== '' ? $code.' - '.$label : $label) ?: 'Non renseigné';
     }
 
     private function levelLabel(string $level): string
@@ -955,26 +955,31 @@ class AlertCenterService
     {
         return match ($type) {
             'retard' => 'Retard',
-            'action_a_parametrer' => 'A parametrer',
-            'action_a_surveiller' => 'A surveiller',
-            'action_non_demarre' => 'Non demarree',
+            'action_a_parametrer' => 'À paramétrer',
+            'action_a_surveiller' => 'À surveiller',
+            'action_non_demarre' => 'Non démarrée',
             'alerte_combinee_critique' => 'Escalade DG',
             'retard_kpi_critique' => 'Escalade DG',
-            'conformite_incomplete' => 'Conformite',
+            'conformite_incomplete' => 'Conformité',
             'justificatif_absent' => 'Justificatif',
+            'progression_sous_seuil' => 'Progression faible',
+            'kpi_global_sous_seuil' => 'Score faible',
+            'echeance_proche' => 'Échéance proche',
             'pao_manquant' => 'PAO manquant',
-            'kpi_global' => 'Performance d execution',
+            'kpi_global' => 'Performance d\'exécution',
             'kpi_sous_seuil' => 'Indicateur sous seuil',
-            'periode_manquante' => 'Periode manquante',
-            'ecart_progression' => 'Ecart progression',
-            'validation_bloquee' => 'Validation bloquee',
+            'periode_manquante' => 'Période manquante',
+            'ecart_progression' => 'Écart de progression',
+            'validation_bloquee' => 'Validation bloquée',
             'delegation_expiration' => 'Delegation',
             'action_soumise_validation' => 'Soumission',
             'action_validee_chef' => 'Validation chef',
             'action_rejetee_chef' => 'Rejet chef',
             'action_validee_direction' => 'Validation direction',
             'action_rejetee_direction' => 'Rejet direction',
-            default => ucfirst(str_replace('_', ' ', $type)),
+            default => str_starts_with($type, 'alerte_temporelle_')
+                ? 'Échéance'
+                : ucfirst(str_replace('_', ' ', $type)),
         };
     }
 
@@ -1007,15 +1012,72 @@ class AlertCenterService
         };
     }
 
+    private function logMessage(ActionLog $log): string
+    {
+        $type = (string) $log->type_evenement;
+        $details = is_array($log->details) ? $log->details : [];
+        $actionLabel = $log->action instanceof Action
+            ? (string) $log->action->libelle
+            : 'cette action';
+
+        return match (true) {
+            $type === 'progression_sous_seuil' => sprintf(
+                'L\'action "%s" avance moins vite que prévu. Réalisé : %s. Attendu : %s.',
+                $actionLabel,
+                $this->percentLabel($details['progression_reelle'] ?? null),
+                $this->percentLabel($details['progression_theorique'] ?? null)
+            ),
+            $type === 'action_a_surveiller' => is_numeric($details['jours_restants'] ?? null)
+                ? sprintf('L\'action "%s" arrive à échéance dans %d jour(s). Vérifiez l\'avancement.', $actionLabel, (int) $details['jours_restants'])
+                : sprintf('L\'action "%s" arrive bientôt à échéance. Vérifiez l\'avancement.', $actionLabel),
+            $type === 'echeance_proche' => sprintf(
+                'La date de fin de l\'action "%s" est proche, mais l\'avancement reste insuffisant.',
+                $actionLabel
+            ),
+            $type === 'justificatif_absent' => sprintf(
+                'Aucun justificatif n\'a été déposé pour l\'action "%s". Ajoutez une pièce pour prouver l\'exécution.',
+                $actionLabel
+            ),
+            $type === 'kpi_global_sous_seuil' => sprintf(
+                'Le score global de l\'action "%s" est trop bas%s. Vérifiez les causes.',
+                $actionLabel,
+                is_numeric($details['kpi_global'] ?? null)
+                    ? ' : '.$this->percentLabel($details['kpi_global'])
+                    : ''
+            ),
+            $type === 'alerte_combinee_critique' => sprintf(
+                'L\'action "%s" est en retard et son score est critique. Une décision rapide est nécessaire.',
+                $actionLabel
+            ),
+            str_starts_with($type, 'alerte_temporelle_') => trim((string) $log->message) !== ''
+                ? (string) $log->message
+                : sprintf('L\'échéance de l\'action "%s" doit être vérifiée.', $actionLabel),
+            default => trim((string) $log->message) !== ''
+                ? (string) $log->message
+                : 'Un problème a été détecté sur cette action.',
+        };
+    }
+
+    private function percentLabel(mixed $value): string
+    {
+        return is_numeric($value)
+            ? number_format((float) $value, 0, ',', ' ').' %'
+            : 'non renseigné';
+    }
+
     private function logTitle(ActionLog $log): string
     {
         return match ((string) $log->type_evenement) {
-            'action_a_surveiller' => 'Action a surveiller',
+            'action_a_surveiller' => 'Action à surveiller',
             'alerte_combinee_critique' => 'Retard et indicateur critique',
+            'progression_sous_seuil' => 'Progression trop faible',
+            'kpi_global_sous_seuil' => 'Score global trop faible',
+            'echeance_proche' => 'Échéance proche',
+            'justificatif_absent' => 'Justificatif absent',
             'retard_kpi_critique' => 'Retard et indicateur critique',
-            'periode_manquante' => 'Periode non renseignee',
-            'ecart_progression' => 'Ecart de progression',
-            'validation_bloquee' => 'Validation bloquee',
+            'periode_manquante' => 'Période non renseignée',
+            'ecart_progression' => 'Écart de progression',
+            'validation_bloquee' => 'Validation bloquée',
             'action_soumise_validation' => 'Action soumise pour validation',
             'action_validee_chef' => 'Action validee par le chef',
             'action_rejetee_chef' => 'Action rejetee par le chef',

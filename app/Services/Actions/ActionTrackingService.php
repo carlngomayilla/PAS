@@ -1030,7 +1030,7 @@ class ActionTrackingService
                 $action,
                 'progression_sous_seuil',
                 'warning',
-                'Progression reelle en dessous du seuil attendu.',
+                'La progression réelle est plus basse que la progression attendue.',
                 [
                     'progression_reelle' => $realProgress,
                     'progression_theorique' => $theoreticalProgress,
@@ -1052,7 +1052,7 @@ class ActionTrackingService
                     $action,
                     'action_a_surveiller',
                     'warning',
-                    'Action proche de l echeance et necessitant une vigilance immediate.',
+                    'L\'action arrive bientôt à échéance. Elle doit être suivie de près.',
                     [
                         'jours_restants' => $daysLeft,
                         'progression_reelle' => $realProgress,
@@ -1076,7 +1076,7 @@ class ActionTrackingService
                     $action,
                     'echeance_proche',
                     'critical',
-                    'Date de fin proche sans avancement suffisant.',
+                    'La date de fin est proche et l\'avancement est insuffisant.',
                     [
                         'jours_restants' => $daysLeft,
                         'progression_reelle' => $realProgress,
@@ -1101,7 +1101,7 @@ class ActionTrackingService
                 $action,
                 'justificatif_absent',
                 'warning',
-                'Aucun justificatif d execution n a ete depose pour l action.',
+                'Aucun justificatif d\'exécution n\'a été déposé pour l\'action.',
                 [
                     'statut_dynamique' => $action->statut_dynamique,
                     'date_fin_reelle' => optional($action->date_fin_reelle)->toDateString(),
@@ -1119,7 +1119,7 @@ class ActionTrackingService
                 $action,
                 'kpi_global_sous_seuil',
                 'critical',
-                'Indicateur global de l action sous le seuil critique de pilotage.',
+                'Le score global de l\'action est sous le seuil critique.',
                 ['kpi_global' => $globalKpi],
                 'direction'
             );
@@ -1128,7 +1128,7 @@ class ActionTrackingService
                 $action,
                 'kpi_global_sous_seuil',
                 'warning',
-                'Indicateur global de l action sous le seuil de pilotage.',
+                'Le score global de l\'action est sous le seuil attendu.',
                 ['kpi_global' => $globalKpi],
                 'direction'
             );
@@ -1144,7 +1144,7 @@ class ActionTrackingService
                 $action,
                 'alerte_combinee_critique',
                 'urgence',
-                'Action en retard avec indicateur critique. Urgence et escalade DG requises.',
+                'L\'action est en retard et son score est critique. Une décision rapide est nécessaire.',
                 [
                     'kpi_global' => $globalKpi,
                     'progression_reelle' => $realProgress,
@@ -1183,7 +1183,7 @@ class ActionTrackingService
                 $action,
                 'alerte_temporelle_'.(string) ($rule['code'] ?? $offsetDays),
                 (string) ($rule['level'] ?? 'warning'),
-                $message !== '' ? $message : sprintf('Alerte temporelle %s sur l echeance de l action.', $offsetDays >= 0 ? 'J+'.$offsetDays : 'J'.$offsetDays),
+                $message !== '' ? $message : sprintf('Échéance à vérifier (%s) pour cette action.', $offsetDays >= 0 ? 'J+'.$offsetDays : 'J'.$offsetDays),
                 [
                     'offset_days' => $offsetDays,
                     'timeline_rule' => (string) ($rule['code'] ?? ''),

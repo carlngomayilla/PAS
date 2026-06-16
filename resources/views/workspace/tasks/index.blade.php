@@ -15,25 +15,22 @@
     @endphp
 
     <div class="app-screen-flow">
-        <section class="showcase-hero mb-4 app-screen-block">
-            <div class="showcase-hero-body">
-                <div>
-                    <span class="showcase-eyebrow">Centre personnel</span>
-                    <h1 class="showcase-title">Mes taches</h1>
-                </div>
-
-                <div class="showcase-action-row">
-                    <span class="showcase-chip">
-                        <span class="showcase-chip-dot {{ (int) ($summary['overdue'] ?? 0) > 0 ? 'bg-red-600' : 'bg-green-600' }}"></span>
-                        {{ (int) ($summary['total'] ?? 0) }} ouverte(s)
-                    </span>
-                    <span class="showcase-chip">
-                        Score {{ number_format((float) ($summary['score'] ?? 100), 0, ',', ' ') }}%
-                    </span>
-                    <span class="showcase-chip">Qualite {{ $summary['quality_label'] ?? 'Excellent' }}</span>
-                </div>
-            </div>
-        </section>
+        <x-ui.page-title
+            class="mb-4 app-screen-block"
+            eyebrow="Centre personnel"
+            title="Mes taches"
+        >
+            <x-slot:actions>
+                <span class="showcase-chip">
+                    <span class="showcase-chip-dot {{ (int) ($summary['overdue'] ?? 0) > 0 ? 'bg-red-600' : 'bg-green-600' }}"></span>
+                    {{ (int) ($summary['total'] ?? 0) }} ouverte(s)
+                </span>
+                <span class="showcase-chip">
+                    Score {{ number_format((float) ($summary['score'] ?? 100), 0, ',', ' ') }}%
+                </span>
+                <span class="showcase-chip">Qualite {{ $summary['quality_label'] ?? 'Excellent' }}</span>
+            </x-slot:actions>
+        </x-ui.page-title>
 
         <section class="showcase-panel app-screen-block">
             <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">

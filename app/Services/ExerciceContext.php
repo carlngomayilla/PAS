@@ -9,10 +9,10 @@ use App\Models\KpiMesure;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\Pta;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Schema;
 
 class ExerciceContext
 {
@@ -128,7 +128,7 @@ class ExerciceContext
         $statuses = [];
 
         // 1. Annees couvertes par les PAS en BDD (periode_debut → periode_fin inclus).
-        if (Schema::hasTable('pas')) {
+        if (SchemaIntrospectionCache::hasTable('pas')) {
             Pas::query()
                 ->select(['periode_debut', 'periode_fin'])
                 ->get()
@@ -146,7 +146,7 @@ class ExerciceContext
         }
 
         // 2. Annees des PAO (filet de securite si un PAO orphelin existe).
-        if (Schema::hasTable('paos')) {
+        if (SchemaIntrospectionCache::hasTable('paos')) {
             Pao::query()
                 ->whereNotNull('annee')
                 ->distinct()
@@ -162,7 +162,7 @@ class ExerciceContext
         // 3. Pour les annees retenues, on enrichit le libelle/statut depuis la
         //    table exercices SI un exercice correspondant existe. On NE remonte
         //    PAS d'annees supplementaires depuis cette table.
-        if ($years !== [] && Schema::hasTable('exercices')) {
+        if ($years !== [] && SchemaIntrospectionCache::hasTable('exercices')) {
             Exercice::query()
                 ->whereIn('annee', array_keys($years))
                 ->get(['annee', 'libelle', 'statut'])
@@ -335,7 +335,7 @@ class ExerciceContext
     {
         $this->upsertYear($year);
 
-        if (! Schema::hasTable('exercices')) {
+        if (! SchemaIntrospectionCache::hasTable('exercices')) {
             return null;
         }
 
@@ -346,7 +346,7 @@ class ExerciceContext
 
     public function upsertYear(int $year): void
     {
-        if (! Schema::hasTable('exercices')) {
+        if (! SchemaIntrospectionCache::hasTable('exercices')) {
             return;
         }
 
@@ -364,7 +364,7 @@ class ExerciceContext
 
     private function activeExerciseYear(): ?int
     {
-        if (! Schema::hasTable('exercices')) {
+        if (! SchemaIntrospectionCache::hasTable('exercices')) {
             return null;
         }
 

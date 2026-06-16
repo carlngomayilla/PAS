@@ -94,7 +94,7 @@ class AlerteController extends Controller
         $this->markAlertNotificationsAsRead($user);
 
         return response()->json([
-            'message' => 'Alerte marquee comme lue.',
+            'message' => 'Alerte marquée comme lue.',
             'target_url' => (string) ($alert['target_url'] ?? route('workspace.alertes')),
             'fingerprint' => (string) ($alert['fingerprint'] ?? ''),
         ]);
@@ -121,7 +121,7 @@ class AlerteController extends Controller
         $this->markAlertNotificationsAsRead($user);
 
         return response()->json([
-            'message' => 'Alertes visibles marquees comme lues.',
+            'message' => 'Alertes visibles marquées comme lues.',
             'count' => count($fingerprints),
         ]);
     }

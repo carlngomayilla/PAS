@@ -18,12 +18,12 @@ use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\PlanningModificationLockService;
 use App\Services\PlanningClosureReportService;
 use App\Services\Security\SecureJustificatifStorage;
 use App\Services\WorkflowSettings;
+use App\Support\SchemaIntrospectionCache;
 use App\Support\UiLabel;
 use App\Services\ExerciceContext;
 use Illuminate\Http\RedirectResponse;
@@ -1311,7 +1311,7 @@ class PtaWebController extends Controller
      */
     private function syncActionRmos(Action $action, array $rmoIds): void
     {
-        if (! Schema::hasTable('action_responsables')) {
+        if (! SchemaIntrospectionCache::hasTable('action_responsables')) {
             return;
         }
 

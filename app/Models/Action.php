@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\ActionPerformanceService;
+use App\Support\SchemaIntrospectionCache;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Support\Facades\Schema;
 
 class Action extends Model
 {
@@ -374,7 +374,7 @@ class Action extends Model
         ];
 
         foreach ($optionalColumns as $column => $value) {
-            if (Schema::hasColumn($this->getTable(), $column)) {
+            if (SchemaIntrospectionCache::hasColumn($this->getTable(), $column)) {
                 $updates[$column] = $value;
             }
         }

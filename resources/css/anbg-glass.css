@@ -7,7 +7,7 @@
    ============================================================ */
 
 /* ========================================================
-   ─── LIGHT MODE (par défaut) ───
+   â”€â”€â”€ LIGHT MODE (par dÃ©faut) â”€â”€â”€
    ======================================================== */
 body.anbg-glass-theme {
     /* Couleurs de la palette ANBG */
@@ -18,16 +18,16 @@ body.anbg-glass-theme {
     --glass-orange: #245f99;
     --glass-yellow: #dbeafe;
 
-    /* Surfaces — opacité renforcée en mode clair pour garantir la lisibilité
-       du texte des cartes/badges (le fond mesh coloré ne transparaît plus
-       assez pour brouiller les écritures). L'effet verre reste présent via le
-       backdrop-filter et la translucidité résiduelle. */
+    /* Surfaces â€” opacitÃ© renforcÃ©e en mode clair pour garantir la lisibilitÃ©
+       du texte des cartes/badges (le fond mesh colorÃ© ne transparaÃ®t plus
+       assez pour brouiller les Ã©critures). L'effet verre reste prÃ©sent via le
+       backdrop-filter et la transluciditÃ© rÃ©siduelle. */
     --glass-surface: rgba(255, 255, 255, 0.78);
     --glass-surface-soft: rgba(255, 255, 255, 0.66);
     --glass-surface-strong: rgba(255, 255, 255, 0.90);
     --glass-surface-hover: rgba(255, 255, 255, 0.86);
 
-    /* Bordures translucides — teinte légère pour délimiter les cartes sur fond clair */
+    /* Bordures translucides â€” teinte lÃ©gÃ¨re pour dÃ©limiter les cartes sur fond clair */
     --glass-border: rgba(57, 150, 211, 0.28);
     --glass-border-soft: rgba(57, 150, 211, 0.16);
 
@@ -38,12 +38,12 @@ body.anbg-glass-theme {
     --glass-shadow-strong: 0 28px 70px rgba(28, 32, 61, 0.20),
                            0 10px 24px rgba(28, 32, 61, 0.10);
 
-    /* Surfaces teintées (subtil rappel de la couleur de fond) */
+    /* Surfaces teintÃ©es (subtil rappel de la couleur de fond) */
     --glass-tint-blue: rgba(57, 150, 211, 0.12);
     --glass-tint-green: rgba(57, 150, 211, 0.10);
     --glass-tint-orange: rgba(36, 95, 153, 0.10);
 
-    /* Fond mesh ANBG — plus saturé et vivant */
+    /* Fond mesh ANBG â€” plus saturÃ© et vivant */
     min-height: 100vh !important;
     background:
         radial-gradient(900px 700px at 8% 0%, rgba(57, 150, 211, 0.52), transparent 60%),
@@ -80,7 +80,7 @@ body.anbg-glass-theme main {
     background: transparent !important;
 }
 
-/* === SURFACES PRINCIPALES — transparence visible === */
+/* === SURFACES PRINCIPALES â€” transparence visible === */
 body.anbg-glass-theme .glass-card,
 body.anbg-glass-theme .showcase-panel,
 body.anbg-glass-theme .action-detail-card,
@@ -101,7 +101,7 @@ body.anbg-glass-theme .reporting-hub-kpi {
     box-shadow: var(--glass-shadow) !important;
 }
 
-/* Halo doux sur le bord supérieur des cartes (effet premium) */
+/* Halo doux sur le bord supÃ©rieur des cartes (effet premium) */
 body.anbg-glass-theme .showcase-panel,
 body.anbg-glass-theme .app-card,
 body.anbg-glass-theme .ui-card,
@@ -362,7 +362,7 @@ body.anbg-glass-theme [role="status"].danger {
 }
 
 /* ========================================================
-   ─── DARK MODE — palette nuit ANBG ───
+   â”€â”€â”€ DARK MODE â€” palette nuit ANBG â”€â”€â”€
    Active sur <html class="dark"> ou body.dark
    ======================================================== */
 html.dark body.anbg-glass-theme,
@@ -450,7 +450,7 @@ html.dark body.anbg-glass-theme .admin-page-header {
 }
 
 /* ============================================================
-   ─── CHARTS PREMIUM (2026-05-30) ───
+   â”€â”€â”€ CHARTS PREMIUM (2026-05-30) â”€â”€â”€
    Layout Bento + animations + finitions premium
    ============================================================ */
 
@@ -469,7 +469,7 @@ body.anbg-glass-theme .charts-bento-row-rank {
     body.anbg-glass-theme .charts-bento {
         grid-template-columns: 1fr !important;
     }
-    /* Bug fix : les rows internes restaient en 2 colonnes <1100px → stack */
+    /* Bug fix : les rows internes restaient en 2 colonnes <1100px â†’ stack */
     body.anbg-glass-theme .charts-bento-row-hero,
     body.anbg-glass-theme .charts-bento-row-trend,
     body.anbg-glass-theme .charts-bento-row-rank {
@@ -484,7 +484,7 @@ body.anbg-glass-theme .charts-bento-row-rank {
         padding: 0.875rem !important;
         border-radius: 14px !important;
     }
-    /* Réduit typo + chart heights sur mobile pour éviter scroll horizontal */
+    /* RÃ©duit typo + chart heights sur mobile pour Ã©viter scroll horizontal */
     body.anbg-glass-theme .charts-hero-panel .charts-hero-score {
         font-size: 2.5rem !important;
     }
@@ -501,7 +501,7 @@ body.anbg-glass-theme .charts-bento .showcase-panel:nth-child(3) { animation-del
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── HERO SCORE PANEL ─── */
+/* â”€â”€â”€ HERO SCORE PANEL â”€â”€â”€ */
 body.anbg-glass-theme .charts-hero-panel {
     position: relative !important;
     overflow: hidden !important;
@@ -649,7 +649,7 @@ body.anbg-glass-theme .charts-hero-sparkline {
     pointer-events: none !important;
 }
 
-/* ─── JAUGES KPI PANEL ─── */
+/* â”€â”€â”€ JAUGES KPI PANEL â”€â”€â”€ */
 body.anbg-glass-theme .charts-gauges-panel {
     display: flex !important;
     flex-direction: column !important;
@@ -662,7 +662,7 @@ body.anbg-glass-theme .charts-gauges-grid {
     align-items: center !important;
 }
 
-/* ─── STATUS GRID PREMIUM ─── */
+/* â”€â”€â”€ STATUS GRID PREMIUM â”€â”€â”€ */
 body.anbg-glass-theme .charts-status-grid {
     display: flex !important;
     flex-direction: column !important;
@@ -728,7 +728,7 @@ body.anbg-glass-theme .charts-status-item-pct {
     font-variant-numeric: tabular-nums !important;
 }
 
-/* ─── UNIT BARS PREMIUM ─── */
+/* â”€â”€â”€ UNIT BARS PREMIUM â”€â”€â”€ */
 body.anbg-glass-theme .charts-unit-bars {
     display: flex !important;
     flex-direction: column !important;
@@ -774,7 +774,7 @@ body.anbg-glass-theme .charts-unit-bar-value {
     font-variant-numeric: tabular-nums !important;
 }
 
-/* ─── TOP ACTIONS PREMIUM ─── */
+/* â”€â”€â”€ TOP ACTIONS PREMIUM â”€â”€â”€ */
 body.anbg-glass-theme .charts-top-actions {
     display: flex !important;
     flex-direction: column !important;
@@ -847,7 +847,7 @@ body.anbg-glass-theme .charts-top-action-value {
     font-variant-numeric: tabular-nums !important;
 }
 
-/* ─── PERIOD BUTTONS PREMIUM ─── */
+/* â”€â”€â”€ PERIOD BUTTONS PREMIUM â”€â”€â”€ */
 body.anbg-glass-theme .chart-period-bar {
     display: inline-flex !important;
     gap: 0.25rem !important;
@@ -876,7 +876,7 @@ body.anbg-glass-theme .chart-period-btn.active {
     box-shadow: 0 4px 12px rgba(57, 150, 211, 0.28) !important;
 }
 
-/* ─── DARK MODE pour charts premium ─── */
+/* â”€â”€â”€ DARK MODE pour charts premium â”€â”€â”€ */
 html.dark body.anbg-glass-theme .charts-hero-panel {
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.6), color-mix(in srgb, var(--tone, #3996d3) 18%, rgba(15, 23, 42, 0.4))) !important;
 }
@@ -1640,13 +1640,13 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
     }
 
     /* ============================================================
-       PREMIUM PASS v3 (2026-06-10) — barre supérieure + en-têtes de page
-       Raffinement du rendu général : navbar frostée cohérente avec le
-       système de cartes, héros de page avec halo lumineux et typographie
-       soignée. Posé en fin de couche pour faire autorité.
+       PREMIUM PASS v3 (2026-06-10) â€” barre supÃ©rieure + en-tÃªtes de page
+       Raffinement du rendu gÃ©nÃ©ral : navbar frostÃ©e cohÃ©rente avec le
+       systÃ¨me de cartes, hÃ©ros de page avec halo lumineux et typographie
+       soignÃ©e. PosÃ© en fin de couche pour faire autoritÃ©.
        ============================================================ */
 
-    /* ── Barre supérieure (navbar) : verre clair premium ── */
+    /* â”€â”€ Barre supÃ©rieure (navbar) : verre clair premium â”€â”€ */
     html:not(.dark) body.admin-theme-scope.anbg-glass-theme #admin-shell-header,
     html:not(.dark) body.admin-theme-scope.anbg-glass-theme .admin-page-header {
         background-color: rgba(255, 255, 255, 0.80) !important;
@@ -1657,7 +1657,7 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         box-shadow: 0 12px 32px -20px rgba(28, 32, 61, 0.34) !important;
     }
 
-    /* Filet dégradé sous la navbar pour la détacher proprement du contenu */
+    /* Filet dÃ©gradÃ© sous la navbar pour la dÃ©tacher proprement du contenu */
     html:not(.dark) body.admin-theme-scope.anbg-glass-theme #admin-shell-header::after {
         content: "" !important;
         position: absolute !important;
@@ -1680,7 +1680,7 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         font-weight: 600 !important;
     }
 
-    /* Boutons icônes + pills de contrôle : verre clair cohérent */
+    /* Boutons icÃ´nes + pills de contrÃ´le : verre clair cohÃ©rent */
     html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
         .admin-navbar-icon-button,
         .admin-exercise-filter,
@@ -1705,7 +1705,7 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         box-shadow: 0 8px 20px -10px rgba(57, 150, 211, 0.45) !important;
     }
 
-    /* ── Héros de page : halo lumineux décoratif ── */
+    /* â”€â”€ HÃ©ros de page : halo lumineux dÃ©coratif â”€â”€ */
     html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
         .app-page-header,
         .showcase-hero,
@@ -1727,7 +1727,7 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         z-index: 0 !important;
     }
 
-    /* Eyebrow : pastille raffinée */
+    /* Eyebrow : pastille raffinÃ©e */
     html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
         .showcase-hero .showcase-eyebrow,
         .app-page-header .app-eyebrow
@@ -1741,7 +1741,7 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
         backdrop-filter: blur(6px) !important;
     }
 
-    /* Titre du héros : échelle & graisse premium */
+    /* Titre du hÃ©ros : Ã©chelle & graisse premium */
     html:not(.dark) body.admin-theme-scope.anbg-glass-theme :where(
         .showcase-hero .showcase-title,
         .showcase-hero h1,
@@ -2075,6 +2075,193 @@ body.admin-theme-scope.anbg-glass-theme .action-detail-actions .btn {
     padding: 0.55rem 0.95rem !important;
 }
 
+body.admin-theme-scope.anbg-glass-theme .action-stepper-panel {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(203, 213, 225, 0.92);
+    border-radius: 0.9rem;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 253, 0.96) 58%, rgba(236, 247, 240, 0.72));
+    box-shadow: 0 18px 48px rgba(23, 50, 74, 0.10);
+    padding: clamp(1.1rem, 1.8vw, 1.45rem);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 0.38rem;
+    background: linear-gradient(90deg, #1c203d 0%, #3996d3 52%, #8fc043 100%);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-head {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-title {
+    margin: 0.35rem 0 0;
+    color: #17324a;
+    font-size: clamp(1.2rem, 1.6vw, 1.5rem);
+    font-weight: 800;
+    line-height: 1.15;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-pill {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(57, 150, 211, 0.28);
+    border-radius: 999px;
+    background: rgba(57, 150, 211, 0.10);
+    color: #1f6f9f;
+    font-size: 0.82rem;
+    font-weight: 900;
+    line-height: 1;
+    padding: 0.5rem 0.85rem;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+    padding: 0.25rem 0 0;
+    list-style: none;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0 0.55rem;
+    text-align: center;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item:not(:first-child)::before {
+    content: "";
+    position: absolute;
+    top: 1.18rem;
+    right: 50%;
+    z-index: 0;
+    width: 100%;
+    height: 0.36rem;
+    border-radius: 999px;
+    background: rgba(203, 213, 225, 0.84);
+    box-shadow: inset 0 1px 2px rgba(23, 50, 74, 0.08);
+    transform: translateY(-50%);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-line-active:not(:first-child)::before {
+    background: linear-gradient(90deg, #2bb8b6, #3996d3);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-warning:not(:first-child)::before {
+    background: linear-gradient(90deg, #2bb8b6, #f9b13c);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-blocked:not(:first-child)::before {
+    background: linear-gradient(90deg, #2bb8b6, #dc2626);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-marker {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    width: 2.35rem;
+    height: 2.35rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(203, 213, 225, 0.96);
+    border-radius: 999px;
+    background: #ffffff;
+    color: #667085;
+    font-size: 0.9rem;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 10px 24px rgba(23, 50, 74, 0.10), inset 0 0 0 0.28rem rgba(248, 250, 252, 0.92);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-copy strong {
+    color: #17324a;
+    font-size: 0.9rem;
+    font-weight: 900;
+    line-height: 1.2;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-copy small {
+    color: #667085;
+    font-size: 0.74rem;
+    font-weight: 800;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-done .action-stepper-marker,
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-current .action-stepper-marker {
+    border-color: rgba(43, 184, 182, 0.42);
+    background: linear-gradient(135deg, #2bb8b6, #3996d3);
+    color: #ffffff;
+    box-shadow: 0 12px 28px rgba(57, 150, 211, 0.22), inset 0 0 0 0.25rem rgba(255, 255, 255, 0.24);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-current .action-stepper-marker {
+    transform: scale(1.08);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-warning .action-stepper-marker {
+    border-color: rgba(249, 177, 60, 0.45);
+    background: linear-gradient(135deg, #f9b13c, #f59e0b);
+    color: #1c203d;
+    box-shadow: 0 12px 28px rgba(249, 177, 60, 0.20), inset 0 0 0 0.25rem rgba(255, 255, 255, 0.25);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-blocked .action-stepper-marker {
+    border-color: rgba(220, 38, 38, 0.38);
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    color: #ffffff;
+    box-shadow: 0 12px 28px rgba(220, 38, 38, 0.18), inset 0 0 0 0.25rem rgba(255, 255, 255, 0.22);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-pending .action-stepper-marker {
+    background: #eef2f6;
+    color: #98a2b3;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item:is(.is-done, .is-current) .action-stepper-copy strong {
+    color: #1f6f9f;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-warning .action-stepper-copy strong {
+    color: #9a5b00;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-blocked .action-stepper-copy strong {
+    color: #b42318;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-pending .action-stepper-copy strong,
+body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-pending .action-stepper-copy small {
+    color: #98a2b3;
+}
+
 body.admin-theme-scope.anbg-glass-theme .action-tracking-panel {
     padding: clamp(1.1rem, 1.8vw, 1.45rem);
 }
@@ -2173,6 +2360,7 @@ body.admin-theme-scope.anbg-glass-theme .action-tracking-type {
 }
 
 html.dark body.admin-theme-scope.anbg-glass-theme .action-detail-hero,
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-panel,
 html.dark body.admin-theme-scope.anbg-glass-theme .action-tracking-panel {
     border-color: rgba(148, 163, 184, 0.22);
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.88));
@@ -2181,6 +2369,8 @@ html.dark body.admin-theme-scope.anbg-glass-theme .action-tracking-panel {
 
 html.dark body.admin-theme-scope.anbg-glass-theme :where(
     .action-detail-title,
+    .action-stepper-title,
+    .action-stepper-copy strong,
     .action-tracking-title,
     .action-tracking-stat-label,
     .action-tracking-stat-value
@@ -2195,6 +2385,43 @@ html.dark body.admin-theme-scope.anbg-glass-theme :where(
     border-color: rgba(148, 163, 184, 0.24) !important;
     background: rgba(15, 23, 42, 0.78) !important;
     color: #e5e7eb !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-pill {
+    border-color: rgba(96, 165, 250, 0.26);
+    background: rgba(57, 150, 211, 0.16);
+    color: #bfdbfe;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-item:not(:first-child)::before {
+    background: rgba(51, 65, 85, 0.86);
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-line-active:not(:first-child)::before {
+    background: linear-gradient(90deg, #2bb8b6, #3996d3);
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-warning:not(:first-child)::before {
+    background: linear-gradient(90deg, #2bb8b6, #f9b13c);
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-blocked:not(:first-child)::before {
+    background: linear-gradient(90deg, #2bb8b6, #dc2626);
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-copy small {
+    color: #cbd5e1;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-pending .action-stepper-marker {
+    border-color: rgba(148, 163, 184, 0.24);
+    background: rgba(15, 23, 42, 0.78);
+    color: #94a3b8 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-pending .action-stepper-copy strong,
+html.dark body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-pending .action-stepper-copy small {
+    color: #64748b;
 }
 
 html.dark body.admin-theme-scope.anbg-glass-theme .action-detail-tabs {
@@ -2223,6 +2450,34 @@ html.dark body.admin-theme-scope.anbg-glass-theme .action-detail-tab:hover {
 }
 
 @media (max-width: 640px) {
+    body.admin-theme-scope.anbg-glass-theme .action-stepper {
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme .action-stepper-item {
+        min-height: 3.2rem;
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 0.75rem;
+        padding: 0;
+        text-align: left;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme .action-stepper-item:not(:first-child)::before {
+        top: -0.85rem;
+        right: auto;
+        left: 1.02rem;
+        width: 0.34rem;
+        height: 0.95rem;
+        transform: none;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme .action-stepper-copy {
+        padding-top: 0.18rem;
+    }
+
     body.admin-theme-scope.anbg-glass-theme .action-detail-tabs {
         width: 100%;
         border-radius: 0.75rem;
@@ -2232,3 +2487,4 @@ html.dark body.admin-theme-scope.anbg-glass-theme .action-detail-tab:hover {
         flex: 1 1 auto;
     }
 }
+

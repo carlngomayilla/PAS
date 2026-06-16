@@ -22,44 +22,41 @@
 
 @section('content')
     <div class="app-screen-flow">
-        <section class="showcase-hero mb-4 app-screen-block">
-            <div class="showcase-hero-body">
-                <div>
-                    <span class="showcase-eyebrow">Centre personnel</span>
-                    <h1 class="showcase-title">Notifications</h1>
-                </div>
+        <x-ui.page-title
+            class="mb-4 app-screen-block"
+            eyebrow="Centre personnel"
+            title="Notifications"
+        >
+            <x-slot:actions>
+                <span class="showcase-chip">
+                    <span class="showcase-chip-dot bg-[#3996d3]"></span>
+                    {{ $unreadCount }} notification(s) non lue(s)
+                </span>
 
-                <div class="showcase-action-row">
+                @if ($canReadAlerts)
                     <span class="showcase-chip">
-                        <span class="showcase-chip-dot bg-[#3996d3]"></span>
-                        {{ $unreadCount }} notification(s) non lue(s)
+                        <span class="showcase-chip-dot bg-[#f9b13c]"></span>
+                        {{ $alertUnreadCount }} alerte(s) non lue(s)
                     </span>
+                @endif
 
-                    @if ($canReadAlerts)
-                        <span class="showcase-chip">
-                            <span class="showcase-chip-dot bg-[#f9b13c]"></span>
-                            {{ $alertUnreadCount }} alerte(s) non lue(s)
-                        </span>
-                    @endif
-
-                    @if ($activeTab === 'notifications' && $unreadCount > 0)
-                        <form method="POST" action="{{ route('workspace.notifications.read_all') }}">
-                            @csrf
-                            <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
-                                Tout marquer comme lu
-                            </button>
-                        </form>
-                    @elseif ($activeTab === 'alertes' && $canReadAlerts && $alertUnreadCount > 0)
-                        <form method="POST" action="{{ route('workspace.alertes.read_all', ['limit' => 100]) }}">
-                            @csrf
-                            <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
-                                Tout marquer comme lu
-                            </button>
-                        </form>
-                    @endif
-                </div>
-            </div>
-        </section>
+                @if ($activeTab === 'notifications' && $unreadCount > 0)
+                    <form method="POST" action="{{ route('workspace.notifications.read_all') }}">
+                        @csrf
+                        <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
+                            Tout marquer comme lu
+                        </button>
+                    </form>
+                @elseif ($activeTab === 'alertes' && $canReadAlerts && $alertUnreadCount > 0)
+                    <form method="POST" action="{{ route('workspace.alertes.read_all', ['limit' => 100]) }}">
+                        @csrf
+                        <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
+                            Tout marquer comme lu
+                        </button>
+                    </form>
+                @endif
+            </x-slot:actions>
+        </x-ui.page-title>
 
         <section class="showcase-toolbar app-screen-block">
             <div class="flex flex-wrap items-center gap-2">
@@ -142,7 +139,7 @@
                     @empty
                         <x-ui.empty-state
                             title="Aucune alerte"
-                            message="Les alertes liees a votre perimetre apparaitront ici."
+                            message="Les problèmes liés à votre périmètre apparaîtront ici."
                             icon="bell"
                             tone="info"
                         />
@@ -159,7 +156,15 @@
                             $badgeClass = match ($level) {
                                 'critical', 'critique', 'urgence' => 'anbg-badge anbg-badge-danger',
                                 'warning', 'avertissement' => 'anbg-badge anbg-badge-warning',
+                                'success', 'succes' => 'anbg-badge anbg-badge-success',
                                 default => 'anbg-badge anbg-badge-info',
+                            };
+                            $levelLabel = match ($level) {
+                                'critical', 'critique' => 'Critique',
+                                'urgence' => 'Urgence',
+                                'warning', 'avertissement' => 'Attention',
+                                'success', 'succes' => 'Validée',
+                                default => 'Info',
                             };
                         @endphp
 
@@ -169,7 +174,7 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         <strong class="text-[#1c203d]">{{ $title }}</strong>
                                         <span class="{{ $badgeClass }} px-2 py-0.5 text-xs">
-                                            {{ $level }}
+                                            {{ $levelLabel }}
                                         </span>
                                         @if ($notification->read_at === null)
                                             <span class="anbg-badge anbg-badge-success px-2 py-0.5 text-xs">Non lue</span>
@@ -193,7 +198,7 @@
                     @empty
                         <x-ui.empty-state
                             title="Aucune notification"
-                            message="Les notifications liees a votre perimetre apparaitront ici."
+                            message="Les échanges et les décisions liés à vos actions apparaîtront ici."
                             icon="bell"
                             tone="info"
                         />

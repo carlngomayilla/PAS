@@ -82,7 +82,7 @@
                 'badge_tone' => 'info',
             ],
             [
-                'label' => 'Info',
+                'label' => 'À suivre',
                 'value' => $summary['info'] ?? 0,
                 'meta' => null,
                 'href' => route('workspace.alertes', ['niveau' => 'info', 'limit' => 100]),
@@ -181,7 +181,7 @@
                 @foreach (['urgence', 'critical', 'warning', 'info'] as $level)
                     @php $style = $levelStyles[$level]; @endphp
                     <button class="{{ $filterButtonBase }} border-transparent {{ $style['soft'] }}" data-level-filter="{{ $level }}" type="button">
-                        {{ $level === 'urgence' ? 'Urgence' : ($level === 'critical' ? 'Critique' : ($level === 'warning' ? 'Attention' : 'Info')) }}
+                        {{ $level === 'urgence' ? 'Urgence' : ($level === 'critical' ? 'Critique' : ($level === 'warning' ? 'Attention' : 'À suivre')) }}
                         @if (($levelUnreadCounts[$level] ?? 0) > 0)
                             <span class="{{ $style['badge'] }} px-2 py-0.5 text-[10px] leading-none">{{ $levelUnreadCounts[$level] }}</span>
                         @endif
@@ -256,7 +256,7 @@
                             <span>{{ $alert['direction'] }}</span>
                             <span>{{ $alert['service'] }}</span>
                             <span>{{ $alert['date_label'] }}</span>
-                            <span>Section cible: {{ $alert['section_label'] }}</span>
+                            <span>Où vérifier : {{ $alert['section_label'] }}</span>
                         </div>
 
                         @if (!empty($alert['action']))
@@ -294,7 +294,7 @@
                     </div>
 
                     <div class="hidden shrink-0 self-center rounded-xl bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition group-hover:bg-[#3996d3] group-hover:text-white md:block">
-                        Voir la cause
+                        Voir le problème
                     </div>
                 </div>
             </a>

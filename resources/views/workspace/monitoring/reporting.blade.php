@@ -37,33 +37,30 @@
             ->all();
     @endphp
 
-    <section class="showcase-hero mb-4">
-        <div class="showcase-hero-body">
-            <div class="max-w-3xl">
-                <span class="showcase-eyebrow">{{ $roleProfile['eyebrow'] }}</span>
-                <h1 class="showcase-title">{{ $roleProfile['title'] }}</h1>
-                <div class="showcase-chip-row">
-                    <span class="showcase-chip"><span class="showcase-chip-dot bg-[#1C203D]"></span>{{ $scopeLabel }}</span>
-                    <span class="showcase-chip"><span class="showcase-chip-dot bg-[#8FC043]"></span>{{ $officialBaseText }}</span>
-                </div>
-            </div>
-            <div class="showcase-action-row">
-                <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ $dashboardAnalyticsUrl }}">Tableau de bord analytique</a>
-                <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.excel', $reportQuery) }}">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h11l5 5v11H4V4zm11 0v5h5M8 13h8M8 17h8M8 9h3" />
-                    </svg>
-                    Export Excel
-                </a>
-                <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.pdf', $reportQuery) }}">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M8 13h2a2 2 0 010 4H8v-4zm6 0h2m-2 4h2" />
-                    </svg>
-                    Export PDF
-                </a>
-            </div>
-        </div>
-    </section>
+    <x-ui.page-title
+        class="mb-4"
+        :eyebrow="$roleProfile['eyebrow']"
+        :title="$roleProfile['title']"
+        :subtitle="$roleProfile['subtitle'] ?? null"
+    >
+        <x-slot:actions>
+            <span class="showcase-chip"><span class="showcase-chip-dot bg-[#1C203D]"></span>{{ $scopeLabel }}</span>
+            <span class="showcase-chip"><span class="showcase-chip-dot bg-[#8FC043]"></span>{{ $officialBaseText }}</span>
+            <a class="btn btn-secondary rounded-2xl px-4 py-2.5" href="{{ $dashboardAnalyticsUrl }}">Tableau de bord analytique</a>
+            <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.excel', $reportQuery) }}">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h11l5 5v11H4V4zm11 0v5h5M8 13h8M8 17h8M8 9h3" />
+                </svg>
+                Export Excel
+            </a>
+            <a class="btn btn-primary rounded-2xl px-4 py-2.5" href="{{ route('workspace.reporting.export.pdf', $reportQuery) }}">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M8 13h2a2 2 0 010 4H8v-4zm6 0h2m-2 4h2" />
+                </svg>
+                Export PDF
+            </a>
+        </x-slot:actions>
+    </x-ui.page-title>
 
     <section class="showcase-panel mb-4">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">

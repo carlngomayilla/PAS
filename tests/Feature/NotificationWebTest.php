@@ -62,4 +62,40 @@ class NotificationWebTest extends TestCase
 
         $this->assertSame(0, $user->fresh()->unreadNotifications()->count());
     }
+
+    public function test_alert_notifications_are_not_shown_or_marked_from_notification_tab(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+        ]);
+
+        $user->notify(new WorkspaceModuleNotification([
+            'title' => 'Action soumise',
+            'message' => 'Une action attend votre validation.',
+            'module' => 'actions',
+            'url' => route('workspace.actions.index'),
+        ]));
+        $user->notify(new WorkspaceModuleNotification([
+            'title' => 'Action en retard',
+            'message' => 'Cette action a dépassé son échéance.',
+            'module' => 'alertes',
+            'url' => route('workspace.notifications.index', ['tab' => 'alertes']),
+        ]));
+
+        $this->actingAs($user)
+            ->get(route('workspace.notifications.index'))
+            ->assertOk()
+            ->assertSee('Action soumise')
+            ->assertDontSee('Action en retard')
+            ->assertSee('1 notification(s) non lue(s)');
+
+        $this->actingAs($user)
+            ->post(route('workspace.notifications.read_all'))
+            ->assertRedirect();
+
+        $notifications = $user->fresh()->notifications()->get();
+
+        $this->assertNotNull($notifications->firstWhere('data.module', 'actions')?->read_at);
+        $this->assertNull($notifications->firstWhere('data.module', 'alertes')?->read_at);
+    }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\Action;
+use App\Models\ActionLog;
 use App\Models\ActionWeek;
 use App\Models\Direction;
 use App\Models\Justificatif;
@@ -357,6 +358,31 @@ class ActionTrackingServiceTest extends TestCase
             fn (array $alert): bool => ($alert['type'] ?? null) === 'justificatif_absent'
                 && (int) ($alert['action']['id'] ?? 0) === (int) $action->id
         ));
+    }
+
+    public function test_manual_info_action_log_is_not_an_active_alert(): void
+    {
+        $action = $this->createQuantitativeAction();
+
+        $infoLog = ActionLog::query()->create([
+            'action_id' => $action->id,
+            'niveau' => 'info',
+            'type_evenement' => 'commentaire',
+            'message' => 'L\'agent a ajouté une information de suivi.',
+            'details' => ['manual' => true],
+            'lu' => false,
+        ]);
+        $warningLog = ActionLog::query()->create([
+            'action_id' => $action->id,
+            'niveau' => 'warning',
+            'type_evenement' => 'progression_sous_seuil',
+            'message' => 'La progression réelle est plus basse que prévu.',
+            'details' => ['manual' => true],
+            'lu' => false,
+        ]);
+
+        $this->assertFalse(ActionLog::query()->activeAlert()->whereKey($infoLog->id)->exists());
+        $this->assertTrue(ActionLog::query()->activeAlert()->whereKey($warningLog->id)->exists());
     }
 
     public function test_non_started_action_keeps_zero_progress_and_execution_performance(): void

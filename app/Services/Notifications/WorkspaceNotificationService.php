@@ -435,7 +435,7 @@ class WorkspaceNotificationService
             return;
         }
 
-        if (! in_array((string) $log->niveau, ['info', 'warning', 'critical', 'urgence'], true)) {
+        if (! in_array((string) $log->niveau, ['warning', 'critical', 'urgence'], true)) {
             return;
         }
 
@@ -454,7 +454,6 @@ class WorkspaceNotificationService
         $level = match ($rawLevel) {
             'urgence' => 'urgence',
             'critical' => 'critical',
-            'info' => 'info',
             default => 'warning',
         };
 
@@ -468,17 +467,16 @@ class WorkspaceNotificationService
             [
                 'title' => match ($level) {
                     'urgence' => 'Urgence sur une action',
-                    'critical' => 'Alerte critique — Action à traiter',
-                    'info' => 'Information sur une action',
-                    default => 'Alerte sur une action',
+                    'critical' => 'Problème important sur une action',
+                    default => 'Action à surveiller',
                 },
                 'message' => $this->notificationPolicySettings->renderActionAlertMessage($log),
                 'module' => 'alertes',
                 'entity_type' => 'action_log',
                 'entity_id' => $log->id,
                 'url' => $this->resolveActionAlertUrl($log),
-                'icon' => $level === 'info' ? 'info' : ($level === 'warning' ? 'alert-triangle' : 'alert-octagon'),
-                'status' => $level === 'info' ? 'info' : ($level === 'warning' ? 'warning' : 'critical'),
+                'icon' => $level === 'warning' ? 'alert-triangle' : 'alert-octagon',
+                'status' => $level === 'warning' ? 'warning' : 'critical',
                 'priority' => $level === 'urgence' ? 'urgent' : ($level === 'critical' ? 'high' : 'normal'),
                 'meta' => [
                     'event' => 'action_alert',
@@ -495,6 +493,64 @@ class WorkspaceNotificationService
                 'actor_name' => (string) ($log->utilisateur?->name ?? ''),
             ],
             $excludeUserId
+        );
+    }
+
+    public function notifyActionCommentAdded(Action $action, string $comment, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_comment_added')) {
+            return;
+        }
+
+        $action->loadMissing(
+            'pta:id,pao_id,direction_id,service_id',
+            'pta.pao:id,pas_id',
+            'responsable:id,unite_dg_id'
+        );
+
+        $targets = $this->mergeRecipients(
+            $this->actionSupervisorRecipients($action),
+            $this->agentRecipient($action)
+        );
+        $actorName = (string) ($actor?->name ?? 'Un utilisateur');
+        $commentExcerpt = Str::limit(trim($comment), 140, '');
+
+        $this->dispatchEvent(
+            'action_comment_added',
+            $targets,
+            [
+                'title' => 'Nouveau commentaire sur une action',
+                'message' => sprintf('%s a ajouté un commentaire sur l\'action « %s ».', $actorName, (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action).'#action-logs',
+                'icon' => 'message-square',
+                'status' => 'info',
+                'priority' => 'normal',
+                'notification_type' => 'evenement',
+                'categorie' => 'metier',
+                'niveau' => 'info',
+                'user_id_declencheur' => $actor?->id,
+                'direction_id' => $action->pta?->direction_id,
+                'service_id' => $action->pta?->service_id,
+                'unite_dg_id' => $action->unite_dg_id ?: $action->responsable?->unite_dg_id,
+                'action_id' => $action->id,
+                'pta_id' => $action->pta_id,
+                'pao_id' => $action->pao_id ?: $action->pta?->pao_id,
+                'pas_id' => $action->pta?->pao?->pas_id,
+                'meta' => [
+                    'event' => 'action_comment_added',
+                    'action_label' => (string) $action->libelle,
+                    'comment_excerpt' => $commentExcerpt,
+                ],
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => $actorName,
+                'comment_excerpt' => $commentExcerpt,
+            ],
+            $actor?->id
         );
     }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Action;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,9 +15,11 @@ class ActionCommentController extends Controller
     public function comment(
         Request $request,
         Action $action,
-        ActionTrackingService $trackingService
+        ActionTrackingService $trackingService,
+        WorkspaceNotificationService $notificationService
     ): JsonResponse {
-        if (! $request->user() instanceof User) {
+        $user = $request->user();
+        if (! $user instanceof User) {
             abort(401);
         }
 
@@ -34,11 +37,12 @@ class ActionCommentController extends Controller
             'commentaire',
             'info',
             [],
-            $request->user()
+            $user
         );
+        $notificationService->notifyActionCommentAdded($action, $validated['message'], $user);
 
         return response()->json([
-            'message' => 'Commentaire enregistre.',
+            'message' => 'Commentaire enregistré.',
             'data' => $entry->load('utilisateur:id,name,email'),
         ], 201);
     }

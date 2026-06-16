@@ -8,11 +8,11 @@ use App\Models\PlanningUnlockRequest;
 use App\Models\Pta;
 use App\Models\User;
 use App\Notifications\WorkspaceModuleNotification;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Throwable;
 
@@ -409,8 +409,8 @@ class PlanningModificationLockService
     private function supports(Model $target): bool
     {
         return array_key_exists($target::class, self::MODULES)
-            && Schema::hasColumn($target->getTable(), 'modification_locked_at')
-            && Schema::hasColumn($target->getTable(), 'modification_unlocked_at');
+            && SchemaIntrospectionCache::hasColumn($target->getTable(), 'modification_locked_at')
+            && SchemaIntrospectionCache::hasColumn($target->getTable(), 'modification_unlocked_at');
     }
 
     private function moduleFor(Model $target): string

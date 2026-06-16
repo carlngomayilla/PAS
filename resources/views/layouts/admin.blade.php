@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="{{ $platformSettings->htmlLang() }}" class="h-full">
 <head>
     <meta charset="utf-8">
@@ -137,7 +137,7 @@
         // La cle integre dashboardVersion(), bumpee des qu'un statut_validation
         // d'action change (ActionObserver) → invalidation immediate et correcte.
         $validationBadgeCount = 0;
-        if (\Illuminate\Support\Facades\Schema::hasTable('actions')) {
+        if (\App\Support\SchemaIntrospectionCache::hasTable('actions')) {
             $dashboardVersion = app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->dashboardVersion();
             $validationBadgeCount = (int) \Illuminate\Support\Facades\Cache::remember(
                 'header-validation-badge:'.$dashboardVersion.':'.(int) $layoutUser->id,
@@ -603,3 +603,4 @@
     </div>
 </body>
 </html>
+

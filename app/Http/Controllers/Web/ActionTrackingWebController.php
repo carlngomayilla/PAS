@@ -136,7 +136,8 @@ class ActionTrackingWebController extends Controller
     public function comment(
         Request $request,
         Action $action,
-        ActionTrackingService $trackingService
+        ActionTrackingService $trackingService,
+        WorkspaceNotificationService $notificationService
     ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -161,6 +162,7 @@ class ActionTrackingWebController extends Controller
             [],
             $user
         );
+        $notificationService->notifyActionCommentAdded($action, $validated['message'], $user);
 
         return redirect()
             ->route('workspace.actions.suivi', $action)

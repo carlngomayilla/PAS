@@ -225,7 +225,7 @@ class WorkflowSettings
         }
 
         try {
-            return $this->tableAvailable = Schema::hasTable('platform_settings');
+            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }

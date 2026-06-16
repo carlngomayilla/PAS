@@ -70,15 +70,7 @@ class ActionLog extends Model
     public function scopeActiveAlert(Builder $query): Builder
     {
         return $query
-            ->where(function (Builder $levelQuery): void {
-                $levelQuery
-                    ->whereIn('niveau', ['warning', 'critical', 'urgence'])
-                    ->orWhere(function (Builder $manualInfoQuery): void {
-                        $manualInfoQuery
-                            ->where('niveau', 'info')
-                            ->where('details->manual', true);
-                    });
-            })
+            ->whereIn('niveau', ['warning', 'critical', 'urgence'])
             ->where(function (Builder $detailsQuery): void {
                 $detailsQuery
                     ->whereNull('details->resolved')
