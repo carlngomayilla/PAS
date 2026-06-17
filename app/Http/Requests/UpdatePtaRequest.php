@@ -312,10 +312,11 @@ class UpdatePtaRequest extends FormRequest
                     $actionBelongsToPta = \App\Models\Action::query()
                         ->whereKey((int) $actionPayload['id'])
                         ->where('pta_id', (int) $this->resolveCurrentPtaId())
+                        ->where('objectif_operationnel_id', (int) $this->input('objectif_operationnel_id'))
                         ->exists();
 
                     if (! $actionBelongsToPta) {
-                        $validator->errors()->add("actions.{$index}.id", 'Cette action ne peut pas etre modifiee depuis ce PTA.');
+                        $validator->errors()->add("actions.{$index}.id", 'Cette action ne peut pas etre modifiee depuis cet objectif operationnel.');
                     }
                 }
 

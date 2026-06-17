@@ -89,7 +89,7 @@ class WorkspaceNotificationService
         $directionId = (int) ($action->pta?->direction_id ?? 0);
         $serviceId = (int) ($action->pta?->service_id ?? 0);
 
-        $users = $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]);
+        $users = $this->serviceUsers($directionId, $serviceId, $this->serviceManagerRoles());
         $users = $this->mergeRecipients(
             $users,
             $this->delegationService->delegatedServiceReviewers($directionId, $serviceId)
@@ -1595,7 +1595,7 @@ class WorkspaceNotificationService
         $serviceId = (int) ($action->pta?->service_id ?? 0);
 
         $targets = $this->mergeRecipients(
-            $this->serviceUsers($directionId, $serviceId, [User::ROLE_SERVICE]),
+            $this->serviceUsers($directionId, $serviceId, $this->serviceManagerRoles()),
             $this->delegationService->delegatedServiceReviewers($directionId, $serviceId)
         );
 

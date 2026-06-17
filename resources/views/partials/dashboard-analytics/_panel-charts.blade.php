@@ -115,6 +115,8 @@
         $progressionScore = (float) ($globalScores['progression'] ?? 0);
         $scoreTone = $globalScore >= 80 ? '#8FC043' : ($globalScore >= 60 ? '#3996D3' : ($globalScore >= 40 ? '#F9B13C' : '#ef4444'));
         $scoreToneLabel = $globalScore >= 80 ? 'Excellent' : ($globalScore >= 60 ? 'Bon' : ($globalScore >= 40 ? 'A surveiller' : 'Critique'));
+        $directionPerformanceFallbackRows = collect($directionPerformanceRows)->take(8);
+        $servicePerformanceFallbackRows = collect($synthesisServiceRows)->take(8);
     @endphp
 
     {{-- ─── RANGEE 1 : HERO SCORE + JAUGES KPI ─────────────────────── --}}
@@ -259,6 +261,72 @@
     </div>
 
     {{-- ─── RANGEE 3 : PERFORMANCE PAR UNITE + TOP ACTIONS ─────────── --}}
+    <div class="charts-bento charts-bento-row-rank mb-4">
+        <article class="showcase-panel">
+            <div class="chart-panel-head mb-3">
+                <h2 class="chart-title">Performance des directions</h2>
+                <span class="showcase-chip">{{ count($directionPerformanceRows) }} directions</span>
+            </div>
+            <div class="dashboard-canvas dashboard-canvas-lg">
+                <div id="dashboard-direction-performance-chart" class="dashboard-chart-host">
+                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                        @if ($directionPerformanceFallbackRows->isNotEmpty())
+                            <div class="charts-unit-bars">
+                                @foreach ($directionPerformanceFallbackRows as $row)
+                                    @php
+                                        $directionValue = min(100, max(0, (float) ($row['score'] ?? $row['taux_execution'] ?? 0)));
+                                        $directionTone = $directionValue >= 80 ? '#8FC043' : ($directionValue >= 60 ? '#3996D3' : ($directionValue >= 40 ? '#F9B13C' : '#ef4444'));
+                                    @endphp
+                                    <div class="charts-unit-bar">
+                                        <span class="charts-unit-bar-label">{{ $row['direction'] ?? '-' }}</span>
+                                        <span class="charts-unit-bar-track">
+                                            <span class="charts-unit-bar-fill" style="width: {{ $directionValue }}%; background: linear-gradient(90deg, {{ $directionTone }}, {{ $directionTone }}cc);"></span>
+                                        </span>
+                                        <span class="charts-unit-bar-value" style="color: {{ $directionTone }};">{{ number_format($directionValue, 0, ',', ' ') }}%</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <x-ui.empty-state title="Aucune direction" message="Les performances apparaîtront dès que des actions seront rattachées aux directions." icon="chart" tone="info" />
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <article class="showcase-panel">
+            <div class="chart-panel-head mb-3">
+                <h2 class="chart-title">Performance des services</h2>
+                <span class="showcase-chip">{{ count($synthesisServiceRows) }} services</span>
+            </div>
+            <div class="dashboard-canvas dashboard-canvas-lg">
+                <div id="dashboard-service-performance-chart" class="dashboard-chart-host">
+                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                        @if ($servicePerformanceFallbackRows->isNotEmpty())
+                            <div class="charts-unit-bars">
+                                @foreach ($servicePerformanceFallbackRows as $row)
+                                    @php
+                                        $serviceValue = min(100, max(0, (float) ($row['kpi_global'] ?? $row['progression_moyenne'] ?? 0)));
+                                        $serviceTone = $serviceValue >= 80 ? '#8FC043' : ($serviceValue >= 60 ? '#3996D3' : ($serviceValue >= 40 ? '#F9B13C' : '#ef4444'));
+                                    @endphp
+                                    <div class="charts-unit-bar">
+                                        <span class="charts-unit-bar-label">{{ $row['label'] ?? '-' }}</span>
+                                        <span class="charts-unit-bar-track">
+                                            <span class="charts-unit-bar-fill" style="width: {{ $serviceValue }}%; background: linear-gradient(90deg, {{ $serviceTone }}, {{ $serviceTone }}cc);"></span>
+                                        </span>
+                                        <span class="charts-unit-bar-value" style="color: {{ $serviceTone }};">{{ number_format($serviceValue, 0, ',', ' ') }}%</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <x-ui.empty-state title="Aucun service" message="Les performances apparaîtront dès que des actions seront rattachées aux services." icon="chart" tone="info" />
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </article>
+    </div>
+
     <div class="charts-bento charts-bento-row-rank mb-4">
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">

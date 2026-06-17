@@ -301,8 +301,11 @@ class PtaWebController extends Controller
             (int) $pta->service_id
         );
 
+        $selectedObjectifId = $this->selectedObjectifIdForPta($request, $pta);
+
         $pta->loadMissing([
             'actions' => fn ($query) => $query
+                ->where('objectif_operationnel_id', $selectedObjectifId)
                 ->select([
                     'id',
                     'pta_id',
@@ -376,7 +379,8 @@ class PtaWebController extends Controller
         return view('workspace.pta.form', [
             'mode' => 'edit',
             'row' => $pta,
-            'objectifOperationnelOptions' => $this->objectifOperationnelOptions($user, (int) $pta->objectif_operationnel_id),
+            'selectedObjectifId' => $selectedObjectifId,
+            'objectifOperationnelOptions' => $this->objectifOperationnelOptions($user, $selectedObjectifId),
             'responsableOptions' => $this->responsableOptions($user),
             'statusOptions' => $this->statusOptions($user),
             'timeline' => $this->validationTimeline($pta),
@@ -538,6 +542,7 @@ class PtaWebController extends Controller
         try {
             $validated = $request->validate([
                 'id' => ['nullable', 'integer', 'exists:actions,id'],
+                'objectif_operationnel_id' => ['nullable', 'integer', 'exists:objectifs_operationnels,id'],
                 'libelle' => ['required', 'string', 'max:255'],
                 'description' => ['nullable', 'string'],
                 'resultat_attendu' => ['nullable', 'string'],
@@ -590,9 +595,31 @@ class PtaWebController extends Controller
         }
 
         try {
-            $objectifOperationnel = $pta->objectifOperationnel;
+            $objectifOperationnel = isset($validated['objectif_operationnel_id'])
+                ? $this->resolveObjectifOperationnel((int) $validated['objectif_operationnel_id'])
+                : $pta->objectifOperationnel;
             if (! $objectifOperationnel instanceof ObjectifOperationnel) {
                 return response()->json(['ok' => false, 'message' => 'PTA sans objectif operationnel rattache.'], 422);
+            }
+
+            if ((int) $objectifOperationnel->direction_id !== (int) $pta->direction_id
+                || (int) $objectifOperationnel->service_id !== (int) $pta->service_id) {
+                return response()->json(['ok' => false, 'message' => 'Objectif operationnel hors perimetre du PTA.'], 422);
+            }
+
+            $submittedActionId = isset($validated['id']) && is_numeric($validated['id'])
+                ? (int) $validated['id']
+                : 0;
+            if ($submittedActionId > 0) {
+                $actionMatchesObjective = Action::query()
+                    ->whereKey($submittedActionId)
+                    ->where('pta_id', (int) $pta->id)
+                    ->where('objectif_operationnel_id', (int) $objectifOperationnel->id)
+                    ->exists();
+
+                if (! $actionMatchesObjective) {
+                    return response()->json(['ok' => false, 'message' => 'Cette action ne peut pas etre modifiee depuis cet objectif operationnel.'], 422);
+                }
             }
 
             $saved = $this->syncPtaActions($pta, $objectifOperationnel, [$validated], $user);
@@ -818,6 +845,37 @@ class PtaWebController extends Controller
             ->first();
     }
 
+    private function selectedObjectifIdForPta(Request $request, Pta $pta): int
+    {
+        $candidateId = $request->filled('objectif_operationnel_id')
+            ? (int) $request->integer('objectif_operationnel_id')
+            : (int) $pta->objectif_operationnel_id;
+
+        $baseQuery = ObjectifOperationnel::query()
+            ->where('direction_id', (int) $pta->direction_id)
+            ->where('service_id', (int) $pta->service_id);
+
+        if ($candidateId > 0 && (clone $baseQuery)->whereKey($candidateId)->exists()) {
+            return $candidateId;
+        }
+
+        $firstActionObjectifId = Action::query()
+            ->where('pta_id', (int) $pta->id)
+            ->whereNotNull('objectif_operationnel_id')
+            ->orderBy('objectif_operationnel_id')
+            ->value('objectif_operationnel_id');
+
+        if (is_numeric($firstActionObjectifId) && (int) $firstActionObjectifId > 0) {
+            return (int) $firstActionObjectifId;
+        }
+
+        if ((int) $pta->objectif_operationnel_id > 0) {
+            return (int) $pta->objectif_operationnel_id;
+        }
+
+        return (int) ((clone $baseQuery)->orderBy('id')->value('id') ?? 0);
+    }
+
     /**
      * @param array<int, mixed> $actionsPayload
      * @return list<Action>
@@ -856,6 +914,7 @@ class PtaWebController extends Controller
                 : Action::query()
                     ->whereKey($actionId)
                     ->where('pta_id', (int) $pta->id)
+                    ->where('objectif_operationnel_id', (int) $objectifOperationnel->id)
                     ->firstOrFail();
 
             if (! $isNewAction) {
@@ -1062,12 +1121,8 @@ class PtaWebController extends Controller
             ?? optional($objectifOperationnel->echeance)->format('Y-m-d')
             ?? ($actionPayload['date_debut'] ?? null);
         $isQuantitative = $modeEvaluation === Action::MODE_QUANTITATIF;
-        $actionPaoId = $isNewAction
-            ? (int) $objectifOperationnel->pao_id
-            : (int) ($existingAction?->pao_id ?: $objectifOperationnel->pao_id);
-        $actionObjectifId = $isNewAction
-            ? (int) $objectifOperationnel->id
-            : (int) ($existingAction?->objectif_operationnel_id ?: $objectifOperationnel->id);
+        $actionPaoId = (int) $objectifOperationnel->pao_id;
+        $actionObjectifId = (int) $objectifOperationnel->id;
         $thresholdMode = (string) ($actionPayload['seuil_mode'] ?? $existingAction?->seuil_mode ?? 'unique');
         $primaryRmoUniteId = isset($rmoIds[0])
             ? User::query()->whereKey((int) $rmoIds[0])->value('unite_dg_id')

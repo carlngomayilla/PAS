@@ -201,8 +201,8 @@ class ActionWorkflowService
     }
 
     /**
-     * Décision du chef sur une sous-action. Si toutes les sous-actions du parent
-     * sont validées, l'action composée est clôturée automatiquement.
+     * Decision du chef sur une sous-action. Si toutes les sous-actions du parent
+     * sont validees, l'action composee est soumise a la validation finale.
      */
     public function reviewSubAction(SousAction $sousAction, bool $approve, ?string $motif, ?User $actor = null): SousAction
     {
@@ -234,8 +234,8 @@ class ActionWorkflowService
     }
 
     /**
-     * Recalcule la performance d'une action composée depuis ses sous-actions
-     * et la clôture automatiquement si toutes sont validées.
+     * Recalcule la performance d'une action composee depuis ses sous-actions.
+     * La validation des sous-actions declenche la validation finale du parent.
      */
     public function refreshCompositeParent(Action $action, ?User $actor = null): Action
     {
@@ -245,6 +245,9 @@ class ActionWorkflowService
         $provisional = $this->calculator->compositePerformance($action);
         $allValidated = $subActions->isNotEmpty()
             && $subActions->every(fn (SousAction $sa): bool => (string) $sa->validation_status === SousAction::VALIDATION_VALIDEE);
+        $validationStatus = (string) $action->statut_validation;
+        $alreadySubmitted = $validationStatus === ActionTrackingService::VALIDATION_SOUMISE_CHEF;
+        $alreadyValidated = $validationStatus === ActionTrackingService::VALIDATION_VALIDEE_CHEF;
 
         $payload = [
             'progression_reelle' => $provisional,
@@ -252,12 +255,20 @@ class ActionWorkflowService
         ];
 
         if ($allValidated) {
-            $payload['official_progress_percent'] = $provisional;
-            $payload['statut_validation'] = ActionTrackingService::VALIDATION_VALIDEE_CHEF;
-            $payload['statut'] = ActionTrackingService::STATUS_CLOTUREE;
-            $payload['statut_dynamique'] = ActionTrackingService::STATUS_CLOTUREE;
-            $payload['evalue_le'] = now();
-            $payload['evalue_par'] = $actor?->id ?? $action->evalue_par;
+            if ($alreadyValidated) {
+                $payload['statut'] = ActionTrackingService::STATUS_CLOTUREE;
+                $payload['statut_dynamique'] = ActionTrackingService::STATUS_CLOTUREE;
+            } else {
+                $payload['statut_validation'] = ActionTrackingService::VALIDATION_SOUMISE_CHEF;
+                $payload['statut'] = ActionTrackingService::STATUS_EN_COURS;
+                $payload['statut_dynamique'] = ActionTrackingService::STATUS_EN_COURS;
+                $payload['soumise_le'] = $alreadySubmitted && $action->soumise_le
+                    ? $action->soumise_le
+                    : now();
+                $payload['soumise_par'] = $alreadySubmitted && $action->soumise_par
+                    ? $action->soumise_par
+                    : ($actor?->id ?? $action->soumise_par);
+            }
         } else {
             $payload['statut'] = ActionTrackingService::STATUS_EN_COURS;
             $payload['statut_dynamique'] = ActionTrackingService::STATUS_EN_COURS;
@@ -265,9 +276,9 @@ class ActionWorkflowService
 
         $action->forceFill($payload)->save();
 
-        if ($allValidated) {
-            $this->log($action, 'action_validee_chef', 'Action composée clôturée (toutes les sous-actions validées).', $actor, [
-                'performance_officielle' => $provisional,
+        if ($allValidated && ! $alreadySubmitted && ! $alreadyValidated) {
+            $this->log($action, 'action_soumise_validation', 'Action composee soumise au chef de service (toutes les sous-actions sont validees).', $actor, [
+                'progression_provisoire' => $provisional,
             ]);
         }
 

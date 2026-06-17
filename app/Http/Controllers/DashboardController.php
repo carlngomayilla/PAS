@@ -502,6 +502,7 @@ class DashboardController extends Controller
             'unit_rows',
             'synthesis_service_rows',
             'synthesis_agent_rows',
+            'direction_performance_rows',
             'decision_counts',
             'decision_service_rows',
             'decision_agent_rows',
@@ -1169,7 +1170,9 @@ class DashboardController extends Controller
                     'kpi_performance' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
                     'kpi_conformite' => round(0.0, 2),
                     'date_debut' => $action->date_debut instanceof Carbon ? $action->date_debut->format('d/m/Y') : '-',
-                    'date_fin' => $action->date_fin instanceof Carbon ? $action->date_fin->format('d/m/Y') : '-',
+                    'date_fin' => $this->actionDeadline($action)?->format('d/m/Y') ?? '-',
+                    'delay_status' => $this->delayStatusKey($action),
+                    'statut_delai' => $this->delayStatusLabel($action),
                     'mode_evaluation' => $action->resolvedEvaluationMode(),
                     'unite_cible' => (string) ($action->unite_cible ?? ''),
                     'quantite_cible' => round($target, 4),
@@ -1282,7 +1285,7 @@ class DashboardController extends Controller
             'personal_actions_summary' => [
                 'total' => $personalActions->count(),
                 'late' => $personalActions
-                    ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')
+                    ->filter(fn (Action $action): bool => $this->isLateAction($action))
                     ->count(),
                 'url' => $this->actionIndexRoute(['vue' => 'mes_actions']),
             ],
@@ -1512,7 +1515,7 @@ class DashboardController extends Controller
                 'url' => $this->actionIndexRoute(['mois_demarrage' => $monthKey]),
                 'total' => $monthActions->count(),
                 'achevees' => $monthActions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count(),
-                'retard' => $monthActions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count(),
+                'retard' => $monthActions->filter(fn (Action $action): bool => $this->isLateAction($action))->count(),
             ];
         })->all();
 
@@ -1642,13 +1645,28 @@ class DashboardController extends Controller
 
     private function delayDays(Action $action): int
     {
-        $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
+        $deadline = $this->actionDeadline($action);
 
-        if (! $deadline instanceof Carbon || $deadline->gte(Carbon::today())) {
+        if (! $deadline instanceof Carbon) {
             return 0;
         }
 
-        return $deadline->diffInDays(Carbon::today());
+        $deadlineDay = $deadline->copy()->startOfDay();
+
+        if ($this->isDelayCompletedAction($action)) {
+            $completedAt = $this->actionCompletionDate($action);
+
+            return $completedAt instanceof Carbon && $completedAt->copy()->startOfDay()->gt($deadlineDay)
+                ? (int) $deadlineDay->diffInDays($completedAt->copy()->startOfDay())
+                : 0;
+        }
+
+        $today = Carbon::today();
+        if ($deadlineDay->gte($today)) {
+            return 0;
+        }
+
+        return (int) $deadlineDay->diffInDays($today);
     }
 
     /**
@@ -1777,7 +1795,7 @@ class DashboardController extends Controller
                 $first = $rows->first();
                 $total = $rows->count();
                 $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
-                $late = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+                $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
                 $validatedDirection = $this->validatedActions($rows)->count();
                 $score = round((float) $rows->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2);
                 $directionId = (int) ($first?->pta?->direction?->id ?? 0);
@@ -2224,18 +2242,22 @@ class DashboardController extends Controller
     {
         return $actions
             ->sortBy([
-                fn (Action $action): int => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard' ? 0 : 1,
-                fn (Action $action): int => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'a_risque' ? 0 : 1,
+                fn (Action $action): int => $this->delayStatusKey($action) === 'en_retard' ? 0 : 1,
+                fn (Action $action): int => $this->delayStatusKey($action) === 'proche_echeance' ? 0 : 1,
                 fn (Action $action): float => -1 * $this->progressionGap($action),
-                fn (Action $action): string => $action->date_echeance instanceof Carbon ? $action->date_echeance->toDateString() : '9999-12-31',
+                fn (Action $action): string => $this->actionDeadline($action)?->toDateString() ?? '9999-12-31',
             ])
             ->take($limit)
             ->map(function (Action $action): array {
+                $deadline = $this->actionDeadline($action);
+
                 return [
                     'libelle' => (string) $action->libelle,
                     'pta' => (string) ($action->pta?->titre ?? '-'),
-                    'echeance' => $action->date_echeance instanceof Carbon ? $action->date_echeance->format('d/m/Y') : '-',
+                    'echeance' => $deadline instanceof Carbon ? $deadline->format('d/m/Y') : '-',
                     'statut' => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')),
+                    'delay_status' => $this->delayStatusKey($action),
+                    'statut_delai' => $this->delayStatusLabel($action),
                     'progression' => round((float) ($action->progression_reelle ?? 0), 2),
                     'validation_status' => (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE),
                     'url' => route('workspace.actions.suivi', $action),
@@ -2251,24 +2273,19 @@ class DashboardController extends Controller
      */
     private function buildLateActionRows(Collection $actions, int $limit = 8): array
     {
-        $today = Carbon::today();
-
         return $actions
-            ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')
-            ->sortByDesc(function (Action $action) use ($today): int {
-                $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
-
-                return $deadline instanceof Carbon ? $deadline->diffInDays($today) : 0;
-            })
+            ->filter(fn (Action $action): bool => $this->isLateAction($action))
+            ->sortByDesc(fn (Action $action): int => $this->delayDays($action))
             ->take($limit)
-            ->map(function (Action $action) use ($today): array {
-                $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
-                $daysLate = $deadline instanceof Carbon ? $deadline->diffInDays($today) : 0;
+            ->map(function (Action $action): array {
+                $deadline = $this->actionDeadline($action);
 
                 return [
                     'libelle' => (string) $action->libelle,
                     'echeance' => $deadline instanceof Carbon ? $deadline->format('d/m/Y') : '-',
-                    'retard_jours' => $daysLate,
+                    'retard_jours' => $this->delayDays($action),
+                    'delay_status' => $this->delayStatusKey($action),
+                    'statut_delai' => $this->delayStatusLabel($action),
                     'validation_status' => (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE),
                     'progression' => round((float) ($action->progression_reelle ?? 0), 2),
                     'url' => route('workspace.actions.suivi', $action),
@@ -2296,6 +2313,8 @@ class DashboardController extends Controller
                     'statut' => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')),
                     'progression' => round((float) ($action->progression_reelle ?? 0), 2),
                     'retard_jours' => $this->delayDays($action),
+                    'delay_status' => $this->delayStatusKey($action),
+                    'statut_delai' => $this->delayStatusLabel($action),
                     'url' => route('workspace.actions.suivi', $action),
                 ];
             })
@@ -2315,7 +2334,7 @@ class DashboardController extends Controller
                 $first = $rows->first();
                 $total = $rows->count();
                 $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
-                $late = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+                $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
 
                 return [
                     'agent' => (string) ($first?->responsable?->name ?? 'Non assigne'),
@@ -2350,7 +2369,7 @@ class DashboardController extends Controller
                     $first = $rows->first();
                     $total = $rows->count();
                     $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
-                    $late = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+                    $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
                     $validatedDirection = $this->officialActions($rows)->count();
                     $score = round((float) $rows->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2);
                     $serviceId = (int) ($first?->pta?->service?->id ?? 0);
@@ -2382,7 +2401,7 @@ class DashboardController extends Controller
             $serviceActions = $actionGroups->get((int) $service->id, collect());
             $total = $serviceActions->count();
             $completed = $serviceActions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
-            $late = $serviceActions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+            $late = $serviceActions->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
             $validatedDirection = $this->officialActions($serviceActions)->count();
             $score = $total > 0
                 ? round((float) $serviceActions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2)
@@ -2423,7 +2442,7 @@ class DashboardController extends Controller
         return $actions
             ->filter(fn (Action $action): bool => $this->isAlertAction($action))
             ->sortByDesc(function (Action $action): float {
-                return ($this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard' ? 100 : 0)
+                return ($this->delayStatusKey($action) === 'en_retard' ? 100 : 0)
                     + $this->delayDays($action)
                     + max(0.0, 60 - (float) ($action->actionKpi?->kpi_global ?? 0));
             })
@@ -2435,6 +2454,8 @@ class DashboardController extends Controller
                     'service' => (string) ($action->pta?->service?->libelle ?? '-'),
                     'responsable' => (string) ($action->responsable?->name ?? '-'),
                     'retard_jours' => $this->delayDays($action),
+                    'delay_status' => $this->delayStatusKey($action),
+                    'statut_delai' => $this->delayStatusLabel($action),
                     'validation_status' => (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE),
                     'performance_execution' => (float) ($action->actionKpi?->kpi_performance ?? 0),
                     'url' => route('workspace.actions.suivi', $action),
@@ -2557,7 +2578,7 @@ class DashboardController extends Controller
         $total = $actions->count();
         $completed = $actions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
         $inProgress = $actions->filter(fn (Action $action): bool => in_array($this->normalizeStatus((string) ($action->statut_dynamique ?? '')), ['en_cours', 'a_risque', 'en_avance'], true))->count();
-        $late = $actions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+        $late = $actions->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
         $validated = $this->officialActions($actions)->count();
         $aligned = $actions->filter(function (Action $action): bool {
             return $action->pta !== null
@@ -2629,7 +2650,7 @@ class DashboardController extends Controller
                 $first = $rows->first();
                 $total = $rows->count();
                 $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
-                $late = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+                $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
                 $objective = $first?->pta?->pao?->pasObjectif;
                 $operationalObjective = $first?->objectifOperationnel ?? $first?->pta?->objectifOperationnel;
                 $pas = $first?->pta?->pao?->pas;
@@ -2673,7 +2694,7 @@ class DashboardController extends Controller
                 $first = $rows->first();
                 $total = $rows->count();
                 $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
-                $late = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+                $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
                 $inProgress = $rows->filter(fn (Action $action): bool => in_array($this->normalizeStatus((string) ($action->statut_dynamique ?? '')), ['en_cours', 'a_risque', 'en_avance'], true))->count();
 
                 return [
@@ -2739,7 +2760,7 @@ class DashboardController extends Controller
                 $rows = collect($group['actions'] ?? []);
                 $total = $rows->count();
                 $completed = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
-                $late = $rows->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+                $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
 
                 return [
                     'agent' => (string) ($group['agent'] ?? 'Non assigne'),
@@ -2774,8 +2795,9 @@ class DashboardController extends Controller
                 };
 
                 return $priority
-                    + ($status === 'en_retard' ? 100 : 0)
-                    + ($status === 'a_risque' ? 60 : 0)
+                    + ($this->delayStatusKey($action) === 'en_retard' ? 100 : 0)
+                    + ($this->delayStatusKey($action) === 'proche_echeance' ? 60 : 0)
+                    + ($status === 'a_risque' ? 30 : 0)
                     + max(0, 100 - (float) ($action->progression_reelle ?? 0)) / 10;
             })
             ->take($limit)
@@ -2784,6 +2806,8 @@ class DashboardController extends Controller
                 'service' => (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? '-'),
                 'responsable' => $this->actionResponsibleLabel($action),
                 'date_fin' => $this->actionDeadline($action)?->format('d/m/Y') ?? '-',
+                'delay_status' => $this->delayStatusKey($action),
+                'statut_delai' => $this->delayStatusLabel($action),
                 'statut' => $this->statusLabel($this->normalizeStatus((string) ($action->statut_dynamique ?? ''))),
                 'progression' => round((float) ($action->progression_reelle ?? 0), 2),
                 'validation' => (string) ($action->validation_status_label ?? $action->statut_validation ?? '-'),
@@ -2799,13 +2823,11 @@ class DashboardController extends Controller
      */
     private function buildDecisionLateRows(Collection $actions, int $limit = 10): array
     {
-        $today = Carbon::today();
-
         return $actions
-            ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')
-            ->sortByDesc(fn (Action $action): int => $this->actionDeadline($action)?->diffInDays($today) ?? 0)
+            ->filter(fn (Action $action): bool => $this->isLateAction($action))
+            ->sortByDesc(fn (Action $action): int => $this->delayDays($action))
             ->take($limit)
-            ->map(function (Action $action) use ($today): array {
+            ->map(function (Action $action): array {
                 $deadline = $this->actionDeadline($action);
 
                 return [
@@ -2813,7 +2835,9 @@ class DashboardController extends Controller
                     'responsable' => $this->actionResponsibleLabel($action),
                     'service' => (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? '-'),
                     'date_fin' => $deadline?->format('d/m/Y') ?? '-',
-                    'jours_retard' => $deadline instanceof Carbon ? $deadline->diffInDays($today) : 0,
+                    'jours_retard' => $this->delayDays($action),
+                    'delay_status' => $this->delayStatusKey($action),
+                    'statut_delai' => $this->delayStatusLabel($action),
                     'progression' => round((float) ($action->progression_reelle ?? 0), 2),
                     'motif' => trim((string) ($action->difficultes_rencontrees ?: $action->mesures_correctives ?: 'Non renseigne')),
                 ];
@@ -2899,7 +2923,7 @@ class DashboardController extends Controller
             $service = (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? '-');
             $label = (string) $action->libelle;
 
-            if ($status === 'en_retard') {
+            if ($this->isLateAction($action)) {
                 $rows[] = [
                     'type' => 'Retard',
                     'element' => $label,
@@ -2968,7 +2992,7 @@ class DashboardController extends Controller
                 });
                 $total = $quarterActions->count();
                 $completed = $quarterActions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')->count();
-                $late = $quarterActions->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')->count();
+                $late = $quarterActions->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
 
                 return [
                     'trimestre' => 'T'.$quarter,
@@ -3023,6 +3047,8 @@ class DashboardController extends Controller
                     'hors_delai' => $completedLate,
                     'taux_execution' => $executionRate,
                     'taux_realisation' => $quantitativeRate,
+                    'taux_validation' => $this->completionRate($validated, $total),
+                    'score' => $score,
                     'performance' => $this->performanceLabel($score),
                     'statut' => $this->groupEvolutionLabel($rows),
                     'derniere_activite' => $this->lastActivityLabel($rows),
@@ -3247,17 +3273,29 @@ class DashboardController extends Controller
 
     private function actionDeadline(Action $action): ?Carbon
     {
-        if ($action->date_fin instanceof Carbon) {
-            return $action->date_fin;
-        }
-
         if ($action->date_echeance instanceof Carbon) {
             return $action->date_echeance;
+        }
+
+        if ($action->date_fin instanceof Carbon) {
+            return $action->date_fin;
         }
 
         return $action->objectifOperationnel?->echeance instanceof Carbon
             ? $action->objectifOperationnel->echeance
             : null;
+    }
+
+    private function actionCompletionDate(Action $action): ?Carbon
+    {
+        foreach (['date_fin_reelle', 'cloture_le', 'evalue_le', 'soumise_le'] as $field) {
+            $date = $action->{$field} ?? null;
+            if ($date instanceof Carbon) {
+                return $date;
+            }
+        }
+
+        return null;
     }
 
     private function actionReferenceDate(Action $action): ?Carbon
@@ -3318,12 +3356,12 @@ class DashboardController extends Controller
 
     private function isLateAction(Action $action): bool
     {
-        return $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard';
+        return $this->delayStatusKey($action) === 'en_retard';
     }
 
     private function isCompletedLateAction(Action $action): bool
     {
-        return (string) ($action->statut_dynamique ?? '') === ActionTrackingService::STATUS_ACHEVE_HORS_DELAI;
+        return $this->delayStatusKey($action) === 'acheve_hors_delai';
     }
 
     /**
@@ -3508,31 +3546,79 @@ class DashboardController extends Controller
         return round((float) ($action->taux_atteinte_cible ?? 0), 2);
     }
 
-    private function delayStatusLabel(Action $action): string
+    private function isDelayCompletedAction(Action $action): bool
     {
         $rawStatus = (string) ($action->statut_dynamique ?? '');
+        $validationStatus = (string) ($action->statut_validation ?? '');
+
+        return in_array($rawStatus, [
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_CLOTUREE,
+        ], true)
+            || in_array($validationStatus, [
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ], true)
+            || $action->date_fin_reelle instanceof Carbon
+            || $action->cloture_le instanceof Carbon
+            || $action->evalue_le instanceof Carbon;
+    }
+
+    private function delayStatusKey(Action $action): string
+    {
+        $rawStatus = (string) ($action->statut_dynamique ?? '');
+        if ($rawStatus === ActionTrackingService::STATUS_ANNULE) {
+            return 'annule';
+        }
+
+        if ($rawStatus === ActionTrackingService::STATUS_SUSPENDU) {
+            return 'suspendu';
+        }
+
         if ($rawStatus === ActionTrackingService::STATUS_ACHEVE_HORS_DELAI) {
-            return 'Achevee hors delai';
-        }
-
-        if ($this->isLateAction($action)) {
-            return 'En retard';
-        }
-
-        if ($this->isCompletedAction($action)) {
-            return 'Dans les delais';
+            return 'acheve_hors_delai';
         }
 
         $deadline = $this->actionDeadline($action);
         if (! $deadline instanceof Carbon) {
-            return '-';
+            return 'sans_echeance';
         }
 
-        if ($deadline->betweenIncluded(Carbon::today(), Carbon::today()->addDays(7))) {
-            return 'Proche echeance';
+        $deadlineDay = $deadline->copy()->startOfDay();
+
+        if ($this->isDelayCompletedAction($action)) {
+            $completedAt = $this->actionCompletionDate($action);
+
+            return $completedAt instanceof Carbon && $completedAt->copy()->startOfDay()->gt($deadlineDay)
+                ? 'acheve_hors_delai'
+                : 'dans_delais';
         }
 
-        return 'Dans les delais';
+        $today = Carbon::today();
+        if ($deadlineDay->lt($today)) {
+            return 'en_retard';
+        }
+
+        if ($deadlineDay->betweenIncluded($today, $today->copy()->addDays(7))) {
+            return 'proche_echeance';
+        }
+
+        return 'dans_delais';
+    }
+
+    private function delayStatusLabel(Action $action): string
+    {
+        return match ($this->delayStatusKey($action)) {
+            'acheve_hors_delai' => 'Achevee hors delai',
+            'en_retard' => 'En retard',
+            'proche_echeance' => 'Proche echeance',
+            'dans_delais' => 'Dans les delais',
+            'sans_echeance' => 'Sans echeance',
+            'suspendu' => 'Suspendue',
+            'annule' => 'Annulee',
+            default => '-',
+        };
     }
 
     private function actionPerformanceLabel(Action $action): string
@@ -3623,7 +3709,7 @@ class DashboardController extends Controller
                     ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')
                     ->count();
                 $late = $rows
-                    ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')
+                    ->filter(fn (Action $action): bool => $this->isLateAction($action))
                     ->count();
                 $objective = $first?->pta?->pao?->pasObjectif;
                 $axisCode = (string) ($objective?->pasAxe?->code ?? '');
@@ -3662,7 +3748,7 @@ class DashboardController extends Controller
                     ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')
                     ->count();
                 $late = $rows
-                    ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')
+                    ->filter(fn (Action $action): bool => $this->isLateAction($action))
                     ->count();
                 $pao = $first?->pta?->pao;
 
@@ -3697,7 +3783,7 @@ class DashboardController extends Controller
                     ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'acheve')
                     ->count();
                 $late = $rows
-                    ->filter(fn (Action $action): bool => $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard')
+                    ->filter(fn (Action $action): bool => $this->isLateAction($action))
                     ->count();
                 $pta = $first?->pta;
 
@@ -3727,23 +3813,20 @@ class DashboardController extends Controller
         $rows = [];
 
         foreach ($actions as $action) {
-            $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
-            $status = (string) ($action->statut_dynamique ?? '');
+            $deadline = $this->actionDeadline($action);
+            $delayStatus = $this->delayStatusKey($action);
             $globalKpi = (float) ($action->actionKpi?->kpi_global ?? 0);
             $conformiteKpi = 0.0;
             $gap = max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
 
-            if ($deadline instanceof Carbon && $deadline->lt($today) && ! in_array($status, [ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, ActionTrackingService::STATUS_ACHEVE_HORS_DELAI], true)) {
-                if (in_array($status, [ActionTrackingService::STATUS_SUSPENDU, ActionTrackingService::STATUS_ANNULE], true)) {
-                    continue;
-                }
+            if ($delayStatus === 'en_retard' && $deadline instanceof Carbon) {
                 $daysLate = $deadline->diffInDays($today);
                 $rows[] = [
                     'titre' => (float) ($action->progression_reelle ?? 0) <= 0 ? 'Action non demarree' : 'Action en retard',
                     'niveau' => $daysLate >= 7 || (float) ($action->progression_reelle ?? 0) <= 0 ? 'Critique' : 'Attention',
                     'direction' => (string) ($action->pta?->direction?->code ?? '-'),
                     'action' => (string) $action->libelle,
-                    'details' => $daysLate.'j',
+                    'details' => $this->delayStatusLabel($action).' - '.$daysLate.'j',
                     'kpi' => round($globalKpi, 2),
                     'kpi_conformite' => round($conformiteKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
@@ -3764,10 +3847,7 @@ class DashboardController extends Controller
             }
 
             if (
-                $deadline instanceof Carbon
-                && $deadline->lt($today)
-                && ! in_array($status, [ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, ActionTrackingService::STATUS_ACHEVE_HORS_DELAI], true)
-                && ! in_array($status, [ActionTrackingService::STATUS_SUSPENDU, ActionTrackingService::STATUS_ANNULE], true)
+                $delayStatus === 'en_retard'
                 && $globalKpi > 0
                 && $globalKpi < 40
             ) {
@@ -3849,7 +3929,7 @@ class DashboardController extends Controller
                 $validatedActions = $this->officialActions($actions);
                 $actionsValidees = $validatedActions->count();
                 $actionsRetard = $actions->filter(function (Action $action): bool {
-                    return $this->normalizeStatus((string) ($action->statut_dynamique ?? '')) === 'en_retard';
+                    return $this->isLateAction($action);
                 })->count();
 
                 return [
@@ -4055,13 +4135,10 @@ class DashboardController extends Controller
 
     private function isAlertAction(Action $action): bool
     {
-        $deadline = $action->date_echeance instanceof Carbon ? $action->date_echeance : $action->date_fin;
         if (in_array((string) ($action->statut_dynamique ?? ''), [ActionTrackingService::STATUS_SUSPENDU, ActionTrackingService::STATUS_ANNULE], true)) {
             return false;
         }
-        $isOverdue = $deadline instanceof Carbon
-            && $deadline->lt(Carbon::today())
-            && ! in_array((string) ($action->statut_dynamique ?? ''), [ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, ActionTrackingService::STATUS_ACHEVE_HORS_DELAI], true);
+        $isOverdue = $this->delayStatusKey($action) === 'en_retard';
         $isLowKpi = (float) ($action->actionKpi?->kpi_global ?? 0) > 0 && (float) ($action->actionKpi?->kpi_global ?? 0) < 60;
 
         return $isOverdue

@@ -264,6 +264,67 @@ class PtaServiceWorkflowTest extends TestCase
         $this->assertTrue($posT1 < $posT2 && $posT2 < $posT3, 'Les actions du PTA doivent etre triees par trimestre, de l echeance la plus proche a la plus lointaine.');
     }
 
+    public function test_pta_edit_filters_actions_by_selected_operational_objective(): void
+    {
+        $fixture = $this->fixture();
+        $secondObjective = ObjectifOperationnel::query()->create([
+            'pao_id' => $fixture['pao']->id,
+            'pas_id' => $fixture['ownObjective']->pas_id,
+            'pas_axe_id' => $fixture['ownObjective']->pas_axe_id,
+            'pas_objectif_id' => $fixture['ownObjective']->pas_objectif_id,
+            'direction_id' => $fixture['ownService']->direction_id,
+            'service_id' => $fixture['ownService']->id,
+            'libelle' => 'Deuxieme objectif transmis au service cible',
+            'echeance' => '2026-12-31',
+            'statut' => Pao::STATUS_VALIDE,
+        ]);
+        $pta = Pta::query()->create([
+            'pao_id' => $fixture['pao']->id,
+            'objectif_operationnel_id' => $fixture['ownObjective']->id,
+            'direction_id' => $fixture['ownService']->direction_id,
+            'service_id' => $fixture['ownService']->id,
+            'titre' => 'PTA multi objectifs',
+        ]);
+
+        $makeAction = function (ObjectifOperationnel $objectif, string $libelle) use ($fixture, $pta): Action {
+            $action = Action::query()->create([
+                'pta_id' => $pta->id,
+                'pao_id' => $fixture['pao']->id,
+                'objectif_operationnel_id' => $objectif->id,
+                'responsable_id' => $fixture['agent']->id,
+                'libelle' => $libelle,
+                'date_debut' => '2026-03-01',
+                'date_fin' => '2026-06-30',
+                'date_echeance' => '2026-06-30',
+                'statut' => 'non_demarre',
+                'statut_parametrage' => 'parametre',
+                'contexte_action' => Action::CONTEXT_PILOTAGE,
+                'origine_action' => Action::ORIGIN_PTA,
+            ]);
+            $action->responsables()->attach($fixture['agent']->id, ['is_primary' => true]);
+
+            return $action;
+        };
+
+        $makeAction($fixture['ownObjective'], 'Action objectif un');
+        $makeAction($secondObjective, 'Action objectif deux');
+
+        $this->actingAs($fixture['serviceUser'])
+            ->get(route('workspace.pta.edit', $pta))
+            ->assertOk()
+            ->assertSee('Action objectif un')
+            ->assertDontSee('Action objectif deux');
+
+        $this->actingAs($fixture['serviceUser'])
+            ->get(route('workspace.pta.edit', [
+                'pta' => $pta,
+                'objectif_operationnel_id' => $secondObjective->id,
+            ]))
+            ->assertOk()
+            ->assertSee('Action objectif deux')
+            ->assertDontSee('Action objectif un');
+    }
+
     public function test_pta_action_date_fin_cannot_exceed_operational_objective_deadline(): void
     {
         $fixture = $this->fixture();

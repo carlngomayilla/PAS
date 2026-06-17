@@ -2488,3 +2488,88 @@ html.dark body.admin-theme-scope.anbg-glass-theme .action-detail-tab:hover {
     }
 }
 
+/* Global premium tables for the admin glass theme. */
+body.admin-theme-scope.anbg-glass-theme :is(.app-table-wrapper, .data-table-shell, .table-wrap, .preview-table-wrapper) {
+    overflow: auto !important;
+    border: 1px solid rgba(57, 150, 211, 0.20) !important;
+    border-radius: 18px !important;
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,252,255,0.82)) !important;
+    box-shadow: 0 18px 44px rgba(28,32,61,0.10) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :is(.app-table, .data-table, .dashboard-table, .glass-table, .app-table-wrapper table, .data-table-shell table, .table-wrap table, .showcase-panel table, .preview-table) {
+    width: 100% !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    font-size: 0.86rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme table thead,
+body.admin-theme-scope.anbg-glass-theme table thead tr {
+    background: linear-gradient(135deg, #1c203d 0%, #24679b 48%, #3996d3 100%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme table thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2 !important;
+    border: 0 !important;
+    border-bottom: 1px solid rgba(255,255,255,0.20) !important;
+    background: transparent !important;
+    color: #ffffff !important;
+    padding: 0.82rem 1rem !important;
+    font-size: 0.72rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.075em !important;
+    line-height: 1.15 !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme table tbody td {
+    border-bottom: 1px solid rgba(57,150,211,0.10) !important;
+    background: rgba(255,255,255,0.84) !important;
+    color: var(--app-text-color, #0f172a) !important;
+    padding: 0.78rem 1rem !important;
+    vertical-align: middle !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme table tbody tr:nth-child(odd) td {
+    background: rgba(232,243,251,0.52) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme table tbody tr:hover td {
+    background: linear-gradient(90deg, rgba(57,150,211,0.17), rgba(143,192,67,0.10)) !important;
+    box-shadow: inset 3px 0 0 #3996d3 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme table tbody td:first-child {
+    color: #17324a !important;
+    font-weight: 800 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :is(.app-table-wrapper, .data-table-shell, .table-wrap, .preview-table-wrapper) {
+    border-color: rgba(148,163,184,0.18) !important;
+    background: linear-gradient(180deg, rgba(15,23,42,0.86), rgba(15,23,42,0.76)) !important;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.36) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme table thead,
+html.dark body.admin-theme-scope.anbg-glass-theme table thead tr {
+    background: linear-gradient(135deg, #0f172a 0%, #1c203d 52%, #245f99 100%) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme table tbody td {
+    border-bottom-color: rgba(148,163,184,0.12) !important;
+    background: rgba(15,23,42,0.72) !important;
+    color: #dbeafe !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme table tbody tr:nth-child(odd) td {
+    background: rgba(30,41,59,0.58) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme table tbody td:first-child {
+    color: #f8fafc !important;
+}
+

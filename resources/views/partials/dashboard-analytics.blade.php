@@ -178,6 +178,17 @@
         };
     };
 
+    $delayStatusTone = static function (string $status): string {
+        return match ($status) {
+            'dans_delais' => 'success',
+            'proche_echeance' => 'warning',
+            'en_retard', 'acheve_hors_delai' => 'danger',
+            'suspendu' => 'danger',
+            'annule', 'sans_echeance' => 'neutral',
+            default => 'info',
+        };
+    };
+
     $fmtCount = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ');
     $fmtPct = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ').'%';
     $shortText = static fn ($value, int $limit = 42): string => \Illuminate\Support\Str::limit((string) ($value ?: '-'), $limit);
@@ -302,8 +313,8 @@
         [
             'title' => 'Retards',
             'chip' => $fmtCount($metrics['alerts']['actions_en_retard'] ?? 0),
-            'headers' => ['Action', 'J', 'Prog.'],
-            'rows' => collect($synthesisLateRows)->map(fn (array $row): array => ['cells' => [$shortText($row['libelle'] ?? '-', 34), $fmtCount($row['retard_jours'] ?? 0), $fmtPct($row['progression'] ?? 0)]])->all(),
+            'headers' => ['Action', 'Statut', 'J', 'Prog.'],
+            'rows' => collect($synthesisLateRows)->map(fn (array $row): array => ['cells' => [$shortText($row['libelle'] ?? '-', 34), $row['statut_delai'] ?? '-', $fmtCount($row['retard_jours'] ?? 0), $fmtPct($row['progression'] ?? 0)]])->all(),
             'empty' => 'Aucun retard.',
         ],
         [
@@ -434,10 +445,11 @@
         [
             'title' => 'Actions en retard',
             'chip' => $fmtCount($metrics['alerts']['actions_en_retard'] ?? 0).' retards',
-            'headers' => ['Action', 'Échéance', 'Jours de retard', 'Progression', 'Validation'],
+            'headers' => ['Action', 'Échéance', 'Statut délai', 'Jours de retard', 'Progression', 'Validation'],
             'rows' => collect($synthesisLateRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['libelle'] ?? '-', 42),
                 (string) ($row['echeance'] ?? '-'),
+                $row['statut_delai'] ?? '-',
                 $fmtCount($row['retard_jours'] ?? 0),
                 $fmtPct($row['progression'] ?? 0),
                 $validationStatusLabel((string) ($row['validation_status'] ?? '')),
@@ -510,12 +522,13 @@
         [
             'title' => 'Actions prioritaires',
             'chip' => count($decisionPriorityRows).' actions',
-            'headers' => ['Action', 'Service', 'Responsable', 'Date fin', 'Statut', 'Progression', 'Validation'],
+            'headers' => ['Action', 'Service', 'Responsable', 'Date fin', 'Statut délai', 'Statut', 'Progression', 'Validation'],
             'rows' => collect($decisionPriorityRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 38),
                 $shortText($row['service'] ?? '-', 24),
                 $shortText($row['responsable'] ?? '-', 28),
                 $row['date_fin'] ?? '-',
+                $row['statut_delai'] ?? '-',
                 $row['statut'] ?? '-',
                 $fmtPct($row['progression'] ?? 0),
                 $shortText($row['validation'] ?? '-', 22),
@@ -525,12 +538,13 @@
         [
             'title' => 'Actions en retard',
             'chip' => count($decisionLateRows).' retards',
-            'headers' => ['Action', 'Responsable', 'Service', 'Date fin', 'Jours retard', 'Progression', 'Motif'],
+            'headers' => ['Action', 'Responsable', 'Service', 'Date fin', 'Statut délai', 'Jours retard', 'Progression', 'Motif'],
             'rows' => collect($decisionLateRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 34),
                 $shortText($row['responsable'] ?? '-', 24),
                 $shortText($row['service'] ?? '-', 22),
                 $row['date_fin'] ?? '-',
+                $row['statut_delai'] ?? '-',
                 $fmtCount($row['jours_retard'] ?? 0),
                 $fmtPct($row['progression'] ?? 0),
                 $shortText($row['motif'] ?? '-', 28),
@@ -730,7 +744,7 @@
         [
             'title' => 'Actions des agents',
             'chip' => count($agentActionRows).' lignes',
-            'headers' => ['Agent', 'Action', 'Objectif opérationnel', 'PTA', 'Direction', 'Service', 'Échéance', 'Cible', 'Réalisé', 'Reste', 'Sous-actions', 'Progression', 'Taux de réalisation', 'Statut', 'Délai', 'Performance', 'Justificatifs', 'Commentaires', 'Dernière activité'],
+            'headers' => ['Agent', 'Action', 'Objectif opérationnel', 'PTA', 'Direction', 'Service', 'Échéance', 'Cible', 'Réalisé', 'Reste', 'Sous-actions', 'Progression', 'Taux de réalisation', 'Statut', 'Statut délai', 'Performance', 'Justificatifs', 'Commentaires', 'Dernière activité'],
             'rows' => collect($agentActionRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['agent'] ?? '-', 24),
                 $shortText($row['action'] ?? '-', 32),
@@ -794,12 +808,13 @@
         [
             'title' => 'Actions prioritaires',
             'chip' => count($decisionPriorityRows).' actions',
-            'headers' => ['Action', 'Service', 'Responsable', 'Date fin', 'Statut', 'Progression', 'Validation'],
+            'headers' => ['Action', 'Service', 'Responsable', 'Date fin', 'Statut délai', 'Statut', 'Progression', 'Validation'],
             'rows' => collect($decisionPriorityRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 38),
                 $shortText($row['service'] ?? '-', 24),
                 $shortText($row['responsable'] ?? '-', 28),
                 $row['date_fin'] ?? '-',
+                $row['statut_delai'] ?? '-',
                 $row['statut'] ?? '-',
                 $fmtPct($row['progression'] ?? 0),
                 $shortText($row['validation'] ?? '-', 22),
@@ -809,12 +824,13 @@
         [
             'title' => 'Actions en retard',
             'chip' => count($decisionLateRows).' retards',
-            'headers' => ['Action', 'Responsable', 'Service', 'Date fin', 'Jours retard', 'Progression', 'Motif'],
+            'headers' => ['Action', 'Responsable', 'Service', 'Date fin', 'Statut délai', 'Jours retard', 'Progression', 'Motif'],
             'rows' => collect($decisionLateRows)->map(fn (array $row): array => ['cells' => [
                 $shortText($row['action'] ?? '-', 34),
                 $shortText($row['responsable'] ?? '-', 24),
                 $shortText($row['service'] ?? '-', 22),
                 $row['date_fin'] ?? '-',
+                $row['statut_delai'] ?? '-',
                 $fmtCount($row['jours_retard'] ?? 0),
                 $fmtPct($row['progression'] ?? 0),
                 $shortText($row['motif'] ?? '-', 28),

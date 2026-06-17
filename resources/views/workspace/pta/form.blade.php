@@ -6,7 +6,8 @@
         $workflowStatusLabel = static fn (string $status): string => \App\Support\UiLabel::workflowStatus($status);
         $objectifOptions = collect($objectifOperationnelOptions ?? []);
         $responsableOptions = collect($responsableOptions ?? []);
-        $selectedObjectif = $objectifOptions->firstWhere('id', (int) old('objectif_operationnel_id', $row->objectif_operationnel_id));
+        $selectedObjectifId = (int) old('objectif_operationnel_id', $selectedObjectifId ?? $row->objectif_operationnel_id);
+        $selectedObjectif = $objectifOptions->firstWhere('id', $selectedObjectifId);
         $selectedPao = $selectedObjectif?->pao;
         $serviceCodeForTitle = $selectedObjectif?->service?->code ?: $selectedObjectif?->service?->libelle ?: 'SERVICE';
         $defaultTitle = old('titre', $row->titre ?: 'PTA - '.$serviceCodeForTitle);
@@ -179,7 +180,7 @@
                                         data-strategic-objective-label="{{ $objectif->pasObjectif?->code }} - {{ $objectif->pasObjectif?->libelle }}"
                                         data-operational-description="{{ $objectif->description ?: $objectif->libelle }}"
                                         data-echeance="{{ optional($objectif->echeance)->format('Y-m-d') }}"
-                                        @selected((int) old('objectif_operationnel_id', $row->objectif_operationnel_id) === (int) $objectif->id)
+                                        @selected($selectedObjectifId === (int) $objectif->id)
                                     >
                                         {{ $objectif->libelle }} ({{ $objectif->direction?->code }} / {{ $objectif->service?->code }})
                                     </option>
@@ -438,6 +439,7 @@
             var rmoTemplate = document.getElementById('pta-rmo-template');
             var actionCount = document.getElementById('pta-action-count');
             var addActionButton = document.getElementById('add-action-button');
+            var isEditMode = @json($isEdit);
 
             function optionValue(option, key) {
                 return option ? (option.getAttribute(key) || '').trim() : '';
@@ -460,6 +462,18 @@
                     syncActionEcheance(block);
                 });
                 filterRmosForScope();
+            }
+
+            function reloadActionsForSelectedObjective() {
+                if (!isEditMode || !objectifSelect || !objectifSelect.value) return;
+
+                var url = new URL(window.location.href);
+                if (url.searchParams.get('objectif_operationnel_id') === objectifSelect.value) {
+                    return;
+                }
+
+                url.searchParams.set('objectif_operationnel_id', objectifSelect.value);
+                window.location.href = url.toString();
             }
 
             function filterRmosForScope() {
@@ -910,7 +924,10 @@
             }
 
             if (objectifSelect) {
-                objectifSelect.addEventListener('change', syncScope);
+                objectifSelect.addEventListener('change', function () {
+                    syncScope();
+                    reloadActionsForSelectedObjective();
+                });
             }
 
             if (addActionButton) {
@@ -1102,6 +1119,9 @@
                             cur[last] = value;
                         }
                     });
+                    if (objectifSelect && objectifSelect.value) {
+                        payload.objectif_operationnel_id = objectifSelect.value;
+                    }
                     return payload;
                 }
 

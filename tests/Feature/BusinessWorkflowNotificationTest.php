@@ -72,6 +72,12 @@ class BusinessWorkflowNotificationTest extends TestCase
             'password_changed_at' => now(),
         ]);
         $unit->forceFill(['chef_user_id' => $unitChief->id])->save();
+        $serviceChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_UNITE,
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+            'password_changed_at' => now(),
+        ]);
 
         $agent = User::factory()->create([
             'role' => User::ROLE_AGENT,
@@ -120,7 +126,7 @@ class BusinessWorkflowNotificationTest extends TestCase
         $notificationService->notifyJustificatifAdded($action, $agent, $sousAction, 'sous_action');
         $notificationService->notifyActionCommentAdded($action, 'Commentaire de suivi ajouté.', $agent);
 
-        foreach ([$fixture['service_user'], $unitChief] as $recipient) {
+        foreach ([$fixture['service_user'], $serviceChief, $unitChief] as $recipient) {
             Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Action en attente de validation');
             Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Nouveau commentaire sur une action');
             Notification::assertSentTo($recipient, WorkspaceModuleNotification::class, fn (WorkspaceModuleNotification $notification): bool => $notification->toArray($recipient)['title'] === 'Nouvelle sous-action créée');

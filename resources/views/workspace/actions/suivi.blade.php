@@ -538,8 +538,8 @@
             </div>
         @endif
 
-        {{-- VALIDATION CHEF — action simple soumise --}}
-        @if (($canReviewByChefV2 ?? false) && ! $action->isComposee() && $v2IsSubmitted)
+        {{-- VALIDATION CHEF — action soumise --}}
+        @if (($canReviewByChefV2 ?? false) && $v2IsSubmitted)
             <div class="mt-3 rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm">
                 <strong class="text-sm text-[#17324a]">Décision du chef de service</strong>
                 <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-2 flex flex-wrap items-end gap-2">

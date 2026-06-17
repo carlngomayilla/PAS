@@ -29,6 +29,8 @@ function bootDashboardRender(force = false) {
   const statusCards = payload.status_cards || [];
   const monthly = payload.monthly || [];
   const unitRows = payload.unit_rows || [];
+  const directionPerformanceRows = payload.direction_performance_rows || [];
+  const servicePerformanceRows = payload.synthesis_service_rows || [];
   const interannual = payload.interannual || [];
   const scatterPoints = payload.scatter_points || [];
   const radarDatasets = payload.radar_datasets || [];
@@ -1758,6 +1760,146 @@ function bootDashboardRender(force = false) {
     });
   }
 
+  function boundedPercent(value) {
+    return Math.max(0, Math.min(100, finiteNumber(value, 0)));
+  }
+
+  function horizontalPercentScales() {
+    return cartesianScales({
+      x: {
+        max: 100,
+        ticks: {
+          callback(value) {
+            return `${value} %`;
+          },
+        },
+      },
+      y: {
+        ticks: {
+          autoSkip: false,
+          maxTicksLimit: 12,
+        },
+      },
+    });
+  }
+
+  function mountDirectionAndServicePerformance() {
+    const percentLabel = (value) => (value > 0 ? `${Math.round(value)}%` : '');
+    const directionRows = Array.isArray(directionPerformanceRows)
+      ? directionPerformanceRows.filter(isObject).slice(0, 10)
+      : [];
+    const serviceRows = Array.isArray(servicePerformanceRows)
+      ? servicePerformanceRows.filter(isObject).slice(0, 10)
+      : [];
+    const horizontalTooltip = {
+      callbacks: {
+        title(items) {
+          return items[0]?.label || '';
+        },
+        label(context) {
+          const value = Number(context.parsed?.x ?? context.raw ?? 0);
+          return ` ${context.dataset.label} : ${Math.round(value)} %`;
+        },
+      },
+    };
+
+    mountChart('dashboard-direction-performance-chart', baseConfig('bar', {
+      data: {
+        labels: directionRows.map((item) => item.direction || 'Direction'),
+        datasets: [
+          {
+            label: 'Score',
+            data: directionRows.map((item) => boundedPercent(item.score ?? item.taux_execution)),
+            backgroundColor: (context) => barGradient(context.chart, '#1C203D'),
+            maxBarThickness: 22,
+          },
+          {
+            label: 'Execution',
+            data: directionRows.map((item) => boundedPercent(item.taux_execution)),
+            backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
+            maxBarThickness: 22,
+          },
+          {
+            label: 'Validation',
+            data: directionRows.map((item) => boundedPercent(item.taux_validation)),
+            backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
+            maxBarThickness: 22,
+          },
+          {
+            label: 'Realisation',
+            data: directionRows.map((item) => boundedPercent(item.taux_realisation)),
+            backgroundColor: (context) => barGradient(context.chart, '#F9B13C'),
+            maxBarThickness: 22,
+          },
+        ],
+      },
+      options: {
+        indexAxis: 'y',
+        scales: horizontalPercentScales(),
+        plugins: {
+          anbgBarShadow: { enabled: true },
+          datalabels: false,
+          tooltip: {
+            ...horizontalTooltip,
+            callbacks: {
+              ...horizontalTooltip.callbacks,
+              afterLabel(context) {
+                const row = directionRows[context.dataIndex];
+                if (!row) return '';
+                return ` Actions : ${row.actions_total ?? 0}  |  Retards : ${row.retards ?? 0}`;
+              },
+            },
+          },
+        },
+      },
+    }), ({ element }) => directionRows[element?.index]?.url || '');
+
+    mountChart('dashboard-service-performance-chart', baseConfig('bar', {
+      data: {
+        labels: serviceRows.map((item) => item.label || 'Service'),
+        datasets: [
+          {
+            label: 'Score KPI',
+            data: serviceRows.map((item) => boundedPercent(item.kpi_global)),
+            backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
+            maxBarThickness: 24,
+          },
+          {
+            label: 'Progression',
+            data: serviceRows.map((item) => boundedPercent(item.progression_moyenne)),
+            backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
+            maxBarThickness: 24,
+          },
+          {
+            label: 'Validation',
+            data: serviceRows.map((item) => boundedPercent(item.validation_pct)),
+            backgroundColor: (context) => barGradient(context.chart, '#1C203D'),
+            maxBarThickness: 24,
+          },
+        ],
+      },
+      options: {
+        indexAxis: 'y',
+        scales: horizontalPercentScales(),
+        plugins: {
+          anbgBarShadow: { enabled: true },
+          datalabels: false,
+          tooltip: {
+            ...horizontalTooltip,
+            callbacks: {
+              ...horizontalTooltip.callbacks,
+              afterLabel(context) {
+                const row = serviceRows[context.dataIndex];
+                if (!row) return '';
+                return ` Actions : ${row.actions_total ?? 0}  |  Alertes : ${row.alertes ?? 0}`;
+              },
+            },
+          },
+        },
+      },
+    }), ({ element }) => serviceRows[element?.index]?.url || '');
+  }
+
   function mountUnitSummary() {
     const percentLabel = (v) => (v > 0 ? `${Math.round(v)}%` : '');
 
@@ -2024,6 +2166,7 @@ function bootDashboardRender(force = false) {
           mountMonthlyKpiLine();
           bindPeriodButtons('[data-period-chart="kpi-line"]', (n) => mountMonthlyKpiLine('dashboard-kpi-line-chart', monthly, n));
         });
+        safeRenderStep('direction service performance', mountDirectionAndServicePerformance);
         safeRenderStep('unit summary', mountUnitSummary);
         safeRenderStep('status donut', () => mountStatusDonut('dashboard-status-mix-chart', statusCards, (payload.totals && payload.totals.actions_total) || 0));
         safeRenderStep('reporting charts', mountReportingCharts);

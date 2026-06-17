@@ -505,6 +505,49 @@ class PlanningExcelImportServiceTest extends TestCase
         Bus::assertNotDispatched(NotifyImportedParametreActionsJob::class);
     }
 
+    public function test_import_scopes_action_order_duplicates_to_operational_objective(): void
+    {
+        $fixture = $this->fixture();
+        $service = app(PlanningExcelImportService::class);
+
+        $firstPreview = $service->validateSheet($this->sheet([
+            $this->row([
+                'ordre_objectif_operationnel' => 1,
+                'libelle_objectif_operationnel' => 'Objectif operationnel 1',
+                'ordre_action' => 1,
+                'libelle_action' => 'Action objectif import 1',
+            ]),
+        ]));
+
+        $this->assertFalse($firstPreview['has_errors']);
+        $this->executePreview($service, $fixture['admin'], $firstPreview);
+
+        $secondPreview = $service->validateSheet($this->sheet([
+            $this->row([
+                'ordre_objectif_operationnel' => 2,
+                'libelle_objectif_operationnel' => 'Objectif operationnel 2',
+                'ordre_action' => 1,
+                'libelle_action' => 'Action objectif import 2',
+            ]),
+        ]));
+
+        $this->assertFalse($secondPreview['has_errors']);
+        $this->assertSame([], $secondPreview['rows'][0]['warnings']);
+
+        $this->executePreview($service, $fixture['admin'], $secondPreview);
+
+        $this->assertDatabaseCount('objectifs_operationnels', 2);
+        $this->assertDatabaseCount('actions', 2);
+
+        $firstAction = Action::query()->where('libelle', 'Action objectif import 1')->firstOrFail();
+        $secondAction = Action::query()->where('libelle', 'Action objectif import 2')->firstOrFail();
+
+        $this->assertSame(1, (int) $firstAction->ordre_import);
+        $this->assertSame(1, (int) $secondAction->ordre_import);
+        $this->assertNotSame((int) $firstAction->objectif_operationnel_id, (int) $secondAction->objectif_operationnel_id);
+        $this->assertSame((int) $firstAction->pta_id, (int) $secondAction->pta_id);
+    }
+
     public function test_imported_action_assigned_to_current_profile_is_counted_in_dashboard_cards(): void
     {
         $fixture = $this->fixture();

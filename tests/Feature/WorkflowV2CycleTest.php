@@ -75,7 +75,7 @@ class WorkflowV2CycleTest extends TestCase
         $this->assertEquals(0.0, (float) $action->official_progress_percent);
     }
 
-    public function test_composite_action_closes_when_all_sub_actions_validated(): void
+    public function test_composite_action_requires_parent_validation_after_all_sub_actions_validated(): void
     {
         $fixture = $this->createFixture(Action::TYPE_COMPOSEE);
         $action = $fixture['action'];
@@ -109,8 +109,15 @@ class WorkflowV2CycleTest extends TestCase
         $workflow->submitSubAction($sa2->fresh(), ['has_new_proof' => false], $fixture['agent']);
         $workflow->reviewSubAction($sa2->fresh(), true, null, $fixture['chef']);
 
-        // Parent clôturé : perf pondérée = 100*0.6 + 50*0.4 = 80%.
+        // Parent soumis au chef : perf ponderee = 100*0.6 + 50*0.4 = 80%.
         $action->refresh();
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
+        $this->assertNotSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
+        $this->assertEquals(0.0, (float) $action->official_progress_percent);
+
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
         $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
         $this->assertEquals(80.0, (float) $action->official_progress_percent);
     }
@@ -155,6 +162,36 @@ class WorkflowV2CycleTest extends TestCase
             ->get(route('workspace.actions.suivi', $fixture['action']))
             ->assertOk()
             ->assertSee('Décision du chef de service', false);
+    }
+
+    public function test_chef_sees_parent_validation_when_composite_action_is_submitted(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_COMPOSEE);
+        $action = $fixture['action'];
+        $workflow = app(ActionWorkflowService::class);
+
+        $sousAction = $action->sousActions()->create([
+            'agent_id' => $fixture['agent']->id,
+            'libelle' => 'SA parent validation',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-06-30',
+            'sub_action_type' => SousAction::TYPE_QUANTITATIVE,
+            'cible_prevue' => 100,
+            'weight' => 100,
+            'requires_proof' => false,
+            'statut' => 'non_demarre',
+            'validation_status' => SousAction::VALIDATION_NON_SOUMISE,
+        ]);
+
+        $workflow->recordSubActionProgress($sousAction, ['quantite_realisee' => 100], $fixture['agent']);
+        $workflow->submitSubAction($sousAction->fresh(), ['has_new_proof' => false], $fixture['agent']);
+        $workflow->reviewSubAction($sousAction->fresh(), true, null, $fixture['chef']);
+
+        $this->actingAs($fixture['chef'])
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('Décision du chef de service', false)
+            ->assertSee('Valider l\'action', false);
     }
 
     public function test_validation_module_lists_composite_actions_with_submitted_sub_actions(): void

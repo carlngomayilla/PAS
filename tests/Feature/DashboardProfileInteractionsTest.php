@@ -131,6 +131,11 @@ class DashboardProfileInteractionsTest extends TestCase
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
         $charts->assertSee('Indicateurs KPI');
+        $charts->assertSee('Performance des directions');
+        $charts->assertSee('Performance des services');
+        $charts->assertSee('dashboard-direction-performance-chart', false);
+        $charts->assertSee('dashboard-service-performance-chart', false);
+        $charts->assertSee('direction_performance_rows', false);
         $charts->assertSee('dashboard-role-support-chart', false);
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');

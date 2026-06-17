@@ -468,6 +468,9 @@ class PlanningExcelImportService
             if ($errors === [] && $service instanceof Service) {
                 $existing = Action::query()
                     ->whereHas('pta', fn ($query) => $query->where('service_id', $service->id))
+                    ->whereHas('objectifOperationnel', fn ($query) => $query
+                        ->where('service_id', $service->id)
+                        ->where('import_ordre', (int) $normalized['ordre_objectif_operationnel']))
                     ->where('ordre_import', (int) $normalized['ordre_action'])
                     ->whereYear('date_debut', $startYear)
                     ->exists();

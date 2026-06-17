@@ -59,7 +59,7 @@
             <div class="app-table-wrapper max-h-[60vh] overflow-auto">
                 <table class="app-table data-table">
                     {{-- Colonne "Conformité" retiree (2026-05-28) : KPI conformite supprime de l'app. --}}
-                    <thead class="sticky top-0 z-10 bg-white"><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Délai</th></tr></thead>
+                    <thead class="sticky top-0 z-10 bg-white"><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Statut délai</th></tr></thead>
                     <tbody>
                         @forelse ($priorityActionRows as $row)
                             @php
@@ -72,10 +72,9 @@
                                 <td>{{ $row['direction'] }}</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}"><span class="h-2 w-2 rounded-full" style="background: {{ $statusColor }};"></span>{{ $actionStatusLabel($row['statut']) }}</span></td>
                                 <td><div class="flex min-w-[120px] items-center gap-2"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/90"><div class="h-full rounded-full" style="width: {{ min(100, max(0, $progress)) }}%; background: {{ $progressColor }};"></div></div><span class="text-[11px] font-black">{{ number_format($progress, 0) }}%</span></div></td>
-                                @foreach (['kpi_performance', 'kpi_delai'] as $metricKey)
-                                    @php $metricValue = (float) ($row[$metricKey] ?? 0); @endphp
-                                    <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($metricValue)) }}">{{ number_format($metricValue, 0) }}</span></td>
-                                @endforeach
+                                @php $performanceValue = (float) ($row['kpi_performance'] ?? 0); @endphp
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardKpiTone($performanceValue)) }}">{{ number_format($performanceValue, 0) }}</span></td>
+                                <td><span class="dashboard-pill" style="{{ $dashboardPillVars($delayStatusTone((string) ($row['delay_status'] ?? ''))) }}">{{ $row['statut_delai'] ?? '-' }}</span></td>
                             </tr>
                         @empty
                             <tr>
