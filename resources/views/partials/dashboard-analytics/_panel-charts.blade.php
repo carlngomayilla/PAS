@@ -1,16 +1,18 @@
 <section class="dashboard-tab-panel active" data-dashboard-panel="charts">
     @if ($showRoleOverview)
-        @include('partials.dashboard-role-overview', [
-            'roleDashboard' => $roleDashboard,
-            'dashboardRole' => $dashboardRole,
-            'statisticalPolicy' => $statisticalPolicy,
-            'officialPolicy' => $officialPolicy,
-            'displayMode' => 'charts',
-        ])
+        <div class="charts-role-overview">
+            @include('partials.dashboard-role-overview', [
+                'roleDashboard' => $roleDashboard,
+                'dashboardRole' => $dashboardRole,
+                'statisticalPolicy' => $statisticalPolicy,
+                'officialPolicy' => $officialPolicy,
+                'displayMode' => 'charts',
+            ])
+        </div>
     @endif
 
     @if ($showDirectionSynthesisSelector)
-        <section class="mb-4">
+        <section class="charts-decision-section mb-4">
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h2 class="showcase-panel-title">Graphiques de decision</h2>
                 <span class="showcase-chip">Services, agents et evolution</span>
@@ -21,7 +23,7 @@
                         <div class="mb-3 flex items-center justify-between gap-2">
                             <h3 class="text-sm font-black text-[#17324a]">{{ $chart['title'] }}</h3>
                         </div>
-                        <div class="space-y-3">
+                        <div class="charts-scroll-list charts-scroll-list-sm space-y-3">
                             @forelse (($chart['rows'] ?? []) as $row)
                                 @php
                                     $barValue = min(100, max(0, (float) ($row['value'] ?? 0)));
@@ -261,7 +263,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="mt-4 charts-status-grid" aria-label="Liste complète des statuts">
+                <div class="charts-scroll-list charts-scroll-list-sm mt-4 charts-status-grid" aria-label="Liste complète des statuts">
                     @foreach ($statusCards as $card)
                         @php $cardPct = $statusCardsTotal > 0 ? round(((float) $card['count'] / $statusCardsTotal) * 100, 1) : 0; @endphp
                         <a class="charts-status-item" href="{{ $card['href'] ?? '#' }}" style="--tone: {{ $card['color'] }};">
@@ -284,12 +286,13 @@
     </div>
 
     {{-- ─── RANGEE 3 : PERFORMANCE PAR UNITE + TOP ACTIONS ─────────── --}}
-    <div class="charts-bento charts-bento-row-rank mb-4">
+    <div class="charts-bento charts-bento-row-rank charts-long-row mb-4">
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
                 <h2 class="chart-title">Performance des directions</h2>
                 <span class="showcase-chip">{{ count($directionPerformanceRows) }} directions</span>
             </div>
+            <div class="dashboard-chart-scroll-frame">
             <div class="dashboard-canvas dashboard-canvas-lg" style="height: {{ number_format($directionPerformanceChartHeight, 2, '.', '') }}rem;">
                 <div id="dashboard-direction-performance-chart" class="dashboard-chart-host">
                     <div class="dashboard-chart-fallback" aria-hidden="true">
@@ -315,6 +318,7 @@
                     </div>
                 </div>
             </div>
+            </div>
         </article>
 
         <article class="showcase-panel">
@@ -322,6 +326,7 @@
                 <h2 class="chart-title">Performance des services</h2>
                 <span class="showcase-chip">{{ count($synthesisServiceRows) }} services</span>
             </div>
+            <div class="dashboard-chart-scroll-frame">
             <div class="dashboard-canvas dashboard-canvas-lg" style="height: {{ number_format($servicePerformanceChartHeight, 2, '.', '') }}rem;">
                 <div id="dashboard-service-performance-chart" class="dashboard-chart-host">
                     <div class="dashboard-chart-fallback" aria-hidden="true">
@@ -347,15 +352,17 @@
                     </div>
                 </div>
             </div>
+            </div>
         </article>
     </div>
 
-    <div class="charts-bento charts-bento-row-rank mb-4">
+    <div class="charts-bento charts-bento-row-rank charts-long-row mb-4">
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
                 <h2 class="chart-title">Performance par {{ strtolower($unitModeLabel) }}</h2>
                 <span class="showcase-chip">{{ count($unitRows) }} {{ strtolower($unitModeLabel) }}</span>
             </div>
+            <div class="dashboard-chart-scroll-frame">
             <div class="dashboard-canvas" style="height: {{ number_format($unitSummaryChartHeight, 2, '.', '') }}rem;">
                 <div id="dashboard-unit-summary-chart" class="dashboard-chart-host">
                     <div class="dashboard-chart-fallback" aria-hidden="true">
@@ -381,6 +388,7 @@
                     </div>
                 </div>
             </div>
+            </div>
         </article>
 
         <article class="showcase-panel">
@@ -389,7 +397,7 @@
                 <span class="showcase-chip">{{ count($analytics['top_action_bars'] ?? []) }} actions</span>
             </div>
             @if ($analytics['top_action_bars'] ?? false)
-                <div class="charts-top-actions">
+                <div class="charts-top-actions charts-scroll-list">
                     @foreach ($analytics['top_action_bars'] as $row)
                         <a href="{{ $row['url'] }}" class="charts-top-action-row">
                             <span class="charts-top-action-rank">{{ $loop->iteration }}</span>
@@ -415,7 +423,7 @@
     </div>
 
     @if ($showDashboardAdvancedReporting)
-        <section class="mt-4">
+        <section class="charts-advanced-section mt-4">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div><h2 class="showcase-panel-title">Analytique avancée</h2></div>
                 <a href="{{ route('workspace.reporting') }}" class="dashboard-reporting-jump">Exports</a>

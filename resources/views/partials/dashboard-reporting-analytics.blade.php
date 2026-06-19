@@ -144,6 +144,7 @@
                     <h2 class="showcase-panel-title">Statuts empiles par {{ strtolower($reportingCharts['status_by_unit']['unit_label'] ?? 'unite') }}</h2>
                 </div>
             </div>
+            <div class="dashboard-chart-scroll-frame">
             <div class="dashboard-canvas dashboard-canvas-lg" style="height: {{ number_format($reportStatusUnitChartHeight, 2, '.', '') }}rem;">
                 <div id="dashboard-report-status-unit-chart" class="dashboard-chart-host">
                     <div class="dashboard-chart-fallback" aria-hidden="true">
@@ -158,6 +159,7 @@
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
         </article>
 

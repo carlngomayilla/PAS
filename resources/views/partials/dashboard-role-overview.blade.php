@@ -93,6 +93,7 @@
             </div>
             <span class="showcase-chip">{{ count($comparisonChart['labels'] ?? []) }} indicateurs</span>
         </div>
+        <div class="dashboard-chart-scroll-frame">
         <div class="dashboard-canvas" style="height: {{ number_format($roleComparisonChartHeight, 2, '.', '') }}rem;">
             <div id="dashboard-role-comparison-chart" class="dashboard-chart-host">
                 <div class="dashboard-chart-fallback" aria-hidden="true">
@@ -107,6 +108,7 @@
                     </div>
                 </div>
             </div>
+        </div>
         </div>
     </article>
 @endif
@@ -137,7 +139,7 @@
                     </div>
                 </div>
                 @if ($roleStatusRows->isNotEmpty())
-                    <div class="mt-4 charts-status-grid" aria-label="Liste complète des statuts">
+                    <div class="charts-scroll-list charts-scroll-list-sm mt-4 charts-status-grid" aria-label="Liste complète des statuts">
                         @foreach ($roleStatusRows as $row)
                             @php $rowPct = $roleStatusTotal > 0 ? round(((float) $row['value'] / $roleStatusTotal) * 100, 1) : 0; @endphp
                             <a class="charts-status-item" href="{{ $row['href'] }}" style="--tone: {{ $row['color'] }};">
@@ -195,6 +197,7 @@
             </div>
             <span class="showcase-chip">{{ count($supportChart['labels'] ?? []) }} lignes</span>
         </div>
+        <div class="dashboard-chart-scroll-frame">
         <div class="dashboard-canvas" style="height: {{ number_format($roleSupportChartHeight, 2, '.', '') }}rem;">
             <div id="dashboard-role-support-chart" class="dashboard-chart-host">
                 <div class="dashboard-chart-fallback" aria-hidden="true">
@@ -213,6 +216,7 @@
                     @endif
                 </div>
             </div>
+        </div>
         </div>
     </article>
     @endif

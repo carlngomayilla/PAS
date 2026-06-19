@@ -8547,4 +8547,74 @@ body.admin-theme-scope .dealdeck-dashboard .chart-export-btn {
     color: var(--chart-teal) !important;
 }
 
+body.admin-theme-scope .dealdeck-dashboard [data-dashboard-panel="charts"].active {
+    display: flex !important;
+    flex-direction: column;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-bento-row-hero { order: 10; }
+body.admin-theme-scope .dealdeck-dashboard .charts-bento-row-trend { order: 20; }
+body.admin-theme-scope .dealdeck-dashboard .charts-role-overview { order: 30; }
+body.admin-theme-scope .dealdeck-dashboard .charts-decision-section { order: 40; }
+body.admin-theme-scope .dealdeck-dashboard .charts-long-row { order: 80; }
+body.admin-theme-scope .dealdeck-dashboard .charts-advanced-section { order: 90; }
+
+body.admin-theme-scope .dealdeck-dashboard .dashboard-chart-scroll-frame {
+    max-height: clamp(22rem, 58vh, 34rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.25rem;
+    border-radius: 0.85rem;
+    scrollbar-gutter: stable;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .dashboard-chart-scroll-frame > .dashboard-canvas {
+    min-height: 18rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-scroll-list {
+    max-height: clamp(17rem, 46vh, 28rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.25rem;
+    scrollbar-gutter: stable;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-scroll-list-sm {
+    max-height: 18rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard :is(
+    .dashboard-chart-scroll-frame,
+    .charts-scroll-list
+)::-webkit-scrollbar {
+    width: 0.55rem;
+    height: 0.55rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard :is(
+    .dashboard-chart-scroll-frame,
+    .charts-scroll-list
+)::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(15, 91, 102, 0.28);
+}
+
+body.admin-theme-scope .dealdeck-dashboard :is(
+    .dashboard-chart-scroll-frame,
+    .charts-scroll-list
+)::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+@media (max-width: 768px) {
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-chart-scroll-frame {
+        max-height: 28rem;
+    }
+
+    body.admin-theme-scope .dealdeck-dashboard .charts-scroll-list {
+        max-height: 22rem;
+    }
+}
+
 }
