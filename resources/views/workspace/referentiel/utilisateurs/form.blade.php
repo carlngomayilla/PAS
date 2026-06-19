@@ -85,7 +85,7 @@
                                 <option
                                     value="{{ $role }}"
                                     data-allow-contexts="{{ implode(' ', $contexts) }}"
-                                    @selected(old('role', $row->role) === $role)
+                                    @selected(old('role', $row->effectiveRoleCode()) === $role)
                                 >{{ $roleLabels[$role] ?? $role }}</option>
                             @endforeach
                         </select>

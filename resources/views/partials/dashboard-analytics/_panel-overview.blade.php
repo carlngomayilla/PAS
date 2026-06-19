@@ -279,49 +279,6 @@
     @endif
 
     @if ($directionSynthesisTables !== [])
-        @if (false)
-        <section class="mb-4">
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 class="showcase-panel-title">Graphiques de décision</h2>
-                <span class="showcase-chip">Services et agents</span>
-            </div>
-            <div class="grid gap-3 xl:grid-cols-3">
-                @foreach ($decisionCharts as $chart)
-                    <article class="showcase-panel dashboard-synthesis-card">
-                        <div class="mb-3 flex items-center justify-between gap-2">
-                            <h3 class="text-sm font-black text-[#17324a]">{{ $chart['title'] }}</h3>
-                        </div>
-                        <div class="space-y-3">
-                            @forelse (($chart['rows'] ?? []) as $row)
-                                @php
-                                    $barValue = min(100, max(0, (float) ($row['value'] ?? 0)));
-                                    $barColor = (string) ($row['color'] ?? '#3996D3');
-                                @endphp
-                                <div>
-                                    <div class="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-[#17324a]">
-                                        <span class="truncate">{{ $row['label'] }}</span>
-                                        <span class="whitespace-nowrap">{{ number_format($barValue, 0, ',', ' ') }}%</span>
-                                    </div>
-                                    <div class="h-2.5 overflow-hidden rounded-full bg-slate-200/80">
-                                        <div class="h-full rounded-full" style="width: {{ $barValue }}%; background: {{ $barColor }};"></div>
-                                    </div>
-                                    <p class="mt-1 text-[11px] font-medium text-[#667085]">{{ $row['meta'] ?? '' }}</p>
-                                </div>
-                            @empty
-                                <x-ui.empty-state
-                                    title="Aucune donnée"
-                                    message="Aucune donnée disponible."
-                                    icon="chart"
-                                    tone="info"
-                                />
-                            @endforelse
-                        </div>
-                    </article>
-                @endforeach
-            </div>
-        </section>
-        @endif
-
         <section class="mb-3">
             <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <h2 class="showcase-panel-title">Tableaux de décision</h2>
@@ -351,7 +308,7 @@
                                 </button>
                             </div>
                         </summary>
-                        <div class="app-table-wrapper max-h-[60vh] overflow-auto">
+                        <div class="app-table-wrapper overflow-x-auto">
                             <table id="{{ $synthesisTableId }}" class="app-table data-table dashboard-synthesis-table">
                                 <thead class="sticky top-0 z-10 bg-white">
                                     <tr>

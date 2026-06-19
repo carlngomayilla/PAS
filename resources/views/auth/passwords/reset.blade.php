@@ -91,7 +91,7 @@
             </div>
 
             <div class="policy">
-                <strong>Politique de securite :</strong> minimum 12 caracteres, au moins une majuscule, une minuscule, un chiffre et un symbole. Les 5 derniers mots de passe ne peuvent pas etre reutilises.
+                <strong>Politique de securite :</strong> minimum 8 caracteres, lettres et chiffres requis. Majuscules et symboles sont acceptes mais non obligatoires. Les 5 derniers mots de passe ne peuvent pas etre reutilises.
             </div>
 
             <button class="btn" type="submit">Reinitialiser le mot de passe</button>

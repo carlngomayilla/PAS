@@ -289,6 +289,7 @@ class DashboardController extends Controller
         $alertRows = collect($dashboardData['alert_rows'] ?? []);
         $actionRows = collect($dashboardData['action_rows'] ?? []);
         $globalScores = is_array($dashboardData['global_scores'] ?? null) ? $dashboardData['global_scores'] : [];
+        $qualityThreshold = (float) ($dashboardData['quality_threshold'] ?? $globalScores['quality_threshold'] ?? 60);
         $policy = [
             'scope_status' => $this->actionCalculationSettings->statisticalScope(),
             'scope_label' => $this->actionCalculationSettings->statisticalScopeLabel(),
@@ -325,11 +326,13 @@ class DashboardController extends Controller
                 'kpi_mesures_total' => (int) ($totals['kpi_mesures_total'] ?? 0),
                 'objectifs_operationnels_total' => 0,
             ],
+            'quality_threshold' => $qualityThreshold,
             'kpiSummary' => [
                 'delai' => (float) ($globalScores['delai'] ?? 0),
                 'performance' => (float) ($globalScores['performance'] ?? 0),
                 'conformite' => (float) ($globalScores['conformite'] ?? 0),
                 'global' => (float) ($globalScores['global'] ?? 0),
+                'quality_threshold' => $qualityThreshold,
             ],
             'managedKpis' => [],
             'statuts' => $statusBreakdown,
@@ -354,24 +357,27 @@ class DashboardController extends Controller
                 ],
                 'status_by_unit' => [
                     'unit_label' => (string) ($dashboardData['unit_mode_label'] ?? 'unite'),
-                    'labels' => $unitRows->pluck('label')->take(8)->values()->all(),
+                    'labels' => $unitRows->pluck('label')->values()->all(),
                     'datasets' => [[
                         'label' => 'Actions',
-                        'data' => $unitRows->pluck('actions_total')->take(8)->map(fn ($value): int => (int) $value)->values()->all(),
+                        'data' => $unitRows->pluck('actions_total')->map(fn ($value): int => (int) $value)->values()->all(),
                     ]],
-                    'urls' => [$unitRows->pluck('url')->take(8)->values()->all()],
+                    'urls' => [$unitRows->pluck('url')->values()->all()],
                 ],
                 'progress_weekly' => [
                     'labels' => $monthly->pluck('label')->values()->all(),
-                    'reel' => $monthly->pluck('global')->map(fn ($value): float => (float) $value)->values()->all(),
-                    'theorique' => $monthly->map(fn (): int => 80)->values()->all(),
+                    'reel' => $monthly->pluck('progression_reelle')->map(fn ($value): float => (float) $value)->values()->all(),
+                    'theorique' => $monthly->pluck('progression_theorique')->map(fn ($value): float => (float) $value)->values()->all(),
+                    'seuils' => $monthly->pluck('quality_threshold')->map(fn ($value): float => (float) ($value ?: $qualityThreshold))->values()->all(),
+                    'quality_threshold' => $qualityThreshold,
                     'urls' => $monthly->pluck('url')->values()->all(),
                 ],
                 'kpi_trend' => [
                     'labels' => $monthly->pluck('label')->values()->all(),
                     'valeurs' => $monthly->pluck('global')->map(fn ($value): float => (float) $value)->values()->all(),
                     'cibles' => $monthly->map(fn (): int => 80)->values()->all(),
-                    'seuils' => $monthly->map(fn (): int => 60)->values()->all(),
+                    'seuils' => $monthly->pluck('quality_threshold')->map(fn ($value): float => (float) ($value ?: $qualityThreshold))->values()->all(),
+                    'quality_threshold' => $qualityThreshold,
                     'urls' => $monthly->pluck('url')->values()->all(),
                 ],
                 'interannual_overview' => [
@@ -391,9 +397,9 @@ class DashboardController extends Controller
                 'performance_gauge' => [
                     'scope_label' => (string) ($performanceGaugeMeta['label'] ?? 'Directions'),
                     'empty_label' => (string) ($performanceGaugeMeta['empty_label'] ?? 'Aucune donnée disponible pour les jauges.'),
-                    'labels' => $performanceGaugeRows->pluck('label')->take(6)->values()->all(),
-                    'values' => $performanceGaugeRows->pluck('kpi_global')->take(6)->map(fn ($value): float => (float) $value)->values()->all(),
-                    'urls' => $performanceGaugeRows->pluck('url')->take(6)->values()->all(),
+                    'labels' => $performanceGaugeRows->pluck('label')->values()->all(),
+                    'values' => $performanceGaugeRows->pluck('kpi_global')->map(fn ($value): float => (float) $value)->values()->all(),
+                    'urls' => $performanceGaugeRows->pluck('url')->values()->all(),
                 ],
             ],
             'details' => [
@@ -497,6 +503,7 @@ class DashboardController extends Controller
             'official_action_filters',
             'unit_mode_label',
             'global_scores',
+            'quality_threshold',
             'status_cards',
             'monthly',
             'unit_rows',
@@ -1103,8 +1110,8 @@ class DashboardController extends Controller
         $synthesisPaoRows = $this->buildSynthesisPaoRows($actions);
         $synthesisPtaRows = $this->buildSynthesisPtaRows($actions);
         $synthesisServiceRows = $this->buildUnitRows($actions, 'service');
-        $synthesisAgentRows = $this->buildServiceAgentPerformanceRows($actions, 12);
-        $synthesisLateRows = $this->buildLateActionRows($actions, 12);
+        $synthesisAgentRows = $this->buildServiceAgentPerformanceRows($actions);
+        $synthesisLateRows = $this->buildLateActionRows($actions);
         $decisionCounts = $this->buildDecisionCounts($actions);
         $decisionChainRows = $this->buildDecisionChainRows($actions);
         $decisionServiceRows = $this->buildDecisionServiceRows($actions);
@@ -1139,14 +1146,15 @@ class DashboardController extends Controller
 
         $operationalGlobalScores = $this->buildGlobalScoreSummary($actions, $avg);
         $globalScores = $this->buildGlobalScoreSummary($officialActions, $avg);
-        $operationalMonthly = $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false);
-        $monthly = $this->buildMonthlyScoreRows($officialActions, $currentYear, $avg, true);
+        $qualityThreshold = $this->averageActionQualityThreshold($actions);
+        $operationalMonthly = $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false, $qualityThreshold);
+        $monthly = $this->buildMonthlyScoreRows($officialActions, $currentYear, $avg, true, $qualityThreshold);
 
         $actionRows = $actions
             ->sortByDesc(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0))
-            ->take(12)
             ->map(function (Action $action): array {
                 $statusKey = $this->dashboardStatus($action);
+                $actionQualityThreshold = $this->actionQualityThreshold($action);
                 $target = max(0.0, (float) ($action->quantite_cible ?? 0));
                 $realized = max(0.0, (float) ($action->quantite_realisee ?? 0));
                 $targetRate = $target > 0.0
@@ -1169,6 +1177,7 @@ class DashboardController extends Controller
                     'kpi_delai' => round((float) ($action->actionKpi?->kpi_delai ?? 0), 2),
                     'kpi_performance' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
                     'kpi_conformite' => round(0.0, 2),
+                    'quality_threshold' => $actionQualityThreshold,
                     'date_debut' => $action->date_debut instanceof Carbon ? $action->date_debut->format('d/m/Y') : '-',
                     'date_fin' => $this->actionDeadline($action)?->format('d/m/Y') ?? '-',
                     'delay_status' => $this->delayStatusKey($action),
@@ -1190,7 +1199,6 @@ class DashboardController extends Controller
         $ganttRows = $actions
             ->filter(fn (Action $action): bool => $action->date_debut instanceof Carbon && $action->date_fin instanceof Carbon)
             ->sortBy(fn (Action $action): string => $action->date_debut instanceof Carbon ? $action->date_debut->toDateString() : '')
-            ->take(10)
             ->map(function (Action $action): array {
                 $statusKey = $this->dashboardStatus($action);
 
@@ -1212,11 +1220,10 @@ class DashboardController extends Controller
             ->all();
 
         $bulletRows = collect($actionRows)
-            ->take(8)
             ->map(fn (array $row): array => [
                 'label' => $row['libelle'],
                 'real' => (float) $row['kpi_global'],
-                'target' => 80.0,
+                'target' => (float) ($row['quality_threshold'] ?? $qualityThreshold),
                 'url' => (string) $row['url'],
             ])
             ->all();
@@ -1224,16 +1231,17 @@ class DashboardController extends Controller
         $scatterPoints = $actions
             ->filter(fn (Action $action): bool => $action->actionKpi instanceof ActionKpi)
             ->sortByDesc(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0))
-            ->take(18)
             ->map(function (Action $action): array {
                 $global = (float) ($action->actionKpi?->kpi_global ?? 0);
+                $threshold = $this->actionQualityThreshold($action);
 
                 return [
                     'label' => (string) $action->id,
                     'x' => round((float) ($action->actionKpi?->kpi_performance ?? 0), 2),
                     'y' => round(0.0, 2),
                     'r' => max(5, min(12, (int) round($global / 10))),
-                    'color' => $global >= 80 ? '#8FC043' : ($global >= 60 ? '#3996D3' : '#F9B13C'),
+                    'threshold' => $threshold,
+                    'color' => $global >= $threshold ? '#20C76B' : ($global >= ($threshold * 0.75) ? '#F26522' : '#D92D20'),
                     'title' => (string) $action->libelle,
                     'url' => route('workspace.actions.suivi', $action),
                 ];
@@ -1242,10 +1250,9 @@ class DashboardController extends Controller
             ->all();
 
         $radarDatasets = collect($unitRows)
-            ->take(3)
             ->values()
             ->map(function (array $row, int $index): array {
-                $palette = ['#3996D3', '#8FC043', '#F0E509'];
+                $palette = ['#F26522', '#0F5B66', '#20C76B', '#F4B400'];
 
                 return [
                     'label' => (string) $row['label'],
@@ -1263,7 +1270,6 @@ class DashboardController extends Controller
             ->all();
 
         $topActionBars = collect($actionRows)
-            ->take(6)
             ->map(fn (array $row): array => [
                 'label' => (string) $row['libelle'],
                 'value' => (float) $row['kpi_global'],
@@ -1293,6 +1299,7 @@ class DashboardController extends Controller
             'unit_mode_label' => (string) $unitMeta['label'],
             'operational_global_scores' => $operationalGlobalScores,
             'global_scores' => $globalScores,
+            'quality_threshold' => $qualityThreshold,
             'operational_status_cards' => $statusCards,
             'official_status_cards' => $officialStatusCards,
             'operational_monthly' => $operationalMonthly,
@@ -1523,8 +1530,8 @@ class DashboardController extends Controller
             'labels' => array_column($rows, 'label'),
             'urls' => array_column($rows, 'url'),
             'datasets' => [
-                ['label' => 'Actions', 'color' => '#3996D3', 'data' => array_column($rows, 'total')],
-                ['label' => 'Achevées', 'color' => '#8FC043', 'data' => array_column($rows, 'achevees')],
+                ['label' => 'Actions', 'color' => '#0F5B66', 'data' => array_column($rows, 'total')],
+                ['label' => 'Achevées', 'color' => '#20C76B', 'data' => array_column($rows, 'achevees')],
                 ['label' => 'En retard', 'color' => '#B42318', 'data' => array_column($rows, 'retard')],
             ],
         ];
@@ -1561,7 +1568,7 @@ class DashboardController extends Controller
             'labels' => array_column($rows, 'label'),
             'urls' => array_column($rows, 'url'),
             'datasets' => [
-                ['label' => 'Actions', 'color' => '#1C203D', 'data' => array_column($rows, 'total')],
+                ['label' => 'Actions', 'color' => '#0F5B66', 'data' => array_column($rows, 'total')],
             ],
         ];
     }
@@ -1597,7 +1604,7 @@ class DashboardController extends Controller
             'labels' => array_column($rows, 'label'),
             'urls' => array_column($rows, 'url'),
             'datasets' => [
-                ['label' => 'Actions', 'color' => '#1C203D', 'data' => array_column($rows, 'value')],
+                ['label' => 'Actions', 'color' => '#0F5B66', 'data' => array_column($rows, 'value')],
             ],
         ];
     }
@@ -1617,8 +1624,8 @@ class DashboardController extends Controller
             'labels' => $rows->pluck('service')->all(),
             'urls' => $rows->pluck('url')->all(),
             'datasets' => [
-                ['label' => 'Exécution', 'color' => '#8FC043', 'data' => $rows->pluck('taux_execution')->all()],
-                ['label' => 'Validation', 'color' => '#3996D3', 'data' => $rows->pluck('taux_validation')->all()],
+                ['label' => 'Exécution', 'color' => '#F26522', 'data' => $rows->pluck('taux_execution')->all()],
+                ['label' => 'Validation', 'color' => '#0F5B66', 'data' => $rows->pluck('taux_validation')->all()],
                 ['label' => 'Retards', 'color' => '#B42318', 'data' => $rows->pluck('retards')->all()],
             ],
         ];
@@ -1684,6 +1691,7 @@ class DashboardController extends Controller
         $this->scopePta($ptaQuery, $user);
 
         $directionRows = $this->buildGlobalDirectionRows($actions, 100);
+        $qualityThreshold = $this->averageActionQualityThreshold($actions);
 
         return [
             'pas_total' => (clone $pasQuery)->count(),
@@ -1704,8 +1712,8 @@ class DashboardController extends Controller
             'global_score' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
             'directions_total' => collect($directionRows)->count(),
             'services_total' => $actions->pluck('pta.service_id')->filter()->unique()->count(),
-            'directions_difficulte' => collect($directionRows)->filter(function (array $row): bool {
-                return (float) ($row['score'] ?? 0) < 60 || (int) ($row['retards'] ?? 0) > 0;
+            'directions_difficulte' => collect($directionRows)->filter(function (array $row) use ($qualityThreshold): bool {
+                return (float) ($row['score'] ?? 0) < $qualityThreshold || (int) ($row['retards'] ?? 0) > 0;
             })->count(),
         ];
     }
@@ -1743,16 +1751,38 @@ class DashboardController extends Controller
             'conformite' => $avg($actions, fn (Action $action): float => 0.0),
             'global' => $avg($actions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
             'progression' => $avg($actions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
+            'quality_threshold' => $this->averageActionQualityThreshold($actions),
         ];
+    }
+
+    /**
+     * @param Collection<int, Action> $actions
+     */
+    private function averageActionQualityThreshold(Collection $actions): float
+    {
+        $thresholds = $actions
+            ->map(fn (Action $action): float => $this->actionQualityThreshold($action))
+            ->filter(fn (float $value): bool => $value > 0.0);
+
+        if ($thresholds->isEmpty()) {
+            return 60.0;
+        }
+
+        return round((float) $thresholds->avg(), 2);
+    }
+
+    private function actionQualityThreshold(Action $action): float
+    {
+        return max(0.0, min(100.0, (float) $action->performanceThreshold()));
     }
 
     /**
      * @param Collection<int, Action> $actions
      * @return array<int, array<string, mixed>>
      */
-    private function buildMonthlyScoreRows(Collection $actions, int $currentYear, callable $avg, bool $official): array
+    private function buildMonthlyScoreRows(Collection $actions, int $currentYear, callable $avg, bool $official, float $qualityThreshold): array
     {
-        return collect(range(1, 12))->map(function (int $month) use ($actions, $currentYear, $avg, $official): array {
+        return collect(range(1, 12))->map(function (int $month) use ($actions, $currentYear, $avg, $official, $qualityThreshold): array {
             $monthActions = $actions->filter(function (Action $action) use ($currentYear, $month): bool {
                 $date = $action->date_debut;
 
@@ -1779,6 +1809,9 @@ class DashboardController extends Controller
                 'performance' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_performance ?? 0)),
                 'conformite' => $avg($monthActions, fn (Action $action): float => 0.0),
                 'global' => $avg($monthActions, fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)),
+                'progression_reelle' => $avg($monthActions, fn (Action $action): float => (float) ($action->progression_reelle ?? 0)),
+                'progression_theorique' => $avg($monthActions, fn (Action $action): float => (float) ($action->progression_theorique ?? 0)),
+                'quality_threshold' => $qualityThreshold,
             ];
         })->all();
     }
@@ -1822,7 +1855,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('score')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -1869,7 +1901,6 @@ class DashboardController extends Controller
             ->sortByDesc(function (array $row): float {
                 return ((float) ($row['score_officiel'] ?? 0) * 1000) + (float) ($row['score_operationnel'] ?? 0);
             })
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -1886,7 +1917,6 @@ class DashboardController extends Controller
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
             ], true))
             ->sortBy(fn (Action $action): string => $action->soumise_le instanceof Carbon ? $action->soumise_le->toIso8601String() : '')
-            ->take($limit)
             ->map(function (Action $action): array {
                 return [
                     'direction' => (string) ($action->pta?->direction?->libelle ?? '-'),
@@ -1947,8 +1977,8 @@ class DashboardController extends Controller
                     'labels' => array_column($directionRows, 'direction'),
                     'urls' => array_column($directionRows, 'url'),
                     'datasets' => [
-                        ['label' => 'Exécution', 'color' => '#8FC043', 'data' => array_column($directionRows, 'taux_execution')],
-                        ['label' => 'Validation', 'color' => '#3996D3', 'data' => array_column($directionRows, 'taux_validation')],
+                        ['label' => 'Exécution', 'color' => '#F26522', 'data' => array_column($directionRows, 'taux_execution')],
+                        ['label' => 'Validation', 'color' => '#0F5B66', 'data' => array_column($directionRows, 'taux_validation')],
                         ['label' => 'Retards', 'color' => '#B42318', 'data' => array_column($directionRows, 'retards')],
                     ],
                 ],
@@ -1968,9 +1998,10 @@ class DashboardController extends Controller
         $portfolio = $this->buildScopePortfolioMetrics($user, $actions, $validatedActions);
         $snapshot = $this->buildDashboardSnapshot($actions);
         $directionRows = $this->buildGlobalDirectionRows($actions, 8);
+        $qualityThreshold = $this->averageActionQualityThreshold($actions);
         $difficultyRows = collect($directionRows)
-            ->filter(function (array $row): bool {
-                return (float) ($row['score'] ?? 0) < 60
+            ->filter(function (array $row) use ($qualityThreshold): bool {
+                return (float) ($row['score'] ?? 0) < $qualityThreshold
                     || (int) ($row['retards'] ?? 0) > 0
                     || (float) ($row['taux_validation'] ?? 0) < 50;
             })
@@ -2018,10 +2049,10 @@ class DashboardController extends Controller
                     'labels' => array_column($directionRows, 'direction'),
                     'urls' => array_column($directionRows, 'url'),
                     'datasets' => [
-                        ['label' => 'Exécution', 'color' => '#3996D3', 'data' => array_column($directionRows, 'taux_execution')],
-                        ['label' => 'Validation', 'color' => '#8FC043', 'data' => array_column($directionRows, 'taux_validation')],
+                        ['label' => 'Exécution', 'color' => '#F26522', 'data' => array_column($directionRows, 'taux_execution')],
+                        ['label' => 'Validation', 'color' => '#0F5B66', 'data' => array_column($directionRows, 'taux_validation')],
                         ['label' => 'Retards', 'color' => '#B42318', 'data' => array_column($directionRows, 'retards')],
-                        ['label' => 'Score', 'color' => '#1C203D', 'data' => array_column($directionRows, 'score')],
+                        ['label' => 'Score', 'color' => '#1F2430', 'data' => array_column($directionRows, 'score')],
                     ],
                 ],
             ],
@@ -2247,7 +2278,6 @@ class DashboardController extends Controller
                 fn (Action $action): float => -1 * $this->progressionGap($action),
                 fn (Action $action): string => $this->actionDeadline($action)?->toDateString() ?? '9999-12-31',
             ])
-            ->take($limit)
             ->map(function (Action $action): array {
                 $deadline = $this->actionDeadline($action);
 
@@ -2276,7 +2306,6 @@ class DashboardController extends Controller
         return $actions
             ->filter(fn (Action $action): bool => $this->isLateAction($action))
             ->sortByDesc(fn (Action $action): int => $this->delayDays($action))
-            ->take($limit)
             ->map(function (Action $action): array {
                 $deadline = $this->actionDeadline($action);
 
@@ -2304,7 +2333,6 @@ class DashboardController extends Controller
         return $actions
             ->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)
             ->sortBy(fn (Action $action): string => $action->soumise_le instanceof Carbon ? $action->soumise_le->toIso8601String() : '')
-            ->take($limit)
             ->map(function (Action $action): array {
                 return [
                     'libelle' => (string) $action->libelle,
@@ -2346,7 +2374,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('actions_total')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -2389,7 +2416,7 @@ class DashboardController extends Controller
                     ];
                 });
 
-            return ($limit === null ? $rows : $rows->take($limit))
+            return $rows
                 ->values()
                 ->all();
         }
@@ -2428,7 +2455,7 @@ class DashboardController extends Controller
             ])
             ->values();
 
-        return ($limit === null ? $sortedRows : $sortedRows->take($limit))
+        return $sortedRows
             ->values()
             ->all();
     }
@@ -2442,11 +2469,12 @@ class DashboardController extends Controller
         return $actions
             ->filter(fn (Action $action): bool => $this->isAlertAction($action))
             ->sortByDesc(function (Action $action): float {
+                $threshold = $this->actionQualityThreshold($action);
+
                 return ($this->delayStatusKey($action) === 'en_retard' ? 100 : 0)
                     + $this->delayDays($action)
-                    + max(0.0, 60 - (float) ($action->actionKpi?->kpi_global ?? 0));
+                    + max(0.0, $threshold - (float) ($action->actionKpi?->kpi_global ?? 0));
             })
-            ->take($limit)
             ->map(function (Action $action): array {
                 return [
                     'libelle' => (string) $action->libelle,
@@ -2473,14 +2501,14 @@ class DashboardController extends Controller
     {
         $rows = [
             'a_parametrer' => ['label' => 'À paramétrer', 'color' => '#A855F7', 'bg' => '#F5EBFF', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'a_parametrer'])],
-            'en_avance' => ['label' => 'En avance', 'color' => '#8FC043', 'bg' => '#EEF6E1', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_avance'])],
-            'en_cours' => ['label' => 'En cours', 'color' => '#3996D3', 'bg' => '#E8F3FB', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_cours'])],
-            'a_risque' => ['label' => 'A surveiller', 'color' => '#F0E509', 'bg' => '#FFF8D6', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'a_risque'])],
-            'en_retard' => ['label' => 'En retard', 'color' => '#F9B13C', 'bg' => '#FFF0DF', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_retard'])],
+            'en_avance' => ['label' => 'En avance', 'color' => '#20C76B', 'bg' => '#EAFBF2', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_avance'])],
+            'en_cours' => ['label' => 'En cours', 'color' => '#0F5B66', 'bg' => '#E7F3F5', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_cours'])],
+            'a_risque' => ['label' => 'A surveiller', 'color' => '#F4B400', 'bg' => '#FFF7DF', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'a_risque'])],
+            'en_retard' => ['label' => 'En retard', 'color' => '#F26522', 'bg' => '#FFF0E9', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'en_retard'])],
             'suspendu' => ['label' => 'Suspendu', 'color' => '#7C3AED', 'bg' => '#F3E8FF', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'suspendu'])],
             'annule' => ['label' => 'Annule', 'color' => '#475569', 'bg' => '#E2E8F0', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'annule'])],
             'non_demarre' => ['label' => 'Non demarre', 'color' => '#64748B', 'bg' => '#F1F5F9', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'non_demarre'])],
-            'acheve' => ['label' => 'Achevé', 'color' => '#1C203D', 'bg' => '#EEF1F8', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'achevees'])],
+            'acheve' => ['label' => 'Achevé', 'color' => '#1F2430', 'bg' => '#EEF1F6', 'count' => 0, 'href' => $this->actionIndexRoute(['statut' => 'achevees'])],
         ];
 
         foreach ($actions as $action) {
@@ -2677,7 +2705,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('actions')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -2709,7 +2736,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('actions')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -2773,7 +2799,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('score')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -2800,7 +2825,6 @@ class DashboardController extends Controller
                     + ($status === 'a_risque' ? 30 : 0)
                     + max(0, 100 - (float) ($action->progression_reelle ?? 0)) / 10;
             })
-            ->take($limit)
             ->map(fn (Action $action): array => [
                 'action' => (string) $action->libelle,
                 'service' => (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? '-'),
@@ -2826,7 +2850,6 @@ class DashboardController extends Controller
         return $actions
             ->filter(fn (Action $action): bool => $this->isLateAction($action))
             ->sortByDesc(fn (Action $action): int => $this->delayDays($action))
-            ->take($limit)
             ->map(function (Action $action): array {
                 $deadline = $this->actionDeadline($action);
 
@@ -2859,7 +2882,6 @@ class DashboardController extends Controller
         return $actions
             ->filter(fn (Action $action): bool => in_array((string) ($action->statut_validation ?? ''), $pendingStatuses, true))
             ->sortBy(fn (Action $action): string => $action->soumise_le instanceof Carbon ? $action->soumise_le->toIso8601String() : '')
-            ->take($limit)
             ->map(function (Action $action): array {
                 $validationStatus = (string) ($action->statut_validation ?? '');
                 $level = 'Chef de service';
@@ -2888,7 +2910,6 @@ class DashboardController extends Controller
             ->sortByDesc(function (Action $action): int {
                 return $this->actionProofs($action)->count();
             })
-            ->take($limit)
             ->map(function (Action $action): array {
                 $proofs = $this->actionProofs($action);
                 $firstProof = $proofs->first();
@@ -2956,20 +2977,22 @@ class DashboardController extends Controller
                 ];
             }
 
-            if ((float) ($action->actionKpi?->kpi_global ?? 0) > 0 && (float) ($action->actionKpi?->kpi_global ?? 0) < 60) {
+            $actionThreshold = $this->actionQualityThreshold($action);
+            $globalKpi = (float) ($action->actionKpi?->kpi_global ?? 0);
+
+            if ($globalKpi > 0 && $globalKpi < $actionThreshold) {
                 $rows[] = [
                     'type' => 'Performance',
                     'element' => $label,
                     'service' => $service,
                     'gravite' => 'Moyenne',
-                    'detail' => 'Score inferieur a 60',
+                    'detail' => 'Score inferieur au seuil '.number_format($actionThreshold, 0, ',', ' '),
                     'action_corrective' => 'Analyser le blocage',
                 ];
             }
         }
 
         return collect($rows)
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -3058,7 +3081,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('actions_total')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -3094,7 +3116,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('taux_declinaison')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -3139,7 +3160,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('actions_creees')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -3152,7 +3172,6 @@ class DashboardController extends Controller
     {
         return $actions
             ->sortByDesc(fn (Action $action): string => $action->updated_at instanceof Carbon ? $action->updated_at->toIso8601String() : '')
-            ->take($limit)
             ->map(function (Action $action): array {
                 $deadline = $this->actionDeadline($action);
 
@@ -3225,7 +3244,6 @@ class DashboardController extends Controller
 
         return collect($rows)
             ->sortByDesc('derniere_activite')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -3266,7 +3284,6 @@ class DashboardController extends Controller
         }
 
         return collect($rows)
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -3728,7 +3745,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('actions_total')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -3763,7 +3779,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('actions_total')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -3798,7 +3813,6 @@ class DashboardController extends Controller
                 ];
             })
             ->sortByDesc('actions_total')
-            ->take($limit)
             ->values()
             ->all();
     }
@@ -3816,6 +3830,7 @@ class DashboardController extends Controller
             $deadline = $this->actionDeadline($action);
             $delayStatus = $this->delayStatusKey($action);
             $globalKpi = (float) ($action->actionKpi?->kpi_global ?? 0);
+            $qualityThreshold = $this->actionQualityThreshold($action);
             $conformiteKpi = 0.0;
             $gap = max(0.0, (float) ($action->progression_theorique ?? 0) - (float) ($action->progression_reelle ?? 0));
 
@@ -3833,13 +3848,13 @@ class DashboardController extends Controller
                 ];
             }
 
-            if ($globalKpi > 0 && $globalKpi < 60) {
+            if ($globalKpi > 0 && $globalKpi < $qualityThreshold) {
                 $rows[] = [
                     'titre' => 'Indicateur global critique',
-                    'niveau' => $globalKpi < 40 ? 'Critique' : 'Attention',
+                    'niveau' => $globalKpi < ($qualityThreshold * 0.67) ? 'Critique' : 'Attention',
                     'direction' => (string) ($action->pta?->direction?->code ?? '-'),
                     'action' => (string) $action->libelle,
-                    'details' => number_format($globalKpi, 0).' / 100',
+                    'details' => number_format($globalKpi, 0).' / 100 | seuil '.number_format($qualityThreshold, 0),
                     'kpi' => round($globalKpi, 2),
                     'kpi_conformite' => round($conformiteKpi, 2),
                     'url' => route('workspace.actions.suivi', $action).'#action-status',
@@ -3898,7 +3913,6 @@ class DashboardController extends Controller
             ->sortByDesc(function (array $row): int {
                 return $row['niveau'] === 'Critique' ? 2 : 1;
             })
-            ->take(8)
             ->values()
             ->all();
     }
@@ -4003,7 +4017,6 @@ class DashboardController extends Controller
         return collect($this->buildUnitRows($actions, $mode))
             ->filter(fn (array $row): bool => (int) ($row['actions_total'] ?? 0) > 0)
             ->sortByDesc(fn (array $row): float => (float) ($row['kpi_global'] ?? 0))
-            ->take(6)
             ->values()
             ->all();
     }
@@ -4105,29 +4118,29 @@ class DashboardController extends Controller
     {
         return match ($status) {
             'a_parametrer' => '#A855F7',
-            'acheve' => '#1C203D',
-            'a_risque' => '#F0E509',
-            'en_avance' => '#8FC043',
-            'en_retard' => '#F9B13C',
+            'acheve' => '#1F2430',
+            'a_risque' => '#F4B400',
+            'en_avance' => '#20C76B',
+            'en_retard' => '#F26522',
             'suspendu' => '#7C3AED',
             'annule' => '#475569',
             'non_demarre' => '#64748B',
-            default => '#3996D3',
+            default => '#0F5B66',
         };
     }
 
     private function kpiColor(float $value): string
     {
         if ($value >= 80) {
-            return '#8FC043';
+            return '#20C76B';
         }
 
         if ($value >= 60) {
-            return '#F0E509';
+            return '#0F5B66';
         }
 
         if ($value > 0) {
-            return '#F9B13C';
+            return '#F26522';
         }
 
         return '#94A3B8';
@@ -4139,7 +4152,8 @@ class DashboardController extends Controller
             return false;
         }
         $isOverdue = $this->delayStatusKey($action) === 'en_retard';
-        $isLowKpi = (float) ($action->actionKpi?->kpi_global ?? 0) > 0 && (float) ($action->actionKpi?->kpi_global ?? 0) < 60;
+        $globalKpi = (float) ($action->actionKpi?->kpi_global ?? 0);
+        $isLowKpi = $globalKpi > 0 && $globalKpi < $this->actionQualityThreshold($action);
 
         return $isOverdue
             || $isLowKpi

@@ -17,6 +17,8 @@
         && ! empty($statusChart['labels']);
     $showTrendChart = (bool) ($roleDashboard['trend_chart_enabled'] ?? true);
     $showSupportChart = (bool) ($roleDashboard['support_chart_enabled'] ?? true);
+    $roleComparisonChartHeight = max(15, (count($comparisonChart['labels'] ?? []) * 2.1) + 4);
+    $roleSupportChartHeight = max(15, (count($supportChart['labels'] ?? []) * 2.1) + 4);
     $statisticalPolicy = is_array(($statisticalPolicy ?? null)) ? $statisticalPolicy : [];
     $officialPolicy = is_array(($officialPolicy ?? null)) ? $officialPolicy : [];
     $basePolicy = $statisticalPolicy !== [] ? $statisticalPolicy : $officialPolicy;
@@ -34,7 +36,6 @@
                 'label' => (string) $label,
                 'value' => min(100, max(0, (float) ($values[$index] ?? 0))),
             ])
-            ->take(6)
             ->all();
     };
     $roleFallbackPoints = static function (array $chart): string {
@@ -67,7 +68,7 @@
         ->map(fn ($label, int $index): array => [
             'label' => (string) $label,
             'value' => (int) (($statusChart['values'] ?? [])[$index] ?? 0),
-            'color' => (string) (($statusChart['colors'] ?? [])[$index] ?? '#3996D3'),
+            'color' => (string) (($statusChart['colors'] ?? [])[$index] ?? '#0F5B66'),
             'href' => (string) (($statusChart['urls'] ?? [])[$index] ?? '#'),
         ]);
     $roleStatusTotal = max(0, (int) $roleStatusRows->sum('value'));
@@ -92,7 +93,7 @@
             </div>
             <span class="showcase-chip">{{ count($comparisonChart['labels'] ?? []) }} indicateurs</span>
         </div>
-        <div class="dashboard-canvas">
+        <div class="dashboard-canvas" style="height: {{ number_format($roleComparisonChartHeight, 2, '.', '') }}rem;">
             <div id="dashboard-role-comparison-chart" class="dashboard-chart-host">
                 <div class="dashboard-chart-fallback" aria-hidden="true">
                     <div class="dashboard-chart-fallback-bars">
@@ -171,7 +172,7 @@
                                 <svg viewBox="0 0 360 140" preserveAspectRatio="none">
                                     <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
                                     <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
-                                    <polyline points="{{ $roleFallbackPoints($trendChart) }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                                    <polyline points="{{ $roleFallbackPoints($trendChart) }}" fill="none" stroke="#F26522" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
                             @else
                                 <x-ui.empty-state title="Aucune tendance" message="Les points apparaîtront dès que des actions seront disponibles." icon="chart" tone="info" />
@@ -194,7 +195,7 @@
             </div>
             <span class="showcase-chip">{{ count($supportChart['labels'] ?? []) }} lignes</span>
         </div>
-        <div class="dashboard-canvas">
+        <div class="dashboard-canvas" style="height: {{ number_format($roleSupportChartHeight, 2, '.', '') }}rem;">
             <div id="dashboard-role-support-chart" class="dashboard-chart-host">
                 <div class="dashboard-chart-fallback" aria-hidden="true">
                     @if (count($supportChart['labels'] ?? []) > 0)

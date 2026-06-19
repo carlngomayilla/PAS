@@ -66,9 +66,7 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/workspace/alertes')
-            ->assertOk()
-            ->assertSee('Alertes opérationnelles')
-            ->assertSee("Centre d'alertes", false);
+            ->assertRedirect(route('workspace.notifications.index', ['tab' => 'alertes']));
 
         $this->actingAs($admin)
             ->get('/workspace/audit')
@@ -320,9 +318,7 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/workspace/alertes?limit=100')
-            ->assertOk()
-            ->assertDontSee('Provisoire')
-            ->assertDontSee('Officiel');
+            ->assertRedirect(route('workspace.notifications.index', ['tab' => 'alertes', 'limit' => 100]));
     }
 
     public function test_service_user_has_no_audit_access_and_removed_modules_are_unavailable(): void

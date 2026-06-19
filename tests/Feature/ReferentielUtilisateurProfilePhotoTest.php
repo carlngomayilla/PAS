@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\RolePermissionSettings;
+use App\Services\RoleRegistryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +15,51 @@ class ReferentielUtilisateurProfilePhotoTest extends TestCase
     use RefreshDatabase;
 
     private const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0n8AAAAASUVORK5CYII=';
+
+    public function test_super_admin_can_assign_custom_role_from_referentiel_and_permissions_apply(): void
+    {
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'custom_role_code' => null,
+            'direction_id' => null,
+            'service_id' => null,
+        ]);
+
+        app(RoleRegistryService::class)->updateCustomRoles([
+            [
+                'code' => 'controleur_reporting',
+                'label' => 'Controleur reporting',
+                'base_role' => User::ROLE_ADMIN_FONCTIONNEL,
+                'description' => 'Profil limite au reporting',
+                'active' => true,
+            ],
+        ], $superAdmin);
+
+        $permissionSettings = app(RolePermissionSettings::class);
+        $permissionSettings->flush();
+        $matrix = $permissionSettings->all();
+        $matrix['controleur_reporting'] = ['reporting.read'];
+        $permissionSettings->update($matrix, $superAdmin);
+
+        $this->actingAs($superAdmin)
+            ->post(route('workspace.referentiel.utilisateurs.store'), [
+                'name' => 'Controleur Reporting',
+                'email' => 'controleur.reporting@anbg.test',
+                'role' => 'controleur_reporting',
+                'is_active' => '1',
+                'password' => 'Password-Test@123',
+                'password_confirmation' => 'Password-Test@123',
+            ])
+            ->assertRedirect(route('workspace.referentiel.utilisateurs.index'));
+
+        $created = User::query()->where('email', 'controleur.reporting@anbg.test')->firstOrFail();
+
+        $this->assertSame(User::ROLE_ADMIN_FONCTIONNEL, $created->role);
+        $this->assertSame('controleur_reporting', $created->custom_role_code);
+        $this->assertSame('controleur_reporting', $created->effectiveRoleCode());
+        $this->assertTrue($created->hasPermission('reporting.read'));
+        $this->assertFalse($created->hasPermission('users.manage'));
+    }
 
     public function test_admin_can_create_user_with_profile_photo(): void
     {

@@ -62,8 +62,8 @@ class SuperAdminWebController extends Controller
 
     /**
      * Mot de passe par defaut applique aux nouveaux comptes lorsque le
-     * super-admin ne saisit rien. Conforme a la policy (12+ caracteres,
-     * majuscules/minuscules, chiffres, symboles).
+     * super-admin ne saisit rien. Conforme a la policy moyenne par defaut
+     * (8+ caracteres, lettres et chiffres; symboles acceptes).
      */
     private const DEFAULT_NEW_USER_PASSWORD = 'Anbg@2026!Pas';
 

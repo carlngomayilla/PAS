@@ -1,4 +1,4 @@
-# Durcissement securite ANBG
+# Securite ANBG
 
 ## Controle d acces
 
@@ -8,8 +8,9 @@
 
 ## Politique mot de passe
 
-- Longueur minimale: `12`
-- Complexite: lettres, majuscules/minuscules, chiffres, symboles
+- Longueur minimale: `8`
+- Complexite moyenne: lettres et chiffres requis
+- Majuscules et symboles acceptes, mais non obligatoires
 - Verification contre mots de passe compromis
 - Expiration: `90 jours`
 - Historique: `5 derniers mots de passe`
@@ -25,6 +26,11 @@
 - `SECURITY_PASSWORD_MIN_LENGTH`
 - `SECURITY_PASSWORD_EXPIRE_DAYS`
 - `SECURITY_PASSWORD_HISTORY_SIZE`
+- `SECURITY_PASSWORD_REQUIRE_LETTERS`
+- `SECURITY_PASSWORD_REQUIRE_MIXED_CASE`
+- `SECURITY_PASSWORD_REQUIRE_NUMBERS`
+- `SECURITY_PASSWORD_REQUIRE_SYMBOLS`
+- `SECURITY_PASSWORD_CHECK_PWNED`
 - `SECURITY_ENCRYPT_JUSTIFICATIFS`
 - `ANTIVIRUS_SCAN_ENABLED`
 - `ANTIVIRUS_BINARY`

@@ -9,6 +9,7 @@
     $reportingGlobal = $reporting['global'] ?? [];
     $reportingStatuses = $reporting['statuts'] ?? [];
     $reportingAlerts = $reporting['alertes'] ?? [];
+    $reportingQualityThreshold = min(100, max(0, (float) ($reporting['quality_threshold'] ?? $reporting['kpiSummary']['quality_threshold'] ?? 60)));
     $pasConsolidation = $reporting['pasConsolidation'] ?? [];
     $interannualComparison = $reporting['interannualComparison'] ?? [];
     $reportingDetails = $reporting['details'] ?? ['structure_rapports' => collect()];
@@ -26,9 +27,8 @@
     $performanceGaugeScopeLabel = (string) ($performanceGauge['scope_label'] ?? 'Directions');
     $performanceGaugeEmptyLabel = (string) ($performanceGauge['empty_label'] ?? 'Aucune donnée disponible pour les jauges.');
     $structureHighlights = collect($reportingDetails['structure_rapports'] ?? collect())
-        ->take(6)
         ->values();
-    $managedKpis = collect($reporting['managedKpis'] ?? [])->take(6)->values();
+    $managedKpis = collect($reporting['managedKpis'] ?? [])->values();
     $reportingFallbackBars = static function (array $chart): array {
         $labels = collect($chart['labels'] ?? [])->values();
         $datasets = collect($chart['datasets'] ?? []);
@@ -42,7 +42,6 @@
                     'value' => min(100, max(0, $value)),
                 ];
             })
-            ->take(8)
             ->all();
     };
     $reportingFallbackPoints = static function (array $chart, string $key): string {
@@ -66,6 +65,8 @@
     $ganttMax = \Illuminate\Support\Carbon::parse($criticalGantt['max'] ?? now()->addDays(14)->toDateString());
     $ganttRange = max(1, $ganttMin->diffInDays($ganttMax));
     $treemapTotal = max(0.01, (float) ($resourceTreemap['total'] ?? 0));
+    $reportingThresholdY = 120 - ($reportingQualityThreshold * 0.9);
+    $reportStatusUnitChartHeight = max(20, (count($reportingCharts['status_by_unit']['labels'] ?? []) * 2.15) + 5);
     $reportingSummaryCards = [
         ['label' => 'Périmètres PAS', 'value' => $reportingGlobal['pas_total'] ?? 0, 'tone' => 'navy', 'meta' => 'Stratégie couverte', 'href' => route('workspace.pas.index'), 'badge' => null, 'badge_tone' => 'info'],
         ['label' => 'Mesures d\'indicateur', 'value' => $reportingGlobal['kpi_mesures_total'] ?? 0, 'tone' => 'blue', 'meta' => 'Mesures suivies', 'href' => route('workspace.reporting'), 'badge' => null, 'badge_tone' => 'warning'],
@@ -143,7 +144,7 @@
                     <h2 class="showcase-panel-title">Statuts empiles par {{ strtolower($reportingCharts['status_by_unit']['unit_label'] ?? 'unite') }}</h2>
                 </div>
             </div>
-            <div class="dashboard-canvas dashboard-canvas-lg">
+            <div class="dashboard-canvas dashboard-canvas-lg" style="height: {{ number_format($reportStatusUnitChartHeight, 2, '.', '') }}rem;">
                 <div id="dashboard-report-status-unit-chart" class="dashboard-chart-host">
                     <div class="dashboard-chart-fallback" aria-hidden="true">
                         <div class="dashboard-chart-fallback-bars">
@@ -178,8 +179,9 @@
                         <svg viewBox="0 0 360 140" preserveAspectRatio="none">
                             <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
                             <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
-                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['progress_weekly'] ?? [], 'reel') }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['progress_weekly'] ?? [], 'theorique') }}" fill="none" stroke="#1C203D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 5" />
+                            <line x1="20" y1="{{ $reportingThresholdY }}" x2="340" y2="{{ $reportingThresholdY }}" stroke="#F4B400" stroke-width="2" stroke-dasharray="7 5" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['progress_weekly'] ?? [], 'reel') }}" fill="none" stroke="#F26522" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['progress_weekly'] ?? [], 'theorique') }}" fill="none" stroke="#0F5B66" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 5" />
                         </svg>
                     </div>
                 </div>
@@ -204,9 +206,9 @@
                         <svg viewBox="0 0 360 140" preserveAspectRatio="none">
                             <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
                             <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
-                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'valeurs') }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'cibles') }}" fill="none" stroke="#8FC043" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'seuils') }}" fill="none" stroke="#F9B13C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 5" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'valeurs') }}" fill="none" stroke="#F26522" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'cibles') }}" fill="none" stroke="#20C76B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'seuils') }}" fill="none" stroke="#F4B400" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 5" />
                         </svg>
                     </div>
                 </div>

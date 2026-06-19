@@ -13,9 +13,7 @@ class PasswordPolicyService
 {
     public function rule(bool $required = true): Password
     {
-        $rule = $required
-            ? Password::min((int) config('security.passwords.min_length', 12))
-            : Password::min((int) config('security.passwords.min_length', 12));
+        $rule = Password::min((int) config('security.passwords.min_length', 8));
 
         if (config('security.passwords.require_letters', true)) {
             $rule = $rule->letters();
@@ -121,19 +119,19 @@ class PasswordPolicyService
     }
 
     /**
-     * Genere un mot de passe aleatoire conforme a la policy (longueur min,
-     * lettres + chiffres + symboles + mixte casse). Utilise par les seeders et
-     * imports admin pour eviter tout mdp partage `Pass@12345` (cf. A08).
+     * Genere un mot de passe aleatoire conforme a la policy active. Utilise par
+     * les seeders et imports admin pour eviter tout mdp partage `Pass@12345`
+     * (cf. A08).
      */
     public function generateInitialPassword(): string
     {
-        $minLength = max(12, (int) config('security.passwords.min_length', 12));
+        $minLength = max(8, (int) config('security.passwords.min_length', 8));
 
         return \Illuminate\Support\Str::password(
             length: $minLength + 4,
-            letters: true,
-            numbers: true,
-            symbols: true,
+            letters: (bool) config('security.passwords.require_letters', true),
+            numbers: (bool) config('security.passwords.require_numbers', true),
+            symbols: (bool) config('security.passwords.require_symbols', false),
             spaces: false,
         );
     }
@@ -155,9 +153,30 @@ class PasswordPolicyService
 
     public function helpText(): string
     {
+        $requirements = [];
+
+        if (config('security.passwords.require_letters', true)) {
+            $requirements[] = config('security.passwords.require_mixed_case', false)
+                ? 'majuscules/minuscules'
+                : 'lettres';
+        }
+
+        if (config('security.passwords.require_numbers', true)) {
+            $requirements[] = 'chiffres';
+        }
+
+        if (config('security.passwords.require_symbols', false)) {
+            $requirements[] = 'symboles';
+        }
+
+        $requirementsText = $requirements !== []
+            ? implode(', ', $requirements)
+            : 'aucune complexite obligatoire';
+
         return sprintf(
-            'Mot de passe: %d caracteres minimum, majuscules/minuscules, chiffres, symboles, expiration tous les %d jours, historique des %d derniers mots de passe.',
-            (int) config('security.passwords.min_length', 12),
+            'Mot de passe: %d caracteres minimum, %s, expiration tous les %d jours, historique des %d derniers mots de passe.',
+            (int) config('security.passwords.min_length', 8),
+            $requirementsText,
             (int) config('security.passwords.expire_days', 90),
             (int) config('security.passwords.history_size', 5)
         );

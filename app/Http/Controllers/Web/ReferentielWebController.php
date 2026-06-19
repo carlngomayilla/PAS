@@ -29,7 +29,7 @@ class ReferentielWebController extends Controller
     /**
      * Mot de passe par defaut applique aux nouveaux comptes lorsque l admin
      * ne saisit rien dans le formulaire de creation. Conforme a la policy
-     * (12+ caracteres, majuscules/minuscules, chiffres, symboles).
+     * (8+ caracteres, lettres et chiffres; symboles acceptes).
      */
     private const DEFAULT_NEW_USER_PASSWORD = 'Anbg@2026!Pas';
 
@@ -389,7 +389,21 @@ class ReferentielWebController extends Controller
         );
         $query->when(
             $request->filled('role'),
-            fn (Builder $q) => $q->where('role', (string) $request->string('role'))
+            function (Builder $q) use ($request): void {
+                $selectedRole = (string) $request->string('role');
+
+                if ($this->roleRegistry->isCustomRole($selectedRole)) {
+                    $q->where('custom_role_code', $selectedRole);
+
+                    return;
+                }
+
+                $q->where('role', $selectedRole)
+                    ->where(function (Builder $subQuery): void {
+                        $subQuery->whereNull('custom_role_code')
+                            ->orWhere('custom_role_code', '');
+                    });
+            }
         );
         $query->when(
             $request->filled('is_active'),
@@ -477,6 +491,7 @@ class ReferentielWebController extends Controller
                 'profile_photo_path' => $profilePhotoPath,
                 'email' => (string) $validated['email'],
                 'role' => (string) $validated['role'],
+                'custom_role_code' => $validated['custom_role_code'] ?? null,
                 'is_active' => $request->boolean('is_active', true),
                 'is_agent' => (string) $validated['role'] === User::ROLE_AGENT,
                 'agent_matricule' => $validated['agent_matricule'] ?? null,
@@ -540,6 +555,7 @@ class ReferentielWebController extends Controller
             'name' => (string) $validated['name'],
             'email' => (string) $validated['email'],
             'role' => (string) $validated['role'],
+            'custom_role_code' => $validated['custom_role_code'] ?? null,
             'is_active' => $request->boolean('is_active', true),
             'is_agent' => (string) $validated['role'] === User::ROLE_AGENT,
             'agent_matricule' => $validated['agent_matricule'] ?? null,
@@ -765,8 +781,10 @@ class ReferentielWebController extends Controller
      */
     private function applyRoleScopeRules(array &$validated): void
     {
-        $role = $this->roleRegistry->baseRole((string) $validated['role']);
+        $selectedRole = (string) $validated['role'];
+        $role = $this->roleRegistry->baseRole($selectedRole);
         $validated['role'] = $role;
+        $validated['custom_role_code'] = $this->roleRegistry->isCustomRole($selectedRole) ? $selectedRole : null;
         $directionId = isset($validated['direction_id']) ? (int) $validated['direction_id'] : null;
         $serviceId = isset($validated['service_id']) ? (int) $validated['service_id'] : null;
 
@@ -1049,7 +1067,7 @@ class ReferentielWebController extends Controller
         }
 
         if (! $this->canManageRoles($actor)) {
-            return $subject instanceof User ? [$subject->role] : [User::ROLE_AGENT];
+            return $subject instanceof User ? [$subject->effectiveRoleCode()] : [User::ROLE_AGENT];
         }
 
         if ($actor->isPlanningControlChief()) {

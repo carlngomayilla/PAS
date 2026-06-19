@@ -21,8 +21,8 @@ use Throwable;
  *   GET  /password/reset/{token}     → formulaire de saisie du nouveau mot de passe
  *   POST /password/reset             → application du reset
  *
- * Respecte la politique mots de passe (longueur, mixed case, symboles, HIBP)
- * et l'historique (5 derniers) via PasswordPolicyService.
+ * Respecte la politique mots de passe (longueur, complexite moyenne, HIBP)
+ * et l'historique via PasswordPolicyService.
  */
 class PasswordResetController extends Controller
 {

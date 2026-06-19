@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\Security\PasswordPolicyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;
 
 /**
@@ -55,12 +56,26 @@ class PasswordPolicyForceRenewalTest extends TestCase
         $this->assertTrue($policy->isExpired($user));
     }
 
-    public function test_generate_initial_password_is_long_enough_and_includes_all_classes(): void
+    public function test_medium_password_policy_accepts_letters_and_numbers_without_symbols(): void
     {
         /** @var PasswordPolicyService $policy */
         $policy = app(PasswordPolicyService::class);
 
-        $minLength = (int) config('security.passwords.min_length', 12);
+        $validator = Validator::make([
+            'password' => 'pilotage2026',
+        ], [
+            'password' => ['required', 'string', $policy->rule()],
+        ]);
+
+        $this->assertFalse($validator->fails(), (string) $validator->errors()->first('password'));
+    }
+
+    public function test_generate_initial_password_is_long_enough_and_matches_medium_policy(): void
+    {
+        /** @var PasswordPolicyService $policy */
+        $policy = app(PasswordPolicyService::class);
+
+        $minLength = (int) config('security.passwords.min_length', 8);
 
         for ($i = 0; $i < 25; $i++) {
             $password = $policy->generateInitialPassword();
@@ -68,7 +83,6 @@ class PasswordPolicyForceRenewalTest extends TestCase
             $this->assertGreaterThanOrEqual($minLength, strlen($password));
             $this->assertMatchesRegularExpression('/[A-Za-z]/', $password);
             $this->assertMatchesRegularExpression('/\d/', $password);
-            $this->assertMatchesRegularExpression('/[^A-Za-z0-9]/', $password);
         }
     }
 }

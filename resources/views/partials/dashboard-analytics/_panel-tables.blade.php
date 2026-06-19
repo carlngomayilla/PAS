@@ -18,7 +18,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($unitRows) }} lignes</span>
             </summary>
-            <div class="app-table-wrapper max-h-[60vh] overflow-auto">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     <thead class="sticky top-0 z-10 bg-white"><tr><th>{{ $unitModeLabel }}</th><th>Actions</th><th>Progression</th><th>Indicateur moyen</th><th>Alertes</th><th>Validation</th></tr></thead>
                     <tbody>
@@ -56,7 +56,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($priorityActionRows) }} lignes</span>
             </summary>
-            <div class="app-table-wrapper max-h-[60vh] overflow-auto">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     {{-- Colonne "Conformité" retiree (2026-05-28) : KPI conformite supprime de l'app. --}}
                     <thead class="sticky top-0 z-10 bg-white"><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Statut délai</th></tr></thead>
@@ -96,7 +96,7 @@
                 </div>
                 <span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span>
             </summary>
-            <div class="app-table-wrapper max-h-[60vh] overflow-auto">
+            <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     {{-- Colonne "Conformité" retiree (2026-05-28) du tableau des alertes. --}}
                     <thead class="sticky top-0 z-10 bg-white">

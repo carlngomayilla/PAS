@@ -57,15 +57,15 @@ function bootDashboardRender(force = false) {
     maximumFractionDigits: 0,
   });
   const ANBG = {
-    primary: '#1C203D',
-    secondary: '#3996D3',
-    light: '#E8F3FB',
+    primary: '#0F5B66',
+    secondary: '#F26522',
+    light: '#F4F7FA',
     white: '#FFFFFF',
-    dark: '#101A33',
-    muted: '#64748B',
-    success: '#8FC043',
-    warning: '#F9B13C',
-    danger: '#B42318',
+    dark: '#1F2430',
+    muted: '#6B7280',
+    success: '#20C76B',
+    warning: '#F4B400',
+    danger: '#D92D20',
   };
   let assetBootstrapPromise = null;
   let optionalChartPluginsPromise = null;
@@ -208,18 +208,18 @@ function bootDashboardRender(force = false) {
     return {
       isDark,
       text: isDark ? '#cbd5e1' : '#334155',
-      muted: isDark ? '#94a3b8' : '#64748b',
-      grid: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(148,163,184,0.22)',
+      muted: isDark ? '#94a3b8' : '#6B7280',
+      grid: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(226,232,240,0.9)',
       tooltipBackground: isDark ? 'rgba(15,23,42,0.97)' : 'rgba(255,255,255,0.98)',
       tooltipTitle: isDark ? '#f1f5f9' : '#0f172a',
       tooltipBody: isDark ? '#cbd5e1' : '#334155',
-      tooltipBorder: isDark ? 'rgba(148,163,184,0.16)' : 'rgba(148,163,184,0.28)',
-      emphasis: isDark ? '#e2e8f0' : '#1c203d',
+      tooltipBorder: isDark ? 'rgba(148,163,184,0.16)' : 'rgba(15,91,102,0.16)',
+      emphasis: isDark ? '#e2e8f0' : '#1F2430',
     };
   }
 
   function palette() {
-    return [ANBG.primary, ANBG.secondary, ANBG.success, ANBG.warning, ANBG.danger, ANBG.dark, ANBG.secondary, ANBG.primary];
+    return [ANBG.secondary, ANBG.primary, ANBG.success, ANBG.warning, ANBG.danger, '#8A94A6', '#F97316', '#0EA5A4'];
   }
 
   function toneForIndex(index) {
@@ -321,18 +321,19 @@ function bootDashboardRender(force = false) {
     return toneForIndex(index);
   }
 
-  function gaugeColor(value) {
+  function gaugeColor(value, threshold = qualityThresholdValue()) {
     const numeric = Number.isFinite(Number(value)) ? Number(value) : 0;
+    const dynamicThreshold = Math.max(1, Math.min(100, finiteNumber(threshold, 60)));
 
     if (numeric >= 80) {
       return ANBG.success;
     }
 
-    if (numeric >= 60) {
-      return ANBG.secondary;
+    if (numeric >= dynamicThreshold) {
+      return ANBG.primary;
     }
 
-    return ANBG.warning;
+    return numeric > 0 ? ANBG.secondary : ANBG.muted;
   }
 
   function finiteNumber(value, fallback = 0) {
@@ -447,10 +448,31 @@ function bootDashboardRender(force = false) {
   }
 
   // Ligne de seuil qualité (annotation) — pour les graphiques à échelle 0-100.
-  function kpiAnnotations(threshold = 60) {
+  function qualityThresholdValue(source = payload) {
+    if (Array.isArray(source?.seuils) && source.seuils.length > 0) {
+      const values = source.seuils
+        .map((value) => finiteNumber(value, NaN))
+        .filter(Number.isFinite);
+
+      if (values.length > 0) {
+        const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+        return Math.max(0, Math.min(100, average));
+      }
+    }
+
+    const raw = source?.quality_threshold ?? payload?.quality_threshold ?? payload?.global_scores?.quality_threshold ?? 60;
+    return Math.max(0, Math.min(100, finiteNumber(raw, 60)));
+  }
+
+  function kpiAnnotations(source = payload) {
     if (typeof window.Chart === 'undefined' || !window.Chart.registry?.plugins?.get('annotation')) {
       return {};
     }
+
+    const threshold = typeof source === 'number'
+      ? Math.max(0, Math.min(100, finiteNumber(source, qualityThresholdValue())))
+      : qualityThresholdValue(source);
+    const rounded = Math.round(threshold);
 
     return {
       annotation: {
@@ -460,15 +482,15 @@ function bootDashboardRender(force = false) {
             type: 'line',
             yMin: threshold,
             yMax: threshold,
-            borderColor: alphaColor(ANBG.warning, 0.85),
-            borderWidth: 1.5,
+            borderColor: alphaColor(ANBG.warning, 0.9),
+            borderWidth: 1.25,
             borderDash: [6, 5],
             label: {
               display: true,
-              content: `Seuil qualité ${threshold}`,
+              content: `Seuil moyen ${rounded}%`,
               position: 'end',
-              backgroundColor: alphaColor(ANBG.warning, 0.92),
-              color: '#1c203d',
+              backgroundColor: alphaColor(ANBG.warning, 0.95),
+              color: '#1F2430',
               font: { size: 10, weight: '700' },
               padding: { x: 6, y: 3 },
               borderRadius: 6,
@@ -1054,10 +1076,10 @@ function bootDashboardRender(force = false) {
         normalized: true,
         layout: {
           padding: {
-            top: 6,
-            right: 8,
-            bottom: 2,
-            left: 4,
+            top: 12,
+            right: 14,
+            bottom: 4,
+            left: 6,
           },
         },
         animation: prefersReducedMotion() ? false : {
@@ -1080,17 +1102,17 @@ function bootDashboardRender(force = false) {
         plugins: {
           legend: {
             position: 'bottom',
-            maxHeight: 54,
+            maxHeight: 44,
             labels: {
               usePointStyle: true,
               pointStyle: 'circle',
-              boxWidth: 10,
-              boxHeight: 10,
-              padding: 16,
+              boxWidth: 8,
+              boxHeight: 8,
+              padding: 14,
               color: theme.text,
               font: {
                 size: 11,
-                weight: '700',
+                weight: '800',
               },
               filter(item, data) {
                 const dataset = data?.datasets?.[item.datasetIndex];
@@ -1105,7 +1127,7 @@ function bootDashboardRender(force = false) {
             borderColor: theme.tooltipBorder,
             borderWidth: 1,
             padding: 12,
-            cornerRadius: 14,
+            cornerRadius: 10,
             boxPadding: 5,
             usePointStyle: true,
             displayColors: true,
@@ -1152,7 +1174,6 @@ function bootDashboardRender(force = false) {
           autoSkipPadding: 14,
           maxRotation: 0,
           minRotation: 0,
-          maxTicksLimit: 8,
           padding: 8,
           font: {
             size: 11,
@@ -1175,7 +1196,6 @@ function bootDashboardRender(force = false) {
         },
         ticks: {
           color: theme.muted,
-          maxTicksLimit: 6,
           padding: 10,
           font: {
             size: 11,
@@ -1237,7 +1257,9 @@ function bootDashboardRender(force = false) {
             callbacks: {
               title: () => label,
               label: (ctx) => ` Score : ${Math.round(numeric)} %`,
-              afterLabel: () => numeric >= 80 ? ' ✔ Objectif atteint' : numeric >= 60 ? ' ⚡ À surveiller' : ' ✖ Sous le seuil',
+              afterLabel: () => numeric >= qualityThresholdValue()
+                ? ` Objectif atteint (seuil ${Math.round(qualityThresholdValue())} %)`
+                : ` Sous le seuil moyen (${Math.round(qualityThresholdValue())} %)`,
             },
           },
           anbgCenterText: {
@@ -1291,7 +1313,7 @@ function bootDashboardRender(force = false) {
               borderRadius: chartType === 'bar' ? 14 : 0,
               maxBarThickness: 34,
               tension: 0.38,
-              fill: chartType === 'line',
+              fill: false,
               pointRadius: chartType === 'line' ? 4 : 0,
               pointHoverRadius: chartType === 'line' ? 7 : 0,
               pointBackgroundColor: color,
@@ -1348,14 +1370,14 @@ function bootDashboardRender(force = false) {
               pointRadius: 4,
               pointHoverRadius: 7,
               tension: 0.38,
-              fill: true,
+              fill: false,
               borderWidth: 2.5,
             };
           }),
         },
         options: {
           scales: cartesianScales(),
-          plugins: { ...kpiAnnotations() },
+          plugins: {},
         },
       }), ({ element }) => (trend.urls || [])[element?.index] || '');
     }
@@ -1383,7 +1405,7 @@ function bootDashboardRender(force = false) {
               borderRadius: chartType === 'bar' ? 14 : 0,
               maxBarThickness: 32,
               tension: 0.38,
-              fill: chartType === 'line',
+              fill: false,
               pointRadius: chartType === 'line' ? 4 : 0,
               pointHoverRadius: chartType === 'line' ? 7 : 0,
               pointBackgroundColor: color,
@@ -1436,7 +1458,7 @@ function bootDashboardRender(force = false) {
           start,
           end,
           progress: Math.max(0, Math.min(100, Number(meta.progressAccèssor(row) || 0))),
-          color: meta.colorAccèssor ? meta.colorAccèssor(row) : '#3996D3',
+          color: meta.colorAccèssor ? meta.colorAccèssor(row) : ANBG.primary,
           rightLabel: meta.rightLabelAccèssor ? meta.rightLabelAccèssor(row) : '',
           url: meta.urlAccèssor ? meta.urlAccèssor(row) : null,
         };
@@ -1606,7 +1628,7 @@ function bootDashboardRender(force = false) {
       labelAccèssor: (row) => row.libelle,
       subLabelAccèssor: (row) => `${row.responsable || ''} | ${row.date_debut_label || ''} - ${row.date_fin_label || ''}`,
       progressAccèssor: (row) => row.progression,
-      colorAccèssor: (row) => row.color || '#3996D3',
+      colorAccèssor: (row) => row.color || ANBG.primary,
       rightLabelAccèssor: (row) => {
         const action = actionById[row.id] || {};
         return String(Math.round(Number(action.kpi_global || 0)));
@@ -1677,9 +1699,9 @@ function bootDashboardRender(force = false) {
     const filtered = filterByPeriod(rows, period);
     // KPI "Conformité" retire (2026-05-28) du graphique mensuel KPI.
     const kpiDatasets = [
-      { label: 'Délai',       key: 'delai',       color: '#3996D3' },
-      { label: 'Performance', key: 'performance', color: '#16A34A' },
-      { label: 'Global',      key: 'global',      color: '#7C3AED' },
+      { label: 'Délai',       key: 'delai',       color: ANBG.primary },
+      { label: 'Performance', key: 'performance', color: ANBG.success },
+      { label: 'Global',      key: 'global',      color: ANBG.secondary },
     ];
 
     mountChart(hostId, baseConfig('line', {
@@ -1689,11 +1711,11 @@ function bootDashboardRender(force = false) {
           label,
           data: filtered.map((item) => Number(item[key] || 0)),
           borderColor: color,
-          backgroundColor: (context) => chartGradient(context.chart, color),
-          fill: true,
+          backgroundColor: alphaColor(color, 0.12),
+          fill: false,
           tension: 0.42,
-          pointRadius: 4,
-          pointHoverRadius: 8,
+          pointRadius: 3.5,
+          pointHoverRadius: 7,
           pointBackgroundColor: color,
           pointBorderColor: '#ffffff',
           pointBorderWidth: 2.5,
@@ -1704,7 +1726,7 @@ function bootDashboardRender(force = false) {
         scales: percentScales(),
         plugins: {
           anbgCrosshair: { enabled: true },
-          ...kpiAnnotations(),
+          ...kpiAnnotations(filtered[0] || payload),
           tooltip: {
             callbacks: {
               title(items) {
@@ -1712,8 +1734,9 @@ function bootDashboardRender(force = false) {
               },
               label(context) {
                 const value = Number(context.parsed?.y ?? 0);
-                const bar = value >= 80 ? '▓▓▓' : value >= 60 ? '▓▓░' : '▓░░';
-                return ` ${context.dataset.label} : ${formatNumber(value)} %  ${bar}`;
+                const threshold = qualityThresholdValue(filtered[context.dataIndex] || payload);
+                const status = value >= threshold ? 'au-dessus du seuil' : 'sous le seuil';
+                return ` ${context.dataset.label} : ${formatNumber(value)} % (${status})`;
               },
               afterBody(items) {
                 const vals = items.map((i) => Number(i.parsed?.y ?? 0)).filter(Number.isFinite);
@@ -1777,7 +1800,6 @@ function bootDashboardRender(force = false) {
       y: {
         ticks: {
           autoSkip: false,
-          maxTicksLimit: 12,
         },
       },
     });
@@ -1786,10 +1808,10 @@ function bootDashboardRender(force = false) {
   function mountDirectionAndServicePerformance() {
     const percentLabel = (value) => (value > 0 ? `${Math.round(value)}%` : '');
     const directionRows = Array.isArray(directionPerformanceRows)
-      ? directionPerformanceRows.filter(isObject).slice(0, 10)
+      ? directionPerformanceRows.filter(isObject)
       : [];
     const serviceRows = Array.isArray(servicePerformanceRows)
-      ? servicePerformanceRows.filter(isObject).slice(0, 10)
+      ? servicePerformanceRows.filter(isObject)
       : [];
     const horizontalTooltip = {
       callbacks: {
@@ -1810,25 +1832,25 @@ function bootDashboardRender(force = false) {
           {
             label: 'Score',
             data: directionRows.map((item) => boundedPercent(item.score ?? item.taux_execution)),
-            backgroundColor: (context) => barGradient(context.chart, '#1C203D'),
+            backgroundColor: (context) => barGradient(context.chart, ANBG.dark),
             maxBarThickness: 22,
           },
           {
             label: 'Execution',
             data: directionRows.map((item) => boundedPercent(item.taux_execution)),
-            backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
+            backgroundColor: (context) => barGradient(context.chart, ANBG.secondary),
             maxBarThickness: 22,
           },
           {
             label: 'Validation',
             data: directionRows.map((item) => boundedPercent(item.taux_validation)),
-            backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
+            backgroundColor: (context) => barGradient(context.chart, ANBG.primary),
             maxBarThickness: 22,
           },
           {
             label: 'Realisation',
             data: directionRows.map((item) => boundedPercent(item.taux_realisation)),
-            backgroundColor: (context) => barGradient(context.chart, '#F9B13C'),
+            backgroundColor: (context) => barGradient(context.chart, ANBG.warning),
             maxBarThickness: 22,
           },
         ],
@@ -1861,19 +1883,19 @@ function bootDashboardRender(force = false) {
           {
             label: 'Score KPI',
             data: serviceRows.map((item) => boundedPercent(item.kpi_global)),
-            backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
+            backgroundColor: (context) => barGradient(context.chart, ANBG.secondary),
             maxBarThickness: 24,
           },
           {
             label: 'Progression',
             data: serviceRows.map((item) => boundedPercent(item.progression_moyenne)),
-            backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
+            backgroundColor: (context) => barGradient(context.chart, ANBG.primary),
             maxBarThickness: 24,
           },
           {
             label: 'Validation',
             data: serviceRows.map((item) => boundedPercent(item.validation_pct)),
-            backgroundColor: (context) => barGradient(context.chart, '#1C203D'),
+            backgroundColor: (context) => barGradient(context.chart, ANBG.dark),
             maxBarThickness: 24,
           },
         ],
@@ -1910,13 +1932,13 @@ function bootDashboardRender(force = false) {
           {
             label: 'Indicateur KPI moyen',
             data: unitRows.map((item) => Number(item.kpi_global || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#3996D3'),
+            backgroundColor: (context) => barGradient(context.chart, ANBG.secondary),
             maxBarThickness: 34,
           },
           {
             label: 'Progression moyenne',
             data: unitRows.map((item) => Number(item.progression_moyenne || 0)),
-            backgroundColor: (context) => barGradient(context.chart, '#8FC043'),
+            backgroundColor: (context) => barGradient(context.chart, ANBG.primary),
             maxBarThickness: 34,
           },
         ],
@@ -1926,7 +1948,7 @@ function bootDashboardRender(force = false) {
         plugins: {
           anbgBarShadow: { enabled: true },
           datalabels: barDataLabels(percentLabel),
-          ...kpiAnnotations(),
+          ...kpiAnnotations(payload),
           tooltip: {
             callbacks: {
               title(items) {
@@ -1983,8 +2005,8 @@ function bootDashboardRender(force = false) {
               label: 'Avancement réel',
               data: data.reel,
               borderColor: ANBG.secondary,
-              backgroundColor: (context) => chartGradient(context.chart, ANBG.secondary),
-              fill: true,
+              backgroundColor: alphaColor(ANBG.secondary, 0.12),
+              fill: false,
               tension: 0.38,
               pointRadius: 4,
               pointHoverRadius: 7,
@@ -1997,8 +2019,8 @@ function bootDashboardRender(force = false) {
               label: 'Progression théorique',
               data: data.theorique,
               borderColor: ANBG.primary,
-              backgroundColor: (context) => chartGradient(context.chart, ANBG.primary),
-              fill: true,
+              backgroundColor: alphaColor(ANBG.primary, 0.12),
+              fill: false,
               tension: 0.38,
               borderDash: [8, 5],
               pointRadius: 4,
@@ -2014,7 +2036,7 @@ function bootDashboardRender(force = false) {
           scales: percentScales(),
           plugins: {
             anbgCrosshair: { enabled: true },
-            ...kpiAnnotations(),
+            ...kpiAnnotations(data),
             tooltip: {
               callbacks: {
                 title: (items) => items[0]?.label ? `Semaine : ${items[0].label}` : '',
@@ -2042,6 +2064,8 @@ function bootDashboardRender(force = false) {
         labels: filterByPeriod(progressWeekly.labels || [], n),
         reel: filterByPeriod(progressWeekly.reel || [], n),
         theorique: filterByPeriod(progressWeekly.theorique || [], n),
+        seuils: filterByPeriod(progressWeekly.seuils || [], n),
+        quality_threshold: progressWeekly.quality_threshold,
         urls: filterByPeriod(progressWeekly.urls || [], n),
       };
       mountChart('dashboard-report-progress-chart', buildProgressChartConfig(d),
@@ -2097,7 +2121,7 @@ function bootDashboardRender(force = false) {
           plugins: {
             anbgCrosshair: { enabled: true },
             anbgBarShadow: { enabled: true },
-            ...kpiAnnotations(),
+            ...kpiAnnotations(data),
           },
         },
       });
@@ -2112,6 +2136,7 @@ function bootDashboardRender(force = false) {
         valeurs: filterByPeriod(kpiTrend.valeurs || [], n),
         cibles: filterByPeriod(kpiTrend.cibles || [], n),
         seuils: filterByPeriod(kpiTrend.seuils || [], n),
+        quality_threshold: kpiTrend.quality_threshold,
         urls: filterByPeriod(kpiTrend.urls || [], n),
       };
       mountChart('dashboard-report-kpi-trend-chart', buildKpiTrendChartConfig(d),

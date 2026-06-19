@@ -2,13 +2,13 @@
 
 return [
     'passwords' => [
-        'min_length' => (int) env('SECURITY_PASSWORD_MIN_LENGTH', 12),
+        'min_length' => (int) env('SECURITY_PASSWORD_MIN_LENGTH', 8),
         'expire_days' => (int) env('SECURITY_PASSWORD_EXPIRE_DAYS', 90),
         'history_size' => (int) env('SECURITY_PASSWORD_HISTORY_SIZE', 5),
         'require_letters' => (bool) env('SECURITY_PASSWORD_REQUIRE_LETTERS', true),
-        'require_mixed_case' => (bool) env('SECURITY_PASSWORD_REQUIRE_MIXED_CASE', true),
+        'require_mixed_case' => (bool) env('SECURITY_PASSWORD_REQUIRE_MIXED_CASE', false),
         'require_numbers' => (bool) env('SECURITY_PASSWORD_REQUIRE_NUMBERS', true),
-        'require_symbols' => (bool) env('SECURITY_PASSWORD_REQUIRE_SYMBOLS', true),
+        'require_symbols' => (bool) env('SECURITY_PASSWORD_REQUIRE_SYMBOLS', false),
         'check_pwned' => (bool) env('SECURITY_PASSWORD_CHECK_PWNED', true),
     ],
 

@@ -25,7 +25,7 @@
                             @forelse (($chart['rows'] ?? []) as $row)
                                 @php
                                     $barValue = min(100, max(0, (float) ($row['value'] ?? 0)));
-                                    $barColor = (string) ($row['color'] ?? '#3996D3');
+                                    $barColor = (string) ($row['color'] ?? '#0F5B66');
                                 @endphp
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-[#17324a]">
@@ -53,20 +53,27 @@
             @php
                 $curveRows = collect($decisionQuarterRows)->values();
                 $curveSteps = max(1, $curveRows->count() - 1);
+                $curveLeft = 44;
+                $curveRight = 344;
+                $curveTop = 20;
+                $curveBottom = 130;
+                $curveHeight = $curveBottom - $curveTop;
+                $curveWidth = $curveRight - $curveLeft;
+                $curveThresholdY = $curveBottom - (($qualityThreshold / 100) * $curveHeight);
                 $executionCurvePoints = $curveRows
-                    ->map(function (array $row, int $index) use ($curveSteps): string {
+                    ->map(function (array $row, int $index) use ($curveSteps, $curveLeft, $curveWidth, $curveBottom, $curveHeight): string {
                         $value = min(100, max(0, (float) ($row['taux_execution'] ?? 0)));
-                        $x = 24 + (($index * 312) / $curveSteps);
-                        $y = 118 - ($value * 0.9);
+                        $x = $curveLeft + (($index * $curveWidth) / $curveSteps);
+                        $y = $curveBottom - (($value / 100) * $curveHeight);
 
                         return number_format($x, 0, '.', '').','.number_format($y, 0, '.', '');
                     })
                     ->implode(' ');
                 $scoreCurvePoints = $curveRows
-                    ->map(function (array $row, int $index) use ($curveSteps): string {
+                    ->map(function (array $row, int $index) use ($curveSteps, $curveLeft, $curveWidth, $curveBottom, $curveHeight): string {
                         $value = min(100, max(0, (float) ($row['score'] ?? 0)));
-                        $x = 24 + (($index * 312) / $curveSteps);
-                        $y = 118 - ($value * 0.9);
+                        $x = $curveLeft + (($index * $curveWidth) / $curveSteps);
+                        $y = $curveBottom - (($value / 100) * $curveHeight);
 
                         return number_format($x, 0, '.', '').','.number_format($y, 0, '.', '');
                     })
@@ -77,27 +84,40 @@
                     <h3 class="text-sm font-black text-[#17324a]">Courbes d'evolution trimestrielle</h3>
                     <span class="showcase-chip">{{ $exerciseFilter['label'] ?? 'Exercice courant' }}</span>
                 </div>
-                <div class="overflow-x-auto">
-                    <svg class="min-w-[520px]" viewBox="0 0 360 150" role="img" aria-label="Courbes trimestrielles">
-                        <line x1="24" y1="118" x2="336" y2="118" stroke="#d8ecf8" stroke-width="1" />
-                        <line x1="24" y1="28" x2="336" y2="28" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
-                        <path d="M {{ $smoothPath($executionCurvePoints) }}" fill="none" stroke="#3996D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                        <path d="M {{ $smoothPath($scoreCurvePoints) }}" fill="none" stroke="#8FC043" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                <div class="overflow-x-auto rounded-2xl border border-[#d8ecf8] bg-white/92 px-2 py-3">
+                    <svg class="w-full min-w-[640px]" style="height: 18rem;" viewBox="0 0 380 170" preserveAspectRatio="none" role="img" aria-label="Courbes trimestrielles">
+                        <defs>
+                            <linearGradient id="quarter-score-area" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#F26522" stop-opacity="0.20" />
+                                <stop offset="100%" stop-color="#F26522" stop-opacity="0.02" />
+                            </linearGradient>
+                        </defs>
+                        @foreach ([0, 25, 50, 75, 100] as $tick)
+                            @php $tickY = $curveBottom - (($tick / 100) * $curveHeight); @endphp
+                            <line x1="{{ $curveLeft }}" y1="{{ $tickY }}" x2="{{ $curveRight }}" y2="{{ $tickY }}" stroke="#e5eef7" stroke-width="1" @if ($tick > 0) stroke-dasharray="4 6" @endif />
+                            <text x="20" y="{{ $tickY + 3 }}" text-anchor="end" font-size="9" font-weight="800" fill="#64748B">{{ $tick }}%</text>
+                        @endforeach
+                        <line x1="{{ $curveLeft }}" y1="{{ $curveThresholdY }}" x2="{{ $curveRight }}" y2="{{ $curveThresholdY }}" stroke="#F4B400" stroke-width="1.5" stroke-dasharray="6 5" />
+                        <text x="{{ $curveRight - 2 }}" y="{{ $curveThresholdY - 5 }}" text-anchor="end" font-size="8.5" font-weight="900" fill="#9A5B00">Seuil moyen {{ number_format($qualityThreshold, 0, ',', ' ') }}%</text>
+                        <path d="M {{ $smoothPath($scoreCurvePoints) }} L {{ $curveRight }},{{ $curveBottom }} L {{ $curveLeft }},{{ $curveBottom }} Z" fill="url(#quarter-score-area)" />
+                        <path d="M {{ $smoothPath($executionCurvePoints) }}" fill="none" stroke="#F26522" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M {{ $smoothPath($scoreCurvePoints) }}" fill="none" stroke="#0F5B66" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
                         @foreach ($curveRows as $row)
                             @php
-                                $x = 24 + (($loop->index * 312) / $curveSteps);
-                                $executionY = 118 - (min(100, max(0, (float) ($row['taux_execution'] ?? 0))) * 0.9);
-                                $scoreY = 118 - (min(100, max(0, (float) ($row['score'] ?? 0))) * 0.9);
+                                $x = $curveLeft + (($loop->index * $curveWidth) / $curveSteps);
+                                $executionY = $curveBottom - ((min(100, max(0, (float) ($row['taux_execution'] ?? 0))) / 100) * $curveHeight);
+                                $scoreY = $curveBottom - ((min(100, max(0, (float) ($row['score'] ?? 0))) / 100) * $curveHeight);
                             @endphp
-                            <circle cx="{{ $x }}" cy="{{ $executionY }}" r="4" fill="#3996D3" />
-                            <circle cx="{{ $x }}" cy="{{ $scoreY }}" r="4" fill="#8FC043" />
-                            <text x="{{ $x }}" y="140" text-anchor="middle" font-size="10" font-weight="800" fill="#667085">{{ $row['trimestre'] ?? '-' }}</text>
+                            <circle cx="{{ $x }}" cy="{{ $executionY }}" r="4.5" fill="#ffffff" stroke="#F26522" stroke-width="2.5" />
+                            <circle cx="{{ $x }}" cy="{{ $scoreY }}" r="4.5" fill="#ffffff" stroke="#0F5B66" stroke-width="2.5" />
+                            <text x="{{ $x }}" y="154" text-anchor="middle" font-size="10" font-weight="900" fill="#475569">{{ $row['trimestre'] ?? '-' }}</text>
                         @endforeach
                     </svg>
                 </div>
                 <div class="mt-2 flex flex-wrap gap-3 text-xs font-semibold text-[#667085]">
-                    <span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[#3996D3]"></i>Taux d'exécution</span>
-                    <span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[#8FC043]"></i>Score</span>
+                    <span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[#F26522]"></i>Taux d'exécution</span>
+                    <span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[#0F5B66]"></i>Score</span>
+                    <span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[#F4B400]"></i>Seuil moyen {{ number_format($qualityThreshold, 0, ',', ' ') }}%</span>
                 </div>
             </article>
         </section>
@@ -113,10 +133,13 @@
     @php
         $globalScore = (float) ($globalScores['global'] ?? 0);
         $progressionScore = (float) ($globalScores['progression'] ?? 0);
-        $scoreTone = $globalScore >= 80 ? '#8FC043' : ($globalScore >= 60 ? '#3996D3' : ($globalScore >= 40 ? '#F9B13C' : '#ef4444'));
-        $scoreToneLabel = $globalScore >= 80 ? 'Excellent' : ($globalScore >= 60 ? 'Bon' : ($globalScore >= 40 ? 'A surveiller' : 'Critique'));
-        $directionPerformanceFallbackRows = collect($directionPerformanceRows)->take(8);
-        $servicePerformanceFallbackRows = collect($synthesisServiceRows)->take(8);
+        $scoreTone = $globalScore >= 80 ? '#20C76B' : ($globalScore >= $qualityThreshold ? '#0F5B66' : ($globalScore > 0 ? '#F26522' : '#94A3B8'));
+        $scoreToneLabel = $globalScore >= 80 ? 'Excellent' : ($globalScore >= $qualityThreshold ? 'Bon' : ($globalScore > 0 ? 'A surveiller' : 'Non evalue'));
+        $directionPerformanceFallbackRows = collect($directionPerformanceRows);
+        $servicePerformanceFallbackRows = collect($synthesisServiceRows);
+        $directionPerformanceChartHeight = max(20, ($directionPerformanceFallbackRows->count() * 2.25) + 4);
+        $servicePerformanceChartHeight = max(20, ($servicePerformanceFallbackRows->count() * 2.25) + 4);
+        $unitSummaryChartHeight = max(15, (count($unitRows) * 2) + 4);
     @endphp
 
     {{-- ─── RANGEE 1 : HERO SCORE + JAUGES KPI ─────────────────────── --}}
@@ -132,7 +155,7 @@
             </div>
             <div class="charts-hero-progress-track">
                 <div class="charts-hero-progress-fill" style="width: {{ min(100, max(0, $globalScore)) }}%; background: linear-gradient(90deg, {{ $scoreTone }}, {{ $scoreTone }}cc);"></div>
-                <div class="charts-hero-progress-threshold" style="left: 60%;" title="Seuil de qualité : 60"></div>
+                <div class="charts-hero-progress-threshold" style="left: {{ $qualityThreshold }}%;" title="Seuil moyen de qualité : {{ number_format($qualityThreshold, 0, ',', ' ') }}"></div>
             </div>
             <div class="charts-hero-meta">
                 <div class="charts-hero-meta-cell">
@@ -141,7 +164,7 @@
                 </div>
                 <div class="charts-hero-meta-cell">
                     <span class="charts-hero-meta-label">Seuil qualité</span>
-                    <span class="charts-hero-meta-value">60</span>
+                    <span class="charts-hero-meta-value">{{ number_format($qualityThreshold, 0, ',', ' ') }}</span>
                 </div>
             </div>
             {{-- Mini-sparkline si on a des donnees mensuelles --}}
@@ -163,7 +186,7 @@
                 @foreach ([['key' => 'delai', 'label' => $metricLabel('delai')],['key' => 'performance', 'label' => $metricLabel('performance')]] as $gauge)
                     @php
                         $gaugeValue = min(100, max(0, (float) ($globalScores[$gauge['key']] ?? 0)));
-                        $gaugeTone = $gaugeValue >= 80 ? '#8FC043' : ($gaugeValue >= 60 ? '#3996D3' : ($gaugeValue >= 40 ? '#F9B13C' : '#ef4444'));
+                        $gaugeTone = $gaugeValue >= 80 ? '#20C76B' : ($gaugeValue >= $qualityThreshold ? '#0F5B66' : ($gaugeValue > 0 ? '#F26522' : '#94A3B8'));
                     @endphp
                     <div class="dashboard-gauge-item">
                         <div id="dashboard-kpi-gauge-{{ $gauge['key'] }}" class="dashboard-chart-host">
@@ -199,21 +222,21 @@
                             <svg viewBox="0 0 360 140" preserveAspectRatio="none">
                                 <defs>
                                     <linearGradient id="charts-area-grad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stop-color="#3996D3" stop-opacity="0.32" />
-                                        <stop offset="100%" stop-color="#3996D3" stop-opacity="0.02" />
+                                        <stop offset="0%" stop-color="#F26522" stop-opacity="0.32" />
+                                        <stop offset="100%" stop-color="#F26522" stop-opacity="0.02" />
                                     </linearGradient>
                                 </defs>
                                 <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
                                 <line x1="20" y1="84" x2="340" y2="84" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="3 4" opacity="0.6" />
                                 <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
                                 <path d="M 20,120 L {{ $smoothPath($chartFallbackPoints($monthlyOfficial, 'global')) }} L 340,120 Z" fill="url(#charts-area-grad)" />
-                                <path d="M {{ $smoothPath($chartFallbackPoints($monthlyOfficial, 'global')) }}" fill="none" stroke="#3996D3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M {{ $smoothPath($chartFallbackPoints($monthlyOfficial, 'global')) }}" fill="none" stroke="#F26522" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
                                 @foreach (collect($monthlyOfficial)->values() as $row)
                                     @php
                                         $x = 20 + (($loop->index * 320) / max(1, count($monthlyOfficial) - 1));
                                         $y = 120 - (min(100, max(0, (float) ($row['global'] ?? 0))) * 0.9);
                                     @endphp
-                                    <circle cx="{{ $x }}" cy="{{ $y }}" r="4" fill="#ffffff" stroke="#3996D3" stroke-width="2.5" />
+                                    <circle cx="{{ $x }}" cy="{{ $y }}" r="4" fill="#ffffff" stroke="#F26522" stroke-width="2.5" />
                                 @endforeach
                             </svg>
                         @else
@@ -267,7 +290,7 @@
                 <h2 class="chart-title">Performance des directions</h2>
                 <span class="showcase-chip">{{ count($directionPerformanceRows) }} directions</span>
             </div>
-            <div class="dashboard-canvas dashboard-canvas-lg">
+            <div class="dashboard-canvas dashboard-canvas-lg" style="height: {{ number_format($directionPerformanceChartHeight, 2, '.', '') }}rem;">
                 <div id="dashboard-direction-performance-chart" class="dashboard-chart-host">
                     <div class="dashboard-chart-fallback" aria-hidden="true">
                         @if ($directionPerformanceFallbackRows->isNotEmpty())
@@ -275,7 +298,7 @@
                                 @foreach ($directionPerformanceFallbackRows as $row)
                                     @php
                                         $directionValue = min(100, max(0, (float) ($row['score'] ?? $row['taux_execution'] ?? 0)));
-                                        $directionTone = $directionValue >= 80 ? '#8FC043' : ($directionValue >= 60 ? '#3996D3' : ($directionValue >= 40 ? '#F9B13C' : '#ef4444'));
+                                        $directionTone = $directionValue >= 80 ? '#20C76B' : ($directionValue >= $qualityThreshold ? '#0F5B66' : ($directionValue > 0 ? '#F26522' : '#94A3B8'));
                                     @endphp
                                     <div class="charts-unit-bar">
                                         <span class="charts-unit-bar-label">{{ $row['direction'] ?? '-' }}</span>
@@ -299,7 +322,7 @@
                 <h2 class="chart-title">Performance des services</h2>
                 <span class="showcase-chip">{{ count($synthesisServiceRows) }} services</span>
             </div>
-            <div class="dashboard-canvas dashboard-canvas-lg">
+            <div class="dashboard-canvas dashboard-canvas-lg" style="height: {{ number_format($servicePerformanceChartHeight, 2, '.', '') }}rem;">
                 <div id="dashboard-service-performance-chart" class="dashboard-chart-host">
                     <div class="dashboard-chart-fallback" aria-hidden="true">
                         @if ($servicePerformanceFallbackRows->isNotEmpty())
@@ -307,7 +330,7 @@
                                 @foreach ($servicePerformanceFallbackRows as $row)
                                     @php
                                         $serviceValue = min(100, max(0, (float) ($row['kpi_global'] ?? $row['progression_moyenne'] ?? 0)));
-                                        $serviceTone = $serviceValue >= 80 ? '#8FC043' : ($serviceValue >= 60 ? '#3996D3' : ($serviceValue >= 40 ? '#F9B13C' : '#ef4444'));
+                                        $serviceTone = $serviceValue >= 80 ? '#20C76B' : ($serviceValue >= $qualityThreshold ? '#0F5B66' : ($serviceValue > 0 ? '#F26522' : '#94A3B8'));
                                     @endphp
                                     <div class="charts-unit-bar">
                                         <span class="charts-unit-bar-label">{{ $row['label'] ?? '-' }}</span>
@@ -333,7 +356,7 @@
                 <h2 class="chart-title">Performance par {{ strtolower($unitModeLabel) }}</h2>
                 <span class="showcase-chip">{{ count($unitRows) }} {{ strtolower($unitModeLabel) }}</span>
             </div>
-            <div class="dashboard-canvas">
+            <div class="dashboard-canvas" style="height: {{ number_format($unitSummaryChartHeight, 2, '.', '') }}rem;">
                 <div id="dashboard-unit-summary-chart" class="dashboard-chart-host">
                     <div class="dashboard-chart-fallback" aria-hidden="true">
                         @if ($unitFallbackRows->isNotEmpty())
@@ -341,7 +364,7 @@
                                 @foreach ($unitFallbackRows as $row)
                                     @php
                                         $unitValue = min(100, max(0, (float) ($row['kpi_global'] ?? $row['progression_moyenne'] ?? 0)));
-                                        $unitTone = $unitValue >= 80 ? '#8FC043' : ($unitValue >= 60 ? '#3996D3' : ($unitValue >= 40 ? '#F9B13C' : '#ef4444'));
+                                        $unitTone = $unitValue >= 80 ? '#20C76B' : ($unitValue >= $qualityThreshold ? '#0F5B66' : ($unitValue > 0 ? '#F26522' : '#94A3B8'));
                                     @endphp
                                     <div class="charts-unit-bar">
                                         <span class="charts-unit-bar-label">{{ $row['label'] ?? '-' }}</span>
@@ -362,8 +385,8 @@
 
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Top actions (meilleur score)</h2>
-                <span class="showcase-chip">Top {{ count($analytics['top_action_bars'] ?? []) }}</span>
+                <h2 class="chart-title">Actions classees (meilleur score)</h2>
+                <span class="showcase-chip">{{ count($analytics['top_action_bars'] ?? []) }} actions</span>
             </div>
             @if ($analytics['top_action_bars'] ?? false)
                 <div class="charts-top-actions">
