@@ -8548,16 +8548,65 @@ body.admin-theme-scope .dealdeck-dashboard .chart-export-btn {
 }
 
 body.admin-theme-scope .dealdeck-dashboard [data-dashboard-panel="charts"].active {
-    display: flex !important;
-    flex-direction: column;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+    grid-auto-rows: 0.5rem;
+    grid-auto-flow: dense;
+    gap: 1rem;
+    align-items: start;
 }
 
-body.admin-theme-scope .dealdeck-dashboard .charts-bento-row-hero { order: 10; }
-body.admin-theme-scope .dealdeck-dashboard .charts-bento-row-trend { order: 20; }
-body.admin-theme-scope .dealdeck-dashboard .charts-role-overview { order: 30; }
-body.admin-theme-scope .dealdeck-dashboard .charts-decision-section { order: 40; }
-body.admin-theme-scope .dealdeck-dashboard .charts-long-row { order: 80; }
-body.admin-theme-scope .dealdeck-dashboard .charts-advanced-section { order: 90; }
+body.admin-theme-scope .dealdeck-dashboard [data-dashboard-panel="charts"].active > * {
+    min-width: 0;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-bento {
+    display: contents !important;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-bento > .showcase-panel,
+body.admin-theme-scope .dealdeck-dashboard .charts-role-overview,
+body.admin-theme-scope .dealdeck-dashboard .charts-decision-section,
+body.admin-theme-scope .dealdeck-dashboard .charts-advanced-section {
+    min-width: 0;
+    margin: 0 !important;
+    align-self: start;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-bento-row-hero > .charts-hero-panel {
+    order: 10;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-bento-row-hero > .charts-gauges-panel {
+    order: 11;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-bento-row-trend > .showcase-panel:first-child {
+    order: 20;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-bento-row-trend > .showcase-panel:last-child {
+    order: 21;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-role-overview {
+    order: 30;
+    grid-column: 1 / -1;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-decision-section {
+    order: 40;
+    grid-column: 1 / -1;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-long-row > .showcase-panel {
+    order: 80;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-advanced-section {
+    order: 90;
+    grid-column: 1 / -1;
+}
 
 body.admin-theme-scope .dealdeck-dashboard .dashboard-chart-scroll-frame {
     max-height: clamp(22rem, 58vh, 34rem);

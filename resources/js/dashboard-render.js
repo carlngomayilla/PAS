@@ -71,6 +71,7 @@ function bootDashboardRender(force = false) {
   let optionalChartPluginsPromise = null;
   let renderInFlight = false;
   let renderQueued = false;
+  let chartsMasonryTimer = null;
 
   const centerTextPlugin = {
     id: 'anbgCenterText',
@@ -2144,12 +2145,67 @@ function bootDashboardRender(force = false) {
     });
   }
 
+  function chartsMasonryItems(panel) {
+    try {
+      return Array.from(panel.querySelectorAll([
+        ':scope > .charts-bento > .showcase-panel',
+        ':scope > .charts-role-overview',
+        ':scope > .charts-decision-section',
+        ':scope > .charts-advanced-section',
+      ].join(', ')));
+    } catch (error) {
+      return Array.from(panel.querySelectorAll(
+        '.charts-bento > .showcase-panel, .charts-role-overview, .charts-decision-section, .charts-advanced-section'
+      ));
+    }
+  }
+
+  function layoutChartsMasonry() {
+    const panel = document.querySelector('[data-dashboard-panel="charts"].active');
+
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+
+    const styles = window.getComputedStyle(panel);
+
+    if (!styles.display.includes('grid')) {
+      return;
+    }
+
+    const rowHeight = Number.parseFloat(styles.gridAutoRows) || 8;
+    const rowGap = Number.parseFloat(styles.rowGap) || 16;
+    const items = chartsMasonryItems(panel).filter((item) => item instanceof HTMLElement);
+
+    items.forEach((item) => {
+      item.style.gridRowEnd = 'auto';
+    });
+
+    window.requestAnimationFrame(() => {
+      items.forEach((item) => {
+        const height = item.getBoundingClientRect().height;
+        const span = Math.max(1, Math.ceil((height + rowGap) / (rowHeight + rowGap)));
+
+        item.style.gridRowEnd = `span ${span}`;
+      });
+    });
+  }
+
+  function scheduleChartsMasonryLayout(delay = 0) {
+    window.clearTimeout(chartsMasonryTimer);
+    chartsMasonryTimer = window.setTimeout(() => {
+      layoutChartsMasonry();
+    }, delay);
+  }
+
   function resizeCharts() {
     Object.values(chartInstances).forEach((chart) => {
       if (chart && typeof chart.resize === 'function') {
         chart.resize();
       }
     });
+
+    scheduleChartsMasonryLayout();
   }
 
   async function render() {
