@@ -805,8 +805,7 @@ class ActionTrackingWebController extends Controller
             return false;
         }
 
-        return $action->isResponsible($user)
-            && ($user->isAgent() || $action->isOperationalContext());
+        return $action->isResponsible($user);
     }
 
     private function canTrackSubAction(User $user, Action $action, SousAction $sousAction): bool

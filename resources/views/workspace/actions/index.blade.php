@@ -8,9 +8,12 @@
         $financingStatusOptions = is_array($financingStatusOptions ?? null) ? $financingStatusOptions : \App\Models\Action::financingStatusOptions();
         $currentViewMode = (string) ($filters['vue'] ?? '');
         $showDualActionTabs = (bool) ($showDualActionTabs ?? false);
+        $showActionValidationTab = (bool) ($showActionValidationTab ?? false);
+        $isValidationTab = $currentViewMode === 'validations';
         $viewModeLabel = match ($currentViewMode) {
             'pilotage' => 'Actions pilotées',
             'mes_actions' => 'Mes actions',
+            'validations' => 'Validations à traiter',
             default => 'Vue complète',
         };
         $paginationRange = $rows->total() > 0
@@ -77,7 +80,7 @@
             ['label' => 'Actions en retard', 'value' => $statusCounts['en_retard'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => null, 'badge_tone' => $statusCounts['en_retard'] > 0 ? 'danger' : 'neutral'],
             // A42 — La validation se fait desormais dans Mes taches : la carte
             // devient un raccourci vers ce module (acte Valider/Renvoyer inline).
-            ['label' => 'En attente validation', 'value' => $pendingValidationCount, 'meta' => 'À valider dans Mes tâches', 'href' => route('workspace.tasks.index'), 'badge' => null, 'badge_tone' => $pendingValidationCount > 0 ? 'warning' : 'neutral'],
+            ['label' => 'En attente validation', 'value' => $pendingValidationCount, 'meta' => $showActionValidationTab ? 'À traiter dans Actions' : 'À valider dans Mes tâches', 'href' => $showActionValidationTab ? route('workspace.actions.index', ['vue' => 'validations']) : route('workspace.tasks.index'), 'badge' => null, 'badge_tone' => $pendingValidationCount > 0 ? 'warning' : 'neutral'],
             ['label' => 'Performance moyenne', 'value' => number_format($avgKpi, 0).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
         ];
         $layoutMode = request()->query('layout', 'list');
@@ -163,6 +166,14 @@
                     <a class="btn btn-sm {{ $currentViewMode === 'pilotage' ? 'btn-primary' : 'btn-secondary' }} rounded-xl px-3 py-1.5" href="{{ route('workspace.actions.index', ['vue' => 'pilotage']) }}">Actions pilotées</a>
                     <a class="btn btn-sm {{ $currentViewMode === 'mes_actions' ? 'btn-primary' : 'btn-secondary' }} rounded-xl px-3 py-1.5" href="{{ route('workspace.actions.index', ['vue' => 'mes_actions']) }}">Mes actions</a>
                 @endif
+                @if ($showActionValidationTab)
+                    <a class="btn btn-sm {{ $isValidationTab ? 'btn-primary' : 'btn-secondary' }} rounded-xl px-3 py-1.5" href="{{ route('workspace.actions.index', ['vue' => 'validations']) }}">
+                        Validations
+                        @if ($pendingValidationCount > 0)
+                            <span class="ml-1 rounded-full bg-white/25 px-2 py-0.5 text-[11px] font-bold">{{ $pendingValidationCount }}</span>
+                        @endif
+                    </a>
+                @endif
             </div>
             <div class="flex items-center gap-2">
                 <div class="view-toggle" role="group" aria-label="Mode d'affichage">
@@ -243,12 +254,17 @@
                 </div>
                 <div>
                     <label for="statut_validation">Validation</label>
-                    <select id="statut_validation" name="statut_validation">
-                        <option value="">Toutes</option>
-                        @foreach ($validationOptions as $status)
-                            <option value="{{ $status }}" @selected($filters['statut_validation'] === $status)>{{ $validationStatusLabel($status) }}</option>
-                        @endforeach
-                    </select>
+                    @if ($isValidationTab)
+                        <input type="hidden" name="statut_validation" value="soumise_chef">
+                        <input id="statut_validation" type="text" value="En attente chef" readonly>
+                    @else
+                        <select id="statut_validation" name="statut_validation">
+                            <option value="">Toutes</option>
+                            @foreach ($validationOptions as $status)
+                                <option value="{{ $status }}" @selected($filters['statut_validation'] === $status)>{{ $validationStatusLabel($status) }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                 </div>
                 <div>
                     <label for="financement_requis">Financement requis</label>
@@ -727,7 +743,9 @@
                             </td>
                             <td>
                                 <div class="row-actions">
-                                    <a class="btn btn-follow btn-sm rounded-xl" href="{{ route('workspace.actions.suivi', $row) }}">Suivi</a>
+                                    <a class="btn btn-follow btn-sm rounded-xl" href="{{ route('workspace.actions.suivi', $row) }}{{ $isValidationTab ? '#action-validation' : '' }}">
+                                        {{ $isValidationTab ? 'Traiter' : 'Suivi' }}
+                                    </a>
                                     @if ($canWrite)
                                         @php
                                             $lockService = $lockService ?? app(\App\Services\PlanningModificationLockService::class);

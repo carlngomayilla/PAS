@@ -164,6 +164,31 @@ class WorkflowV2CycleTest extends TestCase
             ->assertSee('Soumettre au chef', false);
     }
 
+    public function test_chef_responsable_can_track_own_pilotage_action(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, [
+            'contexte_action' => Action::CONTEXT_PILOTAGE,
+            'quantite_cible' => 100,
+        ]);
+        $action = $fixture['action'];
+        $action->forceFill(['responsable_id' => $fixture['chef']->id])->save();
+
+        $this->actingAs($fixture['chef'])
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('Soumettre au chef', false);
+
+        $this->actingAs($fixture['chef'])
+            ->post(route('workspace.actions.execution.update', $action), [
+                'quantite_realisee' => 35,
+                'commentaire' => 'Avancement saisi par le chef responsable.',
+                'tracking_action' => 'save',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->assertSame('35.00', (string) $action->fresh()->progression_reelle);
+    }
+
     public function test_suivi_page_renders_for_agent_composite(): void
     {
         $fixture = $this->createFixture(Action::TYPE_COMPOSEE);
@@ -224,7 +249,7 @@ class WorkflowV2CycleTest extends TestCase
             ->assertSee('Valider l\'action', false);
     }
 
-    public function test_validation_module_lists_composite_actions_with_submitted_sub_actions(): void
+    public function test_validation_tab_lists_only_actions_waiting_for_validation(): void
     {
         $fixture = $this->createFixture(Action::TYPE_COMPOSEE);
         $fixture['action']->sousActions()->create([
@@ -239,14 +264,26 @@ class WorkflowV2CycleTest extends TestCase
             'validation_status' => SousAction::VALIDATION_SOUMISE,
             'est_effectuee' => true,
         ]);
+        Action::query()->create([
+            'pta_id' => $fixture['action']->pta_id,
+            'responsable_id' => $fixture['agent']->id,
+            'libelle' => 'Action hors validation',
+            'type_action' => Action::TYPE_QUANTITATIVE,
+            'statut_parametrage' => 'parametre',
+            'statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE,
+            'contexte_action' => Action::CONTEXT_PILOTAGE,
+            'quantite_cible' => 100,
+            'justificatif_obligatoire' => false,
+        ]);
 
         $this->actingAs($fixture['chef'])
             ->get(route('workspace.actions.index', [
-                'vue' => 'pilotage',
-                'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                'vue' => 'validations',
             ]))
             ->assertOk()
-            ->assertSee('Action WF '.Action::TYPE_COMPOSEE);
+            ->assertSee('Validations', false)
+            ->assertSee('Action WF '.Action::TYPE_COMPOSEE)
+            ->assertDontSee('Action hors validation');
     }
 
     /**

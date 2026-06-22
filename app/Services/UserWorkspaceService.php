@@ -357,10 +357,8 @@ class UserWorkspaceService
                 $m('pilotage', 'Dashboard', '/dashboard'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
-                $m('execution', 'Action', '/workspace/actions', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier']]),
-                $m('validations', 'Validations', '/workspace/actions?vue=pilotage&statut_validation=soumise_chef', ['can_write' => true, 'actions' => ['Consulter', 'Valider', 'Renvoyer']]),
-                // A42 — La validation est fusionnee dans « Mes taches » (acte Valider/Renvoyer
-                // inline) : plus d'entree « Validations » distincte dans la sidebar.
+                $m('execution', 'Action', '/workspace/actions', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Valider', 'Renvoyer']]),
+                // La validation est désormais traitée dans l'onglet Actions > Validations.
                 // 'agents' → liste des utilisateurs du referentiel (deja filtree par scope).
                 $m('agents', 'Agents / RMO', '/workspace/referentiel/utilisateurs'),
                 $m('reporting', 'Reporting service', '/workspace/reporting'),
@@ -375,8 +373,8 @@ class UserWorkspaceService
                 $m('pta', 'PTA', '/workspace/pta'),
                 $m('imports_excel', 'Imports Excel', '/workspace/imports-excel', ['can_write' => true, 'actions' => ['Verifier', 'Mapper colonnes', 'Importer']]),
                 $m('execution', 'Action', '/workspace/actions'),
-                // 'controle' → vue "Pilotage" des actions filtree sur validations a faire.
-                $m('controle', 'Contrôle', '/workspace/actions?vue=pilotage&statut_validation=soumise_chef', ['can_write' => true, 'actions' => ['Signaler', 'Bloquer', 'Lever blocage']]),
+                // 'controle' → onglet "Validations" des actions.
+                $m('controle', 'Contrôle', '/workspace/actions?vue=validations', ['can_write' => true, 'actions' => ['Signaler', 'Bloquer', 'Lever blocage']]),
                 ...($user->isPlanningControlChief()
                     ? [$m('referentiel', 'Utilisateurs', '/workspace/referentiel/utilisateurs', ['can_write' => true, 'actions' => ['Consulter', 'Administrer utilisateurs']])]
                     : []),
@@ -438,9 +436,8 @@ class UserWorkspaceService
                 $m('pilotage', 'Dashboard unité', '/dashboard'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier']]),
-                $m('execution', 'Action', '/workspace/actions', ['can_write' => true]),
-                $m('validations', 'Validations', '/workspace/actions?vue=pilotage&statut_validation=soumise_chef', ['can_write' => true, 'actions' => ['Consulter', 'Valider', 'Renvoyer']]),
-                // A42 — Validation fusionnee dans « Mes taches » : plus d'entree distincte.
+                $m('execution', 'Action', '/workspace/actions', ['can_write' => true, 'actions' => ['Consulter', 'Valider', 'Renvoyer']]),
+                // Validation fusionnée dans l'onglet Actions > Validations.
                 $m('agents', 'Agents / RMO', '/workspace/referentiel/utilisateurs'),
                 $m('reporting', 'Reporting unité', '/workspace/reporting'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),

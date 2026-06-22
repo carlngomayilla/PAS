@@ -465,9 +465,10 @@
                         $saPerf = app(\App\Services\Workflow\ActionPerformanceCalculator::class)->subActionPerformance($sa);
                         $saValStatus = (string) ($sa->validation_status ?? 'non_soumise');
                         // Éditable uniquement si non soumise ou rejetée (gel après soumission).
+                        $canEditSubActionAsResponsible = auth()->check() && $action->isResponsible(auth()->user());
                         $saEditable = ($canTrackSubActionsV2 ?? false)
                             && in_array($saValStatus, ['non_soumise', 'rejetee'], true)
-                            && (int) $sa->agent_id === (int) auth()->id();
+                            && ((int) $sa->agent_id === (int) auth()->id() || $canEditSubActionAsResponsible);
                         $saFrozen = $saValStatus === 'soumise';
                     @endphp
                     <article class="rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm">
@@ -480,7 +481,7 @@
                             </div>
                         </div>
 
-                        @if ($saFrozen && (int) $sa->agent_id === (int) auth()->id())
+                        @if ($saFrozen && ((int) $sa->agent_id === (int) auth()->id() || $canEditSubActionAsResponsible))
                             <p class="action-section-note mt-2">🔒 Sous-action soumise — figée jusqu'à la décision du chef.</p>
                         @endif
 

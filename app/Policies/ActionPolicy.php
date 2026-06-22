@@ -117,8 +117,7 @@ class ActionPolicy
      */
     public function submitWeek(User $user, Action $action): bool
     {
-        return $action->isResponsible($user)
-            && ($user->isAgent() || $action->isOperationalContext());
+        return $action->isResponsible($user);
     }
 
     /**

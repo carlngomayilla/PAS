@@ -124,6 +124,7 @@ class ActionWebController extends Controller
             'sortOptions' => $this->sortOptions(),
             'canWrite' => $this->canWrite($user),
             'showDualActionTabs' => $this->shouldUseDualActionTabs($user),
+            'showActionValidationTab' => $this->canUseActionValidationTab($user),
             'filters' => [
                 'vue' => $viewMode,
                 'contexte_action' => trim((string) $request->string('contexte_action')),
@@ -137,8 +138,12 @@ class ActionWebController extends Controller
                 'mois_demarrage' => $request->filled('mois_demarrage') ? trim((string) $request->string('mois_demarrage')) : '',
                 'week_start' => $request->filled('week_start') ? trim((string) $request->string('week_start')) : '',
                 'statut' => trim((string) $request->string('statut')),
-                'statut_validation' => $request->filled('statut_validation') ? trim((string) $request->string('statut_validation')) : '',
-                'statut_validation_min' => $request->filled('statut_validation_min') ? trim((string) $request->string('statut_validation_min')) : '',
+                'statut_validation' => $viewMode === 'validations'
+                    ? ActionTrackingService::VALIDATION_SOUMISE_CHEF
+                    : ($request->filled('statut_validation') ? trim((string) $request->string('statut_validation')) : ''),
+                'statut_validation_min' => $viewMode === 'validations'
+                    ? ''
+                    : ($request->filled('statut_validation_min') ? trim((string) $request->string('statut_validation_min')) : ''),
                 'financement_requis' => $request->filled('financement_requis') ? (int) $request->boolean('financement_requis') : null,
                 'financement_statut' => $request->filled('financement_statut') ? trim((string) $request->string('financement_statut')) : '',
                 'without_kpi' => $request->boolean('without_kpi'),
@@ -1123,8 +1128,12 @@ class ActionWebController extends Controller
         );
 
         $showDualActionTabs = $this->shouldUseDualActionTabs($user);
+        $showValidationTab = $this->canUseActionValidationTab($user);
         $viewMode = trim((string) $request->string('vue'));
-        if (! in_array($viewMode, ['', 'pilotage', 'mes_actions'], true)) {
+        $allowedViewModes = $showValidationTab
+            ? ['', 'pilotage', 'mes_actions', 'validations']
+            : ['', 'pilotage', 'mes_actions'];
+        if (! in_array($viewMode, $allowedViewModes, true)) {
             $viewMode = $showDualActionTabs ? 'pilotage' : '';
         }
 
@@ -1155,6 +1164,10 @@ class ActionWebController extends Controller
                     $q->orWhereHas('responsables', fn (Builder $r) => $r->whereKey((int) $user->id));
                 }
             });
+        }
+
+        if ($viewMode === 'validations') {
+            $this->wherePendingChefValidation($query);
         }
 
         $contextFilter = trim((string) $request->string('contexte_action'));
@@ -1243,23 +1256,27 @@ class ActionWebController extends Controller
             }
         }
 
-        $query->when($request->filled('statut_validation'), function (Builder $q) use ($request): void {
-            $status = trim((string) $request->string('statut_validation'));
-            if ($status === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
-                $this->wherePendingChefValidation($q);
+        if ($viewMode !== 'validations') {
+            $query->when($request->filled('statut_validation'), function (Builder $q) use ($request): void {
+                $status = trim((string) $request->string('statut_validation'));
+                if ($status === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
+                    $this->wherePendingChefValidation($q);
 
-                return;
-            }
+                    return;
+                }
 
-            $q->where('statut_validation', $status);
-        });
-        $query->when($request->filled('statut_validation_min'), function (Builder $q) use ($request): void {
-            $threshold = trim((string) $request->string('statut_validation_min'));
-            $settings = app(ActionCalculationSettings::class);
-            $statuses = $settings->validationStatusesFrom($threshold);
+                $q->where('statut_validation', $status);
+            });
+        }
+        if ($viewMode !== 'validations') {
+            $query->when($request->filled('statut_validation_min'), function (Builder $q) use ($request): void {
+                $threshold = trim((string) $request->string('statut_validation_min'));
+                $settings = app(ActionCalculationSettings::class);
+                $statuses = $settings->validationStatusesFrom($threshold);
 
-            $q->whereIn('statut_validation', $statuses);
-        });
+                $q->whereIn('statut_validation', $statuses);
+            });
+        }
 
         $query->when(
             $request->filled('financement_requis'),
@@ -1487,6 +1504,11 @@ class ActionWebController extends Controller
     private function shouldUseDualActionTabs(User $user): bool
     {
         return app(\App\Services\AccessScopeService::class)->hasDualInterface($user);
+    }
+
+    private function canUseActionValidationTab(User $user): bool
+    {
+        return ! $user->isAgent();
     }
 
     private function scopeAction(Builder $query, User $user): void
