@@ -17,6 +17,30 @@ use Illuminate\Support\Facades\Storage;
 
 class PlatformDiagnosticService
 {
+    /**
+     * @var list<string>
+     */
+    private const INTERVENTION_MODULES = [
+        'planning_unlock',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const INTERVENTION_ACTIONS = [
+        'submit_validation_chef',
+        'submit_sub_action_validation_chef',
+        'review_action_validate',
+        'review_action_reject',
+        'review_sub_action_validate',
+        'review_sub_action_reject',
+        'review_financing_daf',
+        'review_financing_dg',
+        'update_financing_status_daf',
+        'deletion_request_create',
+        'deletion_request_decision',
+    ];
+
     public function __construct(
         private readonly WorkspaceModuleSettings $workspaceModuleSettings
     ) {
@@ -232,6 +256,15 @@ class PlatformDiagnosticService
                 $subQuery->where('module', 'like', "%{$search}%")
                     ->orWhere('action', 'like', "%{$search}%")
                     ->orWhere('entite_type', 'like', "%{$search}%");
+            });
+        }
+
+        if (($filters['operation_scope'] ?? '') === 'interventions') {
+            $query->where(function ($interventionQuery): void {
+                $interventionQuery
+                    ->whereIn('module', self::INTERVENTION_MODULES)
+                    ->orWhereIn('action', self::INTERVENTION_ACTIONS)
+                    ->orWhere('action', 'like', '%deletion_request%');
             });
         }
 

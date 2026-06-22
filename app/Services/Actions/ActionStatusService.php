@@ -77,6 +77,27 @@ class ActionStatusService
         'sous_action',
     ];
 
+    /**
+     * @var list<string>
+     */
+    private const NON_FINAL_VALIDATION_STATUSES = [
+        ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+        ActionTrackingService::VALIDATION_REJETEE_CHEF,
+        ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+        ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+        'en_validation_chef',
+        'soumise_direction',
+        'en_validation_direction',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const FINAL_VALIDATION_STATUSES = [
+        ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+    ];
+
     public function __construct(
         private readonly ActionCalculationSettings $actionCalculationSettings
     ) {
@@ -114,6 +135,10 @@ class ActionStatusService
         $dynamicStatus = strtolower(trim((string) ($action->statut_dynamique ?? $action->statut ?? '')));
         $validationStatus = strtolower(trim((string) ($action->statut_validation ?? '')));
 
+        if (in_array($validationStatus, self::NON_FINAL_VALIDATION_STATUSES, true)) {
+            return false;
+        }
+
         return in_array($dynamicStatus, [
             ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
             ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
@@ -125,13 +150,8 @@ class ActionStatusService
         ], true)
             // Validation finale chef de service (etape terminale du workflow ANBG)
             // ou validation direction historique : l'action est consideree achevee.
-            || in_array($validationStatus, [
-                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
-            ], true)
-            || $action->date_fin_reelle !== null
-            || $action->cloture_le !== null
-            || (float) ($action->progression_reelle ?? $action->taux_global ?? 0) >= 100.0;
+            || in_array($validationStatus, self::FINAL_VALIDATION_STATUSES, true)
+            || $action->cloture_le !== null;
     }
 
     public function isOfficiallyValidated(Action $action, ?string $level = null): bool
@@ -171,6 +191,7 @@ class ActionStatusService
             ActionTrackingService::STATUS_A_RISQUE => 'a_risque',
             ActionTrackingService::STATUS_EN_AVANCE => 'en_avance',
             ActionTrackingService::STATUS_EN_RETARD => 'en_retard',
+            ActionTrackingService::STATUS_A_CORRIGER => 'a_corriger',
             ActionTrackingService::STATUS_SUSPENDU => 'suspendu',
             ActionTrackingService::STATUS_ANNULE => 'annule',
             default => 'en_cours',

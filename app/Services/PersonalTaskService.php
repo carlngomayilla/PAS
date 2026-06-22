@@ -524,7 +524,7 @@ class PersonalTaskService
                     responsible: $request->requester?->name,
                     receivedAt: $received,
                     deadlineAt: $deadline,
-                    url: route('workspace.planning-unlocks.index'),
+                    url: route('workspace.planning-unlocks.index').'#unlock-request-'.$request->id,
                     criticality: $this->criticalityFromDeadline($deadline, 'importante'),
                     scoreImpact: $role === 'dg'
                         ? 'Retard de decision impute au DG.'

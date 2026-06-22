@@ -35,6 +35,29 @@ class NotificationWebTest extends TestCase
         $this->assertNotNull($notification->read_at);
     }
 
+    public function test_notification_opening_ignores_external_redirect_url(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+        ]);
+
+        $user->notify(new WorkspaceModuleNotification([
+            'title' => 'Lien externe',
+            'message' => 'URL invalide pour le centre de notifications.',
+            'module' => 'actions',
+            'url' => 'https://example.test/phishing',
+        ]));
+
+        $notification = $user->notifications()->latest()->firstOrFail();
+
+        $this->actingAs($user)
+            ->get(route('workspace.notifications.read', $notification->id))
+            ->assertRedirect(route('dashboard'));
+
+        $notification->refresh();
+        $this->assertNotNull($notification->read_at);
+    }
+
     public function test_user_can_mark_all_notifications_as_read(): void
     {
         $user = User::factory()->create([

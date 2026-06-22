@@ -92,6 +92,8 @@ class ActionWorkflowService
             'progression_reelle' => $provisional,
             'statut_performance' => $this->calculator->performanceStatus($provisional),
             'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'statut' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
             'soumise_le' => now(),
             'soumise_par' => $actor?->id ?? $action->soumise_par,
         ])->save();
@@ -118,6 +120,9 @@ class ActionWorkflowService
                 'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
                 'statut' => ActionTrackingService::STATUS_CLOTUREE,
                 'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
+                'date_fin_reelle' => $action->date_fin_reelle ?: now()->toDateString(),
+                'cloture_le' => $action->cloture_le ?: now(),
+                'cloture_par' => $actor?->id ?? $action->cloture_par,
                 'evalue_le' => now(),
                 'evalue_par' => $actor?->id,
                 'motif_validation_chef' => $motif,

@@ -29,6 +29,13 @@
                     <input id="module" name="module" type="text" value="{{ $filters['module'] }}">
                 </div>
                 <div>
+                    <label for="operation_scope">PÃ©rimÃ¨tre</label>
+                    <select id="operation_scope" name="operation_scope">
+                        <option value="" @selected(($filters['operation_scope'] ?? '') === '')>Tous les journaux</option>
+                        <option value="interventions" @selected(($filters['operation_scope'] ?? '') === 'interventions')>Interventions Ã  traiter</option>
+                    </select>
+                </div>
+                <div>
                     <label for="action">Action</label>
                     <input id="action" name="action" type="text" value="{{ $filters['action'] }}">
                 </div>
@@ -65,7 +72,10 @@
     </section>
 
     <section class="showcase-panel mb-4 app-screen-block">
-        <h2>Historique</h2>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2>Historique</h2>
+            <span class="text-sm text-slate-500">Tri par dÃ©faut : plus rÃ©cent au plus ancien</span>
+        </div>
         <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
                 <thead>

@@ -602,6 +602,7 @@ class ActionTrackingService
         if ($this->actionManagementSettings->autoCompleteWhenTargetReached()
             && $action->date_fin_reelle === null
             && $realProgress >= 100.0
+            && $this->hasFinalValidation($action)
             && ! in_array((string) ($action->statut ?? ''), [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)) {
             $action->date_fin_reelle = $referenceDate->copy()->toDateString();
         }
@@ -722,6 +723,7 @@ class ActionTrackingService
             $this->actionManagementSettings->autoCompleteWhenTargetReached()
             && $action->date_fin_reelle === null
             && $realProgress >= 100.0
+            && $this->hasFinalValidation($action)
             && ! in_array((string) ($action->statut ?? ''), [self::STATUS_SUSPENDU, self::STATUS_ANNULE], true)
         ) {
             $action->date_fin_reelle = $referenceDate->copy()->toDateString();
@@ -913,6 +915,10 @@ class ActionTrackingService
             return self::STATUS_SUSPENDU;
         }
 
+        if (in_array($manualStatus, [self::STATUS_CLOTUREE, 'cloture', 'cloturee'], true)) {
+            return self::STATUS_CLOTUREE;
+        }
+
         if (in_array((string) ($action->statut_validation ?? ''), [
             self::VALIDATION_REJETEE_CHEF,
             self::VALIDATION_CORRECTION_DEMANDEE,
@@ -924,7 +930,7 @@ class ActionTrackingService
         $endDate = $action->date_fin !== null ? Carbon::parse($action->date_fin)->endOfDay() : null;
         $actualEnd = $action->date_fin_reelle !== null ? Carbon::parse($action->date_fin_reelle)->endOfDay() : null;
 
-        if ($actualEnd !== null) {
+        if ($actualEnd !== null && $this->hasFinalValidation($action)) {
             $realEnd = $action->date_fin_reelle !== null
                 ? Carbon::parse($action->date_fin_reelle)->endOfDay()
                 : $referenceDate->copy()->endOfDay();
@@ -1311,9 +1317,18 @@ class ActionTrackingService
             self::STATUS_NON_DEMARRE => 'non_demarre',
             self::STATUS_SUSPENDU => 'suspendu',
             self::STATUS_ANNULE => 'annule',
+            self::STATUS_CLOTUREE => 'cloturee',
             self::STATUS_ACHEVE_DANS_DELAI, self::STATUS_ACHEVE_HORS_DELAI => 'termine',
             self::STATUS_EN_RETARD => 'en_cours',
             default => 'en_cours',
         };
+    }
+
+    private function hasFinalValidation(Action $action): bool
+    {
+        return in_array((string) ($action->statut_validation ?? ''), [
+            self::VALIDATION_VALIDEE_CHEF,
+            self::VALIDATION_VALIDEE_DIRECTION,
+        ], true);
     }
 }

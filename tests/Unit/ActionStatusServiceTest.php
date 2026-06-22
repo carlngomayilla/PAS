@@ -195,4 +195,21 @@ class ActionStatusServiceTest extends TestCase
         $this->assertTrue($service->isCompleted($action));
         $this->assertSame('acheve', $service->dashboardStatus($action));
     }
+
+    public function test_submitted_action_at_full_progress_stays_pending_validation(): void
+    {
+        $action = new Action([
+            'statut_parametrage' => 'parametre',
+            'statut' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'progression_reelle' => 100,
+            'date_fin_reelle' => now()->toDateString(),
+        ]);
+
+        $service = app(ActionStatusService::class);
+
+        $this->assertFalse($service->isCompleted($action));
+        $this->assertSame('en_cours', $service->dashboardStatus($action));
+    }
 }

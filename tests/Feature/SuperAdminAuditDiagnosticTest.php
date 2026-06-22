@@ -114,4 +114,42 @@ class SuperAdminAuditDiagnosticTest extends TestCase
             ->assertSee('Date fin');
     }
 
+    public function test_audit_index_can_filter_intervention_journal_entries(): void
+    {
+        $admin = $this->createAdminUser();
+
+        JournalAudit::query()->create([
+            'user_id' => $admin->id,
+            'module' => 'action',
+            'entite_type' => 'action',
+            'entite_id' => 10,
+            'action' => 'review_action_validate',
+            'ancienne_valeur' => ['statut_validation' => 'soumise_chef'],
+            'nouvelle_valeur' => ['statut_validation' => 'validee_chef'],
+            'adresse_ip' => '127.0.0.1',
+            'user_agent' => 'PHPUnit',
+        ]);
+
+        JournalAudit::query()->create([
+            'user_id' => $admin->id,
+            'module' => 'profil_utilisateur',
+            'entite_type' => 'user',
+            'entite_id' => 11,
+            'action' => 'update',
+            'ancienne_valeur' => ['name' => 'A'],
+            'nouvelle_valeur' => ['name' => 'B'],
+            'adresse_ip' => '127.0.0.1',
+            'user_agent' => 'PHPUnit',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('workspace.audit.index', [
+                'operation_scope' => 'interventions',
+            ]))
+            ->assertOk()
+            ->assertSee('Interventions')
+            ->assertSee('review_action_validate')
+            ->assertDontSee('profil_utilisateur');
+    }
+
 }

@@ -206,6 +206,7 @@ class ActionTrackingWebController extends Controller
         ]);
 
         $hasNewProof = $request->hasFile('justificatif');
+        $before = $action->toArray();
 
         try {
             DB::transaction(function () use ($workflow, $action, $validated, $intent, $user, $request, $secureStorage, $hasNewProof): void {
@@ -245,7 +246,16 @@ class ActionTrackingWebController extends Controller
         }
 
         if ($intent === 'submit') {
-            $notificationService->notifyActionSubmittedToChef($action->fresh()->loadMissing('pta:id,direction_id,service_id'), $user);
+            $submittedAction = $action->fresh()->loadMissing('pta:id,direction_id,service_id');
+            $this->recordAudit($request, 'action', 'submit_validation_chef', $submittedAction, $before, [
+                ...$submittedAction->toArray(),
+                'audit_context' => [
+                    'intervention_created' => true,
+                    'task_type' => 'validation_chef',
+                    'target_route' => route('workspace.actions.suivi', $submittedAction).'#action-validation',
+                ],
+            ]);
+            $notificationService->notifyActionSubmittedToChef($submittedAction, $user);
         }
 
         return redirect()
@@ -290,6 +300,7 @@ class ActionTrackingWebController extends Controller
         ]);
 
         $hasNewProof = $request->hasFile('justificatif');
+        $beforeSubAction = $sousAction->toArray();
 
         try {
             DB::transaction(function () use ($workflow, $action, $sousAction, $validated, $intent, $user, $request, $secureStorage, $hasNewProof): void {
@@ -332,9 +343,20 @@ class ActionTrackingWebController extends Controller
         }
 
         if ($intent === 'submit') {
+            $submittedSubAction = $sousAction->fresh();
+            $submittedAction = $action->fresh()->loadMissing('pta:id,direction_id,service_id');
+            $this->recordAudit($request, 'action', 'submit_sub_action_validation_chef', $submittedSubAction, $beforeSubAction, [
+                ...$submittedSubAction->toArray(),
+                'audit_context' => [
+                    'intervention_created' => true,
+                    'task_type' => 'validation_sous_action_chef',
+                    'parent_action_id' => (int) $submittedAction->id,
+                    'target_route' => route('workspace.actions.suivi', $submittedAction).'#action-weeks',
+                ],
+            ]);
             $notificationService->notifySubActionCompleted(
-                $action->fresh()->loadMissing('pta:id,direction_id,service_id'),
-                $sousAction->fresh(),
+                $submittedAction,
+                $submittedSubAction,
                 $user
             );
         }
@@ -377,12 +399,36 @@ class ActionTrackingWebController extends Controller
             return back()->withErrors(['motif' => 'Le motif est obligatoire en cas de renvoi pour correction.']);
         }
 
+        $source = (string) $request->input('source', '');
         $subActionId = $validated['sous_action_id'] ?? null;
         if ($subActionId !== null) {
             $sousAction = SousAction::query()->whereKey((int) $subActionId)->where('action_id', $action->id)->firstOrFail();
+            $before = $sousAction->toArray();
             $workflow->reviewSubAction($sousAction, $approve, $validated['motif'] ?? null, $user);
+            $reviewed = $sousAction->fresh();
+            $this->recordAudit($request, 'action', $approve ? 'review_sub_action_validate' : 'review_sub_action_reject', $reviewed, $before, [
+                ...$reviewed->toArray(),
+                'audit_context' => [
+                    'intervention_processed' => true,
+                    'source' => $source === 'personal_tasks' ? 'personal_tasks' : 'action_tracking',
+                    'parent_action_id' => (int) $action->id,
+                    'decision' => $approve ? 'valider' : 'rejeter',
+                    'motif' => $validated['motif'] ?? null,
+                ],
+            ]);
         } else {
+            $before = $action->toArray();
             $workflow->reviewAction($action, $approve, $validated['motif'] ?? null, $user);
+            $reviewed = $action->fresh();
+            $this->recordAudit($request, 'action', $approve ? 'review_action_validate' : 'review_action_reject', $reviewed, $before, [
+                ...$reviewed->toArray(),
+                'audit_context' => [
+                    'intervention_processed' => true,
+                    'source' => $source === 'personal_tasks' ? 'personal_tasks' : 'action_tracking',
+                    'decision' => $approve ? 'valider' : 'rejeter',
+                    'motif' => $validated['motif'] ?? null,
+                ],
+            ]);
         }
 
         $notificationService->notifyActionReviewedByChef($action->fresh()->loadMissing('pta:id,direction_id,service_id'), $approve, $user);

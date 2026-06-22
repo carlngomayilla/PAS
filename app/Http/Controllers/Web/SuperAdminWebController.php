@@ -603,7 +603,7 @@ class SuperAdminWebController extends Controller
         $this->denyUnlessSuperAdmin($user);
 
         $permissionCodes = array_keys($this->rolePermissionSettings->permissions());
-        $rules = ['permissions' => ['required', 'array']];
+        $rules = ['permissions' => ['nullable', 'array']];
         $roleCodes = array_values(array_unique(array_merge(
             array_keys($this->rolePermissionSettings->roles()),
             array_keys($this->rolePermissionSettings->defaults())
@@ -616,8 +616,13 @@ class SuperAdminWebController extends Controller
 
         $validated = $request->validate($rules);
 
+        $submittedPermissions = $validated['permissions'] ?? [];
+        foreach ($roleCodes as $role) {
+            $submittedPermissions[$role] = $submittedPermissions[$role] ?? [];
+        }
+
         $before = $this->rolePermissionSettings->all();
-        $after = $this->rolePermissionSettings->update($validated['permissions'], $user);
+        $after = $this->rolePermissionSettings->update($submittedPermissions, $user);
         $this->roleRegistry->recordVersionSnapshot(
             $this->customRolePermissionSnapshot($after),
             $user,

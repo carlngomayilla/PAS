@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Action;
 use App\Models\Direction;
+use App\Models\JournalAudit;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
+use App\Models\PlanningUnlockRequest;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\SousAction;
@@ -44,6 +46,37 @@ class PersonalTaskWorkflowTest extends TestCase
             ->get(route('workspace.tasks.index'))
             ->assertOk()
             ->assertDontSee('Validation chef');
+    }
+
+    public function test_inline_validation_from_personal_tasks_is_journalized(): void
+    {
+        $fixture = $this->planningFixture();
+
+        $action = $this->makeAction($fixture['pta'], $fixture['agent'], 'Action journalisee depuis taches');
+        $action->forceFill([
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'soumise_le' => now()->subHour(),
+            'progression_reelle' => 80,
+        ])->save();
+
+        $this->actingAs($fixture['chef'])
+            ->post(route('workspace.actions.review', $action), [
+                'source' => 'personal_tasks',
+                'decision' => 'valider',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $audit = JournalAudit::query()
+            ->where('module', 'action')
+            ->where('action', 'review_action_validate')
+            ->where('entite_id', $action->id)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame($fixture['chef']->id, $audit->user_id);
+        $this->assertSame('personal_tasks', $audit->nouvelle_valeur['audit_context']['source'] ?? null);
+        $this->assertTrue((bool) ($audit->nouvelle_valeur['audit_context']['intervention_processed'] ?? false));
     }
 
     public function test_chef_receives_sub_action_validation_task_with_48h_deadline(): void
@@ -204,6 +237,40 @@ class PersonalTaskWorkflowTest extends TestCase
             ->get(route('workspace.tasks.index'))
             ->assertOk()
             ->assertDontSee('Arbitrage DG financement');
+    }
+
+    public function test_planning_unlock_task_redirects_to_the_exact_request(): void
+    {
+        $fixture = $this->planningFixture();
+        $controller = User::factory()->create([
+            'role' => User::ROLE_PLANIFICATION,
+            'is_active' => true,
+            'password_changed_at' => now(),
+        ]);
+
+        $unlockRequest = PlanningUnlockRequest::query()->create([
+            'module' => 'action',
+            'target_type' => Action::class,
+            'target_id' => $fixture['pta']->id,
+            'target_label' => 'Action a deverrouiller',
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+            'requested_by' => $fixture['chef']->id,
+            'reason' => 'Correction necessaire',
+            'status' => PlanningUnlockRequest::STATUS_SOUMISE,
+        ]);
+
+        $tasks = app(PersonalTaskService::class)->forUser($controller, 10)['items'];
+        $task = collect($tasks)->firstWhere('key', 'planning-unlock:sciq_planif:'.$unlockRequest->id);
+
+        $this->assertNotNull($task);
+        $this->assertSame(route('workspace.planning-unlocks.index').'#unlock-request-'.$unlockRequest->id, $task['url']);
+
+        $this->actingAs($controller)
+            ->get($task['url'])
+            ->assertOk()
+            ->assertSee('unlock-request-'.$unlockRequest->id, false)
+            ->assertSee('Action a deverrouiller');
     }
 
     public function test_dashboard_no_longer_embeds_personal_tasks_widget_but_module_remains_accessible(): void

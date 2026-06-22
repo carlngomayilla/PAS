@@ -110,6 +110,7 @@
                                 <div class="flex w-full flex-col items-stretch gap-2 sm:w-56">
                                     <form method="POST" action="{{ route('workspace.actions.review', $task['action_id']) }}">
                                         @csrf
+                                        <input type="hidden" name="source" value="personal_tasks">
                                         <input type="hidden" name="decision" value="valider">
                                         @if (! empty($task['sous_action_id']))
                                             <input type="hidden" name="sous_action_id" value="{{ $task['sous_action_id'] }}">
@@ -121,6 +122,7 @@
                                         <summary class="cursor-pointer rounded-2xl px-4 py-2.5 text-center text-sm font-semibold text-[#B42318]">Renvoyer pour correction</summary>
                                         <form method="POST" action="{{ route('workspace.actions.review', $task['action_id']) }}" class="space-y-2 p-3">
                                             @csrf
+                                            <input type="hidden" name="source" value="personal_tasks">
                                             <input type="hidden" name="decision" value="rejeter">
                                             @if (! empty($task['sous_action_id']))
                                                 <input type="hidden" name="sous_action_id" value="{{ $task['sous_action_id'] }}">

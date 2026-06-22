@@ -11,6 +11,30 @@ use Illuminate\View\View;
 
 class AuditWebController extends Controller
 {
+    /**
+     * @var list<string>
+     */
+    private const INTERVENTION_MODULES = [
+        'planning_unlock',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const INTERVENTION_ACTIONS = [
+        'submit_validation_chef',
+        'submit_sub_action_validation_chef',
+        'review_action_validate',
+        'review_action_reject',
+        'review_sub_action_validate',
+        'review_sub_action_reject',
+        'review_financing_daf',
+        'review_financing_dg',
+        'update_financing_status_daf',
+        'deletion_request_create',
+        'deletion_request_decision',
+    ];
+
     public function __construct(
         private readonly PlatformDiagnosticService $platformDiagnosticService
     ) {
@@ -40,6 +64,7 @@ class AuditWebController extends Controller
                 'date_from' => (string) $request->string('date_from'),
                 'date_to' => (string) $request->string('date_to'),
                 'q' => (string) $request->string('q'),
+                'operation_scope' => (string) $request->string('operation_scope'),
             ]),
             'filters' => [
                 'module' => (string) $request->string('module'),
@@ -50,6 +75,7 @@ class AuditWebController extends Controller
                 'date_from' => (string) $request->string('date_from'),
                 'date_to' => (string) $request->string('date_to'),
                 'q' => (string) $request->string('q'),
+                'operation_scope' => (string) $request->string('operation_scope'),
             ],
         ]);
     }
@@ -101,6 +127,20 @@ class AuditWebController extends Controller
             });
         });
 
+        if ((string) $request->string('operation_scope') === 'interventions') {
+            $this->applyInterventionScope($query);
+        }
+
         return $query;
+    }
+
+    private function applyInterventionScope($query): void
+    {
+        $query->where(function ($interventionQuery): void {
+            $interventionQuery
+                ->whereIn('module', self::INTERVENTION_MODULES)
+                ->orWhereIn('action', self::INTERVENTION_ACTIONS)
+                ->orWhere('action', 'like', '%deletion_request%');
+        });
     }
 }

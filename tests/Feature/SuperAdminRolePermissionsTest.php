@@ -79,6 +79,22 @@ class SuperAdminRolePermissionsTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_super_admin_can_save_matrix_when_roles_have_no_checked_permissions(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+
+        $this->actingAs($superAdmin)
+            ->put(route('workspace.super-admin.roles.update'), [])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $settings = app(RolePermissionSettings::class);
+        $settings->flush();
+
+        $this->assertSame([], $settings->forRole(User::ROLE_ADMIN));
+        $this->assertNotEmpty($settings->forRole(User::ROLE_SUPER_ADMIN));
+    }
+
     public function test_direction_role_can_be_granted_scoped_user_management_access(): void
     {
         $superAdmin = $this->createSuperAdminUser();

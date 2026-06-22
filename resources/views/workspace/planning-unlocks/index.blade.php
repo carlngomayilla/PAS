@@ -40,7 +40,7 @@
                                 ];
                                 [$stLabel, $stClass] = $statusMeta[(string) $row->status] ?? [str_replace('_', ' ', (string) $row->status), 'anbg-badge-neutral'];
                             @endphp
-                            <tr>
+                            <tr id="unlock-request-{{ $row->id }}" class="scroll-mt-28 target:bg-yellow-50">
                                 <td>
                                     <div class="font-semibold text-slate-900">{{ strtoupper((string) $row->module) }} — {{ $row->target_label }}</div>
                                     <p class="mt-1 text-xs text-slate-500">Demande #{{ $row->id }}</p>

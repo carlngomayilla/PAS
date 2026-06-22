@@ -84,7 +84,7 @@ class NotificationWebController extends Controller
             $record->markAsRead();
         }
 
-        $targetUrl = (string) ($record->data['url'] ?? route('dashboard'));
+        $targetUrl = $this->safeTargetUrl($record->data['url'] ?? null, $request);
 
         return redirect()->to($targetUrl);
     }
@@ -110,6 +110,40 @@ class NotificationWebController extends Controller
         $data = is_array($notification->data ?? null) ? $notification->data : [];
 
         return strtolower((string) ($data['module'] ?? '')) === 'alertes';
+    }
+
+    private function safeTargetUrl(mixed $target, Request $request): string
+    {
+        $fallback = route('dashboard');
+        $url = trim((string) $target);
+
+        if ($url === '') {
+            return $fallback;
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false) {
+            return $fallback;
+        }
+
+        $host = $parts['host'] ?? null;
+        if ($host !== null && strcasecmp($host, $request->getHost()) !== 0) {
+            return $fallback;
+        }
+
+        if (isset($parts['scheme']) && ! in_array(strtolower((string) $parts['scheme']), ['http', 'https'], true)) {
+            return $fallback;
+        }
+
+        $path = (string) ($parts['path'] ?? '');
+        if ($path === '' || $path[0] !== '/' || str_starts_with($path, '//')) {
+            return $fallback;
+        }
+
+        $path .= isset($parts['query']) ? '?'.$parts['query'] : '';
+        $path .= isset($parts['fragment']) ? '#'.$parts['fragment'] : '';
+
+        return url($path);
     }
 
     /**

@@ -106,7 +106,7 @@ class ActionTrackingServiceTest extends TestCase
         $this->assertSame(ActionTrackingService::STATUS_NON_DEMARRE, $action->statut_dynamique);
     }
 
-    public function test_refresh_metrics_marks_action_completed_from_real_end_even_before_direction_validation(): void
+    public function test_refresh_metrics_keeps_submitted_real_end_pending_until_final_validation(): void
     {
         $action = $this->createQuantitativeAction([
             'date_fin' => '2026-01-10',
@@ -120,6 +120,16 @@ class ActionTrackingServiceTest extends TestCase
 
         app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-09'));
 
+        $action->refresh();
+
+        $this->assertNotContains($action->statut_dynamique, ActionTrackingService::completedActionStatuses());
+        $this->assertSame(ActionTrackingService::STATUS_A_RISQUE, $action->statut_dynamique);
+
+        $action->forceFill([
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ])->save();
+
+        app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-09'));
         $action->refresh();
 
         $this->assertSame(ActionTrackingService::STATUS_ACHEVE_DANS_DELAI, $action->statut_dynamique);

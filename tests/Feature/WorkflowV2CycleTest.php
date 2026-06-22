@@ -6,6 +6,7 @@ use App\Models\Action;
 use App\Models\Direction;
 use App\Models\Pao;
 use App\Models\Pas;
+use App\Models\PlatformSetting;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\SousAction;
@@ -59,6 +60,35 @@ class WorkflowV2CycleTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $workflow->submitAction($fixture['action'], ['has_new_proof' => true], $fixture['agent']);
+    }
+
+    public function test_full_progress_submission_is_not_auto_closed_before_chef_validation(): void
+    {
+        PlatformSetting::query()->updateOrCreate(
+            ['group' => 'action_management', 'key' => 'actions_auto_complete_when_target_reached'],
+            ['value' => '1']
+        );
+
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+        $tracking = app(ActionTrackingService::class);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 100], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $tracking->refreshActionMetrics($action->fresh());
+
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
+        $this->assertNotSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
+        $this->assertNull($action->date_fin_reelle);
+        $this->assertNull($action->cloture_le);
+
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut_dynamique);
+        $this->assertNotNull($action->date_fin_reelle);
+        $this->assertNotNull($action->cloture_le);
     }
 
     public function test_reject_returns_action_to_correction(): void
