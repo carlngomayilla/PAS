@@ -61,6 +61,8 @@
                 'active' => false,
             ]);
         }
+        $lockedPermissionsByRole = is_array($lockedPermissionsByRole ?? null) ? $lockedPermissionsByRole : [];
+        $forcedPermissionsByRole = is_array($forcedPermissionsByRole ?? null) ? $forcedPermissionsByRole : [];
     @endphp
 
     <section class="showcase-panel mb-4">
@@ -124,6 +126,7 @@
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <h2 class="form-section-title">Matrice de permissions</h2>
+                        <p class="mt-2 text-xs font-medium text-slate-500">Les cases grisees sont imposees ou bloquees par le perimetre du role.</p>
                         <p class="form-section-subtitle">Un rôle sans permission ne voit plus le module correspondant et perd l'accès direct à ses routes principales.</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
@@ -161,14 +164,21 @@
                                         </td>
                                         @foreach ($roles as $roleCode => $roleLabel)
                                             @php($checked = in_array($permission['code'], $matrix[$roleCode] ?? [], true))
+                                            @php($isBlocked = in_array($permission['code'], $lockedPermissionsByRole[$roleCode] ?? [], true))
+                                            @php($isForced = in_array($permission['code'], $forcedPermissionsByRole[$roleCode] ?? [], true))
+                                            @php($isReadonlyPermission = $roleCode === \App\Models\User::ROLE_SUPER_ADMIN || $isBlocked || $isForced)
                                             <td class="px-3 py-3 text-center align-top">
+                                                @if ($checked && ($roleCode === \App\Models\User::ROLE_SUPER_ADMIN || $isForced))
+                                                    <input type="hidden" name="permissions[{{ $roleCode }}][]" value="{{ $permission['code'] }}">
+                                                @endif
                                                 <input
-                                                    class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                    class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 @if ($isReadonlyPermission) cursor-not-allowed opacity-50 @endif"
                                                     type="checkbox"
                                                     name="permissions[{{ $roleCode }}][]"
                                                     value="{{ $permission['code'] }}"
                                                     @checked($checked)
-                                                    @disabled($roleCode === \App\Models\User::ROLE_SUPER_ADMIN)
+                                                    @disabled($isReadonlyPermission)
+                                                    title="@if ($isForced || $roleCode === \App\Models\User::ROLE_SUPER_ADMIN) Permission obligatoire pour ce role @elseif ($isBlocked) Permission incompatible avec le perimetre de ce role @else {{ $permission['label'] }} @endif"
                                                 >
                                             </td>
                                         @endforeach

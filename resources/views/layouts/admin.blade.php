@@ -496,6 +496,12 @@
                             <button type="button" class="flash-dismiss" aria-label="Fermer">x</button>
                         </div>
                     @endif
+                    @if (session('warning'))
+                        <div class="flash-warning">
+                            {{ session('warning') }}
+                            <button type="button" class="flash-dismiss" aria-label="Fermer">x</button>
+                        </div>
+                    @endif
                     @if ($errors->any())
                         <div class="flash-error">
                             {{ $errors->first() }}

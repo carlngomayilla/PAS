@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
-use App\Models\Direction;
 use App\Models\DeletionRequest;
+use App\Models\Direction;
 use App\Models\Exercice;
 use App\Models\ExportTemplate;
 use App\Models\ExportTemplateAssignment;
@@ -15,10 +15,10 @@ use App\Models\PlatformSetting;
 use App\Models\PlatformSettingSnapshot;
 use App\Models\Service;
 use App\Models\User;
-use App\Services\AppearanceSettings;
 use App\Services\ActionCalculationSettings;
-use App\Services\Actions\ActionTrackingService;
 use App\Services\ActionManagementSettings;
+use App\Services\Actions\ActionTrackingService;
+use App\Services\AppearanceSettings;
 use App\Services\DashboardProfileSettings;
 use App\Services\DeletionRequestService;
 use App\Services\DocumentPolicySettings;
@@ -27,30 +27,28 @@ use App\Services\Exports\ExportTemplatePublisher;
 use App\Services\ManagedKpiSettings;
 use App\Services\NotificationPolicySettings;
 use App\Services\OrganizationGovernanceService;
-use App\Services\PlatformDiagnosticService;
-use App\Services\PlatformSimulationService;
-use App\Services\PlatformSnapshotService;
-use App\Services\PlatformSettings;
-use App\Services\PlatformMaintenanceService;
-use App\Services\RoleRegistryService;
-use App\Services\RolePermissionSettings;
 use App\Services\PlanningArchiveSettings;
 use App\Services\PlanningAutoArchiveService;
+use App\Services\PlatformDiagnosticService;
+use App\Services\PlatformMaintenanceService;
+use App\Services\PlatformSettings;
+use App\Services\PlatformSimulationService;
+use App\Services\PlatformSnapshotService;
+use App\Services\RolePermissionSettings;
+use App\Services\RoleRegistryService;
 use App\Services\Security\PasswordPolicyService;
 use App\Services\UserLifecycleService;
 use App\Services\WorkflowSettings;
 use App\Services\WorkspaceModuleSettings;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -91,8 +89,7 @@ class SuperAdminWebController extends Controller
         private readonly WorkflowSettings $workflowSettings,
         private readonly WorkspaceModuleSettings $workspaceModuleSettings,
         private readonly \App\Services\ChefUniteSyncService $chefUniteSync
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -461,6 +458,8 @@ class SuperAdminWebController extends Controller
             'roleRegistryVersions' => $this->roleRegistry->versions(),
             'baseRoleOptions' => $this->roleRegistry->systemRoles(),
             'matrix' => $this->rolePermissionSettings->all(),
+            'lockedPermissionsByRole' => $this->lockedPermissionsByRole($roles),
+            'forcedPermissionsByRole' => $this->forcedPermissionsByRole($roles),
             'permissionGroups' => $this->rolePermissionSettings->groupedPermissions(),
             'selectedRole' => $selectedRole,
             'selectedRoleLabel' => $roles[$selectedRole] ?? $selectedRole,
@@ -623,6 +622,7 @@ class SuperAdminWebController extends Controller
 
         $before = $this->rolePermissionSettings->all();
         $after = $this->rolePermissionSettings->update($submittedPermissions, $user);
+        $ignoredPermissions = $this->ignoredSubmittedPermissions($submittedPermissions, $after, $roleCodes);
         $this->roleRegistry->recordVersionSnapshot(
             $this->customRolePermissionSnapshot($after),
             $user,
@@ -633,11 +633,17 @@ class SuperAdminWebController extends Controller
 
         $this->recordAudit($request, 'super_admin', 'role_permission_settings_update', $auditTarget, $before, $after);
 
-        return redirect()
+        $redirect = redirect()
             ->route('workspace.super-admin.roles.edit', [
                 'simulate_role' => (string) $request->string('simulate_role', User::ROLE_ADMIN_FONCTIONNEL),
             ])
             ->with('success', 'Rôles et permissions mis à jour.');
+
+        if ($ignoredPermissions !== []) {
+            $redirect->with('warning', $this->ignoredPermissionsMessage($ignoredPermissions));
+        }
+
+        return $redirect;
     }
 
     /**
@@ -1300,7 +1306,6 @@ class SuperAdminWebController extends Controller
             ->with('success', 'Sessions actives revoquees : '.$revoked.'.');
     }
 
-
     public function organizationUsersImport(Request $request): RedirectResponse
     {
         $user = $this->authUser($request);
@@ -1326,7 +1331,7 @@ class SuperAdminWebController extends Controller
         $updated = 0;
         $skipped = 0;
 
-        DB::transaction(function () use ($rows, $request, $user, &$created, &$updated, &$skipped): void {
+        DB::transaction(function () use ($rows, $request, &$created, &$updated, &$skipped): void {
             foreach ($rows as $row) {
                 $email = trim((string) ($row['email'] ?? ''));
                 $name = trim((string) ($row['name'] ?? ''));
@@ -1334,12 +1339,14 @@ class SuperAdminWebController extends Controller
 
                 if ($email === '' || $name === '' || ! in_array($selectedRole, $this->profileOptions(), true)) {
                     $skipped++;
+
                     continue;
                 }
 
                 $existing = User::query()->where('email', $email)->first();
                 if ($existing?->isSuperAdmin()) {
                     $skipped++;
+
                     continue;
                 }
 
@@ -1391,6 +1398,7 @@ class SuperAdminWebController extends Controller
 
                     $updated++;
                     $this->recordAudit($request, 'super_admin', 'organization_user_import_update', $existing, $before, Arr::except($existing->fresh()->toArray(), ['password']));
+
                     continue;
                 }
 
@@ -1448,11 +1456,13 @@ class SuperAdminWebController extends Controller
             foreach ($users as $managedUser) {
                 if ($managedUser->isSuperAdmin() && (string) $validated['bulk_action'] !== 'revoke_sessions') {
                     $skipped++;
+
                     continue;
                 }
 
                 if ((int) $managedUser->id === (int) $user->id && (string) $validated['bulk_action'] === 'deactivate') {
                     $skipped++;
+
                     continue;
                 }
 
@@ -1477,6 +1487,7 @@ class SuperAdminWebController extends Controller
                             );
                         } catch (ValidationException) {
                             $skipped++;
+
                             continue 2;
                         }
                         $this->revokeSessionsForUser($managedUser);
@@ -1508,6 +1519,7 @@ class SuperAdminWebController extends Controller
                     case 'assign_role':
                         if (! isset($validated['bulk_role'])) {
                             $skipped++;
+
                             continue 2;
                         }
                         $selectedRole = (string) $validated['bulk_role'];
@@ -1515,6 +1527,7 @@ class SuperAdminWebController extends Controller
                         $customRoleCode = $this->roleRegistry->isCustomRole($selectedRole) ? $selectedRole : null;
                         if ((int) $managedUser->id === (int) $user->id && $baseRole !== User::ROLE_SUPER_ADMIN) {
                             $skipped++;
+
                             continue 2;
                         }
                         $payload = [
@@ -1543,6 +1556,7 @@ class SuperAdminWebController extends Controller
                             : null;
                         if (! $service instanceof Service) {
                             $skipped++;
+
                             continue 2;
                         }
                         $managedUser->forceFill([
@@ -2524,7 +2538,7 @@ class SuperAdminWebController extends Controller
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
 
-        return view('workspace.super_admin.templates.form', $this->formPayload(new ExportTemplate(), 'create'));
+        return view('workspace.super_admin.templates.form', $this->formPayload(new ExportTemplate, 'create'));
     }
 
     public function templatesStore(Request $request): RedirectResponse
@@ -3612,6 +3626,71 @@ class SuperAdminWebController extends Controller
     }
 
     /**
+     * @param  array<string, string>  $roles
+     * @return array<string, array<int, string>>
+     */
+    private function lockedPermissionsByRole(array $roles): array
+    {
+        return collect(array_keys($roles))
+            ->mapWithKeys(fn (string $role): array => [
+                $role => $this->rolePermissionSettings->lockedPermissionsForRole($role),
+            ])
+            ->all();
+    }
+
+    /**
+     * @param  array<string, string>  $roles
+     * @return array<string, array<int, string>>
+     */
+    private function forcedPermissionsByRole(array $roles): array
+    {
+        return collect(array_keys($roles))
+            ->mapWithKeys(fn (string $role): array => [
+                $role => $this->rolePermissionSettings->forcedPermissionsForRole($role),
+            ])
+            ->all();
+    }
+
+    /**
+     * @param  array<string, array<int, string>|mixed>  $submittedPermissions
+     * @param  array<string, array<int, string>>  $appliedPermissions
+     * @param  array<int, string>  $roleCodes
+     * @return array<string, array<int, string>>
+     */
+    private function ignoredSubmittedPermissions(array $submittedPermissions, array $appliedPermissions, array $roleCodes): array
+    {
+        return collect($roleCodes)
+            ->mapWithKeys(function (string $role) use ($submittedPermissions, $appliedPermissions): array {
+                $submitted = collect(is_array($submittedPermissions[$role] ?? null) ? $submittedPermissions[$role] : [])
+                    ->map(fn ($permission): string => trim((string) $permission))
+                    ->filter(fn (string $permission): bool => $permission !== '')
+                    ->unique()
+                    ->values();
+                $applied = collect($appliedPermissions[$role] ?? [])->values();
+                $ignored = $submitted->diff($applied)->values()->all();
+
+                return $ignored === [] ? [] : [$role => $ignored];
+            })
+            ->all();
+    }
+
+    /**
+     * @param  array<string, array<int, string>>  $ignoredPermissions
+     */
+    private function ignoredPermissionsMessage(array $ignoredPermissions): string
+    {
+        $roleLabels = $this->rolePermissionSettings->roles();
+        $chunks = collect($ignoredPermissions)
+            ->map(function (array $permissions, string $role) use ($roleLabels): string {
+                return ($roleLabels[$role] ?? $role).': '.implode(', ', $permissions);
+            })
+            ->values()
+            ->all();
+
+        return 'Certaines permissions ne peuvent pas être appliquées à ces rôles et ont été ignorées : '.Str::limit(implode(' | ', $chunks), 600);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function compareRolePermissions(string $leftRole, string $rightRole): array
@@ -3734,10 +3813,10 @@ class SuperAdminWebController extends Controller
      */
     private function generateSecureTemporaryPassword(): string
     {
-        $upper   = substr(str_shuffle('ABCDEFGHJKLMNPQRSTUVWXYZ'), 0, 4);
-        $digits  = substr(str_shuffle('23456789'), 0, 4);
+        $upper = substr(str_shuffle('ABCDEFGHJKLMNPQRSTUVWXYZ'), 0, 4);
+        $digits = substr(str_shuffle('23456789'), 0, 4);
         $symbols = substr(str_shuffle('@#$!%&'), 0, 2);
-        $lower   = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz'), 0, 2);
+        $lower = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz'), 0, 2);
 
         return str_shuffle($upper.$digits.$symbols.$lower);
     }
@@ -3784,7 +3863,7 @@ class SuperAdminWebController extends Controller
             return [];
         }
 
-        $lines = preg_split("/\\r\\n|\\n|\\r/", $contents) ?: [];
+        $lines = preg_split('/\\r\\n|\\n|\\r/', $contents) ?: [];
         if ($lines === []) {
             return [];
         }

@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
 use App\Models\Action;
-use App\Models\ActionLog;
 use App\Models\Justificatif;
 use App\Models\SousAction;
 use App\Models\User;
@@ -760,15 +759,11 @@ class ActionTrackingWebController extends Controller
             return true;
         }
 
-        if (! $this->canReadDirection($user, (int) $action->pta?->direction_id)) {
-            return false;
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && (int) $user->service_id !== (int) $action->pta?->service_id) {
-            return false;
-        }
-
-        return true;
+        return $this->canReadService(
+            $user,
+            (int) $action->pta?->direction_id,
+            (int) $action->pta?->service_id
+        );
     }
 
     private function canManageAction(User $user, Action $action): bool
@@ -830,7 +825,7 @@ class ActionTrackingWebController extends Controller
             return false;
         }
 
-        return ($user->hasRole(User::ROLE_SERVICE) && $this->canManageAction($user, $action))
+        return ($user->isServiceOrUnitChief() && $this->canManageAction($user, $action))
             || app(DelegationService::class)->canReviewServiceAction(
                 $user,
                 (int) $action->pta?->direction_id,

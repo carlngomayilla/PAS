@@ -5,14 +5,12 @@ namespace App\Services;
 use App\Models\PlatformSetting;
 use App\Models\User;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 
 class RolePermissionSettings
 {
     public function __construct(
         private readonly RoleRegistryService $roleRegistry
-    ) {
-    }
+    ) {}
 
     /**
      * @var array<string, array<int, string>>|null
@@ -76,6 +74,7 @@ class RolePermissionSettings
             foreach ($this->knownRoleCodes() as $role) {
                 if ($role === User::ROLE_SUPER_ADMIN) {
                     $settings[$role] = array_keys($this->permissions());
+
                     continue;
                 }
 
@@ -475,6 +474,66 @@ class RolePermissionSettings
             ->all();
     }
 
+    /**
+     * @return array<int, string>
+     */
+    public function lockedPermissionsForRole(string $role): array
+    {
+        $baseRole = $this->roleRegistry->baseRole($role);
+        $isServiceOrUnitChief = in_array($role, User::serviceOrUnitChiefRoles(), true)
+            || in_array($baseRole, User::serviceOrUnitChiefRoles(), true);
+
+        if (! $isServiceOrUnitChief) {
+            return [];
+        }
+
+        $blocked = User::serviceOrUnitChiefBlockedPermissions();
+
+        if (
+            in_array($role, User::planningControlChiefRoles(), true)
+            || in_array($baseRole, User::planningControlChiefRoles(), true)
+        ) {
+            $blocked = array_diff($blocked, [
+                'scope.global.read',
+                'planning.write.global',
+                'planning.strategic.manage',
+            ]);
+        }
+
+        return array_values($blocked);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function forcedPermissionsForRole(string $role): array
+    {
+        if ($role === User::ROLE_SUPER_ADMIN) {
+            return array_keys($this->permissions());
+        }
+
+        $baseRole = $this->roleRegistry->baseRole($role);
+        if (
+            ! in_array($role, User::planningControlChiefRoles(), true)
+            && ! in_array($baseRole, User::planningControlChiefRoles(), true)
+        ) {
+            return [];
+        }
+
+        return [
+            'scope.global.read',
+            'planning.read',
+            'planning.write.global',
+            'planning.write.service',
+            'planning.strategic.manage',
+            'reporting.read',
+            'alerts.read',
+            'referentiel.read',
+            'users.manage',
+            'users.manage_roles',
+        ];
+    }
+
     public function flush(): void
     {
         $this->resolved = null;
@@ -498,45 +557,23 @@ class RolePermissionSettings
     }
 
     /**
-     * @param array<int, string> $permissions
+     * @param  array<int, string>  $permissions
      * @return array<int, string>
      */
     private function enforceServiceOrUnitChiefBoundary(string $role, array $permissions): array
     {
-        $baseRole = $this->roleRegistry->baseRole($role);
-        $isServiceOrUnitChief = in_array($role, User::serviceOrUnitChiefRoles(), true)
-            || in_array($baseRole, User::serviceOrUnitChiefRoles(), true);
+        $blocked = $this->lockedPermissionsForRole($role);
 
-        if (! $isServiceOrUnitChief) {
+        if ($blocked === []) {
             return $permissions;
         }
 
-        $blocked = User::serviceOrUnitChiefBlockedPermissions();
-
-        if (
-            in_array($role, User::planningControlChiefRoles(), true)
-            || in_array($baseRole, User::planningControlChiefRoles(), true)
+        if (in_array($role, User::planningControlChiefRoles(), true)
+            || in_array($this->roleRegistry->baseRole($role), User::planningControlChiefRoles(), true)
         ) {
-            $blocked = array_diff($blocked, [
-                'scope.global.read',
-                'planning.write.global',
-                'planning.strategic.manage',
-            ]);
-
             return array_values(array_unique(array_merge(
                 array_diff($permissions, $blocked),
-                [
-                    'scope.global.read',
-                    'planning.read',
-                    'planning.write.global',
-                    'planning.write.service',
-                    'planning.strategic.manage',
-                    'reporting.read',
-                    'alerts.read',
-                    'referentiel.read',
-                    'users.manage',
-                    'users.manage_roles',
-                ]
+                $this->forcedPermissionsForRole($role)
             )));
         }
 

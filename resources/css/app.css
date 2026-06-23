@@ -3712,6 +3712,7 @@
 
     .app-alert,
     .flash-success,
+    .flash-warning,
     .flash-error,
     .alert {
         display: flex;
@@ -3730,6 +3731,11 @@
     .flash-success {
         border-color: rgba(23, 143, 95, 0.22) !important;
         color: var(--app-success) !important;
+    }
+
+    .flash-warning {
+        border-color: rgba(249, 177, 60, 0.35) !important;
+        color: #a15c07 !important;
     }
 
     .flash-error {
@@ -5195,6 +5201,12 @@
         background: #0f2d1f !important;
         color: #6ee7b7 !important;
         border-color: rgba(110, 231, 183, 0.2) !important;
+    }
+
+    html.dark body.admin-theme-scope .flash-warning {
+        background: #2f2208 !important;
+        color: #fbbf24 !important;
+        border-color: rgba(251, 191, 36, 0.24) !important;
     }
 
     html.dark body.admin-theme-scope .flash-error {

@@ -15,16 +15,15 @@ use App\Models\Pao;
 use App\Models\Pta;
 use App\Models\SousAction;
 use App\Models\User;
-use App\Support\UiLabel;
-use App\Services\ExerciceContext;
 use App\Services\ActionCalculationSettings;
-use App\Services\ActionManagementSettings;
 use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\DynamicReferentialSettings;
+use App\Services\ExerciceContext;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\PlanningModificationLockService;
 use App\Services\Security\SecureJustificatifStorage;
+use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -207,7 +206,7 @@ class ActionWebController extends Controller
             ActionTrackingService::STATUS_CLOTUREE,
         ];
         if (in_array($currentStatut, $terminalStates, true)) {
-            return response()->json(['error' => "Action terminée ou clôturée : statut non modifiable."], 422);
+            return response()->json(['error' => 'Action terminée ou clôturée : statut non modifiable.'], 422);
         }
         if ($currentStatut === $statut) {
             return response()->json(['error' => "L'action est déjà dans ce statut."], 422);
@@ -350,8 +349,7 @@ class ActionWebController extends Controller
         ActionTrackingService $trackingService,
         WorkspaceNotificationService $notificationService,
         SecureJustificatifStorage $secureStorage
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
@@ -653,8 +651,7 @@ class ActionWebController extends Controller
         Request $request,
         Action $action,
         SecureJustificatifStorage $secureStorage
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
@@ -722,11 +719,11 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     /**
-     * @param array<string, mixed> $before
+     * @param  array<string, mixed>  $before
      */
     private function shouldResubmitFinancingRequest(array $before, Action $action): bool
     {
@@ -773,6 +770,7 @@ class ActionWebController extends Controller
             'financement_dg_commentaire' => null,
         ])->save();
     }
+
     private function normalizeActionPayload(array $validated): array
     {
         $validated['seuil_alerte_progression'] = $validated['seuil_alerte_progression'] ?? 10;
@@ -869,7 +867,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return list<int>
      */
     private function extractRmoIds(array $validated): array
@@ -890,7 +888,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return list<array<string, mixed>>
      */
     private function extractSubActionsPayload(array $validated): array
@@ -913,8 +911,8 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @param list<array<string, mixed>> $subActionsPayload
-     * @param list<int> $rmoIds
+     * @param  list<array<string, mixed>>  $subActionsPayload
+     * @param  list<int>  $rmoIds
      */
     private function syncPlannedSubActions(Action $action, array $subActionsPayload, array $rmoIds): void
     {
@@ -957,6 +955,7 @@ class ActionWebController extends Controller
 
             if ($subAction instanceof SousAction) {
                 $subAction->fill($payload)->save();
+
                 continue;
             }
 
@@ -979,8 +978,8 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $subActionPayload
-     * @param list<int> $rmoIds
+     * @param  array<string, mixed>  $subActionPayload
+     * @param  list<int>  $rmoIds
      */
     private function resolveSubActionAgentId(array $subActionPayload, ?SousAction $subAction, array $rmoIds, int $defaultAgentId, int $subActionIndex = 0): int
     {
@@ -1008,7 +1007,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @param list<int> $rmoIds
+     * @param  list<int>  $rmoIds
      */
     private function primaryRmoUniteId(array $rmoIds): ?int
     {
@@ -1022,7 +1021,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @param list<int> $rmoIds
+     * @param  list<int>  $rmoIds
      */
     private function syncActionRmos(Action $action, array $rmoIds): void
     {
@@ -1145,14 +1144,7 @@ class ActionWebController extends Controller
             $query->where('contexte_action', Action::CONTEXT_PILOTAGE);
 
             if (! $user->isAgent()) {
-                $query->where(function (Builder $q) use ($user): void {
-                    $q->whereNull('responsable_id')
-                        ->orWhere('responsable_id', '!=', (int) $user->id);
-
-                    if (Schema::hasTable('action_responsables')) {
-                        $q->whereDoesntHave('responsables', fn (Builder $r) => $r->whereKey((int) $user->id));
-                    }
-                });
+                $this->whereUserIsNotResponsible($query, $user);
             }
         }
 
@@ -1168,6 +1160,7 @@ class ActionWebController extends Controller
 
         if ($viewMode === 'validations') {
             $this->wherePendingChefValidation($query);
+            $this->whereUserIsNotResponsible($query, $user);
         }
 
         $contextFilter = trim((string) $request->string('contexte_action'));
@@ -1531,6 +1524,7 @@ class ActionWebController extends Controller
                     $agentQuery->orWhereHas('responsables', fn (Builder $responsableQuery) => $responsableQuery->whereKey((int) $user->id));
                 }
             });
+
             return;
         }
 
@@ -1592,6 +1586,18 @@ class ActionWebController extends Controller
             $pendingQuery->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)
                 ->orWhereHas('sousActions', fn (Builder $subActionQuery) => $subActionQuery
                     ->where('validation_status', SousAction::VALIDATION_SOUMISE));
+        });
+    }
+
+    private function whereUserIsNotResponsible(Builder $query, User $user): Builder
+    {
+        return $query->where(function (Builder $responsibilityQuery) use ($user): void {
+            $responsibilityQuery->whereNull('responsable_id')
+                ->orWhere('responsable_id', '!=', (int) $user->id);
+
+            if (Schema::hasTable('action_responsables')) {
+                $responsibilityQuery->whereDoesntHave('responsables', fn (Builder $responsableQuery) => $responsableQuery->whereKey((int) $user->id));
+            }
         });
     }
 

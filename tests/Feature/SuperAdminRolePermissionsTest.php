@@ -10,8 +10,8 @@ use Tests\TestCase;
 
 class SuperAdminRolePermissionsTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -77,6 +77,67 @@ class SuperAdminRolePermissionsTest extends TestCase
         $this->actingAs($serviceUser)
             ->get(route('workspace.reporting'))
             ->assertForbidden();
+    }
+
+    public function test_saved_permission_matrix_is_reloaded_in_edit_form(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $settings = app(RolePermissionSettings::class);
+        $payload = $settings->all();
+        $payload[User::ROLE_CABINET] = array_values(array_diff($payload[User::ROLE_CABINET], ['audit.read']));
+
+        $this->actingAs($superAdmin)
+            ->put(route('workspace.super-admin.roles.update', ['simulate_role' => User::ROLE_CABINET]), [
+                'permissions' => $payload,
+            ])
+            ->assertRedirect(route('workspace.super-admin.roles.edit', ['simulate_role' => User::ROLE_CABINET]));
+
+        $settings->flush();
+        $this->assertNotContains('audit.read', $settings->forRole(User::ROLE_CABINET));
+
+        $html = $this->actingAs($superAdmin)
+            ->get(route('workspace.super-admin.roles.edit', ['simulate_role' => User::ROLE_CABINET]))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/<input[^>]*name="permissions\[cabinet\]\[\]"[^>]*value="audit\.read"(?![^>]*checked)[^>]*>/s',
+            $html
+        );
+    }
+
+    public function test_incompatible_chief_permissions_are_locked_and_reported(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $settings = app(RolePermissionSettings::class);
+        $payload = $settings->all();
+        $payload[User::ROLE_SERVICE] = array_values(array_unique(array_merge(
+            $payload[User::ROLE_SERVICE],
+            ['scope.global.read']
+        )));
+
+        $this->actingAs($superAdmin)
+            ->put(route('workspace.super-admin.roles.update', ['simulate_role' => User::ROLE_SERVICE]), [
+                'permissions' => $payload,
+            ])
+            ->assertRedirect(route('workspace.super-admin.roles.edit', ['simulate_role' => User::ROLE_SERVICE]))
+            ->assertSessionHas('warning');
+
+        $warning = (string) session('warning');
+        $this->assertStringContainsString('scope.global.read', $warning);
+
+        $settings->flush();
+        $this->assertNotContains('scope.global.read', $settings->forRole(User::ROLE_SERVICE));
+
+        $html = $this->actingAs($superAdmin)
+            ->get(route('workspace.super-admin.roles.edit', ['simulate_role' => User::ROLE_SERVICE]))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/<input[^>]*name="permissions\[service\]\[\]"[^>]*value="scope\.global\.read"[^>]*disabled[^>]*>/s',
+            $html
+        );
     }
 
     public function test_super_admin_can_save_matrix_when_roles_have_no_checked_permissions(): void

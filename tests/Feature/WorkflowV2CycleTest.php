@@ -219,6 +219,48 @@ class WorkflowV2CycleTest extends TestCase
             ->assertSee('Décision du chef de service', false);
     }
 
+    public function test_unit_chief_can_review_service_action_when_in_scope(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 100], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $pta = $action->pta()->firstOrFail();
+        $unitChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_UNITE_UCAS,
+            'direction_id' => $pta->direction_id,
+            'service_id' => $pta->service_id,
+        ]);
+
+        $this->actingAs($unitChief)
+            ->post(route('workspace.actions.review', $action), [
+                'decision' => 'valider',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->fresh()->statut_validation);
+    }
+
+    public function test_unit_chief_cannot_open_action_from_another_service(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $pta = $fixture['action']->pta()->firstOrFail();
+        $otherService = Service::query()->create([
+            'direction_id' => $pta->direction_id,
+            'code' => 'SWF2',
+            'libelle' => 'Service WF 2',
+        ]);
+        $otherUnitChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_UNITE_UCAS,
+            'direction_id' => $pta->direction_id,
+            'service_id' => $otherService->id,
+        ]);
+
+        $this->actingAs($otherUnitChief)
+            ->get(route('workspace.actions.suivi', $fixture['action']))
+            ->assertForbidden();
+    }
+
     public function test_chef_sees_parent_validation_when_composite_action_is_submitted(): void
     {
         $fixture = $this->createFixture(Action::TYPE_COMPOSEE);
@@ -275,6 +317,17 @@ class WorkflowV2CycleTest extends TestCase
             'quantite_cible' => 100,
             'justificatif_obligatoire' => false,
         ]);
+        Action::query()->create([
+            'pta_id' => $fixture['action']->pta_id,
+            'responsable_id' => $fixture['chef']->id,
+            'libelle' => 'Action personnelle du chef',
+            'type_action' => Action::TYPE_QUANTITATIVE,
+            'statut_parametrage' => 'parametre',
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'contexte_action' => Action::CONTEXT_PILOTAGE,
+            'quantite_cible' => 100,
+            'justificatif_obligatoire' => false,
+        ]);
 
         $this->actingAs($fixture['chef'])
             ->get(route('workspace.actions.index', [
@@ -283,7 +336,8 @@ class WorkflowV2CycleTest extends TestCase
             ->assertOk()
             ->assertSee('Validations', false)
             ->assertSee('Action WF '.Action::TYPE_COMPOSEE)
-            ->assertDontSee('Action hors validation');
+            ->assertDontSee('Action hors validation')
+            ->assertDontSee('Action personnelle du chef');
     }
 
     /**
