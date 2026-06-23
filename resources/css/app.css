@@ -9115,4 +9115,300 @@ body.admin-theme-scope .dealdeck-dashboard :is(
         color: #e2e8f0 !important;
         border-color: rgba(148, 163, 184, 0.28) !important;
     }
+
+    .charts-agent-performance-section {
+        display: grid;
+        gap: 1rem;
+        min-width: 0;
+    }
+
+    .charts-agent-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 1rem;
+        min-width: 0;
+    }
+
+    .dashboard-agent-card {
+        min-width: 0;
+    }
+
+    .dashboard-agent-card-gauge {
+        grid-column: span 4;
+    }
+
+    .dashboard-agent-card-top {
+        grid-column: span 8;
+    }
+
+    .dashboard-agent-card-3d,
+    .dashboard-agent-card-heatmap {
+        grid-column: span 6;
+    }
+
+    .dashboard-agent-gauge-canvas {
+        height: 18rem;
+    }
+
+    .dashboard-agent-plotly-lg {
+        height: 26rem;
+    }
+
+    .dashboard-plotly-host.is-plotly-rendered .dashboard-chart-fallback,
+    .dashboard-plotly-host.is-plotly-rendered .dashboard-gauge-fallback {
+        display: none;
+    }
+
+    .dashboard-agent-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.55rem;
+        margin-top: 0.75rem;
+    }
+
+    .dashboard-agent-summary-grid span {
+        min-width: 0;
+        border: 1px solid rgba(57, 150, 211, 0.18);
+        border-radius: 0.65rem;
+        background: rgba(238, 246, 252, 0.74);
+        padding: 0.55rem;
+        color: var(--app-muted);
+        font-size: 0.72rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    .dashboard-agent-summary-grid strong {
+        display: block;
+        color: var(--app-text);
+        font-size: 0.95rem;
+        line-height: 1.1;
+    }
+
+    .dashboard-agent-bars {
+        align-items: stretch;
+        justify-content: flex-start;
+        overflow: auto;
+    }
+
+    .dashboard-agent-bar-row {
+        display: grid;
+        grid-template-columns: 2rem minmax(6rem, 1.1fr) minmax(7rem, 2fr) 3.6rem;
+        align-items: center;
+        gap: 0.65rem;
+        width: 100%;
+        min-height: 2.35rem;
+        border-radius: 0.65rem;
+        color: var(--app-text);
+        text-decoration: none;
+    }
+
+    .dashboard-agent-rank {
+        display: grid;
+        width: 1.65rem;
+        height: 1.65rem;
+        place-items: center;
+        border-radius: 999px;
+        background: rgba(15, 91, 102, 0.10);
+        color: #0F5B66;
+        font-size: 0.72rem;
+        font-weight: 900;
+    }
+
+    .dashboard-agent-bar-label {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--app-text);
+        font-size: 0.78rem;
+        font-weight: 850;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dashboard-agent-bar-track {
+        height: 0.74rem;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(216, 236, 248, 0.98);
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .dashboard-agent-bar-fill {
+        display: block;
+        height: 100%;
+        min-width: 0.2rem;
+        border-radius: inherit;
+    }
+
+    .dashboard-agent-bar-value {
+        font-size: 0.78rem;
+        font-weight: 900;
+        text-align: right;
+    }
+
+    .dashboard-agent-scatter-fallback {
+        position: relative;
+        overflow: hidden;
+        background:
+            linear-gradient(90deg, rgba(15, 91, 102, 0.08) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(15, 91, 102, 0.08) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(255,255,255,0.94), rgba(238,246,252,0.88));
+        background-size: 2.5rem 2.5rem, 2.5rem 2.5rem, auto;
+    }
+
+    .dashboard-agent-bubble {
+        position: absolute;
+        z-index: 1;
+        border: 2px solid rgba(255,255,255,0.92);
+        border-radius: 999px;
+        box-shadow: 0 14px 26px rgba(15, 23, 42, 0.18);
+        transform: translate(-50%, -50%);
+    }
+
+    .dashboard-agent-heatmap-fallback {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+        align-content: start;
+        gap: 0.65rem;
+        overflow: auto;
+    }
+
+    .dashboard-agent-heat-cell {
+        display: flex;
+        min-height: 4.4rem;
+        flex-direction: column;
+        justify-content: space-between;
+        border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+        border-radius: 0.7rem;
+        background:
+            linear-gradient(180deg, color-mix(in srgb, var(--tone) var(--heat), white), rgba(255,255,255,0.90));
+        padding: 0.7rem;
+        color: #17324a;
+        font-weight: 850;
+    }
+
+    .dashboard-agent-heat-cell span {
+        overflow: hidden;
+        font-size: 0.72rem;
+        line-height: 1.15;
+        text-overflow: ellipsis;
+    }
+
+    .dashboard-agent-heat-cell strong {
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .dashboard-agent-alert-panel {
+        min-width: 0;
+    }
+
+    .dashboard-agent-alert-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+        gap: 0.7rem;
+    }
+
+    .dashboard-agent-alert {
+        display: flex;
+        min-width: 0;
+        align-items: flex-start;
+        gap: 0.7rem;
+        border: 1px solid color-mix(in srgb, var(--tone) 28%, transparent);
+        border-radius: 0.75rem;
+        background: color-mix(in srgb, var(--tone) 10%, white);
+        padding: 0.75rem;
+        color: var(--app-text);
+        text-decoration: none;
+    }
+
+    .dashboard-agent-alert-dot {
+        flex: 0 0 auto;
+        width: 0.72rem;
+        height: 0.72rem;
+        margin-top: 0.2rem;
+        border-radius: 999px;
+        background: var(--tone);
+        box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--tone) 14%, transparent);
+    }
+
+    .dashboard-agent-alert-body {
+        display: grid;
+        gap: 0.2rem;
+        min-width: 0;
+    }
+
+    .dashboard-agent-alert-body strong,
+    .dashboard-agent-alert-body span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .dashboard-agent-alert-body strong {
+        font-size: 0.82rem;
+        font-weight: 900;
+        line-height: 1.2;
+    }
+
+    .dashboard-agent-alert-body span {
+        color: var(--app-muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+        line-height: 1.25;
+    }
+
+    body.admin-theme-scope .dealdeck-dashboard .charts-agent-performance-section {
+        order: 85;
+        grid-column: 1 / -1;
+        margin: 0 !important;
+    }
+
+    html.dark body.admin-theme-scope .dashboard-agent-summary-grid span,
+    html.dark body.admin-theme-scope .dashboard-agent-rank,
+    html.dark body.admin-theme-scope .dashboard-agent-bar-track {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.10);
+    }
+
+    html.dark body.admin-theme-scope .dashboard-agent-scatter-fallback {
+        background:
+            linear-gradient(90deg, rgba(148, 163, 184, 0.16) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(148, 163, 184, 0.14) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(17, 28, 47, 0.88));
+        background-size: 2.5rem 2.5rem, 2.5rem 2.5rem, auto;
+    }
+
+    html.dark body.admin-theme-scope .dashboard-agent-heat-cell {
+        background:
+            linear-gradient(180deg, color-mix(in srgb, var(--tone) 24%, #111c2f), rgba(17,28,47,0.92));
+        color: #f8fafc;
+    }
+
+    html.dark body.admin-theme-scope .dashboard-agent-alert {
+        background: color-mix(in srgb, var(--tone) 12%, #111c2f);
+    }
+
+    @media (max-width: 1120px) {
+        .dashboard-agent-card-gauge,
+        .dashboard-agent-card-top,
+        .dashboard-agent-card-3d,
+        .dashboard-agent-card-heatmap {
+            grid-column: 1 / -1;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .dashboard-agent-summary-grid,
+        .dashboard-agent-alert-list {
+            grid-template-columns: 1fr;
+        }
+
+        .dashboard-agent-bar-row {
+            grid-template-columns: 1.8rem minmax(0, 1fr) 3.2rem;
+        }
+
+        .dashboard-agent-bar-track {
+            grid-column: 2 / -1;
+        }
+    }
 }

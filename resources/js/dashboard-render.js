@@ -35,6 +35,8 @@ function bootDashboardRender(force = false) {
   const scatterPoints = payload.scatter_points || [];
   const radarDatasets = payload.radar_datasets || [];
   const actionRows = payload.action_rows || [];
+  const agentPerformance = payload.agent_performance || {};
+  const plotlyFigures = payload.plotly_figures || agentPerformance.plotly_figures || {};
   const reportingCharts = reporting.charts || {};
   const panelKeys = ['overview', 'charts', 'tables'];
   const panelAliases = {
@@ -69,6 +71,7 @@ function bootDashboardRender(force = false) {
   };
   let assetBootstrapPromise = null;
   let optionalChartPluginsPromise = null;
+  let plotlyBootstrapPromise = null;
   let renderInFlight = false;
   let renderQueued = false;
   let chartsMasonryTimer = null;
@@ -831,6 +834,132 @@ function bootDashboardRender(force = false) {
         headerRow.appendChild(exportBtn);
       }
     }
+  }
+
+  function plotlyFigureHasData(figure) {
+    return Boolean(figure && Array.isArray(figure.data) && figure.data.length > 0);
+  }
+
+  async function ensurePlotly() {
+    const hasPlotlyHosts = Boolean(document.querySelector('[data-plotly-chart]'));
+
+    if (!hasPlotlyHosts || Object.keys(plotlyFigures || {}).length === 0) {
+      return false;
+    }
+
+    if (typeof window.Plotly !== 'undefined') {
+      return true;
+    }
+
+    if (!plotlyBootstrapPromise) {
+      plotlyBootstrapPromise = import('plotly.js-dist-min')
+        .then((module) => {
+          window.Plotly = module.default || module;
+          return true;
+        })
+        .catch((error) => {
+          console.error('Impossible de charger Plotly.', error);
+          return false;
+        })
+        .finally(() => {
+          plotlyBootstrapPromise = null;
+        });
+    }
+
+    return plotlyBootstrapPromise;
+  }
+
+  function plotlyThemeLayout() {
+    const isDark = document.documentElement.classList.contains('dark')
+      || document.documentElement.dataset.theme === 'dark';
+    const fontColor = isDark ? '#E2E8F0' : ANBG.dark;
+    const gridColor = isDark ? 'rgba(148,163,184,0.22)' : 'rgba(15,91,102,0.14)';
+    const zeroLineColor = isDark ? 'rgba(226,232,240,0.34)' : 'rgba(15,91,102,0.20)';
+
+    return {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      font: {
+        color: fontColor,
+        family: 'Public Sans, Manrope, system-ui, sans-serif',
+      },
+      xaxis: { gridcolor: gridColor, zerolinecolor: zeroLineColor },
+      yaxis: { gridcolor: gridColor, zerolinecolor: zeroLineColor },
+      scene: {
+        bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: gridColor, zerolinecolor: zeroLineColor },
+        yaxis: { gridcolor: gridColor, zerolinecolor: zeroLineColor },
+        zaxis: { gridcolor: gridColor, zerolinecolor: zeroLineColor },
+      },
+    };
+  }
+
+  function mergePlotlyLayout(layout) {
+    const theme = plotlyThemeLayout();
+
+    return {
+      ...theme,
+      ...(layout || {}),
+      autosize: true,
+      margin: {
+        ...(layout?.margin || {}),
+      },
+      font: {
+        ...theme.font,
+        ...(layout?.font || {}),
+      },
+      xaxis: {
+        ...theme.xaxis,
+        ...(layout?.xaxis || {}),
+      },
+      yaxis: {
+        ...theme.yaxis,
+        ...(layout?.yaxis || {}),
+      },
+      scene: {
+        ...theme.scene,
+        ...(layout?.scene || {}),
+      },
+    };
+  }
+
+  function mountPlotlyFigure(id, figure) {
+    const host = document.getElementById(id);
+
+    if (!host || typeof window.Plotly === 'undefined') {
+      return;
+    }
+
+    rememberHostFallback(host);
+
+    if (!plotlyFigureHasData(figure)) {
+      restoreHostFallback(host);
+      return;
+    }
+
+    const config = {
+      responsive: true,
+      displaylogo: false,
+      modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+    };
+
+    window.Plotly.react(host, figure.data, mergePlotlyLayout(figure.layout || {}), config)
+      .then(() => {
+        host.dataset.chartState = 'ready';
+        host.classList.add('is-plotly-rendered');
+      })
+      .catch((error) => {
+        console.error(`Impossible d'afficher le graphique Plotly ${id}.`, error);
+        host.classList.remove('is-plotly-rendered');
+        restoreHostFallback(host, "Impossible d'afficher ce graphique.");
+      });
+  }
+
+  function mountAgentPerformanceCharts() {
+    mountPlotlyFigure('dashboard-agent-gauge', plotlyFigures.agent_gauge);
+    mountPlotlyFigure('dashboard-agent-top', plotlyFigures.agent_top);
+    mountPlotlyFigure('dashboard-agent-3d', plotlyFigures.agent_3d);
+    mountPlotlyFigure('dashboard-agent-heatmap', plotlyFigures.agent_heatmap);
   }
 
   async function ensureChartRegisterables() {
@@ -2205,6 +2334,12 @@ function bootDashboardRender(force = false) {
       }
     });
 
+    if (typeof window.Plotly !== 'undefined') {
+      document.querySelectorAll('.dashboard-plotly-host.is-plotly-rendered').forEach((host) => {
+        window.Plotly.Plots.resize(host);
+      });
+    }
+
     scheduleChartsMasonryLayout();
   }
 
@@ -2223,11 +2358,13 @@ function bootDashboardRender(force = false) {
       );
 
       await ensureDashboardAssets({ needD3: needsD3 });
+      await ensurePlotly();
 
       const hasChart = typeof window.Chart !== 'undefined';
       const hasD3 = typeof window.d3 !== 'undefined';
+      const hasPlotly = typeof window.Plotly !== 'undefined';
 
-      if (!hasChart && !hasD3) {
+      if (!hasChart && !hasD3 && !hasPlotly) {
         document.addEventListener('anbg:dashboard-assets-ready', () => {
           void render();
         }, { once: true });
@@ -2255,6 +2392,10 @@ function bootDashboardRender(force = false) {
 
       if (hasD3) {
         safeRenderStep('gantt', renderGantts);
+      }
+
+      if (hasPlotly) {
+        safeRenderStep('agent performance plotly', mountAgentPerformanceCharts);
       }
 
       safeRenderStep('row links', bindRowLinks);

@@ -190,7 +190,7 @@
         $stepperHasSubmitted = in_array($validationStatus, $stepperSubmittedStatuses, true);
         $stepperIsValidated = in_array($validationStatus, $stepperValidatedStatuses, true);
         $stepperNeedsCorrection = in_array($validationStatus, $stepperCorrectionStatuses, true) || $status === 'a_corriger';
-        $stepperIsClosed = in_array($status, $stepperFinishedStatuses, true) || $stepperIsValidated;
+        $stepperIsClosed = $stepperIsValidated;
         $actionStepperSteps = [
             [
                 'label' => 'Planification',
@@ -216,7 +216,7 @@
                 'caption' => $stepperIsClosed ? 'Dossier finalisé' : 'À venir',
                 'state' => $stepperIsStopped
                     ? 'blocked'
-                    : ($stepperIsClosed ? 'done' : (($stepperExecutionDone || $stepperIsValidated) ? 'current' : 'pending')),
+                    : ($stepperIsClosed ? 'done' : 'pending'),
             ],
         ];
         $actionStepperActiveIndex = 0;

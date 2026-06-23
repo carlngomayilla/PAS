@@ -2,13 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\ActionLog;
-use App\Models\Direction;
-use App\Models\Pao;
 use App\Models\Action;
-use App\Models\KpiMesure;
+use App\Models\Direction;
 use App\Models\Kpi;
 use App\Models\ObjectifOperationnel;
+use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
@@ -21,10 +19,8 @@ use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
 use App\Services\Analytics\ReportingAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\Concerns\CreatesAdminUser;
 use Tests\Support\SimpleZipReader;
@@ -33,8 +29,8 @@ use ZipArchive;
 
 class WebWorkspaceTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -239,6 +235,10 @@ class WebWorkspaceTest extends TestCase
             ->assertOk()
             ->assertSee('Analytique avancée')
             ->assertSee('Statuts empiles par')
+            ->assertSee('dashboard-agent-gauge', false)
+            ->assertSee('dashboard-agent-top', false)
+            ->assertSee('dashboard-agent-3d', false)
+            ->assertSee('dashboard-agent-heatmap', false)
             ->assertSee('dashboard-report-status-unit-chart', false)
             ->assertSee('analytics-explorer-title', false);
 
@@ -472,7 +472,7 @@ class WebWorkspaceTest extends TestCase
         if ($expectedAlertUnreadCount > 0) {
             $expectedBadge = $expectedAlertUnreadCount > 99 ? '99+' : (string) $expectedAlertUnreadCount;
             $this->assertMatchesRegularExpression(
-                '/data-sidebar-module="notifications"[\s\S]*?data-sidebar-badge-for="notifications">' . preg_quote($expectedBadge, '/') . '<\/span>/',
+                '/data-sidebar-module="notifications"[\s\S]*?data-sidebar-badge-for="notifications">'.preg_quote($expectedBadge, '/').'<\/span>/',
                 $content
             );
         }
@@ -502,10 +502,10 @@ class WebWorkspaceTest extends TestCase
             'limit' => 20,
         ]));
 
-        $response->assertRedirect(route('workspace.actions.suivi', $action) . '#action-status');
+        $response->assertRedirect(route('workspace.actions.suivi', $action).'#action-status');
         $this->assertDatabaseHas('alert_reads', [
             'user_id' => $admin->id,
-            'fingerprint' => 'action_overdue:' . $action->id . ':' . \Illuminate\Support\Carbon::parse($action->date_echeance)->format('Ymd') . ':' . ((float) ($action->progression_reelle ?? 0) <= 0.0 ? 'action_non_demarre' : 'retard'),
+            'fingerprint' => 'action_overdue:'.$action->id.':'.\Illuminate\Support\Carbon::parse($action->date_echeance)->format('Ymd').':'.((float) ($action->progression_reelle ?? 0) <= 0.0 ? 'action_non_demarre' : 'retard'),
             'source_type' => 'action_overdue',
             'source_id' => $action->id,
         ]);
@@ -708,7 +708,7 @@ class WebWorkspaceTest extends TestCase
         file_put_contents($tempFile, $xlsxBinary);
 
         if (class_exists(ZipArchive::class)) {
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             $this->assertTrue($zip->open($tempFile) === true);
             $workbookXml = $zip->getFromName('xl/workbook.xml');
             $sheetOneXml = $zip->getFromName('xl/worksheets/sheet1.xml');
@@ -889,7 +889,7 @@ class WebWorkspaceTest extends TestCase
         file_put_contents($tempFile, $xlsxBinary);
 
         if (class_exists(ZipArchive::class)) {
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             $this->assertTrue($zip->open($tempFile) === true);
             $sheetOneXml = $zip->getFromName('xl/worksheets/sheet1.xml');
             $sheetTwoXml = $zip->getFromName('xl/worksheets/sheet2.xml');

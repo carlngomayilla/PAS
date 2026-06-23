@@ -422,6 +422,157 @@
         </article>
     </div>
 
+    @php
+        $agentAverageScore = min(100, max(0, (float) ($agentPerformanceSummary['average_score'] ?? 0)));
+        $agentExecutionRate = min(100, max(0, (float) ($agentPerformanceSummary['execution_rate'] ?? 0)));
+        $agentTone = $agentAverageScore >= $agentPerformanceThreshold
+            ? '#20C76B'
+            : ($agentAverageScore >= 55 ? '#F26522' : ($agentAverageScore > 0 ? '#D92D20' : '#94A3B8'));
+        $agentTopRows = collect($agentPerformanceTopRows)->values();
+        $agentAllRows = collect($agentPerformanceRows)->values();
+    @endphp
+
+    <section class="charts-agent-performance-section">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="showcase-panel-title">Performance des agents</h2>
+                <p class="showcase-panel-subtitle">Score global agent : execution, delai, reference et charge.</p>
+            </div>
+            <span class="showcase-chip">Seuil {{ number_format($agentPerformanceThreshold, 0, ',', ' ') }}%</span>
+        </div>
+
+        <div class="charts-agent-grid">
+            <article class="showcase-panel dashboard-agent-card dashboard-agent-card-gauge">
+                <div class="chart-panel-head mb-3">
+                    <h3 class="chart-title">Moyenne agents</h3>
+                    <span class="showcase-chip">{{ (int) ($agentPerformanceSummary['agents_total'] ?? 0) }} agents</span>
+                </div>
+                <div class="dashboard-canvas dashboard-agent-gauge-canvas">
+                    <div id="dashboard-agent-gauge" class="dashboard-chart-host dashboard-plotly-host" data-plotly-chart="agent_gauge">
+                        <div class="dashboard-gauge-fallback" style="--value-pct: {{ $agentAverageScore }}%; --tone: {{ $agentTone }};" aria-hidden="true">
+                            <span class="dashboard-gauge-fallback-ring">
+                                <span class="dashboard-gauge-fallback-value">{{ number_format($agentAverageScore, 0, ',', ' ') }}%</span>
+                            </span>
+                            <span class="dashboard-gauge-fallback-label">Seuil {{ number_format($agentPerformanceThreshold, 0, ',', ' ') }}%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-agent-summary-grid">
+                    <span><strong>{{ number_format((float) ($agentPerformanceSummary['actions_assigned'] ?? 0), 0, ',', ' ') }}</strong> assignees</span>
+                    <span><strong>{{ number_format((float) ($agentPerformanceSummary['actions_closed'] ?? 0), 0, ',', ' ') }}</strong> cloturees</span>
+                    <span><strong>{{ number_format($agentExecutionRate, 0, ',', ' ') }}%</strong> execution</span>
+                </div>
+            </article>
+
+            <article class="showcase-panel dashboard-agent-card dashboard-agent-card-top">
+                <div class="chart-panel-head mb-3">
+                    <h3 class="chart-title">Top 10 agents</h3>
+                    <span class="showcase-chip">Score global</span>
+                </div>
+                <div class="dashboard-canvas dashboard-canvas-lg">
+                    <div id="dashboard-agent-top" class="dashboard-chart-host dashboard-plotly-host" data-plotly-chart="agent_top">
+                        <div class="dashboard-chart-fallback dashboard-agent-bars" aria-hidden="true">
+                            @forelse ($agentTopRows as $row)
+                                @php
+                                    $agentScore = min(100, max(0, (float) ($row['score_global'] ?? 0)));
+                                    $agentRowTone = $agentScore >= $agentPerformanceThreshold ? '#20C76B' : ($agentScore >= 55 ? '#F26522' : '#D92D20');
+                                @endphp
+                                <a href="{{ $row['url'] ?? route('workspace.actions.index') }}" class="dashboard-agent-bar-row">
+                                    <span class="dashboard-agent-rank">{{ $loop->iteration }}</span>
+                                    <span class="dashboard-agent-bar-label">{{ $row['agent'] ?? 'Agent' }}</span>
+                                    <span class="dashboard-agent-bar-track">
+                                        <span class="dashboard-agent-bar-fill" style="width: {{ $agentScore }}%; background: {{ $agentRowTone }};"></span>
+                                    </span>
+                                    <span class="dashboard-agent-bar-value" style="color: {{ $agentRowTone }};">{{ number_format($agentScore, 0, ',', ' ') }}%</span>
+                                </a>
+                            @empty
+                                <x-ui.empty-state title="Aucun agent" message="Les performances apparaîtront dès que les actions seront affectées." icon="chart" tone="info" />
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="showcase-panel dashboard-agent-card dashboard-agent-card-3d">
+                <div class="chart-panel-head mb-3">
+                    <h3 class="chart-title">Positionnement 3D</h3>
+                    <span class="showcase-chip">Charge, cloture, score</span>
+                </div>
+                <div class="dashboard-canvas dashboard-agent-plotly-lg">
+                    <div id="dashboard-agent-3d" class="dashboard-chart-host dashboard-plotly-host" data-plotly-chart="agent_3d">
+                        <div class="dashboard-chart-fallback dashboard-agent-scatter-fallback" aria-hidden="true">
+                            @forelse ($agentAllRows->take(12) as $row)
+                                @php
+                                    $x = min(92, 8 + ((int) ($row['actions_assigned'] ?? 0) * 7));
+                                    $y = max(8, 92 - min(84, (float) ($row['score_global'] ?? 0) * 0.84));
+                                    $bubble = min(2.2, 0.75 + ((int) ($row['actions_late'] ?? 0) * 0.24));
+                                    $score = min(100, max(0, (float) ($row['score_global'] ?? 0)));
+                                    $bubbleTone = $score >= $agentPerformanceThreshold ? '#20C76B' : ($score >= 55 ? '#F26522' : '#D92D20');
+                                @endphp
+                                <span class="dashboard-agent-bubble" style="left: {{ $x }}%; top: {{ $y }}%; width: {{ $bubble }}rem; height: {{ $bubble }}rem; background: {{ $bubbleTone }};" title="{{ $row['agent'] ?? 'Agent' }}"></span>
+                            @empty
+                                <x-ui.empty-state title="Aucune donnée" message="Le nuage 3D apparaîtra avec les actions affectées." icon="chart" tone="info" />
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="showcase-panel dashboard-agent-card dashboard-agent-card-heatmap">
+                <div class="chart-panel-head mb-3">
+                    <h3 class="chart-title">Agents et services</h3>
+                    <span class="showcase-chip">Carte thermique</span>
+                </div>
+                <div class="dashboard-canvas dashboard-agent-plotly-lg">
+                    <div id="dashboard-agent-heatmap" class="dashboard-chart-host dashboard-plotly-host" data-plotly-chart="agent_heatmap">
+                        <div class="dashboard-chart-fallback dashboard-agent-heatmap-fallback" aria-hidden="true">
+                            @forelse ($agentTopRows as $row)
+                                @php
+                                    $heatScore = min(100, max(0, (float) ($row['score_global'] ?? 0)));
+                                    $heatTone = $heatScore >= $agentPerformanceThreshold ? '#20C76B' : ($heatScore >= 55 ? '#F26522' : '#D92D20');
+                                @endphp
+                                <div class="dashboard-agent-heat-cell" style="--heat: {{ $heatScore }}%; --tone: {{ $heatTone }};">
+                                    <span>{{ $row['agent'] ?? 'Agent' }}</span>
+                                    <strong>{{ number_format($heatScore, 0, ',', ' ') }}%</strong>
+                                </div>
+                            @empty
+                                <x-ui.empty-state title="Aucune donnée" message="La carte thermique apparaîtra dès que des agents seront affectés." icon="chart" tone="info" />
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
+
+        <article class="showcase-panel dashboard-agent-alert-panel">
+            <div class="chart-panel-head mb-3">
+                <h3 class="chart-title">Alertes agents</h3>
+                <span class="showcase-chip">{{ count($agentPerformanceAlerts) }} signalements</span>
+            </div>
+            <div class="dashboard-agent-alert-list">
+                @forelse ($agentPerformanceAlerts as $alert)
+                    @php
+                        $alertLevel = (string) ($alert['level'] ?? 'warning');
+                        $alertTone = match ($alertLevel) {
+                            'danger' => '#D92D20',
+                            'success' => '#20C76B',
+                            default => '#F26522',
+                        };
+                    @endphp
+                    <a href="{{ $alert['url'] ?? route('workspace.actions.index') }}" class="dashboard-agent-alert" style="--tone: {{ $alertTone }};">
+                        <span class="dashboard-agent-alert-dot"></span>
+                        <span class="dashboard-agent-alert-body">
+                            <strong>{{ $alert['title'] ?? 'Alerte agent' }}</strong>
+                            <span>{{ $alert['message'] ?? '' }}</span>
+                        </span>
+                    </a>
+                @empty
+                    <x-ui.empty-state title="Aucune alerte agent" message="Les agents sont au-dessus des seuils de surveillance." icon="check" tone="success" />
+                @endforelse
+            </div>
+        </article>
+    </section>
+
     @if ($showDashboardAdvancedReporting)
         <section class="charts-advanced-section mt-4">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">

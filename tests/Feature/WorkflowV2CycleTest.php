@@ -91,6 +91,26 @@ class WorkflowV2CycleTest extends TestCase
         $this->assertNotNull($action->cloture_le);
     }
 
+    public function test_stale_closed_status_is_reopened_until_chef_validation(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+        $tracking = app(ActionTrackingService::class);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 100], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action->forceFill([
+            'statut' => ActionTrackingService::STATUS_CLOTUREE,
+            'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
+        ])->save();
+
+        $action = $tracking->refreshActionMetrics($action->fresh());
+
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut);
+    }
+
     public function test_reject_returns_action_to_correction(): void
     {
         $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);

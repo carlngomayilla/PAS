@@ -46,6 +46,12 @@
     $paoDirectionRows = $analytics['pao_direction_rows'] ?? [];
     $ptaServiceActionRows = $analytics['pta_service_action_rows'] ?? [];
     $agentActionRows = $analytics['agent_action_rows'] ?? [];
+    $agentPerformance = is_array($analytics['agent_performance'] ?? null) ? $analytics['agent_performance'] : [];
+    $agentPerformanceSummary = is_array($agentPerformance['summary'] ?? null) ? $agentPerformance['summary'] : [];
+    $agentPerformanceRows = is_array($agentPerformance['rows'] ?? null) ? $agentPerformance['rows'] : [];
+    $agentPerformanceTopRows = is_array($agentPerformance['top_rows'] ?? null) ? $agentPerformance['top_rows'] : [];
+    $agentPerformanceAlerts = is_array($agentPerformance['alerts'] ?? null) ? $agentPerformance['alerts'] : [];
+    $agentPerformanceThreshold = (float) ($agentPerformanceSummary['threshold'] ?? $agentPerformance['threshold'] ?? 77);
     $subActionRows = $analytics['sub_action_rows'] ?? [];
     $priorityActionRows = collect($actionRows)->values()->all();
     $quantitativeTargetRows = collect($actionRows)

@@ -17,8 +17,9 @@ use App\Models\User;
 use App\Services\ActionCalculationSettings;
 use App\Services\Actions\ActionStatusService;
 use App\Services\Actions\ActionTrackingService;
-use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Analytics\AnalyticsCacheVersionService;
+use App\Services\Analytics\ReportingAnalyticsService;
+use App\Services\Dashboard\DashboardPythonChartService;
 use App\Services\DashboardProfileSettings;
 use App\Services\ExerciceContext;
 use App\Services\PersonalTaskService;
@@ -26,11 +27,11 @@ use App\Services\WorkflowSettings;
 use App\Support\SafeSql;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\View\View;
 use Throwable;
 
 class DashboardController extends Controller
@@ -38,21 +39,24 @@ class DashboardController extends Controller
     use AuthorizesPlanningScope;
 
     private bool $dashboardDirectionResolved = false;
+
     private ?int $dashboardDirectionId = null;
+
     private bool $dashboardServiceResolved = false;
+
     private ?int $dashboardServiceId = null;
 
     public function __construct(
         private readonly ActionCalculationSettings $actionCalculationSettings,
         private readonly ReportingAnalyticsService $reportingAnalyticsService,
+        private readonly DashboardPythonChartService $dashboardPythonChartService,
         private readonly DashboardProfileSettings $dashboardProfileSettings,
         private readonly WorkflowSettings $workflowSettings,
         private readonly AnalyticsCacheVersionService $cacheVersionService,
         private readonly ExerciceContext $exerciceContext,
         private readonly ActionStatusService $actionStatusService,
         private readonly PersonalTaskService $personalTaskService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -183,16 +187,16 @@ class DashboardController extends Controller
             ->first();
 
         $totals = [
-            'pas_total'          => (int) ($pasAgg->total ?? 0),
-            'pas_actifs'         => (int) ($pasAgg->actifs ?? 0),
-            'paos_total'         => (int) ($paoAgg->total ?? 0),
-            'paos_actifs'        => (int) ($paoAgg->actifs ?? 0),
-            'ptas_total'         => (int) ($ptaAgg->total ?? 0),
-            'ptas_actifs'        => (int) ($ptaAgg->actifs ?? 0),
-            'actions_total'      => $dashboardActions->count(),
-            'actions_validees'   => $dashboardValidatedActions->count(),
-            'kpis_total'         => (clone $kpis)->count(),
-            'kpi_mesures_total'  => (clone $mesures)->count(),
+            'pas_total' => (int) ($pasAgg->total ?? 0),
+            'pas_actifs' => (int) ($pasAgg->actifs ?? 0),
+            'paos_total' => (int) ($paoAgg->total ?? 0),
+            'paos_actifs' => (int) ($paoAgg->actifs ?? 0),
+            'ptas_total' => (int) ($ptaAgg->total ?? 0),
+            'ptas_actifs' => (int) ($ptaAgg->actifs ?? 0),
+            'actions_total' => $dashboardActions->count(),
+            'actions_validees' => $dashboardValidatedActions->count(),
+            'kpis_total' => (clone $kpis)->count(),
+            'kpi_mesures_total' => (clone $mesures)->count(),
         ];
 
         $statusBreakdown = [
@@ -486,6 +490,7 @@ class DashboardController extends Controller
             'service_filter' => $this->selectedDashboardServiceId($user),
         ], JSON_THROW_ON_ERROR));
     }
+
     /**
      * Keep the embedded dashboard JSON small. The Blade view still receives the
      * full server payload for tables, but the browser only needs chart-ready rows.
@@ -509,6 +514,8 @@ class DashboardController extends Controller
             'unit_rows',
             'synthesis_service_rows',
             'synthesis_agent_rows',
+            'agent_performance',
+            'plotly_figures',
             'direction_performance_rows',
             'decision_counts',
             'decision_service_rows',
@@ -581,16 +588,19 @@ class DashboardController extends Controller
                     ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
                     ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
             });
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             $query->whereHas('pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
             $query->whereHas('pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
+
             return;
         }
 
@@ -613,16 +623,19 @@ class DashboardController extends Controller
                     ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
                     ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
             });
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             $query->whereHas('action.pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
             $query->whereHas('action.pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
+
             return;
         }
 
@@ -645,16 +658,19 @@ class DashboardController extends Controller
                     ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
                     ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
             });
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             $query->whereHas('kpi.action.pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
             $query->whereHas('kpi.action.pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
+
             return;
         }
 
@@ -681,16 +697,19 @@ class DashboardController extends Controller
 
         if ($user->isAgent()) {
             $query->where('actions.responsable_id', (int) $user->id);
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             $query->where($directionColumn, (int) $user->direction_id);
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
             $query->where($serviceColumn, (int) $user->service_id);
+
             return;
         }
 
@@ -704,6 +723,7 @@ class DashboardController extends Controller
         if ($user->isAgent()) {
             $query->whereHas('paos.ptas.actions', fn (Builder $q) => $q->where('responsable_id', (int) $user->id));
             $this->exerciceContext->applyToPas($query);
+
             return $query;
         }
 
@@ -950,7 +970,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array{visible:Collection<int, Action>, dashboard:Collection<int, Action>, personal:Collection<int, Action>}
      */
     private function splitDashboardActionCollections(User $user, Collection $actions): array
@@ -976,6 +996,7 @@ class DashboardController extends Controller
     private function isPilotageDashboardAction(Action $action, User $user): bool
     {
         $context = (string) ($action->contexte_action ?: Action::CONTEXT_PILOTAGE);
+
         return $context === Action::CONTEXT_PILOTAGE;
     }
 
@@ -996,7 +1017,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, int>
      */
     private function countActionsByAttribute(Collection $actions, string $attribute): array
@@ -1029,9 +1050,9 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param array<string, int> $totals
-     * @param array<string, int> $alerts
-     * @param array<string, array<string, int>> $statusBreakdown
+     * @param  array<string, int>  $totals
+     * @param  array<string, int>  $alerts
+     * @param  array<string, array<string, int>>  $statusBreakdown
      * @return array<string, mixed>
      */
     private function buildChartPayload(array $totals, array $alerts, array $statusBreakdown): array
@@ -1092,7 +1113,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
     private function buildDashboardData(User $user, Collection $actions): array
@@ -1147,6 +1168,8 @@ class DashboardController extends Controller
         $operationalGlobalScores = $this->buildGlobalScoreSummary($actions, $avg);
         $globalScores = $this->buildGlobalScoreSummary($officialActions, $avg);
         $qualityThreshold = $this->averageActionQualityThreshold($actions);
+        $agentPerformance = $this->buildAgentPerformancePayload($actions, 77.0);
+        $plotlyFigures = $this->dashboardPythonChartService->generate($agentPerformance);
         $operationalMonthly = $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false, $qualityThreshold);
         $monthly = $this->buildMonthlyScoreRows($officialActions, $currentYear, $avg, true, $qualityThreshold);
 
@@ -1312,6 +1335,8 @@ class DashboardController extends Controller
             'synthesis_service_rows' => $synthesisServiceRows,
             'synthesis_agent_rows' => $synthesisAgentRows,
             'synthesis_late_rows' => $synthesisLateRows,
+            'agent_performance' => $agentPerformance,
+            'plotly_figures' => $plotlyFigures,
             'decision_counts' => $decisionCounts,
             'decision_chain_rows' => $decisionChainRows,
             'decision_service_rows' => $decisionServiceRows,
@@ -1343,8 +1368,8 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
-     * @param Collection<int, Action> $validatedActions
+     * @param  Collection<int, Action>  $actions
+     * @param  Collection<int, Action>  $validatedActions
      * @return array<string, mixed>
      */
     private function buildRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
@@ -1474,7 +1499,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, int>
      */
     private function statusCounts(Collection $actions): array
@@ -1500,7 +1525,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
     private function buildRoleTrendChart(Collection $actions): array
@@ -1538,7 +1563,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
     private function buildWeeklyLoadChart(Collection $actions): array
@@ -1574,7 +1599,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
     private function buildValidationPipelineChart(Collection $actions): array
@@ -1610,7 +1635,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
     private function buildDirectionServiceChart(User $user, Collection $actions): array
@@ -1677,8 +1702,8 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
-     * @param Collection<int, Action> $validatedActions
+     * @param  Collection<int, Action>  $actions
+     * @param  Collection<int, Action>  $validatedActions
      * @return array<string, mixed>
      */
     private function buildScopePortfolioMetrics(User $user, Collection $actions, Collection $validatedActions): array
@@ -1719,7 +1744,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, float|int>
      */
     private function buildDashboardSnapshot(Collection $actions): array
@@ -1740,7 +1765,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, float>
      */
     private function buildGlobalScoreSummary(Collection $actions, callable $avg): array
@@ -1756,7 +1781,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      */
     private function averageActionQualityThreshold(Collection $actions): float
     {
@@ -1777,7 +1802,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildMonthlyScoreRows(Collection $actions, int $currentYear, callable $avg, bool $official, float $qualityThreshold): array
@@ -1817,7 +1842,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildGlobalDirectionRows(Collection $actions, int $limit = 8): array
@@ -1860,7 +1885,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildGlobalDirectionComparisonRows(Collection $actions, int $limit = 8): array
@@ -1906,7 +1931,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildGlobalPendingValidationRows(Collection $actions, int $limit = 8): array
@@ -1933,8 +1958,8 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
-     * @param Collection<int, Action> $validatedActions
+     * @param  Collection<int, Action>  $actions
+     * @param  Collection<int, Action>  $validatedActions
      * @return array<string, mixed>
      */
     private function buildPlanificationRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
@@ -1989,8 +2014,8 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
-     * @param Collection<int, Action> $validatedActions
+     * @param  Collection<int, Action>  $actions
+     * @param  Collection<int, Action>  $validatedActions
      * @return array<string, mixed>
      */
     private function buildDgRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
@@ -2062,8 +2087,8 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
-     * @param Collection<int, Action> $validatedActions
+     * @param  Collection<int, Action>  $actions
+     * @param  Collection<int, Action>  $validatedActions
      * @return array<string, mixed>
      */
     private function buildCabinetRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
@@ -2105,7 +2130,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
     private function buildAgentRoleDashboard(Collection $actions): array
@@ -2149,7 +2174,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
     private function buildServiceRoleDashboard(Collection $actions): array
@@ -2202,8 +2227,8 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
-     * @param Collection<int, Action> $validatedActions
+     * @param  Collection<int, Action>  $actions
+     * @param  Collection<int, Action>  $validatedActions
      * @return array<string, mixed>
      */
     private function buildDirectionRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
@@ -2266,7 +2291,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildPriorityActionRows(Collection $actions, int $limit = 8): array
@@ -2298,7 +2323,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildLateActionRows(Collection $actions, int $limit = 8): array
@@ -2325,7 +2350,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildServiceValidationRows(Collection $actions, int $limit = 8): array
@@ -2351,7 +2376,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildServiceAgentPerformanceRows(Collection $actions, int $limit = 8): array
@@ -2379,7 +2404,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDirectionServiceRows(User $user, Collection $actions, ?int $limit = null): array
@@ -2461,7 +2486,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDirectionCriticalRows(Collection $actions, int $limit = 8): array
@@ -2494,7 +2519,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildStatusCards(Collection $actions): array
@@ -2528,7 +2553,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildUnitRows(Collection $actions, string $mode): array
@@ -2598,7 +2623,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
     private function buildDecisionCounts(Collection $actions): array
@@ -2659,7 +2684,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDecisionChainRows(Collection $actions, int $limit = 10): array
@@ -2710,7 +2735,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDecisionServiceRows(Collection $actions, int $limit = 10): array
@@ -2741,7 +2766,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDecisionAgentRows(Collection $actions, int $limit = 10): array
@@ -2804,7 +2829,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDecisionPriorityRows(Collection $actions, int $limit = 10): array
@@ -2842,7 +2867,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDecisionLateRows(Collection $actions, int $limit = 10): array
@@ -2870,7 +2895,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDecisionPendingValidationRows(Collection $actions, int $limit = 10): array
@@ -2901,7 +2926,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDecisionProofRows(Collection $actions, int $limit = 10): array
@@ -2932,7 +2957,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDecisionAnomalyRows(Collection $actions, int $limit = 10): array
@@ -2998,7 +3023,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDecisionQuarterRows(Collection $actions, int $year): array
@@ -3031,7 +3056,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDirectionPerformanceRows(Collection $actions, int $limit = 12): array
@@ -3086,7 +3111,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildPasDirectionRows(Collection $actions, int $limit = 12): array
@@ -3121,7 +3146,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildPaoDirectionRows(Collection $actions, int $limit = 15): array
@@ -3165,7 +3190,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildPtaServiceActionRows(Collection $actions, int $limit = 15): array
@@ -3199,7 +3224,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildAgentActionRows(Collection $actions, int $limit = 18): array
@@ -3249,7 +3274,244 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, mixed>
+     */
+    private function buildAgentPerformancePayload(Collection $actions, float $threshold): array
+    {
+        $loadThreshold = 10;
+        $buckets = [];
+
+        foreach ($actions as $action) {
+            $agents = $this->actionAgents($action);
+            $serviceLabel = (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? 'Non renseigne');
+            $actionScore = $this->agentPerformanceReferenceScore($action);
+            $isClosed = $this->isAgentPerformanceClosedAction($action);
+            $isClosedInTime = $isClosed && $this->delayStatusKey($action) === 'dans_delais';
+            $isLate = $this->isLateAction($action);
+            $latestActivity = $this->actionLatestActivityDate($action);
+
+            foreach ($agents as $agent) {
+                $agentId = (int) ($agent->id ?? 0);
+                $agentName = trim((string) ($agent->name ?? '')) ?: 'Non assigne';
+                $bucketKey = $agentId > 0 ? (string) $agentId : 'unassigned:'.$agentName;
+
+                if (! isset($buckets[$bucketKey])) {
+                    $buckets[$bucketKey] = [
+                        'agent_id' => $agentId,
+                        'agent' => $agentName,
+                        'service' => $serviceLabel,
+                        'actions_assigned' => 0,
+                        'actions_closed' => 0,
+                        'actions_closed_in_time' => 0,
+                        'actions_late' => 0,
+                        'score_sum' => 0.0,
+                        'service_score_sums' => [],
+                        'service_score_counts' => [],
+                        'latest_activity_at' => null,
+                    ];
+                }
+
+                $buckets[$bucketKey]['actions_assigned']++;
+                $buckets[$bucketKey]['actions_closed'] += $isClosed ? 1 : 0;
+                $buckets[$bucketKey]['actions_closed_in_time'] += $isClosedInTime ? 1 : 0;
+                $buckets[$bucketKey]['actions_late'] += $isLate ? 1 : 0;
+                $buckets[$bucketKey]['score_sum'] += $actionScore;
+                $buckets[$bucketKey]['service_score_sums'][$serviceLabel] = ($buckets[$bucketKey]['service_score_sums'][$serviceLabel] ?? 0.0) + $actionScore;
+                $buckets[$bucketKey]['service_score_counts'][$serviceLabel] = ($buckets[$bucketKey]['service_score_counts'][$serviceLabel] ?? 0) + 1;
+
+                if ($latestActivity instanceof Carbon) {
+                    $currentLatest = $buckets[$bucketKey]['latest_activity_at'];
+                    if (! $currentLatest instanceof Carbon || $latestActivity->gt($currentLatest)) {
+                        $buckets[$bucketKey]['latest_activity_at'] = $latestActivity;
+                    }
+                }
+            }
+        }
+
+        $rows = collect($buckets)
+            ->map(function (array $bucket) use ($loadThreshold, $threshold): array {
+                $assigned = max(0, (int) $bucket['actions_assigned']);
+                $closed = max(0, (int) $bucket['actions_closed']);
+                $closedInTime = max(0, (int) $bucket['actions_closed_in_time']);
+                $late = max(0, (int) $bucket['actions_late']);
+                $scoreExecution = $this->completionRate($closed, $assigned);
+                $scoreDelay = $closed > 0 ? $this->completionRate($closedInTime, $closed) : 0.0;
+                $scoreQuality = $assigned > 0 ? round(((float) $bucket['score_sum']) / $assigned, 2) : 0.0;
+                $scoreLoad = round(min($assigned / $loadThreshold, 1.0) * 100, 2);
+                $scoreGlobal = round(
+                    ($scoreExecution * 0.45)
+                    + ($scoreDelay * 0.25)
+                    + ($scoreQuality * 0.20)
+                    + ($scoreLoad * 0.10),
+                    2
+                );
+                $latestActivity = $bucket['latest_activity_at'];
+                $serviceScores = [];
+
+                foreach ($bucket['service_score_sums'] as $service => $sum) {
+                    $count = max(1, (int) ($bucket['service_score_counts'][$service] ?? 1));
+                    $serviceScores[$service] = round(((float) $sum) / $count, 2);
+                }
+
+                return [
+                    'agent_id' => (int) $bucket['agent_id'],
+                    'agent' => (string) $bucket['agent'],
+                    'service' => (string) $bucket['service'],
+                    'actions_assigned' => $assigned,
+                    'actions_closed' => $closed,
+                    'actions_closed_in_time' => $closedInTime,
+                    'actions_late' => $late,
+                    'score_execution' => $scoreExecution,
+                    'score_delay' => $scoreDelay,
+                    'score_quality' => $scoreQuality,
+                    'score_load' => $scoreLoad,
+                    'score_global' => $scoreGlobal,
+                    'threshold' => $threshold,
+                    'service_scores' => $serviceScores,
+                    'last_activity_at' => $latestActivity instanceof Carbon ? $latestActivity->toIso8601String() : null,
+                    'last_activity_label' => $latestActivity instanceof Carbon ? $latestActivity->format('d/m/Y') : '-',
+                    'last_activity_days' => $latestActivity instanceof Carbon ? (int) floor($latestActivity->diffInDays(Carbon::today())) : null,
+                    'url' => (int) $bucket['agent_id'] > 0
+                        ? $this->actionIndexRoute(['rmo_id' => (int) $bucket['agent_id']])
+                        : $this->actionIndexRoute(),
+                ];
+            })
+            ->sortByDesc('score_global')
+            ->values();
+
+        $averageScore = $rows->isNotEmpty()
+            ? round((float) $rows->avg(fn (array $row): float => (float) $row['score_global']), 2)
+            : 0.0;
+        $assignedTotal = (int) $rows->sum('actions_assigned');
+        $closedTotal = (int) $rows->sum('actions_closed');
+
+        return [
+            'threshold' => $threshold,
+            'load_threshold' => $loadThreshold,
+            'summary' => [
+                'agents_total' => $rows->count(),
+                'actions_assigned' => $assignedTotal,
+                'actions_closed' => $closedTotal,
+                'actions_late' => (int) $rows->sum('actions_late'),
+                'average_score' => $averageScore,
+                'execution_rate' => $this->completionRate($closedTotal, $assignedTotal),
+                'threshold' => $threshold,
+            ],
+            'rows' => $rows->all(),
+            'top_rows' => $rows->take(10)->all(),
+            'alerts' => $this->buildAgentPerformanceAlerts($rows, $threshold, $loadThreshold),
+        ];
+    }
+
+    private function agentPerformanceReferenceScore(Action $action): float
+    {
+        $kpi = (float) ($action->actionKpi?->kpi_global ?? 0);
+        if ($kpi > 0.0) {
+            return round(max(0.0, min(100.0, $kpi)), 2);
+        }
+
+        $quantitativeRate = $this->actionQuantitativeRate($action);
+        if ($quantitativeRate > 0.0) {
+            return round(max(0.0, min(100.0, $quantitativeRate)), 2);
+        }
+
+        $progression = (float) ($action->progression_reelle ?? 0);
+        if ($progression > 0.0) {
+            return round(max(0.0, min(100.0, $progression)), 2);
+        }
+
+        return 70.0;
+    }
+
+    private function isAgentPerformanceClosedAction(Action $action): bool
+    {
+        $validationStatus = (string) ($action->statut_validation ?? '');
+        if (in_array($validationStatus, [
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
+            return true;
+        }
+
+        return in_array((string) ($action->statut_dynamique ?? ''), [
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+        ], true);
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildAgentPerformanceAlerts(Collection $rows, float $threshold, int $loadThreshold): array
+    {
+        $alerts = [];
+
+        foreach ($rows as $row) {
+            $agent = (string) ($row['agent'] ?? 'Non assigne');
+            $score = (float) ($row['score_global'] ?? 0);
+            $assigned = (int) ($row['actions_assigned'] ?? 0);
+            $closed = (int) ($row['actions_closed'] ?? 0);
+            $late = (int) ($row['actions_late'] ?? 0);
+            $lastActivityDays = $row['last_activity_days'] ?? null;
+            $url = (string) ($row['url'] ?? $this->actionIndexRoute());
+
+            if ($score > 0 && $score < $threshold) {
+                $alerts[] = [
+                    'level' => $score < 55 ? 'danger' : 'warning',
+                    'title' => $agent.' sous le seuil',
+                    'message' => 'Score global '.$this->formatPercent($score).' pour un seuil de '.$this->formatPercent($threshold).'.',
+                    'url' => $url,
+                    'priority' => $score < 55 ? 1 : 2,
+                ];
+            }
+
+            if ($late > 0) {
+                $alerts[] = [
+                    'level' => $late >= 3 ? 'danger' : 'warning',
+                    'title' => $agent.' a des actions en retard',
+                    'message' => $late.' action(s) en retard sur '.$assigned.' assignee(s).',
+                    'url' => $url,
+                    'priority' => $late >= 3 ? 1 : 2,
+                ];
+            }
+
+            if (is_int($lastActivityDays) && $lastActivityDays >= 30 && $closed === 0) {
+                $alerts[] = [
+                    'level' => 'warning',
+                    'title' => $agent.' sans activite recente',
+                    'message' => 'Aucune cloture recente depuis '.$lastActivityDays.' jour(s).',
+                    'url' => $url,
+                    'priority' => 3,
+                ];
+            }
+
+            if ($assigned >= $loadThreshold && $this->completionRate($closed, $assigned) < 50.0) {
+                $alerts[] = [
+                    'level' => 'danger',
+                    'title' => $agent.' en surcharge',
+                    'message' => $assigned.' action(s) assignee(s) avec un faible taux de cloture.',
+                    'url' => $url,
+                    'priority' => 1,
+                ];
+            }
+        }
+
+        return collect($alerts)
+            ->sortBy('priority')
+            ->take(12)
+            ->values()
+            ->all();
+    }
+
+    private function formatPercent(float $value): string
+    {
+        return number_format($value, 0, ',', ' ').'%';
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildSubActionRows(Collection $actions, int $limit = 18): array
@@ -3322,6 +3584,45 @@ class DashboardController extends Controller
             ?? ($action->created_at instanceof Carbon ? $action->created_at : null);
     }
 
+    private function actionLatestActivityDate(Action $action): ?Carbon
+    {
+        $dates = collect([
+            $action->updated_at,
+            $action->soumise_le,
+            $action->cloture_le,
+            $action->evalue_le,
+            $action->date_fin_reelle,
+            $action->created_at,
+        ])->filter(fn ($date): bool => $date instanceof Carbon);
+
+        if ($action->relationLoaded('justificatifs')) {
+            $dates = $dates->concat($action->justificatifs
+                ->pluck('created_at')
+                ->filter(fn ($date): bool => $date instanceof Carbon));
+        }
+
+        if ($action->relationLoaded('sousActions')) {
+            foreach ($action->sousActions as $subAction) {
+                $dates = $dates->concat(collect([
+                    $subAction->updated_at ?? null,
+                    $subAction->date_fin ?? null,
+                    $subAction->completed_at ?? null,
+                    $subAction->date_realisation ?? null,
+                ])->filter(fn ($date): bool => $date instanceof Carbon));
+
+                if ($subAction->relationLoaded('justificatifs')) {
+                    $dates = $dates->concat($subAction->justificatifs
+                        ->pluck('created_at')
+                        ->filter(fn ($date): bool => $date instanceof Carbon));
+                }
+            }
+        }
+
+        return $dates
+            ->sortByDesc(fn (Carbon $date): int => $date->getTimestamp())
+            ->first();
+    }
+
     private function actionResponsibleLabel(Action $action): string
     {
         if ($action->relationLoaded('responsables') && $action->responsables->isNotEmpty()) {
@@ -3382,7 +3683,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      */
     private function averageQuantitativeRate(Collection $actions): float
     {
@@ -3399,7 +3700,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      */
     private function dashboardScore(Collection $actions, float $fallbackRate): float
     {
@@ -3438,7 +3739,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      */
     private function groupEvolutionLabel(Collection $actions): string
     {
@@ -3466,7 +3767,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      */
     private function lastActivityLabel(Collection $actions): string
     {
@@ -3712,7 +4013,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildSynthesisObjectiveRows(Collection $actions, int $limit = 12): array
@@ -3750,7 +4051,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildSynthesisPaoRows(Collection $actions, int $limit = 12): array
@@ -3784,7 +4085,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildSynthesisPtaRows(Collection $actions, int $limit = 12): array
@@ -3818,7 +4119,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildDashboardAlertRows(Collection $actions): array
@@ -4003,7 +4304,7 @@ class DashboardController extends Controller
      * Les jauges de performance doivent lire l\'exécution organisationnelle,
      * pas les axes/objectifs stratégiques du PAS.
      *
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildPerformanceGaugeRows(User $user, Collection $actions): array
@@ -4022,7 +4323,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return Collection<int, Action>
      */
     private function officialActions(Collection $actions): Collection
@@ -4034,7 +4335,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return Collection<int, Action>
      */
     private function validatedActions(Collection $actions): Collection

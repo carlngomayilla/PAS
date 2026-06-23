@@ -6,7 +6,6 @@ use App\Models\Action;
 use App\Models\ActionKpi;
 use App\Models\ActionLog;
 use App\Models\Justificatif;
-use App\Models\SousAction;
 use App\Models\User;
 use App\Services\ActionManagementSettings;
 use App\Services\ActionPerformanceService;
@@ -37,29 +36,42 @@ class ActionTrackingService
         private readonly ActionPerformanceService $actionPerformanceService,
         private readonly ActionStatusService $actionStatusService,
         private readonly WorkspaceNotificationService $notificationService
-    ) {
-    }
+    ) {}
 
     // ── CONSTANTES DE FRÉQUENCE D'EXÉCUTION ───────────────────────────────────
     // Fréquence à laquelle l'agent soumet ses rapports de progression.
     public const FREQUENCE_INSTANTANEE = 'instantanee';
+
     public const FREQUENCE_JOURNALIERE = 'journaliere';
+
     public const FREQUENCE_HEBDOMADAIRE = 'hebdomadaire';
+
     public const FREQUENCE_MENSUELLE = 'mensuelle';
+
     public const FREQUENCE_ANNUELLE = 'annuelle';
 
     // ── CONSTANTES DE STATUT DYNAMIQUE ────────────────────────────────────────
     // Statut calculé automatiquement par le système selon la progression et les délais.
     public const STATUS_NON_DEMARRE = 'non_demarre';
+
     public const STATUS_EN_COURS = 'en_cours';
+
     public const STATUS_A_RISQUE = 'a_risque';        // À surveiller (proche de l'échéance)
+
     public const STATUS_EN_AVANCE = 'en_avance';
+
     public const STATUS_EN_RETARD = 'en_retard';
+
     public const STATUS_SUSPENDU = 'suspendu';
+
     public const STATUS_ANNULE = 'annule';
+
     public const STATUS_ACHEVE_DANS_DELAI = 'acheve_dans_delai';
+
     public const STATUS_ACHEVE_HORS_DELAI = 'acheve_hors_delai';
+
     public const STATUS_A_CORRIGER = 'a_corriger';
+
     public const STATUS_CLOTUREE = 'cloturee';
 
     // Nombre de jours avant l'échéance à partir duquel une action passe en "à surveiller".
@@ -68,10 +80,15 @@ class ActionTrackingService
     // ── CONSTANTES DE VALIDATION ──────────────────────────────────────────────
     // Circuit de validation : agent → chef de service → direction.
     public const VALIDATION_NON_SOUMISE = 'non_soumise';
+
     public const VALIDATION_SOUMISE_CHEF = 'soumise_chef';
+
     public const VALIDATION_REJETEE_CHEF = 'rejetee_chef';
+
     public const VALIDATION_CORRECTION_DEMANDEE = 'correction_demandee';
+
     public const VALIDATION_VALIDEE_CHEF = 'validee_chef';
+
     /**
      * @deprecated L'etape de validation direction a ete supprimee du circuit.
      * Ces constantes sont conservees pour la retro-compatibilite des chemins
@@ -80,15 +97,20 @@ class ActionTrackingService
      * chef par la migration de purge.
      */
     public const VALIDATION_REJETEE_DIRECTION = 'rejetee_direction';
+
     /** @deprecated Voir VALIDATION_REJETEE_DIRECTION. */
     public const VALIDATION_VALIDEE_DIRECTION = 'validee_direction';
 
     // ── CONSTANTES DE FINANCEMENT ─────────────────────────────────────────────
     // Décisions possibles sur une demande de financement d'action.
     public const FINANCEMENT_DECISION_VALIDER = 'valider';   // DAF : dossier complet, transmis au DG
+
     public const FINANCEMENT_DECISION_REJETER = 'rejeter';   // DAF : dossier incomplet, retour agent
+
     public const FINANCEMENT_DECISION_COMPLEMENT = 'demander_complement'; // DAF : dossier a completer
+
     public const FINANCEMENT_DECISION_ACCORDER = 'accorder'; // DG  : financement accordé
+
     public const FINANCEMENT_DECISION_REFUSER = 'refuser';   // DG  : financement refusé
 
     /**
@@ -309,7 +331,7 @@ class ActionTrackingService
         // La soumission officielle est volontairement explicite: le bouton
         // "Enregistrer" garde le suivi chez l'agent, seul "Soumettre au chef"
         // declenche le circuit de validation.
-        return;
+
     }
 
     /**
@@ -349,10 +371,9 @@ class ActionTrackingService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     // ── CLÔTURE ET VALIDATION ─────────────────────────────────────────────────
-
 
     // ── WORKFLOW DE VALIDATION OPÉRATIONNEL SUPPRIMÉ (2026-05-31) ──────────
     // Les méthodes submitClosureForReview / reviewClosureSubmission /
@@ -360,7 +381,6 @@ class ActionTrackingService
     // ont été retirées pour permettre la refonte from scratch du workflow
     // de suivi opérationnel. La méthode attemptAutoSubmitClosure ci-dessus
     // est conservée comme no-op pour compatibilité ascendante.
-
 
     // reviewClosureByDirection : methode supprimee.
     // L'etape de validation direction a ete retiree du circuit metier.
@@ -424,7 +444,7 @@ class ActionTrackingService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     /** La DAF examine la demande de financement et la valide ou la rejette. */
     public function reviewFinancingByDaf(Action $action, array $payload, User $actor): Action
@@ -508,7 +528,7 @@ class ActionTrackingService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     /** Le DG accorde ou refuse définitivement le financement d'une action. */
     public function reviewFinancingByDg(Action $action, array $payload, User $actor): Action
@@ -915,7 +935,7 @@ class ActionTrackingService
             return self::STATUS_SUSPENDU;
         }
 
-        if (in_array($manualStatus, [self::STATUS_CLOTUREE, 'cloture', 'cloturee'], true)) {
+        if (in_array($manualStatus, [self::STATUS_CLOTUREE, 'cloture', 'cloturee'], true) && $this->hasFinalValidation($action)) {
             return self::STATUS_CLOTUREE;
         }
 
@@ -1015,8 +1035,8 @@ class ActionTrackingService
     }
 
     /**
-     * @param \Illuminate\Support\Collection $weeks parametre conserve mais ignore (suivi hebdomadaire supprime)
-     * @param array{kpi_delai: float, kpi_performance: float, kpi_global: float} $kpis
+     * @param  \Illuminate\Support\Collection  $weeks  parametre conserve mais ignore (suivi hebdomadaire supprime)
+     * @param  array{kpi_delai: float, kpi_performance: float, kpi_global: float}  $kpis
      */
     private function generateAutomaticAlerts(
         Action $action,
@@ -1246,7 +1266,7 @@ class ActionTrackingService
     }
 
     /**
-     * @param array<string, mixed> $details
+     * @param  array<string, mixed>  $details
      */
     private function createLogIfMissingToday(
         Action $action,
@@ -1286,7 +1306,7 @@ class ActionTrackingService
     }
 
     /**
-     * @param array<string, mixed> $details
+     * @param  array<string, mixed>  $details
      */
     // ── COMMENTAIRES ET DISCUSSION ────────────────────────────────────────────
 
