@@ -1,6 +1,6 @@
 # Analyse des graphiques — Page « Graphiques » du dashboard
 
-**Date :** 05/06/2026 · **Périmètre :** onglet `charts` (`_panel-charts.blade.php`) + reporting avancé · **Stack :** Chart.js + D3 (gantt) + fallbacks SVG/CSS server-side · **Thème :** `chart-theme.js` / `dashboard-render.js`
+**Date :** 05/06/2026 · **Mise à jour :** 28/06/2026 · **Périmètre :** onglet `charts` (`_panel-charts.blade.php`) + reporting avancé · **Stack :** Chart.js + Plotly + D3 (gantt) + fallbacks SVG/CSS server-side · **Thème :** `chart-theme.js` / `dashboard-render.js`
 
 ---
 
@@ -13,15 +13,28 @@
 | 3 | Évolution mensuelle des indicateurs | Chart.js `line`/area + fallback SVG | Courbe avec dégradé, toggle 3M/6M/12M/Tout |
 | 4 | Répartition des statuts | CSS (barres horizontales) | Liste de barres % par statut |
 | 5 | Performance par unité | Chart.js `bar` + fallback CSS | Barres verticales (KPI vs progression) |
-| 6 | Top actions à risque | CSS (barres classées + liens) | Classement cliquable |
+| 6 | Actions classées (meilleur score) | CSS (barres classées + liens) | Classement cliquable |
 | 7 | Courbes d'évolution trimestrielle | SVG `polyline` (server-side) | 2 séries (exécution / score) |
 | 8 | Graphiques de décision (services/agents) | CSS (barres %) | Barres de progression |
 | 9 | Reporting : Statuts par unité | Chart.js `bar` empilé | Barres empilées |
 | 10 | Reporting : Avancement hebdo | Chart.js `line` area | Réel vs théorique (pointillé) |
 | 11 | Reporting : Tendance KPI | Chart.js mixte `bar`+`line` | Valeur / Cible / Seuil |
 | 12 | Reporting : Gantt + Gantt critique | D3 | Diagramme de Gantt |
+| 13 | Moyenne agents | Plotly + fallback CSS | Jauge dynamique |
+| 14 | Top 10 agents | Plotly + fallback CSS | Barres horizontales |
+| 15 | Positionnement 3D agents | Plotly + fallback CSS | Nuage 3D charge / clôture / score |
+| 16 | Heatmap agents | Plotly + fallback CSS | Lecture croisée performance / charge |
 
-**État global :** la base est déjà de bon niveau — dégradés (`barGradient`, `chartGradient`), barres arrondies, tooltips « glass », animations `easeOutCubic` en cascade, dark mode, click-through vers les actions filtrées, fallbacks accessibles. On est à ~75 % d'un rendu « pro ». Les améliorations ci-dessous visent les 25 % restants.
+**État global :** la base est déjà de bon niveau — dégradés (`barGradient`, `chartGradient`), barres arrondies, tooltips « glass », animations `easeOutCubic` en cascade, dark mode, click-through vers les actions filtrées, fallbacks accessibles, et graphiques Plotly pour les analyses agents. On est à ~80 % d'un rendu « pro ». Les améliorations ci-dessous visent les 20 % restants.
+
+## Mise à jour 2026-06-28
+
+- Les **graphes de décision** de l'onglet Graphiques sont réaffichés via la vraie condition métier au lieu d'un garde temporaire `@if (false...)`.
+- Les graphiques Plotly générés côté Python sont maintenant **cachés par contexte** (`tenant`, année, période, direction, service, rôle, version du script et payload).
+- Le rendu JS conserve la figure Plotly dans le DOM (`__pasPlotlyFigure`) pour permettre un **aperçu interactif grand format**.
+- Le modal d'aperçu sait ouvrir les graphiques **Plotly** et **Chart.js**, puis exporter l'aperçu en PNG.
+- L'onglet dashboard est clarifié : `Synthèse`, `Graphiques`, `Analyse avancée`.
+- La synthèse expose des filtres décisionnels partagés avec le Suivi PTA : période, statut de suivi, statut délai et alerte échéance.
 
 ---
 

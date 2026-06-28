@@ -8511,8 +8511,8 @@ html.dark body.admin-theme-scope :is(.app-table-wrapper, .data-table-shell, .tab
     z-index: 1;
     display: flex;
     flex-direction: column;
-    width: min(1120px, calc(100vw - 2rem));
-    height: min(82vh, 780px);
+    width: min(1600px, calc(100vw - 1rem));
+    height: min(94vh, calc(100vh - 1rem));
     overflow: hidden;
     border: 1px solid var(--app-border, #d8ecf8);
     border-radius: 0.75rem;
@@ -8581,6 +8581,20 @@ html.dark body.admin-theme-scope :is(.app-table-wrapper, .data-table-shell, .tab
     object-fit: contain;
     background: #fff;
     box-shadow: 0 1px 8px rgba(15, 23, 42, 0.12);
+}
+.preview-interactive-chart {
+    width: 100%;
+    min-height: 28rem;
+    height: calc(94vh - 8.5rem);
+    overflow: hidden;
+    border: 1px solid var(--app-border, #d8ecf8);
+    border-radius: 0.65rem;
+    background: var(--app-surface, #fff);
+}
+.preview-interactive-chart canvas,
+.preview-interactive-chart .js-plotly-plot {
+    width: 100% !important;
+    height: 100% !important;
 }
 .preview-empty-state {
     display: grid;

@@ -1,4 +1,4 @@
-<section class="dashboard-tab-panel active" data-dashboard-panel="overview-tables">
+<section class="dashboard-tab-panel active" data-dashboard-panel="advanced">
     <div class="space-y-2">
         @if ($showRoleOverview)
             @include('partials.dashboard-role-overview', [

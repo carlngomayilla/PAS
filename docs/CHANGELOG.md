@@ -3,6 +3,72 @@
 Traçabilité chronologique des actions effectuées sur l'application.
 Format : entrées datées (les plus récentes en haut), avec description, fichiers modifiés et extraits de code clés.
 
+**Règle active :** toute modification fonctionnelle, UI, sécurité, performance ou workflow doit mettre à jour les fichiers Markdown pertinents dans la même session (`docs/CHANGELOG.md` au minimum, plus les specs/backlogs concernés si le comportement change).
+
+---
+
+## 2026-06-28 — Suivi PTA officiel + filtres de synthèse + graphiques dashboard
+
+### Demande
+
+Reprendre et terminer proprement les modifications restées en suspens, dont :
+- un chantier **Suivi PTA officiel** ;
+- un chantier côté **graphiques/dashboard** ;
+- la règle de travail : maintenir les fichiers Markdown à jour à chaque modification.
+
+### Changement
+
+- **Suivi PTA officiel** : nouvelle page `/pta/suivi` avec filtres année, période annuelle/trimestrielle/semestrielle/mensuelle, direction, service, statut de suivi, statut délai et alerte échéance.
+- **Table officielle Suivi PTA** : regroupement PAS → axe stratégique → objectif stratégique → objectif opérationnel → actions, avec statuts colorés, performance, retard, preuve, observations et état vide.
+- **Détails d'action en modal** : consultation du parcours, validations, pièces jointes/preuves et indicateurs d'une action PTA.
+- **Exports officiels** : export Excel `.xlsx` via `PtaSuiviWorkbookExporter` et export PDF paysage via DomPDF.
+- **Reporting** : le type de rapport PTA réutilise le composant officiel de suivi PTA en lecture seule.
+- **Permissions** : ajout de `pta.control`, migration d'alignement des permissions stockées et mise à jour de la matrice de rôles.
+- **Synthèse dashboard** : ajout de filtres décisionnels (`periode`, `statut_suivi`, `statut_delai`, `alerte_echeance`) et de cartes cliquables par workflow/délai/alerte.
+- **Onglets dashboard** : séparation claire `Synthèse`, `Graphiques`, `Analyse avancée`.
+- **Graphiques** : cache des figures Python/Plotly par contexte, conservation de la figure Plotly pour l'aperçu, aperçu interactif grand format Plotly/Chart.js et téléchargement PNG.
+- **Finition** : suppression des gardes temporaires `@if (false...)` sur les graphes/tableaux de décision ; les panneaux sont désormais pilotés par les vraies conditions métier.
+- **Sécurité/périmètre** : les détails Suivi PTA refusent une action hors périmètre utilisateur ; les filtres de statut invalides sont ignorés au lieu de vider artificiellement le rapport.
+
+### Fichiers modifiés
+
+- `app/Http/Controllers/DashboardController.php`
+- `app/Http/Controllers/Web/DependentSelectController.php`
+- `app/Http/Controllers/Web/MonitoringWebController.php`
+- `app/Http/Controllers/Web/PtaSuiviWebController.php`
+- `app/Services/Dashboard/DashboardPythonChartService.php`
+- `app/Services/Exports/PtaSuiviWorkbookExporter.php`
+- `app/Services/PtaSuiviService.php`
+- `app/Services/RolePermissionSettings.php`
+- `config/dashboard.php`
+- `database/migrations/2026_06_27_000000_add_pta_control_permission_to_role_settings.php`
+- `resources/js/dashboard-render.js`
+- `resources/js/preview-modal.js`
+- `resources/views/components/tables/pta-suivi-table.blade.php`
+- `resources/views/partials/dashboard-analytics.blade.php`
+- `resources/views/partials/dashboard-analytics/_panel-charts.blade.php`
+- `resources/views/partials/dashboard-analytics/_panel-overview.blade.php`
+- `resources/views/partials/dashboard-analytics/_panel-tables.blade.php`
+- `resources/views/workspace/monitoring/reporting.blade.php`
+- `resources/views/workspace/pta-suivi/*`
+- `routes/web.php`
+- `tests/Feature/DashboardProfileInteractionsTest.php`
+- `tests/Feature/DashboardSynthesisDropdownTest.php`
+- `tests/Feature/PtaSuiviWebTest.php`
+- `tests/Feature/RolePermissionMatrixTest.php`
+
+### Validation
+
+- `php artisan test --filter=PtaSuiviWebTest`
+- `php artisan test --filter=DashboardSynthesisDropdownTest`
+- `php artisan test --filter=DashboardProfileInteractionsTest`
+- `php artisan test --filter=RolePermissionMatrixTest`
+- `php -l` sur les contrôleurs/services touchés
+- `git diff --check`
+- `npm run build`
+
+Note build : Vite signale seulement le chunk Plotly volumineux, attendu avec `plotly.js-dist-min` et l'import dynamique.
+
 ---
 
 ## 2026-06-11 — Bouton de retour global + suppression des imports Excel

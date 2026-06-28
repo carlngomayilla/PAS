@@ -25,6 +25,7 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.read',
                 'planning.write.global',
                 'planning.strategic.manage',
+                'pta.control',
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
@@ -62,6 +63,7 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.read',
                 'planning.write.global',
                 'planning.strategic.manage',
+                'pta.control',
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
@@ -92,6 +94,7 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.global',
                 'planning.write.service',
                 'planning.strategic.manage',
+                'pta.control',
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
@@ -104,6 +107,7 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.global',
                 'planning.write.service',
                 'planning.strategic.manage',
+                'pta.control',
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
@@ -140,6 +144,7 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.read',
                 'planning.write.global',
                 'planning.strategic.manage',
+                'pta.control',
                 'reporting.read',
                 'alerts.read',
                 'referentiel.read',
@@ -250,6 +255,7 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertContains('scope.global.read', $permissions);
         $this->assertContains('planning.write.global', $permissions);
         $this->assertContains('planning.strategic.manage', $permissions);
+        $this->assertContains('pta.control', $permissions);
         $this->assertContains('users.manage', $permissions);
         $this->assertContains('users.manage_roles', $permissions);
         $this->assertNotContains('scope.global.write', $permissions);

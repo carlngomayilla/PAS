@@ -230,6 +230,9 @@ Le module PTA permet:
 - rattachement du PTA a une direction et un service
 - suivi du statut du PTA
 - soumission, validation, verrouillage et reouverture avec motif
+- consultation du Suivi PTA officiel par les profils habilites
+- filtrage du Suivi PTA par annee, periode, direction, service, statut de suivi, statut delai et alerte echeance
+- export du Suivi PTA officiel en PDF et Excel
 
 ## 5.6 Module Actions
 
@@ -445,6 +448,9 @@ Le dashboard affiche notamment:
 - les statuts par module
 - les notifications recentes
 - les modules accessibles pour le profil connecte
+- des onglets Synthese, Graphiques et Analyse avancee
+- des filtres de synthese par periode, direction, service, statut de suivi, statut delai et alerte echeance
+- des graphiques dynamiques Chart.js et Plotly avec apercu grand format quand les donnees sont disponibles
 
 Le module Pilotage permet:
 
@@ -460,6 +466,7 @@ Le module Reporting permet:
 
 - affichage de tableaux et graphiques
 - reporting sur PAS / PAO / PTA / Actions
+- rapport PTA officiel reutilisant la table Suivi PTA
 - comparaison interannuelle
 - vue consolidee du PAS
 - export PDF

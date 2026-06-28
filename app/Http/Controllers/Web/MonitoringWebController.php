@@ -32,6 +32,7 @@ use App\Services\Exports\ExportTemplateResolver;
 use App\Services\ExerciceContext;
 use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Exports\ReportingWorkbookExporter;
+use App\Services\PtaSuiviService;
 use App\Support\SafeSql;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
@@ -59,7 +60,8 @@ class MonitoringWebController extends Controller
         private readonly ReportingWorkbookExporter $reportingWorkbookExporter,
         private readonly ReportingAnalyticsService $reportingAnalyticsService,
         private readonly ExportTemplateResolver $exportTemplateResolver,
-        private readonly ActionTrackingService $actionTrackingService
+        private readonly ActionTrackingService $actionTrackingService,
+        private readonly PtaSuiviService $ptaSuiviService
     ) {
     }
 
@@ -443,6 +445,9 @@ class MonitoringWebController extends Controller
         $payload['reportTypes'] = $this->reportTypeDefinitions();
         $payload['activeReportType'] = $reportType;
         $payload['reportFilterOptions'] = $this->reportFilterOptions($user);
+        if ($reportType === 'pta') {
+            $payload['ptaSuiviPayload'] = $this->ptaSuiviService->buildPagePayload($this->requestForPtaSuivi($request), $user);
+        }
 
         return view('workspace.monitoring.reporting', $payload);
     }
@@ -663,6 +668,24 @@ class MonitoringWebController extends Controller
         ];
     }
 
+    private function requestForPtaSuivi(Request $request): Request
+    {
+        $query = $request->query();
+        $ptaRequest = $request->duplicate($query->all());
+
+        if ($query->has('exercice') && ! $query->has('annee')) {
+            $ptaRequest->query->set('annee', $query->get('exercice'));
+        }
+
+        if ($query->has('trimestre') && ! $query->has('periode')) {
+            $ptaRequest->query->set('periode', $query->get('trimestre'));
+        }
+
+        $ptaRequest->query->remove('statut');
+
+        return $ptaRequest;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -672,6 +695,7 @@ class MonitoringWebController extends Controller
             ->only([
                 'report_type',
                 'exercice',
+                'periode',
                 'trimestre',
                 'direction_id',
                 'service_id',
@@ -716,6 +740,8 @@ class MonitoringWebController extends Controller
                     'label' => trim((string) ($service->code ? $service->code.' - ' : '').$service->libelle),
                 ])
                 ->all(),
+            'periodes' => $this->ptaSuiviService->periodOptions(),
+            'trimestres' => $this->ptaSuiviService->periodOptions(),
             'responsables' => $responsables->limit(200)->get(['id', 'name'])
                 ->map(fn (User $responsable): array => [
                     'id' => (int) $responsable->id,

@@ -38,7 +38,7 @@ function bootDashboardRender(force = false) {
   const agentPerformance = payload.agent_performance || {};
   const plotlyFigures = payload.plotly_figures || agentPerformance.plotly_figures || {};
   const reportingCharts = reporting.charts || {};
-  const panelKeys = ['overview', 'charts', 'tables'];
+  const panelKeys = ['overview', 'charts', 'advanced'];
   const panelAliases = {
     overview: 'overview',
     synthese: 'overview',
@@ -47,8 +47,10 @@ function bootDashboardRender(force = false) {
     kpi: 'charts',
     gantt: 'charts',
     analytics: 'charts',
-    actions: 'tables',
-    tables: 'tables',
+    actions: 'advanced',
+    tables: 'advanced',
+    advanced: 'advanced',
+    analyse: 'advanced',
   };
   const chartInstances = {};
   const compactFormatter = new Intl.NumberFormat('fr-FR', {
@@ -939,11 +941,19 @@ function bootDashboardRender(force = false) {
 
     const config = {
       responsive: true,
+      displayModeBar: true,
       displaylogo: false,
       modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     };
 
-    window.Plotly.react(host, figure.data, mergePlotlyLayout(figure.layout || {}), config)
+    const layout = mergePlotlyLayout(figure.layout || {});
+    host.__pasPlotlyFigure = {
+      data: figure.data,
+      layout,
+      config,
+    };
+
+    window.Plotly.react(host, figure.data, layout, config)
       .then(() => {
         host.dataset.chartState = 'ready';
         host.classList.add('is-plotly-rendered');

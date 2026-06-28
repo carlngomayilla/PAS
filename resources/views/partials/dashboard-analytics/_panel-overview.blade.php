@@ -77,6 +77,136 @@
             ];
         }
 
+        $baseSynthesisQuery = [
+            'dashboardTab' => 'overview',
+            'direction_id' => $selectedSynthesisDirection ?: 'all',
+            'service_id' => $selectedSynthesisService ?: 'all',
+            'exercice' => $selectedSynthesisYear ?: 'all',
+            'periode' => $selectedSynthesisPeriod ?: 'all',
+            'statut_suivi' => $synthesisFilters['statut_suivi'] ?? 'all',
+            'statut_delai' => $synthesisFilters['statut_delai'] ?? 'all',
+            'alerte_echeance' => $synthesisFilters['alerte_echeance'] ?? 'all',
+        ];
+        $synthesisCardUrl = static fn (array $filters = []): string => route('synthese.index', array_merge($baseSynthesisQuery, $filters));
+        $summaryCount = static fn (array $rows, string $key): int => (int) ($rows[$key] ?? 0);
+        $workflowCounts = is_array($synthesisWorkflowCounts ?? null) ? $synthesisWorkflowCounts : [];
+        $delayCounts = is_array($synthesisDelayCounts ?? null) ? $synthesisDelayCounts : [];
+        $alertCounts = is_array($synthesisAlertCounts ?? null) ? $synthesisAlertCounts : [];
+
+        $kpiStatCards = [
+            [
+                'label' => 'Actions totales',
+                'value' => $fmtCount($synthesisDecisionSummary['total'] ?? ($metrics['totals']['actions_total'] ?? 0)),
+                'accent' => '#17324a',
+                'icon' => '<path d="M4 4h16v16H4z"/><path d="M4 9h16"/><path d="M9 4v16"/>',
+                'trend' => null,
+                'href' => $synthesisCardUrl(['statut_suivi' => 'all', 'statut_delai' => 'all', 'alerte_echeance' => 'all']),
+            ],
+            [
+                'label' => 'Taux execution',
+                'value' => $fmtPct($synthesisDecisionSummary['taux_execution'] ?? ($globalScores['progression'] ?? 0)),
+                'accent' => '#178f5f',
+                'icon' => '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+                'trend' => null,
+                'href' => $synthesisCardUrl(),
+            ],
+            [
+                'label' => 'Performance PTA',
+                'value' => $fmtPct($synthesisDecisionSummary['performance_pta'] ?? ($globalScores['global'] ?? 0)),
+                'accent' => '#3996d3',
+                'icon' => '<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="5" width="3" height="12"/>',
+                'trend' => null,
+                'href' => $synthesisCardUrl(),
+            ],
+            [
+                'label' => 'A parametrer',
+                'value' => $fmtCount($summaryCount($workflowCounts, 'a_parametrer')),
+                'accent' => '#6b7280',
+                'icon' => '<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/>',
+                'trend' => 'neutral',
+                'trendLabel' => 'Workflow',
+                'href' => $synthesisCardUrl(['statut_suivi' => 'a_parametrer']),
+            ],
+            [
+                'label' => 'Non demarrees',
+                'value' => $fmtCount($summaryCount($workflowCounts, 'non_demarre')),
+                'accent' => '#94a3b8',
+                'icon' => '<circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/>',
+                'trend' => 'neutral',
+                'trendLabel' => 'Workflow',
+                'href' => $synthesisCardUrl(['statut_suivi' => 'non_demarre']),
+            ],
+            [
+                'label' => 'En cours',
+                'value' => $fmtCount($summaryCount($workflowCounts, 'en_cours')),
+                'accent' => '#3996d3',
+                'icon' => '<path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/>',
+                'trend' => null,
+                'href' => $synthesisCardUrl(['statut_suivi' => 'en_cours']),
+            ],
+            [
+                'label' => 'Validation chef',
+                'value' => $fmtCount($summaryCount($workflowCounts, 'validation_chef')),
+                'accent' => '#9333ea',
+                'icon' => '<path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.83 0 3.53.55 4.95 1.49"/>',
+                'trend' => null,
+                'href' => $synthesisCardUrl(['statut_suivi' => 'validation_chef']),
+            ],
+            [
+                'label' => 'Validation controleur',
+                'value' => $fmtCount($summaryCount($workflowCounts, 'validation_controleur')),
+                'accent' => '#4f46e5',
+                'icon' => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+                'trend' => null,
+                'href' => $synthesisCardUrl(['statut_suivi' => 'validation_controleur']),
+            ],
+            [
+                'label' => 'Cloturees',
+                'value' => $fmtCount($summaryCount($workflowCounts, 'cloture')),
+                'accent' => '#00a65a',
+                'icon' => '<path d="M20 6L9 17l-5-5"/>',
+                'trend' => 'up',
+                'trendLabel' => 'Terminees',
+                'href' => $synthesisCardUrl(['statut_suivi' => 'cloture']),
+            ],
+            [
+                'label' => 'Dans les delais',
+                'value' => $fmtCount($summaryCount($delayCounts, 'dans_les_delais')),
+                'accent' => '#178f5f',
+                'icon' => '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+                'trend' => 'up',
+                'trendLabel' => 'Delai',
+                'href' => $synthesisCardUrl(['statut_delai' => 'dans_les_delais']),
+            ],
+            [
+                'label' => 'Hors delai',
+                'value' => $fmtCount($summaryCount($delayCounts, 'hors_delai')),
+                'accent' => '#f97316',
+                'icon' => '<circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 17h.01"/>',
+                'trend' => $summaryCount($delayCounts, 'hors_delai') > 0 ? 'down' : 'up',
+                'trendLabel' => 'Delai',
+                'href' => $synthesisCardUrl(['statut_delai' => 'hors_delai']),
+            ],
+            [
+                'label' => 'Alertes critiques',
+                'value' => $fmtCount($summaryCount($alertCounts, 'critique')),
+                'accent' => '#f9b13c',
+                'icon' => '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+                'trend' => $summaryCount($alertCounts, 'critique') > 0 ? 'down' : 'up',
+                'trendLabel' => 'Alerte',
+                'href' => $synthesisCardUrl(['alerte_echeance' => 'critique']),
+            ],
+            [
+                'label' => 'En retard',
+                'value' => $fmtCount($summaryCount($alertCounts, 'en_retard')),
+                'accent' => '#b42318',
+                'icon' => '<circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/>',
+                'trend' => $summaryCount($alertCounts, 'en_retard') > 0 ? 'down' : 'up',
+                'trendLabel' => $summaryCount($alertCounts, 'en_retard') > 0 ? 'Alerte' : 'OK',
+                'href' => $synthesisCardUrl(['alerte_echeance' => 'en_retard']),
+            ],
+        ];
+
         if ($dashboardRole === 'agent' && (int) ($personalActionsSummary['total'] ?? 0) > 0) {
             array_unshift($kpiStatCards, [
                 'label'  => 'Mes actions',

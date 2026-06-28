@@ -74,12 +74,49 @@
     $officialFilters = (array) ($basePolicy['route_filters'] ?? []);
     $directionSelector = is_array($analytics['direction_selector'] ?? null) ? $analytics['direction_selector'] : [];
     $exerciseFilter = is_array($analytics['exercise'] ?? null) ? $analytics['exercise'] : [];
+    $synthesisFilters = is_array($analytics['synthesis_filters'] ?? null) ? $analytics['synthesis_filters'] : [];
+    $synthesisDecisionSummary = is_array($analytics['synthesis_decision_summary'] ?? null) ? $analytics['synthesis_decision_summary'] : [];
+    $synthesisWorkflowCounts = is_array($synthesisDecisionSummary['workflow'] ?? null) ? $synthesisDecisionSummary['workflow'] : [];
+    $synthesisDelayCounts = is_array($synthesisDecisionSummary['delay'] ?? null) ? $synthesisDecisionSummary['delay'] : [];
+    $synthesisAlertCounts = is_array($synthesisDecisionSummary['alerts'] ?? null) ? $synthesisDecisionSummary['alerts'] : [];
+    $exerciceContext = app(\App\Services\ExerciceContext::class);
+    $ptaSuiviService = app(\App\Services\PtaSuiviService::class);
+    $synthesisExerciseOptions = $exerciceContext->options();
+    $synthesisPeriodOptions = $ptaSuiviService->periodOptions();
+    $synthesisWorkflowOptions = [
+        'all' => 'Tous suivis',
+        'a_parametrer' => 'A parametrer',
+        'non_demarre' => 'Non demarre',
+        'en_cours' => 'En cours',
+        'validation_chef' => 'Validation chef',
+        'validation_controleur' => 'Validation controleur',
+        'cloture' => 'Cloture',
+    ];
+    $synthesisDelayOptions = [
+        'all' => 'Tous delais',
+        'dans_les_delais' => 'Dans les delais',
+        'hors_delai' => 'Hors delai',
+    ];
+    $synthesisAlertOptions = [
+        'all' => 'Toutes alertes',
+        'aucune_alerte' => 'Aucune alerte',
+        'echeance_proche' => 'Echeance proche',
+        'critique' => 'Critique',
+        'en_retard' => 'En retard',
+        'cloturee' => 'Cloturee',
+        'a_parametrer' => 'A parametrer',
+    ];
+    $selectedSynthesisYear = request()->query('exercice', $exerciseFilter['year'] ?? 'all');
+    $selectedSynthesisPeriod = $ptaSuiviService->normalizePeriod(request()->query('periode', request()->query('trimestre', $exerciseFilter['period'] ?? 'all')));
+    $selectedSynthesisDirection = (string) ($directionSelector['selected_id'] ?? request('direction_id', 'all'));
+    $selectedSynthesisService = (string) ($directionSelector['service_selected_id'] ?? request('service_id', 'all'));
     $pilotDashboardRoles = ['global', 'admin', 'super_admin', 'dg', 'cabinet', 'planification'];
     $showDirectionSynthesisSelector = ($directionSelector['enabled'] ?? false)
         && in_array($dashboardRole, $pilotDashboardRoles, true);
     $availableDashboardTabs = [
-        'overview' => 'Synthèse',
+        'overview' => 'Synthese',
         'charts' => 'Graphiques',
+        'advanced' => 'Analyse avancee',
     ];
     $dashboardTabAliases = [
         'overview' => 'overview',
@@ -89,14 +126,38 @@
         'kpi' => 'charts',
         'gantt' => 'charts',
         'analytics' => 'charts',
-        'actions' => 'overview',
-        'tables' => 'overview',
+        'actions' => 'advanced',
+        'tables' => 'advanced',
+        'advanced' => 'advanced',
+        'analyse' => 'advanced',
     ];
     $requestedDashboardTab = request()->query('dashboardTab', 'overview');
     $currentDashboardTab = $dashboardTabAliases[$requestedDashboardTab] ?? 'overview';
     if ($currentDashboardTab === 'tables') {
         $currentDashboardTab = 'overview';
     }
+    $canOpenPtaSuivi = $currentDashboardUser
+        && (
+            $currentDashboardUser->hasPermission(\App\Services\PtaSuiviService::PERMISSION)
+            || $currentDashboardUser->isPlanningControlChief()
+            || $currentDashboardUser->hasRole(
+                \App\Models\User::ROLE_SUPER_ADMIN,
+                \App\Models\User::ROLE_ADMIN,
+                \App\Models\User::ROLE_ADMIN_FONCTIONNEL,
+                \App\Models\User::ROLE_PLANIFICATION,
+                \App\Models\User::ROLE_SCIQ,
+                \App\Models\User::ROLE_SCIQ_SUIVI_GLOBAL
+            )
+        );
+    $ptaSuiviQuery = collect([
+        'direction_id' => $directionSelector['selected_id'] ?? request('direction_id'),
+        'service_id' => $directionSelector['service_selected_id'] ?? request('service_id'),
+        'annee' => $exerciseFilter['year'] ?? request('exercice'),
+        'periode' => $selectedSynthesisPeriod,
+        'statut_suivi' => request('statut_suivi'),
+        'statut_delai' => request('statut_delai'),
+        'alerte_echeance' => request('alerte_echeance'),
+    ])->filter(fn ($value): bool => $value !== null && trim((string) $value) !== '' && trim((string) $value) !== 'all')->all();
 
     $summaryStrip = ($roleDashboard['summary_cards'] ?? []) !== [] ? $roleDashboard['summary_cards'] : [
         ['label' => 'Actions totales', 'value' => $metrics['totals']['actions_total'] ?? 0, 'accent' => '#1F2937', 'bg' => '#F8FBFF', 'meta' => null, 'href' => route('workspace.actions.index')],
@@ -532,7 +593,7 @@
         ],
         [
             'title' => 'Évolution trimestrielle',
-            'chip' => $exerciseFilter['quarter_label'] ?? 'Tous les trimestres',
+            'chip' => $exerciseFilter['period_label'] ?? $exerciseFilter['quarter_label'] ?? 'Annuelle',
             'headers' => ['Trimestre', 'Actions prévues', 'Terminées', 'Retard', 'Taux d\'exécution', 'Score'],
             'rows' => collect($decisionQuarterRows)->map(fn (array $row): array => ['cells' => [
                 $row['trimestre'] ?? '-',
@@ -629,36 +690,101 @@
     </form>
     <div class="ml-auto flex flex-wrap gap-2 pr-1">
         <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('workspace.notifications.index', ['tab' => 'alertes']) }}">Alertes</a>
+        @if ($canOpenPtaSuivi)
+            <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('pta.suivi.index', $ptaSuiviQuery) }}">
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4V4zm0 5h16M9 4v16" />
+                </svg>
+                Suivi PTA
+            </a>
+        @endif
         <a class="btn btn-primary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('workspace.reporting') }}">Rapports</a>
     </div>
 </div>
 
-@if ($showDirectionSynthesisSelector)
-    <div class="dashboard-synthesis-context mb-4 flex flex-wrap items-center gap-2 px-1 py-1 text-sm font-semibold text-[#17324a]">
-        <span>{{ $directionSelector['selected_label'] ?? 'Synthèse globale' }}</span>
-        <span class="text-[#3996d3]">|</span>
-        <span>{{ $directionSelector['service_selected_label'] ?? 'Tous les services' }}</span>
-        <span class="text-[#3996d3]">|</span>
-        <span>{{ $exerciseFilter['label'] ?? 'Exercice courant' }}</span>
-        @if (!empty($directionSelector['selected_id']) && !empty($directionSelector['service_options']))
-            <details class="relative z-[100] ml-auto" data-dashboard-synthesis-selector>
-                <summary class="btn btn-primary btn-sm cursor-pointer list-none rounded-xl px-3 py-1.5 text-xs">
-                    Choisir un service
-                </summary>
-                <div class="absolute right-0 top-[calc(100%+0.5rem)] z-[9999] min-w-[260px] overflow-hidden rounded-2xl border border-[#3996d3]/20 bg-white p-2 shadow-xl">
-                    <a class="block rounded-xl px-3 py-2 text-sm font-semibold text-[#17324a] hover:bg-[#e8f3fb]" href="{{ request()->fullUrlWithQuery(['dashboardTab' => 'overview', 'service_id' => 'all']) }}">
-                        Tous les services
-                    </a>
-                    @foreach (($directionSelector['service_options'] ?? []) as $serviceOption)
-                        <a class="block rounded-xl px-3 py-2 text-sm font-semibold text-[#17324a] hover:bg-[#e8f3fb]" href="{{ request()->fullUrlWithQuery(['dashboardTab' => 'overview', 'service_id' => $serviceOption['id']]) }}">
-                            {{ $serviceOption['label'] }}
-                        </a>
+@if ($currentDashboardTab === 'overview')
+    <form
+        method="GET"
+        action="{{ route('synthese.index') }}"
+        class="mb-4 rounded-2xl border border-[#3996d3]/20 bg-white/95 p-3 shadow-sm"
+        data-dashboard-synthesis-filter-form
+        data-services-url-template="{{ route('synthese.services-by-direction', ['direction' => '__DIRECTION__']) }}"
+    >
+        <input type="hidden" name="dashboardTab" value="overview">
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+            <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
+                Annee
+                <select name="exercice" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
+                    @foreach ($synthesisExerciseOptions as $option)
+                        <option value="{{ $option['value'] }}" @selected((string) $selectedSynthesisYear === (string) $option['value'])>{{ $option['label'] }}</option>
                     @endforeach
-                </div>
-            </details>
-        @endif
-    </div>
+                </select>
+            </label>
+            <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
+                Periode
+                <select name="periode" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
+                    @foreach ($synthesisPeriodOptions as $option)
+                        <option value="{{ $option['value'] }}" @selected((string) $selectedSynthesisPeriod === (string) $option['value'])>{{ $option['label'] }}</option>
+                    @endforeach
+                </select>
+            </label>
+            @if ($showDirectionSynthesisSelector)
+                <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
+                    Direction
+                    <select name="direction_id" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]" data-synthesis-direction-select>
+                        <option value="all" @selected($selectedSynthesisDirection === '' || $selectedSynthesisDirection === 'all')>Toutes directions</option>
+                        @foreach (($directionSelector['options'] ?? []) as $directionOption)
+                            <option value="{{ $directionOption['id'] }}" @selected($selectedSynthesisDirection === (string) $directionOption['id'])>{{ $directionOption['label'] }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
+                    Service
+                    <select name="service_id" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]" data-synthesis-service-select @disabled($selectedSynthesisDirection === '' || $selectedSynthesisDirection === 'all')>
+                        <option value="all" @selected($selectedSynthesisService === '' || $selectedSynthesisService === 'all')>Tous services</option>
+                        @foreach (($directionSelector['service_options'] ?? []) as $serviceOption)
+                            <option value="{{ $serviceOption['id'] }}" @selected($selectedSynthesisService === (string) $serviceOption['id'])>{{ $serviceOption['label'] }}</option>
+                        @endforeach
+                    </select>
+                </label>
+            @endif
+            <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
+                Statut suivi
+                <select name="statut_suivi" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
+                    @foreach ($synthesisWorkflowOptions as $value => $label)
+                        <option value="{{ $value }}" @selected((string) ($synthesisFilters['statut_suivi'] ?? 'all') === (string) $value || (($synthesisFilters['statut_suivi'] ?? null) === null && $value === 'all'))>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
+                Statut delai
+                <select name="statut_delai" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
+                    @foreach ($synthesisDelayOptions as $value => $label)
+                        <option value="{{ $value }}" @selected((string) ($synthesisFilters['statut_delai'] ?? 'all') === (string) $value || (($synthesisFilters['statut_delai'] ?? null) === null && $value === 'all'))>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
+                Alerte echeance
+                <select name="alerte_echeance" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
+                    @foreach ($synthesisAlertOptions as $value => $label)
+                        <option value="{{ $value }}" @selected((string) ($synthesisFilters['alerte_echeance'] ?? 'all') === (string) $value || (($synthesisFilters['alerte_echeance'] ?? null) === null && $value === 'all'))>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="text-xs font-semibold text-[#667085]">
+                {{ $directionSelector['selected_label'] ?? 'Synthese globale' }} | {{ $directionSelector['service_selected_label'] ?? 'Tous les services' }} | {{ $exerciseFilter['label'] ?? 'Exercice courant' }}
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('synthese.index', ['dashboardTab' => 'overview', 'direction_id' => 'all', 'service_id' => 'all', 'exercice' => 'all', 'periode' => 'all', 'trimestre' => 'all', 'statut_suivi' => 'all', 'statut_delai' => 'all', 'alerte_echeance' => 'all']) }}">Reinitialiser</a>
+                <button type="submit" class="btn btn-primary btn-sm rounded-xl px-3 py-1.5 text-xs">Appliquer</button>
+            </div>
+        </div>
+    </form>
 @endif
+
 {{-- Badge redondant supprimé : les informations rôle/périmètre/direction/service/exercice
      sont désormais accessibles via le chip de périmètre dans la navbar (et le filtre exercice). --}}
 
@@ -687,7 +813,7 @@
 @include("partials.dashboard-analytics._panel-charts")
 @endif
 
-@if ($currentDashboardTab === 'overview')
+@if ($currentDashboardTab === 'advanced')
 @include("partials.dashboard-analytics._panel-tables")
 @endif
 
@@ -807,6 +933,63 @@
                         URL.revokeObjectURL(url);
                     });
                 });
+
+                const synthesisFilterForm = document.querySelector('[data-dashboard-synthesis-filter-form]');
+                if (synthesisFilterForm instanceof HTMLFormElement) {
+                    const directionSelect = synthesisFilterForm.querySelector('[data-synthesis-direction-select]');
+                    const serviceSelect = synthesisFilterForm.querySelector('[data-synthesis-service-select]');
+                    const servicesUrlTemplate = synthesisFilterForm.dataset.servicesUrlTemplate || '';
+
+                    const resetServiceSelect = () => {
+                        if (!(serviceSelect instanceof HTMLSelectElement)) {
+                            return;
+                        }
+
+                        serviceSelect.innerHTML = '';
+                        const option = document.createElement('option');
+                        option.value = 'all';
+                        option.textContent = 'Tous services';
+                        serviceSelect.appendChild(option);
+                        serviceSelect.value = 'all';
+                    };
+
+                    if (directionSelect instanceof HTMLSelectElement && serviceSelect instanceof HTMLSelectElement && servicesUrlTemplate) {
+                        directionSelect.addEventListener('change', async () => {
+                            resetServiceSelect();
+
+                            if (!directionSelect.value || directionSelect.value === 'all') {
+                                serviceSelect.disabled = true;
+                                return;
+                            }
+
+                            serviceSelect.disabled = true;
+                            try {
+                                const response = await fetch(servicesUrlTemplate.replace('__DIRECTION__', encodeURIComponent(directionSelect.value)), {
+                                    headers: {
+                                        Accept: 'application/json',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                    },
+                                });
+
+                                if (!response.ok) {
+                                    return;
+                                }
+
+                                const services = await response.json();
+                                services.forEach((service) => {
+                                    const option = document.createElement('option');
+                                    option.value = String(service.id || '');
+                                    const code = service.code ? `${service.code} - ` : '';
+                                    option.textContent = `${code}${service.libelle || 'Service'}`;
+                                    serviceSelect.appendChild(option);
+                                });
+                                serviceSelect.disabled = false;
+                            } catch (error) {
+                                serviceSelect.disabled = false;
+                            }
+                        });
+                    }
+                }
             })();
         </script>
     @endpush

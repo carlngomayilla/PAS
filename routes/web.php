@@ -19,6 +19,7 @@ use App\Http\Controllers\Web\PlanningImportWebController;
 use App\Http\Controllers\Web\PlanningUnlockWebController;
 use App\Http\Controllers\Web\ProfileWebController;
 use App\Http\Controllers\Web\PtaWebController;
+use App\Http\Controllers\Web\PtaSuiviWebController;
 use App\Http\Controllers\Web\ReferentielWebController;
 use App\Http\Controllers\Web\SuperAdminWebController;
 use App\Http\Middleware\EnsureActiveAccount;
@@ -71,6 +72,23 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
 
     Route::middleware(EnsurePasswordIsFresh::class)->group(function (): void {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/synthese', static fn () => redirect()->route('dashboard', ['dashboardTab' => 'overview'] + request()->query()))
+            ->name('synthese.index');
+        Route::get('/synthese/services-by-direction/{direction}', [DependentSelectController::class, 'servicesByDirection'])
+            ->whereNumber('direction')
+            ->name('synthese.services-by-direction');
+
+        Route::get('/pta/suivi', [PtaSuiviWebController::class, 'index'])
+            ->name('pta.suivi.index');
+        Route::get('/workspace/pta/suivi', static fn () => redirect()->route('pta.suivi.index', request()->query()))
+            ->name('workspace.pta.suivi.index');
+        Route::get('/pta/suivi/export/excel', [PtaSuiviWebController::class, 'exportExcel'])
+            ->name('pta.suivi.export.excel');
+        Route::get('/pta/suivi/export/pdf', [PtaSuiviWebController::class, 'exportPdf'])
+            ->name('pta.suivi.export.pdf');
+        Route::get('/pta/suivi/{action}/details', [PtaSuiviWebController::class, 'details'])
+            ->whereNumber('action')
+            ->name('pta.suivi.details');
 
         Route::prefix('/admin')->name('admin.')->group(function (): void {
             Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

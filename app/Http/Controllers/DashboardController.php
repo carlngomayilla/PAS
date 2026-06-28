@@ -23,6 +23,7 @@ use App\Services\Dashboard\DashboardPythonChartService;
 use App\Services\DashboardProfileSettings;
 use App\Services\ExerciceContext;
 use App\Services\PersonalTaskService;
+use App\Services\PtaSuiviService;
 use App\Services\WorkflowSettings;
 use App\Support\SafeSql;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,7 +56,8 @@ class DashboardController extends Controller
         private readonly AnalyticsCacheVersionService $cacheVersionService,
         private readonly ExerciceContext $exerciceContext,
         private readonly ActionStatusService $actionStatusService,
-        private readonly PersonalTaskService $personalTaskService
+        private readonly PersonalTaskService $personalTaskService,
+        private readonly PtaSuiviService $ptaSuiviService
     ) {}
 
     public function index(Request $request): View
@@ -165,6 +167,7 @@ class DashboardController extends Controller
             ])
             ->orderByDesc('date_echeance')
             ->get();
+        $scopedActions = $this->applyDashboardSynthesisActionFilters($scopedActions);
 
         $actionSets = $this->splitDashboardActionCollections($user, $scopedActions);
         $dashboardActions = $actionSets['dashboard'];
@@ -313,6 +316,8 @@ class DashboardController extends Controller
                 'label' => $this->exerciceContext->activeLabel(),
                 'quarter' => $this->exerciceContext->selectedQuarter(),
                 'quarter_label' => $this->exerciceContext->activeQuarterLabel(),
+                'period' => $this->selectedDashboardSynthesisPeriod(),
+                'period_label' => $this->ptaSuiviService->periodLabel($this->selectedDashboardSynthesisPeriod()),
             ],
             'statisticalPolicy' => $policy,
             'officialPolicy' => [
@@ -486,8 +491,12 @@ class DashboardController extends Controller
             'alert_version' => (int) Cache::get('alert-center:version', 1),
             'exercice' => $this->exerciceContext->selectedYear(),
             'trimestre' => $this->exerciceContext->selectedQuarter(),
+            'periode' => $this->selectedDashboardSynthesisPeriod(),
             'direction_filter' => $this->selectedDashboardDirectionId($user),
             'service_filter' => $this->selectedDashboardServiceId($user),
+            'statut_suivi' => $this->selectedDashboardSynthesisFilters()['statut_suivi'],
+            'statut_delai' => $this->selectedDashboardSynthesisFilters()['statut_delai'],
+            'alerte_echeance' => $this->selectedDashboardSynthesisFilters()['alerte_echeance'],
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -529,6 +538,8 @@ class DashboardController extends Controller
             'radar_datasets',
             'top_action_bars',
             'role_dashboard',
+            'synthesis_filters',
+            'synthesis_decision_summary',
         ];
 
         return array_intersect_key($dashboardData, array_flip($keys));
@@ -1017,6 +1028,243 @@ class DashboardController extends Controller
     }
 
     /**
+     * @return array{periode: string, periode_label: string, statut_suivi: string|null, statut_delai: string|null, alerte_echeance: string|null}
+     */
+    private function selectedDashboardSynthesisFilters(): array
+    {
+        $pick = static function (string $key, array $allowed): ?string {
+            $value = trim((string) request()->query($key, ''));
+
+            return $value !== '' && $value !== 'all' && in_array($value, $allowed, true)
+                ? $value
+                : null;
+        };
+
+        $period = $this->selectedDashboardSynthesisPeriod();
+
+        return [
+            'periode' => $period,
+            'periode_label' => $this->ptaSuiviService->periodLabel($period),
+            'statut_suivi' => $pick('statut_suivi', [
+                'a_parametrer',
+                'non_demarre',
+                'en_cours',
+                'validation_chef',
+                'validation_controleur',
+                'cloture',
+            ]),
+            'statut_delai' => $pick('statut_delai', [
+                'dans_les_delais',
+                'hors_delai',
+            ]),
+            'alerte_echeance' => $pick('alerte_echeance', [
+                'aucune_alerte',
+                'echeance_proche',
+                'critique',
+                'en_retard',
+                'cloturee',
+                'a_parametrer',
+            ]),
+        ];
+    }
+
+    private function selectedDashboardSynthesisPeriod(): string
+    {
+        return $this->ptaSuiviService->normalizePeriod(
+            request()->query('periode', request()->query('trimestre', $this->exerciceContext->selectedQuarter() ?: 'all'))
+        );
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return Collection<int, Action>
+     */
+    private function applyDashboardSynthesisActionFilters(Collection $actions): Collection
+    {
+        $filters = $this->selectedDashboardSynthesisFilters();
+        $periodRange = $this->ptaSuiviService->periodRange(
+            $this->exerciceContext->selectedYear(),
+            (string) ($filters['periode'] ?? 'all')
+        );
+
+        if ($periodRange === null && ! $filters['statut_suivi'] && ! $filters['statut_delai'] && ! $filters['alerte_echeance']) {
+            return $actions->values();
+        }
+
+        return $actions
+            ->filter(function (Action $action) use ($filters, $periodRange): bool {
+                if ($periodRange !== null) {
+                    $date = $this->actionReferenceDate($action);
+                    if (! $date instanceof Carbon || ! $date->betweenIncluded($periodRange[0], $periodRange[1])) {
+                        return false;
+                    }
+                }
+
+                if ($filters['statut_suivi'] !== null && $this->synthesisWorkflowStatus($action) !== $filters['statut_suivi']) {
+                    return false;
+                }
+
+                if ($filters['statut_delai'] !== null && $this->synthesisDelayStatus($action) !== $filters['statut_delai']) {
+                    return false;
+                }
+
+                if ($filters['alerte_echeance'] !== null && $this->synthesisAlertStatus($action) !== $filters['alerte_echeance']) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, mixed>
+     */
+    private function buildSynthesisDecisionSummary(Collection $actions): array
+    {
+        $workflowCounts = [
+            'a_parametrer' => 0,
+            'non_demarre' => 0,
+            'en_cours' => 0,
+            'validation_chef' => 0,
+            'validation_controleur' => 0,
+            'cloture' => 0,
+        ];
+        $delayCounts = [
+            'dans_les_delais' => 0,
+            'hors_delai' => 0,
+        ];
+        $alertCounts = [
+            'aucune_alerte' => 0,
+            'echeance_proche' => 0,
+            'critique' => 0,
+            'en_retard' => 0,
+            'cloturee' => 0,
+            'a_parametrer' => 0,
+        ];
+
+        foreach ($actions as $action) {
+            $workflow = $this->synthesisWorkflowStatus($action);
+            $delay = $this->synthesisDelayStatus($action);
+            $alert = $this->synthesisAlertStatus($action);
+
+            $workflowCounts[$workflow] = ($workflowCounts[$workflow] ?? 0) + 1;
+            $delayCounts[$delay] = ($delayCounts[$delay] ?? 0) + 1;
+            $alertCounts[$alert] = ($alertCounts[$alert] ?? 0) + 1;
+        }
+
+        $total = $actions->count();
+        $progress = $total > 0
+            ? round((float) $actions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2)
+            : 0.0;
+        $performance = $total > 0
+            ? round((float) $actions->avg(function (Action $action): float {
+                $score = (float) ($action->actionKpi?->kpi_global ?? 0);
+
+                return $score > 0 ? $score : $this->actionQuantitativeRate($action);
+            }), 2)
+            : 0.0;
+
+        return [
+            'total' => $total,
+            'taux_execution' => $progress,
+            'performance_pta' => $performance,
+            'workflow' => $workflowCounts,
+            'delay' => $delayCounts,
+            'alerts' => $alertCounts,
+        ];
+    }
+
+    private function synthesisWorkflowStatus(Action $action): string
+    {
+        if ($this->actionStatusService->isPendingSetup($action)) {
+            return 'a_parametrer';
+        }
+
+        $dynamic = strtolower(trim((string) ($action->statut_dynamique ?? $action->statut ?? '')));
+        $validation = strtolower(trim((string) ($action->statut_validation ?? '')));
+
+        if ($dynamic === ActionTrackingService::STATUS_CLOTUREE || $action->cloture_le !== null) {
+            return 'cloture';
+        }
+
+        if (in_array($validation, [
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
+            return 'validation_controleur';
+        }
+
+        if ($validation === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
+            return 'validation_chef';
+        }
+
+        if ($this->actionStatusService->isNotStarted($action)) {
+            return 'non_demarre';
+        }
+
+        return 'en_cours';
+    }
+
+    private function synthesisDelayStatus(Action $action): string
+    {
+        $deadline = $this->actionDeadline($action);
+        if (! $deadline instanceof Carbon) {
+            return 'dans_les_delais';
+        }
+
+        $deadlineDay = $deadline->copy()->endOfDay();
+        $completedAt = $this->synthesisCompletedAt($action);
+        if ($completedAt instanceof Carbon) {
+            return $completedAt->copy()->startOfDay()->gt($deadlineDay) ? 'hors_delai' : 'dans_les_delais';
+        }
+
+        return Carbon::today()->gt($deadlineDay) ? 'hors_delai' : 'dans_les_delais';
+    }
+
+    private function synthesisAlertStatus(Action $action): string
+    {
+        if ($this->synthesisWorkflowStatus($action) === 'cloture' || $this->synthesisCompletedAt($action) instanceof Carbon) {
+            return 'cloturee';
+        }
+
+        $deadline = $this->actionDeadline($action);
+        if (! $deadline instanceof Carbon) {
+            return 'a_parametrer';
+        }
+
+        $today = Carbon::today();
+        $deadlineDay = $deadline->copy()->startOfDay();
+        if ($today->gt($deadlineDay)) {
+            return 'en_retard';
+        }
+
+        $days = $today->diffInDays($deadlineDay, false);
+        if ($days <= 3) {
+            return 'critique';
+        }
+
+        if ($days <= 7) {
+            return 'echeance_proche';
+        }
+
+        return 'aucune_alerte';
+    }
+
+    private function synthesisCompletedAt(Action $action): ?Carbon
+    {
+        foreach (['date_fin_reelle', 'cloture_le', 'evalue_le'] as $field) {
+            $date = $action->{$field} ?? null;
+            if ($date instanceof Carbon) {
+                return $date;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param  Collection<int, Action>  $actions
      * @return array<string, int>
      */
@@ -1154,6 +1402,7 @@ class DashboardController extends Controller
         $interannual = $this->buildInterannualComparison($user);
         $statusCards = $this->buildStatusCards($actions);
         $officialStatusCards = $this->buildStatusCards($officialActions);
+        $synthesisDecisionSummary = $this->buildSynthesisDecisionSummary($actions);
         $alerts = $this->buildDashboardAlertRows($actions);
         $roleDashboard = $this->buildRoleDashboard($user, $actions, $validatedActions);
 
@@ -1169,6 +1418,14 @@ class DashboardController extends Controller
         $globalScores = $this->buildGlobalScoreSummary($officialActions, $avg);
         $qualityThreshold = $this->averageActionQualityThreshold($actions);
         $agentPerformance = $this->buildAgentPerformancePayload($actions, 77.0);
+        $agentPerformance['context'] = [
+            'tenant_id' => 'default',
+            'year' => $currentYear,
+            'period' => $this->selectedDashboardSynthesisPeriod(),
+            'direction_id' => $this->selectedDashboardDirectionId($user) ?? 'all',
+            'service_id' => $this->selectedDashboardServiceId($user) ?? 'all',
+            'role' => $dashboardRole,
+        ];
         $plotlyFigures = $this->dashboardPythonChartService->generate($agentPerformance);
         $operationalMonthly = $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false, $qualityThreshold);
         $monthly = $this->buildMonthlyScoreRows($officialActions, $currentYear, $avg, true, $qualityThreshold);
@@ -1309,6 +1566,8 @@ class DashboardController extends Controller
                 'label' => $this->exerciceContext->activeLabel(),
                 'quarter' => $this->exerciceContext->selectedQuarter(),
                 'quarter_label' => $this->exerciceContext->activeQuarterLabel(),
+                'period' => $this->selectedDashboardSynthesisPeriod(),
+                'period_label' => $this->ptaSuiviService->periodLabel($this->selectedDashboardSynthesisPeriod()),
             ],
             'actions_index_url' => $this->actionIndexRoute(),
             'personal_actions_summary' => [
@@ -1328,6 +1587,8 @@ class DashboardController extends Controller
             'operational_monthly' => $operationalMonthly,
             'status_cards' => $statusCards,
             'monthly' => $monthly,
+            'synthesis_filters' => $this->selectedDashboardSynthesisFilters(),
+            'synthesis_decision_summary' => $synthesisDecisionSummary,
             'unit_rows' => $unitRows,
             'synthesis_objective_rows' => $synthesisObjectiveRows,
             'synthesis_pao_rows' => $synthesisPaoRows,

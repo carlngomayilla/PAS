@@ -162,6 +162,8 @@ function svgToPngDataUrl(svgElement) {
     var activeTableTitle = 'Apercu tableau';
     var activeChartUrl = '';
     var activeChartTitle = 'Graphique';
+    var activePreviewCleanup = null;
+    var plotlyLoader = null;
     var previewId = 0;
     var refreshTimer = null;
     var previewInitialized = false;
@@ -197,10 +199,23 @@ function svgToPngDataUrl(svgElement) {
         downloadBtn.onclick = null;
     }
 
+    function cleanupActivePreview() {
+        if (typeof activePreviewCleanup === 'function') {
+            try {
+                activePreviewCleanup();
+            } catch (error) {
+                console.debug('Nettoyage de l apercu ignore.', error);
+            }
+        }
+
+        activePreviewCleanup = null;
+    }
+
     function openBase(options) {
         if (!ensureElements()) return;
 
         lastFocus = document.activeElement;
+        cleanupActivePreview();
         hideActions();
         eyebrowEl.textContent = options.eyebrow || 'Previsualisation';
         titleEl.textContent = options.title || 'Apercu';
@@ -225,6 +240,7 @@ function svgToPngDataUrl(svgElement) {
         modal.style.display = '';
         modal.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('preview-modal-open');
+        cleanupActivePreview();
         bodyEl.innerHTML = '';
         activeTableRows = [];
         activeChartUrl = '';
@@ -327,10 +343,229 @@ function svgToPngDataUrl(svgElement) {
         return source.querySelector ? source.querySelector('canvas, svg') : null;
     }
 
+    function resolvePlotlyNode(source) {
+        if (!source) return null;
+        if (source.classList && source.classList.contains('js-plotly-plot')) return source;
+
+        return source.querySelector
+            ? source.querySelector('.js-plotly-plot, .dashboard-plotly-host.is-plotly-rendered')
+            : null;
+    }
+
+    function clonePlain(value, seen) {
+        if (value === null || typeof value !== 'object') {
+            return value;
+        }
+
+        if (typeof Element !== 'undefined' && value instanceof Element) {
+            return value;
+        }
+
+        if (value instanceof Date) {
+            return new Date(value.getTime());
+        }
+
+        var refs = seen || new WeakMap();
+        if (refs.has(value)) {
+            return refs.get(value);
+        }
+
+        if (Array.isArray(value)) {
+            var list = [];
+            refs.set(value, list);
+            value.forEach(function (item, index) {
+                list[index] = clonePlain(item, refs);
+            });
+            return list;
+        }
+
+        var output = {};
+        refs.set(value, output);
+        Object.keys(value).forEach(function (key) {
+            output[key] = clonePlain(value[key], refs);
+        });
+
+        return output;
+    }
+
+    function clonePlotlyFigure(plotlyNode) {
+        var stored = plotlyNode && plotlyNode.__pasPlotlyFigure;
+
+        if (stored && Array.isArray(stored.data)) {
+            return {
+                data: clonePlain(stored.data),
+                layout: clonePlain(stored.layout || {}),
+                config: clonePlain(stored.config || {}),
+            };
+        }
+
+        return {
+            data: clonePlain((plotlyNode && plotlyNode.data) || []),
+            layout: clonePlain((plotlyNode && plotlyNode.layout) || {}),
+            config: {},
+        };
+    }
+
+    function ensurePlotly() {
+        if (window.Plotly) {
+            return Promise.resolve(window.Plotly);
+        }
+
+        if (!plotlyLoader) {
+            plotlyLoader = import('plotly.js-dist-min')
+                .then(function (module) {
+                    window.Plotly = module.default || module;
+                    return window.Plotly;
+                })
+                .finally(function () {
+                    plotlyLoader = null;
+                });
+        }
+
+        return plotlyLoader;
+    }
+
+    function cloneChartConfig(chart) {
+        var sourceConfig = (chart && chart.config && chart.config._config) || (chart && chart.config) || {};
+        var options = clonePlain(sourceConfig.options || {});
+
+        options.responsive = true;
+        options.maintainAspectRatio = false;
+
+        return {
+            type: sourceConfig.type || chart.config.type,
+            data: clonePlain(sourceConfig.data || chart.data || {}),
+            options: options,
+        };
+    }
+
+    function openPlotlyPreview(plotlyNode, title, subtitle) {
+        var figure = clonePlotlyFigure(plotlyNode);
+
+        if (!Array.isArray(figure.data) || figure.data.length === 0) {
+            return false;
+        }
+
+        activeChartTitle = title || 'Graphique';
+        openBase({
+            eyebrow: 'Graphique dynamique',
+            title: activeChartTitle,
+            subtitle: subtitle,
+            body: '<div id="preview-interactive-plotly" class="preview-interactive-chart"></div>',
+        });
+
+        ensurePlotly().then(function (Plotly) {
+            var target = document.getElementById('preview-interactive-plotly');
+            if (!target) return;
+
+            var layout = clonePlain(figure.layout || {});
+            layout.autosize = true;
+            layout.height = null;
+            layout.width = null;
+
+            var config = Object.assign({
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+            }, figure.config || {});
+
+            return Plotly.newPlot(target, figure.data, layout, config).then(function () {
+                activePreviewCleanup = function () {
+                    if (target && window.Plotly) {
+                        window.Plotly.purge(target);
+                    }
+                };
+
+                window.setTimeout(function () {
+                    if (target && window.Plotly) {
+                        window.Plotly.Plots.resize(target);
+                    }
+                }, 60);
+
+                downloadBtn.textContent = 'Telecharger PNG';
+                downloadBtn.href = '#';
+                downloadBtn.onclick = function (event) {
+                    event.preventDefault();
+                    Plotly.downloadImage(target, {
+                        format: 'png',
+                        filename: safeFilename(activeChartTitle, 'graphique'),
+                        height: 900,
+                        width: 1400,
+                        scale: 2,
+                    });
+                };
+                downloadBtn.classList.remove('hidden');
+            });
+        }).catch(function (error) {
+            console.error('Impossible d ouvrir l apercu Plotly.', error);
+            bodyEl.innerHTML = [
+                '<div class="preview-empty-state">',
+                '<p class="preview-empty-title">Apercu dynamique indisponible</p>',
+                '<p>Le moteur Plotly n a pas pu etre charge.</p>',
+                '</div>',
+            ].join('');
+        });
+
+        return true;
+    }
+
+    function openChartJsPreview(canvas, title, subtitle) {
+        var sourceChart = window.Chart && typeof window.Chart.getChart === 'function'
+            ? window.Chart.getChart(canvas)
+            : null;
+
+        if (!sourceChart) {
+            return false;
+        }
+
+        activeChartTitle = title || 'Graphique';
+        openBase({
+            eyebrow: 'Graphique dynamique',
+            title: activeChartTitle,
+            subtitle: subtitle,
+            body: '<div class="preview-interactive-chart"><canvas id="preview-interactive-canvas"></canvas></div>',
+        });
+
+        var targetCanvas = document.getElementById('preview-interactive-canvas');
+        if (!targetCanvas) {
+            return true;
+        }
+
+        var previewChart = new window.Chart(targetCanvas, cloneChartConfig(sourceChart));
+        activePreviewCleanup = function () {
+            previewChart.destroy();
+        };
+
+        downloadBtn.textContent = 'Telecharger PNG';
+        downloadBtn.href = '#';
+        downloadBtn.onclick = function (event) {
+            event.preventDefault();
+            var url = previewChart.toBase64Image('image/png', 1);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = safeFilename(activeChartTitle, 'graphique') + '.png';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        };
+        downloadBtn.classList.remove('hidden');
+
+        return true;
+    }
+
     function openChartPreview(source) {
+        var plotlyNode = resolvePlotlyNode(source);
         var chartNode = resolveChartNode(source);
         var title = (source && source.dataset ? source.dataset.previewTitle : '') || nearestTitle(source || chartNode);
         var subtitle = (source && source.dataset ? source.dataset.previewSubtitle : '') || nearestSubtitle(source || chartNode) || 'Apercu grand format du graphique';
+
+        if (plotlyNode && openPlotlyPreview(plotlyNode, title, subtitle)) {
+            return Promise.resolve();
+        }
+
+        if (chartNode && chartNode.matches('canvas') && openChartJsPreview(chartNode, title, subtitle)) {
+            return Promise.resolve();
+        }
 
         if (!chartNode) {
             openBase({
@@ -435,7 +670,7 @@ function svgToPngDataUrl(svgElement) {
         document.querySelectorAll('.dashboard-chart-host, .dashboard-canvas, .dashboard-gauge-card').forEach(function (node) {
             if (node.closest('#preview-modal')) return;
             if (node.matches('.dashboard-canvas, .dashboard-gauge-card') && node.querySelector('.dashboard-chart-host')) return;
-            if (!resolveChartNode(node)) return;
+            if (!resolveChartNode(node) && !resolvePlotlyNode(node)) return;
             if (node.dataset.previewChartReady === '1') return;
 
             node.dataset.previewChartReady = '1';

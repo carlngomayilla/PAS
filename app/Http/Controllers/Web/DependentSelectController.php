@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Controller;
 use App\Models\Action;
+use App\Models\Direction;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pta;
 use App\Models\Service;
@@ -35,6 +36,13 @@ class DependentSelectController extends Controller
         $this->scopeByUserDirection($query, $user, 'direction_id', 'id');
 
         return response()->json($query->get(['id', 'direction_id', 'code', 'libelle']));
+    }
+
+    public function servicesByDirection(Request $request, Direction $direction): JsonResponse
+    {
+        $request->merge(['direction_id' => (int) $direction->id]);
+
+        return $this->services($request);
     }
 
     public function users(Request $request): JsonResponse

@@ -2,6 +2,27 @@
 
 @section('title', 'Reporting')
 
+@push('head')
+    <style>
+        .reporting-pta-official .pta-suivi-table-wrap { width:100%; overflow-x:auto; }
+        .reporting-pta-official .pta-suivi-table { width:100%; min-width:1620px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+        .reporting-pta-official .pta-suivi-table th,
+        .reporting-pta-official .pta-suivi-table td { border:1px solid #111; padding:6px; vertical-align:middle; overflow-wrap:anywhere; }
+        .reporting-pta-official .pta-suivi-table th { background:#d9d9d9; color:#000; text-align:center; font-weight:900; }
+        .reporting-pta-official .pta-pas-row td { background:#2f75b5; color:#fff; font-weight:900; text-align:center; }
+        .reporting-pta-official .pta-strategy-row td { background:#5b9bd5; color:#000; font-weight:900; text-align:center; }
+        .reporting-pta-official .pta-strategy-rate { background:#ddebf7 !important; }
+        .reporting-pta-official .pta-objective-row td { background:#ddebf7; font-weight:900; text-align:center; }
+        .reporting-pta-official .pta-objective-number { width:42px; background:#fff !important; }
+        .reporting-pta-official .pta-center,
+        .reporting-pta-official .pta-status-cell { text-align:center; }
+        .reporting-pta-official .pta-status-cell { font-weight:900; line-height:1.15; }
+        .reporting-pta-official .pta-action-link { display:inline; border:0; padding:0; background:transparent; color:#17324a; font:inherit; font-weight:800; text-decoration:underline; cursor:pointer; text-align:left; }
+        .reporting-pta-official .pta-observation { font-size:11px; line-height:1.35; }
+        .reporting-pta-official .pta-empty { padding:18px; text-align:center; font-weight:800; color:#64748b; }
+    </style>
+@endpush
+
 @section('content')
     @php
         $roleProfile = $roleProfile ?? ['eyebrow' => 'Reporting institutionnel', 'title' => "Centre d'export et de diffusion", 'subtitle' => 'Exports et diffusion du reporting.', 'role_label' => strtoupper((string) ($scope['role'] ?? 'lecture'))];
@@ -31,8 +52,11 @@
         $reportTypes = collect($reportTypes ?? []);
         $activeReportType = (string) ($activeReportType ?? request('report_type', 'consolide_dg'));
         $reportFilterOptions = (array) ($reportFilterOptions ?? []);
+        $selectedReportPeriod = app(\App\Services\PtaSuiviService::class)->normalizePeriod(request('periode', request('trimestre', 'all')));
+        $ptaSuiviPayload = is_array($ptaSuiviPayload ?? null) ? $ptaSuiviPayload : [];
+        $ptaSuiviSummary = (array) ($ptaSuiviPayload['summary'] ?? []);
         $reportQuery = collect(request()->query())
-            ->only(['report_type', 'exercice', 'trimestre', 'direction_id', 'service_id', 'statut', 'type_action', 'responsable_id', 'criticite', 'periode_debut', 'periode_fin'])
+            ->only(['report_type', 'exercice', 'periode', 'trimestre', 'direction_id', 'service_id', 'statut', 'type_action', 'responsable_id', 'criticite', 'periode_debut', 'periode_fin'])
             ->filter(fn ($value): bool => trim((string) $value) !== '' && trim((string) $value) !== 'all')
             ->all();
     @endphp
@@ -94,10 +118,10 @@
                 </select>
             </div>
             <div>
-                <label for="trimestre">Trimestre</label>
-                <select id="trimestre" name="trimestre">
-                    @foreach (($reportFilterOptions['trimestres'] ?? []) as $option)
-                        <option value="{{ $option['value'] }}" @selected((string) request('trimestre', '') === (string) $option['value'])>{{ $option['label'] }}</option>
+                <label for="periode">Periode</label>
+                <select id="periode" name="periode">
+                    @foreach (($reportFilterOptions['periodes'] ?? $reportFilterOptions['trimestres'] ?? []) as $option)
+                        <option value="{{ $option['value'] }}" @selected((string) $selectedReportPeriod === (string) $option['value'])>{{ $option['label'] }}</option>
                     @endforeach
                 </select>
             </div>
@@ -176,6 +200,26 @@
 
     <div class="grid gap-4">
 
+        @if ($activeReportType === 'pta')
+            <article class="showcase-panel reporting-pta-official overflow-hidden p-0">
+                <div class="border-b border-slate-200 bg-white px-4 py-3">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 class="showcase-panel-title">Suivi PTA officiel</h2>
+                            <p class="mt-1 text-xs font-semibold text-slate-500">{{ $ptaSuiviPayload['scopeLabel'] ?? 'Perimetre PTA' }}</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-xs">
+                            <span class="anbg-badge anbg-badge-neutral px-3">{{ $ptaSuiviSummary['actions'] ?? 0 }} actions</span>
+                            <span class="anbg-badge anbg-badge-info px-3">{{ number_format((float) ($ptaSuiviSummary['performance'] ?? 0), 0) }}% performance</span>
+                            <span class="anbg-badge anbg-badge-warning px-3">{{ $ptaSuiviSummary['en_retard'] ?? 0 }} retards</span>
+                        </div>
+                    </div>
+                </div>
+                <x-tables.pta-suivi-table :groups="$ptaSuiviPayload['groups'] ?? []" export-mode="readonly" />
+            </article>
+        @endif
+
+        @if ($activeReportType !== 'pta')
         <article class="showcase-panel">
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -244,5 +288,6 @@
                 @endforelse
             </div>
         </article>
+        @endif
     </div>
 @endsection

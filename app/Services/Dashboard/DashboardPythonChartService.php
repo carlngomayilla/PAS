@@ -2,7 +2,8 @@
 
 namespace App\Services\Dashboard;
 
-use Symfony\Component\Process\Process;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
 use Throwable;
 
 class DashboardPythonChartService
@@ -28,6 +29,26 @@ class DashboardPythonChartService
             return [];
         }
 
+        $cacheKey = $this->cacheKey($payload, $script);
+        $ttl = now()->addMinutes(max(1, (int) config('dashboard.charts.cache_minutes', 10)));
+
+        try {
+            return Cache::remember($cacheKey, $ttl, fn (): array => $this->generateFresh($payload, $script));
+        } catch (Throwable) {
+            return $this->generateFresh($payload, $script);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function generateFresh(array $payload, string $script): array
+    {
+        if (self::$available === false || empty($payload['rows'])) {
+            return [];
+        }
+
         $pythonBinaries = $this->pythonBinaries();
         if ($pythonBinaries === []) {
             self::$available = false;
@@ -43,19 +64,18 @@ class DashboardPythonChartService
 
         foreach ($pythonBinaries as $python) {
             try {
-                $process = new Process([$python, $script]);
-                $process->setInput($input);
-                $process->setTimeout(self::TIMEOUT_SECONDS);
-                $process->run();
+                $result = Process::timeout(self::TIMEOUT_SECONDS)
+                    ->input($input)
+                    ->run([$python, $script]);
             } catch (Throwable) {
                 continue;
             }
 
-            if (! $process->isSuccessful()) {
+            if ($result->failed()) {
                 continue;
             }
 
-            $decoded = json_decode($process->getOutput(), true);
+            $decoded = json_decode($result->output(), true);
             if (! is_array($decoded)) {
                 continue;
             }
@@ -68,6 +88,25 @@ class DashboardPythonChartService
         self::$available = false;
 
         return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function cacheKey(array $payload, string $script): string
+    {
+        $context = is_array($payload['context'] ?? null) ? $payload['context'] : [];
+        $parts = [
+            'tenant' => $context['tenant_id'] ?? 'default',
+            'year' => $context['year'] ?? 'all',
+            'period' => $context['period'] ?? 'all',
+            'direction' => $context['direction_id'] ?? 'all',
+            'service' => $context['service_id'] ?? 'all',
+            'script' => @filemtime($script) ?: 0,
+            'payload' => sha1(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR) ?: ''),
+        ];
+
+        return 'dashboard_charts:'.implode(':', array_map(static fn ($value): string => (string) $value, $parts));
     }
 
     /**

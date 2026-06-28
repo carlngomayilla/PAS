@@ -340,6 +340,8 @@ Chaque dashboard contient : KPI du périmètre + Mes tâches + score personnel +
 Dashboard = périmètre autorisé + tâches + score personnel + alertes
 ```
 
+La vue de pilotage est organisée en trois onglets : **Synthèse**, **Graphiques** et **Analyse avancée**. La synthèse peut être filtrée par exercice, période, direction, service, statut de suivi, statut délai et alerte échéance. Les profils habilités peuvent ouvrir le **Suivi PTA officiel** depuis la synthèse.
+
 ---
 
 ## 17. Sidebars validées
@@ -380,6 +382,8 @@ Utilisateurs, rôles, permissions, directions, services, unités, exercices, wor
 **Formats** : PDF + Excel uniquement.
 
 Liste : Rapport PAS · Rapport PAO · Rapport PTA · Rapport Actions · Rapport KPI · Rapport Anomalies · Rapport Financement · Rapport Consolidé DG.
+
+Le rapport PTA officiel réutilise la table **Suivi PTA** et peut être exporté en PDF paysage et Excel.
 
 Détail dans le prompt technique (sections 15 du prompt Claude Code).
 

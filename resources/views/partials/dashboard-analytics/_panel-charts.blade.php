@@ -142,6 +142,8 @@
         $directionPerformanceChartHeight = max(20, ($directionPerformanceFallbackRows->count() * 2.25) + 4);
         $servicePerformanceChartHeight = max(20, ($servicePerformanceFallbackRows->count() * 2.25) + 4);
         $unitSummaryChartHeight = max(15, (count($unitRows) * 2) + 4);
+        $unitModeKey = \Illuminate\Support\Str::ascii(mb_strtolower((string) $unitModeLabel));
+        $showUnitSummaryChart = ! in_array($unitModeKey, ['services', 'directions'], true);
     @endphp
 
     {{-- ─── RANGEE 1 : HERO SCORE + JAUGES KPI ─────────────────────── --}}
@@ -287,6 +289,7 @@
 
     {{-- ─── RANGEE 3 : PERFORMANCE PAR UNITE + TOP ACTIONS ─────────── --}}
     <div class="charts-bento charts-bento-row-rank charts-long-row mb-4">
+        @if ($showDashboardMacroCharts || $showUnitSummaryChart)
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
                 <h2 class="chart-title">Performance des directions</h2>
@@ -320,6 +323,7 @@
             </div>
             </div>
         </article>
+        @endif
 
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
