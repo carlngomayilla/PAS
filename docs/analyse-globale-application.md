@@ -8,16 +8,16 @@ _Date : 2026 • Version auditée : branche courante `main`_
 
 | Aspect | Valeur |
 |---|---|
-| Framework back | **Laravel 12** (PHP 8.2+) |
-| Auth | **Laravel Sanctum 4.3** (session web + tokens API) |
+| Framework back | **Laravel 13.17.0** (PHP 8.3+, local PHP 8.4.19) |
+| Auth | **Laravel Sanctum 4.x-dev** (session web + tokens API, verrou compatible Laravel 13) |
 | Base de données | SQLite (dev) / **PostgreSQL** (prod) — `pdo_pgsql` requis |
 | Moteur de vues | **Blade** (Laravel natif, aucune SPA) |
 | Front | **Tailwind CSS 4** (build Vite 7) + Chart.js 4 + D3 + GSAP |
 | Real-time | **Laravel Echo + Pusher** (messagerie, notifications) |
 | Queue / Jobs | DB queue (`database`) — `GenerateReportJob`, `SendAlertDigestJob` |
 | Mail | SMTP (digest d'alertes via `AlertDigestMail`) |
-| Exports | `barryvdh/laravel-dompdf` + générateurs `.xlsx` maison (`app/Services/Exports/`) |
-| Tests | PHPUnit 11 — **41 tests Feature + 11 tests Unit = ~52 fichiers** |
+| Exports | `barryvdh/laravel-dompdf` `dev-master` compatible Laravel 13 + générateurs `.xlsx` maison (`app/Services/Exports/`) |
+| Tests | PHPUnit 12 — **447 tests passants, 3 skipped, 2705 assertions** après migration Laravel 13 |
 | Code | ~ 60 modèles Eloquent, 40 contrôleurs, 30 services applicatifs, 65 migrations |
 
 ---

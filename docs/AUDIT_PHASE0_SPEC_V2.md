@@ -1,8 +1,9 @@
 # Audit Phase 0 — Conformité avec la spec v2 PAS ANBG
 
-**Projet :** e-Pilotage PAS ANBG (Laravel 12, PHP 8.2+, PostgreSQL/SQLite)
+**Projet :** e-Pilotage PAS ANBG (Laravel 13.17.0, PHP 8.3+/8.4 local, PostgreSQL/SQLite)
 **Date de l'audit :** 2026-05-28
 **Base auditée :** `C:\Users\chris\OK\PAS` (branche courante)
+**Mise à jour technique :** 2026-06-28 — migration locale Laravel 13 sur `local/laravel-13-ai-pta`.
 **Référence :** Spec v2 consolidée du 28/05/2026 (Module Import Excel, paramétrage 3 modes, suppression KPI conformité, KPI Délai gradué, workflow report d'échéance Chef → SCIQ → DG)
 
 ---
@@ -25,7 +26,7 @@ Aucun module existant n'est à reconstruire. Il s'agit principalement de **migra
 
 ### 1.1 Stack
 
-- Laravel 12, PHP 8.2+, Sanctum 4.3, DomPDF pour les exports.
+- Laravel 13.17.0, PHP 8.3+ (PHP 8.4.19 en local), Sanctum `4.x-dev`, DomPDF wrapper `dev-master` pour les exports.
 - **Aucune dépendance Excel tierce** (pas de `maatwebsite/excel` ni `phpoffice/phpspreadsheet`). Le parsing est fait via un service custom `app/Services/Imports/SimpleSpreadsheet.php`.
 - **Aucune dépendance Spatie Permission** : la matrice de permissions est custom et stockée dans la table `platform_settings` (clés `role_permissions_<role>`).
 

@@ -7,6 +7,50 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 — Migration locale Laravel 13 + Laravel Boost
+
+### Demande
+
+Migrer proprement le projet local de Laravel 12.51.0 vers Laravel 13 sur la branche `local/laravel-13-ai-pta`, sans pousser sur `main`, avant le chantier IA PTA/PAS/PAO.
+
+### Changement
+
+- **Framework** : passage a `laravel/framework` 13.17.0 et PHP applicatif declare en `^8.3`.
+- **Console/dev** : passage a `laravel/tinker` 3.0.2, `phpunit/phpunit` 12.5.30, `nunomaduro/collision` 8.9.4, `laravel/pint` 1.29.3, `laravel/sail` 1.63.0.
+- **Boost** : installation de Laravel Boost 2.4.10 avec guidelines, skills et MCP local (`php artisan boost:mcp`).
+- **Compatibilite Laravel 13** : verrouillage local de `laravel/sanctum` sur `4.x-dev` et `barryvdh/laravel-dompdf` sur `dev-master`, car les tags stables disponibles ne declarent pas encore Illuminate 13.
+- **Composer** : regeneration de `composer.lock` et reinstall propre de `vendor/` depuis le lock apres nettoyage du dossier partiellement source/dist.
+
+### Fichiers modifies
+
+- `composer.json`
+- `composer.lock`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `.agents/**`
+- `.codex/config.toml`
+- `.mcp.json`
+- `boost.json`
+- `docs/CHANGELOG.md`
+- `docs/analyse-globale-application.md`
+- `docs/AUDIT_PHASE0_SPEC_V2.md`
+
+### Validation
+
+- `composer dump-autoload`
+- `composer run post-update-cmd`
+- `php artisan about` — Laravel 13.17.0, PHP 8.4.19
+- `php artisan route:list --except-vendor` — 299 routes
+- `php artisan optimize:clear`
+- `php artisan migrate --no-interaction`
+- `npm install`
+- `npm run build` — OK, avertissement attendu sur le chunk Plotly
+- `php artisan test` — 447 passed, 3 skipped, 2705 assertions
+- `vendor/bin/pint --dirty --test`
+- `composer validate` — valide avec avertissement attendu sur `laravel/sanctum` `4.x-dev`
+
+---
+
 ## 2026-06-28 — Stabilisation locale avant migration Laravel 13
 
 ### Demande
