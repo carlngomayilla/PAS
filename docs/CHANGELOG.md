@@ -7,6 +7,35 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 — Stabilisation locale avant migration Laravel 13
+
+### Demande
+
+Securiser l'etat local de la branche `local/laravel-13-ai-pta` avant de lancer la migration Laravel 13 et le chantier IA PTA/PAS/PAO.
+
+### Changement
+
+- **Test dashboard** : alignement du test de drilldown avec le filtre officiel `alerte_echeance=en_retard` introduit par le Suivi PTA.
+- **Suite de tests** : ajout d'une limite memoire PHPUnit a `512M` pour permettre aux exports PDF DomPDF de passer dans la suite complete, sans changer la configuration de production.
+
+### Fichiers modifies
+
+- `phpunit.xml`
+- `tests/Feature/WebWorkspaceTest.php`
+- `docs/CHANGELOG.md`
+
+### Validation
+
+- `php artisan test --filter=WebWorkspaceTest`
+- `php artisan test tests/Feature/PtaSuiviWebTest.php tests/Feature/ReportingExportPermissionTest.php tests/Feature/ReportingExportDownloadSecurityTest.php tests/Feature/ReportingReportCatalogTest.php`
+- `php artisan test tests/Feature/SuperAdminWebTest.php`
+- `php artisan test` — 447 passed, 3 skipped, 2705 assertions
+- `npm run build` — OK, avertissement attendu sur le chunk Plotly
+- `vendor/bin/pint --dirty --test`
+- `git diff --check`
+
+---
+
 ## 2026-06-28 — Suivi PTA officiel + filtres de synthèse + graphiques dashboard
 
 ### Demande

@@ -260,7 +260,7 @@ class WebWorkspaceTest extends TestCase
             ->get('/dashboard')
             ->assertOk()
             ->assertSee(route('workspace.actions.index'), false)
-            ->assertSee(route('workspace.actions.index', ['statut' => 'en_retard']), false)
+            ->assertSee('alerte_echeance=en_retard', false)
             ->assertSee('statut_validation_min=validee_chef', false);
     }
 
