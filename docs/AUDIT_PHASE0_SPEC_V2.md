@@ -27,7 +27,8 @@ Aucun module existant n'est à reconstruire. Il s'agit principalement de **migra
 ### 1.1 Stack
 
 - Laravel 13.17.0, PHP 8.3+ (PHP 8.4.19 en local), Sanctum `4.x-dev`, DomPDF wrapper `dev-master` pour les exports.
-- **Aucune dépendance Excel tierce** (pas de `maatwebsite/excel` ni `phpoffice/phpspreadsheet`). Le parsing est fait via un service custom `app/Services/Imports/SimpleSpreadsheet.php`.
+- `laravel/ai` 0.8.1 installe la configuration IA, les stubs agents/tools et les tables de conversations IA.
+- `maatwebsite/excel` 3.1.69, `phpoffice/phpspreadsheet` 1.30.5 et `phpoffice/phpword` 1.4.0 sont disponibles pour les futurs imports/exports IA PTA.
 - **Aucune dépendance Spatie Permission** : la matrice de permissions est custom et stockée dans la table `platform_settings` (clés `role_permissions_<role>`).
 
 ### 1.2 Modèles métier (`app/Models`)

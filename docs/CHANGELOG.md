@@ -7,6 +7,47 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 — Outillage IA, Excel et Word pour module PTA
+
+### Demande
+
+Installer les briques techniques necessaires au futur module IA PTA/PAS/PAO : SDK IA Laravel, generation Excel normalisee, exports Word, configuration locale sans secret commite.
+
+### Changement
+
+- **Laravel AI** : ajout de `laravel/ai` 0.8.1, publication de `config/ai.php`, stubs agents/tools et migration `agent_conversations`.
+- **Configuration IA** : `config/ai.php` lit maintenant `AI_DEFAULT_PROVIDER`, avec `openai` par defaut.
+- **Excel** : ajout de `maatwebsite/excel` 3.1.69 et `phpoffice/phpspreadsheet` 1.30.5.
+- **Word** : ajout de `phpoffice/phpword` 1.4.0 pour preparer les exports `.docx`.
+- **Environnement local** : ajout de `AI_DEFAULT_PROVIDER=openai` et `OPENAI_API_KEY=` dans `.env` ignore par Git, sans cle API commitee.
+
+### Fichiers modifies
+
+- `composer.json`
+- `composer.lock`
+- `config/ai.php`
+- `database/migrations/2026_06_28_111106_create_agent_conversations_table.php`
+- `stubs/agent.stub`
+- `stubs/structured-agent.stub`
+- `stubs/tool.stub`
+- `stubs/agent-middleware.stub`
+- `docs/CHANGELOG.md`
+- `docs/analyse-globale-application.md`
+- `docs/AUDIT_PHASE0_SPEC_V2.md`
+
+### Validation
+
+- `php artisan vendor:publish --provider="Laravel\\Ai\\AiServiceProvider" --no-interaction`
+- `php artisan config:show ai.default` — `openai`
+- `php artisan optimize:clear`
+- `php artisan migrate --no-interaction`
+- `npm run build` — OK, avertissement attendu sur le chunk Plotly
+- `php artisan test` — 447 passed, 3 skipped, 2705 assertions
+- `vendor/bin/pint --dirty --test`
+- `git diff --check`
+
+---
+
 ## 2026-06-28 — Migration locale Laravel 13 + Laravel Boost
 
 ### Demande

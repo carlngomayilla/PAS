@@ -16,7 +16,8 @@ _Date : 2026 • Version auditée : branche courante `main`_
 | Real-time | **Laravel Echo + Pusher** (messagerie, notifications) |
 | Queue / Jobs | DB queue (`database`) — `GenerateReportJob`, `SendAlertDigestJob` |
 | Mail | SMTP (digest d'alertes via `AlertDigestMail`) |
-| Exports | `barryvdh/laravel-dompdf` `dev-master` compatible Laravel 13 + générateurs `.xlsx` maison (`app/Services/Exports/`) |
+| IA | `laravel/ai` 0.8.1, config `AI_DEFAULT_PROVIDER`, conversations IA persistables |
+| Exports | `barryvdh/laravel-dompdf` `dev-master` compatible Laravel 13 + `maatwebsite/excel` 3.1.69 + `phpoffice/phpword` 1.4.0 + générateurs `.xlsx` maison (`app/Services/Exports/`) |
 | Tests | PHPUnit 12 — **447 tests passants, 3 skipped, 2705 assertions** après migration Laravel 13 |
 | Code | ~ 60 modèles Eloquent, 40 contrôleurs, 30 services applicatifs, 65 migrations |
 

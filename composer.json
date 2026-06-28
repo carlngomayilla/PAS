@@ -11,9 +11,12 @@
     "require":  {
         "php": "^8.3",
         "barryvdh/laravel-dompdf": "dev-master",
+        "laravel/ai": "^0.8",
         "laravel/framework": "^13.0",
         "laravel/sanctum": "4.x-dev",
-        "laravel/tinker": "^3.0"
+        "laravel/tinker": "^3.0",
+        "maatwebsite/excel": "^3.1",
+        "phpoffice/phpword": "^1.4"
     },
     "require-dev":  {
         "fakerphp/faker": "^1.23",
