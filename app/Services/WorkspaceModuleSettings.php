@@ -4,11 +4,12 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaIntrospectionCache;
 
 class WorkspaceModuleSettings
 {
     private const GROUP_PUBLISHED = 'workspace_modules';
+
     private const GROUP_DRAFT = 'workspace_modules_draft';
 
     /**
@@ -198,7 +199,7 @@ class WorkspaceModuleSettings
 
     public function flush(): void
     {
-        \App\Support\SchemaIntrospectionCache::flush();
+        SchemaIntrospectionCache::flush();
 
         $this->resolved = null;
         $this->draftResolved = null;
@@ -216,8 +217,10 @@ class WorkspaceModuleSettings
             'pao' => ['code' => 'pao', 'label' => 'PAO', 'description' => 'Déclinaison annuelle par direction', 'enabled' => true, 'order' => 40, 'section' => 'planification'],
             'pta' => ['code' => 'pta', 'label' => 'PTA', 'description' => 'Planification opérationnelle par service', 'enabled' => true, 'order' => 50, 'section' => 'planification'],
             'imports_excel' => ['code' => 'imports_excel', 'label' => 'Imports Excel', 'description' => 'Chargement Excel global PAS, PAO, PTA et actions', 'enabled' => true, 'order' => 55, 'section' => 'planification'],
+            'ai_imports' => ['code' => 'ai_imports', 'label' => 'IA & Imports', 'description' => 'Extraction IA, previsualisation et import PTA valide', 'enabled' => true, 'order' => 56, 'section' => 'planification'],
             'execution' => ['code' => 'execution', 'label' => 'Actions', 'description' => 'Exécution des tâches et suivi de progression', 'enabled' => true, 'order' => 60, 'section' => 'execution'],
             'reporting' => ['code' => 'reporting', 'label' => 'Reporting', 'description' => 'Reporting consolidé, exports et diffusion', 'enabled' => true, 'order' => 70, 'section' => 'pilotage'],
+            'ai_reports' => ['code' => 'ai_reports', 'label' => 'Rapports IA', 'description' => 'Rapports PAS, PAO et PTA rediges depuis les metriques', 'enabled' => true, 'order' => 72, 'section' => 'pilotage'],
             'referentiel' => ['code' => 'referentiel', 'label' => 'Référentiels', 'description' => 'Directions, services, utilisateurs', 'enabled' => true, 'order' => 80, 'section' => 'gouvernance'],
             'delegations' => ['code' => 'delegations', 'label' => 'Délégations', 'description' => 'Suppléance temporaire de validation', 'enabled' => true, 'order' => 90, 'section' => 'gouvernance'],
             'retention' => ['code' => 'retention', 'label' => 'Rétention', 'description' => 'Archivage et gouvernance des données', 'enabled' => true, 'order' => 100, 'section' => 'gouvernance'],
@@ -234,7 +237,7 @@ class WorkspaceModuleSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }

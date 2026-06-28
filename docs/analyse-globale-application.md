@@ -1,6 +1,6 @@
 # Analyse globale — Application ANBG Pilotage PAS / PAO / PTA
 
-_Date : 2026 • Version auditée : branche courante `main`_
+_Date : 2026 • Version auditée : branche `local/laravel-13-ai-pta`_
 
 ---
 
@@ -16,9 +16,9 @@ _Date : 2026 • Version auditée : branche courante `main`_
 | Real-time | **Laravel Echo + Pusher** (messagerie, notifications) |
 | Queue / Jobs | DB queue (`database`) — `GenerateReportJob`, `SendAlertDigestJob` |
 | Mail | SMTP (digest d'alertes via `AlertDigestMail`) |
-| IA | `laravel/ai` 0.8.1, config `AI_DEFAULT_PROVIDER`, conversations IA persistables |
-| Exports | `barryvdh/laravel-dompdf` `dev-master` compatible Laravel 13 + `maatwebsite/excel` 3.1.69 + `phpoffice/phpword` 1.4.0 + générateurs `.xlsx` maison (`app/Services/Exports/`) |
-| Tests | PHPUnit 12 — **447 tests passants, 3 skipped, 2705 assertions** après migration Laravel 13 |
+| IA | `laravel/ai` 0.8.1, config `AI_DEFAULT_PROVIDER`, conversations IA persistables, module IA PTA contrôlé par validation humaine |
+| Exports | `barryvdh/laravel-dompdf` `dev-master` compatible Laravel 13 + `maatwebsite/excel` 3.1.69 + `phpoffice/phpword` 1.4.0 + exports PDF/Word/Excel IA + générateurs `.xlsx` maison (`app/Services/Exports/`) |
+| Tests | PHPUnit 12 — **458 tests passants, 3 skipped, 2742 assertions** après module IA PTA/Rapports |
 | Code | ~ 60 modèles Eloquent, 40 contrôleurs, 30 services applicatifs, 65 migrations |
 
 ---
@@ -57,6 +57,7 @@ Périmètres d'accès calculés dynamiquement via `RolePermissionSettings` (flag
 ### 2.4 Modules Blade (workspace)
 - `dashboard` (rôle-aware) · `pas` · `pao` · `pta` · `actions` (list + suivi) · `kpi` / `kpi-mesures`
 - `alertes` · `reporting` (analytics cross-plan) · `justificatifs` · `messaging`
+- `ai_imports` (import IA PTA : upload, analyse, correction, validation, import) · `ai_reports` (rapports IA PAS/PAO/PTA : génération, validation, exports)
 - `monitoring` · `audit` · `notifications` · `profile` · `global-search`
 - `super_admin` : **18 panneaux** (roles, modules, workflow, calculation, dashboard_profiles, notifications, documents, maintenance, snapshots, simulation, audit_diagnostic, organization, referentials, kpis, appearance, action_policies, settings, templates_export)
 
@@ -70,6 +71,7 @@ Périmètres d'accès calculés dynamiquement via `RolePermissionSettings` (flag
 - **Policies exhaustives** : `ActionPolicy`, `PasPolicy`, `PaoPolicy`, `PaoAxePolicy`, `PaoObjectifOperationnelPolicy`, `PaoObjectifStrategiquePolicy` — toutes enregistrées dans `AppServiceProvider`.
 - **Observers** : `ActionObserver` (recalcul KPI à chaque update/save) et `PlanningCacheObserver` (invalidation cache agrégé sur Pao/Pta/User) → pattern CQRS léger.
 - **Audit** : `JournalAudit` + trait `RecordsAuditTrail` → toutes les mutations API sont journalisées.
+- **IA sous contrôle humain** : le module PTA stocke les lots analysés, normalise les lignes, expose les erreurs, impose validation/correction avant import et historise les actions IA dans `ai_import_audits`.
 - **Configuration dynamique runtime** : `PlatformSettings`, `AppearanceSettings`, `WorkflowSettings`, `WorkspaceModuleSettings`, etc., persistés en DB (`platform_settings`) avec snapshots (`platform_setting_snapshots`) pour rollback.
 - **Rate limiting login** : 5/10 min par email + 25/10 min par IP (`AppServiceProvider::configureRateLimiting`).
 - **Sécurité fichiers** : `Security/Antivirus` + `SecureJustificatifStorage` + `SecureMessageAttachmentStorage` (scan avant stockage, quarantaine).

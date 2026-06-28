@@ -4,7 +4,7 @@
 
 - Version : 1.0
 - Date : 21 mai 2026
-- Périmètre : tous les workflows métier de l'application Laravel courante (branche `main`)
+- Périmètre : tous les workflows métier de l'application Laravel courante (branche `local/laravel-13-ai-pta`)
 - Sources : code (`routes/`, `app/Http/Controllers`, `app/Models`, `app/Services`, `database/migrations`) et documentation (`docs/specifications-fonctionnelles.md`, `docs/analyse-globale-application.md`, `docs/rapport-specifications-fonctionnelles-application-actuelle.md`, `README.md`)
 
 ---
@@ -56,6 +56,7 @@ L'application gère huit profils (sept rôles métier + un rôle technique). Les
 - **Exercices budgétaires** : `ExerciceContext` injecte l'exercice actif. Les plans et actions sont scopés par `exercice_id`, ce qui empêche les fuites cross-année.
 - **Délégations** : la table `delegations` autorise un utilisateur à agir au nom d'une direction/service pendant une fenêtre temporelle. Les Policies (`PasPolicy`, `PaoPolicy`, etc.) consomment `DelegationService`.
 - **Audit immuable** : le trait `RecordsAuditTrail` + le contrôleur web persistent dans `journal_audit` chaque mutation sensible (`create`, `update`, `delete`, `submit`, `approve`, `lock`, `reopen`).
+- **IA assistée, jamais autonome** : les imports PTA et les rapports IA produisent des propositions traçables ; aucune création d'action ni validation de rapport n'est définitive sans correction/validation humaine.
 
 ---
 
@@ -458,6 +459,26 @@ Les dashboards sont rôle-aware : le `DashboardController` construit un agrégat
 
 `ReportingAnalyticsService`, `app/Services/Exports/*`, `ExportTemplate`, `ExportTemplateVersion`, `ExportTemplateAssignment`, `DashboardProfileSettings`, `GenerateReportJob`.
 
+### 6.5.a Sous-workflow IA — Import PTA
+
+1. **Upload** : un utilisateur habilité ouvre `workspace.ai-imports.pta.index` et dépose un fichier PTA (`csv`, `xlsx`, `pdf`, `doc`, `docx`, image). Le fichier est stocké sur le disque local non public.
+2. **Analyse** : `PtaExtractionService` extrait les lignes tabulaires quand le format le permet. Les formats non tabulaires créent une ligne de travail à faible confiance, sans inventer de données.
+3. **Normalisation** : `PtaNormalizationService` mappe les colonnes vers les champs PTA attendus, normalise statuts/budgets/dates et crée les lignes `ai_import_rows`.
+4. **Prévisualisation** : l'utilisateur consulte les lignes, erreurs, avertissements et scores de confiance avant toute écriture métier.
+5. **Correction humaine** : les lignes peuvent être corrigées ou ignorées. Les corrections sont enregistrées dans `corrected_data`.
+6. **Validation** : `PtaImportValidationService` bloque les lignes incomplètes ou incohérentes. Les erreurs restent visibles et exportables.
+7. **Import final** : `PtaFinalImportService` réexécute la validation, crée au besoin les conteneurs PAS/PAO/PTA, puis crée uniquement les actions issues des lignes valides.
+8. **Historique** : chaque étape sensible est tracée dans `ai_import_audits` et consultable via `workspace.ai-imports.pta.history`.
+
+### 6.5.b Sous-workflow IA — Rapports PAS/PAO/PTA
+
+1. **Sélection** : l'utilisateur habilité choisit le type de rapport (`pas`, `pao`, `pta`) et le périmètre (exercice, direction, service).
+2. **Calcul métrique** : les builders `PasReportDataBuilder`, `PaoReportDataBuilder`, `PtaReportDataBuilder` s'appuient sur les actions Laravel existantes ; le rapport ne dépend pas d'une réponse IA non vérifiée pour ses chiffres.
+3. **Rédaction assistée** : `AiReportWritingService` produit un brouillon structuré avec synthèse, analyse, risques et recommandations.
+4. **Correction** : le contenu peut être modifié avant validation.
+5. **Validation humaine** : `ReportValidationService` marque le rapport comme validé et conserve l'utilisateur/date de validation.
+6. **Exports** : seuls les contenus contrôlés sont exportés en PDF, Word et Excel par `ReportExportService`.
+
 ### 6.6 Exceptions
 
 - Volume important + filtre large : risque de timeout (l'absence de pagination sur `reporting/overview` est un point d'attention identifié dans l'audit).
@@ -624,6 +645,8 @@ Maintenir le socle organisationnel et de sécurité : structures (directions, se
 | Action — financement | DAF, DG | non_requis · en_attente_daf · en_cours_analyse · approuve · rejete · finance · non_finance | — | ✓ | via `action_log` |
 | Alertes | Tous (par scope) | non lu / lu | — | lecture journalisée | — |
 | Pilotage / Reporting | DG, Cabinet, Planif. | — | — | — | — |
+| Import IA PTA | Planification, SCIQ, Direction/Service habilités | uploaded→analyzed→validated→imported | validation humaine avant import | ✓ (`ai_import_audits`) | erreurs exportables |
+| Rapports IA PAS/PAO/PTA | Planification, DG, Cabinet, Direction habilitée | draft→validated→exported | validation humaine avant export officiel | ✓ (`ai_generated_reports`) | — |
 | Référentiels | Admin, Super-Admin | actif/inactif | — | ✓ | — |
 | Délégations | Tous (sur scope) | active / annulée / expirée | — | ✓ | `delegation_expiring` |
 | Audit | (lecture) | append-only | — | — | — |

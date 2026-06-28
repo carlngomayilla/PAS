@@ -3,7 +3,7 @@
 **Projet :** e-Pilotage PAS ANBG (Laravel 13.17.0, PHP 8.3+/8.4 local, PostgreSQL/SQLite)
 **Date de l'audit :** 2026-05-28
 **Base auditée :** `C:\Users\chris\OK\PAS` (branche courante)
-**Mise à jour technique :** 2026-06-28 — migration locale Laravel 13 sur `local/laravel-13-ai-pta`.
+**Mise à jour technique :** 2026-06-28 — migration locale Laravel 13 et module IA PTA/Rapports sur `local/laravel-13-ai-pta`.
 **Référence :** Spec v2 consolidée du 28/05/2026 (Module Import Excel, paramétrage 3 modes, suppression KPI conformité, KPI Délai gradué, workflow report d'échéance Chef → SCIQ → DG)
 
 ---
@@ -11,6 +11,8 @@
 ## 0. Synthèse exécutive
 
 Le projet est **très avancé** : la majorité des briques métier de la spec v2 sont **déjà implémentées ou ébauchées** (table `planning_imports`, `deadline_extension_requests`, `PlanningExcelImportService`, `DeadlineExtensionRequestService`, `WorkspaceNotificationService` + `BrevoMailService`, audit `journal_audit`, chiffrement justificatifs, modes `quantitatif/sans_quantite/sous_actions` côté `Action`, statuts `a_parametrer/parametre`).
+
+Depuis la mise à jour du 2026-06-28, le chantier local ajoute un module IA encadré pour les imports PTA et les rapports PAS/PAO/PTA : les données sont extraites/normalisées, prévisualisées, corrigées puis validées par un humain avant écriture métier ou export officiel.
 
 Les écarts à la spec v2 se concentrent sur **trois familles** :
 
@@ -28,7 +30,7 @@ Aucun module existant n'est à reconstruire. Il s'agit principalement de **migra
 
 - Laravel 13.17.0, PHP 8.3+ (PHP 8.4.19 en local), Sanctum `4.x-dev`, DomPDF wrapper `dev-master` pour les exports.
 - `laravel/ai` 0.8.1 installe la configuration IA, les stubs agents/tools et les tables de conversations IA.
-- `maatwebsite/excel` 3.1.69, `phpoffice/phpspreadsheet` 1.30.5 et `phpoffice/phpword` 1.4.0 sont disponibles pour les futurs imports/exports IA PTA.
+- `maatwebsite/excel` 3.1.69, `phpoffice/phpspreadsheet` 1.30.5 et `phpoffice/phpword` 1.4.0 sont utilisés pour les imports/exports IA PTA et les rapports PDF/Word/Excel.
 - **Aucune dépendance Spatie Permission** : la matrice de permissions est custom et stockée dans la table `platform_settings` (clés `role_permissions_<role>`).
 
 ### 1.2 Modèles métier (`app/Models`)
@@ -44,6 +46,8 @@ Aucun module existant n'est à reconstruire. Il s'agit principalement de **migra
 | `Justificatif` (morphé) | oui | Pièces attachées à actions/sous-actions |
 | `DeadlineExtensionRequest` | oui | Workflow report d'échéance |
 | `PlanningImport` | oui | Trace d'un import Excel |
+| `AiImportBatch`, `AiImportRow`, `PtaImportMapping`, `AiImportAudit` | oui | Lots IA PTA, lignes normalisées, mappings et audit des étapes d'import |
+| `AiGeneratedReport` | oui | Rapports PAS/PAO/PTA générés, corrigés, validés et exportés |
 | `PlanningUnlockRequest` | oui | **Ancien mécanisme de déverrouillage** des dates — à dépréciser |
 | `JournalAudit` | oui | Audit applicatif |
 | `Direction`, `Service`, `UniteDg`, `Exercice` | oui | Référentiels |
@@ -59,6 +63,15 @@ Actions/
   ActionStatusService.php
   ActionTrackingService.php      (66 ko — service central)
   DeadlineExtensionRequestService.php
+Ai/
+  PtaExtractionService.php
+  PtaNormalizationService.php
+  PtaImportValidationService.php
+  PtaFinalImportService.php
+  PtaExcelGenerationService.php
+  ActionReportMetricsBuilder.php
+  AiReportWritingService.php
+  ReportExportService.php
 Alerting/
 Analytics/
 Dashboard/
@@ -315,6 +328,8 @@ Trois options :
 - Architecture **PAS → Axes → OS → PAO → OO → PTA → Actions → Sous-actions** complète.
 - Génération automatique des codes via `PlanningImportCodeGenerator` + colonnes `code` uniques sur paos/ptas/objectifs_operationnels/actions.
 - Mécanique d'import en plusieurs étapes : upload → mapping → preview → exécution. Modes `MODE_CREATE_ONLY`/`MODE_SKIP_DUPLICATES`/`MODE_UPDATE_EXISTING` équivalents à Création/Complément/Mise à jour.
+- Import IA PTA en plusieurs étapes : upload → analyse → normalisation → preview → correction → validation humaine → import final, avec blocage des lignes invalides.
+- Rapports IA PAS/PAO/PTA : génération depuis les métriques Laravel, correction, validation humaine, exports PDF/Word/Excel.
 - Statut `a_parametrer` / `parametre` (contrainte CHECK PostgreSQL en place).
 - Soft deletes sur les tables opérationnelles (migration `add_soft_deletes_to_core_operational_tables`).
 - Audit trail complet via `journal_audit`.

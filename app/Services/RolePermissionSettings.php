@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Collection;
 
 class RolePermissionSettings
@@ -33,7 +34,22 @@ class RolePermissionSettings
             'planning.write.service' => ['group' => 'Planification', 'label' => 'Écrire en service', 'description' => 'Modifier la planification de son service.', 'sensitive' => false],
             'planning.strategic.manage' => ['group' => 'Planification', 'label' => 'Piloter le stratégique', 'description' => 'Gérer les elements stratégiques et validations avancees.', 'sensitive' => true],
             'pta.control' => ['group' => 'Pilotage', 'label' => 'Controler le Suivi PTA', 'description' => 'Acceder a la page officielle Suivi PTA, aux details et aux exports.', 'sensitive' => true],
+            'ai_pta_import.view' => ['group' => 'IA & Imports', 'label' => 'Voir imports IA PTA', 'description' => 'Acceder au module IA d import PTA.', 'sensitive' => false],
+            'ai_pta_import.upload' => ['group' => 'IA & Imports', 'label' => 'Charger PTA IA', 'description' => 'Deposer un fichier PTA pour extraction IA.', 'sensitive' => false],
+            'ai_pta_import.analyze' => ['group' => 'IA & Imports', 'label' => 'Analyser PTA IA', 'description' => 'Lancer extraction, normalisation et validation IA.', 'sensitive' => true],
+            'ai_pta_import.preview' => ['group' => 'IA & Imports', 'label' => 'Previsualiser PTA IA', 'description' => 'Voir les lignes extraites avant import.', 'sensitive' => false],
+            'ai_pta_import.correct' => ['group' => 'IA & Imports', 'label' => 'Corriger PTA IA', 'description' => 'Modifier ou ignorer les lignes invalides.', 'sensitive' => true],
+            'ai_pta_import.validate' => ['group' => 'IA & Imports', 'label' => 'Valider PTA IA', 'description' => 'Valider les lignes normalisees avant import.', 'sensitive' => true],
+            'ai_pta_import.import' => ['group' => 'IA & Imports', 'label' => 'Importer PTA IA', 'description' => 'Executer l import final apres validation humaine.', 'sensitive' => true],
+            'ai_pta_import.export' => ['group' => 'IA & Imports', 'label' => 'Exporter PTA IA', 'description' => 'Telecharger le classeur normalise et les erreurs.', 'sensitive' => false],
+            'ai_pta_import.history' => ['group' => 'IA & Imports', 'label' => 'Historique imports IA', 'description' => 'Consulter l historique des imports IA PTA.', 'sensitive' => false],
             'reporting.read' => ['group' => 'Pilotage', 'label' => 'Voir le reporting', 'description' => 'Accéder au hub reporting et aux exports.', 'sensitive' => false],
+            'ai_reports.view' => ['group' => 'Rapports IA', 'label' => 'Voir rapports IA', 'description' => 'Acceder aux rapports generes par IA.', 'sensitive' => false],
+            'ai_reports.generate' => ['group' => 'Rapports IA', 'label' => 'Generer rapports IA', 'description' => 'Generer un brouillon de rapport depuis les metriques Laravel.', 'sensitive' => true],
+            'ai_reports.edit' => ['group' => 'Rapports IA', 'label' => 'Modifier rapports IA', 'description' => 'Modifier le brouillon avant validation.', 'sensitive' => true],
+            'ai_reports.validate' => ['group' => 'Rapports IA', 'label' => 'Valider rapports IA', 'description' => 'Valider humainement un rapport IA.', 'sensitive' => true],
+            'ai_reports.export' => ['group' => 'Rapports IA', 'label' => 'Exporter rapports IA', 'description' => 'Exporter les rapports en PDF, Word ou Excel.', 'sensitive' => false],
+            'ai_reports.archive' => ['group' => 'Rapports IA', 'label' => 'Archiver rapports IA', 'description' => 'Archiver les rapports generes.', 'sensitive' => true],
             'alerts.read' => ['group' => 'Pilotage', 'label' => 'Voir les alertes', 'description' => 'Accéder au centre d’alertes.', 'sensitive' => false],
             'referentiel.read' => ['group' => 'Référentiel', 'label' => 'Lire le référentiel', 'description' => 'Consulter directions, services et utilisateurs.', 'sensitive' => false],
             'referentiel.write' => ['group' => 'Référentiel', 'label' => 'Modifier le référentiel', 'description' => 'Créer ou modifier directions et services.', 'sensitive' => true],
@@ -204,7 +220,9 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                ...$this->aiReportPermissions(),
                 'alerts.read',
                 'referentiel.read',
                 'referentiel.write',
@@ -231,6 +249,9 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.export',
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
@@ -246,7 +267,9 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                ...$this->aiReportPermissions(),
                 'alerts.read',
                 'referentiel.read',
                 'referentiel.write',
@@ -263,7 +286,9 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                ...$this->aiReportPermissions(),
                 'alerts.read',
                 'referentiel.read',
                 'referentiel.write',
@@ -272,7 +297,12 @@ class RolePermissionSettings
             User::ROLE_DIRECTION => [
                 'planning.read',
                 'planning.write.direction',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.edit',
+                'ai_reports.export',
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
@@ -280,7 +310,12 @@ class RolePermissionSettings
             User::ROLE_SERVICE => [
                 'planning.read',
                 'planning.write.service',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.edit',
+                'ai_reports.export',
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
@@ -288,13 +323,19 @@ class RolePermissionSettings
             User::ROLE_CHEF_UNITE => [
                 'planning.read',
                 'planning.write.service',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.edit',
+                'ai_reports.export',
                 'alerts.read',
                 'referentiel.read',
             ],
             User::ROLE_AGENT => [
                 'planning.read',
                 'reporting.read',
+                'ai_reports.view',
                 'alerts.read',
             ],
             // A06 — Cabinet et Collaborateurs voient tout mais ne pilotent plus
@@ -304,6 +345,9 @@ class RolePermissionSettings
                 'scope.global.read',
                 'planning.read',
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.export',
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
@@ -328,7 +372,9 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                ...$this->aiReportPermissions(),
                 'alerts.read',
                 'referentiel.read',
                 'referentiel.write',
@@ -354,7 +400,9 @@ class RolePermissionSettings
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                ...$this->aiReportPermissions(),
                 'alerts.read',
                 'referentiel.read',
                 'referentiel.write',
@@ -372,7 +420,9 @@ class RolePermissionSettings
                 'planning.write.service',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                ...$this->aiReportPermissions(),
                 'alerts.read',
                 'referentiel.read',
                 'users.manage',
@@ -388,7 +438,9 @@ class RolePermissionSettings
                 'planning.write.service',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                ...$this->aiReportPermissions(),
                 'alerts.read',
                 'referentiel.read',
                 'users.manage',
@@ -401,6 +453,9 @@ class RolePermissionSettings
                 'scope.global.read',
                 'planning.read',
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.export',
                 'alerts.read',
                 'referentiel.read',
             ],
@@ -409,7 +464,12 @@ class RolePermissionSettings
             User::ROLE_CHEF_UNITE_DGA => [
                 'planning.read',
                 'planning.write.service',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.edit',
+                'ai_reports.export',
                 'alerts.read',
                 'referentiel.read',
             ],
@@ -420,6 +480,9 @@ class RolePermissionSettings
                 'scope.global.read',
                 'planning.read',
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.export',
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
@@ -429,7 +492,12 @@ class RolePermissionSettings
             User::ROLE_CHEF_UNITE_CABINET => [
                 'planning.read',
                 'planning.write.service',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.edit',
+                'ai_reports.export',
                 'alerts.read',
                 'referentiel.read',
             ],
@@ -438,7 +506,12 @@ class RolePermissionSettings
             User::ROLE_CHEF_UNITE_UCAS => [
                 'planning.read',
                 'planning.write.service',
+                ...$this->aiPtaImportPermissions(),
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.edit',
+                'ai_reports.export',
                 'alerts.read',
             ],
 
@@ -446,6 +519,9 @@ class RolePermissionSettings
             User::ROLE_UCAS => [
                 'planning.read',
                 'reporting.read',
+                'ai_reports.view',
+                'ai_reports.generate',
+                'ai_reports.export',
                 'alerts.read',
             ],
             // Auditeur — lecture globale pour audit + reporting + alertes.
@@ -453,6 +529,7 @@ class RolePermissionSettings
                 'scope.global.read',
                 'planning.read',
                 'reporting.read',
+                'ai_reports.view',
                 'alerts.read',
                 'audit.read',
             ],
@@ -535,7 +612,9 @@ class RolePermissionSettings
             'planning.write.service',
             'planning.strategic.manage',
             'pta.control',
+            ...$this->aiPtaImportPermissions(),
             'reporting.read',
+            ...$this->aiReportPermissions(),
             'alerts.read',
             'referentiel.read',
             'users.manage',
@@ -547,6 +626,39 @@ class RolePermissionSettings
     {
         $this->resolved = null;
         $this->tableAvailable = null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function aiPtaImportPermissions(): array
+    {
+        return [
+            'ai_pta_import.view',
+            'ai_pta_import.upload',
+            'ai_pta_import.analyze',
+            'ai_pta_import.preview',
+            'ai_pta_import.correct',
+            'ai_pta_import.validate',
+            'ai_pta_import.import',
+            'ai_pta_import.export',
+            'ai_pta_import.history',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function aiReportPermissions(): array
+    {
+        return [
+            'ai_reports.view',
+            'ai_reports.generate',
+            'ai_reports.edit',
+            'ai_reports.validate',
+            'ai_reports.export',
+            'ai_reports.archive',
+        ];
     }
 
     /**
@@ -607,7 +719,7 @@ class RolePermissionSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }

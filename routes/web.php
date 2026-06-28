@@ -1,9 +1,18 @@
 <?php
 
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SessionController;
-use App\Http\Controllers\Web\ActionWebController;
 use App\Http\Controllers\Web\ActionTrackingWebController;
+use App\Http\Controllers\Web\ActionWebController;
+use App\Http\Controllers\Web\AiPtaImportController;
+use App\Http\Controllers\Web\AiPtaImportHistoryController;
+use App\Http\Controllers\Web\AiPtaImportPreviewController;
+use App\Http\Controllers\Web\AiPtaImportValidationController;
+use App\Http\Controllers\Web\AiReportController;
+use App\Http\Controllers\Web\AiReportExportController;
+use App\Http\Controllers\Web\AiReportGenerationController;
+use App\Http\Controllers\Web\AiReportValidationController;
 use App\Http\Controllers\Web\AuditWebController;
 use App\Http\Controllers\Web\DependentSelectController;
 use App\Http\Controllers\Web\GlobalSearchWebController;
@@ -18,15 +27,15 @@ use App\Http\Controllers\Web\PersonalTaskWebController;
 use App\Http\Controllers\Web\PlanningImportWebController;
 use App\Http\Controllers\Web\PlanningUnlockWebController;
 use App\Http\Controllers\Web\ProfileWebController;
-use App\Http\Controllers\Web\PtaWebController;
 use App\Http\Controllers\Web\PtaSuiviWebController;
+use App\Http\Controllers\Web\PtaWebController;
 use App\Http\Controllers\Web\ReferentielWebController;
 use App\Http\Controllers\Web\SuperAdminWebController;
+use App\Http\Controllers\WorkspaceController;
 use App\Http\Middleware\EnsureActiveAccount;
 use App\Http\Middleware\EnsurePasswordIsFresh;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
-use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 // ── ACCUEIL ────────────────────────────────────────────────────────────────────
@@ -42,14 +51,14 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', [SessionController::class, 'store'])->middleware('throttle:login')->name('login');
 
     // ── Réinitialisation du mot de passe ──────────────────────────────────────
-    Route::get('/password/forgot', [\App\Http\Controllers\Auth\PasswordResetController::class, 'showRequestForm'])
+    Route::get('/password/forgot', [PasswordResetController::class, 'showRequestForm'])
         ->name('password.request');
-    Route::post('/password/forgot', [\App\Http\Controllers\Auth\PasswordResetController::class, 'sendResetLink'])
+    Route::post('/password/forgot', [PasswordResetController::class, 'sendResetLink'])
         ->middleware('throttle:6,1')
         ->name('password.email');
-    Route::get('/password/reset/{token}', [\App\Http\Controllers\Auth\PasswordResetController::class, 'showResetForm'])
+    Route::get('/password/reset/{token}', [PasswordResetController::class, 'showResetForm'])
         ->name('password.reset');
-    Route::post('/password/reset', [\App\Http\Controllers\Auth\PasswordResetController::class, 'reset'])
+    Route::post('/password/reset', [PasswordResetController::class, 'reset'])
         ->middleware('throttle:6,1')
         ->name('password.update');
 });
@@ -203,6 +212,30 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::get('imports-excel/{import}/erreurs', [PlanningImportWebController::class, 'errors'])->name('imports.errors');
             Route::get('imports-excel/{import}/rapport-erreurs', [PlanningImportWebController::class, 'errorReport'])->name('imports.error-report');
             Route::delete('imports-excel/{import}', [PlanningImportWebController::class, 'destroy'])->name('imports.destroy');
+
+            Route::prefix('ai-imports')->name('ai-imports.')->group(function (): void {
+                Route::get('/pta', [AiPtaImportController::class, 'index'])->name('pta.index');
+                Route::post('/pta/upload', [AiPtaImportController::class, 'upload'])->name('pta.upload');
+                Route::post('/pta/{batch}/analyze', [AiPtaImportController::class, 'analyze'])->name('pta.analyze');
+                Route::get('/pta/{batch}/preview', [AiPtaImportPreviewController::class, 'show'])->name('pta.preview');
+                Route::patch('/pta/{batch}/rows/{row}', [AiPtaImportValidationController::class, 'updateRow'])->name('pta.rows.update');
+                Route::post('/pta/{batch}/validate', [AiPtaImportValidationController::class, 'validateBatch'])->name('pta.validate');
+                Route::post('/pta/{batch}/import', [AiPtaImportValidationController::class, 'import'])->name('pta.import');
+                Route::get('/pta/{batch}/excel', [AiPtaImportController::class, 'downloadExcel'])->name('pta.excel');
+                Route::get('/history', [AiPtaImportHistoryController::class, 'index'])->name('history');
+            });
+
+            Route::prefix('ai-reports')->name('ai-reports.')->group(function (): void {
+                Route::get('/', [AiReportController::class, 'index'])->name('index');
+                Route::get('/create', [AiReportController::class, 'create'])->name('create');
+                Route::post('/generate', [AiReportGenerationController::class, 'generate'])->name('generate');
+                Route::get('/{report}', [AiReportController::class, 'show'])->name('show');
+                Route::patch('/{report}', [AiReportController::class, 'update'])->name('update');
+                Route::post('/{report}/validate', [AiReportValidationController::class, 'validateReport'])->name('validate');
+                Route::get('/{report}/export/pdf', [AiReportExportController::class, 'pdf'])->name('export.pdf');
+                Route::get('/{report}/export/word', [AiReportExportController::class, 'word'])->name('export.word');
+                Route::get('/{report}/export/excel', [AiReportExportController::class, 'excel'])->name('export.excel');
+            });
 
             Route::get('demandes-deverrouillage', [PlanningUnlockWebController::class, 'index'])
                 ->name('planning-unlocks.index');

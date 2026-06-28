@@ -33,13 +33,15 @@
         'organisation' => 'organisation',
         'workflows' => 'workflow',
         'imports_excel' => 'docs',
+        'ai_imports' => 'docs',
+        'ai_reports' => 'reporting',
         default => $code,
     };
     $moduleSection = static fn (string $code): string => match ($code) {
         'mes_taches', 'notifications' => 'Menu',
-        'pas', 'pao', 'pta', 'imports_excel' => 'Planification',
+        'pas', 'pao', 'pta', 'imports_excel', 'ai_imports' => 'Planification',
         'execution', 'mes_actions', 'corrections', 'validations', 'agents', 'services_agents', 'controle', 'financement' => 'Exécution',
-        'reporting', 'alertes', 'synthese_agence', 'arbitrages', 'financements_critiques', 'rapports_consolides', 'supervision' => 'Pilotage',
+        'reporting', 'ai_reports', 'alertes', 'synthese_agence', 'arbitrages', 'financements_critiques', 'rapports_consolides', 'supervision' => 'Pilotage',
         'super_admin' => 'Plateforme',
         default => 'Administration',
     };
@@ -124,6 +126,16 @@
             'display_order' => $moduleOrder('imports_excel', 55),
         ];
     }
+    if ($canSeeModule('ai_imports')) {
+        $planningItems[] = [
+            'code' => 'ai_imports',
+            'label' => $moduleLabel('ai_imports', 'IA & Imports'),
+            'route' => 'workspace.ai-imports.pta.index',
+            'icon' => 'docs',
+            'patterns' => ['workspace.ai-imports.*'],
+            'display_order' => $moduleOrder('ai_imports', 56),
+        ];
+    }
     if ($planningItems !== []) {
         $sections[] = ['title' => 'Planification', 'items' => $sortItems($planningItems)];
     }
@@ -165,6 +177,16 @@
             'icon' => 'reporting',
             'patterns' => ['workspace.reporting', 'workspace.reporting.*'],
             'display_order' => $moduleOrder('reporting', 70),
+        ];
+    }
+    if ($canSeeModule('ai_reports')) {
+        $pilotageItems[] = [
+            'code' => 'ai_reports',
+            'label' => $moduleLabel('ai_reports', 'Rapports IA'),
+            'route' => 'workspace.ai-reports.index',
+            'icon' => 'reporting',
+            'patterns' => ['workspace.ai-reports.*'],
+            'display_order' => $moduleOrder('ai_reports', 72),
         ];
     }
     if ($pilotageItems !== []) {

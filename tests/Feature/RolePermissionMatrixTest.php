@@ -16,6 +16,36 @@ class RolePermissionMatrixTest extends TestCase
     public function test_default_role_permissions_match_corrected_matrix(): void
     {
         $settings = app(RolePermissionSettings::class);
+        $aiImportPermissions = [
+            'ai_pta_import.view',
+            'ai_pta_import.upload',
+            'ai_pta_import.analyze',
+            'ai_pta_import.preview',
+            'ai_pta_import.correct',
+            'ai_pta_import.validate',
+            'ai_pta_import.import',
+            'ai_pta_import.export',
+            'ai_pta_import.history',
+        ];
+        $aiReportPermissions = [
+            'ai_reports.view',
+            'ai_reports.generate',
+            'ai_reports.edit',
+            'ai_reports.validate',
+            'ai_reports.export',
+            'ai_reports.archive',
+        ];
+        $aiOperationalReports = [
+            'ai_reports.view',
+            'ai_reports.generate',
+            'ai_reports.edit',
+            'ai_reports.export',
+        ];
+        $aiReportExports = [
+            'ai_reports.view',
+            'ai_reports.generate',
+            'ai_reports.export',
+        ];
 
         $expected = [
             User::ROLE_SUPER_ADMIN => array_keys($settings->permissions()),
@@ -26,7 +56,9 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiReportPermissions,
                 'alerts.read',
                 'referentiel.read',
                 'referentiel.write',
@@ -42,6 +74,7 @@ class RolePermissionMatrixTest extends TestCase
                 'scope.global.read',
                 'planning.read',
                 'reporting.read',
+                'ai_reports.view',
                 'alerts.read',
                 'audit.read',
             ],
@@ -54,6 +87,7 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.global',
                 'planning.strategic.manage',
                 'reporting.read',
+                ...$aiReportExports,
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
@@ -64,7 +98,9 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiReportPermissions,
                 'alerts.read',
                 'referentiel.read',
                 'referentiel.write',
@@ -77,6 +113,7 @@ class RolePermissionMatrixTest extends TestCase
                 'scope.global.read',
                 'planning.read',
                 'reporting.read',
+                ...$aiReportExports,
                 'alerts.read',
                 'referentiel.read',
                 'audit.read',
@@ -84,7 +121,9 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_CHEF_UNITE_CABINET => [
                 'planning.read',
                 'planning.write.service',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiOperationalReports,
                 'alerts.read',
                 'referentiel.read',
             ],
@@ -95,7 +134,9 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.service',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiReportPermissions,
                 'alerts.read',
                 'referentiel.read',
                 'users.manage',
@@ -108,7 +149,9 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.service',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiReportPermissions,
                 'alerts.read',
                 'referentiel.read',
                 'users.manage',
@@ -117,7 +160,9 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_CHEF_UNITE_DGA => [
                 'planning.read',
                 'planning.write.service',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiOperationalReports,
                 'alerts.read',
                 'referentiel.read',
             ],
@@ -125,18 +170,22 @@ class RolePermissionMatrixTest extends TestCase
                 'scope.global.read',
                 'planning.read',
                 'reporting.read',
+                ...$aiReportExports,
                 'alerts.read',
                 'referentiel.read',
             ],
             User::ROLE_CHEF_UNITE_UCAS => [
                 'planning.read',
                 'planning.write.service',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiOperationalReports,
                 'alerts.read',
             ],
             User::ROLE_UCAS => [
                 'planning.read',
                 'reporting.read',
+                ...$aiReportExports,
                 'alerts.read',
             ],
             User::ROLE_SCIQ => [
@@ -145,7 +194,9 @@ class RolePermissionMatrixTest extends TestCase
                 'planning.write.global',
                 'planning.strategic.manage',
                 'pta.control',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiReportPermissions,
                 'alerts.read',
                 'referentiel.read',
                 'referentiel.write',
@@ -154,7 +205,9 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_DIRECTION => [
                 'planning.read',
                 'planning.write.direction',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiOperationalReports,
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
@@ -162,7 +215,9 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_SERVICE => [
                 'planning.read',
                 'planning.write.service',
+                ...$aiImportPermissions,
                 'reporting.read',
+                ...$aiOperationalReports,
                 'alerts.read',
                 'referentiel.read',
                 'delegations.manage',
@@ -170,6 +225,7 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_AGENT => [
                 'planning.read',
                 'reporting.read',
+                'ai_reports.view',
                 'alerts.read',
             ],
         ];
@@ -182,22 +238,22 @@ class RolePermissionMatrixTest extends TestCase
     public function test_workspace_modules_match_corrected_visibility_matrix_for_all_profiles(): void
     {
         $expected = [
-            User::ROLE_SUPER_ADMIN => ['pilotage', 'super_admin', 'imports_excel', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
-            User::ROLE_ADMIN_FONCTIONNEL => ['pilotage', 'super_admin', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
-            User::ROLE_DG => ['pilotage', 'mes_taches', 'synthese_agence', 'arbitrages', 'deverrouillages', 'financements_critiques', 'rapports_consolides', 'notifications'],
+            User::ROLE_SUPER_ADMIN => ['pilotage', 'super_admin', 'imports_excel', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
+            User::ROLE_ADMIN_FONCTIONNEL => ['pilotage', 'super_admin', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
+            User::ROLE_DG => ['pilotage', 'mes_taches', 'synthese_agence', 'arbitrages', 'deverrouillages', 'financements_critiques', 'rapports_consolides', 'ai_reports', 'notifications'],
             // Fusion modules 2026-05-28 : 'mes_actions' supprime — fusionne avec 'execution'
             // (label "Action") qui couvre les deux vues via les onglets de la page.
-            User::ROLE_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
-            User::ROLE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'reporting', 'notifications'],
-            User::ROLE_CHEF_UNITE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'referentiel', 'reporting', 'notifications'],
-            User::ROLE_CHEF_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'execution', 'controle', 'referentiel', 'reporting', 'notifications'],
-            User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'notifications'],
-            User::ROLE_CHEF_UNITE_CABINET => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'notifications'],
-            User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'execution', 'notifications'],
-            User::ROLE_CHEF_UNITE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'notifications'],
-            User::ROLE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'notifications'],
-            User::ROLE_DIRECTION => ['pilotage', 'mes_taches', 'pao', 'pta', 'execution', 'services_agents', 'reporting', 'notifications'],
-            User::ROLE_SERVICE => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'notifications'],
+            User::ROLE_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications'],
+            User::ROLE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'reporting', 'ai_reports', 'notifications'],
+            User::ROLE_CHEF_UNITE_SCIQ => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications'],
+            User::ROLE_CHEF_PLANIFICATION => ['pilotage', 'mes_taches', 'pas', 'pao', 'pta', 'imports_excel', 'ai_imports', 'execution', 'controle', 'referentiel', 'reporting', 'ai_reports', 'notifications'],
+            User::ROLE_CABINET => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications'],
+            User::ROLE_CHEF_UNITE_CABINET => ['pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications'],
+            User::ROLE_DGA_SUPERVISION => ['pilotage', 'mes_taches', 'synthese_agence', 'supervision', 'rapports_consolides', 'ai_reports', 'execution', 'notifications'],
+            User::ROLE_CHEF_UNITE_UCAS => ['pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications'],
+            User::ROLE_UCAS => ['pilotage', 'mes_taches', 'pta', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications'],
+            User::ROLE_DIRECTION => ['pilotage', 'mes_taches', 'pao', 'pta', 'ai_imports', 'execution', 'services_agents', 'reporting', 'ai_reports', 'notifications'],
+            User::ROLE_SERVICE => ['pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications'],
             User::ROLE_AGENT => ['pilotage', 'mes_taches', 'execution', 'corrections', 'notifications'],
             User::ROLE_AUDITEUR => ['pilotage', 'mes_taches', 'execution', 'corrections', 'notifications'],
         ];
@@ -295,7 +351,7 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertNull($admin->direction_id);
         $this->assertNull($admin->service_id);
         $this->assertEqualsCanonicalizing(
-            ['pilotage', 'super_admin', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
+            ['pilotage', 'super_admin', 'ai_imports', 'ai_reports', 'referentiel', 'roles_permissions', 'organisation', 'exercices', 'workflows', 'audit', 'retention', 'notifications'],
             collect($admin->workspaceModules())->pluck('code')->all()
         );
     }

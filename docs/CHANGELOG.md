@@ -7,6 +7,57 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 — Module IA PTA et rapports PAS/PAO/PTA
+
+### Demande
+
+Terminer proprement le chantier IA prévu sur la branche `local/laravel-13-ai-pta` : import assisté des fichiers PTA, correction humaine avant import définitif, génération Excel normalisée, rapports PAS/PAO/PTA assistés par IA contrôlée, exports PDF/Word/Excel, droits, historique et tests.
+
+### Changement
+
+- **Import IA PTA** : ajout d'un parcours `workspace/ai-imports/pta` couvrant l'upload sécurisé, l'analyse, la normalisation, la prévisualisation, la correction ligne par ligne, la validation humaine, l'import final et l'historique.
+- **Données IA** : nouvelles tables `ai_import_batches`, `ai_import_rows`, `pta_import_mappings`, `ai_import_audits` et `ai_generated_reports` pour tracer les lots, lignes, mappings, audits et rapports générés.
+- **Normalisation PTA** : mapping de colonnes, validation des référentiels direction/service/exercice, contrôle des dates, budgets, statuts et génération d'un classeur Excel normalisé avec feuilles données, erreurs et métadonnées.
+- **Import final contrôlé** : aucune action n'est créée avant validation humaine ; les lignes ignorées ou invalides restent bloquées, les lignes valides créent les conteneurs PAS/PAO/PTA nécessaires puis les actions PTA.
+- **Rapports IA** : ajout de `workspace/ai-reports` pour générer des brouillons PAS, PAO et PTA à partir des métriques Laravel existantes, avec correction, validation humaine et exports PDF, Word et Excel.
+- **Permissions et navigation** : ajout des permissions `ai_pta_import.*` et `ai_reports.*`, migration d'alignement des rôles stockés, modules sidebar `IA & Imports` et `Rapports IA`.
+- **Jobs et services** : orchestration asynchrone possible pour extraction, normalisation, génération Excel, validation, import final et exports de rapports.
+- **Tests** : ajout de tests Feature dédiés à Laravel 13, permissions IA, upload/extraction/preview/correction/import PTA, génération Excel, génération/validation/export de rapports et matrice RBAC.
+
+### Fichiers modifiés
+
+- `app/Models/AiImportBatch.php`, `AiImportRow.php`, `PtaImportMapping.php`, `AiImportAudit.php`, `AiGeneratedReport.php`
+- `app/Services/Ai/*`
+- `app/Http/Controllers/Web/AiPtaImport*.php`, `AiReport*.php`
+- `app/Exports/*`, `app/Imports/PtaValidatedImport.php`
+- `app/Jobs/*Ai*`, `app/Jobs/*Pta*`
+- `database/migrations/2026_06_28_1129*_create_ai_*.php`
+- `database/migrations/2026_06_28_113500_add_ai_pta_import_and_ai_reports_permissions.php`
+- `resources/views/workspace/ai-imports/pta/*`
+- `resources/views/workspace/ai-reports/*`
+- `routes/web.php`
+- `app/Services/RolePermissionSettings.php`
+- `app/Services/UserWorkspaceService.php`
+- `app/Services/WorkspaceModuleSettings.php`
+- `resources/views/components/admin/sidebar.blade.php`
+- `tests/Concerns/CreatesAiPtaFixtures.php`
+- `tests/Feature/Ai*.php`, `tests/Feature/Laravel13UpgradeSmokeTest.php`, `tests/Feature/RolePermissionMatrixTest.php`
+- `docs/CHANGELOG.md`, `docs/analyse-globale-application.md`, `docs/analyse-fonctionnelle-workflows.md`, `docs/AUDIT_PHASE0_SPEC_V2.md`
+
+### Validation
+
+- `vendor/bin/pint --dirty`
+- `php artisan optimize:clear`
+- `php artisan migrate --no-interaction`
+- `php artisan route:list --path=ai --except-vendor`
+- `npm run build` — OK, avertissement attendu sur le chunk Plotly
+- `php artisan test tests\Feature\Laravel13UpgradeSmokeTest.php tests\Feature\AiPermissionsTest.php tests\Feature\AiPtaImportUploadTest.php tests\Feature\AiPtaImportExtractionTest.php tests\Feature\AiPtaImportPreviewTest.php tests\Feature\AiPtaImportValidationTest.php tests\Feature\AiPtaImportFinalImportTest.php tests\Feature\AiPtaExcelGenerationTest.php tests\Feature\AiReportGenerationTest.php tests\Feature\AiReportValidationTest.php tests\Feature\AiReportExportTest.php tests\Feature\RolePermissionMatrixTest.php` — 17 passed, 88 assertions
+- `php artisan test` — 458 passed, 3 skipped, 2742 assertions
+- `vendor/bin/pint --dirty --test`
+- `git diff --check` — OK, avertissement de fin de ligne Markdown uniquement
+
+---
+
 ## 2026-06-28 — Outillage IA, Excel et Word pour module PTA
 
 ### Demande
