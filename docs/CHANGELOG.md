@@ -7,6 +7,28 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 - Cartes statistiques dynamiques
+
+### Demande
+
+Rendre les cartes statistiques dynamiques afin qu'elles apparaissent uniquement lorsqu'elles sont réellement utilisées.
+
+### Changement
+
+- **Composants réutilisables** : `x-ui.stat-card`, `x-stat-card` et `x-stat-card-link` acceptent maintenant `show` et `hide-when-empty`.
+- **Dashboard analytique** : les cartes de synthèse, statuts, alertes et modules PAS/PAO/PTA/ACTION sont filtrées selon leur donnée réelle.
+- **Suivi des actions** : les cartes de total, retard, validation et performance disparaissent quand leur périmètre est vide.
+- **Mes tâches** : les cartes ouvertes/retard/sous 24h/critiques ne s'affichent plus avec des compteurs inutilisés à zéro.
+
+### Validation
+
+- `php artisan view:cache`
+- `vendor\bin\pint --dirty`
+- `php artisan test tests\Feature\ActionIndexLayoutsTest.php tests\Feature\PersonalTaskWorkflowTest.php tests\Feature\DashboardSynthesisDropdownTest.php` - 17 passed, 110 assertions
+- `php artisan test tests\Feature\DynamicStatCardTest.php` - 2 passed, 6 assertions
+
+---
+
 ## 2026-06-28 - Extraction PDF PTA et conservation IMPORT_GLOBAL
 
 ### Demande

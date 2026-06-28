@@ -7,6 +7,12 @@
         $items = collect($personalTasks['items'] ?? []);
         $summary = is_array($personalTasks['summary'] ?? null) ? $personalTasks['summary'] : [];
         $components = collect($summary['components'] ?? []);
+        $summaryCards = collect([
+            ['label' => 'Taches ouvertes', 'value' => (int) ($summary['total'] ?? 0), 'color' => '#17324a'],
+            ['label' => 'En retard', 'value' => (int) ($summary['overdue'] ?? 0), 'color' => '#B42318'],
+            ['label' => 'Sous 24h', 'value' => (int) ($summary['due_soon'] ?? 0), 'color' => '#F9B13C'],
+            ['label' => 'Critiques', 'value' => (int) ($summary['critical'] ?? 0), 'color' => '#3996D3'],
+        ])->filter(static fn (array $card): bool => (int) ($card['value'] ?? 0) > 0)->values();
         $badge = static fn (array $task): string => match ((string) ($task['criticality'] ?? 'normale')) {
             'critique' => 'anbg-badge anbg-badge-danger',
             'importante' => 'anbg-badge anbg-badge-warning',
@@ -33,27 +39,19 @@
         </x-ui.page-title>
 
         <section class="showcase-panel app-screen-block">
-            <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
-                <article class="rounded-2xl border border-slate-200/85 bg-white/95 p-4">
-                    <span class="text-xs font-bold uppercase text-[#667085]">Taches ouvertes</span>
-                    <strong class="mt-1 block text-2xl text-[#17324a]">{{ (int) ($summary['total'] ?? 0) }}</strong>
-                </article>
-                <article class="rounded-2xl border border-slate-200/85 bg-white/95 p-4">
-                    <span class="text-xs font-bold uppercase text-[#667085]">En retard</span>
-                    <strong class="mt-1 block text-2xl text-[#B42318]">{{ (int) ($summary['overdue'] ?? 0) }}</strong>
-                </article>
-                <article class="rounded-2xl border border-slate-200/85 bg-white/95 p-4">
-                    <span class="text-xs font-bold uppercase text-[#667085]">Sous 24h</span>
-                    <strong class="mt-1 block text-2xl text-[#F9B13C]">{{ (int) ($summary['due_soon'] ?? 0) }}</strong>
-                </article>
-                <article class="rounded-2xl border border-slate-200/85 bg-white/95 p-4">
-                    <span class="text-xs font-bold uppercase text-[#667085]">Critiques</span>
-                    <strong class="mt-1 block text-2xl text-[#3996D3]">{{ (int) ($summary['critical'] ?? 0) }}</strong>
-                </article>
-            </div>
+            @if ($summaryCards->isNotEmpty())
+                <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
+                    @foreach ($summaryCards as $card)
+                        <article class="rounded-2xl border border-slate-200/85 bg-white/95 p-4">
+                            <span class="text-xs font-bold uppercase text-[#667085]">{{ $card['label'] }}</span>
+                            <strong class="mt-1 block text-2xl" style="color: {{ $card['color'] }};">{{ (int) $card['value'] }}</strong>
+                        </article>
+                    @endforeach
+                </div>
+            @endif
 
             @if ($components->isNotEmpty())
-                <div class="mt-5">
+                <div class="{{ $summaryCards->isNotEmpty() ? 'mt-5' : '' }}">
                     <h2 class="text-sm font-bold uppercase text-[#667085]">Composantes du score personnel</h2>
                     <div class="mt-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
                         @foreach ($components as $component)

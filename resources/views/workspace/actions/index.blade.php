@@ -75,14 +75,18 @@
             'validee_direction'  => 'anbg-badge anbg-badge-success',
         ];
         $summaryCards = [
-            ['label' => 'Total actions', 'value' => $summaryTotal, 'meta' => null, 'href' => route('workspace.actions.index'), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Actions en cours', 'value' => $statusCounts['en_cours'] + $statusCounts['a_risque'] + $statusCounts['en_avance'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_cours']), 'badge' => null, 'badge_tone' => 'neutral'],
-            ['label' => 'Actions en retard', 'value' => $statusCounts['en_retard'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => null, 'badge_tone' => $statusCounts['en_retard'] > 0 ? 'danger' : 'neutral'],
+            ['label' => 'Total actions', 'value' => $summaryTotal, 'meta' => null, 'href' => route('workspace.actions.index'), 'badge' => null, 'badge_tone' => 'neutral', 'used' => $summaryTotal > 0],
+            ['label' => 'Actions en cours', 'value' => $statusCounts['en_cours'] + $statusCounts['a_risque'] + $statusCounts['en_avance'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_cours']), 'badge' => null, 'badge_tone' => 'neutral', 'used' => ($statusCounts['en_cours'] + $statusCounts['a_risque'] + $statusCounts['en_avance']) > 0],
+            ['label' => 'Actions en retard', 'value' => $statusCounts['en_retard'], 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'en_retard']), 'badge' => null, 'badge_tone' => $statusCounts['en_retard'] > 0 ? 'danger' : 'neutral', 'used' => $statusCounts['en_retard'] > 0],
             // A42 — La validation se fait desormais dans Mes taches : la carte
             // devient un raccourci vers ce module (acte Valider/Renvoyer inline).
-            ['label' => 'En attente validation', 'value' => $pendingValidationCount, 'meta' => $showActionValidationTab ? 'À traiter dans Actions' : 'À valider dans Mes tâches', 'href' => $showActionValidationTab ? route('workspace.actions.index', ['vue' => 'validations']) : route('workspace.tasks.index'), 'badge' => null, 'badge_tone' => $pendingValidationCount > 0 ? 'warning' : 'neutral'],
-            ['label' => 'Performance moyenne', 'value' => number_format($avgKpi, 0).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'En attente validation', 'value' => $pendingValidationCount, 'meta' => $showActionValidationTab ? 'À traiter dans Actions' : 'À valider dans Mes tâches', 'href' => $showActionValidationTab ? route('workspace.actions.index', ['vue' => 'validations']) : route('workspace.tasks.index'), 'badge' => null, 'badge_tone' => $pendingValidationCount > 0 ? 'warning' : 'neutral', 'used' => $pendingValidationCount > 0],
+            ['label' => 'Performance moyenne', 'value' => number_format($avgKpi, 0).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']), 'badge' => null, 'badge_tone' => 'neutral', 'used' => $summaryTotal > 0],
         ];
+        $summaryCards = collect($summaryCards)
+            ->filter(static fn (array $card): bool => (bool) ($card['used'] ?? true))
+            ->values()
+            ->all();
         $layoutMode = request()->query('layout', 'list');
         $kanbanColumns = [
             'non_demarre'       => ['label' => 'Non démarrée',   'color' => '#94a3b8', 'tone' => 'neutral'],
@@ -198,18 +202,20 @@
         </div>
     </section>
 
-    <section class="showcase-summary-grid mb-4 app-screen-kpis">
-        @foreach ($summaryCards as $card)
-            <x-stat-card-link
-                :href="$card['href']"
-                :label="$card['label']"
-                :value="$card['value']"
-                :meta="$card['meta']"
-                :badge="$card['badge']"
-                :badge-tone="$card['badge_tone']"
-            />
-        @endforeach
-    </section>
+    @if ($summaryCards !== [])
+        <section class="showcase-summary-grid mb-4 app-screen-kpis">
+            @foreach ($summaryCards as $card)
+                <x-stat-card-link
+                    :href="$card['href']"
+                    :label="$card['label']"
+                    :value="$card['value']"
+                    :meta="$card['meta']"
+                    :badge="$card['badge']"
+                    :badge-tone="$card['badge_tone']"
+                />
+            @endforeach
+        </section>
+    @endif
 
     <section class="showcase-toolbar mb-4 app-screen-block">
         <div class="mb-4 flex flex-wrap items-end justify-between gap-3">

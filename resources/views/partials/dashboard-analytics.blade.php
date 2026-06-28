@@ -187,7 +187,21 @@
         ]]);
     }
 
+    $summaryCardIsUsed = static function (array $card): bool {
+        if (array_key_exists('used', $card)) {
+            return (bool) $card['used'];
+        }
+
+        $normalized = str_replace(['%', ' ', "\u{00A0}"], '', (string) ($card['value'] ?? ''));
+        $normalized = str_replace(',', '.', $normalized);
+
+        return is_numeric($normalized)
+            ? (float) $normalized > 0
+            : trim((string) ($card['value'] ?? '')) !== '';
+    };
+
     $summaryStrip = collect($summaryStrip)
+        ->filter($summaryCardIsUsed)
         ->unique(fn (array $card): string => mb_strtolower(trim((string) ($card['label'] ?? ''))))
         ->values()
         ->all();

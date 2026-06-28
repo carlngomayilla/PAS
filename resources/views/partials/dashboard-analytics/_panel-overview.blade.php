@@ -92,15 +92,38 @@
         $workflowCounts = is_array($synthesisWorkflowCounts ?? null) ? $synthesisWorkflowCounts : [];
         $delayCounts = is_array($synthesisDelayCounts ?? null) ? $synthesisDelayCounts : [];
         $alertCounts = is_array($synthesisAlertCounts ?? null) ? $synthesisAlertCounts : [];
+        $decisionActionTotal = (int) ($synthesisDecisionSummary['total'] ?? ($metrics['totals']['actions_total'] ?? 0));
+        $cardNumericValue = static function (mixed $value): ?float {
+            if (is_numeric($value)) {
+                return (float) $value;
+            }
+
+            $normalized = str_replace(['%', ' ', "\u{00A0}"], '', (string) $value);
+            $normalized = str_replace(',', '.', $normalized);
+
+            return is_numeric($normalized) ? (float) $normalized : null;
+        };
+        $cardIsUsed = static function (array $card) use ($cardNumericValue): bool {
+            if (array_key_exists('used', $card)) {
+                return (bool) $card['used'];
+            }
+
+            $numericValue = $cardNumericValue($card['value'] ?? null);
+
+            return $numericValue === null
+                ? trim((string) ($card['value'] ?? '')) !== ''
+                : $numericValue > 0;
+        };
 
         $kpiStatCards = [
             [
                 'label' => 'Actions totales',
-                'value' => $fmtCount($synthesisDecisionSummary['total'] ?? ($metrics['totals']['actions_total'] ?? 0)),
+                'value' => $fmtCount($decisionActionTotal),
                 'accent' => '#17324a',
                 'icon' => '<path d="M4 4h16v16H4z"/><path d="M4 9h16"/><path d="M9 4v16"/>',
                 'trend' => null,
                 'href' => $synthesisCardUrl(['statut_suivi' => 'all', 'statut_delai' => 'all', 'alerte_echeance' => 'all']),
+                'used' => $decisionActionTotal > 0,
             ],
             [
                 'label' => 'Taux execution',
@@ -109,6 +132,7 @@
                 'icon' => '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
                 'trend' => null,
                 'href' => $synthesisCardUrl(),
+                'used' => $decisionActionTotal > 0,
             ],
             [
                 'label' => 'Performance PTA',
@@ -117,6 +141,7 @@
                 'icon' => '<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="5" width="3" height="12"/>',
                 'trend' => null,
                 'href' => $synthesisCardUrl(),
+                'used' => $decisionActionTotal > 0,
             ],
             [
                 'label' => 'A parametrer',
@@ -215,47 +240,55 @@
                 'icon'   => '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
                 'trend'  => null,
                 'href'   => (string) ($personalActionsSummary['url'] ?? route('workspace.actions.index', ['vue' => 'mes_actions'])),
+                'used'   => true,
             ]);
         }
+
+        $kpiStatCards = collect($kpiStatCards)
+            ->filter($cardIsUsed)
+            ->values()
+            ->all();
     @endphp
     {{-- Cartes statistiques : memes dimensions et structure que <x-ui.stat-card>
          utilisee dans les autres pages (min-w-[150px] max-w-[220px], px-4 py-3,
          label en haut, valeur en bas, badge tendance optionnel). --}}
-    <div class="mx-auto mb-3 flex w-full max-w-5xl flex-wrap justify-center gap-2">
-        @foreach ($kpiStatCards as $ksc)
-            @php
-                $trendUp   = ($ksc['trend'] ?? null) === 'up';
-                $trendDown = ($ksc['trend'] ?? null) === 'down';
-            @endphp
-            <a href="{{ $ksc['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border border-[#3996d3]/30 bg-white px-4 py-3 text-center shadow-sm transition" style="--kpi-accent:{{ $ksc['accent'] }};">
-                <div class="flex min-h-[4.5rem] flex-col items-center justify-center gap-2">
-                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style="color:{{ $ksc['accent'] }}; background:color-mix(in srgb, {{ $ksc['accent'] }} 12%, transparent);">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                             stroke-linejoin="round" aria-hidden="true">{!! $ksc['icon'] !!}</svg>
+    @if ($kpiStatCards !== [])
+        <div class="mx-auto mb-3 flex w-full max-w-5xl flex-wrap justify-center gap-2">
+            @foreach ($kpiStatCards as $ksc)
+                @php
+                    $trendUp   = ($ksc['trend'] ?? null) === 'up';
+                    $trendDown = ($ksc['trend'] ?? null) === 'down';
+                @endphp
+                <a href="{{ $ksc['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border border-[#3996d3]/30 bg-white px-4 py-3 text-center shadow-sm transition" style="--kpi-accent:{{ $ksc['accent'] }};">
+                    <div class="flex min-h-[4.5rem] flex-col items-center justify-center gap-2">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style="color:{{ $ksc['accent'] }}; background:color-mix(in srgb, {{ $ksc['accent'] }} 12%, transparent);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round" aria-hidden="true">{!! $ksc['icon'] !!}</svg>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="truncate text-center text-[11px] font-bold uppercase tracking-wide text-[#667085]">{{ $ksc['label'] }}</p>
+                            <p class="mt-1 text-center text-xl font-extrabold leading-none" style="color:{{ $ksc['accent'] }};">{{ $ksc['value'] }}</p>
+                        </div>
                     </div>
-                    <div class="min-w-0">
-                        <p class="truncate text-center text-[11px] font-bold uppercase tracking-wide text-[#667085]">{{ $ksc['label'] }}</p>
-                        <p class="mt-1 text-center text-xl font-extrabold leading-none" style="color:{{ $ksc['accent'] }};">{{ $ksc['value'] }}</p>
-                    </div>
-                </div>
-                @if (!is_null($ksc['trend'] ?? null))
-                    <div class="mt-2 flex justify-center">
-                        <span class="app-badge app-badge-{{ $trendUp ? 'success' : ($trendDown ? 'danger' : 'neutral') }}">
-                            @if ($trendUp)
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
-                            @elseif ($trendDown)
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
-                            @else
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                            @endif
-                            <span class="ml-1">{{ $ksc['trendLabel'] ?? '' }}</span>
-                        </span>
-                    </div>
-                @endif
-            </a>
-        @endforeach
-    </div>
+                    @if (!is_null($ksc['trend'] ?? null))
+                        <div class="mt-2 flex justify-center">
+                            <span class="app-badge app-badge-{{ $trendUp ? 'success' : ($trendDown ? 'danger' : 'neutral') }}">
+                                @if ($trendUp)
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
+                                @elseif ($trendDown)
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                                @else
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                @endif
+                                <span class="ml-1">{{ $ksc['trendLabel'] ?? '' }}</span>
+                            </span>
+                        </div>
+                    @endif
+                </a>
+            @endforeach
+        </div>
+    @endif
 
     @if (!in_array($dashboardRole, ['agent'], true))
     <div class="mb-4 w-full space-y-3">
@@ -340,6 +373,7 @@
                     'status' => ($metrics['totals']['pas_total'] ?? 0) > 0 ? 'En evolution' : 'A initialiser',
                     'href' => route('workspace.pas.index'),
                     'accent' => '#3996D3',
+                    'used' => (int) ($metrics['totals']['pas_total'] ?? 0) > 0,
                 ],
                 [
                     'group' => 'PAO',
@@ -348,6 +382,7 @@
                     'status' => ($metrics['totals']['paos_total'] ?? 0) > 0 ? 'En cours' : 'A initialiser',
                     'href' => route('workspace.pao.index'),
                     'accent' => '#8FC043',
+                    'used' => (int) ($metrics['totals']['paos_total'] ?? 0) > 0,
                 ],
                 [
                     'group' => 'PTA',
@@ -356,6 +391,7 @@
                     'status' => ($metrics['totals']['ptas_total'] ?? 0) > 0 ? 'Suivi actif' : 'A initialiser',
                     'href' => route('workspace.pta.index'),
                     'accent' => '#F9B13C',
+                    'used' => (int) ($metrics['totals']['ptas_total'] ?? 0) > 0,
                 ],
                 [
                     'group' => 'ACTION',
@@ -364,9 +400,10 @@
                     'status' => $statusCount('non_demarre') > 0 ? $fmtCount($statusCount('non_demarre')).' non démarrée(s)' : 'Suivi opérationnel',
                     'href' => route('workspace.actions.index'),
                     'accent' => '#1C203D',
+                    'used' => $decisionActionTotal > 0,
                 ],
             ];
-            $planningHierarchyRows = collect($moduleProgressCards)->map(function (array $module) use ($fmtPct): array {
+            $planningHierarchyRows = collect($moduleProgressCards)->filter(static fn (array $module): bool => (bool) ($module['used'] ?? true))->map(function (array $module) use ($fmtPct): array {
                 $progress = max(0, min(100, (float) ($module['progress'] ?? 0)));
 
                 return [
@@ -384,27 +421,29 @@
         @endphp
         {{-- 4 cartes PAS / PAO / PTA / ACTION : memes dimensions que les cartes
              statistiques du haut et que <x-ui.stat-card> dans les autres pages. --}}
-        <div class="mx-auto flex w-full max-w-5xl flex-wrap justify-center gap-2">
-            @foreach ($planningHierarchyRows as $row)
-                @php $card = $row['cards'][0] ?? null; @endphp
-                @if ($card)
-                    @php $progress = max(0, min(100, (float) ($card['progress'] ?? 0))); @endphp
-                    <a href="{{ $card['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border bg-white px-4 py-3 text-center shadow-sm transition hover:shadow-md" style="border-color: {{ $card['accent'] }}33;">
-                        <div class="flex min-h-[4.5rem] flex-col items-center justify-center gap-1">
-                            <p class="truncate text-center text-[11px] font-bold uppercase tracking-wide text-[#667085]">{{ $row['group'] }}</p>
-                            <p class="text-xl font-extrabold leading-none" style="color: {{ $card['accent'] }};">{{ $card['value'] }}</p>
-                            <p class="truncate text-center text-[10px] font-semibold text-[#94A3B8]">{{ $card['label'] }}</p>
-                        </div>
-                        <div class="mt-2">
-                            <span class="block h-1.5 overflow-hidden rounded-full bg-slate-200/80">
-                                <span class="block h-full rounded-full" style="width: {{ $progress }}%; background: {{ $card['accent'] }};"></span>
-                            </span>
-                            <p class="mt-1 truncate text-center text-[10px] font-semibold text-[#667085]">{{ $card['meta'] ?? '' }}</p>
-                        </div>
-                    </a>
-                @endif
-            @endforeach
-        </div>
+        @if ($planningHierarchyRows !== [])
+            <div class="mx-auto flex w-full max-w-5xl flex-wrap justify-center gap-2">
+                @foreach ($planningHierarchyRows as $row)
+                    @php $card = $row['cards'][0] ?? null; @endphp
+                    @if ($card)
+                        @php $progress = max(0, min(100, (float) ($card['progress'] ?? 0))); @endphp
+                        <a href="{{ $card['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border bg-white px-4 py-3 text-center shadow-sm transition hover:shadow-md" style="border-color: {{ $card['accent'] }}33;">
+                            <div class="flex min-h-[4.5rem] flex-col items-center justify-center gap-1">
+                                <p class="truncate text-center text-[11px] font-bold uppercase tracking-wide text-[#667085]">{{ $row['group'] }}</p>
+                                <p class="text-xl font-extrabold leading-none" style="color: {{ $card['accent'] }};">{{ $card['value'] }}</p>
+                                <p class="truncate text-center text-[10px] font-semibold text-[#94A3B8]">{{ $card['label'] }}</p>
+                            </div>
+                            <div class="mt-2">
+                                <span class="block h-1.5 overflow-hidden rounded-full bg-slate-200/80">
+                                    <span class="block h-full rounded-full" style="width: {{ $progress }}%; background: {{ $card['accent'] }};"></span>
+                                </span>
+                                <p class="mt-1 truncate text-center text-[10px] font-semibold text-[#667085]">{{ $card['meta'] ?? '' }}</p>
+                            </div>
+                        </a>
+                    @endif
+                @endforeach
+            </div>
+        @endif
     </div>
     @endif
 

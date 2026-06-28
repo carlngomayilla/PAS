@@ -2,6 +2,11 @@
     $items = collect($items ?? []);
     $summary = is_array($summary ?? null) ? $summary : [];
     $components = collect($summary['components'] ?? []);
+    $summaryCards = collect([
+        ['label' => 'Ouvertes', 'value' => (int) ($summary['total'] ?? 0), 'color' => '#17324a'],
+        ['label' => 'En retard', 'value' => (int) ($summary['overdue'] ?? 0), 'color' => '#B42318'],
+        ['label' => 'Critiques', 'value' => (int) ($summary['critical'] ?? 0), 'color' => '#F9B13C'],
+    ])->filter(static fn (array $card): bool => (int) ($card['value'] ?? 0) > 0)->values();
     $taskBadge = static fn (array $task): string => match ((string) ($task['criticality'] ?? 'normale')) {
         'critique' => 'anbg-badge anbg-badge-danger',
         'importante' => 'anbg-badge anbg-badge-warning',
@@ -26,23 +31,19 @@
         </div>
     </div>
 
-    <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
-        <div class="rounded-2xl border border-slate-200/85 bg-white/95 p-3">
-            <span class="text-xs font-bold uppercase text-[#667085]">Ouvertes</span>
-            <strong class="mt-1 block text-2xl text-[#17324a]">{{ (int) ($summary['total'] ?? 0) }}</strong>
+    @if ($summaryCards->isNotEmpty())
+        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
+            @foreach ($summaryCards as $card)
+                <div class="rounded-2xl border border-slate-200/85 bg-white/95 p-3">
+                    <span class="text-xs font-bold uppercase text-[#667085]">{{ $card['label'] }}</span>
+                    <strong class="mt-1 block text-2xl" style="color: {{ $card['color'] }};">{{ (int) $card['value'] }}</strong>
+                </div>
+            @endforeach
         </div>
-        <div class="rounded-2xl border border-slate-200/85 bg-white/95 p-3">
-            <span class="text-xs font-bold uppercase text-[#667085]">En retard</span>
-            <strong class="mt-1 block text-2xl text-[#B42318]">{{ (int) ($summary['overdue'] ?? 0) }}</strong>
-        </div>
-        <div class="rounded-2xl border border-slate-200/85 bg-white/95 p-3">
-            <span class="text-xs font-bold uppercase text-[#667085]">Critiques</span>
-            <strong class="mt-1 block text-2xl text-[#F9B13C]">{{ (int) ($summary['critical'] ?? 0) }}</strong>
-        </div>
-    </div>
+    @endif
 
     @if ($components->isNotEmpty())
-        <div class="mt-3 grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))]">
+        <div class="{{ $summaryCards->isNotEmpty() ? 'mt-3' : '' }} grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))]">
             @foreach ($components as $component)
                 <div class="rounded-lg border border-slate-200/85 bg-white/90 p-3">
                     <span class="block text-[0.68rem] font-bold uppercase text-[#667085]">{{ $component['label'] ?? 'Composante' }}</span>

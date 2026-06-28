@@ -6,10 +6,19 @@
     'tone' => 'blue',
     'href' => null,
     'badge' => null,
+    'show' => true,
+    'hideWhenEmpty' => false,
 ])
 
 @php
     $titleText = $title ?? $label;
+    $normalizedValue = is_string($value)
+        ? str_replace(['%', ' ', "\u{00A0}"], '', $value)
+        : $value;
+    $isEmptyValue = $value === null
+        || trim((string) $value) === ''
+        || (is_numeric($normalizedValue) && (float) $normalizedValue === 0.0);
+    $shouldRender = (bool) $show && (! $hideWhenEmpty || ! $isEmptyValue);
     $tones = [
         'navy' => 'border-[#1c203d]/30',
         'blue' => 'border-[#3996d3]/30',
@@ -22,6 +31,7 @@
     $classes = 'no-kpi-band stat-card glass-kpi app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border '.($tones[$tone] ?? $tones['blue']).' bg-white px-4 py-3 text-center shadow-sm transition hover:shadow-md';
 @endphp
 
+@if ($shouldRender)
 @if ($href)
     <a href="{{ $href }}" {{ $attributes->merge(['class' => $classes]) }}>
 @else
@@ -49,4 +59,5 @@
     </a>
 @else
     </div>
+@endif
 @endif
