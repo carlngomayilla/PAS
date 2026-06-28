@@ -9,7 +9,8 @@ class PtaAiImportNormalizerService
     public function __construct(
         private readonly PtaAgentResolverService $agents,
         private readonly PtaImportTemplateAnalyzerService $template,
-        private readonly PtaImportQualityControlService $quality
+        private readonly PtaImportQualityControlService $quality,
+        private readonly PtaActionParameterizationService $parameterizer
     ) {}
 
     /**
@@ -50,17 +51,6 @@ class PtaAiImportNormalizerService
         $row['codes_agents_rmo'] = $this->agents->codesToString($agentResolution['codes']);
         $row['cible_minimum_execution'] = $this->targetFrom($this->first($source, ['cible_minimum_execution', 'cible']));
         $row['justificatif_attendu'] = $this->first($source, ['justificatif_attendu', 'indicateurs_performance', 'indicateur']);
-        $row['type_action'] = $this->first($source, ['type_action']) ?? ($subActions === [] ? '' : 'M');
-        $row['quantite_cible'] = $this->first($source, ['quantite_cible']);
-        $row['unite_cible'] = $this->first($source, ['unite_cible', 'unite']);
-        $row['seuil_mode'] = $this->first($source, ['seuil_mode']) ?? '';
-        $row['seuil_t1'] = $this->first($source, ['seuil_t1']);
-        $row['seuil_t2'] = $this->first($source, ['seuil_t2']);
-        $row['seuil_t3'] = $this->first($source, ['seuil_t3']);
-        $row['seuil_t4'] = $this->first($source, ['seuil_t4']);
-        $row['nombre_sous_actions'] = $subActions === [] ? ($this->first($source, ['nombre_sous_actions']) ?? 0) : count($subActions);
-        $row['sous_actions'] = $subActions === [] ? $this->first($source, ['sous_actions']) : implode(' ; ', $subActions);
-        $row['niveau_risque'] = $this->first($source, ['niveau_risque']) ?? ($this->blank($this->first($source, ['risque', 'risques_potentiels'])) ? '' : 'modere');
         $row['risque'] = $this->first($source, ['risque', 'risques_potentiels']);
         $row['mesures_preventives'] = $this->first($source, ['mesures_preventives']);
         $row['ressources_materielles'] = $this->first($source, ['ressources_materielles', 'ressources_requises']);
@@ -69,8 +59,34 @@ class PtaAiImportNormalizerService
         $row['financement'] = $this->first($source, ['financement']) ?? 0;
         $row['nature_financement'] = $this->first($source, ['nature_financement', 'source_financement']);
         $row['montant_financement'] = $this->first($source, ['montant_financement', 'budget_previsionnel']);
-        $row['commentaire_obligatoire'] = $this->first($source, ['commentaire_obligatoire']) ?? 1;
-        $row['champ_difficulte'] = $this->first($source, ['champ_difficulte']) ?? 1;
+
+        $parameterization = $this->parameterizer->parameterize(array_merge($source, [
+            'libelle_action' => $row['libelle_action'],
+            'indicateur' => $row['justificatif_attendu'],
+            'cible_minimum_execution' => $row['cible_minimum_execution'],
+            'date_debut_action' => $row['date_debut_action'],
+            'date_fin_action' => $row['date_fin_action'],
+            'risque' => $row['risque'],
+            'ressources_requises' => $row['ressources_materielles'],
+            'sous_actions' => $subActions,
+        ]));
+
+        $row['type_action'] = $this->first($source, ['type_action']) ?? $parameterization['type_action'];
+        $row['quantite_cible'] = $this->first($source, ['quantite_cible']) ?? $parameterization['quantite_cible'];
+        $row['unite_cible'] = $this->first($source, ['unite_cible', 'unite']) ?? $parameterization['unite_cible'];
+        $row['seuil_mode'] = $this->first($source, ['seuil_mode']) ?? $parameterization['seuil_mode'];
+        $row['seuil_t1'] = $this->first($source, ['seuil_t1']) ?? $parameterization['seuil_t1'];
+        $row['seuil_t2'] = $this->first($source, ['seuil_t2']) ?? $parameterization['seuil_t2'];
+        $row['seuil_t3'] = $this->first($source, ['seuil_t3']) ?? $parameterization['seuil_t3'];
+        $row['seuil_t4'] = $this->first($source, ['seuil_t4']) ?? $parameterization['seuil_t4'];
+        $row['nombre_sous_actions'] = $subActions === [] ? ($this->first($source, ['nombre_sous_actions']) ?? $parameterization['nombre_sous_actions']) : count($subActions);
+        $row['sous_actions'] = $subActions === [] ? ($this->first($source, ['sous_actions']) ?? $this->parameterizer->stringifySubActions($parameterization['sous_actions'])) : implode(' ; ', $subActions);
+        $row['niveau_risque'] = $this->first($source, ['niveau_risque']) ?? $parameterization['niveau_risque'];
+        $row['commentaire_obligatoire'] = $this->first($source, ['commentaire_obligatoire']) ?? $parameterization['commentaire_obligatoire'];
+        $row['champ_difficulte'] = $this->first($source, ['champ_difficulte']) ?? $parameterization['champ_difficulte'];
+        $row['justification_type'] = $parameterization['justification_type'];
+        $row['validation_warnings'] = implode(' | ', $parameterization['validation_warnings']);
+        $row['confidence_score'] = $parameterization['confidence_score'];
 
         $row['rmo_raw'] = $rmoRaw;
         $row['etat_realisation_initial'] = $this->first($source, ['etat_realisation_initial', 'etat_realisation', 'statut_initial']);

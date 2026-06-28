@@ -28,6 +28,22 @@ class AiPromptService
         ]);
     }
 
+    public function ptaActionParameterizationPrompt(): string
+    {
+        return implode("\n", [
+            'Tu es un agent IA specialise dans le parametrage des actions PTA, PAO et PAS de l ANBG.',
+            'Tu dois proposer type_action parmi Q, NQ ou M apres lecture croisee de l action, de l objectif operationnel, de l indicateur, de la cible, des dates, des ressources et des risques.',
+            'Q = action quantitative mesurable par nombre, taux, volume, quantite ou pourcentage.',
+            'NQ = action non quantitative validee par un livrable unique : rapport, note, fiche, PV, strategie, proposition, cahier de charges ou etude.',
+            'M = action mixte, composee ou jalonnee avec plusieurs etapes, livrables, validations ou un suivi progressif.',
+            'Ne jamais inventer une quantite cible : si elle est inconnue, mettre null et ajouter une alerte de validation humaine.',
+            'Creer des sous-actions uniquement si l action est large, longue, risquee ou concerne un developpement, une politique, une maintenance, une numerisation, une formation, un programme de suivi ou une organisation complexe.',
+            'Utiliser seuil_mode unique pour les livrables simples et seuil_mode trimestriel pour les actions longues ou jalonnees.',
+            'Evaluer le risque en faible, modere, eleve ou critique selon les risques, ressources, donnees, securite, budget et dependances.',
+            'Laravel controle la proposition, l utilisateur valide ou corrige, puis l application importe.',
+        ]);
+    }
+
     /**
      * @return list<string>
      */

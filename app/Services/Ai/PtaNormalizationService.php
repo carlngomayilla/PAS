@@ -9,6 +9,10 @@ use Illuminate\Support\Str;
 
 class PtaNormalizationService
 {
+    public function __construct(
+        private readonly PtaActionParameterizationService $parameterizer
+    ) {}
+
     /**
      * @var list<string>
      */
@@ -35,6 +39,25 @@ class PtaNormalizationService
         'priorite',
         'statut_initial',
         'livrables_attendus',
+        'ressources_requises',
+        'risques_potentiels',
+        'type_action',
+        'justification_type',
+        'cible_minimum_execution',
+        'quantite_cible',
+        'unite_cible',
+        'seuil_mode',
+        'seuil_t1',
+        'seuil_t2',
+        'seuil_t3',
+        'seuil_t4',
+        'nombre_sous_actions',
+        'sous_actions',
+        'niveau_risque',
+        'commentaire_obligatoire',
+        'champ_difficulte',
+        'validation_warnings',
+        'confidence_score',
         'observations',
         'pta_code',
         'pta_id',
@@ -66,6 +89,25 @@ class PtaNormalizationService
         'priorite' => ['priorite', 'niveau priorite'],
         'statut_initial' => ['statut initial', 'statut', 'etat'],
         'livrables_attendus' => ['livrables attendus', 'livrable', 'resultats attendus'],
+        'ressources_requises' => ['ressources requises', 'ressources', 'moyens requis'],
+        'risques_potentiels' => ['risques potentiels', 'risques', 'risque'],
+        'type_action' => ['type action', 'type_action', 'type propose'],
+        'justification_type' => ['justification ia', 'justification type', 'justification_type'],
+        'cible_minimum_execution' => ['cible minimum execution', 'cible minimum', 'seuil minimum'],
+        'quantite_cible' => ['quantite cible', 'quantite_cible'],
+        'unite_cible' => ['unite cible', 'unite_cible'],
+        'seuil_mode' => ['seuil mode', 'mode seuil', 'seuil propose'],
+        'seuil_t1' => ['seuil t1', 'seuil_t1'],
+        'seuil_t2' => ['seuil t2', 'seuil_t2'],
+        'seuil_t3' => ['seuil t3', 'seuil_t3'],
+        'seuil_t4' => ['seuil t4', 'seuil_t4'],
+        'nombre_sous_actions' => ['nombre sous actions', 'nombre_sous_actions'],
+        'sous_actions' => ['sous actions', 'sous_actions', 'sous-actions proposees'],
+        'niveau_risque' => ['niveau risque', 'niveau_risque', 'risque propose'],
+        'commentaire_obligatoire' => ['commentaire obligatoire', 'commentaire_obligatoire'],
+        'champ_difficulte' => ['champ difficulte', 'champ_difficulte'],
+        'validation_warnings' => ['alerte validation', 'alertes validation', 'validation warnings'],
+        'confidence_score' => ['score confiance', 'score de confiance', 'confidence score'],
         'observations' => ['observations', 'commentaires', 'commentaire', 'notes'],
         'pta_code' => ['pta code', 'code pta', 'pta'],
         'pta_id' => ['pta id', 'id pta'],
@@ -127,6 +169,15 @@ class PtaNormalizationService
             $normalized[$target] = $this->normalizeValue($target, $value);
         }
 
+        $parameterization = $this->parameterizer->parameterize($normalized);
+        foreach ($parameterization as $field => $value) {
+            if (! array_key_exists($field, $normalized) || ! $this->blank($normalized[$field] ?? null)) {
+                continue;
+            }
+
+            $normalized[$field] = $this->normalizeValue($field, $this->formatParameterValue($field, $value));
+        }
+
         return $normalized;
     }
 
@@ -167,6 +218,55 @@ class PtaNormalizationService
             return $this->normalizeStatus((string) $value);
         }
 
+        if (in_array($field, [
+            'cible_minimum_execution',
+            'quantite_cible',
+            'seuil_t1',
+            'seuil_t2',
+            'seuil_t3',
+            'seuil_t4',
+            'confidence_score',
+        ], true)) {
+            $number = str_replace(['%', ' ', "\u{00A0}"], '', (string) $value);
+            $number = str_replace(',', '.', $number);
+
+            return is_numeric($number) ? (float) $number : $value;
+        }
+
+        if ($field === 'nombre_sous_actions') {
+            return is_numeric($value) ? (int) $value : $value;
+        }
+
+        if (in_array($field, ['commentaire_obligatoire', 'champ_difficulte'], true)) {
+            return in_array((string) $value, ['1', 'oui', 'Oui', 'true', 'vrai'], true) ? 1 : 0;
+        }
+
+        if ($field === 'type_action') {
+            return strtoupper((string) $value);
+        }
+
+        if ($field === 'niveau_risque') {
+            return match ($this->key((string) $value)) {
+                'modere' => 'modere',
+                'eleve' => 'eleve',
+                'critique' => 'critique',
+                default => 'faible',
+            };
+        }
+
+        return $value;
+    }
+
+    private function formatParameterValue(string $field, mixed $value): mixed
+    {
+        if ($field === 'sous_actions' && is_array($value)) {
+            return $this->parameterizer->stringifySubActions($value);
+        }
+
+        if ($field === 'validation_warnings' && is_array($value)) {
+            return implode(' | ', array_map(static fn (mixed $warning): string => trim((string) $warning), $value));
+        }
+
         return $value;
     }
 
@@ -198,5 +298,14 @@ class PtaNormalizationService
         $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?? $value;
 
         return trim($value);
+    }
+
+    private function blank(mixed $value): bool
+    {
+        if (is_array($value)) {
+            return $value === [];
+        }
+
+        return trim((string) $value) === '';
     }
 }

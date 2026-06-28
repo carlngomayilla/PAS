@@ -286,10 +286,12 @@ Piloter la réalisation concrète des décisions de planification : assigner une
 
 ### 4.4 Étapes — sous-workflow 1 : création et paramétrage
 
-1. **Création dans le PTA** : champs obligatoires (libellé, pta_id, responsable, date_debut, date_fin_prevue, priorité, type_cible quantitative/qualitative).
+1. **Création dans le PTA** : champs obligatoires (libellé, pta_id, responsable, date_debut, date_fin_prevue, priorité, `type_action` pivot).
 2. **Définition de la cible** :
-   - Quantitative : unité, `quantite_cible`, `mode_evaluation` (`quantitatif` ou `mixte`).
-   - Qualitative : résultat attendu, critères d'achèvement, `mode_evaluation` (`sous_actions`).
+   - `Q` / quantitative : unité, `quantite_cible`, `mode_evaluation = quantitatif`.
+   - `NQ` / livrable unique : justificatif attendu, `mode_evaluation = sans_quantite`.
+   - `M` / action composée : sous-actions proposées ou saisies, `mode_evaluation = sous_actions`.
+   - Import IA PTA : `PtaActionParameterizationService` propose `type_action`, seuils, sous-actions, risque et alertes ; Laravel valide et l'utilisateur peut corriger avant import.
 3. **Indicateurs (KPI d'action)** : configurés directement dans l'écran action (les routes legacy `kpi/create` redirigent désormais ; seuls `kpi.store/update/destroy` sont conservés pour les opérations atomiques).
 4. **Financement** : si `financement_requis = true`, saisie description, source, justificatif initial.
 5. **Génération automatique des semaines** (`ActionWeek`) sur l'intervalle `[date_debut, date_fin_prevue]` (unicité `(action_id, numero_semaine)`).

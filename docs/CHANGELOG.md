@@ -7,6 +7,50 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 - Parametrage IA Q/NQ/M des actions PTA
+
+### Demande
+
+Completer le chantier import PTA en ajoutant une IA qui ne se limite pas a extraire les lignes : elle doit aussi proposer le parametrage metier de chaque action avant import (`Q`, `NQ`, `M`), avec justification, seuils, sous-actions, niveau de risque, alerte de validation et score de confiance.
+
+### Changement
+
+- **Service metier central** : ajout de `PtaActionParameterizationService` pour analyser action + objectif + indicateur + cible + dates + ressources + risques, puis proposer `Q`, `NQ` ou `M`.
+- **Regles Q/NQ/M** : detection des actions quantitatives, livrables uniques et actions composees/jalonnees ; les quantites non deductibles restent nulles avec alerte humaine.
+- **Seuils et risques** : proposition automatique de `seuil_mode` (`unique`/`trimestriel`), `seuil_t1..t4`, `niveau_risque`, `commentaire_obligatoire` et `champ_difficulte`.
+- **Sous-actions proposees** : generation de jalons pour les politiques de sauvegarde, applications/GLPI, maintenance, numerisation, formations et chantiers generiques.
+- **Preview corrigeable** : ajout des colonnes Type propose, Justification IA, Cible/Quantite/Unite, Seuils T1-T4, Sous-actions proposees, Risque propose, Alerte validation et Score confiance.
+- **Excel IMPORT_GLOBAL mono-feuille** : l'export conserve une seule feuille `IMPORT_GLOBAL`, mais renseigne maintenant les colonnes de parametrage si la proposition IA ou la correction humaine existe.
+- **Import final** : les actions importees sont creees avec `statut_parametrage = parametre`, `type_action`, `mode_evaluation`, seuils, risques et sous-actions lorsque `M` est valide.
+- **Controle Laravel** : validation des parametrages IA avant import final (`Q` exige quantite/unite, `M` exige sous-actions, seuils trimestriels controles).
+
+### Fichiers modifies
+
+- `app/Services/Ai/PtaActionParameterizationService.php`
+- `app/Services/Ai/PtaNormalizationService.php`
+- `app/Services/Ai/PtaAiImportNormalizerService.php`
+- `app/Services/Ai/PtaImportValidationService.php`
+- `app/Services/Ai/PtaImportQualityControlService.php`
+- `app/Services/Ai/PtaFinalImportService.php`
+- `app/Services/Ai/AiPromptService.php`
+- `app/Exports/PtaNormalizedWorkbookExport.php`
+- `resources/views/workspace/ai-imports/pta/preview.blade.php`
+- `tests/Feature/AiPtaActionParameterizationTest.php`
+- `tests/Feature/AiPtaExcelGenerationTest.php`
+- `tests/Feature/AiPtaImportFinalImportTest.php`
+- `tests/Feature/AiPtaImportPreviewTest.php`
+- `tests/Feature/AiPtaOfficialTemplateTest.php`
+
+### Validation
+
+- `vendor/bin/pint --dirty`
+- `php artisan view:cache`
+- `php artisan optimize:clear`
+- `php artisan test tests\Feature\AiPtaActionParameterizationTest.php tests\Feature\AiPtaImportExtractionTest.php tests\Feature\AiPtaImportValidationTest.php tests\Feature\AiPtaImportPreviewTest.php tests\Feature\AiPtaExcelGenerationTest.php tests\Feature\AiPtaImportFinalImportTest.php tests\Feature\AiPtaOfficialTemplateTest.php` - 12 passed, 69 assertions
+- `php artisan test` - 465 passed, 3 skipped, 2799 assertions
+
+---
+
 ## 2026-06-28 — Base IA d'apprentissage PTA et export IMPORT_GLOBAL mono-feuille
 
 ### Demande

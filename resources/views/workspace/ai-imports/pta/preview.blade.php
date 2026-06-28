@@ -2,7 +2,32 @@
 
 @section('content')
 @php
-    $visibleFields = ['libelle_action', 'direction', 'service', 'responsable', 'indicateur', 'budget_previsionnel', 'echeance'];
+    $visibleFields = [
+        'libelle_action' => 'Action',
+        'direction' => 'Direction',
+        'service' => 'Service',
+        'responsable' => 'Responsable',
+        'indicateur' => 'Indicateur',
+        'budget_previsionnel' => 'Budget',
+        'echeance' => 'Echeance',
+        'type_action' => 'Type propose',
+        'cible_minimum_execution' => 'Cible min.',
+        'quantite_cible' => 'Quantite',
+        'unite_cible' => 'Unite',
+        'justification_type' => 'Justification IA',
+        'seuil_mode' => 'Seuil propose',
+        'seuil_t1' => 'T1',
+        'seuil_t2' => 'T2',
+        'seuil_t3' => 'T3',
+        'seuil_t4' => 'T4',
+        'sous_actions' => 'Sous-actions proposees',
+        'niveau_risque' => 'Risque propose',
+        'validation_warnings' => 'Alerte validation',
+        'confidence_score' => 'Score confiance',
+    ];
+    $visibleFieldKeys = array_keys($visibleFields);
+    $longFields = ['libelle_action', 'indicateur', 'justification_type', 'sous_actions', 'validation_warnings'];
+    $tableColspan = count($visibleFields) + 4;
 @endphp
 <div class="app-screen-flow">
     <section class="showcase-panel app-screen-block" data-keep-empty="1" data-keep-accordion="0">
@@ -14,7 +39,7 @@
             <div class="flex flex-wrap gap-2">
                 <a class="btn btn-outline" href="{{ route('workspace.ai-imports.pta.index') }}">Retour</a>
                 @if ($batch->generated_excel_path)
-                    <a class="btn btn-secondary" href="{{ route('workspace.ai-imports.pta.excel', $batch) }}">Excel normalise</a>
+                    <a class="btn btn-secondary" href="{{ route('workspace.ai-imports.pta.excel', $batch) }}">Excel IMPORT_GLOBAL</a>
                 @endif
             </div>
         </div>
@@ -56,13 +81,9 @@
                 <thead>
                     <tr class="text-left text-xs uppercase text-slate-500">
                         <th class="px-3 py-2">Ligne</th>
-                        <th class="px-3 py-2">Action</th>
-                        <th class="px-3 py-2">Direction</th>
-                        <th class="px-3 py-2">Service</th>
-                        <th class="px-3 py-2">Responsable</th>
-                        <th class="px-3 py-2">Indicateur</th>
-                        <th class="px-3 py-2">Budget</th>
-                        <th class="px-3 py-2">Echeance</th>
+                        @foreach ($visibleFields as $label)
+                            <th class="px-3 py-2">{{ $label }}</th>
+                        @endforeach
                         <th class="px-3 py-2">Statut</th>
                         <th class="px-3 py-2">Erreurs</th>
                         <th class="px-3 py-2">Actions</th>
@@ -76,9 +97,36 @@
                                 @csrf
                                 @method('PATCH')
                                 <td class="px-3 py-2 font-semibold">{{ $row->row_number }}</td>
-                                @foreach ($visibleFields as $field)
+                                @foreach ($visibleFields as $field => $label)
+                                    @php($fieldValue = old('normalized.'.$field, $payload[$field] ?? ''))
+                                    @php($fieldValue = is_array($fieldValue) ? implode(' | ', $fieldValue) : $fieldValue)
                                     <td class="px-3 py-2">
-                                        <input name="normalized[{{ $field }}]" value="{{ old('normalized.'.$field, $payload[$field] ?? '') }}" class="w-44 rounded border border-slate-200 px-2 py-1 text-xs">
+                                        @if ($field === 'type_action')
+                                            <select name="normalized[{{ $field }}]" class="w-24 rounded border border-slate-200 px-2 py-1 text-xs">
+                                                <option value=""></option>
+                                                @foreach (['Q' => 'Q', 'NQ' => 'NQ', 'M' => 'M'] as $value => $optionLabel)
+                                                    <option value="{{ $value }}" @selected((string) $fieldValue === $value)>{{ $optionLabel }}</option>
+                                                @endforeach
+                                            </select>
+                                        @elseif ($field === 'seuil_mode')
+                                            <select name="normalized[{{ $field }}]" class="w-32 rounded border border-slate-200 px-2 py-1 text-xs">
+                                                <option value=""></option>
+                                                @foreach (['unique' => 'unique', 'trimestriel' => 'trimestriel'] as $value => $optionLabel)
+                                                    <option value="{{ $value }}" @selected((string) $fieldValue === $value)>{{ $optionLabel }}</option>
+                                                @endforeach
+                                            </select>
+                                        @elseif ($field === 'niveau_risque')
+                                            <select name="normalized[{{ $field }}]" class="w-28 rounded border border-slate-200 px-2 py-1 text-xs">
+                                                <option value=""></option>
+                                                @foreach (['faible' => 'faible', 'modere' => 'modere', 'eleve' => 'eleve', 'critique' => 'critique'] as $value => $optionLabel)
+                                                    <option value="{{ $value }}" @selected((string) $fieldValue === $value)>{{ $optionLabel }}</option>
+                                                @endforeach
+                                            </select>
+                                        @elseif (in_array($field, $longFields, true))
+                                            <textarea name="normalized[{{ $field }}]" rows="3" class="w-56 rounded border border-slate-200 px-2 py-1 text-xs">{{ $fieldValue }}</textarea>
+                                        @else
+                                            <input name="normalized[{{ $field }}]" value="{{ $fieldValue }}" class="w-36 rounded border border-slate-200 px-2 py-1 text-xs">
+                                        @endif
                                     </td>
                                 @endforeach
                                 <td class="px-3 py-2">{{ $row->status }}</td>
@@ -90,8 +138,10 @@
                                 </td>
                                 <td class="px-3 py-2">
                                     @foreach ($fields as $field)
-                                        @if (! in_array($field, $visibleFields, true))
-                                            <input type="hidden" name="normalized[{{ $field }}]" value="{{ $payload[$field] ?? '' }}">
+                                        @if (! in_array($field, $visibleFieldKeys, true))
+                                            @php($hiddenValue = $payload[$field] ?? '')
+                                            @php($hiddenValue = is_array($hiddenValue) ? implode(' | ', $hiddenValue) : $hiddenValue)
+                                            <input type="hidden" name="normalized[{{ $field }}]" value="{{ $hiddenValue }}">
                                         @endif
                                     @endforeach
                                     <div class="flex flex-wrap gap-2">
@@ -103,7 +153,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td class="px-3 py-8 text-center text-slate-500" colspan="11">Aucune ligne extraite.</td>
+                            <td class="px-3 py-8 text-center text-slate-500" colspan="{{ $tableColspan }}">Aucune ligne extraite.</td>
                         </tr>
                     @endforelse
                 </tbody>

@@ -66,6 +66,9 @@ class PtaImportQualityControlService
         if ($type === 'Q' && ($this->blank($normalized['quantite_cible'] ?? null) || $this->blank($normalized['unite_cible'] ?? null))) {
             $errors[] = 'Quantite cible et unite cible obligatoires pour une action quantitative.';
         }
+        if ($type === 'M' && $this->blank($normalized['sous_actions'] ?? null)) {
+            $errors[] = 'Sous-actions obligatoires pour une action composee.';
+        }
 
         $seuilMode = $this->key((string) ($normalized['seuil_mode'] ?? ''));
         if (! in_array($seuilMode, ['', 'unique', 'trimestriel'], true)) {

@@ -32,5 +32,20 @@ class AiPtaExcelGenerationTest extends TestCase
 
         $this->assertSame(1, $workbook->getSheetCount());
         $this->assertSame('IMPORT_GLOBAL', $workbook->getSheet(0)->getTitle());
+
+        $sheet = $workbook->getSheet(0);
+        $rows = $sheet->rangeToArray('A1:'.$sheet->getHighestColumn().'2', null, true, false);
+        $headers = $rows[0] ?? [];
+        $values = $rows[1] ?? [];
+        $typeIndex = array_search('type_action', $headers, true);
+        $quantityIndex = array_search('quantite_cible', $headers, true);
+        $unitIndex = array_search('unite_cible', $headers, true);
+
+        $this->assertNotFalse($typeIndex);
+        $this->assertNotFalse($quantityIndex);
+        $this->assertNotFalse($unitIndex);
+        $this->assertSame('Q', $values[$typeIndex]);
+        $this->assertSame(100.0, (float) $values[$quantityIndex]);
+        $this->assertSame('%', $values[$unitIndex]);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\AiImportBatch;
 use App\Services\Ai\AiPromptService;
+use App\Services\Ai\PtaActionParameterizationService;
 use App\Services\Ai\PtaAgentResolverService;
 use App\Services\Ai\PtaImportQualityControlService;
 use App\Services\Ai\PtaImportTemplateAnalyzerService;
@@ -65,6 +66,14 @@ class PtaNormalizedWorkbookExport implements WithMultipleSheets
         $dates = app(PtaImportQualityControlService::class);
         $dateDebut = $dates->normalizeDate($payload['date_debut'] ?? null)?->format('Y-m-d') ?? $payload['date_debut'] ?? null;
         $dateFin = $dates->normalizeDate($payload['date_fin'] ?? $payload['echeance'] ?? null)?->format('Y-m-d') ?? $payload['date_fin'] ?? $payload['echeance'] ?? null;
+        $parameterizer = app(PtaActionParameterizationService::class);
+        $parameterization = $parameterizer->parameterize(array_merge($payload, [
+            'date_debut_action' => $dateDebut,
+            'date_fin_action' => $dateFin,
+            'indicateur' => $payload['livrables_attendus'] ?? $payload['indicateur'] ?? null,
+            'risque' => $payload['risques_potentiels'] ?? null,
+            'ressources_requises' => $payload['ressources_requises'] ?? null,
+        ]));
 
         return [
             'annee_debut_pas' => $year,
@@ -84,29 +93,29 @@ class PtaNormalizedWorkbookExport implements WithMultipleSheets
             'date_debut_action' => $dateDebut,
             'date_fin_action' => $dateFin,
             'codes_agents_rmo' => $this->resolveAgentCodes($payload),
-            'cible_minimum_execution' => $this->percent($payload['cible'] ?? null),
+            'cible_minimum_execution' => $payload['cible_minimum_execution'] ?? $parameterization['cible_minimum_execution'] ?? $this->percent($payload['cible'] ?? null),
             'justificatif_attendu' => $payload['livrables_attendus'] ?? $payload['indicateur'] ?? null,
-            'type_action' => $this->blank($payload['unite'] ?? null) ? null : 'Q',
-            'quantite_cible' => null,
-            'unite_cible' => $payload['unite'] ?? null,
-            'seuil_mode' => null,
-            'seuil_t1' => null,
-            'seuil_t2' => null,
-            'seuil_t3' => null,
-            'seuil_t4' => null,
-            'nombre_sous_actions' => null,
-            'sous_actions' => null,
-            'niveau_risque' => null,
-            'risque' => null,
+            'type_action' => $payload['type_action'] ?? $parameterization['type_action'],
+            'quantite_cible' => $payload['quantite_cible'] ?? $parameterization['quantite_cible'],
+            'unite_cible' => $payload['unite_cible'] ?? $payload['unite'] ?? $parameterization['unite_cible'],
+            'seuil_mode' => $payload['seuil_mode'] ?? $parameterization['seuil_mode'],
+            'seuil_t1' => $payload['seuil_t1'] ?? $parameterization['seuil_t1'],
+            'seuil_t2' => $payload['seuil_t2'] ?? $parameterization['seuil_t2'],
+            'seuil_t3' => $payload['seuil_t3'] ?? $parameterization['seuil_t3'],
+            'seuil_t4' => $payload['seuil_t4'] ?? $parameterization['seuil_t4'],
+            'nombre_sous_actions' => $payload['nombre_sous_actions'] ?? $parameterization['nombre_sous_actions'],
+            'sous_actions' => $payload['sous_actions'] ?? $parameterizer->stringifySubActions($parameterization['sous_actions']),
+            'niveau_risque' => $payload['niveau_risque'] ?? $parameterization['niveau_risque'],
+            'risque' => $payload['risques_potentiels'] ?? null,
             'mesures_preventives' => null,
-            'ressources_materielles' => null,
+            'ressources_materielles' => $payload['ressources_requises'] ?? null,
             'main_oeuvre' => null,
             'autres_ressources' => $payload['partenaires'] ?? null,
             'financement' => $this->blank($payload['budget_previsionnel'] ?? null) ? null : 1,
             'nature_financement' => $payload['source_financement'] ?? null,
             'montant_financement' => $payload['budget_previsionnel'] ?? null,
-            'commentaire_obligatoire' => null,
-            'champ_difficulte' => null,
+            'commentaire_obligatoire' => $payload['commentaire_obligatoire'] ?? $parameterization['commentaire_obligatoire'],
+            'champ_difficulte' => $payload['champ_difficulte'] ?? $parameterization['champ_difficulte'],
         ];
     }
 

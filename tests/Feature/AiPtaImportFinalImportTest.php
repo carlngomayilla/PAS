@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Action;
 use App\Models\AiImportBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -28,6 +29,12 @@ class AiPtaImportFinalImportTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseHas('actions', ['libelle' => 'Action PTA IA']);
+        $action = Action::query()->where('libelle', 'Action PTA IA')->firstOrFail();
+        $this->assertSame('parametre', $action->statut_parametrage);
+        $this->assertSame(Action::TYPE_QUANTITATIVE, $action->type_action);
+        $this->assertSame(Action::MODE_QUANTITATIF, $action->mode_evaluation);
+        $this->assertSame('%', $action->unite_cible);
+        $this->assertEquals(100.0, (float) $action->quantite_cible);
         $this->assertSame('imported', $batch->refresh()->status);
     }
 }

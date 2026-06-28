@@ -63,5 +63,7 @@ class AiPtaOfficialTemplateTest extends TestCase
         $this->assertSame('DG-006', $result['rows'][0]['codes_agents_rmo']);
         $this->assertSame('2026-03-02', $result['rows'][0]['date_debut_action']);
         $this->assertSame('2026-03-13', $result['rows'][0]['date_fin_action']);
+        $this->assertSame('NQ', $result['rows'][0]['type_action']);
+        $this->assertSame('unique', $result['rows'][0]['seuil_mode']);
     }
 }

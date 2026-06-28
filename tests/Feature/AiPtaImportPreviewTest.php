@@ -26,6 +26,10 @@ class AiPtaImportPreviewTest extends TestCase
         $this->actingAs($user)
             ->get(route('workspace.ai-imports.pta.preview', $batch))
             ->assertOk()
-            ->assertSee('Action PTA IA');
+            ->assertSee('Action PTA IA')
+            ->assertSee('Type propose')
+            ->assertSee('Justification IA')
+            ->assertSee('Sous-actions proposees')
+            ->assertSee('Score confiance');
     }
 }

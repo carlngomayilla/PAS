@@ -237,6 +237,8 @@ La migration `2026_05_21_120000_consolidate_indispensable_roles.php` consolide l
 
 **Action :** ajouter `cible_quantitative` (numérique, optionnel) et `unite_mesure` (texte, optionnel) à `REQUIRED_COLUMNS` (ou plus exactement à une nouvelle liste `OPTIONAL_COLUMNS`), adapter `persistRow` pour pré-remplir `actions.quantite_cible` / `actions.unite_cible` et poser `mode_evaluation = 'quantitatif'` quand les deux sont fournis. Mettre à jour le modèle Excel.
 
+**Mise à jour 2026-06-28 :** le modèle `IMPORT_GLOBAL` gère désormais les colonnes de paramétrage optionnelles `type_action`, `quantite_cible`, `unite_cible`, `seuil_mode`, `seuil_t1..t4`, `nombre_sous_actions`, `sous_actions`, `niveau_risque`, `commentaire_obligatoire` et `champ_difficulte`. Le module IA PTA propose ces valeurs automatiquement via `PtaActionParameterizationService`, puis la prévisualisation permet la correction humaine avant import.
+
 ### 2.8 Majeur — Limite de fichier à 5 Mo / 5 000 lignes non vérifiée
 
 **Existant :** non identifié dans `PlanningExcelImportService` (ni la taille, ni le nombre de lignes ne sont contrôlés explicitement).

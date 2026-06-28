@@ -7,6 +7,7 @@ use App\Models\AiImportRow;
 use App\Models\Direction;
 use App\Models\Service;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 class PtaImportValidationService
 {
@@ -138,6 +139,8 @@ class PtaImportValidationService
             $warnings[] = 'Cible recommandee.';
         }
 
+        $this->validateParameterization($payload, $errors, $warnings);
+
         return ['errors' => $errors, 'warnings' => $warnings];
     }
 
@@ -173,5 +176,82 @@ class PtaImportValidationService
     private function blank(mixed $value): bool
     {
         return trim((string) $value) === '';
+    }
+
+    /**
+     * @param  array<string,mixed>  $payload
+     * @param  list<string>  $errors
+     * @param  list<string>  $warnings
+     */
+    private function validateParameterization(array $payload, array &$errors, array &$warnings): void
+    {
+        $type = $this->typeCode($payload['type_action'] ?? null);
+        if ($type === null) {
+            $warnings[] = 'Type action IA recommande avant import final.';
+
+            return;
+        }
+
+        if ($type === 'Q') {
+            if (! is_numeric($payload['quantite_cible'] ?? null) || (float) $payload['quantite_cible'] <= 0) {
+                $errors[] = 'Quantite cible numerique obligatoire lorsque type_action = Q.';
+            }
+
+            if ($this->blank($payload['unite_cible'] ?? $payload['unite'] ?? null)) {
+                $errors[] = 'Unite cible obligatoire lorsque type_action = Q.';
+            }
+        }
+
+        if ($type === 'M' && $this->parseSubActions((string) ($payload['sous_actions'] ?? '')) === []) {
+            $errors[] = 'Sous-actions obligatoires lorsque type_action = M.';
+        }
+
+        $mode = $this->key((string) ($payload['seuil_mode'] ?? ''));
+        if ($mode !== '' && ! in_array($mode, ['unique', 'trimestriel'], true)) {
+            $errors[] = 'Seuil mode non autorise.';
+        }
+
+        if ($mode === 'trimestriel') {
+            foreach (['seuil_t1', 'seuil_t2', 'seuil_t3', 'seuil_t4'] as $field) {
+                if (! is_numeric($payload[$field] ?? null) || (float) $payload[$field] < 0 || (float) $payload[$field] > 100) {
+                    $errors[] = ucfirst(str_replace('_', ' ', $field)).' doit etre compris entre 0 et 100.';
+                }
+            }
+        }
+
+        $risk = $this->key((string) ($payload['niveau_risque'] ?? ''));
+        if ($risk !== '' && ! in_array($risk, ['faible', 'modere', 'eleve', 'critique'], true)) {
+            $errors[] = 'Niveau risque non autorise.';
+        }
+    }
+
+    private function typeCode(mixed $value): ?string
+    {
+        return match ($this->key((string) $value)) {
+            'q', 'quantitative', 'quantitatif' => 'Q',
+            'nq', 'non quantitative', 'non quantitatif', 'nonquantitative' => 'NQ',
+            'm', 'mixte', 'composee', 'compose', 'composite', 'sous actions' => 'M',
+            default => null,
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseSubActions(string $value): array
+    {
+        return collect(explode(';', $value))
+            ->map(fn (string $chunk): string => trim(explode('|', $chunk)[0] ?? ''))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function key(string $value): string
+    {
+        $value = strtolower(Str::ascii(trim($value)));
+        $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?? $value;
+
+        return trim($value);
     }
 }
