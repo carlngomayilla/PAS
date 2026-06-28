@@ -7,6 +7,7 @@ return [
     'pta' => [
         'agent_reference_path' => env('AI_PTA_AGENT_REFERENCE_PATH', base_path('docs/codes_agent_anbg_import.xlsx')),
         'import_template_path' => env('AI_PTA_IMPORT_TEMPLATE_PATH', base_path('docs/modele_import_global_pas_pao_pta.xlsx')),
+        'pdf_text_command' => env('AI_PTA_PDF_TEXT_COMMAND'),
         'embedding_dimensions' => (int) env('AI_EMBEDDING_DIMENSIONS', 64),
         'chunk_size' => (int) env('AI_KNOWLEDGE_CHUNK_SIZE', 1800),
     ],

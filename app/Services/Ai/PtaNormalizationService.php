@@ -61,6 +61,32 @@ class PtaNormalizationService
         'observations',
         'pta_code',
         'pta_id',
+        'annee_debut_pas',
+        'annee_fin_pas',
+        'ordre_axe',
+        'libelle_axe',
+        'ordre_objectif_strategique',
+        'libelle_objectif_strategique',
+        'date_echeance_objectif_strategique',
+        'service_unite',
+        'ordre_objectif_operationnel',
+        'libelle_objectif_operationnel',
+        'date_echeance_objectif_operationnel',
+        'ordre_action',
+        'date_debut_action',
+        'date_fin_action',
+        'codes_agents_rmo',
+        'justificatif_attendu',
+        'risque',
+        'mesures_preventives',
+        'ressources_materielles',
+        'main_oeuvre',
+        'autres_ressources',
+        'financement',
+        'nature_financement',
+        'montant_financement',
+        'rmo_raw',
+        'etat_realisation_initial',
     ];
 
     /**
@@ -72,22 +98,22 @@ class PtaNormalizationService
         'objectif_strategique' => ['objectif strategique', 'objectif pas', 'os'],
         'programme' => ['programme', 'projet', 'composante'],
         'code_action' => ['code action', 'code', 'reference', 'ref action'],
-        'libelle_action' => ['libelle action', 'action', 'intitule action', 'libelle', 'activite'],
+        'libelle_action' => ['libelle action', 'action', 'intitule action', 'libelle', 'activite', 'description des actions detaillees', 'actions detaillees'],
         'description_action' => ['description action', 'description', 'details', 'detail action'],
         'direction' => ['direction', 'departement', 'structure direction'],
         'service' => ['service', 'unite', 'cellule', 'structure service'],
-        'responsable' => ['responsable', 'rmo', 'pilote', 'owner'],
+        'responsable' => ['responsable', 'rmo', 'pilote', 'owner', 'codes agents rmo', 'code agent rmo'],
         'partenaires' => ['partenaires', 'partenaire', 'acteurs impliques'],
-        'indicateur' => ['indicateur', 'kpi', 'indicateur de performance'],
+        'indicateur' => ['indicateur', 'kpi', 'indicateur de performance', 'indicateurs de performance'],
         'cible' => ['cible', 'valeur cible', 'quantite cible'],
         'unite' => ['unite', 'unite cible', 'unite de mesure'],
         'budget_previsionnel' => ['budget previsionnel', 'budget', 'cout', 'montant estime'],
         'source_financement' => ['source financement', 'source de financement', 'financement'],
-        'date_debut' => ['date debut', 'debut', 'date de debut'],
-        'date_fin' => ['date fin', 'fin', 'date de fin'],
+        'date_debut' => ['date debut', 'debut', 'date de debut', 'date debut action'],
+        'date_fin' => ['date fin', 'fin', 'date de fin', 'date fin action'],
         'echeance' => ['echeance', 'deadline', 'date echeance'],
         'priorite' => ['priorite', 'niveau priorite'],
-        'statut_initial' => ['statut initial', 'statut', 'etat'],
+        'statut_initial' => ['statut initial', 'statut', 'etat', 'etat de realisation'],
         'livrables_attendus' => ['livrables attendus', 'livrable', 'resultats attendus'],
         'ressources_requises' => ['ressources requises', 'ressources', 'moyens requis'],
         'risques_potentiels' => ['risques potentiels', 'risques', 'risque'],
@@ -169,6 +195,8 @@ class PtaNormalizationService
             $normalized[$target] = $this->normalizeValue($target, $value);
         }
 
+        $normalized = $this->syncOfficialAndGenericFields($normalized);
+
         $parameterization = $this->parameterizer->parameterize($normalized);
         foreach ($parameterization as $field => $value) {
             if (! array_key_exists($field, $normalized) || ! $this->blank($normalized[$field] ?? null)) {
@@ -177,6 +205,8 @@ class PtaNormalizationService
 
             $normalized[$field] = $this->normalizeValue($field, $this->formatParameterValue($field, $value));
         }
+
+        $normalized = $this->syncOfficialAndGenericFields($normalized);
 
         return $normalized;
     }
@@ -207,7 +237,7 @@ class PtaNormalizationService
             return null;
         }
 
-        if ($field === 'budget_previsionnel') {
+        if (in_array($field, ['budget_previsionnel', 'montant_financement'], true)) {
             $number = str_replace([' ', "\u{00A0}"], '', (string) $value);
             $number = str_replace(',', '.', $number);
 
@@ -237,7 +267,7 @@ class PtaNormalizationService
             return is_numeric($value) ? (int) $value : $value;
         }
 
-        if (in_array($field, ['commentaire_obligatoire', 'champ_difficulte'], true)) {
+        if (in_array($field, ['financement', 'commentaire_obligatoire', 'champ_difficulte'], true)) {
             return in_array((string) $value, ['1', 'oui', 'Oui', 'true', 'vrai'], true) ? 1 : 0;
         }
 
@@ -290,6 +320,69 @@ class PtaNormalizationService
         }
 
         return round(min(95, max(35, ($mappedColumns / max(1, count(self::FIELDS) - 2)) * 100)), 2);
+    }
+
+    /**
+     * @param  array<string,mixed>  $normalized
+     * @return array<string,mixed>
+     */
+    private function syncOfficialAndGenericFields(array $normalized): array
+    {
+        foreach ([
+            ['exercice', 'annee_debut_pas'],
+            ['axe_strategique', 'libelle_axe'],
+            ['objectif_strategique', 'libelle_objectif_strategique'],
+            ['programme', 'libelle_objectif_operationnel'],
+            ['code_action', 'ordre_action'],
+            ['service', 'service_unite'],
+            ['date_debut', 'date_debut_action'],
+            ['date_fin', 'date_fin_action'],
+            ['echeance', 'date_echeance_objectif_operationnel'],
+            ['indicateur', 'justificatif_attendu'],
+            ['cible', 'cible_minimum_execution'],
+            ['ressources_requises', 'ressources_materielles'],
+            ['risques_potentiels', 'risque'],
+            ['budget_previsionnel', 'montant_financement'],
+            ['source_financement', 'nature_financement'],
+            ['statut_initial', 'etat_realisation_initial'],
+        ] as [$generic, $official]) {
+            $normalized = $this->fillBothWays($normalized, $generic, $official);
+        }
+
+        if ($this->blank($normalized['annee_fin_pas'] ?? null) && ! $this->blank($normalized['annee_debut_pas'] ?? null)) {
+            $normalized['annee_fin_pas'] = $normalized['annee_debut_pas'];
+        }
+
+        if ($this->blank($normalized['responsable'] ?? null) && ! $this->blank($normalized['rmo_raw'] ?? null)) {
+            $normalized['responsable'] = $normalized['rmo_raw'];
+        }
+
+        if ($this->blank($normalized['codes_agents_rmo'] ?? null) && ! $this->blank($normalized['responsable'] ?? null)) {
+            $normalized['codes_agents_rmo'] = $normalized['responsable'];
+        }
+
+        if ($this->blank($normalized['date_fin_action'] ?? null) && ! $this->blank($normalized['date_fin'] ?? null)) {
+            $normalized['date_fin_action'] = $normalized['date_fin'];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<string,mixed>  $normalized
+     * @return array<string,mixed>
+     */
+    private function fillBothWays(array $normalized, string $left, string $right): array
+    {
+        if ($this->blank($normalized[$left] ?? null) && ! $this->blank($normalized[$right] ?? null)) {
+            $normalized[$left] = $normalized[$right];
+        }
+
+        if ($this->blank($normalized[$right] ?? null) && ! $this->blank($normalized[$left] ?? null)) {
+            $normalized[$right] = $normalized[$left];
+        }
+
+        return $normalized;
     }
 
     private function key(string $value): string

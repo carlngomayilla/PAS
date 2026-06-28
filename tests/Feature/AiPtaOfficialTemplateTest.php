@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\Ai\PtaAgentResolverService;
+use App\Services\Ai\PtaDocumentStructureExtractorService;
 use App\Services\Ai\PtaDocumentToImportGlobalMapperService;
 use App\Services\Ai\PtaImportTemplateAnalyzerService;
 use Tests\TestCase;
@@ -65,5 +66,40 @@ class AiPtaOfficialTemplateTest extends TestCase
         $this->assertSame('2026-03-13', $result['rows'][0]['date_fin_action']);
         $this->assertSame('NQ', $result['rows'][0]['type_action']);
         $this->assertSame('unique', $result['rows'][0]['seuil_mode']);
+    }
+
+    public function test_plain_text_pta_table_extracts_hierarchy_and_maps_to_import_global(): void
+    {
+        $text = implode("\n", [
+            'PLAN DE TRAVAIL ANNUEL 2026',
+            'Direction: Direction SI',
+            'Service: Service Applications',
+            'AXE STRATEGIQUE 2',
+            'REDRESSEMENT DE LA SITUATION FINANCIERE',
+            'OBJECTIF STRATEGIQUE 1',
+            'Rationaliser la depense de bourse',
+            'OBJECTIF OPERATIONNEL N 1',
+            'Detruire les archives perimees',
+            'DESCRIPTION DES ACTIONS DETAILLEES | RMO | CIBLE | DEBUT | FIN | ETAT DE REALISATION | RESSOURCES REQUISES | INDICATEURS DE PERFORMANCE | RISQUES POTENTIELS',
+            'Selectionner les documents perimes | DG-006 | 100% | 02/03/26 | 13/03/26 | Non demarre | Personnel archives | Objectifs definis | Detruire les documents non perimes',
+        ]);
+
+        $structured = app(PtaDocumentStructureExtractorService::class)->extractFromText($text);
+
+        $this->assertSame('PTA', $structured['document']['type_document']);
+        $this->assertSame(2026, $structured['document']['annee_debut_pas']);
+        $this->assertCount(1, $structured['items']);
+        $this->assertSame(2, $structured['items'][0]['ordre_axe']);
+        $this->assertSame('REDRESSEMENT DE LA SITUATION FINANCIERE', $structured['items'][0]['libelle_axe']);
+        $this->assertSame('Detruire les archives perimees', $structured['items'][0]['libelle_objectif_operationnel']);
+
+        $result = app(PtaDocumentToImportGlobalMapperService::class)->map($structured);
+
+        $this->assertSame(1, $result['valid']);
+        $this->assertSame(2, $result['rows'][0]['ordre_axe']);
+        $this->assertSame('Direction SI', $result['rows'][0]['direction']);
+        $this->assertSame('Service Applications', $result['rows'][0]['service_unite']);
+        $this->assertSame('Selectionner les documents perimes', $result['rows'][0]['libelle_action']);
+        $this->assertSame('2026-03-02', $result['rows'][0]['date_debut_action']);
     }
 }

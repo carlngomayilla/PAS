@@ -85,19 +85,106 @@ class PtaDocumentStructureExtractorService
     {
         $documentType = $this->detectDocumentType($text);
         $years = $this->yearsFrom($text);
+        $lines = $this->linesFrom($text);
+        $context = [
+            'ordre_axe' => null,
+            'libelle_axe' => null,
+            'ordre_objectif_strategique' => null,
+            'libelle_objectif_strategique' => null,
+            'ordre_objectif_operationnel' => null,
+            'libelle_objectif_operationnel' => null,
+        ];
+        $pendingContext = null;
+        $items = [];
+        $actionOrder = 0;
+        $inActionTable = false;
+
+        foreach ($lines as $line) {
+            $key = $this->key($line);
+            if ($key === '' || $this->isIgnoredTextLine($key)) {
+                continue;
+            }
+
+            if ($this->isActionHeaderLine($key)) {
+                $inActionTable = true;
+                $pendingContext = null;
+
+                continue;
+            }
+
+            $detectedContext = $this->contextMarker($line);
+            if ($detectedContext !== null) {
+                [$field, $value, $order] = $detectedContext;
+                if ($order !== null) {
+                    $context[$this->orderFieldFor($field)] = $order;
+                }
+
+                if ($value === null || $value === '') {
+                    $pendingContext = $field;
+                } else {
+                    $context[$field] = $this->cleanContextLabel($value);
+                    $pendingContext = null;
+                    if ($field === 'libelle_objectif_operationnel') {
+                        $actionOrder = 0;
+                    }
+                }
+
+                $inActionTable = false;
+
+                continue;
+            }
+
+            if (is_string($pendingContext)) {
+                $context[$pendingContext] = $this->cleanContextLabel($line);
+                if ($pendingContext === 'libelle_objectif_operationnel') {
+                    $actionOrder = 0;
+                }
+                $pendingContext = null;
+
+                continue;
+            }
+
+            if (! $inActionTable) {
+                continue;
+            }
+
+            $action = $this->actionFromTextTableLine($line);
+            if ($action === null) {
+                continue;
+            }
+
+            $actionOrder++;
+            $items[] = array_merge($context, [
+                'ordre_action' => $actionOrder,
+                'libelle_action' => $action['libelle_action'],
+                'actions_detaillees' => $action['libelle_action'],
+                'rmo_raw' => $action['rmo_raw'],
+                'cible' => $action['cible'],
+                'date_debut_action' => $action['date_debut_action'],
+                'date_fin_action' => $action['date_fin_action'],
+                'etat_realisation_initial' => $action['etat_realisation_initial'],
+                'ressources_requises' => $action['ressources_requises'],
+                'indicateurs_performance' => $action['indicateurs_performance'],
+                'risques_potentiels' => $action['risques_potentiels'],
+                'confidence_score' => 0.72,
+                'validation_warnings' => [],
+            ]);
+        }
+
+        $document = [
+            'type_document' => $documentType,
+            'annee' => $years['annee'],
+            'annee_debut_pas' => $years['annee_debut_pas'],
+            'annee_fin_pas' => $years['annee_fin_pas'],
+            'direction' => $this->lineAfter($text, 'Direction'),
+            'service_unite' => $this->lineAfter($text, 'Service'),
+            'responsable' => null,
+            'fonction_responsable' => null,
+        ];
 
         return [
-            'document' => [
-                'type_document' => $documentType,
-                'annee' => $years['annee'],
-                'annee_debut_pas' => $years['annee_debut_pas'],
-                'annee_fin_pas' => $years['annee_fin_pas'],
-                'direction' => $this->lineAfter($text, 'Direction'),
-                'service_unite' => $this->lineAfter($text, 'Service'),
-                'responsable' => null,
-                'fonction_responsable' => null,
-            ],
-            'items' => [],
+            'document' => $this->completeYears($document, $items),
+            'items' => $items,
         ];
     }
 
@@ -144,6 +231,146 @@ class PtaDocumentStructureExtractorService
         }
 
         return trim($matches[1]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function linesFrom(string $text): array
+    {
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        $lines = preg_split('/\n+/', $text) ?: [];
+
+        return array_values(array_filter(array_map(
+            static fn (string $line): string => trim(preg_replace('/[ \t]+/', ' ', $line) ?? $line),
+            $lines
+        ), static fn (string $line): bool => $line !== ''));
+    }
+
+    private function isIgnoredTextLine(string $key): bool
+    {
+        return Str::startsWith($key, 'anbg proposition')
+            || Str::startsWith($key, 'plan de travail annuel')
+            || Str::startsWith($key, 'plan d actions operationnel')
+            || $key === 'axes strategiques'
+            || $key === 'n'
+            || $key === 'echeance';
+    }
+
+    private function isActionHeaderLine(string $key): bool
+    {
+        return Str::contains($key, 'description des actions')
+            && Str::contains($key, 'rmo')
+            && Str::contains($key, 'cible');
+    }
+
+    /**
+     * @return array{0:string,1:string|null,2:int|null}|null
+     */
+    private function contextMarker(string $line): ?array
+    {
+        $key = $this->key($line);
+
+        if (Str::startsWith($key, 'axe strategique')) {
+            $value = trim(preg_replace('/^axe\s+strategique(?:\s+\d+)?\s*[:\-]?\s*/iu', '', $line) ?? '');
+
+            return ['libelle_axe', $value === '' ? null : $value, $this->orderFrom($line)];
+        }
+
+        if (Str::startsWith($key, 'objectif strategique')) {
+            $value = trim(preg_replace('/^objectif\s+strategique(?:\s+n\s*[^0-9A-Za-z\s]?)?\s*(?:\d+)?\s*[:\-]?\s*/iu', '', $line) ?? '');
+
+            return ['libelle_objectif_strategique', $value === '' ? null : $value, $this->orderFrom($line)];
+        }
+
+        if (Str::startsWith($key, 'objectif operationnel')) {
+            $value = trim(preg_replace('/^objectif\s+operationnel(?:\s+n\s*[^0-9A-Za-z\s]?)?\s*(?:\d+)?\s*[:\-]?\s*/iu', '', $line) ?? '');
+
+            return ['libelle_objectif_operationnel', $value === '' ? null : $value, $this->orderFrom($line)];
+        }
+
+        return null;
+    }
+
+    private function orderFieldFor(string $labelField): string
+    {
+        return match ($labelField) {
+            'libelle_axe' => 'ordre_axe',
+            'libelle_objectif_strategique' => 'ordre_objectif_strategique',
+            default => 'ordre_objectif_operationnel',
+        };
+    }
+
+    private function cleanContextLabel(string $value): string
+    {
+        $value = trim($value);
+        $value = preg_replace('/^\(?[IVXLCDM]+\)?\s*[\).\-]\s*/iu', '', $value) ?? $value;
+        $value = preg_replace('/^\d+\s*[\).\-]?\s*/', '', $value) ?? $value;
+
+        return trim($value);
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function actionFromTextTableLine(string $line): ?array
+    {
+        $columns = $this->splitActionColumns($line);
+        if (count($columns) < 5) {
+            return null;
+        }
+
+        $columns = array_pad($columns, 9, null);
+        $action = trim((string) $columns[0]);
+        if ($action === '' || $this->isActionHeaderLine($this->key($action))) {
+            return null;
+        }
+
+        return [
+            'libelle_action' => $action,
+            'rmo_raw' => $columns[1] ?? null,
+            'cible' => $columns[2] ?? null,
+            'date_debut_action' => $columns[3] ?? null,
+            'date_fin_action' => $columns[4] ?? null,
+            'etat_realisation_initial' => $columns[5] ?? null,
+            'ressources_requises' => $columns[6] ?? null,
+            'indicateurs_performance' => $columns[7] ?? null,
+            'risques_potentiels' => $columns[8] ?? null,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function splitActionColumns(string $line): array
+    {
+        $line = trim($line);
+        if (str_contains($line, '|')) {
+            return $this->cleanColumns(explode('|', $line));
+        }
+
+        if (str_contains($line, "\t")) {
+            return $this->cleanColumns(explode("\t", $line));
+        }
+
+        $columns = preg_split('/\s{2,}/', $line) ?: [];
+        if (count($columns) >= 5) {
+            return $this->cleanColumns($columns);
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  list<string>  $columns
+     * @return list<string>
+     */
+    private function cleanColumns(array $columns): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (string $column): string => trim($column),
+            $columns
+        ), static fn (string $column): bool => $column !== ''));
     }
 
     /**

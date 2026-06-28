@@ -7,6 +7,27 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 - Extraction PDF PTA et conservation IMPORT_GLOBAL
+
+### Demande
+
+Corriger l'analyse IA PTA/PAS/PAO : le fichier genere doit reprendre les actions depuis les documents fournis, conserver les colonnes attendues par l'ancien module d'import et ne plus produire une ligne vide/factice pour les PDF.
+
+### Changement
+
+- **Extraction PDF explicite** : ajout d'un service d'extraction texte PDF avec support `smalot/pdfparser`, tentative `pdftotext` si disponible, et commande configurable `AI_PTA_PDF_TEXT_COMMAND` pour brancher un OCR.
+- **Diagnostic PDF scanne** : les PDF composes uniquement d'images sont maintenant bloques avec un message clair demandant un OCR/source texte, au lieu de creer une ligne "analyse manuelle" inutilisable.
+- **Parsing PTA/PAS/PAO texte** : l'extracteur reconstruit les axes strategiques, objectifs strategiques, objectifs operationnels et lignes d'actions depuis un tableau texte.
+- **Mapping Excel officiel** : la normalisation conserve les champs hierarchiques officiels (`ordre_axe`, `libelle_axe`, `ordre_objectif_operationnel`, `codes_agents_rmo`, dates action, ressources, risques, etc.) tout en gardant les champs de preview.
+- **Export robuste** : l'Excel `IMPORT_GLOBAL` privilegie les valeurs officielles extraites et garde une seule feuille conforme a l'ancien module.
+
+### Validation
+
+- Diagnostic du PDF fourni `C:/Users/chris/OK/images_pta_pas_pao_anbg.pdf` : document scanne/image, aucune couche texte exploitable sans OCR.
+- `php artisan test tests\Feature\AiPtaOfficialTemplateTest.php tests\Feature\AiPtaExcelGenerationTest.php tests\Feature\AiPtaImportExtractionTest.php tests\Feature\AiPtaImportPreviewTest.php tests\Feature\AiPtaImportFinalImportTest.php` - 11 passed, 70 assertions
+
+---
+
 ## 2026-06-28 - Alignement Excel IA sur l'ancien module d'import
 
 ### Demande

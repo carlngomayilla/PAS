@@ -57,39 +57,44 @@ class PtaNormalizedWorkbookExport implements WithMultipleSheets
      */
     private function payloadToImportGlobal(array $payload): array
     {
-        $year = $this->yearFrom($payload['exercice'] ?? $this->batch->detected_year);
+        $yearStart = $this->yearFrom($this->first($payload, ['annee_debut_pas', 'exercice'], $this->batch->detected_year));
+        $yearEnd = $this->yearFrom($this->first($payload, ['annee_fin_pas'], $yearStart)) ?? $yearStart;
         $dates = app(PtaImportQualityControlService::class);
-        $dateDebut = $dates->normalizeDate($payload['date_debut'] ?? null)?->format('Y-m-d') ?? $payload['date_debut'] ?? null;
-        $dateFin = $dates->normalizeDate($payload['date_fin'] ?? $payload['echeance'] ?? null)?->format('Y-m-d') ?? $payload['date_fin'] ?? $payload['echeance'] ?? null;
+        $dateDebutRaw = $this->first($payload, ['date_debut_action', 'date_debut']);
+        $dateFinRaw = $this->first($payload, ['date_fin_action', 'date_fin', 'echeance']);
+        $dateDebut = $dates->normalizeDate($dateDebutRaw)?->format('Y-m-d') ?? $dateDebutRaw;
+        $dateFin = $dates->normalizeDate($dateFinRaw)?->format('Y-m-d') ?? $dateFinRaw;
+        $dateEcheanceStrategique = $this->normalizedDate($this->first($payload, ['date_echeance_objectif_strategique']));
+        $dateEcheanceOperationnel = $this->normalizedDate($this->first($payload, ['date_echeance_objectif_operationnel', 'echeance']));
         $parameterizer = app(PtaActionParameterizationService::class);
         $parameterization = $parameterizer->parameterize(array_merge($payload, [
             'date_debut_action' => $dateDebut,
             'date_fin_action' => $dateFin,
-            'indicateur' => $payload['livrables_attendus'] ?? $payload['indicateur'] ?? null,
-            'risque' => $payload['risques_potentiels'] ?? null,
-            'ressources_requises' => $payload['ressources_requises'] ?? null,
+            'indicateur' => $this->first($payload, ['livrables_attendus', 'justificatif_attendu', 'indicateur']),
+            'risque' => $this->first($payload, ['risque', 'risques_potentiels']),
+            'ressources_requises' => $this->first($payload, ['ressources_materielles', 'ressources_requises']),
         ]));
 
         return [
-            'annee_debut_pas' => $year,
-            'annee_fin_pas' => $year,
-            'ordre_axe' => null,
-            'libelle_axe' => $payload['axe_strategique'] ?? null,
-            'ordre_objectif_strategique' => null,
-            'libelle_objectif_strategique' => $payload['objectif_strategique'] ?? null,
-            'date_echeance_objectif_strategique' => null,
-            'direction' => $payload['direction'] ?? $this->batch->detected_direction,
-            'service_unite' => $payload['service'] ?? $this->batch->detected_service,
-            'ordre_objectif_operationnel' => null,
-            'libelle_objectif_operationnel' => $payload['programme'] ?? null,
-            'date_echeance_objectif_operationnel' => null,
-            'ordre_action' => $payload['code_action'] ?? null,
-            'libelle_action' => $payload['libelle_action'] ?? $payload['description_action'] ?? null,
+            'annee_debut_pas' => $yearStart,
+            'annee_fin_pas' => $yearEnd,
+            'ordre_axe' => $this->first($payload, ['ordre_axe']),
+            'libelle_axe' => $this->first($payload, ['libelle_axe', 'axe_strategique']),
+            'ordre_objectif_strategique' => $this->first($payload, ['ordre_objectif_strategique']),
+            'libelle_objectif_strategique' => $this->first($payload, ['libelle_objectif_strategique', 'objectif_strategique']),
+            'date_echeance_objectif_strategique' => $dateEcheanceStrategique,
+            'direction' => $this->first($payload, ['direction'], $this->batch->detected_direction),
+            'service_unite' => $this->first($payload, ['service_unite', 'service'], $this->batch->detected_service),
+            'ordre_objectif_operationnel' => $this->first($payload, ['ordre_objectif_operationnel']),
+            'libelle_objectif_operationnel' => $this->first($payload, ['libelle_objectif_operationnel', 'programme']),
+            'date_echeance_objectif_operationnel' => $dateEcheanceOperationnel,
+            'ordre_action' => $this->first($payload, ['ordre_action', 'code_action']),
+            'libelle_action' => $this->first($payload, ['libelle_action', 'description_action']),
             'date_debut_action' => $dateDebut,
             'date_fin_action' => $dateFin,
             'codes_agents_rmo' => $this->resolveAgentCodes($payload),
-            'cible_minimum_execution' => $payload['cible_minimum_execution'] ?? $parameterization['cible_minimum_execution'] ?? $this->percent($payload['cible'] ?? null),
-            'justificatif_attendu' => $payload['livrables_attendus'] ?? $payload['indicateur'] ?? null,
+            'cible_minimum_execution' => $this->first($payload, ['cible_minimum_execution']) ?? $parameterization['cible_minimum_execution'] ?? $this->percent($payload['cible'] ?? null),
+            'justificatif_attendu' => $this->first($payload, ['justificatif_attendu', 'livrables_attendus', 'indicateur']),
             'type_action' => $payload['type_action'] ?? $parameterization['type_action'],
             'quantite_cible' => $payload['quantite_cible'] ?? $parameterization['quantite_cible'],
             'unite_cible' => $payload['unite_cible'] ?? $payload['unite'] ?? $parameterization['unite_cible'],
@@ -101,14 +106,14 @@ class PtaNormalizedWorkbookExport implements WithMultipleSheets
             'nombre_sous_actions' => $payload['nombre_sous_actions'] ?? $parameterization['nombre_sous_actions'],
             'sous_actions' => $payload['sous_actions'] ?? $parameterizer->stringifySubActions($parameterization['sous_actions']),
             'niveau_risque' => $payload['niveau_risque'] ?? $parameterization['niveau_risque'],
-            'risque' => $payload['risques_potentiels'] ?? null,
-            'mesures_preventives' => null,
-            'ressources_materielles' => $payload['ressources_requises'] ?? null,
-            'main_oeuvre' => null,
-            'autres_ressources' => $payload['partenaires'] ?? null,
-            'financement' => $this->blank($payload['budget_previsionnel'] ?? null) ? null : 1,
-            'nature_financement' => $payload['source_financement'] ?? null,
-            'montant_financement' => $payload['budget_previsionnel'] ?? null,
+            'risque' => $this->first($payload, ['risque', 'risques_potentiels']),
+            'mesures_preventives' => $this->first($payload, ['mesures_preventives']),
+            'ressources_materielles' => $this->first($payload, ['ressources_materielles', 'ressources_requises']),
+            'main_oeuvre' => $this->first($payload, ['main_oeuvre']),
+            'autres_ressources' => $this->first($payload, ['autres_ressources', 'partenaires']),
+            'financement' => $this->first($payload, ['financement'], $this->blank($payload['budget_previsionnel'] ?? null) ? null : 1),
+            'nature_financement' => $this->first($payload, ['nature_financement', 'source_financement']),
+            'montant_financement' => $this->first($payload, ['montant_financement', 'budget_previsionnel']),
             'commentaire_obligatoire' => $payload['commentaire_obligatoire'] ?? $parameterization['commentaire_obligatoire'],
             'champ_difficulte' => $payload['champ_difficulte'] ?? $parameterization['champ_difficulte'],
         ];
@@ -122,9 +127,9 @@ class PtaNormalizedWorkbookExport implements WithMultipleSheets
         try {
             $resolver = app(PtaAgentResolverService::class);
             $result = $resolver->resolve(
-                $payload['codes_agents_rmo'] ?? $payload['responsable'] ?? null,
+                $this->first($payload, ['codes_agents_rmo', 'rmo_raw', 'responsable']),
                 is_string($payload['direction'] ?? null) ? $payload['direction'] : null,
-                is_string($payload['service'] ?? null) ? $payload['service'] : null
+                is_string(($payload['service_unite'] ?? $payload['service'] ?? null)) ? ($payload['service_unite'] ?? $payload['service']) : null
             );
 
             return $result['codes'] === [] ? null : $resolver->codesToString($result['codes']);
@@ -154,8 +159,38 @@ class PtaNormalizedWorkbookExport implements WithMultipleSheets
         return is_numeric($number) ? (float) $number : $value;
     }
 
+    /**
+     * @param  array<string,mixed>  $payload
+     * @param  list<string>  $keys
+     */
+    private function first(array $payload, array $keys, mixed $fallback = null): mixed
+    {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $payload) && ! $this->blank($payload[$key])) {
+                return $payload[$key];
+            }
+        }
+
+        return $fallback;
+    }
+
+    private function normalizedDate(mixed $value): mixed
+    {
+        if ($this->blank($value)) {
+            return null;
+        }
+
+        $dates = app(PtaImportQualityControlService::class);
+
+        return $dates->normalizeDate($value)?->format('Y-m-d') ?? $value;
+    }
+
     private function blank(mixed $value): bool
     {
+        if (is_array($value)) {
+            return $value === [];
+        }
+
         return trim((string) $value) === '';
     }
 }
