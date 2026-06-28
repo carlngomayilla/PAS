@@ -16,9 +16,9 @@ _Date : 2026 • Version auditée : branche `local/laravel-13-ai-pta`_
 | Real-time | **Laravel Echo + Pusher** (messagerie, notifications) |
 | Queue / Jobs | DB queue (`database`) — `GenerateReportJob`, `SendAlertDigestJob` |
 | Mail | SMTP (digest d'alertes via `AlertDigestMail`) |
-| IA | `laravel/ai` 0.8.1, config `AI_DEFAULT_PROVIDER`, conversations IA persistables, module IA PTA contrôlé par validation humaine |
-| Exports | `barryvdh/laravel-dompdf` `dev-master` compatible Laravel 13 + `maatwebsite/excel` 3.1.69 + `phpoffice/phpword` 1.4.0 + exports PDF/Word/Excel IA + générateurs `.xlsx` maison (`app/Services/Exports/`) |
-| Tests | PHPUnit 12 — **458 tests passants, 3 skipped, 2742 assertions** après module IA PTA/Rapports |
+| IA | `laravel/ai` 0.8.1, config `AI_DEFAULT_PROVIDER`, conversations IA persistables, module IA PTA contrôlé par validation humaine, base documentaire/corrections humaines indexables |
+| Exports | `barryvdh/laravel-dompdf` `dev-master` compatible Laravel 13 + `maatwebsite/excel` 3.1.69 + `phpoffice/phpword` 1.4.0 + exports PDF/Word/Excel IA + fichier import PTA mono-feuille `IMPORT_GLOBAL` |
+| Tests | PHPUnit 12 — **461 tests passants, 3 skipped, 2759 assertions** après base IA d'apprentissage PTA et export `IMPORT_GLOBAL` mono-feuille |
 | Code | ~ 60 modèles Eloquent, 40 contrôleurs, 30 services applicatifs, 65 migrations |
 
 ---
@@ -72,6 +72,7 @@ Périmètres d'accès calculés dynamiquement via `RolePermissionSettings` (flag
 - **Observers** : `ActionObserver` (recalcul KPI à chaque update/save) et `PlanningCacheObserver` (invalidation cache agrégé sur Pao/Pta/User) → pattern CQRS léger.
 - **Audit** : `JournalAudit` + trait `RecordsAuditTrail` → toutes les mutations API sont journalisées.
 - **IA sous contrôle humain** : le module PTA stocke les lots analysés, normalise les lignes, expose les erreurs, impose validation/correction avant import et historise les actions IA dans `ai_import_audits`.
+- **Apprentissage IA applicatif** : les fichiers officiels `IMPORT_GLOBAL` et référentiel `code_agent` alimentent une base documentaire IA (`ai_knowledge_*`) ; les corrections humaines et rapports validés alimentent `ai_training_examples`.
 - **Configuration dynamique runtime** : `PlatformSettings`, `AppearanceSettings`, `WorkflowSettings`, `WorkspaceModuleSettings`, etc., persistés en DB (`platform_settings`) avec snapshots (`platform_setting_snapshots`) pour rollback.
 - **Rate limiting login** : 5/10 min par email + 25/10 min par IP (`AppServiceProvider::configureRateLimiting`).
 - **Sécurité fichiers** : `Security/Antivirus` + `SecureJustificatifStorage` + `SecureMessageAttachmentStorage` (scan avant stockage, quarantaine).

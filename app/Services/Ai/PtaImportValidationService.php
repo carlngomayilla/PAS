@@ -152,10 +152,10 @@ class PtaImportValidationService
             return null;
         }
 
-        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'm/d/Y'] as $format) {
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd/m/y', 'd-m-y', 'm/d/Y'] as $format) {
             try {
                 $date = Carbon::createFromFormat($format, $value);
-                if ($date !== false) {
+                if ($date !== false && $date->format($format) === $value) {
                     return $date->startOfDay();
                 }
             } catch (\Throwable) {

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AiImportBatch;
 use App\Models\AiImportRow;
+use App\Models\AiTrainingExample;
 use App\Services\Ai\PtaNormalizationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -38,5 +39,10 @@ class AiPtaImportValidationTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('corrected', $row->refresh()->status);
+        $this->assertDatabaseHas('ai_training_examples', [
+            'task' => AiTrainingExample::TASK_CORRECTION,
+            'source' => 'human_correction',
+            'is_validated' => true,
+        ]);
     }
 }

@@ -7,6 +7,46 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 — Base IA d'apprentissage PTA et export IMPORT_GLOBAL mono-feuille
+
+### Demande
+
+Intégrer les fichiers officiels `codes_agent_anbg_import.xlsx` et `modele_import_global_pas_pao_pta.xlsx` comme références d'apprentissage/import, traiter les documents sources PAS/PAO/PTA hiérarchiques, résoudre les RMO via `code_agent`, conserver les corrections humaines et garantir que le fichier Excel généré pour import ne contient qu'une seule feuille.
+
+### Changement
+
+- **Modèle officiel versionné** : ajout de `docs/modele_import_global_pas_pao_pta.xlsx` comme référence stable du format `IMPORT_GLOBAL`.
+- **Export mono-feuille** : le fichier généré par le module IA PTA contient désormais uniquement la feuille `IMPORT_GLOBAL`; les erreurs et métadonnées restent dans la prévisualisation/l'historique applicatif.
+- **Référentiel agents/RMO** : lecture de `A_UTILISER_IMPORT`, contrôle des `code_agent`, résolution par code/nom/email/fonction, et blocage des codes introuvables.
+- **Analyse modèle** : extraction des 40 colonnes officielles `IMPORT_GLOBAL`, du `GUIDE` et des contraintes d'import.
+- **Mapping document source** : ajout des services de structure PAS/PAO/PTA, mapping vers `IMPORT_GLOBAL`, normalisation des dates courtes (`02/03/26` → `2026-03-02`), sous-actions et contrôles qualité.
+- **Mémoire IA Laravel** : ajout des tables `ai_knowledge_documents`, `ai_knowledge_chunks`, `ai_training_examples`, `ai_feedbacks`, avec embeddings locaux JSON pour rester compatible SQLite/PostgreSQL.
+- **Apprentissage humain** : les corrections de lignes PTA et les rapports validés alimentent `ai_training_examples`.
+- **Commandes Artisan** : ajout de `ai:index-knowledge`, `ai:build-training-dataset`, `ai:test-pta-extraction`, `ai:test-report-generation`.
+
+### Fichiers modifiés
+
+- `config/ai_training.php`
+- `app/Models/AiKnowledgeDocument.php`, `AiKnowledgeChunk.php`, `AiTrainingExample.php`, `AiFeedback.php`
+- `app/Services/Ai/AiKnowledgeService.php`, `AiEmbeddingService.php`, `AiPromptService.php`, `PtaTrainingDatasetService.php`
+- `app/Services/Ai/PtaImportTemplateAnalyzerService.php`, `PtaAgentResolverService.php`, `PtaAiImportNormalizerService.php`, `PtaDocumentStructureExtractorService.php`, `PtaDocumentToImportGlobalMapperService.php`, `PtaImportQualityControlService.php`
+- `app/Exports/PtaNormalizedWorkbookExport.php`
+- `app/Http/Controllers/Web/AiPtaImportValidationController.php`, `AiReportValidationController.php`
+- `app/Console/Commands/Ai*.php`
+- `database/migrations/2026_06_28_12000*_create_ai_*.php`
+- `tests/Feature/AiPtaOfficialTemplateTest.php`, `AiPtaExcelGenerationTest.php`, `AiPtaImportValidationTest.php`, `AiReportValidationTest.php`
+- `docs/modele_import_global_pas_pao_pta.xlsx`
+
+### Validation
+
+- `php artisan migrate --no-interaction`
+- `php artisan ai:index-knowledge --fresh` — 2 documents, 35 chunks
+- `php artisan test tests\Feature\Laravel13UpgradeSmokeTest.php tests\Feature\AiPermissionsTest.php tests\Feature\AiPtaOfficialTemplateTest.php tests\Feature\AiPtaImportUploadTest.php tests\Feature\AiPtaImportExtractionTest.php tests\Feature\AiPtaImportPreviewTest.php tests\Feature\AiPtaImportValidationTest.php tests\Feature\AiPtaImportFinalImportTest.php tests\Feature\AiPtaExcelGenerationTest.php tests\Feature\AiReportGenerationTest.php tests\Feature\AiReportValidationTest.php tests\Feature\AiReportExportTest.php tests\Feature\RolePermissionMatrixTest.php` — 20 passed, 105 assertions
+- `vendor/bin/pint --dirty --test`
+- `php artisan test` — 461 passed, 3 skipped, 2759 assertions
+
+---
+
 ## 2026-06-28 — Module IA PTA et rapports PAS/PAO/PTA
 
 ### Demande

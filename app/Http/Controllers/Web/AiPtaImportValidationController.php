@@ -10,6 +10,7 @@ use App\Services\Ai\PtaFinalImportService;
 use App\Services\Ai\PtaImportAuditService;
 use App\Services\Ai\PtaImportValidationService;
 use App\Services\Ai\PtaNormalizationService;
+use App\Services\Ai\PtaTrainingDatasetService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -19,7 +20,8 @@ class AiPtaImportValidationController extends Controller
         private readonly PtaImportValidationService $validation,
         private readonly PtaFinalImportService $finalImport,
         private readonly PtaExcelGenerationService $excel,
-        private readonly PtaImportAuditService $audit
+        private readonly PtaImportAuditService $audit,
+        private readonly PtaTrainingDatasetService $training
     ) {}
 
     public function updateRow(Request $request, AiImportBatch $batch, AiImportRow $row): RedirectResponse
@@ -47,6 +49,9 @@ class AiPtaImportValidationController extends Controller
             );
             $row->forceFill(['normalized_payload' => $payload])->save();
             $this->validation->validateRow($row, true);
+            if ($row->refresh()->status === AiImportRow::STATUS_CORRECTED) {
+                $this->training->recordCorrection($row, $request->user());
+            }
         }
 
         $this->excel->generate($batch->refresh());

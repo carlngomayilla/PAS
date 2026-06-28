@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AiGeneratedReport;
+use App\Models\AiTrainingExample;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesAiPtaFixtures;
 use Tests\TestCase;
@@ -30,5 +31,10 @@ class AiReportValidationTest extends TestCase
 
         $this->assertSame(AiGeneratedReport::STATUS_VALIDATED, $report->refresh()->status);
         $this->assertSame('Rapport valide', $report->validated_content);
+        $this->assertDatabaseHas('ai_training_examples', [
+            'task' => AiTrainingExample::TASK_REPORT_WRITING,
+            'source' => 'validated_report',
+            'is_validated' => true,
+        ]);
     }
 }

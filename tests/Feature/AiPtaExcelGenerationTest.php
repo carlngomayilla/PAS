@@ -6,6 +6,7 @@ use App\Models\AiImportBatch;
 use App\Services\Ai\PtaExcelGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Concerns\CreatesAiPtaFixtures;
 use Tests\TestCase;
 
@@ -26,5 +27,10 @@ class AiPtaExcelGenerationTest extends TestCase
 
         $path = app(PtaExcelGenerationService::class)->generate($batch->refresh());
         Storage::disk('local')->assertExists($path);
+
+        $workbook = IOFactory::load(Storage::disk('local')->path($path));
+
+        $this->assertSame(1, $workbook->getSheetCount());
+        $this->assertSame('IMPORT_GLOBAL', $workbook->getSheet(0)->getTitle());
     }
 }
