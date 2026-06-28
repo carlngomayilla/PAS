@@ -97,9 +97,7 @@ class AiPtaImportController extends Controller
     {
         $this->authorizePermission($request, 'ai_pta_import.export');
 
-        if (! $this->excel->exists($batch)) {
-            $this->excel->generate($batch);
-        }
+        $this->excel->generate($batch);
 
         $this->audit->record('download_excel', $batch, $request->user(), $request);
 

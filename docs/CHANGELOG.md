@@ -7,6 +7,24 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 - Alignement Excel IA sur l'ancien module d'import
+
+### Demande
+
+Corriger le fichier Excel genere par l'IA PTA : les colonnes visibles doivent correspondre exactement au modele telechargeable dans l'ancien module `imports-excel/modele`.
+
+### Changement
+
+- **Source canonique unique** : l'export IA PTA utilise maintenant directement `PlanningExcelImportService::IMPORT_COLUMNS`, c'est-a-dire les 40 colonnes de l'ancien module d'import.
+- **Regeneration au telechargement** : le bouton de telechargement Excel IA regenere toujours le fichier avant envoi, afin d'ecraser tout ancien fichier stocke avec un format obsolete.
+- **Controle anti-regression** : ajout d'un test qui compare les en-tetes de l'Excel IA a `PlanningExcelImportService::IMPORT_COLUMNS`, et d'un test qui verifie qu'un fichier existant perime est remplace au telechargement.
+
+### Validation
+
+- `php artisan test tests\Feature\AiPtaExcelGenerationTest.php tests\Feature\AiPtaImportExtractionTest.php tests\Feature\AiPtaImportPreviewTest.php tests\Feature\AiPtaImportFinalImportTest.php tests\Feature\AiPtaOfficialTemplateTest.php` - 8 passed, 47 assertions
+
+---
+
 ## 2026-06-28 - Parametrage IA Q/NQ/M des actions PTA
 
 ### Demande

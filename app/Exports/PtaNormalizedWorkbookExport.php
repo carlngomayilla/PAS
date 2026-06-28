@@ -3,11 +3,10 @@
 namespace App\Exports;
 
 use App\Models\AiImportBatch;
-use App\Services\Ai\AiPromptService;
 use App\Services\Ai\PtaActionParameterizationService;
 use App\Services\Ai\PtaAgentResolverService;
 use App\Services\Ai\PtaImportQualityControlService;
-use App\Services\Ai\PtaImportTemplateAnalyzerService;
+use App\Services\Imports\PlanningExcelImportService;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Throwable;
 
@@ -49,11 +48,7 @@ class PtaNormalizedWorkbookExport implements WithMultipleSheets
      */
     private function importGlobalColumns(): array
     {
-        try {
-            return app(PtaImportTemplateAnalyzerService::class)->columns();
-        } catch (Throwable) {
-            return app(AiPromptService::class)->importGlobalColumns();
-        }
+        return PlanningExcelImportService::IMPORT_COLUMNS;
     }
 
     /**
