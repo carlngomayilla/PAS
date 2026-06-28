@@ -83,6 +83,14 @@ class PtaDocumentStructureExtractorService
      */
     public function extractFromText(string $text): array
     {
+        $ocrBoxes = $this->ocrBoxesFromText($text);
+        if ($ocrBoxes !== []) {
+            $structured = $this->extractFromOcrBoxes($text, $ocrBoxes);
+            if (($structured['items'] ?? []) !== []) {
+                return $structured;
+            }
+        }
+
         $documentType = $this->detectDocumentType($text);
         $years = $this->yearsFrom($text);
         $lines = $this->linesFrom($text);
@@ -95,6 +103,7 @@ class PtaDocumentStructureExtractorService
             'libelle_objectif_operationnel' => null,
         ];
         $pendingContext = null;
+        $pendingOcrAction = null;
         $items = [];
         $actionOrder = 0;
         $inActionTable = false;
@@ -106,6 +115,7 @@ class PtaDocumentStructureExtractorService
             }
 
             if ($this->isActionHeaderLine($key)) {
+                $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
                 $inActionTable = true;
                 $pendingContext = null;
 
@@ -114,6 +124,7 @@ class PtaDocumentStructureExtractorService
 
             $detectedContext = $this->contextMarker($line);
             if ($detectedContext !== null) {
+                $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
                 [$field, $value, $order] = $detectedContext;
                 if ($order !== null) {
                     $context[$this->orderFieldFor($field)] = $order;
@@ -150,9 +161,22 @@ class PtaDocumentStructureExtractorService
 
             $action = $this->actionFromTextTableLine($line);
             if ($action === null) {
+                if ($this->isOcrActionTextLine($line)) {
+                    if ($pendingOcrAction !== null && $this->startsNewAction($line)) {
+                        $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
+                    }
+
+                    if ($pendingOcrAction === null && ! $this->startsNewAction($line)) {
+                        continue;
+                    }
+
+                    $this->pushPendingOcrAction($pendingOcrAction, $line);
+                }
+
                 continue;
             }
 
+            $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
             $actionOrder++;
             $items[] = array_merge($context, [
                 'ordre_action' => $actionOrder,
@@ -170,6 +194,8 @@ class PtaDocumentStructureExtractorService
                 'validation_warnings' => [],
             ]);
         }
+
+        $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
 
         $document = [
             'type_document' => $documentType,
@@ -242,7 +268,7 @@ class PtaDocumentStructureExtractorService
         $lines = preg_split('/\n+/', $text) ?: [];
 
         return array_values(array_filter(array_map(
-            static fn (string $line): string => trim(preg_replace('/[ \t]+/', ' ', $line) ?? $line),
+            static fn (string $line): string => trim($line),
             $lines
         ), static fn (string $line): bool => $line !== ''));
     }
@@ -250,6 +276,9 @@ class PtaDocumentStructureExtractorService
     private function isIgnoredTextLine(string $key): bool
     {
         return Str::startsWith($key, 'anbg proposition')
+            || Str::startsWith($key, 'ocr box')
+            || Str::startsWith($key, 'ocr page')
+            || Str::startsWith($key, 'page ')
             || Str::startsWith($key, 'plan de travail annuel')
             || Str::startsWith($key, 'plan d actions operationnel')
             || $key === 'axes strategiques'
@@ -257,11 +286,190 @@ class PtaDocumentStructureExtractorService
             || $key === 'echeance';
     }
 
+    /**
+     * @param  list<array{page:int,x:int,y:int,text:string}>  $boxes
+     * @return array{document:array<string,mixed>,items:list<array<string,mixed>>}
+     */
+    private function extractFromOcrBoxes(string $text, array $boxes): array
+    {
+        $documentType = $this->detectDocumentType($text);
+        $years = $this->yearsFrom($text);
+        $context = [
+            'ordre_axe' => null,
+            'libelle_axe' => null,
+            'ordre_objectif_strategique' => null,
+            'libelle_objectif_strategique' => null,
+            'ordre_objectif_operationnel' => null,
+            'libelle_objectif_operationnel' => null,
+        ];
+        $pendingContext = null;
+        $pendingOcrAction = null;
+        $items = [];
+        $actionOrder = 0;
+
+        foreach ($this->ocrBoxesByPage($boxes) as $pageBoxes) {
+            $inActionTable = false;
+            $actionColumnRight = null;
+            $headerY = null;
+
+            foreach ($pageBoxes as $box) {
+                $line = $box['text'];
+                $key = $this->key($line);
+                if ($key === '' || $this->isIgnoredTextLine($key)) {
+                    continue;
+                }
+
+                if ($this->isActionHeaderLine($key)) {
+                    $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
+                    $inActionTable = true;
+                    $headerY = $box['y'];
+                    $actionColumnRight = $this->ocrActionColumnRight($pageBoxes, $headerY);
+                    $pendingContext = null;
+
+                    continue;
+                }
+
+                $detectedContext = $this->contextMarker($line);
+                if ($detectedContext !== null) {
+                    $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
+                    [$field, $value, $order] = $detectedContext;
+                    if ($order !== null) {
+                        $context[$this->orderFieldFor($field)] = $order;
+                    }
+
+                    if ($value === null || $value === '') {
+                        $pendingContext = $field;
+                    } else {
+                        $context[$field] = $this->cleanContextLabel($value);
+                        $pendingContext = null;
+                        if ($field === 'libelle_objectif_operationnel') {
+                            $actionOrder = 0;
+                        }
+                    }
+
+                    $inActionTable = false;
+                    $actionColumnRight = null;
+                    $headerY = null;
+
+                    continue;
+                }
+
+                if (is_string($pendingContext)) {
+                    $context[$pendingContext] = $this->cleanContextLabel($line);
+                    if ($pendingContext === 'libelle_objectif_operationnel') {
+                        $actionOrder = 0;
+                    }
+                    $pendingContext = null;
+
+                    continue;
+                }
+
+                if (! $inActionTable || $actionColumnRight === null || $headerY === null) {
+                    continue;
+                }
+
+                if ($box['y'] <= $headerY + 28 || $box['x'] > $actionColumnRight) {
+                    continue;
+                }
+
+                if (! $this->isOcrActionTextLine($line)) {
+                    continue;
+                }
+
+                if ($pendingOcrAction !== null && $this->startsNewAction($line)) {
+                    $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
+                }
+
+                if ($pendingOcrAction === null && ! $this->startsNewAction($line)) {
+                    continue;
+                }
+
+                $this->pushPendingOcrAction($pendingOcrAction, $line);
+            }
+
+            $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
+        }
+
+        $document = [
+            'type_document' => $documentType,
+            'annee' => $years['annee'],
+            'annee_debut_pas' => $years['annee_debut_pas'],
+            'annee_fin_pas' => $years['annee_fin_pas'],
+            'direction' => $this->lineAfter($text, 'Direction'),
+            'service_unite' => $this->lineAfter($text, 'Service'),
+            'responsable' => null,
+            'fonction_responsable' => null,
+        ];
+
+        return [
+            'document' => $this->completeYears($document, $items),
+            'items' => $items,
+        ];
+    }
+
+    /**
+     * @return list<array{page:int,x:int,y:int,text:string}>
+     */
+    private function ocrBoxesFromText(string $text): array
+    {
+        preg_match_all('/^@@OCR_BOX\|(\d+)\|(\d+)\|(\d+)\|(.+)$/m', $text, $matches, PREG_SET_ORDER);
+
+        return array_values(array_map(static fn (array $match): array => [
+            'page' => (int) $match[1],
+            'x' => (int) $match[2],
+            'y' => (int) $match[3],
+            'text' => trim((string) $match[4]),
+        ], $matches));
+    }
+
+    /**
+     * @param  list<array{page:int,x:int,y:int,text:string}>  $boxes
+     * @return list<list<array{page:int,x:int,y:int,text:string}>>
+     */
+    private function ocrBoxesByPage(array $boxes): array
+    {
+        $pages = [];
+        foreach ($boxes as $box) {
+            $pages[$box['page']][] = $box;
+        }
+
+        ksort($pages);
+        foreach ($pages as &$pageBoxes) {
+            usort($pageBoxes, static fn (array $a, array $b): int => [$a['y'], $a['x']] <=> [$b['y'], $b['x']]);
+        }
+
+        return array_values($pages);
+    }
+
+    /**
+     * @param  list<array{page:int,x:int,y:int,text:string}>  $pageBoxes
+     */
+    private function ocrActionColumnRight(array $pageBoxes, int $headerY): int
+    {
+        $columnStarts = [];
+        foreach ($pageBoxes as $box) {
+            if (abs($box['y'] - $headerY) > 90) {
+                continue;
+            }
+
+            $key = $this->key($box['text']);
+            if (in_array($key, ['rmo', 'cible'], true) || Str::startsWith($key, 'debut')) {
+                $columnStarts[] = $box['x'];
+            }
+        }
+
+        if ($columnStarts !== []) {
+            return max(0, min($columnStarts) - 25);
+        }
+
+        $maxX = max(array_map(static fn (array $box): int => $box['x'], $pageBoxes));
+
+        return (int) max(500, $maxX * 0.35);
+    }
+
     private function isActionHeaderLine(string $key): bool
     {
-        return Str::contains($key, 'description des actions')
-            && Str::contains($key, 'rmo')
-            && Str::contains($key, 'cible');
+        return Str::contains($key, 'description des actions');
     }
 
     /**
@@ -337,6 +545,156 @@ class PtaDocumentStructureExtractorService
             'indicateurs_performance' => $columns[7] ?? null,
             'risques_potentiels' => $columns[8] ?? null,
         ];
+    }
+
+    /**
+     * @param  array{parts:list<string>}|null  $pending
+     */
+    private function pushPendingOcrAction(?array &$pending, string $line): void
+    {
+        $line = $this->cleanOcrActionLine($line);
+        if ($line === '') {
+            return;
+        }
+
+        if ($pending === null) {
+            $pending = ['parts' => [$line]];
+
+            return;
+        }
+
+        $pending['parts'][] = $line;
+    }
+
+    /**
+     * @param  array{parts:list<string>,flush?:bool}|null  $pending
+     * @param  list<array<string,mixed>>  $items
+     * @param  array<string,mixed>  $context
+     */
+    private function flushPendingOcrAction(?array &$pending, array &$items, array $context, int &$actionOrder): void
+    {
+        if ($pending === null || ($pending['parts'] ?? []) === []) {
+            $pending = null;
+
+            return;
+        }
+
+        $action = trim(implode(' ', $pending['parts']));
+        $pending = null;
+
+        if ($action === '' || mb_strlen($action) < 6) {
+            return;
+        }
+
+        $actionOrder++;
+        $items[] = array_merge($context, [
+            'ordre_action' => $actionOrder,
+            'libelle_action' => $action,
+            'actions_detaillees' => $action,
+            'rmo_raw' => null,
+            'cible' => null,
+            'date_debut_action' => null,
+            'date_fin_action' => null,
+            'etat_realisation_initial' => null,
+            'ressources_requises' => null,
+            'indicateurs_performance' => null,
+            'risques_potentiels' => null,
+            'confidence_score' => 0.58,
+            'validation_warnings' => ['Action reconstruite depuis une sortie OCR sans colonnes completes.'],
+        ]);
+    }
+
+    private function isOcrActionTextLine(string $line): bool
+    {
+        $key = $this->key($line);
+        if ($key === '' || mb_strlen($key) < 3) {
+            return false;
+        }
+
+        if (preg_match('/^(?:\d+|[ivxlcdm]+)$/i', $key) === 1) {
+            return false;
+        }
+
+        if (preg_match('/^\d{1,2}[\/\-]/', $line) === 1 || str_contains($line, '%')) {
+            return false;
+        }
+
+        if ($this->containsAny($key, [
+            'rmo',
+            'cible',
+            'debut',
+            'fin',
+            'etat de',
+            'realisation',
+            'ressources',
+            'requises',
+            'indicateurs',
+            'performance',
+            'risques',
+            'potentiels',
+            'non demarre',
+            'en cours',
+            'axes strategiques',
+            'objectifs strategiques',
+            'objectifs operationnels',
+            'echeance',
+        ])) {
+            return false;
+        }
+
+        return $this->startsNewAction($line)
+            || preg_match('/^[a-zàâçéèêëîïôûùüÿñæœ]/u', trim($line)) === 1
+            || str_word_count(Str::ascii($line)) >= 3;
+    }
+
+    private function startsNewAction(string $line): bool
+    {
+        $key = $this->key($line);
+        $key = preg_replace('/^\d+\s*/', '', $key) ?? $key;
+
+        return $this->containsAny($key, [
+            'selectionner',
+            'rediger',
+            'detruire',
+            'actualiser',
+            'ctualiser',
+            'proposer',
+            'reposer',
+            'determiner',
+            'organiser',
+            'evaluer',
+            'definir',
+            'derouler',
+            'identifier',
+            'developper',
+            'migrer',
+            'fournir',
+            'etudier',
+            'mettre en place',
+            'faire',
+            'effectuer',
+            'participer',
+            'acquerir',
+            'promouvoir',
+            'soumettre',
+            'inviter',
+            'etablir',
+            'elaborer',
+            'valider',
+            'vulgariser',
+            'vulgarisation',
+            'associer',
+            'aller au contact',
+        ]);
+    }
+
+    private function cleanOcrActionLine(string $line): string
+    {
+        $line = trim($line);
+        $line = preg_replace('/^\d+\s*[\).:-]?\s*/', '', $line) ?? $line;
+        $line = preg_replace('/\s+/', ' ', $line) ?? $line;
+
+        return trim($line);
     }
 
     /**
@@ -438,5 +796,16 @@ class PtaDocumentStructureExtractorService
         $value = preg_replace('/[^a-z0-9]+/', $separator, $value) ?? $value;
 
         return trim($value, $separator);
+    }
+
+    private function containsAny(string $haystack, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if (str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

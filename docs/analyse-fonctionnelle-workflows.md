@@ -464,7 +464,7 @@ Les dashboards sont rôle-aware : le `DashboardController` construit un agrégat
 ### 6.5.a Sous-workflow IA — Import PTA
 
 1. **Upload** : un utilisateur habilité ouvre `workspace.ai-imports.pta.index` et dépose un fichier PTA (`csv`, `xlsx`, `pdf`, `doc`, `docx`, image). Le fichier est stocké sur le disque local non public.
-2. **Analyse** : `PtaExtractionService` extrait les lignes tabulaires quand le format le permet. Les formats non tabulaires créent une ligne de travail à faible confiance, sans inventer de données.
+2. **Analyse** : `PtaExtractionService` extrait les lignes tabulaires quand le format le permet. Pour les PDF, le service tente l'extraction texte native puis l'OCR configure (`AI_PTA_PDF_OCR_COMMAND`) ou l'OCR Windows local integre ; un PDF scanne non lisible est bloque avec un message explicite au lieu de creer une ligne factice.
 3. **Normalisation** : `PtaNormalizationService` mappe les colonnes vers les champs PTA attendus, normalise statuts/budgets/dates et crée les lignes `ai_import_rows`.
 4. **Prévisualisation** : l'utilisateur consulte les lignes, erreurs, avertissements et scores de confiance avant toute écriture métier.
 5. **Correction humaine** : les lignes peuvent être corrigées ou ignorées. Les corrections sont enregistrées dans `corrected_data`.

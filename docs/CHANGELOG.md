@@ -7,6 +7,27 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-28 - OCR local des PDF PTA scannes
+
+### Demande
+
+Lever le blocage "PDF scanne/image-only" rencontre avec `images_pta_pas_pao_anbg.pdf`, afin que l IA puisse extraire les PAS/PAO/PTA et produire le fichier Excel global attendu au lieu de demander uniquement une configuration OCR externe.
+
+### Changement
+
+- **OCR Windows integre** : ajout de `scripts/ocr/windows_pdf_ocr.ps1`, qui rend les pages PDF via les APIs Windows et lance l OCR local sans cle API.
+- **Fallback applicatif** : `PtaDocumentTextExtractionService` tente maintenant `AI_PTA_PDF_OCR_COMMAND`, puis le script OCR Windows integre, avant d afficher le message d echec OCR.
+- **Colonnes OCR preservees** : le nettoyage texte ne supprime plus les espacements internes, pour garder les colonnes des tableaux PTA exploitables.
+- **Parsing OCR robuste** : `PtaDocumentStructureExtractorService` exploite les coordonnees OCR `@@OCR_BOX` pour reconstruire les actions depuis la colonne "DESCRIPTION DES ACTIONS DETAILLEES" sans absorber les colonnes RMO/ressources/risques.
+- **Configuration** : ajout de `AI_PTA_PDF_OCR_COMMAND`, `AI_PTA_WINDOWS_OCR_ENABLED`, `AI_PTA_WINDOWS_OCR_SCRIPT_PATH`, `AI_PTA_WINDOWS_OCR_MAX_PAGES`, `AI_PTA_WINDOWS_OCR_RENDER_WIDTH` et `AI_PTA_WINDOWS_OCR_TIMEOUT`.
+
+### Validation
+
+- Test manuel sur `C:/Users/chris/OK/images_pta_pas_pao_anbg.pdf` : OCR local actif, 35 actions detectees sur le PDF complet.
+- `php artisan test tests\Feature\AiPtaImportExtractionTest.php` - 3 passed, 11 assertions
+
+---
+
 ## 2026-06-28 - Cartes statistiques dynamiques
 
 ### Demande

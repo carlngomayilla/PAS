@@ -29,13 +29,6 @@ class PtaDocumentTextExtractionService
             return $text;
         }
 
-        if ($this->looksLikeImageOnlyPdf($path)) {
-            throw new RuntimeException(
-                'Le PDF semble etre un document scanne ou compose uniquement d images. '
-                .'Aucune couche texte exploitable n a ete detectee. Configurez un OCR/outil texte via AI_PTA_PDF_TEXT_COMMAND ou importez le modele Excel/source texte.'
-            );
-        }
-
         $text = $this->extractWithPdftotext($path)
             ?: $this->extractWithPdfParser($path)
             ?: $this->extractRawPdfText($path);
@@ -45,11 +38,17 @@ class PtaDocumentTextExtractionService
             return $text;
         }
 
-        if ($this->looksLikeImageDominantPdf($path)) {
-            throw new RuntimeException(
-                'Le PDF semble etre un document scanne ou compose uniquement d images. '
-                .'Aucune couche texte exploitable n a ete detectee. Configurez un OCR/outil texte via AI_PTA_PDF_TEXT_COMMAND ou importez le modele Excel/source texte.'
+        if ($this->looksLikeImageOnlyPdf($path) || $this->looksLikeImageDominantPdf($path)) {
+            $text = $this->normalizeText(
+                $this->extractWithConfiguredOcrCommand($path)
+                    ?: $this->extractWithBundledWindowsOcr($path)
             );
+
+            if ($text !== '' && mb_strlen($text) >= 80) {
+                return $text;
+            }
+
+            throw new RuntimeException($this->scannedPdfMessage());
         }
 
         throw new RuntimeException('Aucune donnee texte exploitable n a ete extraite du PDF.');
@@ -57,7 +56,17 @@ class PtaDocumentTextExtractionService
 
     private function extractWithConfiguredCommand(string $path): ?string
     {
-        $command = trim((string) config('ai_training.pta.pdf_text_command', ''));
+        return $this->extractWithConfiguredProcess($path, 'pdf_text_command');
+    }
+
+    private function extractWithConfiguredOcrCommand(string $path): ?string
+    {
+        return $this->extractWithConfiguredProcess($path, 'pdf_ocr_command');
+    }
+
+    private function extractWithConfiguredProcess(string $path, string $configKey): ?string
+    {
+        $command = trim((string) config('ai_training.pta.'.$configKey, ''));
         if ($command === '') {
             return null;
         }
@@ -68,6 +77,49 @@ class PtaDocumentTextExtractionService
             : $command.' '.$escapedPath;
 
         return $this->runShellCommand($command);
+    }
+
+    private function extractWithBundledWindowsOcr(string $path): ?string
+    {
+        if (PHP_OS_FAMILY !== 'Windows' || ! (bool) config('ai_training.pta.windows_ocr_enabled', true)) {
+            return null;
+        }
+
+        try {
+            $script = (string) config('ai_training.pta.windows_ocr_script_path', base_path('scripts/ocr/windows_pdf_ocr.ps1'));
+            if (! is_file($script)) {
+                return null;
+            }
+
+            $binary = (new ExecutableFinder)->find('powershell.exe')
+                ?? (new ExecutableFinder)->find('powershell')
+                ?? (new ExecutableFinder)->find('pwsh');
+
+            if ($binary === null) {
+                return null;
+            }
+
+            $process = new Process([
+                $binary,
+                '-NoProfile',
+                '-ExecutionPolicy',
+                'Bypass',
+                '-File',
+                $script,
+                '-Path',
+                $path,
+                '-MaxPages',
+                (string) max(0, (int) config('ai_training.pta.windows_ocr_max_pages', 0)),
+                '-RenderWidth',
+                (string) max(0, (int) config('ai_training.pta.windows_ocr_render_width', 2600)),
+            ]);
+            $process->setTimeout(max(30, (int) config('ai_training.pta.windows_ocr_timeout', 300)));
+            $process->run();
+
+            return $process->isSuccessful() ? $process->getOutput() : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function extractWithPdftotext(string $path): ?string
@@ -186,6 +238,13 @@ class PtaDocumentTextExtractionService
             && substr_count($content, '/ToUnicode') === 0;
     }
 
+    private function scannedPdfMessage(): string
+    {
+        return 'Le PDF semble etre un document scanne ou compose uniquement d images. '
+            .'L OCR automatique n a pas pu extraire assez de texte exploitable. '
+            .'Configurez AI_PTA_PDF_OCR_COMMAND ou AI_PTA_PDF_TEXT_COMMAND, ou importez le modele Excel/source texte.';
+    }
+
     private function normalizeText(?string $text): string
     {
         if (! is_string($text)) {
@@ -194,7 +253,7 @@ class PtaDocumentTextExtractionService
 
         $text = str_replace(["\r\n", "\r"], "\n", $text);
         $text = str_replace(["\u{00A0}", "\0"], [' ', ''], $text);
-        $text = preg_replace("/[ \t]+/", ' ', $text) ?? $text;
+        $text = preg_replace("/[ \t]+$/m", '', $text) ?? $text;
         $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
 
         return trim($text);
