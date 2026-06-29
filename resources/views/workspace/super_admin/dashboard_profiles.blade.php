@@ -40,7 +40,7 @@
                             <h2>{{ $label }}</h2>
                             <p class="text-slate-600">Activer ou masquer les blocs analytiques et réordonner les cartes de synthèse.</p>
                         </div>
-                        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                             <label class="checkbox-pill !mb-0">
                                 <input type="checkbox" name="profiles[{{ $role }}][overview_enabled]" value="1" @checked(old("profiles.$role.overview_enabled", $profile['overview_enabled'] ?? true))>
                                 Vue détail
@@ -48,10 +48,6 @@
                             <label class="checkbox-pill !mb-0">
                                 <input type="checkbox" name="profiles[{{ $role }}][comparison_chart_enabled]" value="1" @checked(old("profiles.$role.comparison_chart_enabled", $profile['comparison_chart_enabled'] ?? true))>
                                 Comparaison
-                            </label>
-                            <label class="checkbox-pill !mb-0">
-                                <input type="checkbox" name="profiles[{{ $role }}][status_chart_enabled]" value="1" @checked(old("profiles.$role.status_chart_enabled", $profile['status_chart_enabled'] ?? true))>
-                                Statuts
                             </label>
                             <label class="checkbox-pill !mb-0">
                                 <input type="checkbox" name="profiles[{{ $role }}][trend_chart_enabled]" value="1" @checked(old("profiles.$role.trend_chart_enabled", $profile['trend_chart_enabled'] ?? true))>

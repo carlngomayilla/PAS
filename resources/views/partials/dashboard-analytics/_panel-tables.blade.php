@@ -14,7 +14,7 @@
             <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-slate-200/80 px-3 py-2 list-none">
                 <div class="flex items-center gap-2">
                     <span class="inline-block w-3 text-[#3996d3]">▸</span>
-                    <h2 class="showcase-panel-title">Tableau de synthèse par {{ strtolower($unitModeLabel) }}</h2>
+                    <h2 class="showcase-panel-title">Synthese {{ strtolower($unitModeLabel) }}</h2>
                 </div>
                 <span class="showcase-chip">{{ count($unitRows) }} lignes</span>
             </summary>
@@ -52,7 +52,7 @@
             <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-slate-200/80 px-3 py-2 list-none">
                 <div class="flex items-center gap-2">
                     <span class="inline-block w-3 text-[#3996d3]">▸</span>
-                    <h2 class="showcase-panel-title">Actions prioritaires</h2>
+                    <h2 class="showcase-panel-title">Priorites</h2>
                 </div>
                 <span class="showcase-chip">{{ count($priorityActionRows) }} lignes</span>
             </summary>
@@ -92,7 +92,7 @@
             <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-slate-200/80 px-3 py-2 list-none">
                 <div class="flex items-center gap-2">
                     <span class="inline-block w-3 text-[#3996d3]">▸</span>
-                    <h2 class="showcase-panel-title">Alertes actives</h2>
+                    <h2 class="showcase-panel-title">Alertes</h2>
                 </div>
                 <span class="showcase-chip">{{ count($alertRows) }} alerte(s)</span>
             </summary>
@@ -129,7 +129,7 @@
         @if ($showDashboardAnalyticalTables)
             <section>
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div><h2 class="showcase-panel-title">Tables analytiques</h2></div>
+                    <div><h2 class="showcase-panel-title">Tables</h2></div>
                     <a href="{{ route('workspace.reporting') }}" class="dashboard-reporting-jump">Exports</a>
                 </div>
                 @include('partials.dashboard-reporting-analytics', [

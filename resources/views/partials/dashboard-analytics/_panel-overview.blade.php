@@ -450,7 +450,7 @@
     @if ($directionSynthesisTables !== [])
         <section class="mb-3">
             <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h2 class="showcase-panel-title">Tableaux de décision</h2>
+                <h2 class="showcase-panel-title">Tableaux</h2>
                 <span class="showcase-chip">Performance et alertes</span>
             </div>
             <div class="space-y-2">

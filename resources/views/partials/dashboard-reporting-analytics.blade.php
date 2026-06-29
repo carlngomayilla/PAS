@@ -141,7 +141,7 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Statuts empiles par {{ strtolower($reportingCharts['status_by_unit']['unit_label'] ?? 'unite') }}</h2>
+                    <h2 class="showcase-panel-title">Statuts par {{ strtolower($reportingCharts['status_by_unit']['unit_label'] ?? 'unite') }}</h2>
                 </div>
             </div>
             <div class="dashboard-chart-scroll-frame">
@@ -166,7 +166,7 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Avancement réel vs théorique</h2>
+                    <h2 class="showcase-panel-title">Avancement</h2>
                 </div>
                 <div class="chart-period-bar" data-period-chart="report-progress">
                     <button type="button" class="chart-period-btn" data-period="4">4S</button>
@@ -193,7 +193,7 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Indicateurs suivis: valeur, cible, seuil</h2>
+                    <h2 class="showcase-panel-title">Indicateurs</h2>
                 </div>
                 <div class="chart-period-bar" data-period-chart="report-kpi-trend">
                     <button type="button" class="chart-period-btn" data-period="3">3M</button>
@@ -225,7 +225,7 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Consolidation PAS</h2>
+                    <h2 class="showcase-panel-title">PAS</h2>
                 </div>
             </div>
             <div class="app-table-wrapper overflow-x-auto">
@@ -275,7 +275,7 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Comparaison interannuelle détaillée</h2>
+                    <h2 class="showcase-panel-title">Comparaison annuelle</h2>
                 </div>
             </div>
             <div class="app-table-wrapper overflow-x-auto">
@@ -319,7 +319,7 @@
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">
                 <div>
-                    <h2 class="showcase-panel-title">Focus execution</h2>
+                    <h2 class="showcase-panel-title">Execution</h2>
                 </div>
             </div>
             <div class="grid gap-3">

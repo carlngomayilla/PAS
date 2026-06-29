@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Schema;
 
 class DashboardProfileSettings
 {
@@ -82,7 +82,7 @@ class DashboardProfileSettings
         return $this->all()[$role] ?? [
             'overview_enabled' => true,
             'comparison_chart_enabled' => true,
-            'status_chart_enabled' => true,
+            'status_chart_enabled' => false,
             'trend_chart_enabled' => true,
             'support_chart_enabled' => true,
             'cards' => [],
@@ -163,7 +163,7 @@ class DashboardProfileSettings
         $settings = $this->normalizeChartFlags($settings);
         $dashboard['overview_enabled'] = (bool) ($settings['overview_enabled'] ?? true);
         $dashboard['comparison_chart_enabled'] = (bool) ($settings['comparison_chart_enabled'] ?? true);
-        $dashboard['status_chart_enabled'] = (bool) ($settings['status_chart_enabled'] ?? true);
+        $dashboard['status_chart_enabled'] = false;
         $dashboard['trend_chart_enabled'] = (bool) ($settings['trend_chart_enabled'] ?? true);
         $dashboard['support_chart_enabled'] = (bool) ($settings['support_chart_enabled'] ?? true);
 
@@ -222,7 +222,7 @@ class DashboardProfileSettings
                     'value' => json_encode([
                         'overview_enabled' => $chartFlags['overview_enabled'],
                         'comparison_chart_enabled' => $chartFlags['comparison_chart_enabled'],
-                        'status_chart_enabled' => $chartFlags['status_chart_enabled'],
+                        'status_chart_enabled' => false,
                         'trend_chart_enabled' => $chartFlags['trend_chart_enabled'],
                         'support_chart_enabled' => $chartFlags['support_chart_enabled'],
                         'cards' => $cards,
@@ -252,7 +252,7 @@ class DashboardProfileSettings
             'super_admin' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
-                'status_chart_enabled' => true,
+                'status_chart_enabled' => false,
                 'trend_chart_enabled' => true,
                 'support_chart_enabled' => true,
                 'cards' => $this->cards([
@@ -267,7 +267,7 @@ class DashboardProfileSettings
             'admin_fonctionnel' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
-                'status_chart_enabled' => true,
+                'status_chart_enabled' => false,
                 'trend_chart_enabled' => true,
                 'support_chart_enabled' => true,
                 'cards' => $this->cards([
@@ -282,7 +282,7 @@ class DashboardProfileSettings
             'agent' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
-                'status_chart_enabled' => true,
+                'status_chart_enabled' => false,
                 'trend_chart_enabled' => true,
                 'support_chart_enabled' => true,
                 'cards' => $this->cards([
@@ -297,7 +297,7 @@ class DashboardProfileSettings
             'service' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
-                'status_chart_enabled' => true,
+                'status_chart_enabled' => false,
                 'trend_chart_enabled' => true,
                 'support_chart_enabled' => true,
                 'cards' => $this->cards([
@@ -314,7 +314,7 @@ class DashboardProfileSettings
             'direction' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
-                'status_chart_enabled' => true,
+                'status_chart_enabled' => false,
                 'trend_chart_enabled' => true,
                 'support_chart_enabled' => true,
                 'cards' => $this->cards([
@@ -334,7 +334,7 @@ class DashboardProfileSettings
             'planification' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
-                'status_chart_enabled' => true,
+                'status_chart_enabled' => false,
                 'trend_chart_enabled' => true,
                 'support_chart_enabled' => true,
                 'cards' => $this->cards([
@@ -351,7 +351,7 @@ class DashboardProfileSettings
             'dg' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
-                'status_chart_enabled' => true,
+                'status_chart_enabled' => false,
                 'trend_chart_enabled' => true,
                 'support_chart_enabled' => true,
                 'cards' => $this->cards([
@@ -369,7 +369,7 @@ class DashboardProfileSettings
             'auditeur' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
-                'status_chart_enabled' => true,
+                'status_chart_enabled' => false,
                 'trend_chart_enabled' => true,
                 'support_chart_enabled' => true,
                 'cards' => $this->cards([
@@ -509,17 +509,17 @@ class DashboardProfileSettings
     {
         $settings['overview_enabled'] = (bool) ($settings['overview_enabled'] ?? true);
         $settings['comparison_chart_enabled'] = (bool) ($settings['comparison_chart_enabled'] ?? true);
-        $settings['status_chart_enabled'] = (bool) ($settings['status_chart_enabled'] ?? true);
+        // Ancien graphique de statuts par profil retire: on conserve la cle
+        // pour compatibilite des donnees stockees, sans la reactiver.
+        $settings['status_chart_enabled'] = false;
         $settings['trend_chart_enabled'] = (bool) ($settings['trend_chart_enabled'] ?? true);
         $settings['support_chart_enabled'] = (bool) ($settings['support_chart_enabled'] ?? true);
 
         $hasAnyChart = $settings['comparison_chart_enabled']
-            || $settings['status_chart_enabled']
             || $settings['trend_chart_enabled']
             || $settings['support_chart_enabled'];
 
         if (! $hasAnyChart) {
-            $settings['status_chart_enabled'] = true;
             $settings['trend_chart_enabled'] = true;
         }
 
@@ -533,7 +533,7 @@ class DashboardProfileSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }

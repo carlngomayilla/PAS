@@ -2249,12 +2249,12 @@ class DashboardController extends Controller
             // Graphique « Repartition des statuts » retire pour tous les roles
             // (demande metier 2026-06-10).
             'trend_chart' => [
-                'title' => 'Évolution globale du dispositif',
+                'title' => 'Evolution globale',
                 'subtitle' => 'Actions, achèvements et retards sur l\'année en cours.',
                 ...$this->buildRoleTrendChart($actions),
             ],
             'support_chart' => [
-                'title' => 'Performance par direction',
+                'title' => 'Directions',
                 'subtitle' => 'Comparaison des directions sur exécution, validation et retards.',
                 ...[
                     'type' => 'bar',
@@ -2321,12 +2321,12 @@ class DashboardController extends Controller
             // metier 2026-06-10). La repartition reste visible via les autres
             // surfaces (status distribution global, reporting).
             'trend_chart' => [
-                'title' => 'Evolution institutionnelle',
+                'title' => 'Evolution',
                 'subtitle' => 'Lecture temporelle opérationnelle du portefeuille DG.',
                 ...$this->buildRoleTrendChart($actions),
             ],
             'support_chart' => [
-                'title' => 'Performance par direction',
+                'title' => 'Directions',
                 'subtitle' => 'Comparer par direction le volume des actions, le taux d\'exécution, le taux de validation et le score global.',
                 ...[
                     'type' => 'bar',
@@ -2376,12 +2376,12 @@ class DashboardController extends Controller
             // Graphique « Repartition des statuts » retire pour tous les roles
             // (demande metier 2026-06-10).
             'trend_chart' => [
-                'title' => 'Évolution des alertes et retards',
+                'title' => 'Alertes et retards',
                 'subtitle' => 'Lecture temporelle des tensions du portefeuille.',
                 ...$this->buildRoleTrendChart($actions),
             ],
             'support_chart' => [
-                'title' => 'Pipeline de validation transverse',
+                'title' => 'Validations',
                 'subtitle' => 'Repartition des actions entre soumission et validation finale chef.',
                 ...$this->buildValidationPipelineChart($actions),
             ],
@@ -2420,12 +2420,12 @@ class DashboardController extends Controller
             // Graphique « Repartition des statuts » retire pour tous les roles
             // (demande metier 2026-06-10).
             'trend_chart' => [
-                'title' => 'Evolution mensuelle de mes actions',
+                'title' => 'Evolution mensuelle',
                 'subtitle' => 'Volume, achèvement et retards par mois de démarrage.',
                 ...$this->buildRoleTrendChart($actions),
             ],
             'support_chart' => [
-                'title' => 'Charge personnelle par semaine',
+                'title' => 'Charge hebdo',
                 'subtitle' => 'Actions planifiées par semaine de démarrage.',
                 ...$this->buildWeeklyLoadChart($actions),
             ],
@@ -2473,12 +2473,12 @@ class DashboardController extends Controller
             // Graphique « Repartition des statuts » retire pour tous les roles
             // (demande metier 2026-06-10).
             'trend_chart' => [
-                'title' => 'Evolution mensuelle du service',
+                'title' => 'Evolution mensuelle',
                 'subtitle' => 'Volume, achèvement et retards sur les actions du service.',
                 ...$this->buildRoleTrendChart($actions),
             ],
             'support_chart' => [
-                'title' => 'Pipeline de validation du service',
+                'title' => 'Validations',
                 'subtitle' => 'Ou se situent les actions entre soumission et validation finale chef.',
                 ...$this->buildValidationPipelineChart($actions),
             ],
@@ -2537,12 +2537,12 @@ class DashboardController extends Controller
             // Graphique « Repartition des statuts » retire pour tous les roles
             // (demande metier 2026-06-10).
             'trend_chart' => [
-                'title' => 'Evolution mensuelle de la direction',
+                'title' => 'Evolution mensuelle',
                 'subtitle' => 'Volume, achèvement et retards par mois de démarrage.',
                 ...$this->buildRoleTrendChart($actions),
             ],
             'support_chart' => [
-                'title' => 'Performance par service',
+                'title' => 'Services',
                 'subtitle' => 'Comparaison des services sur exécution, validation et retards.',
                 ...$this->buildDirectionServiceChart($user, $actions),
             ],
@@ -2709,7 +2709,7 @@ class DashboardController extends Controller
 
         $actionGroups = $actions->groupBy(fn (Action $action): int => (int) ($action->pta?->service?->id ?? 0));
 
-        $rows = $services->map(function (\App\Models\Service $service) use ($actionGroups): array {
+        $rows = $services->map(function (Service $service) use ($actionGroups): array {
             /** @var Collection<int, Action> $serviceActions */
             $serviceActions = $actionGroups->get((int) $service->id, collect());
             $total = $serviceActions->count();

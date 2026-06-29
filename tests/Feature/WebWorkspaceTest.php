@@ -19,6 +19,7 @@ use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
 use App\Services\Analytics\ReportingAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -233,8 +234,8 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/dashboard?dashboardTab=charts')
             ->assertOk()
-            ->assertSee('Analytique avancée')
-            ->assertSee('Statuts empiles par')
+            ->assertSee('Analyse')
+            ->assertSee('Statuts par')
             ->assertSee('dashboard-agent-gauge', false)
             ->assertSee('dashboard-agent-top', false)
             ->assertSee('dashboard-agent-3d', false)
@@ -252,16 +253,15 @@ class WebWorkspaceTest extends TestCase
             ->assertDontSee('dashboard-report-status-unit-chart', false);
     }
 
-    public function test_dashboard_stat_cards_expose_drilldown_links(): void
+    public function test_dashboard_hides_unused_stat_card_drilldown_links(): void
     {
-        $admin = $this->createAdminUser();
+        $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
 
-        $this->actingAs($admin)
+        $this->actingAs($dg)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee(route('workspace.actions.index'), false)
-            ->assertSee('alerte_echeance=en_retard', false)
-            ->assertSee('statut_validation_min=validee_chef', false);
+            ->assertDontSee(route('workspace.actions.index'), false)
+            ->assertSee('status_chart_enabled":false', false);
     }
 
     public function test_admin_layout_disables_global_content_auto_refresh(): void
@@ -485,10 +485,10 @@ class WebWorkspaceTest extends TestCase
             ->whereNotNull('date_echeance')
             ->whereDate('date_echeance', '<', now()->toDateString())
             ->whereNotIn('statut_dynamique', [
-                \App\Services\Actions\ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
-                \App\Services\Actions\ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
-                \App\Services\Actions\ActionTrackingService::STATUS_SUSPENDU,
-                \App\Services\Actions\ActionTrackingService::STATUS_ANNULE,
+                ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_SUSPENDU,
+                ActionTrackingService::STATUS_ANNULE,
             ])
             ->first();
 
@@ -505,7 +505,7 @@ class WebWorkspaceTest extends TestCase
         $response->assertRedirect(route('workspace.actions.suivi', $action).'#action-status');
         $this->assertDatabaseHas('alert_reads', [
             'user_id' => $admin->id,
-            'fingerprint' => 'action_overdue:'.$action->id.':'.\Illuminate\Support\Carbon::parse($action->date_echeance)->format('Ymd').':'.((float) ($action->progression_reelle ?? 0) <= 0.0 ? 'action_non_demarre' : 'retard'),
+            'fingerprint' => 'action_overdue:'.$action->id.':'.Carbon::parse($action->date_echeance)->format('Ymd').':'.((float) ($action->progression_reelle ?? 0) <= 0.0 ? 'action_non_demarre' : 'retard'),
             'source_type' => 'action_overdue',
             'source_id' => $action->id,
         ]);
@@ -997,7 +997,7 @@ class WebWorkspaceTest extends TestCase
     }
 
     /**
-     * @return array{0: \App\Models\Pta, 1: \App\Models\User}
+     * @return array{0: Pta, 1: User}
      */
     private function firstUnlockedPtaAndAgent(): array
     {

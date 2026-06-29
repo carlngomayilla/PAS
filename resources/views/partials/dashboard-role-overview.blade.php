@@ -6,17 +6,19 @@
     $primaryRows = $roleDashboard['primary_rows'] ?? [];
     $secondaryRows = $roleDashboard['secondary_rows'] ?? [];
     $comparisonChart = $roleDashboard['comparison_chart'] ?? [];
-    $statusChart = $roleDashboard['status_chart'] ?? [];
     $trendChart = $roleDashboard['trend_chart'] ?? [];
     $supportChart = $roleDashboard['support_chart'] ?? [];
+    $hideRepeatedSupportChart = (bool) ($hideRepeatedSupportChart ?? false);
     $showOverview = (bool) ($roleDashboard['overview_enabled'] ?? true);
-    $showComparisonChart = (bool) ($roleDashboard['comparison_chart_enabled'] ?? true);
-    // Le graphique statuts ne s'affiche que si le profil l'autorise ET qu'il y a
-    // des donnees (certains roles, ex. DG, ne fournissent plus ce graphique).
-    $showStatusChart = (bool) ($roleDashboard['status_chart_enabled'] ?? true)
-        && ! empty($statusChart['labels']);
-    $showTrendChart = (bool) ($roleDashboard['trend_chart_enabled'] ?? true);
-    $showSupportChart = (bool) ($roleDashboard['support_chart_enabled'] ?? true);
+    $showComparisonChart = (bool) ($roleDashboard['comparison_chart_enabled'] ?? true)
+        && count($comparisonChart['labels'] ?? []) > 0;
+    $showTrendChart = (bool) ($roleDashboard['trend_chart_enabled'] ?? true)
+        && count($trendChart['labels'] ?? []) > 0;
+    $supportChartRepeatsMacroChart = $hideRepeatedSupportChart
+        && in_array((string) $dashboardRole, ['direction', 'dg', 'planification'], true);
+    $showSupportChart = (bool) ($roleDashboard['support_chart_enabled'] ?? true)
+        && count($supportChart['labels'] ?? []) > 0
+        && ! $supportChartRepeatsMacroChart;
     $roleComparisonChartHeight = max(15, (count($comparisonChart['labels'] ?? []) * 2.1) + 4);
     $roleSupportChartHeight = max(15, (count($supportChart['labels'] ?? []) * 2.1) + 4);
     $statisticalPolicy = is_array(($statisticalPolicy ?? null)) ? $statisticalPolicy : [];
@@ -63,15 +65,6 @@
             default => 'neutral',
         };
     };
-    $roleStatusRows = collect($statusChart['labels'] ?? [])
-        ->values()
-        ->map(fn ($label, int $index): array => [
-            'label' => (string) $label,
-            'value' => (int) (($statusChart['values'] ?? [])[$index] ?? 0),
-            'color' => (string) (($statusChart['colors'] ?? [])[$index] ?? '#0F5B66'),
-            'href' => (string) (($statusChart['urls'] ?? [])[$index] ?? '#'),
-        ]);
-    $roleStatusTotal = max(0, (int) $roleStatusRows->sum('value'));
 @endphp
 
 @if ($showHeroBlock)
@@ -85,11 +78,11 @@
     </div>
 @endif
 
-@if ($showChartBlocks && $showComparisonChart && count($comparisonChart['labels'] ?? []) > 0)
+@if ($showChartBlocks && $showComparisonChart)
     <article class="showcase-panel mb-4">
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">{{ $comparisonChart['title'] ?? 'Comparaison des indicateurs' }}</h2>
+                <h2 class="showcase-panel-title">{{ $comparisonChart['title'] ?? 'Indicateurs' }}</h2>
             </div>
             <span class="showcase-chip">{{ count($comparisonChart['labels'] ?? []) }} indicateurs</span>
         </div>
@@ -113,77 +106,27 @@
     </article>
 @endif
 
-@if ($showChartBlocks && ($showStatusChart || $showTrendChart))
+@if ($showChartBlocks && $showTrendChart)
     <div class="space-y-4">
-        @if ($showStatusChart)
-            <article class="showcase-panel">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="showcase-panel-title">{{ $statusChart['title'] ?? 'Répartition des statuts' }}</h2>
-                    </div>
-                    <span class="showcase-chip">{{ count($statusChart['labels'] ?? []) }} statuts</span>
+        <article class="showcase-panel">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="showcase-panel-title">{{ $trendChart['title'] ?? 'Evolution' }}</h2>
                 </div>
-                <div class="dashboard-canvas">
-                    <div id="dashboard-role-status-chart" class="dashboard-chart-host">
-                        <div class="dashboard-chart-fallback" aria-hidden="true">
-                            <div class="dashboard-chart-fallback-bars">
-                                @foreach ($roleFallbackBars($statusChart) as $row)
-                                    <div class="dashboard-chart-fallback-bar">
-                                        <span class="truncate">{{ $row['label'] }}</span>
-                                        <span class="dashboard-chart-fallback-track"><span class="dashboard-chart-fallback-fill" style="width: {{ $row['value'] }}%;"></span></span>
-                                        <span class="text-right">{{ number_format($row['value'], 0, ',', ' ') }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
+                <span class="showcase-chip">{{ count($trendChart['labels'] ?? []) }} points</span>
+            </div>
+            <div class="dashboard-canvas">
+                <div id="dashboard-role-trend-chart" class="dashboard-chart-host">
+                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                        <svg viewBox="0 0 360 140" preserveAspectRatio="none">
+                            <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
+                            <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
+                            <polyline points="{{ $roleFallbackPoints($trendChart) }}" fill="none" stroke="#F26522" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
                     </div>
                 </div>
-                @if ($roleStatusRows->isNotEmpty())
-                    <div class="charts-scroll-list charts-scroll-list-sm mt-4 charts-status-grid" aria-label="Liste complète des statuts">
-                        @foreach ($roleStatusRows as $row)
-                            @php $rowPct = $roleStatusTotal > 0 ? round(((float) $row['value'] / $roleStatusTotal) * 100, 1) : 0; @endphp
-                            <a class="charts-status-item" href="{{ $row['href'] }}" style="--tone: {{ $row['color'] }};">
-                                <div class="charts-status-item-head">
-                                    <span class="charts-status-dot" style="background: {{ $row['color'] }};"></span>
-                                    <span class="charts-status-item-name">{{ $row['label'] }}</span>
-                                    <span class="charts-status-item-count" style="color: {{ $row['color'] }};">{{ $row['value'] }}</span>
-                                </div>
-                                <div class="charts-status-item-track">
-                                    <div class="charts-status-item-fill" style="width: {{ $rowPct }}%; background: {{ $row['color'] }};"></div>
-                                </div>
-                                <span class="charts-status-item-pct">{{ number_format($rowPct, 0, ',', ' ') }}%</span>
-                            </a>
-                        @endforeach
-                    </div>
-                @endif
-            </article>
-        @endif
-
-        @if ($showTrendChart)
-            <article class="showcase-panel">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="showcase-panel-title">{{ $trendChart['title'] ?? 'Tendance' }}</h2>
-                    </div>
-                    <span class="showcase-chip">{{ count($trendChart['labels'] ?? []) }} points</span>
-                </div>
-                <div class="dashboard-canvas">
-                    <div id="dashboard-role-trend-chart" class="dashboard-chart-host">
-                        <div class="dashboard-chart-fallback" aria-hidden="true">
-                            @if (count($trendChart['labels'] ?? []) > 0)
-                                <svg viewBox="0 0 360 140" preserveAspectRatio="none">
-                                    <line x1="20" y1="120" x2="340" y2="120" stroke="#d8ecf8" stroke-width="1" />
-                                    <line x1="20" y1="48" x2="340" y2="48" stroke="#d8ecf8" stroke-width="1" stroke-dasharray="4 4" />
-                                    <polyline points="{{ $roleFallbackPoints($trendChart) }}" fill="none" stroke="#F26522" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            @else
-                                <x-ui.empty-state title="Aucune tendance" message="Les points apparaîtront dès que des actions seront disponibles." icon="chart" tone="info" />
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </article>
-        @endif
+            </div>
+        </article>
     </div>
 @endif
 
@@ -193,7 +136,7 @@
     <article class="showcase-panel">
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">{{ $supportChart['title'] ?? 'Lecture métier' }}</h2>
+                <h2 class="showcase-panel-title">{{ $supportChart['title'] ?? 'Synthese' }}</h2>
             </div>
             <span class="showcase-chip">{{ count($supportChart['labels'] ?? []) }} lignes</span>
         </div>
@@ -226,7 +169,7 @@
         @if ($dashboardRole === 'agent')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Mes actions prioritaires</h2>
+                    <h2 class="showcase-panel-title">Priorites</h2>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
@@ -257,7 +200,7 @@
         @elseif ($dashboardRole === 'service')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Actions à valider</h2>
+                    <h2 class="showcase-panel-title">Validations</h2>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
@@ -287,7 +230,7 @@
         @elseif ($dashboardRole === 'direction')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Performance par service</h2>
+                    <h2 class="showcase-panel-title">Services</h2>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} services</span>
             </div>
@@ -317,7 +260,7 @@
         @elseif ($dashboardRole === 'dg')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Directions : suivi stratégique</h2>
+                    <h2 class="showcase-panel-title">Directions</h2>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} directions</span>
             </div>
@@ -348,7 +291,7 @@
         @elseif ($dashboardRole === 'planification')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Classement des directions</h2>
+                    <h2 class="showcase-panel-title">Directions</h2>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} directions</span>
             </div>
@@ -378,7 +321,7 @@
         @elseif ($dashboardRole === 'cabinet')
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="showcase-panel-title">Validations en attente</h2>
+                    <h2 class="showcase-panel-title">Validations</h2>
                 </div>
                 <span class="showcase-chip">{{ count($primaryRows) }} lignes</span>
             </div>
@@ -416,7 +359,7 @@
     @if ($dashboardRole === 'agent')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Mes actions en retard</h2>
+                <h2 class="showcase-panel-title">Retards</h2>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -447,7 +390,7 @@
     @elseif ($dashboardRole === 'service')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Performance des agents</h2>
+                <h2 class="showcase-panel-title">Agents</h2>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} agents</span>
         </div>
@@ -476,7 +419,7 @@
     @elseif ($dashboardRole === 'direction')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Actions critiques de la direction</h2>
+                <h2 class="showcase-panel-title">Actions critiques</h2>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -508,7 +451,7 @@
     @elseif ($dashboardRole === 'dg')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Directions en difficulté</h2>
+                <h2 class="showcase-panel-title">Difficultes</h2>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -537,7 +480,7 @@
     @elseif ($dashboardRole === 'planification')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Actions critiques validées</h2>
+                <h2 class="showcase-panel-title">Actions critiques</h2>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>
@@ -568,7 +511,7 @@
     @elseif ($dashboardRole === 'cabinet')
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Alertes critiques transverses</h2>
+                <h2 class="showcase-panel-title">Alertes critiques</h2>
             </div>
             <span class="showcase-chip">{{ count($secondaryRows) }} lignes</span>
         </div>

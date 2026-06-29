@@ -38,7 +38,7 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('Indicateurs KPI');
+        $charts->assertSee('KPI');
         $charts->assertDontSee('Analytique avancee');
         // Graphique « Repartition des statuts » retire pour tous les roles (2026-06-10).
         $charts->assertDontSee('dashboard-role-status-chart', false);
@@ -46,8 +46,8 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
-        $tables->assertSee('Performance des agents');
-        $tables->assertSee('Tableau de synth');
+        $tables->assertSee('Agents');
+        $tables->assertSee('Synthese');
     }
 
     public function test_seeded_agent_user_sees_agent_dashboard_sections(): void
@@ -62,8 +62,8 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
-        $tables->assertSee('Mes actions prioritaires');
-        $tables->assertSee('Mes actions en retard');
+        $tables->assertSee('Priorites');
+        $tables->assertSee('Retards');
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
@@ -82,14 +82,14 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
-        $tables->assertSee('Performance par service');
-        $tables->assertSee('Actions critiques de la direction');
+        $tables->assertSee('Services');
+        $tables->assertSee('Actions critiques');
         $tables->assertSee('SFC');
         $tables->assertSee('AJARH');
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('dashboard-role-support-chart', false);
+        $charts->assertDontSee('dashboard-role-support-chart', false);
     }
 
     public function test_seeded_planification_user_sees_planification_dashboard_sections(): void
@@ -105,12 +105,12 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
-        $tables->assertSee('Classement des directions');
-        $tables->assertSee('Tableau de synth');
+        $tables->assertSee('Directions');
+        $tables->assertSee('Synthese');
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('Indicateurs KPI');
+        $charts->assertSee('KPI');
     }
 
     public function test_seeded_dg_user_sees_dg_dashboard_sections(): void
@@ -126,17 +126,15 @@ class DashboardProfileInteractionsTest extends TestCase
         $overview->assertSee('Actions');
         $overview->assertSee('Taux validation');
         $overview->assertSee('globale');
-        $overview->assertSee('Avancement reel');
-
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('Indicateurs KPI');
-        $charts->assertSee('Performance des directions');
-        $charts->assertSee('Performance des services');
+        $charts->assertSee('KPI');
+        $charts->assertSee('Directions');
+        $charts->assertSee('Services');
         $charts->assertSee('dashboard-direction-performance-chart', false);
         $charts->assertSee('dashboard-service-performance-chart', false);
         $charts->assertSee('direction_performance_rows', false);
-        $charts->assertSee('dashboard-role-support-chart', false);
+        $charts->assertDontSee('dashboard-role-support-chart', false);
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();

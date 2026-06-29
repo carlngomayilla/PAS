@@ -7,6 +7,28 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-29 - Nettoyage des graphiques et tableaux du dashboard
+
+### Demande
+
+Supprimer les graphiques et tableaux qui repetent la meme information, puis renommer les blocs avec des intitules plus simples.
+
+### Changement
+
+- **Graphiques en double** : retrait du graphique de statuts par profil et de sa liste redondante; le statut reste disponible dans le graphique global dedie.
+- **Support role/macro** : masquage du graphique de support par role pour DG, planification et direction lorsque les graphiques globaux Directions/Services couvrent deja la meme information.
+- **Performance par unite** : le graphique generique par unite ne s'affiche plus lorsque l'unite active est deja `directions` ou `services`.
+- **Libelles simplifies** : renommage des principaux tableaux et graphiques du dashboard (`Directions`, `Services`, `Agents`, `Priorites`, `Retards`, `Validations`, `Alertes`, `KPI`, `Analyse`).
+- **Configuration profils** : suppression du toggle super admin `Statuts` pour les dashboards par profil, et neutralisation du flag legacy `status_chart_enabled`.
+
+### Validation
+
+- `php artisan view:cache`
+- `vendor\bin\pint --dirty`
+- `php artisan test tests\Feature\DashboardProfileInteractionsTest.php tests\Feature\WebWorkspaceTest.php tests\Feature\SuperAdminDashboardProfilesTest.php` - 37 passed, 1 skipped, 418 assertions
+
+---
+
 ## 2026-06-29 - Alignement OCR IA sur les 40 colonnes IMPORT_GLOBAL
 
 ### Demande

@@ -7,6 +7,7 @@
                 'statisticalPolicy' => $statisticalPolicy,
                 'officialPolicy' => $officialPolicy,
                 'displayMode' => 'charts',
+                'hideRepeatedSupportChart' => true,
             ])
         </div>
     @endif
@@ -14,8 +15,8 @@
     @if ($showDirectionSynthesisSelector)
         <section class="charts-decision-section mb-4">
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 class="showcase-panel-title">Graphiques de decision</h2>
-                <span class="showcase-chip">Services, agents et evolution</span>
+                <h2 class="showcase-panel-title">Graphiques</h2>
+                <span class="showcase-chip">Services, agents, evolution</span>
             </div>
             <div class="grid gap-3 xl:grid-cols-3">
                 @foreach ($decisionCharts as $chart)
@@ -83,7 +84,7 @@
             @endphp
             <article class="showcase-panel mt-3">
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h3 class="text-sm font-black text-[#17324a]">Courbes d'evolution trimestrielle</h3>
+                    <h3 class="text-sm font-black text-[#17324a]">Evolution trimestrielle</h3>
                     <span class="showcase-chip">{{ $exerciseFilter['label'] ?? 'Exercice courant' }}</span>
                 </div>
                 <div class="overflow-x-auto rounded-2xl border border-[#d8ecf8] bg-white/92 px-2 py-3">
@@ -183,7 +184,7 @@
 
         <article class="showcase-panel charts-gauges-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Indicateurs KPI</h2>
+                <h2 class="chart-title">KPI</h2>
                 <span class="showcase-chip">Délai · Performance</span>
             </div>
             <div class="charts-gauges-grid">
@@ -211,7 +212,7 @@
     <div class="charts-bento charts-bento-row-trend mb-4">
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Évolution mensuelle des indicateurs</h2>
+                <h2 class="chart-title">Evolution mensuelle</h2>
                 <div class="chart-period-bar" data-period-chart="kpi-line">
                     <button type="button" class="chart-period-btn" data-period="3">3M</button>
                     <button type="button" class="chart-period-btn" data-period="6">6M</button>
@@ -253,33 +254,14 @@
 
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Répartition des statuts</h2>
+                <h2 class="chart-title">Statuts</h2>
                 <span class="showcase-chip">{{ collect($statusCards)->sum('count') }} actions</span>
             </div>
             @if (! empty($statusCards) && collect($statusCards)->sum('count') > 0)
-                @php $statusCardsTotal = collect($statusCards)->sum('count'); @endphp
                 <div class="dashboard-canvas">
                     <div id="dashboard-status-mix-chart" class="dashboard-chart-host">
-                        <div class="dashboard-chart-fallback" aria-hidden="true">
-                            <x-ui.empty-state title="Graphique en cours de chargement" message="La liste complète des statuts reste disponible ci-dessous." icon="chart" tone="info" />
-                        </div>
+                        <div class="dashboard-chart-fallback" aria-hidden="true"></div>
                     </div>
-                </div>
-                <div class="charts-scroll-list charts-scroll-list-sm mt-4 charts-status-grid" aria-label="Liste complète des statuts">
-                    @foreach ($statusCards as $card)
-                        @php $cardPct = $statusCardsTotal > 0 ? round(((float) $card['count'] / $statusCardsTotal) * 100, 1) : 0; @endphp
-                        <a class="charts-status-item" href="{{ $card['href'] ?? '#' }}" style="--tone: {{ $card['color'] }};">
-                            <div class="charts-status-item-head">
-                                <span class="charts-status-dot" style="background: {{ $card['color'] }};"></span>
-                                <span class="charts-status-item-name">{{ $card['label'] }}</span>
-                                <span class="charts-status-item-count" style="color: {{ $card['color'] }};">{{ $card['count'] }}</span>
-                            </div>
-                            <div class="charts-status-item-track">
-                                <div class="charts-status-item-fill" style="width: {{ $cardPct }}%; background: {{ $card['color'] }};"></div>
-                            </div>
-                            <span class="charts-status-item-pct">{{ number_format($cardPct, 0, ',', ' ') }}%</span>
-                        </a>
-                    @endforeach
                 </div>
             @else
                 <x-ui.empty-state title="Aucun statut à afficher" message="Importez des actions pour voir la répartition." icon="chart" tone="info" />
@@ -292,7 +274,7 @@
         @if ($showDashboardMacroCharts || $showUnitSummaryChart)
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Performance des directions</h2>
+                <h2 class="chart-title">Directions</h2>
                 <span class="showcase-chip">{{ count($directionPerformanceRows) }} directions</span>
             </div>
             <div class="dashboard-chart-scroll-frame">
@@ -327,7 +309,7 @@
 
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Performance des services</h2>
+                <h2 class="chart-title">Services</h2>
                 <span class="showcase-chip">{{ count($synthesisServiceRows) }} services</span>
             </div>
             <div class="dashboard-chart-scroll-frame">
@@ -361,9 +343,10 @@
     </div>
 
     <div class="charts-bento charts-bento-row-rank charts-long-row mb-4">
+        @if ($showUnitSummaryChart)
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Performance par {{ strtolower($unitModeLabel) }}</h2>
+                <h2 class="chart-title">{{ $unitModeLabel }}</h2>
                 <span class="showcase-chip">{{ count($unitRows) }} {{ strtolower($unitModeLabel) }}</span>
             </div>
             <div class="dashboard-chart-scroll-frame">
@@ -394,10 +377,11 @@
             </div>
             </div>
         </article>
+        @endif
 
         <article class="showcase-panel">
             <div class="chart-panel-head mb-3">
-                <h2 class="chart-title">Actions classees (meilleur score)</h2>
+                <h2 class="chart-title">Meilleures actions</h2>
                 <span class="showcase-chip">{{ count($analytics['top_action_bars'] ?? []) }} actions</span>
             </div>
             @if ($analytics['top_action_bars'] ?? false)
@@ -439,8 +423,7 @@
     <section class="charts-agent-performance-section">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-                <h2 class="showcase-panel-title">Performance des agents</h2>
-                <p class="showcase-panel-subtitle">Score global agent : execution, delai, reference et charge.</p>
+                <h2 class="showcase-panel-title">Agents</h2>
             </div>
             <span class="showcase-chip">Seuil {{ number_format($agentPerformanceThreshold, 0, ',', ' ') }}%</span>
         </div>
@@ -448,7 +431,7 @@
         <div class="charts-agent-grid">
             <article class="showcase-panel dashboard-agent-card dashboard-agent-card-gauge">
                 <div class="chart-panel-head mb-3">
-                    <h3 class="chart-title">Moyenne agents</h3>
+                    <h3 class="chart-title">Moyenne</h3>
                     <span class="showcase-chip">{{ (int) ($agentPerformanceSummary['agents_total'] ?? 0) }} agents</span>
                 </div>
                 <div class="dashboard-canvas dashboard-agent-gauge-canvas">
@@ -470,7 +453,7 @@
 
             <article class="showcase-panel dashboard-agent-card dashboard-agent-card-top">
                 <div class="chart-panel-head mb-3">
-                    <h3 class="chart-title">Top 10 agents</h3>
+                    <h3 class="chart-title">Top agents</h3>
                     <span class="showcase-chip">Score global</span>
                 </div>
                 <div class="dashboard-canvas dashboard-canvas-lg">
@@ -499,7 +482,7 @@
 
             <article class="showcase-panel dashboard-agent-card dashboard-agent-card-3d">
                 <div class="chart-panel-head mb-3">
-                    <h3 class="chart-title">Positionnement 3D</h3>
+                    <h3 class="chart-title">3D</h3>
                     <span class="showcase-chip">Charge, cloture, score</span>
                 </div>
                 <div class="dashboard-canvas dashboard-agent-plotly-lg">
@@ -524,7 +507,7 @@
 
             <article class="showcase-panel dashboard-agent-card dashboard-agent-card-heatmap">
                 <div class="chart-panel-head mb-3">
-                    <h3 class="chart-title">Agents et services</h3>
+                    <h3 class="chart-title">Carte agents</h3>
                     <span class="showcase-chip">Carte thermique</span>
                 </div>
                 <div class="dashboard-canvas dashboard-agent-plotly-lg">
@@ -550,7 +533,7 @@
 
         <article class="showcase-panel dashboard-agent-alert-panel">
             <div class="chart-panel-head mb-3">
-                <h3 class="chart-title">Alertes agents</h3>
+                <h3 class="chart-title">Alertes</h3>
                 <span class="showcase-chip">{{ count($agentPerformanceAlerts) }} signalements</span>
             </div>
             <div class="dashboard-agent-alert-list">
@@ -580,7 +563,7 @@
     @if ($showDashboardAdvancedReporting)
         <section class="charts-advanced-section mt-4">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div><h2 class="showcase-panel-title">Analytique avancée</h2></div>
+                <div><h2 class="showcase-panel-title">Analyse</h2></div>
                 <a href="{{ route('workspace.reporting') }}" class="dashboard-reporting-jump">Exports</a>
             </div>
             @include('partials.dashboard-reporting-analytics', [

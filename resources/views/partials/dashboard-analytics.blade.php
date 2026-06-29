@@ -351,7 +351,7 @@
 
     $directionSynthesisTables = [
         [
-            'title' => 'Performance des directions',
+            'title' => 'Directions',
             'chip' => count($directionPerformanceRows).' directions',
             'headers' => ['Direction', 'PAO créé', 'Objectifs opérationnels', 'Services', 'PTA créés', 'Actions', 'Non démarrées', 'En cours', 'Réalisées', 'Validées', 'Retards', 'Hors délai', 'Taux d\'exécution', 'Taux de réalisation', 'Performance', 'Statut', 'Dernière activité'],
             'rows' => collect($directionPerformanceRows)->map(fn (array $row): array => ['cells' => [
@@ -376,7 +376,7 @@
             'empty' => 'Aucune direction disponible.',
         ],
         [
-            'title' => 'Déclinaison du PAS par direction',
+            'title' => 'PAS par direction',
             'chip' => count($pasDirectionRows).' lignes',
             'headers' => ['Direction', 'Axes concernés', 'Objectifs stratégiques', 'PAO créé', 'Objectifs opérationnels', 'Taux de déclinaison', 'Statut', 'Dernière mise à jour'],
             'rows' => collect($pasDirectionRows)->map(fn (array $row): array => ['cells' => [
@@ -413,7 +413,7 @@
             'empty' => 'Aucun PAO disponible.',
         ],
         [
-            'title' => 'Services de la direction',
+            'title' => 'Services',
             'chip' => count($decisionServiceRows).' services',
             'headers' => ['Service', 'PTA', 'Actions', 'Terminées', 'En cours', 'Retard', 'Taux d\'exécution', 'Score'],
             'rows' => collect($decisionServiceRows)->map(fn (array $row): array => ['cells' => [
@@ -467,7 +467,7 @@
             'empty' => 'Aucun agent disponible.',
         ],
         [
-            'title' => 'Actions des agents',
+            'title' => 'Actions agents',
             'chip' => count($agentActionRows).' lignes',
             'headers' => ['Agent', 'Action', 'Objectif opérationnel', 'PTA', 'Direction', 'Service', 'Échéance', 'Cible', 'Réalisé', 'Reste', 'Sous-actions', 'Progression', 'Taux de réalisation', 'Statut', 'Statut délai', 'Performance', 'Justificatifs', 'Commentaires', 'Dernière activité'],
             'rows' => collect($agentActionRows)->map(fn (array $row): array => ['cells' => [
@@ -494,7 +494,7 @@
             'empty' => 'Aucune action affectée disponible.',
         ],
         [
-            'title' => 'Sous-actions et preuves',
+            'title' => 'Sous-actions',
             'chip' => count($subActionRows).' sous-actions',
             'headers' => ['Action', 'Sous-action', 'Description', 'Cible prévue', 'Quantité réalisée', 'Unité', 'Taux', 'Résultat obtenu', 'Effectuée', 'Date de réalisation', 'Justificatif', 'Commentaire agent', 'Contrôle supérieur', 'Statut'],
             'rows' => collect($subActionRows)->map(fn (array $row): array => ['cells' => [
@@ -516,7 +516,7 @@
             'empty' => 'Aucune sous-action disponible.',
         ],
         [
-            'title' => 'Chaîne PAS PAO PTA Actions',
+            'title' => 'Chaîne PAS-PAO-PTA',
             'chip' => $fmtPct($decisionCounts['taux_alignement'] ?? 0),
             'headers' => ['PAS', 'Objectif stratégique', 'PAO', 'Objectif opérationnel', 'PTA', 'Actions', 'État'],
             'rows' => collect($decisionChainRows)->map(fn (array $row): array => ['cells' => [
@@ -531,7 +531,7 @@
             'empty' => 'Aucune chaîne disponible.',
         ],
         [
-            'title' => 'Actions prioritaires',
+            'title' => 'Priorités',
             'chip' => count($decisionPriorityRows).' actions',
             'headers' => ['Action', 'Service', 'Responsable', 'Date fin', 'Statut délai', 'Statut', 'Progression', 'Validation'],
             'rows' => collect($decisionPriorityRows)->map(fn (array $row): array => ['cells' => [
@@ -547,7 +547,7 @@
             'empty' => 'Aucune action prioritaire.',
         ],
         [
-            'title' => 'Actions en retard',
+            'title' => 'Retards',
             'chip' => count($decisionLateRows).' retards',
             'headers' => ['Action', 'Responsable', 'Service', 'Date fin', 'Statut délai', 'Jours retard', 'Progression', 'Motif'],
             'rows' => collect($decisionLateRows)->map(fn (array $row): array => ['cells' => [
@@ -563,7 +563,7 @@
             'empty' => 'Aucune action en retard.',
         ],
         [
-            'title' => 'Validations en attente',
+            'title' => 'Validations',
             'chip' => count($decisionPendingValidationRows).' attente',
             'headers' => ['Élément', 'Service', 'Responsable', 'Niveau', 'Statut', 'Depuis', 'Action'],
             'rows' => collect($decisionPendingValidationRows)->map(fn (array $row): array => ['cells' => [
@@ -578,7 +578,7 @@
             'empty' => 'Aucune validation en attente.',
         ],
         [
-            'title' => 'Justificatifs et preuves',
+            'title' => 'Justificatifs',
             'chip' => $fmtCount($decisionCounts['justificatifs_total'] ?? 0).' preuves',
             'headers' => ['Action', 'Agent', 'Justificatif', 'Statut preuve', 'Validateur', 'Observation'],
             'rows' => collect($decisionProofRows)->map(fn (array $row): array => ['cells' => [
@@ -592,7 +592,7 @@
             'empty' => 'Aucun justificatif disponible.',
         ],
         [
-            'title' => 'Alertes et anomalies',
+            'title' => 'Alertes',
             'chip' => count($decisionAnomalyRows).' points',
             'headers' => ['Type', 'Élément', 'Service', 'Gravité', 'Détail', 'Action corrective'],
             'rows' => collect($decisionAnomalyRows)->map(fn (array $row): array => ['cells' => [
@@ -606,7 +606,7 @@
             'empty' => 'Aucune anomalie active.',
         ],
         [
-            'title' => 'Évolution trimestrielle',
+            'title' => 'Evolution trimestrielle',
             'chip' => $exerciseFilter['period_label'] ?? $exerciseFilter['quarter_label'] ?? 'Annuelle',
             'headers' => ['Trimestre', 'Actions prévues', 'Terminées', 'Retard', 'Taux d\'exécution', 'Score'],
             'rows' => collect($decisionQuarterRows)->map(fn (array $row): array => ['cells' => [
@@ -622,7 +622,7 @@
 
     $decisionCharts = [
         [
-            'title' => 'Graphique performance des services',
+            'title' => 'Services',
             'rows' => collect($decisionServiceRows)->map(fn (array $row): array => [
                 'label' => $shortText($row['service'] ?? '-', 34),
                 'value' => (float) ($row['score'] ?? 0),
@@ -631,7 +631,7 @@
             ])->all(),
         ],
         [
-            'title' => 'Graphique performance des agents',
+            'title' => 'Agents',
             'rows' => collect($decisionAgentRows)->map(fn (array $row): array => [
                 'label' => $shortText($row['agent'] ?? '-', 34),
                 'value' => (float) ($row['score'] ?? 0),
@@ -640,7 +640,7 @@
             ])->all(),
         ],
         [
-            'title' => 'Graphique evolution trimestrielle',
+            'title' => 'Evolution trimestrielle',
             'rows' => collect($decisionQuarterRows)->map(fn (array $row): array => [
                 'label' => $row['trimestre'] ?? '-',
                 'value' => (float) ($row['taux_execution'] ?? 0),
@@ -810,7 +810,6 @@
         && (
             ($roleDashboard['overview_enabled'] ?? true)
             || ($roleDashboard['comparison_chart_enabled'] ?? true)
-            || ($roleDashboard['status_chart_enabled'] ?? true)
             || ($roleDashboard['trend_chart_enabled'] ?? true)
             || ($roleDashboard['support_chart_enabled'] ?? true)
         );
