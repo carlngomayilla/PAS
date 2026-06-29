@@ -7,6 +7,7 @@ use App\Models\AiImportBatch;
 use App\Models\Direction;
 use App\Models\Service;
 use App\Services\Ai\PtaNormalizationService;
+use App\Services\Imports\PlanningExcelImportService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -21,6 +22,7 @@ class AiPtaImportPreviewController extends Controller
         return view('workspace.ai-imports.pta.preview', [
             'batch' => $batch,
             'fields' => PtaNormalizationService::FIELDS,
+            'importColumns' => PlanningExcelImportService::IMPORT_COLUMNS,
             'directions' => Direction::query()->orderBy('libelle')->get(),
             'services' => Service::query()->orderBy('libelle')->get(),
             'stats' => [

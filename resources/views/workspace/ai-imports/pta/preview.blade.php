@@ -2,31 +2,23 @@
 
 @section('content')
 @php
-    $visibleFields = [
-        'libelle_action' => 'Action',
-        'direction' => 'Direction',
-        'service' => 'Service',
-        'responsable' => 'Responsable',
-        'indicateur' => 'Indicateur',
-        'budget_previsionnel' => 'Budget',
-        'echeance' => 'Echeance',
-        'type_action' => 'Type propose',
-        'cible_minimum_execution' => 'Cible min.',
-        'quantite_cible' => 'Quantite',
-        'unite_cible' => 'Unite',
-        'justification_type' => 'Justification IA',
-        'seuil_mode' => 'Seuil propose',
-        'seuil_t1' => 'T1',
-        'seuil_t2' => 'T2',
-        'seuil_t3' => 'T3',
-        'seuil_t4' => 'T4',
-        'sous_actions' => 'Sous-actions proposees',
-        'niveau_risque' => 'Risque propose',
-        'validation_warnings' => 'Alerte validation',
-        'confidence_score' => 'Score confiance',
-    ];
+    $visibleFields = collect($importColumns ?? [])->mapWithKeys(fn (string $field): array => [$field => $field])->all();
     $visibleFieldKeys = array_keys($visibleFields);
-    $longFields = ['libelle_action', 'indicateur', 'justification_type', 'sous_actions', 'validation_warnings'];
+    $longFields = [
+        'libelle_axe',
+        'libelle_objectif_strategique',
+        'libelle_objectif_operationnel',
+        'libelle_action',
+        'justificatif_attendu',
+        'sous_actions',
+        'risque',
+        'mesures_preventives',
+        'ressources_materielles',
+        'main_oeuvre',
+        'autres_ressources',
+        'nature_financement',
+        'champ_difficulte',
+    ];
     $tableColspan = count($visibleFields) + 4;
 @endphp
 <div class="app-screen-flow">
@@ -119,6 +111,13 @@
                                             <select name="normalized[{{ $field }}]" class="w-28 rounded border border-slate-200 px-2 py-1 text-xs">
                                                 <option value=""></option>
                                                 @foreach (['faible' => 'faible', 'modere' => 'modere', 'eleve' => 'eleve', 'critique' => 'critique'] as $value => $optionLabel)
+                                                    <option value="{{ $value }}" @selected((string) $fieldValue === $value)>{{ $optionLabel }}</option>
+                                                @endforeach
+                                            </select>
+                                        @elseif (in_array($field, ['financement', 'commentaire_obligatoire', 'champ_difficulte'], true))
+                                            <select name="normalized[{{ $field }}]" class="w-24 rounded border border-slate-200 px-2 py-1 text-xs">
+                                                <option value=""></option>
+                                                @foreach (['0' => '0', '1' => '1'] as $value => $optionLabel)
                                                     <option value="{{ $value }}" @selected((string) $fieldValue === $value)>{{ $optionLabel }}</option>
                                                 @endforeach
                                             </select>

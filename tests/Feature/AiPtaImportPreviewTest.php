@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AiImportBatch;
+use App\Services\Imports\PlanningExcelImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\CreatesAiPtaFixtures;
@@ -27,9 +28,13 @@ class AiPtaImportPreviewTest extends TestCase
             ->get(route('workspace.ai-imports.pta.preview', $batch))
             ->assertOk()
             ->assertSee('Action PTA IA')
-            ->assertSee('Type propose')
-            ->assertSee('Justification IA')
-            ->assertSee('Sous-actions proposees')
-            ->assertSee('Score confiance');
+            ->assertSee('annee_debut_pas')
+            ->assertSee('service_unite')
+            ->assertSee('libelle_action')
+            ->assertSee('codes_agents_rmo')
+            ->assertSee('montant_financement')
+            ->assertDontSee('Type propose');
+
+        $this->assertContains('champ_difficulte', PlanningExcelImportService::IMPORT_COLUMNS);
     }
 }

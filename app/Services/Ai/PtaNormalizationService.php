@@ -211,6 +211,36 @@ class PtaNormalizationService
         return $normalized;
     }
 
+    /**
+     * @param  array<string,mixed>  $payload
+     * @return array<string,mixed>
+     */
+    public function normalizeManualPayload(array $payload): array
+    {
+        $normalized = array_fill_keys(self::FIELDS, null);
+
+        foreach ($payload as $field => $value) {
+            if (! in_array((string) $field, self::FIELDS, true)) {
+                continue;
+            }
+
+            $normalized[(string) $field] = $this->normalizeValue((string) $field, $value);
+        }
+
+        $normalized = $this->syncOfficialAndGenericFields($normalized);
+
+        $parameterization = $this->parameterizer->parameterize($normalized);
+        foreach ($parameterization as $field => $value) {
+            if (! array_key_exists($field, $normalized) || ! $this->blank($normalized[$field] ?? null)) {
+                continue;
+            }
+
+            $normalized[$field] = $this->normalizeValue($field, $this->formatParameterValue($field, $value));
+        }
+
+        return $this->syncOfficialAndGenericFields($normalized);
+    }
+
     public function targetForHeader(string $header): ?string
     {
         $normalizedHeader = $this->key($header);
@@ -355,6 +385,14 @@ class PtaNormalizationService
 
         if ($this->blank($normalized['responsable'] ?? null) && ! $this->blank($normalized['rmo_raw'] ?? null)) {
             $normalized['responsable'] = $normalized['rmo_raw'];
+        }
+
+        if ($this->blank($normalized['responsable'] ?? null) && ! $this->blank($normalized['codes_agents_rmo'] ?? null)) {
+            $normalized['responsable'] = $normalized['codes_agents_rmo'];
+        }
+
+        if ($this->blank($normalized['rmo_raw'] ?? null) && ! $this->blank($normalized['codes_agents_rmo'] ?? null)) {
+            $normalized['rmo_raw'] = $normalized['codes_agents_rmo'];
         }
 
         if ($this->blank($normalized['codes_agents_rmo'] ?? null) && ! $this->blank($normalized['responsable'] ?? null)) {

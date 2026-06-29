@@ -21,7 +21,8 @@ class AiPtaImportValidationController extends Controller
         private readonly PtaFinalImportService $finalImport,
         private readonly PtaExcelGenerationService $excel,
         private readonly PtaImportAuditService $audit,
-        private readonly PtaTrainingDatasetService $training
+        private readonly PtaTrainingDatasetService $training,
+        private readonly PtaNormalizationService $normalization
     ) {}
 
     public function updateRow(Request $request, AiImportBatch $batch, AiImportRow $row): RedirectResponse
@@ -43,10 +44,10 @@ class AiPtaImportValidationController extends Controller
                 'normalized.*' => ['nullable'],
             ]);
 
-            $payload = array_replace(
+            $payload = $this->normalization->normalizeManualPayload(array_replace(
                 array_fill_keys(PtaNormalizationService::FIELDS, null),
                 $validated['normalized']
-            );
+            ));
             $row->forceFill(['normalized_payload' => $payload])->save();
             $this->validation->validateRow($row, true);
             if ($row->refresh()->status === AiImportRow::STATUS_CORRECTED) {

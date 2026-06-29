@@ -42,6 +42,7 @@ class PtaDocumentTextExtractionService
             $text = $this->normalizeText(
                 $this->extractWithConfiguredOcrCommand($path)
                     ?: $this->extractWithBundledWindowsOcr($path)
+                    ?: $this->extractWithBundledLinuxOcr($path)
             );
 
             if ($text !== '' && mb_strlen($text) >= 80) {
@@ -76,7 +77,11 @@ class PtaDocumentTextExtractionService
             ? str_replace('{file}', $escapedPath, $command)
             : $command.' '.$escapedPath;
 
-        return $this->runShellCommand($command);
+        $timeout = $configKey === 'pdf_ocr_command'
+            ? max(30, (int) config('ai_training.pta.pdf_ocr_timeout', 900))
+            : 120;
+
+        return $this->runShellCommand($command, $timeout);
     }
 
     private function extractWithBundledWindowsOcr(string $path): ?string
@@ -114,6 +119,33 @@ class PtaDocumentTextExtractionService
                 (string) max(0, (int) config('ai_training.pta.windows_ocr_render_width', 2600)),
             ]);
             $process->setTimeout(max(30, (int) config('ai_training.pta.windows_ocr_timeout', 300)));
+            $process->run();
+
+            return $process->isSuccessful() ? $process->getOutput() : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function extractWithBundledLinuxOcr(string $path): ?string
+    {
+        if (PHP_OS_FAMILY === 'Windows' || ! (bool) config('ai_training.pta.linux_ocr_enabled', true)) {
+            return null;
+        }
+
+        try {
+            $script = (string) config('ai_training.pta.linux_ocr_script_path', base_path('scripts/ocr/linux_pdf_ocr.sh'));
+            if (! is_file($script)) {
+                return null;
+            }
+
+            $binary = (new ExecutableFinder)->find('bash');
+            if ($binary === null) {
+                return null;
+            }
+
+            $process = new Process([$binary, $script, $path]);
+            $process->setTimeout(max(30, (int) config('ai_training.pta.linux_ocr_timeout', 900)));
             $process->run();
 
             return $process->isSuccessful() ? $process->getOutput() : null;
@@ -200,11 +232,11 @@ class PtaDocumentTextExtractionService
         return implode("\n", $chunks);
     }
 
-    private function runShellCommand(string $command): ?string
+    private function runShellCommand(string $command, int $timeout = 120): ?string
     {
         try {
             $process = Process::fromShellCommandline($command);
-            $process->setTimeout(120);
+            $process->setTimeout($timeout);
             $process->run();
 
             return $process->isSuccessful() ? $process->getOutput() : null;
@@ -242,7 +274,8 @@ class PtaDocumentTextExtractionService
     {
         return 'Le PDF semble etre un document scanne ou compose uniquement d images. '
             .'L OCR automatique n a pas pu extraire assez de texte exploitable. '
-            .'Configurez AI_PTA_PDF_OCR_COMMAND ou AI_PTA_PDF_TEXT_COMMAND, ou importez le modele Excel/source texte.';
+            .'Configurez AI_PTA_PDF_OCR_COMMAND ou AI_PTA_PDF_TEXT_COMMAND, '
+            .'verifiez les dependances OCR du serveur, ou importez le modele Excel/source texte.';
     }
 
     private function normalizeText(?string $text): string

@@ -7,6 +7,44 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-29 - Alignement controle humain IA sur IMPORT_GLOBAL
+
+### Demande
+
+Corriger l'import IA PTA lorsque le PDF scanne echoue sur l OCR et lorsque le controle humain n affiche pas les colonnes Excel attendues.
+
+### Changement
+
+- **Controle humain** : la previsualisation IA PTA affiche maintenant les 40 colonnes officielles `IMPORT_GLOBAL` dans le meme ordre que le fichier Excel final.
+- **Correction humaine** : les modifications faites sur les colonnes officielles resynchronisent les champs internes (`service`, `date_fin`, `responsable`, etc.) avant validation et generation Excel.
+- **OCR serveur Linux** : ajout d'un fallback automatique vers `scripts/ocr/linux_pdf_ocr.sh` lorsque le PDF est scanne et que le serveur n'est pas Windows.
+- **Timeout OCR** : ajout de `AI_PTA_PDF_OCR_TIMEOUT`, `AI_PTA_LINUX_OCR_ENABLED`, `AI_PTA_LINUX_OCR_SCRIPT_PATH` et `AI_PTA_LINUX_OCR_TIMEOUT` dans la configuration.
+- **Message OCR** : le message d'echec rappelle aussi de verifier les dependances OCR du serveur.
+
+### Fichiers modifies
+
+- `app/Http/Controllers/Web/AiPtaImportPreviewController.php`
+- `app/Http/Controllers/Web/AiPtaImportValidationController.php`
+- `app/Services/Ai/PtaNormalizationService.php`
+- `app/Services/Ai/PtaDocumentTextExtractionService.php`
+- `resources/views/workspace/ai-imports/pta/preview.blade.php`
+- `config/ai_training.php`
+- `.env.example`
+- `tests/Feature/AiPtaImportPreviewTest.php`
+- `tests/Feature/AiPtaImportValidationTest.php`
+
+### Validation
+
+- `php -l app\Services\Ai\PtaNormalizationService.php`
+- `php -l app\Services\Ai\PtaDocumentTextExtractionService.php`
+- `php -l app\Http\Controllers\Web\AiPtaImportValidationController.php`
+- `php -l app\Http\Controllers\Web\AiPtaImportPreviewController.php`
+- `php artisan view:cache`
+- `php artisan test tests\Feature\AiPtaImportPreviewTest.php tests\Feature\AiPtaImportValidationTest.php tests\Feature\AiPtaImportExtractionTest.php tests\Feature\AiPtaExcelGenerationTest.php tests\Feature\AiPtaOfficialTemplateTest.php`
+- `vendor\bin\pint --dirty`
+
+---
+
 ## 2026-06-29 - Correction affichage script dashboard
 
 ### Demande
