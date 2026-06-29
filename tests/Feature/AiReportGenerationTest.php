@@ -48,6 +48,9 @@ class AiReportGenerationTest extends TestCase
         $this->assertStringContainsString('SUIVI ET EVALUATION', $report->ai_draft);
         $this->assertStringContainsString('Sommaire', $report->ai_draft);
         $this->assertStringContainsString('1-PROGRESSION GLOBALE DU PTA DE LA DIRECTION GENERALE', $report->ai_draft);
+        $this->assertStringContainsString('Il ressort de l analyse des donnees consolidees', $report->ai_draft);
+        $this->assertStringContainsString('La trajectoire de cet axe', $report->ai_draft);
+        $this->assertStringContainsString('Les causes probables des ecarts', $report->ai_draft);
         $this->assertStringContainsString('6-Analyse des ecarts constates', $report->ai_draft);
         $this->assertStringContainsString('Le Gestionnaire Suivi-Evaluation Senior', $report->ai_draft);
     }

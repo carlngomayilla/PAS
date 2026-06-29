@@ -477,7 +477,7 @@ Les dashboards sont rôle-aware : le `DashboardController` construit un agrégat
 
 1. **Sélection** : l'utilisateur habilité choisit le type de rapport (`pas`, `pao`, `pta`) et le périmètre (exercice, direction, service).
 2. **Calcul métrique** : les builders `PasReportDataBuilder`, `PaoReportDataBuilder`, `PtaReportDataBuilder` s'appuient sur les actions Laravel existantes ; le rapport ne dépend pas d'une réponse IA non vérifiée pour ses chiffres.
-3. **Rédaction assistée** : `AiReportWritingService` produit un brouillon structuré avec synthèse, analyse, risques et recommandations.
+3. **Rédaction assistée** : `AiReportWritingService` produit un brouillon structuré avec synthèse, analyse, risques et recommandations. Pour le rapport PTA trimestriel, `PtaQuarterlyNarrativeBuilder` formule aussi des paragraphes analytiques proches du modèle Word fourni : progression globale, lecture des axes, dynamique mensuelle, causes probables des écarts et mesures correctives.
 4. **Correction** : le contenu peut être modifié avant validation.
 5. **Validation humaine** : `ReportValidationService` marque le rapport comme validé et conserve l'utilisateur/date de validation.
 6. **Exports** : seuls les contenus contrôlés sont exportés en PDF, Word et Excel par `ReportExportService`.

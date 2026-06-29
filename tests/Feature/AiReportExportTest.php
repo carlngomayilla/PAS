@@ -65,6 +65,8 @@ class AiReportExportTest extends TestCase
         $this->assertStringContainsString('RAPPORT TRIMESTRIEL', $text);
         $this->assertStringContainsString('Sommaire', $text);
         $this->assertStringContainsString('TAUX DE REALISATION DES AXES GLOBAUX', $text);
+        $this->assertStringContainsString('Il ressort de l analyse des donnees consolidees', $text);
+        $this->assertStringContainsString('Les causes probables des ecarts', $text);
         $this->assertStringContainsString('6-Analyse des ecarts constates', $text);
         $this->assertStringContainsString('Le Gestionnaire Suivi-Evaluation Senior', $text);
     }

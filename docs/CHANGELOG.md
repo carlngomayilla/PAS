@@ -7,6 +7,37 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-29 - Redaction intelligente des paragraphes PTA
+
+### Demande
+
+Ameliorer la redaction par l IA pour que le rapport trimestriel ne soit pas seulement structure comme le modele Word, mais qu il contienne aussi des paragraphes analytiques proches du document fourni.
+
+### Changement
+
+- **Narration PTA centralisee** : ajout de `PtaQuarterlyNarrativeBuilder` pour produire des paragraphes d analyse a partir des donnees consolidees.
+- **Brouillon IA** : les sections du rapport contiennent maintenant des constats formules naturellement : progression globale, lecture des axes, evolution, ecarts, causes probables et mesures correctives.
+- **Export Word** : le `.docx` reprend les memes paragraphes intelligents que le brouillon afin d eviter un rapport final trop mecanique.
+- **Non-regression** : les tests verifient maintenant la presence de paragraphes analytiques dans le brouillon IA et dans le Word genere.
+
+### Fichiers modifies
+
+- `app/Services/Ai/PtaQuarterlyNarrativeBuilder.php`
+- `app/Services/Ai/AiReportWritingService.php`
+- `app/Services/Ai/ReportExportService.php`
+- `tests/Feature/AiReportGenerationTest.php`
+- `tests/Feature/AiReportExportTest.php`
+- `docs/analyse-fonctionnelle-workflows.md`
+
+### Validation
+
+- `php -l app\Services\Ai\PtaQuarterlyNarrativeBuilder.php`
+- `php -l app\Services\Ai\AiReportWritingService.php`
+- `php -l app\Services\Ai\ReportExportService.php`
+- `php artisan test tests\Feature\AiReportGenerationTest.php tests\Feature\AiReportExportTest.php`
+
+---
+
 ## 2026-06-29 - Rapport IA PTA inspire du modele Word fourni
 
 ### Demande

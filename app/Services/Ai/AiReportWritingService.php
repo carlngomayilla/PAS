@@ -7,6 +7,10 @@ use Illuminate\Support\Carbon;
 
 class AiReportWritingService
 {
+    public function __construct(
+        private readonly PtaQuarterlyNarrativeBuilder $ptaNarratives
+    ) {}
+
     /**
      * @param  array<string, mixed>  $metrics
      */
@@ -90,6 +94,7 @@ class AiReportWritingService
         $axes = is_array($analysis['axes'] ?? null) ? $analysis['axes'] : [];
         $services = is_array($analysis['services'] ?? null) ? $analysis['services'] : [];
         $monthly = is_array($analysis['evolution_mensuelle'] ?? null) ? $analysis['evolution_mensuelle'] : [];
+        $narrative = $this->ptaNarratives->build($analysis);
 
         return implode("\n\n", array_filter([
             '# RAPPORT TRIMESTRIEL '.$year,
@@ -106,20 +111,26 @@ class AiReportWritingService
             '6- Analyse des ecarts constates',
             '7. Mesures correctives proposees',
             '1-Progression globale du PTA de la Direction Generale.',
-            'Le plan d actions strategique compte '.$this->countLabel($axes, 'axe strategique').' et '.$this->countLabel($services, 'service').' suivis. Le portefeuille PTA compte '.($summary['actions_prevues'] ?? 0).' action(s) prevue(s), dont '.($summary['actions_realisees'] ?? 0).' realisee(s), '.($summary['actions_en_retard_non_realisees'] ?? 0).' en retard ou non realisee(s), '.($summary['actions_non_demarrees'] ?? 0).' non demarree(s) et '.($summary['actions_echues'] ?? 0).' echue(s). Le taux global d avancement est de '.($summary['taux_global_avancement'] ?? 0).' %, pour un taux de realisation PTA de '.($summary['taux_realisation'] ?? 0).' %.',
-            $this->formatAxisNarrative($axes),
+            $narrative['progression_globale'],
+            implode("\n", $narrative['axes']),
             '2-Taux de realisation des axes strategiques de la Direction Generale.',
             'TAUX DE REALISATION DES AXES GLOBAUX : '.$this->formatQuarterRows($axes, 'libelle', 'taux_realisation'),
+            $narrative['taux_axes'],
             '3-Evolution des taux de realisation des axes strategiques de la DG',
-            $this->formatEvolutionNarrative($axes, $monthly),
+            $narrative['evolution_axes'],
             '4- Taux de realisation du PTA de la Direction Generale au '.$this->periodEndLabel($analysis),
             $this->formatQuarterRows($services, 'libelle', 'taux_realisation'),
+            $narrative['taux_pta'],
             '5-Evolution du taux de realisation du PTA de la Direction Generale sur la periode '.$period,
             $this->formatQuarterRows($monthly, 'mois', 'taux_realisation'),
+            $narrative['evolution_pta'],
             '6-Analyse des ecarts constates.',
+            implode("\n", $narrative['ecarts']),
             $this->formatQuarterGaps($analysis['ecarts'] ?? []),
+            $narrative['causes_ecarts'],
             '7. Mesures correctives proposees :',
-            $this->formatSimpleList($analysis['mesures_correctives'] ?? []),
+            $narrative['mesures_correctives_intro'],
+            $this->formatSimpleList($narrative['mesures_correctives']),
             'Le Gestionnaire Suivi-Evaluation Senior',
         ]));
     }
