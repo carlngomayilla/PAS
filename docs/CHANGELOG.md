@@ -7,6 +7,32 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-29 - Correction affichage script dashboard
+
+### Demande
+
+Corriger le bloc JavaScript du dashboard affiche en clair apres le footer (`${table.outerHTML}`, export Excel, filtres de synthese).
+
+### Changement
+
+- **Script inline retire du rendu** : neutralisation du bloc JavaScript inline dans `dashboard-analytics.blade.php` pour eviter qu'il apparaisse comme texte dans la page.
+- **Bindings dashboard compiles** : deplacement des interactions `Voir`, `Export Excel` et filtre Direction/Service dans `resources/js/dashboard-render.js`.
+- **Bindings idempotents** : ajout de garde-fous `data-*` pour conserver les interactions apres refresh partiel sans dupliquer les ecouteurs.
+
+### Fichiers modifies
+
+- `resources/views/partials/dashboard-analytics.blade.php`
+- `resources/js/dashboard-render.js`
+
+### Validation
+
+- `node --check resources\js\dashboard-render.js`
+- `php artisan view:cache`
+- `php artisan test tests\Feature\DashboardSynthesisDropdownTest.php`
+- `npm run build`
+
+---
+
 ## 2026-06-29 - Correction build Vite Plotly
 
 ### Demande

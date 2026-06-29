@@ -2,6 +2,201 @@ import { loadPlotly } from './plotly-loader';
 
 let dashboardBooted = false;
 
+function decodeDashboardPayload(encoded) {
+  try {
+    const binary = window.atob(encoded || '');
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    console.error('Detail de ligne dashboard illisible.', error);
+    return {};
+  }
+}
+
+function closeDashboardRowModal(modal) {
+  if (!modal) {
+    return;
+  }
+
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function bindDashboardRowDetails() {
+  const modal = document.getElementById('dashboard-row-detail-modal');
+  const modalTitle = document.getElementById('dashboard-row-detail-title');
+  const modalBody = document.getElementById('dashboard-row-detail-body');
+  const modalLink = document.getElementById('dashboard-row-detail-link');
+
+  document.querySelectorAll('[data-dashboard-row-detail]').forEach((button) => {
+    if (button.dataset.dashboardRowDetailBound === '1') {
+      return;
+    }
+
+    button.dataset.dashboardRowDetailBound = '1';
+    button.addEventListener('click', () => {
+      if (!modal || !modalTitle || !modalBody || !modalLink) {
+        return;
+      }
+
+      const detail = decodeDashboardPayload(button.dataset.dashboardRowDetail || '');
+      modalTitle.textContent = detail.title || 'Detail';
+      modalBody.innerHTML = '';
+
+      (detail.headers || []).forEach((header, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'rounded-xl border border-slate-200 bg-slate-50/80 p-3';
+
+        const term = document.createElement('dt');
+        term.className = 'text-[11px] font-black uppercase tracking-wide text-[#667085]';
+        term.textContent = header;
+
+        const value = document.createElement('dd');
+        value.className = 'mt-1 text-sm font-semibold text-[#17324a]';
+        value.textContent = (detail.cells || [])[index] || '-';
+
+        wrapper.append(term, value);
+        modalBody.appendChild(wrapper);
+      });
+
+      if (detail.url) {
+        modalLink.href = detail.url;
+        modalLink.classList.remove('hidden');
+      } else {
+        modalLink.href = '#';
+        modalLink.classList.add('hidden');
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      modal.setAttribute('aria-hidden', 'false');
+    });
+  });
+
+  document.querySelectorAll('[data-dashboard-row-detail-close]').forEach((button) => {
+    if (button.dataset.dashboardRowDetailCloseBound === '1') {
+      return;
+    }
+
+    button.dataset.dashboardRowDetailCloseBound = '1';
+    button.addEventListener('click', () => closeDashboardRowModal(modal));
+  });
+
+  if (modal && modal.dataset.dashboardRowDetailBackdropBound !== '1') {
+    modal.dataset.dashboardRowDetailBackdropBound = '1';
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) {
+        closeDashboardRowModal(modal);
+      }
+    });
+  }
+}
+
+function bindDashboardTableExports() {
+  document.querySelectorAll('[data-dashboard-export-table]').forEach((button) => {
+    if (button.dataset.dashboardExportTableBound === '1') {
+      return;
+    }
+
+    button.dataset.dashboardExportTableBound = '1';
+    button.addEventListener('click', () => {
+      const tableId = button.dataset.dashboardExportTable;
+      const sourceTable = tableId ? document.getElementById(tableId) : null;
+      if (!sourceTable) {
+        return;
+      }
+
+      const table = sourceTable.cloneNode(true);
+      table.querySelectorAll('.dashboard-no-export').forEach((node) => node.remove());
+
+      const html = [
+        '<html>',
+        '<head><meta charset="utf-8"></head>',
+        `<body>${table.outerHTML}</body>`,
+        '</html>',
+      ].join('');
+      const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${button.dataset.dashboardExportName || 'tableau'}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    });
+  });
+}
+
+function bindDashboardSynthesisFilters() {
+  const form = document.querySelector('[data-dashboard-synthesis-filter-form]');
+  if (!(form instanceof HTMLFormElement) || form.dataset.dashboardSynthesisFilterBound === '1') {
+    return;
+  }
+
+  const directionSelect = form.querySelector('[data-synthesis-direction-select]');
+  const serviceSelect = form.querySelector('[data-synthesis-service-select]');
+  const servicesUrlTemplate = form.dataset.servicesUrlTemplate || '';
+
+  if (!(directionSelect instanceof HTMLSelectElement) || !(serviceSelect instanceof HTMLSelectElement) || !servicesUrlTemplate) {
+    return;
+  }
+
+  form.dataset.dashboardSynthesisFilterBound = '1';
+
+  const resetServiceSelect = () => {
+    serviceSelect.innerHTML = '';
+    const option = document.createElement('option');
+    option.value = 'all';
+    option.textContent = 'Tous services';
+    serviceSelect.appendChild(option);
+    serviceSelect.value = 'all';
+  };
+
+  directionSelect.addEventListener('change', async () => {
+    resetServiceSelect();
+
+    if (!directionSelect.value || directionSelect.value === 'all') {
+      serviceSelect.disabled = true;
+      return;
+    }
+
+    serviceSelect.disabled = true;
+    try {
+      const response = await fetch(servicesUrlTemplate.replace('__DIRECTION__', encodeURIComponent(directionSelect.value)), {
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const services = await response.json();
+      services.forEach((service) => {
+        const option = document.createElement('option');
+        option.value = String(service.id || '');
+        const code = service.code ? `${service.code} - ` : '';
+        option.textContent = `${code}${service.libelle || 'Service'}`;
+        serviceSelect.appendChild(option);
+      });
+      serviceSelect.disabled = false;
+    } catch (error) {
+      serviceSelect.disabled = false;
+    }
+  });
+}
+
+function bindDashboardPageInteractions() {
+  bindDashboardRowDetails();
+  bindDashboardTableExports();
+  bindDashboardSynthesisFilters();
+}
+
 function bootDashboardRender(force = false) {
   if (dashboardBooted && !force) {
     return;
@@ -23,6 +218,7 @@ function bootDashboardRender(force = false) {
   }
 
   dashboardBooted = true;
+  bindDashboardPageInteractions();
   window.__anbgDashboardLastPayloadText = payloadNode.textContent || '';
   const payload = parsed.dashboardData || {};
   const roleDashboard = payload.role_dashboard || {};
