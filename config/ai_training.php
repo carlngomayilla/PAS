@@ -17,4 +17,11 @@ return [
         'embedding_dimensions' => (int) env('AI_EMBEDDING_DIMENSIONS', 64),
         'chunk_size' => (int) env('AI_KNOWLEDGE_CHUNK_SIZE', 1800),
     ],
+
+    'reports' => [
+        'pta_quarterly_template_path' => env(
+            'AI_PTA_QUARTERLY_REPORT_TEMPLATE_PATH',
+            env('AI_PTA_REPORT_TEMPLATE_PATH', base_path('docs/templates/rapport_pta_trimestriel_2026.docx'))
+        ),
+    ],
 ];

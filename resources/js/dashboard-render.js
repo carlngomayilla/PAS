@@ -2282,6 +2282,75 @@ function bootDashboardRender(force = false) {
       mountChart('dashboard-report-kpi-trend-chart', buildKpiTrendChartConfig(d),
         ({ element }) => (d.urls || [])[element?.index] || '');
     });
+
+    const ptaQuarterly = reportingCharts.pta_quarterly || {};
+    const ptaAxisRates = ptaQuarterly.axis_rates || { labels: [], values: [], urls: [] };
+    const ptaServiceRates = ptaQuarterly.service_rates || { labels: [], values: [], urls: [] };
+    const ptaMonthlyRates = ptaQuarterly.monthly_rates || { labels: [], values: [], urls: [] };
+
+    function ptaRateBarConfig(data, label, color) {
+      return baseConfig('bar', {
+        data: {
+          labels: data.labels || [],
+          datasets: [{
+            label,
+            data: data.values || [],
+            backgroundColor: (context) => barGradient(context.chart, color),
+            borderColor: color,
+            borderWidth: 1,
+            maxBarThickness: 34,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          scales: percentScales(),
+          plugins: {
+            anbgBarShadow: { enabled: true },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label} : ${formatNumber(ctx.parsed?.x ?? 0)} %`,
+              },
+            },
+          },
+        },
+      });
+    }
+
+    mountChart('dashboard-pta-axis-rate-chart', ptaRateBarConfig(ptaAxisRates, 'Taux PTA', ANBG.primary),
+      ({ element }) => (ptaAxisRates.urls || [])[element?.index] || '');
+    mountChart('dashboard-pta-service-rate-chart', ptaRateBarConfig(ptaServiceRates, 'Taux PTA', ANBG.secondary),
+      ({ element }) => (ptaServiceRates.urls || [])[element?.index] || '');
+
+    mountChart('dashboard-pta-monthly-rate-chart', baseConfig('line', {
+      data: {
+        labels: ptaMonthlyRates.labels || [],
+        datasets: [{
+          label: 'Taux PTA',
+          data: ptaMonthlyRates.values || [],
+          borderColor: ANBG.primary,
+          backgroundColor: (context) => chartGradient(context.chart, ANBG.primary),
+          fill: true,
+          tension: 0.38,
+          pointRadius: 4,
+          pointHoverRadius: 7,
+          pointBackgroundColor: ANBG.primary,
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          borderWidth: 2.5,
+        }],
+      },
+      options: {
+        scales: percentScales(),
+        plugins: {
+          anbgCrosshair: { enabled: true },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` Taux PTA : ${formatNumber(ctx.parsed?.y ?? 0)} %`,
+            },
+          },
+        },
+      },
+    }), ({ element }) => (ptaMonthlyRates.urls || [])[element?.index] || '');
   }
 
   function chartsMasonryItems(panel) {

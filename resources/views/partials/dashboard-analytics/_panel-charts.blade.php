@@ -15,7 +15,7 @@
     @if ($showDirectionSynthesisSelector)
         <section class="charts-decision-section mb-4">
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 class="showcase-panel-title">Graphiques</h2>
+                <h2 class="showcase-panel-title">Graphiques de decision</h2>
                 <span class="showcase-chip">Services, agents, evolution</span>
             </div>
             <div class="grid gap-3 xl:grid-cols-3">
@@ -268,6 +268,127 @@
             @endif
         </article>
     </div>
+
+    @php
+        $ptaQuarterlyCharts = (array) ($ptaQuarterlyAnalysis['charts'] ?? []);
+        $ptaAxisRates = (array) ($ptaQuarterlyCharts['axis_rates'] ?? ['labels' => [], 'values' => []]);
+        $ptaServiceRates = (array) ($ptaQuarterlyCharts['service_rates'] ?? ['labels' => [], 'values' => []]);
+        $ptaMonthlyRates = (array) ($ptaQuarterlyCharts['monthly_rates'] ?? ['labels' => [], 'values' => []]);
+        $ptaChartSets = collect([$ptaAxisRates, $ptaServiceRates, $ptaMonthlyRates]);
+        $showPtaQuarterlyCharts = $ptaChartSets->contains(
+            fn (array $chart): bool => count((array) ($chart['labels'] ?? [])) > 0
+                && collect((array) ($chart['values'] ?? []))->sum() > 0
+        );
+        $ptaFallbackBars = static function (array $chart): array {
+            $labels = collect($chart['labels'] ?? [])->values();
+            $values = collect($chart['values'] ?? [])->values();
+
+            return $labels
+                ->map(fn ($label, int $index): array => [
+                    'label' => (string) $label,
+                    'value' => min(100, max(0, (float) ($values[$index] ?? 0))),
+                ])
+                ->all();
+        };
+    @endphp
+
+    @if ($showPtaQuarterlyCharts)
+        <section class="charts-advanced-section mb-4">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 class="showcase-panel-title">PTA trimestriel</h2>
+                <span class="showcase-chip">{{ $ptaQuarterlyAnalysis['period']['label'] ?? 'Période courante' }}</span>
+            </div>
+            <div class="charts-bento charts-bento-row-rank charts-long-row">
+                @if (count((array) ($ptaAxisRates['labels'] ?? [])) > 0)
+                    <article class="showcase-panel">
+                        <div class="chart-panel-head mb-3">
+                            <h3 class="chart-title">Axes PTA</h3>
+                            <span class="showcase-chip">{{ count((array) ($ptaAxisRates['labels'] ?? [])) }} axes</span>
+                        </div>
+                        <div class="dashboard-chart-scroll-frame">
+                            <div class="dashboard-canvas dashboard-canvas-lg">
+                                <div id="dashboard-pta-axis-rate-chart" class="dashboard-chart-host">
+                                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                                        <div class="charts-unit-bars">
+                                            @foreach ($ptaFallbackBars($ptaAxisRates) as $row)
+                                                @php
+                                                    $value = (float) $row['value'];
+                                                    $tone = $value >= 80 ? '#20C76B' : ($value >= $qualityThreshold ? '#0F5B66' : ($value > 0 ? '#F26522' : '#94A3B8'));
+                                                @endphp
+                                                <div class="charts-unit-bar">
+                                                    <span class="charts-unit-bar-label">{{ $row['label'] }}</span>
+                                                    <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: {{ $value }}%; background: linear-gradient(90deg, {{ $tone }}, {{ $tone }}cc);"></span></span>
+                                                    <span class="charts-unit-bar-value" style="color: {{ $tone }};">{{ number_format($value, 0, ',', ' ') }}%</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                @endif
+
+                @if (count((array) ($ptaServiceRates['labels'] ?? [])) > 0)
+                    <article class="showcase-panel">
+                        <div class="chart-panel-head mb-3">
+                            <h3 class="chart-title">Services PTA</h3>
+                            <span class="showcase-chip">{{ count((array) ($ptaServiceRates['labels'] ?? [])) }} services</span>
+                        </div>
+                        <div class="dashboard-chart-scroll-frame">
+                            <div class="dashboard-canvas dashboard-canvas-lg">
+                                <div id="dashboard-pta-service-rate-chart" class="dashboard-chart-host">
+                                    <div class="dashboard-chart-fallback" aria-hidden="true">
+                                        <div class="charts-unit-bars">
+                                            @foreach ($ptaFallbackBars($ptaServiceRates) as $row)
+                                                @php
+                                                    $value = (float) $row['value'];
+                                                    $tone = $value >= 80 ? '#20C76B' : ($value >= $qualityThreshold ? '#0F5B66' : ($value > 0 ? '#F26522' : '#94A3B8'));
+                                                @endphp
+                                                <div class="charts-unit-bar">
+                                                    <span class="charts-unit-bar-label">{{ $row['label'] }}</span>
+                                                    <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: {{ $value }}%; background: linear-gradient(90deg, {{ $tone }}, {{ $tone }}cc);"></span></span>
+                                                    <span class="charts-unit-bar-value" style="color: {{ $tone }};">{{ number_format($value, 0, ',', ' ') }}%</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                @endif
+
+                @if (count((array) ($ptaMonthlyRates['labels'] ?? [])) > 0)
+                    <article class="showcase-panel">
+                        <div class="chart-panel-head mb-3">
+                            <h3 class="chart-title">Evolution PTA</h3>
+                            <span class="showcase-chip">{{ count((array) ($ptaMonthlyRates['labels'] ?? [])) }} points</span>
+                        </div>
+                        <div class="dashboard-canvas dashboard-canvas-lg">
+                            <div id="dashboard-pta-monthly-rate-chart" class="dashboard-chart-host">
+                                <div class="dashboard-chart-fallback" aria-hidden="true">
+                                    <div class="charts-unit-bars">
+                                        @foreach ($ptaFallbackBars($ptaMonthlyRates) as $row)
+                                            @php
+                                                $value = (float) $row['value'];
+                                                $tone = $value >= 80 ? '#20C76B' : ($value >= $qualityThreshold ? '#0F5B66' : ($value > 0 ? '#F26522' : '#94A3B8'));
+                                            @endphp
+                                            <div class="charts-unit-bar">
+                                                <span class="charts-unit-bar-label">{{ $row['label'] }}</span>
+                                                <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: {{ $value }}%; background: linear-gradient(90deg, {{ $tone }}, {{ $tone }}cc);"></span></span>
+                                                <span class="charts-unit-bar-value" style="color: {{ $tone }};">{{ number_format($value, 0, ',', ' ') }}%</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                @endif
+            </div>
+        </section>
+    @endif
 
     {{-- ─── RANGEE 3 : PERFORMANCE PAR UNITE + TOP ACTIONS ─────────── --}}
     <div class="charts-bento charts-bento-row-rank charts-long-row mb-4">

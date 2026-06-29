@@ -7,6 +7,38 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-29 - Modele rapport PTA trimestriel et analyses dashboard
+
+### Demande
+
+Utiliser le document `RAPPORT PTA TRIMESTRIEL 2026.docx` comme modele de contexte et de mise en forme pour les rapports IA, tout en placant chaque element applicatif dans sa page respective : graphiques dans `Graphiques`, tableaux dans `Analyse avancee`.
+
+### Changement
+
+- **Modele Word IA** : ajout du modele officiel dans `docs/templates/rapport_pta_trimestriel_2026.docx` et copie runtime dans `storage/app/ai/knowledge/templates/rapport_pta_trimestriel_2026.docx`.
+- **Configuration IA** : ajout de `AI_PTA_QUARTERLY_REPORT_TEMPLATE_PATH` dans `config/ai_training.php`, `.env.example` et `.env` local.
+- **Rapport IA PTA trimestriel** : le brouillon `pta_quarterly` reprend les rubriques du modele : progression globale, taux par axes, evolution, taux par services, ecarts et mesures correctives.
+- **Export Word** : export specialise pour les rapports PTA trimestriels avec page structuree, titres et tableaux de synthese.
+- **Graphiques au bon endroit** : ajout des graphes PTA trimestriel dans l'onglet `Graphiques` du dashboard analytique : taux par axes, taux par services et evolution de la periode.
+- **Tableaux au bon endroit** : ajout des tableaux PTA trimestriel dans `Analyse avancee` : synthese, axes, services, ecarts et mesures correctives.
+- **Affichage dynamique** : les nouveaux blocs n'apparaissent que si des donnees PTA existent dans le perimetre courant.
+
+### Fichiers modifies
+
+- `app/Http/Controllers/DashboardController.php`
+- `app/Services/Ai/ActionReportMetricsBuilder.php`
+- `app/Services/Ai/AiReportWritingService.php`
+- `app/Services/Ai/ReportExportService.php`
+- `resources/views/partials/dashboard-analytics/_panel-charts.blade.php`
+- `resources/views/partials/dashboard-analytics/_panel-tables.blade.php`
+- `resources/js/dashboard-render.js`
+- `config/ai_training.php`
+- `.env.example`
+- `tests/Feature/AiReportGenerationTest.php`
+- `docs/templates/rapport_pta_trimestriel_2026.docx`
+
+---
+
 ## 2026-06-29 - Nettoyage des graphiques et tableaux du dashboard
 
 ### Demande

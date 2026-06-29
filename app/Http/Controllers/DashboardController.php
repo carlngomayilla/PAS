@@ -295,6 +295,7 @@ class DashboardController extends Controller
         $interannual = collect($dashboardData['interannual'] ?? []);
         $alertRows = collect($dashboardData['alert_rows'] ?? []);
         $actionRows = collect($dashboardData['action_rows'] ?? []);
+        $ptaQuarterlyAnalysis = $this->buildDashboardPtaQuarterlyAnalysis($user);
         $globalScores = is_array($dashboardData['global_scores'] ?? null) ? $dashboardData['global_scores'] : [];
         $qualityThreshold = (float) ($dashboardData['quality_threshold'] ?? $globalScores['quality_threshold'] ?? 60);
         $policy = [
@@ -348,6 +349,7 @@ class DashboardController extends Controller
             'alertes' => $alerts,
             'pasConsolidation' => $this->buildDashboardPasConsolidation($user),
             'interannualComparison' => $interannual->values()->all(),
+            'ptaQuarterlyAnalysis' => $ptaQuarterlyAnalysis,
             'charts' => [
                 'funnel' => [
                     'labels' => ['PAS', 'PAO', 'PTA', 'Actions'],
@@ -410,6 +412,7 @@ class DashboardController extends Controller
                     'values' => $performanceGaugeRows->pluck('kpi_global')->map(fn ($value): float => (float) $value)->values()->all(),
                     'urls' => $performanceGaugeRows->pluck('url')->values()->all(),
                 ],
+                'pta_quarterly' => $ptaQuarterlyAnalysis['charts'] ?? [],
             ],
             'details' => [
                 'actions_retard' => collect(),
@@ -418,6 +421,321 @@ class DashboardController extends Controller
                 'direction_service_report' => collect(),
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildDashboardPtaQuarterlyAnalysis(User $user): array
+    {
+        $query = Action::query()
+            ->whereNotNull('pta_id')
+            ->with([
+                'actionKpi:id,action_id,kpi_global,kpi_performance,progression_reelle,progression_theorique',
+                'objectifOperationnel:id,pas_axe_id,pas_objectif_id,libelle',
+                'objectifOperationnel.pasAxe:id,code,libelle',
+                'objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
+                'pta:id,pao_id,objectif_operationnel_id,titre,direction_id,service_id',
+                'pta.direction:id,code,libelle',
+                'pta.service:id,code,libelle',
+                'pta.objectifOperationnel:id,pas_axe_id,pas_objectif_id,libelle',
+                'pta.objectifOperationnel.pasAxe:id,code,libelle',
+                'pta.objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
+                'pta.pao:id,pas_objectif_id,titre,objectif_operationnel',
+                'pta.pao.pasObjectif:id,pas_axe_id,code,libelle',
+                'pta.pao.pasObjectif.pasAxe:id,code,libelle',
+                'responsable:id,name,email',
+            ]);
+
+        $this->scopeAction($query, $user);
+        $this->applyDashboardActionContextFilter($query, $user, 'contexte_action');
+
+        /** @var Collection<int, Action> $actions */
+        $actions = $this->applyDashboardSynthesisActionFilters($query->get());
+        $filters = $this->selectedDashboardSynthesisFilters();
+        $periodRange = $this->ptaSuiviService->periodRange(
+            $this->exerciceContext->selectedYear(),
+            (string) ($filters['periode'] ?? 'all')
+        );
+        $periodStart = $periodRange[0] ?? $this->dashboardPtaPeriodStart($actions);
+        $periodEnd = $periodRange[1] ?? $this->dashboardPtaPeriodEnd($actions);
+
+        $axes = $actions
+            ->groupBy(fn (Action $action): string => $this->dashboardPtaAxisKey($action))
+            ->map(fn (Collection $rows): array => $this->dashboardPtaAnalysisRow($rows, $periodEnd) + [
+                'code' => $this->dashboardPtaAxisCode($rows->first()),
+                'libelle' => $this->dashboardPtaAxisLabel($rows->first()),
+            ])
+            ->sortBy('libelle')
+            ->values()
+            ->all();
+
+        $services = $actions
+            ->groupBy(fn (Action $action): string => $this->dashboardPtaServiceKey($action))
+            ->map(fn (Collection $rows): array => $this->dashboardPtaAnalysisRow($rows, $periodEnd) + [
+                'direction' => (string) ($rows->first()?->pta?->direction?->libelle ?? 'Non renseignee'),
+                'libelle' => (string) ($rows->first()?->pta?->service?->libelle ?? 'Non renseigne'),
+                'url' => $rows->first()?->pta?->service_id !== null
+                    ? $this->actionIndexRoute(['service_id' => (int) $rows->first()->pta->service_id])
+                    : $this->actionIndexRoute(),
+            ])
+            ->sortBy('libelle')
+            ->values()
+            ->all();
+
+        $monthly = $this->dashboardPtaMonthlyEvolution($actions, $periodStart, $periodEnd);
+        $dueUnrealized = $this->dashboardPtaDueActions($actions, $periodEnd)
+            ->reject(fn (Action $action): bool => $this->actionStatusService->isCompleted($action))
+            ->values();
+        $partial = $dueUnrealized
+            ->filter(fn (Action $action): bool => $this->dashboardPtaProgressRate($action) > 0)
+            ->values();
+        $postponed = $actions
+            ->filter(function (Action $action) use ($periodEnd): bool {
+                $date = $this->actionReferenceDate($action);
+
+                return $date instanceof Carbon && $date->gt($periodEnd);
+            })
+            ->values();
+
+        return [
+            'period' => [
+                'start' => $periodStart->toDateString(),
+                'end' => $periodEnd->toDateString(),
+                'label' => (string) ($filters['periode_label'] ?? $this->ptaSuiviService->periodLabel((string) ($filters['periode'] ?? 'all'))),
+            ],
+            'summary' => $this->dashboardPtaAnalysisRow($actions, $periodEnd),
+            'axes' => $axes,
+            'services' => $services,
+            'monthly' => $monthly,
+            'gaps' => [
+                'unrealized' => $dueUnrealized->take(12)->map(fn (Action $action): array => $this->dashboardPtaActionLine($action))->all(),
+                'partial' => $partial->take(12)->map(fn (Action $action): array => $this->dashboardPtaActionLine($action))->all(),
+                'postponed' => $postponed->take(12)->map(fn (Action $action): array => $this->dashboardPtaActionLine($action))->all(),
+            ],
+            'corrective_measures' => $this->dashboardPtaCorrectiveMeasures($dueUnrealized, $partial, $postponed),
+            'charts' => [
+                'axis_rates' => [
+                    'labels' => collect($axes)->pluck('libelle')->values()->all(),
+                    'values' => collect($axes)->pluck('realization_rate')->values()->all(),
+                    'urls' => collect($axes)->map(fn (): string => $this->actionIndexRoute())->values()->all(),
+                ],
+                'service_rates' => [
+                    'labels' => collect($services)->pluck('libelle')->values()->all(),
+                    'values' => collect($services)->pluck('realization_rate')->values()->all(),
+                    'urls' => collect($services)->pluck('url')->values()->all(),
+                ],
+                'monthly_rates' => [
+                    'labels' => collect($monthly)->pluck('label')->values()->all(),
+                    'values' => collect($monthly)->pluck('realization_rate')->values()->all(),
+                    'urls' => collect($monthly)->map(fn (): string => $this->actionIndexRoute())->values()->all(),
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, int|float>
+     */
+    private function dashboardPtaAnalysisRow(Collection $actions, Carbon $periodEnd): array
+    {
+        $due = $this->dashboardPtaDueActions($actions, $periodEnd);
+        $completed = $actions->filter(fn (Action $action): bool => $this->actionStatusService->isCompleted($action));
+        $dueCompleted = $due->filter(fn (Action $action): bool => $this->actionStatusService->isCompleted($action));
+        $dueUnrealized = $due->reject(fn (Action $action): bool => $this->actionStatusService->isCompleted($action));
+        $notStarted = $actions->filter(fn (Action $action): bool => $this->dashboardStatus($action) === 'non_demarre');
+
+        return [
+            'planned_actions' => $actions->count(),
+            'completed_actions' => $completed->count(),
+            'late_or_unrealized_actions' => $dueUnrealized->count(),
+            'not_started_actions' => $notStarted->count(),
+            'due_actions' => $due->count(),
+            'progress_rate' => $this->dashboardPtaRate($completed->count(), $actions->count()),
+            'realization_rate' => $this->dashboardPtaRate($dueCompleted->count(), $due->count()),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return Collection<int, Action>
+     */
+    private function dashboardPtaDueActions(Collection $actions, Carbon $periodEnd): Collection
+    {
+        return $actions->filter(function (Action $action) use ($periodEnd): bool {
+            $date = $this->actionReferenceDate($action);
+
+            return $date instanceof Carbon && $date->lte($periodEnd);
+        });
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return list<array<string, int|float|string>>
+     */
+    private function dashboardPtaMonthlyEvolution(Collection $actions, Carbon $periodStart, Carbon $periodEnd): array
+    {
+        $rows = [];
+        $cursor = $periodStart->copy()->startOfMonth();
+        $last = $periodEnd->copy()->startOfMonth();
+
+        while ($cursor->lte($last)) {
+            $monthStart = $cursor->copy()->startOfMonth();
+            $monthEnd = $cursor->copy()->endOfMonth();
+            if ($monthEnd->gt($periodEnd)) {
+                $monthEnd = $periodEnd->copy();
+            }
+            $monthActions = $actions->filter(function (Action $action) use ($monthStart, $monthEnd): bool {
+                $date = $this->actionReferenceDate($action);
+
+                return $date instanceof Carbon && $date->betweenIncluded($monthStart, $monthEnd);
+            });
+            $completed = $monthActions->filter(fn (Action $action): bool => $this->actionStatusService->isCompleted($action))->count();
+
+            $rows[] = [
+                'label' => $cursor->locale('fr')->translatedFormat('M Y'),
+                'due_actions' => $monthActions->count(),
+                'completed_actions' => $completed,
+                'realization_rate' => $this->dashboardPtaRate($completed, $monthActions->count()),
+            ];
+
+            $cursor->addMonth();
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  Collection<int, Action>  $lateOrUnrealized
+     * @param  Collection<int, Action>  $partial
+     * @param  Collection<int, Action>  $postponed
+     * @return list<string>
+     */
+    private function dashboardPtaCorrectiveMeasures(Collection $lateOrUnrealized, Collection $partial, Collection $postponed): array
+    {
+        $measures = [
+            'Planifier les actions PTA avant leur date d echeance.',
+            'Relancer les responsables de mise en oeuvre des actions echues non realisees.',
+        ];
+
+        if ($partial->isNotEmpty()) {
+            $measures[] = 'Identifier les blocages des actions partiellement realisees et fixer un delai de regularisation.';
+        }
+
+        if ($postponed->isNotEmpty()) {
+            $measures[] = 'Arbitrer les actions reportees et confirmer leur nouvelle periode de realisation.';
+        }
+
+        if ($lateOrUnrealized->count() > 5) {
+            $measures[] = 'Organiser une revue hebdomadaire des ecarts jusqu au retour au taux cible.';
+        }
+
+        return $measures;
+    }
+
+    /**
+     * @return array<string, string|float|null>
+     */
+    private function dashboardPtaActionLine(Action $action): array
+    {
+        return [
+            'code' => (string) ($action->code ?? ''),
+            'libelle' => (string) ($action->libelle ?? ''),
+            'axe' => $this->dashboardPtaAxisLabel($action),
+            'objectif_strategique' => (string) (
+                $action->objectifOperationnel?->pasObjectif?->libelle
+                ?? $action->pta?->objectifOperationnel?->pasObjectif?->libelle
+                ?? $action->pta?->pao?->pasObjectif?->libelle
+                ?? 'Non renseigne'
+            ),
+            'objectif_operationnel' => (string) (
+                $action->objectifOperationnel?->libelle
+                ?? $action->pta?->objectifOperationnel?->libelle
+                ?? $action->pta?->pao?->objectif_operationnel
+                ?? 'Non renseigne'
+            ),
+            'direction' => (string) ($action->pta?->direction?->libelle ?? 'Non renseignee'),
+            'service' => (string) ($action->pta?->service?->libelle ?? 'Non renseigne'),
+            'responsable' => (string) ($action->responsable?->name ?? 'Non renseigne'),
+            'date_fin' => $this->actionReferenceDate($action)?->format('d/m/Y'),
+            'progression' => $this->dashboardPtaProgressRate($action),
+            'url' => route('workspace.actions.suivi', $action),
+        ];
+    }
+
+    private function dashboardPtaPeriodStart(Collection $actions): Carbon
+    {
+        $date = $actions
+            ->map(fn (Action $action): ?Carbon => $this->actionReferenceDate($action))
+            ->filter()
+            ->sort()
+            ->first();
+
+        return $date instanceof Carbon ? $date->copy()->startOfMonth() : now()->startOfQuarter();
+    }
+
+    private function dashboardPtaPeriodEnd(Collection $actions): Carbon
+    {
+        $date = $actions
+            ->map(fn (Action $action): ?Carbon => $this->actionReferenceDate($action))
+            ->filter()
+            ->sort()
+            ->last();
+
+        return $date instanceof Carbon ? $date->copy()->endOfMonth() : now()->endOfQuarter();
+    }
+
+    private function dashboardPtaProgressRate(Action $action): float
+    {
+        foreach (['progression_reelle', 'taux_global', 'taux_realisation_global', 'avancement_operationnel', 'taux_atteinte_cible'] as $field) {
+            $value = (float) ($action->{$field} ?? 0);
+            if ($value > 0) {
+                return round(min(100, $value), 2);
+            }
+        }
+
+        return $this->actionStatusService->isCompleted($action) ? 100.0 : 0.0;
+    }
+
+    private function dashboardPtaRate(int $numerator, int $denominator): float
+    {
+        return $denominator > 0 ? round(($numerator / $denominator) * 100, 2) : 0.0;
+    }
+
+    private function dashboardPtaAxisKey(Action $action): string
+    {
+        return (string) (
+            $action->objectifOperationnel?->pas_axe_id
+            ?? $action->pta?->objectifOperationnel?->pas_axe_id
+            ?? $action->pta?->pao?->pasObjectif?->pas_axe_id
+            ?? 'sans_axe'
+        );
+    }
+
+    private function dashboardPtaAxisCode(?Action $action): string
+    {
+        return (string) (
+            $action?->objectifOperationnel?->pasAxe?->code
+            ?? $action?->pta?->objectifOperationnel?->pasAxe?->code
+            ?? $action?->pta?->pao?->pasObjectif?->pasAxe?->code
+            ?? ''
+        );
+    }
+
+    private function dashboardPtaAxisLabel(?Action $action): string
+    {
+        return (string) (
+            $action?->objectifOperationnel?->pasAxe?->libelle
+            ?? $action?->pta?->objectifOperationnel?->pasAxe?->libelle
+            ?? $action?->pta?->pao?->pasObjectif?->pasAxe?->libelle
+            ?? 'Sans axe strategique'
+        );
+    }
+
+    private function dashboardPtaServiceKey(Action $action): string
+    {
+        return (string) ($action->pta?->service_id ?? 'sans_service');
     }
 
     /**

@@ -66,6 +66,7 @@
     $unitModeLabel = $analytics['unit_mode_label'] ?? 'Unites';
     $statisticalPolicy = is_array(($reportingAnalytics['statisticalPolicy'] ?? null)) ? $reportingAnalytics['statisticalPolicy'] : [];
     $officialPolicy = is_array(($reportingAnalytics['officialPolicy'] ?? null)) ? $reportingAnalytics['officialPolicy'] : [];
+    $ptaQuarterlyAnalysis = is_array(($reportingAnalytics['ptaQuarterlyAnalysis'] ?? null)) ? $reportingAnalytics['ptaQuarterlyAnalysis'] : [];
     $basePolicy = $statisticalPolicy !== [] ? $statisticalPolicy : $officialPolicy;
     $officialBaseLabel = (string) ($basePolicy['scope_label'] ?? $basePolicy['threshold_label'] ?? 'Toutes les actions visibles');
     $officialBaseLower = mb_strtolower($officialBaseLabel);
