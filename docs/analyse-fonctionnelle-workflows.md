@@ -469,7 +469,7 @@ Les dashboards sont rôle-aware : le `DashboardController` construit un agrégat
 4. **Prévisualisation** : l'utilisateur consulte les lignes, erreurs, avertissements et scores de confiance avant toute écriture métier.
 5. **Correction humaine** : les lignes peuvent être corrigées ou ignorées. Les corrections sont enregistrées dans `corrected_data`.
 6. **Validation** : `PtaImportValidationService` bloque les lignes incomplètes ou incohérentes. Les erreurs restent visibles et exportables.
-7. **Génération Excel** : le fichier destiné à l'import final contient une seule feuille `IMPORT_GLOBAL`, alignée sur le modèle officiel ; les onglets d'erreurs ou métadonnées ne sont pas ajoutés au classeur importable.
+7. **Génération Excel** : le fichier destiné à l'import final contient une seule feuille `IMPORT_GLOBAL`, alignée sur les 40 colonnes du modèle canonique actuel de l'ancien module (`imports-excel/modele`) ; les onglets d'erreurs ou métadonnées ne sont pas ajoutés au classeur importable.
 8. **Import final** : `PtaFinalImportService` réexécute la validation, crée au besoin les conteneurs PAS/PAO/PTA, puis crée uniquement les actions issues des lignes valides.
 9. **Historique et apprentissage** : chaque étape sensible est tracée dans `ai_import_audits` ; les corrections humaines validées alimentent `ai_training_examples`.
 

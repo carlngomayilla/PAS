@@ -6,6 +6,7 @@ use App\Services\Ai\PtaAgentResolverService;
 use App\Services\Ai\PtaDocumentStructureExtractorService;
 use App\Services\Ai\PtaDocumentToImportGlobalMapperService;
 use App\Services\Ai\PtaImportTemplateAnalyzerService;
+use App\Services\Imports\PlanningExcelImportService;
 use Tests\TestCase;
 
 class AiPtaOfficialTemplateTest extends TestCase
@@ -18,6 +19,7 @@ class AiPtaOfficialTemplateTest extends TestCase
         $this->assertContains('codes_agents_rmo', $template['columns']);
         $this->assertContains('champ_difficulte', $template['columns']);
         $this->assertCount(40, $template['columns']);
+        $this->assertSame(PlanningExcelImportService::IMPORT_COLUMNS, $template['columns']);
         $this->assertNotEmpty($template['guide']);
     }
 
@@ -101,5 +103,62 @@ class AiPtaOfficialTemplateTest extends TestCase
         $this->assertSame('Service Applications', $result['rows'][0]['service_unite']);
         $this->assertSame('Selectionner les documents perimes', $result['rows'][0]['libelle_action']);
         $this->assertSame('2026-03-02', $result['rows'][0]['date_debut_action']);
+    }
+
+    public function test_ocr_box_table_extracts_full_import_columns(): void
+    {
+        $text = implode("\n", [
+            'PLAN DE TRAVAIL ANNUEL 2026',
+            '@@OCR_BOX|1|10|10|AXE STRATEGIQUE',
+            '@@OCR_BOX|1|10|40|REDRESSEMENT DE LA SITUATION FINANCIERE',
+            '@@OCR_BOX|1|10|80|OBJECTIF STRATEGIQUE',
+            '@@OCR_BOX|1|10|110|Rationaliser la depense de bourse',
+            '@@OCR_BOX|1|10|150|OBJECTIF OPERATIONNEL N 1',
+            '@@OCR_BOX|1|10|180|Detruire les archives perimees',
+            '@@OCR_BOX|1|10|230|DESCRIPTION DES ACTIONS',
+            '@@OCR_BOX|1|200|230|RMO',
+            '@@OCR_BOX|1|310|230|CIBLE',
+            '@@OCR_BOX|1|430|230|DEBUT',
+            '@@OCR_BOX|1|560|230|FIN',
+            '@@OCR_BOX|1|700|230|ETAT DE REALISATION',
+            '@@OCR_BOX|1|900|230|RESSOURCES',
+            '@@OCR_BOX|1|1120|230|INDICATEURS DE PERFORMANCE',
+            '@@OCR_BOX|1|1420|230|RISQUES POTENTIELS',
+            '@@OCR_BOX|1|10|320|Selectionner les documents',
+            '@@OCR_BOX|1|10|350|perimes',
+            '@@OCR_BOX|1|200|320|Clovis',
+            '@@OCR_BOX|1|200|350|/Slash',
+            '@@OCR_BOX|1|310|320|100%',
+            '@@OCR_BOX|1|430|320|02/03/26',
+            '@@OCR_BOX|1|560|320|13/03/26',
+            '@@OCR_BOX|1|700|320|Non demarre',
+            '@@OCR_BOX|1|900|320|Personnel archives',
+            '@@OCR_BOX|1|1120|320|Objectifs definis',
+            '@@OCR_BOX|1|1420|320|Documents non perimes',
+        ]);
+
+        $structured = app(PtaDocumentStructureExtractorService::class)->extractFromText($text);
+
+        $this->assertCount(1, $structured['items']);
+        $item = $structured['items'][0];
+        $this->assertSame('REDRESSEMENT DE LA SITUATION FINANCIERE', $item['libelle_axe']);
+        $this->assertSame('Rationaliser la depense de bourse', $item['libelle_objectif_strategique']);
+        $this->assertSame('Detruire les archives perimees', $item['libelle_objectif_operationnel']);
+        $this->assertSame('Selectionner les documents perimes', $item['libelle_action']);
+        $this->assertSame('Clovis /Slash', $item['rmo_raw']);
+        $this->assertSame('100', $item['cible']);
+        $this->assertSame('02/03/26', $item['date_debut_action']);
+        $this->assertSame('13/03/26', $item['date_fin_action']);
+        $this->assertSame('Personnel archives', $item['ressources_requises']);
+        $this->assertSame('Objectifs definis', $item['indicateurs_performance']);
+        $this->assertSame('Documents non perimes', $item['risques_potentiels']);
+
+        $result = app(PtaDocumentToImportGlobalMapperService::class)->map($structured);
+
+        $this->assertSame(PlanningExcelImportService::IMPORT_COLUMNS, $result['columns']);
+        $this->assertSame('2026-03-02', $result['rows'][0]['date_debut_action']);
+        $this->assertSame('2026-03-13', $result['rows'][0]['date_fin_action']);
+        $this->assertSame('Objectifs definis', $result['rows'][0]['justificatif_attendu']);
+        $this->assertSame('Documents non perimes', $result['rows'][0]['risque']);
     }
 }

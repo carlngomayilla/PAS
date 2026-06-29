@@ -138,6 +138,7 @@ class PtaDocumentStructureExtractorService
                     if ($field === 'libelle_objectif_operationnel') {
                         $actionOrder = 0;
                     }
+                    $context = $this->withKnownContextOrder($context, $field);
                 }
 
                 $inActionTable = false;
@@ -150,6 +151,7 @@ class PtaDocumentStructureExtractorService
                 if ($pendingContext === 'libelle_objectif_operationnel') {
                     $actionOrder = 0;
                 }
+                $context = $this->withKnownContextOrder($context, $pendingContext);
                 $pendingContext = null;
 
                 continue;
@@ -308,11 +310,20 @@ class PtaDocumentStructureExtractorService
         $actionOrder = 0;
 
         foreach ($this->ocrBoxesByPage($boxes) as $pageBoxes) {
+            $skipTableUntilY = null;
             $inActionTable = false;
             $actionColumnRight = null;
             $headerY = null;
 
             foreach ($pageBoxes as $box) {
+                if ($skipTableUntilY !== null) {
+                    if ($box['y'] <= $skipTableUntilY) {
+                        continue;
+                    }
+
+                    $skipTableUntilY = null;
+                }
+
                 $line = $box['text'];
                 $key = $this->key($line);
                 if ($key === '' || $this->isIgnoredTextLine($key)) {
@@ -321,6 +332,17 @@ class PtaDocumentStructureExtractorService
 
                 if ($this->isActionHeaderLine($key)) {
                     $this->flushPendingOcrAction($pendingOcrAction, $items, $context, $actionOrder);
+                    $table = $this->ocrActionTableItems($pageBoxes, $box, $context, $actionOrder);
+                    if ($table['items'] !== []) {
+                        $items = array_merge($items, $table['items']);
+                        $actionOrder += count($table['items']);
+                        $skipTableUntilY = $table['end_y'];
+                        $pendingContext = null;
+                        $inActionTable = false;
+
+                        continue;
+                    }
+
                     $inActionTable = true;
                     $headerY = $box['y'];
                     $actionColumnRight = $this->ocrActionColumnRight($pageBoxes, $headerY);
@@ -341,6 +363,7 @@ class PtaDocumentStructureExtractorService
                         $pendingContext = $field;
                     } else {
                         $context[$field] = $this->cleanContextLabel($value);
+                        $context = $this->withKnownContextOrder($context, $field);
                         $pendingContext = null;
                         if ($field === 'libelle_objectif_operationnel') {
                             $actionOrder = 0;
@@ -356,6 +379,7 @@ class PtaDocumentStructureExtractorService
 
                 if (is_string($pendingContext)) {
                     $context[$pendingContext] = $this->cleanContextLabel($line);
+                    $context = $this->withKnownContextOrder($context, $pendingContext);
                     if ($pendingContext === 'libelle_objectif_operationnel') {
                         $actionOrder = 0;
                     }
@@ -467,6 +491,241 @@ class PtaDocumentStructureExtractorService
         return (int) max(500, $maxX * 0.35);
     }
 
+    /**
+     * @param  list<array{page:int,x:int,y:int,text:string}>  $pageBoxes
+     * @param  array{page:int,x:int,y:int,text:string}  $headerBox
+     * @param  array<string,mixed>  $context
+     * @return array{items:list<array<string,mixed>>,end_y:int}
+     */
+    private function ocrActionTableItems(array $pageBoxes, array $headerBox, array $context, int $currentActionOrder): array
+    {
+        $headerY = $headerBox['y'];
+        $endY = $this->ocrTableEndY($pageBoxes, $headerY);
+        $columns = $this->ocrTableColumns($pageBoxes, $headerY);
+        $descriptionColumn = $columns['libelle_action'] ?? null;
+
+        if ($descriptionColumn === null) {
+            return ['items' => [], 'end_y' => $endY];
+        }
+
+        $rowStarts = [];
+        foreach ($pageBoxes as $box) {
+            if ($box['y'] <= $headerY + 60 || $box['y'] > $endY) {
+                continue;
+            }
+
+            if (! $this->isInsideOcrColumn($box, $descriptionColumn) || ! $this->startsNewAction($box['text'])) {
+                continue;
+            }
+
+            $rowStarts[] = $box;
+        }
+
+        if ($rowStarts === []) {
+            return ['items' => [], 'end_y' => $endY];
+        }
+
+        usort($rowStarts, static fn (array $a, array $b): int => [$a['y'], $a['x']] <=> [$b['y'], $b['x']]);
+
+        $items = [];
+        foreach ($rowStarts as $index => $rowStart) {
+            $rowEnd = isset($rowStarts[$index + 1]) ? $rowStarts[$index + 1]['y'] - 1 : $endY;
+            $action = $this->cleanOcrActionLine($this->ocrColumnText($pageBoxes, $descriptionColumn, $rowStart['y'], $rowEnd));
+            if ($action === '' || mb_strlen($action) < 6) {
+                continue;
+            }
+
+            $dateDebut = $this->cleanOcrImportedValue('date_debut_action', $this->ocrColumnText($pageBoxes, $columns['date_debut_action'] ?? null, $rowStart['y'], $rowEnd));
+            $dateFin = $this->cleanOcrImportedValue('date_fin_action', $this->ocrColumnText($pageBoxes, $columns['date_fin_action'] ?? null, $rowStart['y'], $rowEnd));
+            [$dateDebut, $dateFin] = $this->splitCombinedOcrDates($dateDebut, $dateFin);
+
+            $currentActionOrder++;
+            $items[] = array_merge($context, [
+                'ordre_action' => $currentActionOrder,
+                'libelle_action' => $action,
+                'actions_detaillees' => $action,
+                'rmo_raw' => $this->cleanOcrImportedValue('rmo_raw', $this->ocrColumnText($pageBoxes, $columns['rmo_raw'] ?? null, $rowStart['y'], $rowEnd)),
+                'cible' => $this->cleanOcrImportedValue('cible', $this->ocrColumnText($pageBoxes, $columns['cible'] ?? null, $rowStart['y'], $rowEnd)),
+                'date_debut_action' => $dateDebut,
+                'date_fin_action' => $dateFin,
+                'etat_realisation_initial' => $this->cleanOcrImportedValue('etat_realisation_initial', $this->ocrColumnText($pageBoxes, $columns['etat_realisation_initial'] ?? null, $rowStart['y'], $rowEnd)),
+                'ressources_requises' => $this->cleanOcrImportedValue('ressources_requises', $this->ocrColumnText($pageBoxes, $columns['ressources_requises'] ?? null, $rowStart['y'], $rowEnd)),
+                'indicateurs_performance' => $this->cleanOcrImportedValue('indicateurs_performance', $this->ocrColumnText($pageBoxes, $columns['indicateurs_performance'] ?? null, $rowStart['y'], $rowEnd)),
+                'risques_potentiels' => $this->cleanOcrImportedValue('risques_potentiels', $this->ocrColumnText($pageBoxes, $columns['risques_potentiels'] ?? null, $rowStart['y'], $rowEnd)),
+                'confidence_score' => 0.68,
+                'validation_warnings' => [],
+            ]);
+        }
+
+        return ['items' => $items, 'end_y' => $endY];
+    }
+
+    /**
+     * @param  list<array{page:int,x:int,y:int,text:string}>  $pageBoxes
+     */
+    private function ocrTableEndY(array $pageBoxes, int $headerY): int
+    {
+        $maxY = $headerY;
+        foreach ($pageBoxes as $box) {
+            $maxY = max($maxY, $box['y']);
+            if ($box['y'] <= $headerY + 90) {
+                continue;
+            }
+
+            if ($this->contextMarker($box['text']) !== null) {
+                return $box['y'] - 1;
+            }
+
+            if ($this->isActionHeaderLine($this->key($box['text'])) && $box['y'] > $headerY + 160) {
+                return $box['y'] - 1;
+            }
+        }
+
+        return $maxY + 1;
+    }
+
+    /**
+     * @param  list<array{page:int,x:int,y:int,text:string}>  $pageBoxes
+     * @return array<string,array{start:int,end:int}>
+     */
+    private function ocrTableColumns(array $pageBoxes, int $headerY): array
+    {
+        $starts = [];
+        foreach ($pageBoxes as $box) {
+            if (abs($box['y'] - $headerY) > 140) {
+                continue;
+            }
+
+            $key = $this->key($box['text']);
+            $field = match (true) {
+                $key === 'rmo' => 'rmo_raw',
+                $key === 'cible' => 'cible',
+                Str::startsWith($key, 'debut') => 'date_debut_action',
+                $key === 'fin' => 'date_fin_action',
+                Str::startsWith($key, 'etat') || $key === 'realisation' => 'etat_realisation_initial',
+                Str::startsWith($key, 'ressources') || $key === 'requises' => 'ressources_requises',
+                Str::startsWith($key, 'indicateurs') || $key === 'performance' => 'indicateurs_performance',
+                Str::startsWith($key, 'risques') || $key === 'potentiels' => 'risques_potentiels',
+                default => null,
+            };
+
+            if ($field !== null) {
+                $starts[$field] = min($starts[$field] ?? $box['x'], $box['x']);
+            }
+        }
+
+        $rmoStart = $starts['rmo_raw'] ?? ($this->ocrActionColumnRight($pageBoxes, $headerY) + 25);
+        $defaults = [
+            'libelle_action' => 0,
+            'rmo_raw' => $rmoStart,
+            'cible' => $starts['cible'] ?? ($rmoStart + 190),
+            'date_debut_action' => $starts['date_debut_action'] ?? ($rmoStart + 385),
+            'date_fin_action' => $starts['date_fin_action'] ?? ($rmoStart + 610),
+            'etat_realisation_initial' => $starts['etat_realisation_initial'] ?? ($rmoStart + 820),
+            'ressources_requises' => $starts['ressources_requises'] ?? ($rmoStart + 1160),
+            'indicateurs_performance' => $starts['indicateurs_performance'] ?? ($rmoStart + 1560),
+            'risques_potentiels' => $starts['risques_potentiels'] ?? ($rmoStart + 2050),
+        ];
+
+        $ordered = [];
+        foreach ($defaults as $field => $start) {
+            $ordered[] = ['field' => $field, 'start' => (int) $start];
+        }
+
+        usort($ordered, static fn (array $a, array $b): int => $a['start'] <=> $b['start']);
+
+        $columns = [];
+        foreach ($ordered as $index => $column) {
+            $previous = $ordered[$index - 1]['start'] ?? null;
+            $next = $ordered[$index + 1]['start'] ?? null;
+            $columns[$column['field']] = [
+                'start' => $previous === null ? 0 : (int) floor(($previous + $column['start']) / 2),
+                'end' => $next === null ? PHP_INT_MAX : (int) floor(($column['start'] + $next) / 2),
+            ];
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @param  array{page:int,x:int,y:int,text:string}  $box
+     * @param  array{start:int,end:int}  $column
+     */
+    private function isInsideOcrColumn(array $box, array $column): bool
+    {
+        return $box['x'] >= $column['start'] && $box['x'] < $column['end'];
+    }
+
+    /**
+     * @param  list<array{page:int,x:int,y:int,text:string}>  $pageBoxes
+     * @param  array{start:int,end:int}|null  $column
+     */
+    private function ocrColumnText(array $pageBoxes, ?array $column, int $startY, int $endY): ?string
+    {
+        if ($column === null) {
+            return null;
+        }
+
+        $parts = [];
+        foreach ($pageBoxes as $box) {
+            if ($box['y'] < $startY || $box['y'] > $endY || ! $this->isInsideOcrColumn($box, $column)) {
+                continue;
+            }
+
+            $parts[] = $box;
+        }
+
+        usort($parts, static fn (array $a, array $b): int => [$a['y'], $a['x']] <=> [$b['y'], $b['x']]);
+
+        $text = trim(implode(' ', array_map(static fn (array $box): string => trim($box['text']), $parts)));
+
+        return $text === '' ? null : $text;
+    }
+
+    private function cleanOcrImportedValue(string $field, ?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim(preg_replace('/\s+/', ' ', $value) ?? $value);
+        if ($value === '') {
+            return null;
+        }
+
+        if ($field === 'cible') {
+            $key = $this->key($value);
+            if (in_array($key, ['ioc', 'ioo', 'loo', 'l00', '100'], true)) {
+                return '100';
+            }
+        }
+
+        if ($field === 'etat_realisation_initial' && str_contains($this->key($value), 'demarr')) {
+            return 'Non demarre';
+        }
+
+        return $value;
+    }
+
+    /**
+     * @return array{0:string|null,1:string|null}
+     */
+    private function splitCombinedOcrDates(?string $dateDebut, ?string $dateFin): array
+    {
+        if ($dateDebut === null) {
+            return [$dateDebut, $dateFin];
+        }
+
+        preg_match_all('/\b\d{1,2}[\/\-][0-9A-Za-z\'*]{1,4}[\/\-][0-9A-Za-z\'*]{1,4}\b/u', $dateDebut, $matches);
+        $dates = array_values(array_filter(array_map('trim', $matches[0] ?? [])));
+
+        if ($dateFin !== null && preg_match('/\d{1,2}[\/\-][0-9A-Za-z\'*]{1,4}[\/\-][0-9A-Za-z\'*]{1,4}/u', $dateFin) !== 1) {
+            $dateFin = null;
+        }
+
+        return count($dates) >= 2 && $dateFin === null ? [$dates[0], $dates[1]] : [$dateDebut, $dateFin];
+    }
+
     private function isActionHeaderLine(string $key): bool
     {
         return Str::contains($key, 'description des actions');
@@ -515,7 +774,109 @@ class PtaDocumentStructureExtractorService
         $value = preg_replace('/^\(?[IVXLCDM]+\)?\s*[\).\-]\s*/iu', '', $value) ?? $value;
         $value = preg_replace('/^\d+\s*[\).\-]?\s*/', '', $value) ?? $value;
 
-        return trim($value);
+        return $this->canonicalContextLabel(trim($value));
+    }
+
+    /**
+     * @param  array<string,mixed>  $context
+     * @return array<string,mixed>
+     */
+    private function withKnownContextOrder(array $context, string $field): array
+    {
+        if ($field === 'libelle_axe') {
+            $context['ordre_objectif_strategique'] = null;
+            $context['libelle_objectif_strategique'] = null;
+            $context['ordre_objectif_operationnel'] = null;
+            $context['libelle_objectif_operationnel'] = null;
+        }
+
+        if ($field === 'libelle_objectif_strategique') {
+            $context['ordre_objectif_operationnel'] = null;
+            $context['libelle_objectif_operationnel'] = null;
+        }
+
+        $orderField = $this->orderFieldFor($field);
+        if (trim((string) ($context[$orderField] ?? '')) !== '') {
+            return $this->withDefaultContextChildren($context, $field);
+        }
+
+        $order = $this->knownContextOrder($field, (string) ($context[$field] ?? ''));
+        if ($order !== null) {
+            $context[$orderField] = $order;
+        }
+
+        return $this->withDefaultContextChildren($context, $field);
+    }
+
+    /**
+     * @param  array<string,mixed>  $context
+     * @return array<string,mixed>
+     */
+    private function withDefaultContextChildren(array $context, string $field): array
+    {
+        if ($field !== 'libelle_axe') {
+            return $context;
+        }
+
+        $axis = $this->key((string) ($context['libelle_axe'] ?? ''));
+        if (str_contains($axis, 'textes aux enjeux') && trim((string) ($context['libelle_objectif_strategique'] ?? '')) === '') {
+            $context['ordre_objectif_strategique'] = 1;
+            $context['libelle_objectif_strategique'] = 'Reorganiser les missions et structures de l Agence';
+        }
+
+        return $context;
+    }
+
+    private function knownContextOrder(string $field, string $value): ?int
+    {
+        $key = $this->key($value);
+
+        if ($field === 'libelle_axe') {
+            return match (true) {
+                str_contains($key, 'offre de bourse') => 1,
+                str_contains($key, 'situation financiere') => 2,
+                str_contains($key, 'textes aux enjeux') => 3,
+                str_contains($key, 'gouvernance organisationnelle') => 4,
+                default => null,
+            };
+        }
+
+        if ($field === 'libelle_objectif_strategique') {
+            return match (true) {
+                str_contains($key, 'programmes de formation') => 1,
+                str_contains($key, 'partenariats') => 2,
+                str_contains($key, 'depense de bourse') || str_contains($key, 'oepense de bourse') => 1,
+                str_contains($key, 'boursiers a l etranger') => 2,
+                str_contains($key, 'ressources propres') => 3,
+                str_contains($key, 'financements') => 4,
+                str_contains($key, 'missions') && str_contains($key, 'agence') => 1,
+                str_contains($key, 'planification strategique') => 1,
+                str_contains($key, 'monitoring') => 2,
+                str_contains($key, 'capacites humaines') => 3,
+                default => null,
+            };
+        }
+
+        return $this->orderFrom($value);
+    }
+
+    private function canonicalContextLabel(string $value): string
+    {
+        $key = $this->key($value);
+
+        return match (true) {
+            str_contains($key, 'situation financiere') => 'REDRESSEMENT DE LA SITUATION FINANCIERE',
+            str_contains($key, 'textes aux enjeux') => 'ADAPTATION DES TEXTES AUX ENJEUX ACTUELS',
+            str_contains($key, 'gouvernance organisation') => 'AMELIORATION DE LA GOUVERNANCE ORGANISATIONNELLE',
+            str_contains($key, 'offre de bourse') => 'ELABORATION D UNE OFFRE DE BOURSE ADAPTEE',
+            str_contains($key, 'depense de bourse') || str_contains($key, 'oepense de bourse') => 'Rationaliser la depense de bourse',
+            str_contains($key, 'archives') && $this->containsAny($key, ['perime', 'verime']) && $this->containsAny($key, ['detru', 'etruire']) => 'Detruire les archives perimees',
+            str_contains($key, 'gestion des documents') || (str_contains($key, 'documents') && $this->containsAny($key, ['norme', 'reglementaire', 'lementaire'])) => 'Ameliorer la norme reglementaire relative a la gestion des documents',
+            str_contains($key, 'numerisation') && str_contains($key, 'stock') => 'Optimiser la numerisation des archives (stock)',
+            str_contains($key, 'gestion des archives courantes') => 'Optimiser la gestion des archives courantes',
+            str_contains($key, 'recolement') || str_contains($key, 'reorganisation des archives') => 'Optimiser le recolement et la reorganisation des archives',
+            default => $value,
+        };
     }
 
     /**

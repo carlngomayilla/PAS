@@ -339,6 +339,7 @@ Trois options :
 - Mécanique d'import en plusieurs étapes : upload → mapping → preview → exécution. Modes `MODE_CREATE_ONLY`/`MODE_SKIP_DUPLICATES`/`MODE_UPDATE_EXISTING` équivalents à Création/Complément/Mise à jour.
 - Import IA PTA en plusieurs étapes : upload → analyse → normalisation → preview → correction → validation humaine → import final, avec blocage des lignes invalides.
 - Extraction PDF IA PTA : texte natif, commande OCR configurable et OCR Windows local pour les PDF scannes/image-only, sans ligne factice si aucune donnee exploitable n'est extraite.
+- Extraction OCR des tableaux : les coordonnees OCR sont utilisees pour reconstruire les colonnes d action (`RMO`, cible, dates, etat, ressources, indicateurs, risques), pas seulement le libelle de l action.
 - Fichier import IA PTA final limité à une feuille `IMPORT_GLOBAL`, les erreurs et métadonnées restant dans la prévisualisation/historique.
 - Rapports IA PAS/PAO/PTA : génération depuis les métriques Laravel, correction, validation humaine, exports PDF/Word/Excel.
 - Statut `a_parametrer` / `parametre` (contrainte CHECK PostgreSQL en place).
