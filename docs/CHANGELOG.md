@@ -7,6 +7,26 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-29 - Alignement OCR IA sur les 40 colonnes IMPORT_GLOBAL
+
+### Demande
+
+Verifier que l Excel IA ne contient pas seulement les actions et qu il respecte le fichier final attendu par l ancien module d import.
+
+### Changement
+
+- **Analyse des modeles Excel** : comparaison du modele historique a 27 colonnes avec le modele actuel `imports-excel/modele` et les exports finaux recents a 40 colonnes.
+- **Format canonique confirme** : l export IA reste aligne sur les 40 colonnes `PlanningExcelImportService::IMPORT_COLUMNS`, feuille unique `IMPORT_GLOBAL`.
+- **OCR tableau complet** : l extraction OCR reconstruit maintenant les cellules de tableau par coordonnees pour remplir `RMO`, `cible`, `debut`, `fin`, `etat`, `ressources`, `indicateurs` et `risques`, pas uniquement `libelle_action`.
+- **Contexte hierarchique** : correction de plusieurs libelles OCR d axes/objectifs courants pour eviter de propager un objectif du bloc precedent.
+
+### Validation
+
+- Controle local du PDF `C:/Users/chris/OK/images_pta_pas_pao_anbg.pdf` : extraction de 37 lignes avec colonnes de contexte et colonnes action renseignees lorsque l OCR les lit.
+- `php artisan test tests\Feature\AiPtaImportExtractionTest.php tests\Feature\AiPtaExcelGenerationTest.php tests\Feature\AiPtaImportPreviewTest.php tests\Feature\AiPtaImportFinalImportTest.php tests\Feature\AiPtaOfficialTemplateTest.php` - 13 passed, 92 assertions
+
+---
+
 ## 2026-06-28 - OCR local des PDF PTA scannes
 
 ### Demande
