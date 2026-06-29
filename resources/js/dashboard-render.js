@@ -1,3 +1,5 @@
+import { loadPlotly } from './plotly-loader';
+
 let dashboardBooted = false;
 
 function bootDashboardRender(force = false) {
@@ -73,7 +75,6 @@ function bootDashboardRender(force = false) {
   };
   let assetBootstrapPromise = null;
   let optionalChartPluginsPromise = null;
-  let plotlyBootstrapPromise = null;
   let renderInFlight = false;
   let renderQueued = false;
   let chartsMasonryTimer = null;
@@ -853,22 +854,14 @@ function bootDashboardRender(force = false) {
       return true;
     }
 
-    if (!plotlyBootstrapPromise) {
-      plotlyBootstrapPromise = import('plotly.js-dist-min')
-        .then((module) => {
-          window.Plotly = module.default || module;
-          return true;
-        })
-        .catch((error) => {
-          console.error('Impossible de charger Plotly.', error);
-          return false;
-        })
-        .finally(() => {
-          plotlyBootstrapPromise = null;
-        });
-    }
+    try {
+      const plotly = await loadPlotly();
 
-    return plotlyBootstrapPromise;
+      return Boolean(plotly);
+    } catch (error) {
+      console.error('Impossible de charger Plotly.', error);
+      return false;
+    }
   }
 
   function plotlyThemeLayout() {

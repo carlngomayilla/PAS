@@ -7,6 +7,34 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-29 - Correction build Vite Plotly
+
+### Demande
+
+Continuer apres l'erreur `ViteManifestNotFoundException` : `public/build/manifest.json` absent sur le dashboard.
+
+### Changement
+
+- **Diagnostic build** : identification du blocage sur `plotly.js-dist-min` lors du build Vite de `resources/js/dashboard-render.js`.
+- **Chargement Plotly** : ajout d'un chargeur partage qui copie Plotly comme asset navigateur et le charge a la demande, sans le parser dans le bundle principal.
+- **Dashboard et preview** : remplacement des imports dynamiques Plotly directs par le chargeur partage.
+- **Manifeste Vite** : regeneration valide de `public/build/manifest.json` via `npm run build`.
+
+### Fichiers modifies
+
+- `resources/js/plotly-loader.js`
+- `resources/js/dashboard-render.js`
+- `resources/js/preview-modal.js`
+
+### Validation
+
+- `node --check resources\js\plotly-loader.js`
+- `node --check resources\js\dashboard-render.js`
+- `node --check resources\js\preview-modal.js`
+- `npm run build`
+
+---
+
 ## 2026-06-29 - Modele rapport PTA trimestriel et analyses dashboard
 
 ### Demande

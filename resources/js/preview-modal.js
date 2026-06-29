@@ -1,3 +1,5 @@
+import { loadPlotly } from './plotly-loader';
+
 function escapeHtml(value) {
     return String(value || '')
         .replace(/&/g, '&amp;')
@@ -412,11 +414,7 @@ function svgToPngDataUrl(svgElement) {
         }
 
         if (!plotlyLoader) {
-            plotlyLoader = import('plotly.js-dist-min')
-                .then(function (module) {
-                    window.Plotly = module.default || module;
-                    return window.Plotly;
-                })
+            plotlyLoader = loadPlotly()
                 .finally(function () {
                     plotlyLoader = null;
                 });
