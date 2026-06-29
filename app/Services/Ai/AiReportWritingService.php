@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Models\AiGeneratedReport;
+use Illuminate\Support\Carbon;
 
 class AiReportWritingService
 {
@@ -84,25 +85,137 @@ class AiReportWritingService
         $analysis = $metrics['pta_analyse'] ?? [];
         $summary = $analysis['synthese'] ?? [];
         $period = $analysis['periode']['libelle'] ?? 'Periode non renseignee';
+        $periodMonths = $this->periodMonthsLabel($analysis);
+        $year = $this->reportYear($analysis);
+        $axes = is_array($analysis['axes'] ?? null) ? $analysis['axes'] : [];
+        $services = is_array($analysis['services'] ?? null) ? $analysis['services'] : [];
+        $monthly = is_array($analysis['evolution_mensuelle'] ?? null) ? $analysis['evolution_mensuelle'] : [];
 
         return implode("\n\n", array_filter([
-            '# '.$title,
-            'RAPPORT TRIMESTRIEL PTA - '.$period,
+            '# RAPPORT TRIMESTRIEL '.$year,
+            $periodMonths,
+            'SUIVI ET EVALUATION',
+            'Titre du rapport : '.$title,
             'Source des donnees : snapshot Laravel calcule sur les actions PTA visibles dans le perimetre selectionne.',
-            '1. Progression globale du PTA',
-            'Le portefeuille PTA compte '.($summary['actions_prevues'] ?? 0).' action(s) prevue(s), dont '.($summary['actions_realisees'] ?? 0).' realisee(s), '.($summary['actions_en_retard_non_realisees'] ?? 0).' en retard ou non realisee(s), '.($summary['actions_non_demarrees'] ?? 0).' non demarree(s) et '.($summary['actions_echues'] ?? 0).' echue(s). Le taux global d avancement est de '.($summary['taux_global_avancement'] ?? 0).' %, pour un taux de realisation PTA de '.($summary['taux_realisation'] ?? 0).' %.',
-            '2. Taux de realisation des axes strategiques',
-            $this->formatQuarterRows($analysis['axes'] ?? [], 'libelle', 'taux_realisation'),
-            '3. Evolution de la realisation PTA sur la periode',
-            $this->formatQuarterRows($analysis['evolution_mensuelle'] ?? [], 'mois', 'taux_realisation'),
-            '4. Taux de realisation par service',
-            $this->formatQuarterRows($analysis['services'] ?? [], 'libelle', 'taux_realisation'),
-            '5. Analyse des ecarts constates',
+            'Sommaire',
+            '1-PROGRESSION GLOBALE DU PTA DE LA DIRECTION GENERALE',
+            '2- Taux de realisation des axes strategiques de la Direction Generale',
+            '3- Evolution des taux de realisation des axes strategiques de la DG',
+            '4- Taux de realisation du PTA de la Direction Generale au '.$this->periodEndLabel($analysis),
+            '5- Evolution du taux de realisation du PTA de la Direction Generale sur la periode '.$period,
+            '6- Analyse des ecarts constates',
+            '7. Mesures correctives proposees',
+            '1-Progression globale du PTA de la Direction Generale.',
+            'Le plan d actions strategique compte '.$this->countLabel($axes, 'axe strategique').' et '.$this->countLabel($services, 'service').' suivis. Le portefeuille PTA compte '.($summary['actions_prevues'] ?? 0).' action(s) prevue(s), dont '.($summary['actions_realisees'] ?? 0).' realisee(s), '.($summary['actions_en_retard_non_realisees'] ?? 0).' en retard ou non realisee(s), '.($summary['actions_non_demarrees'] ?? 0).' non demarree(s) et '.($summary['actions_echues'] ?? 0).' echue(s). Le taux global d avancement est de '.($summary['taux_global_avancement'] ?? 0).' %, pour un taux de realisation PTA de '.($summary['taux_realisation'] ?? 0).' %.',
+            $this->formatAxisNarrative($axes),
+            '2-Taux de realisation des axes strategiques de la Direction Generale.',
+            'TAUX DE REALISATION DES AXES GLOBAUX : '.$this->formatQuarterRows($axes, 'libelle', 'taux_realisation'),
+            '3-Evolution des taux de realisation des axes strategiques de la DG',
+            $this->formatEvolutionNarrative($axes, $monthly),
+            '4- Taux de realisation du PTA de la Direction Generale au '.$this->periodEndLabel($analysis),
+            $this->formatQuarterRows($services, 'libelle', 'taux_realisation'),
+            '5-Evolution du taux de realisation du PTA de la Direction Generale sur la periode '.$period,
+            $this->formatQuarterRows($monthly, 'mois', 'taux_realisation'),
+            '6-Analyse des ecarts constates.',
             $this->formatQuarterGaps($analysis['ecarts'] ?? []),
-            '6. Mesures correctives proposees',
+            '7. Mesures correctives proposees :',
             $this->formatSimpleList($analysis['mesures_correctives'] ?? []),
-            'Conclusion : ce brouillon reprend la structure du modele officiel de rapport trimestriel PTA et doit etre relu puis valide humainement avant diffusion.',
+            'Le Gestionnaire Suivi-Evaluation Senior',
         ]));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $axes
+     */
+    private function formatAxisNarrative(array $axes): string
+    {
+        if ($axes === []) {
+            return 'Aucun axe strategique n est disponible dans le snapshot.';
+        }
+
+        return collect($axes)
+            ->map(function (array $axis, int $index): string {
+                return 'L axe strategique N '.($index + 1).' : "'.($axis['libelle'] ?? 'Non renseigne').'" compte '.($axis['actions_prevues'] ?? 0).' action(s) prevue(s), '.($axis['actions_realisees'] ?? 0).' action(s) realisee(s), '.($axis['actions_en_retard_non_realisees'] ?? 0).' action(s) en retard ou non realisee(s), et affiche un taux de realisation de '.($axis['taux_realisation'] ?? 0).' %.';
+            })
+            ->implode("\n");
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $axes
+     * @param  list<array<string, mixed>>  $monthly
+     */
+    private function formatEvolutionNarrative(array $axes, array $monthly): string
+    {
+        $monthText = $this->formatQuarterRows($monthly, 'mois', 'taux_realisation');
+        $axisText = collect($axes)
+            ->map(fn (array $axis): string => ($axis['libelle'] ?? 'Non renseigne').' : '.($axis['taux_realisation'] ?? 0).' %')
+            ->implode(' ; ');
+
+        return 'Sur la periode analysee, les taux disponibles par axe sont les suivants : '.($axisText !== '' ? $axisText : 'donnee non disponible').'. Evolution mensuelle consolidee : '.$monthText;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function countLabel(array $rows, string $label): string
+    {
+        $count = count($rows);
+
+        return $count.' '.$label.($count > 1 ? 's' : '');
+    }
+
+    /**
+     * @param  array<string, mixed>  $analysis
+     */
+    private function periodMonthsLabel(array $analysis): string
+    {
+        $start = $analysis['periode']['debut'] ?? null;
+        $end = $analysis['periode']['fin'] ?? null;
+
+        if (! is_string($start) || ! is_string($end)) {
+            return 'PERIODE NON RENSEIGNEE';
+        }
+
+        try {
+            $cursor = Carbon::parse($start)->startOfMonth();
+            $last = Carbon::parse($end)->startOfMonth();
+            $months = [];
+            while ($cursor->lte($last)) {
+                $months[] = $cursor->locale('fr')->translatedFormat('F');
+                $cursor->addMonth();
+            }
+
+            return mb_strtoupper(implode('-', $months));
+        } catch (\Throwable) {
+            return 'PERIODE NON RENSEIGNEE';
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $analysis
+     */
+    private function reportYear(array $analysis): string
+    {
+        $end = (string) ($analysis['periode']['fin'] ?? '');
+
+        return preg_match('/20\d{2}/', $end, $matches) === 1 ? $matches[0] : now()->format('Y');
+    }
+
+    /**
+     * @param  array<string, mixed>  $analysis
+     */
+    private function periodEndLabel(array $analysis): string
+    {
+        $end = $analysis['periode']['fin'] ?? null;
+        if (! is_string($end)) {
+            return 'la date de cloture';
+        }
+
+        try {
+            return Carbon::parse($end)->format('d/m/Y');
+        } catch (\Throwable) {
+            return 'la date de cloture';
+        }
     }
 
     /**

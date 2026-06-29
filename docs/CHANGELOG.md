@@ -7,6 +7,36 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-06-29 - Rapport IA PTA inspire du modele Word fourni
+
+### Demande
+
+Corriger le rapport trimestriel genere par l IA : il devait s inspirer du modele Word `RAPPORT PTA TRIMESTRIEL 2026.docx`, pas produire un rapport generique.
+
+### Changement
+
+- **Brouillon IA PTA** : ajout d une couverture textuelle `RAPPORT TRIMESTRIEL`, de la periode, du bloc `SUIVI ET EVALUATION`, du sommaire et des rubriques 1 a 7 du modele.
+- **Export Word PTA** : generation d un document structure avec couverture, sommaire, progression globale, table des axes strategiques, taux par axe, evolution, taux PTA/service, analyse des ecarts, mesures correctives et signature.
+- **Tableau modele** : ajout de la table globale inspiree du modele avec les colonnes `Nombre d actions prevues`, `Actions realisees`, `Actions en retard/non realisees`, `Actions non demarrees`, `Actions echues` et `Taux global d avancement`.
+- **Non-regression** : ajout d un test qui ouvre le `.docx` genere et verifie les reperes du modele (`Sommaire`, `TAUX DE REALISATION DES AXES GLOBAUX`, analyse des ecarts, signature).
+
+### Fichiers modifies
+
+- `app/Services/Ai/AiReportWritingService.php`
+- `app/Services/Ai/ReportExportService.php`
+- `tests/Feature/AiReportGenerationTest.php`
+- `tests/Feature/AiReportExportTest.php`
+
+### Validation
+
+- `php -l app\Services\Ai\AiReportWritingService.php`
+- `php -l app\Services\Ai\ReportExportService.php`
+- `php -l tests\Feature\AiReportGenerationTest.php`
+- `php -l tests\Feature\AiReportExportTest.php`
+- `php artisan test tests\Feature\AiReportGenerationTest.php tests\Feature\AiReportExportTest.php`
+
+---
+
 ## 2026-06-29 - Alignement controle humain IA sur IMPORT_GLOBAL
 
 ### Demande

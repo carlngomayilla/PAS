@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use App\Models\AiGeneratedReport;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -120,140 +121,285 @@ class ReportExportService
     {
         $analysis = $report->metrics_snapshot['pta_analyse'] ?? [];
         $summary = $analysis['synthese'] ?? [];
+        $axes = is_array($analysis['axes'] ?? null) ? $analysis['axes'] : [];
+        $services = is_array($analysis['services'] ?? null) ? $analysis['services'] : [];
+        $monthly = is_array($analysis['evolution_mensuelle'] ?? null) ? $analysis['evolution_mensuelle'] : [];
+        $gaps = is_array($analysis['ecarts'] ?? null) ? $analysis['ecarts'] : [];
+        $measures = is_array($analysis['mesures_correctives'] ?? null) ? $analysis['mesures_correctives'] : [];
         $period = (string) ($analysis['periode']['libelle'] ?? 'Periode courante');
+        $periodMonths = $this->ptaPeriodMonthsLabel($analysis);
+        $periodEnd = $this->ptaPeriodEndLabel($analysis);
+        $year = $this->ptaReportYear($analysis);
         $templatePath = (string) config('ai_training.reports.pta_quarterly_template_path', '');
 
         $phpWord = new PhpWord;
-        $phpWord->setDefaultFontName('Aptos');
+        $phpWord->setDefaultFontName('Arial');
         $phpWord->setDefaultFontSize(11);
-        $phpWord->addTitleStyle(1, ['bold' => true, 'size' => 18, 'color' => '17324A'], ['alignment' => 'center', 'spaceAfter' => 240]);
-        $phpWord->addTitleStyle(2, ['bold' => true, 'size' => 13, 'color' => '17324A'], ['spaceBefore' => 260, 'spaceAfter' => 120]);
-        $phpWord->addTableStyle('ptaReportTable', [
+        $phpWord->addTitleStyle(1, ['bold' => true, 'size' => 22, 'color' => '4B5563'], ['alignment' => 'center', 'spaceAfter' => 160]);
+        $phpWord->addTitleStyle(2, ['bold' => true, 'size' => 13, 'color' => '17324A'], ['spaceBefore' => 220, 'spaceAfter' => 100]);
+        $phpWord->addTableStyle('ptaReportGrid', [
             'borderSize' => 6,
             'borderColor' => '7A8797',
             'cellMargin' => 80,
+            'width' => 100 * 50,
         ], [
             'bgColor' => '0EA5D7',
         ]);
 
         $section = $phpWord->addSection([
+            'orientation' => 'landscape',
             'marginTop' => 900,
             'marginBottom' => 900,
             'marginLeft' => 900,
             'marginRight' => 900,
         ]);
-        $section->addTitle('RAPPORT TRIMESTRIEL PTA', 1);
-        $section->addText($period, ['bold' => true, 'size' => 14, 'color' => '17324A'], ['alignment' => 'center']);
-        $section->addText('SUIVI ET EVALUATION', ['bold' => true, 'color' => '0F5B66'], ['alignment' => 'center', 'spaceAfter' => 300]);
-        if ($templatePath !== '' && is_file($templatePath)) {
-            $section->addText('Modele de mise en forme reference : '.basename($templatePath), ['size' => 8, 'color' => '64748B'], ['alignment' => 'center']);
-        }
 
-        $section->addTitle('1. Progression globale du PTA', 2);
-        $this->addKeyValueTable($section, [
-            ['Actions prevues', $summary['actions_prevues'] ?? 0],
-            ['Actions realisees', $summary['actions_realisees'] ?? 0],
-            ['Actions en retard/non realisees', $summary['actions_en_retard_non_realisees'] ?? 0],
-            ['Actions non demarrees', $summary['actions_non_demarrees'] ?? 0],
-            ['Actions echues', $summary['actions_echues'] ?? 0],
-            ['Taux global d avancement', ($summary['taux_global_avancement'] ?? 0).' %'],
-            ['Taux de realisation PTA', ($summary['taux_realisation'] ?? 0).' %'],
-        ]);
+        $this->addPtaCover($section, $report->title, $year, $periodMonths, $templatePath);
+        $section->addPageBreak();
+        $this->addPtaSommaire($section, $period, $periodEnd);
+        $section->addPageBreak();
 
-        $section->addTitle('2. Taux de realisation des axes strategiques', 2);
-        $this->addAnalysisTable($section, ['Axe', 'Prevues', 'Realisees', 'Retard/non realisees', 'Non demarrees', 'Echues', 'Taux PTA'], $analysis['axes'] ?? [], 'libelle');
+        $this->addPtaSectionTitle($section, '1-Progression globale du PTA de la Direction Generale.');
+        $this->addPtaIntro($section, $summary, $axes, $services);
+        $this->addPtaSummaryTable($section, $summary, $axes);
+        $this->addPtaAxisNarratives($section, $axes);
 
-        $section->addTitle('3. Taux de realisation par service', 2);
-        $this->addAnalysisTable($section, ['Service', 'Prevues', 'Realisees', 'Retard/non realisees', 'Non demarrees', 'Echues', 'Taux PTA'], $analysis['services'] ?? [], 'libelle');
+        $this->addPtaSectionTitle($section, '2-Taux de realisation des axes strategiques de la Direction Generale.');
+        $this->addPtaAxisRatesTable($section, $axes);
 
-        $section->addTitle('4. Evolution de la periode', 2);
-        $this->addMonthlyTable($section, $analysis['evolution_mensuelle'] ?? []);
+        $this->addPtaSectionTitle($section, '3-Evolution des taux de realisation des axes strategiques de la DG');
+        $this->addPtaAxisEvolution($section, $axes, $monthly);
 
-        $section->addTitle('5. Analyse des ecarts constates', 2);
-        $this->addGapList($section, $analysis['ecarts'] ?? []);
+        $this->addPtaSectionTitle($section, '4- Taux de realisation du PTA de la Direction Generale au '.$periodEnd);
+        $this->addPtaServiceRateTable($section, $services);
 
-        $section->addTitle('6. Mesures correctives proposees', 2);
-        foreach (($analysis['mesures_correctives'] ?? []) as $measure) {
-            $section->addListItem((string) $measure, 0, ['size' => 10]);
-        }
+        $this->addPtaSectionTitle($section, '5-Evolution du taux de realisation du PTA de la Direction Generale sur la periode '.$period);
+        $this->addPtaMonthlyEvolutionTable($section, $monthly);
+
+        $this->addPtaSectionTitle($section, '6-Analyse des ecarts constates.');
+        $this->addPtaGapAnalysis($section, $gaps, $axes, $services);
+
+        $this->addPtaSectionTitle($section, '7. Mesures correctives proposees :');
+        $this->addPtaCorrectiveMeasures($section, $measures);
 
         return $phpWord;
     }
 
-    /**
-     * @param  list<array{0:string,1:mixed}>  $rows
-     */
-    private function addKeyValueTable($section, array $rows): void
+    private function addPtaCover($section, string $title, string $year, string $periodMonths, string $templatePath): void
     {
-        $table = $section->addTable('ptaReportTable');
-        foreach ($rows as [$label, $value]) {
-            $table->addRow();
-            $table->addCell(5200)->addText($label, ['bold' => true]);
-            $table->addCell(2400)->addText((string) $value);
+        $section->addTitle('RAPPORT TRIMESTRIEL '.$year, 1);
+        $section->addText($periodMonths, ['bold' => true, 'size' => 16, 'color' => '17324A'], ['alignment' => 'center', 'spaceAfter' => 120]);
+        $section->addText('SUIVI ET EVALUATION', ['bold' => true, 'size' => 13, 'color' => '0F5B66'], ['alignment' => 'center', 'spaceAfter' => 500]);
+        $section->addText($title, ['bold' => true, 'size' => 12], ['alignment' => 'center', 'spaceAfter' => 220]);
+
+        if ($templatePath !== '' && is_file($templatePath)) {
+            $section->addText('Modele de reference : '.basename($templatePath), ['size' => 8, 'color' => '64748B'], ['alignment' => 'center']);
+        }
+    }
+
+    private function addPtaSommaire($section, string $period, string $periodEnd): void
+    {
+        $section->addTitle('Sommaire', 2);
+        foreach ([
+            '1-PROGRESSION GLOBALE DU PTA DE LA DIRECTION GENERALE',
+            '2- Taux de realisation des axes strategiques de la Direction Generale',
+            '3- Evolution des taux de realisation des axes strategiques de la DG',
+            '4- Taux de realisation du PTA de la Direction Generale au '.$periodEnd,
+            '5- Evolution du taux de realisation du PTA de la Direction Generale sur la periode '.$period,
+            '6-Analyse des ecarts constates',
+            '7. Mesures correctives proposees',
+        ] as $item) {
+            $section->addText($item, ['size' => 11], ['spaceAfter' => 80]);
+        }
+    }
+
+    private function addPtaSectionTitle($section, string $title): void
+    {
+        $section->addTitle($title, 2);
+    }
+
+    /**
+     * @param  array<string, mixed>  $summary
+     * @param  list<array<string, mixed>>  $axes
+     * @param  list<array<string, mixed>>  $services
+     */
+    private function addPtaIntro($section, array $summary, array $axes, array $services): void
+    {
+        $section->addText(
+            'Le plan d actions strategique compte '.count($axes).' axe(s) strategique(s) et '.count($services).' PTA/service(s) suivis. '
+            .'Le portefeuille consolide comprend '.($summary['actions_prevues'] ?? 0).' action(s) prevue(s), dont '.($summary['actions_realisees'] ?? 0).' realisee(s), '
+            .($summary['actions_en_retard_non_realisees'] ?? 0).' en retard ou non realisee(s), '.($summary['actions_non_demarrees'] ?? 0).' non demarree(s) et '
+            .($summary['actions_echues'] ?? 0).' echue(s). Le taux global d avancement est de '.$this->asPercent($summary['taux_global_avancement'] ?? 0)
+            .' et le taux de realisation PTA est de '.$this->asPercent($summary['taux_realisation'] ?? 0).'.',
+            ['size' => 10],
+            ['spaceAfter' => 140]
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $summary
+     * @param  list<array<string, mixed>>  $axes
+     */
+    private function addPtaSummaryTable($section, array $summary, array $axes): void
+    {
+        $widths = [700, 3800, 1400, 1400, 1800, 1500, 1200, 1600];
+        $table = $section->addTable('ptaReportGrid');
+        $this->addPtaTableHeader($table, [
+            'Axe',
+            'AXES STRATEGIQUES DE LA DIRECTION GENERALE',
+            'Nombre d actions prevues',
+            'Actions realisees',
+            'Actions en retard/non realisees',
+            'Actions non demarrees',
+            'Actions echues',
+            'Taux global d avancement',
+        ], $widths);
+
+        foreach ($axes as $index => $axis) {
+            $this->addPtaTableRow($table, [
+                (string) ($index + 1),
+                (string) ($axis['libelle'] ?? 'Non renseigne'),
+                (string) ($axis['actions_prevues'] ?? 0),
+                (string) ($axis['actions_realisees'] ?? 0),
+                (string) ($axis['actions_en_retard_non_realisees'] ?? 0),
+                (string) ($axis['actions_non_demarrees'] ?? 0),
+                (string) ($axis['actions_echues'] ?? 0),
+                $this->asPercent($axis['taux_global_avancement'] ?? $axis['taux_realisation'] ?? 0),
+            ], $widths);
+        }
+
+        $this->addPtaTableRow($table, [
+            'T',
+            'TOTAL',
+            (string) ($summary['actions_prevues'] ?? 0),
+            (string) ($summary['actions_realisees'] ?? 0),
+            (string) ($summary['actions_en_retard_non_realisees'] ?? 0),
+            (string) ($summary['actions_non_demarrees'] ?? 0),
+            (string) ($summary['actions_echues'] ?? 0),
+            $this->asPercent($summary['taux_global_avancement'] ?? $summary['taux_realisation'] ?? 0),
+        ], $widths, true);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $axes
+     */
+    private function addPtaAxisNarratives($section, array $axes): void
+    {
+        if ($axes === []) {
+            $section->addText('Aucun axe strategique n est disponible dans le snapshot.', ['size' => 10], ['spaceAfter' => 100]);
+
+            return;
+        }
+
+        foreach ($axes as $index => $axis) {
+            $section->addText(
+                'L axe strategique N '.($index + 1).' "'.($axis['libelle'] ?? 'Non renseigne').'" compte '.($axis['actions_prevues'] ?? 0)
+                .' action(s) prevue(s), '.($axis['actions_realisees'] ?? 0).' action(s) realisee(s), '.($axis['actions_echues'] ?? 0)
+                .' action(s) echue(s) et affiche un taux de realisation de '.$this->asPercent($axis['taux_realisation'] ?? 0).'.',
+                ['size' => 10],
+                ['spaceAfter' => 80]
+            );
         }
     }
 
     /**
-     * @param  list<string>  $headers
-     * @param  list<array<string, mixed>>  $rows
+     * @param  list<array<string, mixed>>  $axes
      */
-    private function addAnalysisTable($section, array $headers, array $rows, string $labelKey): void
+    private function addPtaAxisRatesTable($section, array $axes): void
     {
-        $table = $section->addTable('ptaReportTable');
-        $table->addRow();
-        foreach ($headers as $header) {
-            $table->addCell(1800)->addText($header, ['bold' => true, 'color' => 'FFFFFF']);
-        }
+        $section->addText('TAUX DE REALISATION DES AXES GLOBAUX', ['bold' => true, 'size' => 10], ['spaceAfter' => 80]);
+        $widths = [4400, 1600, 1600, 1800, 2000];
+        $table = $section->addTable('ptaReportGrid');
+        $this->addPtaTableHeader($table, ['Axe strategique', 'Actions prevues', 'Actions echues', 'Taux de realisation', 'Statut'], $widths);
 
-        foreach ($rows as $row) {
-            $table->addRow();
-            foreach ([
-                $row[$labelKey] ?? '-',
-                $row['actions_prevues'] ?? 0,
-                $row['actions_realisees'] ?? 0,
-                $row['actions_en_retard_non_realisees'] ?? 0,
-                $row['actions_non_demarrees'] ?? 0,
-                $row['actions_echues'] ?? 0,
-                ($row['taux_realisation'] ?? 0).' %',
-            ] as $value) {
-                $table->addCell(1800)->addText((string) $value);
-            }
+        foreach ($axes as $axis) {
+            $rate = $axis['taux_realisation'] ?? 0;
+            $this->addPtaTableRow($table, [
+                (string) ($axis['libelle'] ?? 'Non renseigne'),
+                (string) ($axis['actions_prevues'] ?? 0),
+                (string) ($axis['actions_echues'] ?? 0),
+                $this->asPercent($rate),
+                $this->statusFromRate($rate),
+            ], $widths);
         }
     }
 
     /**
-     * @param  list<array<string, mixed>>  $rows
+     * @param  list<array<string, mixed>>  $axes
+     * @param  list<array<string, mixed>>  $monthly
      */
-    private function addMonthlyTable($section, array $rows): void
+    private function addPtaAxisEvolution($section, array $axes, array $monthly): void
     {
-        $table = $section->addTable('ptaReportTable');
-        $table->addRow();
-        foreach (['Mois', 'Actions echues', 'Actions realisees', 'Taux PTA'] as $header) {
-            $table->addCell(2200)->addText($header, ['bold' => true, 'color' => 'FFFFFF']);
-        }
+        $axisRates = collect($axes)
+            ->map(fn (array $axis): string => ($axis['libelle'] ?? 'Non renseigne').' : '.$this->asPercent($axis['taux_realisation'] ?? 0))
+            ->implode(' ; ');
+        $monthlyRates = collect($monthly)
+            ->map(fn (array $row): string => ($row['mois'] ?? 'Mois non renseigne').' : '.$this->asPercent($row['taux_realisation'] ?? 0))
+            ->implode(' ; ');
 
-        foreach ($rows as $row) {
-            $table->addRow();
-            foreach ([
-                $row['mois'] ?? '-',
-                $row['actions_echues'] ?? 0,
-                $row['actions_realisees'] ?? 0,
-                ($row['taux_realisation'] ?? 0).' %',
-            ] as $value) {
-                $table->addCell(2200)->addText((string) $value);
-            }
+        $section->addText(
+            'Les taux disponibles par axe sont les suivants : '.($axisRates !== '' ? $axisRates : 'donnee non disponible').'.',
+            ['size' => 10],
+            ['spaceAfter' => 80]
+        );
+        $section->addText(
+            'L evolution mensuelle consolidee indique : '.($monthlyRates !== '' ? $monthlyRates : 'donnee non disponible').'.',
+            ['size' => 10],
+            ['spaceAfter' => 100]
+        );
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $services
+     */
+    private function addPtaServiceRateTable($section, array $services): void
+    {
+        $widths = [4400, 2200, 2600, 2200];
+        $table = $section->addTable('ptaReportGrid');
+        $this->addPtaTableHeader($table, ['PTA', 'Taux de realisation', 'Nombre d actions echues (Poids)', 'Statut'], $widths);
+
+        foreach ($services as $service) {
+            $rate = $service['taux_realisation'] ?? 0;
+            $this->addPtaTableRow($table, [
+                (string) ($service['libelle'] ?? 'Non renseigne'),
+                $this->asPercent($rate),
+                (string) ($service['actions_echues'] ?? 0),
+                $this->statusFromRate($rate),
+            ], $widths);
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $monthly
+     */
+    private function addPtaMonthlyEvolutionTable($section, array $monthly): void
+    {
+        $widths = [2800, 2200, 2200, 2200];
+        $table = $section->addTable('ptaReportGrid');
+        $this->addPtaTableHeader($table, ['Mois', 'Actions echues', 'Actions realisees', 'Taux de realisation'], $widths);
+
+        foreach ($monthly as $row) {
+            $this->addPtaTableRow($table, [
+                (string) ($row['mois'] ?? 'Non renseigne'),
+                (string) ($row['actions_echues'] ?? 0),
+                (string) ($row['actions_realisees'] ?? 0),
+                $this->asPercent($row['taux_realisation'] ?? 0),
+            ], $widths);
         }
     }
 
     /**
      * @param  array<string, mixed>  $gaps
+     * @param  list<array<string, mixed>>  $axes
+     * @param  list<array<string, mixed>>  $services
      */
-    private function addGapList($section, array $gaps): void
+    private function addPtaGapAnalysis($section, array $gaps, array $axes, array $services): void
     {
+        $section->addText('1. Ecarts de realisation', ['bold' => true, 'size' => 10], ['spaceAfter' => 80]);
         foreach ([
-            'actions_non_realisees' => 'Actions non realisees',
-            'actions_partielles' => 'Actions partiellement realisees',
-            'actions_reportees' => 'Actions reportees',
+            'actions_non_realisees' => 'Actions non realisees dans le trimestre:',
+            'actions_partielles' => 'Actions partiellement realisees:',
+            'actions_reportees' => 'Activites reportees a une periode ulterieure.',
         ] as $key => $title) {
             $section->addText($title, ['bold' => true]);
             $rows = is_array($gaps[$key] ?? null) ? $gaps[$key] : [];
@@ -265,6 +411,149 @@ class ReportExportService
             foreach ($rows as $row) {
                 $section->addListItem(trim((string) (($row['libelle'] ?? '-').' - RMO : '.($row['responsable'] ?? 'Non renseigne'))), 0, ['size' => 10]);
             }
+        }
+
+        $section->addText('Taux de realisation inferieur a la cible prevue.', ['bold' => true]);
+        $lowRates = collect(array_merge($axes, $services))
+            ->filter(fn (array $row): bool => (float) ($row['taux_realisation'] ?? 0) < 100)
+            ->take(8);
+        if ($lowRates->isEmpty()) {
+            $section->addText('Aucun taux inferieur a la cible n est signale dans le snapshot.', ['size' => 10]);
+        } else {
+            $lowRates->each(function (array $row) use ($section): void {
+                $section->addListItem((string) (($row['libelle'] ?? 'Non renseigne').' : '.$this->asPercent($row['taux_realisation'] ?? 0)), 0, ['size' => 10]);
+            });
+        }
+
+        $section->addText('2. Causes des ecarts', ['bold' => true, 'size' => 10], ['spaceBefore' => 120, 'spaceAfter' => 80]);
+        $section->addText(
+            'Les causes des ecarts doivent etre confirmees par les responsables concernes. Les alertes a prioriser portent sur les actions echues non realisees, les activites reportees, les ressources non disponibles et les retards de validation.',
+            ['size' => 10],
+            ['spaceAfter' => 100]
+        );
+    }
+
+    /**
+     * @param  list<mixed>  $measures
+     */
+    private function addPtaCorrectiveMeasures($section, array $measures): void
+    {
+        if ($measures === []) {
+            $section->addText('Aucune mesure corrective n est disponible dans le snapshot.', ['size' => 10]);
+        }
+
+        foreach ($measures as $measure) {
+            $section->addListItem((string) $measure, 0, ['size' => 10]);
+        }
+
+        $section->addTextBreak(2);
+        $section->addText('Le Gestionnaire Suivi-Evaluation Senior', ['bold' => true, 'size' => 10], ['alignment' => 'right']);
+    }
+
+    /**
+     * @param  list<string>  $headers
+     * @param  list<int>  $widths
+     */
+    private function addPtaTableHeader($table, array $headers, array $widths): void
+    {
+        $table->addRow();
+        foreach ($headers as $index => $header) {
+            $table->addCell($widths[$index] ?? 1600, ['bgColor' => '0EA5D7', 'valign' => 'center'])
+                ->addText($header, ['bold' => true, 'color' => 'FFFFFF', 'size' => 8], ['alignment' => 'center', 'spaceAfter' => 0]);
+        }
+    }
+
+    /**
+     * @param  list<string>  $values
+     * @param  list<int>  $widths
+     */
+    private function addPtaTableRow($table, array $values, array $widths, bool $bold = false): void
+    {
+        $table->addRow();
+        foreach ($values as $index => $value) {
+            $table->addCell($widths[$index] ?? 1600, ['valign' => 'center'])
+                ->addText($value, ['bold' => $bold, 'size' => 8], ['spaceAfter' => 0]);
+        }
+    }
+
+    private function asPercent(mixed $value): string
+    {
+        return rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.').' %';
+    }
+
+    private function statusFromRate(mixed $rate): string
+    {
+        $rate = (float) $rate;
+
+        return match (true) {
+            $rate >= 100 => 'Realise',
+            $rate >= 50 => 'En cours',
+            $rate > 0 => 'Faible',
+            default => 'Non demarre',
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $analysis
+     */
+    private function ptaPeriodMonthsLabel(array $analysis): string
+    {
+        $start = $analysis['periode']['debut'] ?? null;
+        $end = $analysis['periode']['fin'] ?? null;
+
+        if (! is_string($start) || ! is_string($end)) {
+            return 'PERIODE NON RENSEIGNEE';
+        }
+
+        try {
+            $cursor = Carbon::parse($start)->startOfMonth();
+            $last = Carbon::parse($end)->startOfMonth();
+            $months = [];
+
+            while ($cursor->lte($last)) {
+                $months[] = $cursor->locale('fr')->translatedFormat('F');
+                $cursor->addMonth();
+            }
+
+            return mb_strtoupper(implode('-', $months));
+        } catch (\Throwable) {
+            return 'PERIODE NON RENSEIGNEE';
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $analysis
+     */
+    private function ptaPeriodEndLabel(array $analysis): string
+    {
+        $end = $analysis['periode']['fin'] ?? null;
+
+        if (! is_string($end)) {
+            return 'la date de cloture';
+        }
+
+        try {
+            return Carbon::parse($end)->format('d/m/Y');
+        } catch (\Throwable) {
+            return 'la date de cloture';
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $analysis
+     */
+    private function ptaReportYear(array $analysis): string
+    {
+        $end = $analysis['periode']['fin'] ?? null;
+
+        if (! is_string($end)) {
+            return now()->format('Y');
+        }
+
+        try {
+            return Carbon::parse($end)->format('Y');
+        } catch (\Throwable) {
+            return now()->format('Y');
         }
     }
 }

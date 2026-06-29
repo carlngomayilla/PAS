@@ -44,7 +44,11 @@ class AiReportGenerationTest extends TestCase
 
         $report = AiGeneratedReport::query()->firstOrFail();
         $this->assertArrayHasKey('pta_analyse', $report->metrics_snapshot);
-        $this->assertStringContainsString('Progression globale du PTA', $report->ai_draft);
-        $this->assertStringContainsString('Mesures correctives proposees', $report->ai_draft);
+        $this->assertStringContainsString('RAPPORT TRIMESTRIEL', $report->ai_draft);
+        $this->assertStringContainsString('SUIVI ET EVALUATION', $report->ai_draft);
+        $this->assertStringContainsString('Sommaire', $report->ai_draft);
+        $this->assertStringContainsString('1-PROGRESSION GLOBALE DU PTA DE LA DIRECTION GENERALE', $report->ai_draft);
+        $this->assertStringContainsString('6-Analyse des ecarts constates', $report->ai_draft);
+        $this->assertStringContainsString('Le Gestionnaire Suivi-Evaluation Senior', $report->ai_draft);
     }
 }
