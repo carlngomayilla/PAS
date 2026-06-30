@@ -117,7 +117,7 @@
     $availableDashboardTabs = [
         'overview' => 'Synthese',
         'charts' => 'Graphiques',
-        'advanced' => 'Analyse avancee',
+        'advanced' => 'Vue detaillee',
     ];
     $dashboardTabAliases = [
         'overview' => 'overview',

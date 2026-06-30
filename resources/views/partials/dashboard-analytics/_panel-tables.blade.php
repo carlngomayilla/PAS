@@ -10,6 +10,8 @@
             ])
         @endif
 
+        @include('partials.dashboard-analytics._panel-synthesis-tables')
+
         <details class="showcase-panel overflow-hidden p-0" open>
             <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-slate-200/80 px-3 py-2 list-none">
                 <div class="flex items-center gap-2">

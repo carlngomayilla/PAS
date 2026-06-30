@@ -14,8 +14,8 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringContainsString('data-dashboard-synthesis-selector', $view);
         $this->assertStringContainsString('function bindSynthesisSelectors()', $script);
         $this->assertStringContainsString("summary.addEventListener('click'", $script);
-        $this->assertStringContainsString("event.preventDefault();", $script);
-        $this->assertStringContainsString("details.open = shouldOpen;", $script);
+        $this->assertStringContainsString('event.preventDefault();', $script);
+        $this->assertStringContainsString('details.open = shouldOpen;', $script);
     }
 
     public function test_dashboard_synthesis_view_exposes_decision_filters_and_advanced_tab(): void
@@ -23,6 +23,7 @@ class DashboardSynthesisDropdownTest extends TestCase
         $view = (string) file_get_contents(resource_path('views/partials/dashboard-analytics.blade.php'));
         $overview = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-overview.blade.php'));
         $tables = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-tables.blade.php'));
+        $detailTables = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-synthesis-tables.blade.php'));
         $script = (string) file_get_contents(resource_path('js/dashboard-render.js'));
 
         $this->assertStringContainsString('data-dashboard-synthesis-filter-form', $view);
@@ -33,11 +34,16 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringContainsString('name="alerte_echeance"', $view);
         $this->assertStringContainsString('data-synthesis-direction-select', $view);
         $this->assertStringContainsString('data-synthesis-service-select', $view);
-        $this->assertStringContainsString('Analyse avancee', $view);
-        $this->assertStringContainsString("data-dashboard-panel=\"advanced\"", $tables);
+        $this->assertStringContainsString('Vue detaillee', $view);
+        $this->assertStringContainsString('data-dashboard-panel="advanced"', $tables);
         $this->assertStringContainsString("const panelKeys = ['overview', 'charts', 'advanced'];", $script);
         $this->assertStringContainsString('$baseSynthesisQuery', $overview);
         $this->assertStringContainsString('Alertes critiques', $overview);
+        $this->assertStringContainsString('$showSynthesisTablesInOverview ?? false', $overview);
+        $this->assertStringContainsString('_panel-synthesis-tables', $tables);
+        $this->assertStringContainsString('Tableaux de synthese', $detailTables);
+        $this->assertStringContainsString('dashboard-synthesis-table', $detailTables);
+        $this->assertStringContainsString('data-dashboard-row-detail', $detailTables);
         $this->assertStringNotContainsString('@if (false', $overview);
     }
 
