@@ -642,6 +642,7 @@ function svgToPngDataUrl(svgElement) {
     function injectTablePreviewButtons() {
         document.querySelectorAll('table.app-table').forEach(function (table) {
             if (table.closest('#preview-modal')) return;
+            if (table.closest('[data-preview-disabled="1"]')) return;
             if (table.dataset.previewReady === '1') return;
             table.dataset.previewReady = '1';
             table.dataset.previewTableId = table.dataset.previewTableId || nextPreviewId('preview-table');
@@ -667,6 +668,7 @@ function svgToPngDataUrl(svgElement) {
     function injectChartPreviewButtons() {
         document.querySelectorAll('.dashboard-chart-host, .dashboard-canvas, .dashboard-gauge-card').forEach(function (node) {
             if (node.closest('#preview-modal')) return;
+            if (node.closest('[data-preview-disabled="1"]')) return;
             if (node.matches('.dashboard-canvas, .dashboard-gauge-card') && node.querySelector('.dashboard-chart-host')) return;
             if (!resolveChartNode(node) && !resolvePlotlyNode(node)) return;
             if (node.dataset.previewChartReady === '1') return;

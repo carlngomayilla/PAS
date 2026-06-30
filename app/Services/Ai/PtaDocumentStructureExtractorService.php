@@ -38,19 +38,23 @@ class PtaDocumentStructureExtractorService
         foreach ($rows as $row) {
             $normalized = $this->normalizeKeys($row);
             $context = array_merge($context, array_filter([
-                'ordre_axe' => $normalized['ordre_axe'] ?? $this->orderFrom($normalized['axe_strategique'] ?? null),
-                'libelle_axe' => $normalized['libelle_axe'] ?? $normalized['axe_strategique'] ?? null,
-                'ordre_objectif_strategique' => $normalized['ordre_objectif_strategique'] ?? $this->orderFrom($normalized['objectif_strategique'] ?? null),
-                'libelle_objectif_strategique' => $normalized['libelle_objectif_strategique'] ?? $normalized['objectif_strategique'] ?? null,
-                'ordre_objectif_operationnel' => $normalized['ordre_objectif_operationnel'] ?? $this->orderFrom($normalized['objectif_operationnel'] ?? null),
-                'libelle_objectif_operationnel' => $normalized['libelle_objectif_operationnel'] ?? $normalized['objectif_operationnel'] ?? null,
+                'ordre_axe' => $normalized['ordre_axe'] ?? $normalized['numero_axe'] ?? $this->orderFrom($normalized['axe_strategique'] ?? $normalized['axe'] ?? null),
+                'libelle_axe' => $normalized['libelle_axe'] ?? $normalized['axe_strategique'] ?? $normalized['axe'] ?? $normalized['pas_axe'] ?? null,
+                'ordre_objectif_strategique' => $normalized['ordre_objectif_strategique'] ?? $normalized['numero_objectif_strategique'] ?? $this->orderFrom($normalized['objectif_strategique'] ?? null),
+                'libelle_objectif_strategique' => $normalized['libelle_objectif_strategique'] ?? $normalized['objectif_strategique'] ?? $normalized['objectif_strategique_pas'] ?? null,
+                'ordre_objectif_operationnel' => $normalized['ordre_objectif_operationnel'] ?? $normalized['numero_objectif_operationnel'] ?? $this->orderFrom($normalized['objectif_operationnel'] ?? $normalized['pao'] ?? null),
+                'libelle_objectif_operationnel' => $normalized['libelle_objectif_operationnel'] ?? $normalized['objectif_operationnel'] ?? $normalized['objectif_operationnel_pao'] ?? $normalized['pao'] ?? $normalized['programme'] ?? null,
             ], static fn (mixed $value): bool => $value !== null && trim((string) $value) !== ''));
 
             $action = $normalized['libelle_action']
+                ?? $normalized['action_pta']
+                ?? $normalized['action']
+                ?? $normalized['activite']
+                ?? $normalized['tache']
                 ?? $normalized['description_actions_detaillees']
                 ?? $normalized['description_des_actions_detaillees']
+                ?? $normalized['description_action']
                 ?? $normalized['actions_detaillees']
-                ?? $normalized['action']
                 ?? null;
 
             if ($action === null || trim((string) $action) === '') {
@@ -62,14 +66,17 @@ class PtaDocumentStructureExtractorService
                 'ordre_action' => $normalized['ordre_action'] ?? $actionOrder,
                 'libelle_action' => $action,
                 'actions_detaillees' => $normalized['actions_detaillees'] ?? $action,
+                'direction' => $normalized['direction'] ?? $normalized['direction_responsable'] ?? $normalized['direction_concernee'] ?? null,
+                'service_unite' => $normalized['service_unite'] ?? $normalized['service'] ?? $normalized['service_responsable'] ?? $normalized['service_concerne'] ?? null,
                 'rmo_raw' => $normalized['rmo'] ?? $normalized['responsable'] ?? null,
-                'cible' => $normalized['cible'] ?? null,
+                'cible' => $normalized['cible'] ?? $normalized['valeur_cible'] ?? $normalized['target'] ?? null,
                 'date_debut_action' => $normalized['debut'] ?? $normalized['date_debut'] ?? $normalized['date_debut_action'] ?? null,
-                'date_fin_action' => $normalized['fin'] ?? $normalized['date_fin'] ?? $normalized['date_fin_action'] ?? null,
-                'etat_realisation_initial' => $normalized['etat_de_realisation'] ?? $normalized['etat_realisation'] ?? null,
+                'date_fin_action' => $normalized['fin'] ?? $normalized['date_fin'] ?? $normalized['date_fin_action'] ?? $normalized['echeance'] ?? null,
+                'etat_realisation_initial' => $normalized['etat_de_realisation'] ?? $normalized['etat_realisation'] ?? $normalized['statut'] ?? null,
                 'ressources_requises' => $normalized['ressources_requises'] ?? null,
-                'indicateurs_performance' => $normalized['indicateurs_de_performance'] ?? $normalized['indicateurs_performance'] ?? null,
-                'risques_potentiels' => $normalized['risques_potentiels'] ?? null,
+                'indicateurs_performance' => $normalized['indicateurs_de_performance'] ?? $normalized['indicateurs_performance'] ?? $normalized['indicateur'] ?? $normalized['justificatif_attendu'] ?? $normalized['livrable'] ?? null,
+                'risques_potentiels' => $normalized['risques_potentiels'] ?? $normalized['risque'] ?? null,
+                'montant_financement' => $normalized['montant_financement'] ?? $normalized['budget_previsionnel'] ?? $normalized['budget'] ?? $normalized['montant'] ?? $normalized['cout'] ?? null,
                 'confidence_score' => 0.78,
                 'validation_warnings' => [],
             ]);

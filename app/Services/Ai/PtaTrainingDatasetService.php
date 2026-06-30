@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\File;
 
 class PtaTrainingDatasetService
 {
+    public function __construct(
+        private readonly AiPromptService $prompts
+    ) {}
+
     public function recordCorrection(AiImportRow $row, ?User $user = null): AiTrainingExample
     {
         return AiTrainingExample::query()->create([
@@ -78,8 +82,8 @@ class PtaTrainingDatasetService
     private function toFineTuningLine(AiTrainingExample $example): array
     {
         $system = $example->task === AiTrainingExample::TASK_REPORT_WRITING
-            ? 'Tu rediges des rapports institutionnels PAS PAO PTA sans inventer de chiffres.'
-            : 'Tu extrais et normalises les actions PTA en JSON strict sans inventer de donnees.';
+            ? $this->prompts->reportSystemPrompt()
+            : $this->prompts->ptaExtractionSystemPrompt();
 
         $expected = $example->expected_text ?: json_encode($example->expected_json ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 

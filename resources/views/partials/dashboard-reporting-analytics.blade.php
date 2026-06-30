@@ -138,30 +138,6 @@
 
     @if ($showChartBlocks)
     <div class="space-y-4">
-        <article class="dashboard-advanced-card">
-            <div class="dashboard-advanced-head">
-                <div>
-                    <h2 class="showcase-panel-title">Statuts par {{ strtolower($reportingCharts['status_by_unit']['unit_label'] ?? 'unite') }}</h2>
-                </div>
-            </div>
-            <div class="dashboard-chart-scroll-frame">
-            <div class="dashboard-canvas dashboard-canvas-lg" style="height: {{ number_format($reportStatusUnitChartHeight, 2, '.', '') }}rem;">
-                <div id="dashboard-report-status-unit-chart" class="dashboard-chart-host">
-                    <div class="dashboard-chart-fallback" aria-hidden="true">
-                        <div class="dashboard-chart-fallback-bars">
-                            @foreach ($reportingFallbackBars($reportingCharts['status_by_unit'] ?? []) as $row)
-                                <div class="dashboard-chart-fallback-bar">
-                                    <span class="truncate">{{ $row['label'] }}</span>
-                                    <span class="dashboard-chart-fallback-track"><span class="dashboard-chart-fallback-fill" style="width: {{ $row['value'] }}%;"></span></span>
-                                    <span class="text-right">{{ number_format($row['value'], 0, ',', ' ') }}</span>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-            </div>
-            </div>
-        </article>
 
         <article class="dashboard-advanced-card">
             <div class="dashboard-advanced-head">

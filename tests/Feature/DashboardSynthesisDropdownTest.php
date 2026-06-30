@@ -41,11 +41,18 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringNotContainsString('@if (false', $overview);
     }
 
-    public function test_dashboard_charts_expose_decision_graphs_without_temporary_guards(): void
+    public function test_dashboard_charts_focus_on_status_and_pta_evolution_graphs(): void
     {
         $charts = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-charts.blade.php'));
 
-        $this->assertStringContainsString('Graphiques de decision', $charts);
+        $this->assertStringNotContainsString('Graphiques de decision', $charts);
+        $this->assertStringNotContainsString('Evolution mensuelle', $charts);
+        $this->assertStringNotContainsString('Services PTA', $charts);
+        $this->assertStringNotContainsString('Meilleures actions', $charts);
+        $this->assertStringContainsString('dashboard-status-mix-chart', $charts);
+        $this->assertStringContainsString('dashboard-pta-axis-rate-chart', $charts);
+        $this->assertStringContainsString('dashboard-pta-monthly-rate-chart', $charts);
+        $this->assertStringContainsString('dashboard-canvas-evolution', $charts);
         $this->assertStringNotContainsString('@if (false', $charts);
     }
 }

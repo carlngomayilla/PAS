@@ -32,11 +32,11 @@ class PtaActionParameterizationService
      */
     public function parameterize(array $payload): array
     {
-        $action = $this->firstString($payload, ['libelle_action', 'action', 'description_action', 'actions_detaillees']) ?? '';
-        $objective = $this->firstString($payload, ['libelle_objectif_operationnel', 'objectif_operationnel', 'programme', 'objectif']) ?? '';
-        $indicator = $this->firstString($payload, ['indicateur', 'indicateurs_performance', 'justificatif_attendu', 'livrables_attendus']) ?? '';
-        $target = $this->firstString($payload, ['cible', 'cible_minimum_execution']) ?? '';
-        $resources = $this->firstString($payload, ['ressources_requises', 'ressources_materielles', 'main_oeuvre', 'autres_ressources', 'partenaires']) ?? '';
+        $action = $this->firstString($payload, ['libelle_action', 'action_pta', 'action', 'activite', 'tache', 'description_action', 'actions_detaillees']) ?? '';
+        $objective = $this->firstString($payload, ['libelle_objectif_operationnel', 'objectif_operationnel', 'objectif_operationnel_pao', 'programme', 'pao', 'objectif']) ?? '';
+        $indicator = $this->firstString($payload, ['indicateur', 'indicateurs_performance', 'justificatif_attendu', 'livrables_attendus', 'livrable', 'preuve_attendue']) ?? '';
+        $target = $this->firstString($payload, ['cible', 'cible_minimum_execution', 'valeur_cible', 'target_value']) ?? '';
+        $resources = $this->firstString($payload, ['ressources_requises', 'ressources_materielles', 'ressources_techniques', 'equipements', 'main_oeuvre', 'autres_ressources', 'partenaires']) ?? '';
         $risk = $this->firstString($payload, ['risque', 'risques_potentiels', 'risque_potentiel']) ?? '';
         $startDate = $this->firstString($payload, ['date_debut_action', 'date_debut', 'debut']);
         $endDate = $this->firstString($payload, ['date_fin_action', 'date_fin', 'fin', 'echeance']);

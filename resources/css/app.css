@@ -8876,7 +8876,8 @@ body.admin-theme-scope .dealdeck-dashboard .charts-bento {
 body.admin-theme-scope .dealdeck-dashboard .charts-bento > .showcase-panel,
 body.admin-theme-scope .dealdeck-dashboard .charts-role-overview,
 body.admin-theme-scope .dealdeck-dashboard .charts-decision-section,
-body.admin-theme-scope .dealdeck-dashboard .charts-advanced-section {
+body.admin-theme-scope .dealdeck-dashboard .charts-advanced-section,
+body.admin-theme-scope .dealdeck-dashboard .charts-status-section {
     min-width: 0;
     margin: 0 !important;
     align-self: start;
@@ -8898,6 +8899,35 @@ body.admin-theme-scope .dealdeck-dashboard .charts-bento-row-trend > .showcase-p
     order: 21;
 }
 
+body.admin-theme-scope .dealdeck-dashboard .charts-status-section {
+    order: 20;
+    grid-column: 1 / -1;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-status-section .charts-status-panel {
+    width: 100%;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-status-panel .dashboard-canvas {
+    height: clamp(22rem, 42vh, 28rem);
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-gauges-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-gauges-panel .dashboard-gauge-item {
+    height: 10.5rem;
+    min-height: 10.5rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-gauges-panel #dashboard-kpi-gauge-delai {
+    min-height: 10.5rem;
+    overflow: visible;
+}
+
 body.admin-theme-scope .dealdeck-dashboard .charts-role-overview {
     order: 30;
     grid-column: 1 / -1;
@@ -8915,6 +8945,21 @@ body.admin-theme-scope .dealdeck-dashboard .charts-long-row > .showcase-panel {
 body.admin-theme-scope .dealdeck-dashboard .charts-advanced-section {
     order: 90;
     grid-column: 1 / -1;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-evolution-stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-evolution-panel {
+    width: 100%;
+    min-width: 0;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-evolution {
+    height: clamp(24rem, 52vh, 32rem) !important;
 }
 
 body.admin-theme-scope .dealdeck-dashboard .dashboard-chart-scroll-frame {
@@ -8972,6 +9017,15 @@ body.admin-theme-scope .dealdeck-dashboard :is(
 
     body.admin-theme-scope .dealdeck-dashboard .charts-scroll-list {
         max-height: 22rem;
+    }
+
+    body.admin-theme-scope .dealdeck-dashboard .charts-gauges-grid {
+        grid-template-columns: 1fr;
+    }
+
+    body.admin-theme-scope .dealdeck-dashboard .charts-status-panel .dashboard-canvas,
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-evolution {
+        height: 24rem !important;
     }
 }
 

@@ -1983,11 +1983,10 @@ function bootDashboardRender(force = false) {
     });
   }
 
-  function mountStatusDonut(hostId = 'dashboard-status-mix-chart', cards = statusCards, total = (payload.totals && payload.totals.actions_total) || 0) {
+  function mountStatusPie(hostId = 'dashboard-status-mix-chart', cards = statusCards) {
     const theme = dashboardTheme();
-    const resolvedTotal = total || cards.reduce((sum, item) => sum + Number(item.count || 0), 0);
 
-    mountChart(hostId, baseConfig('doughnut', {
+    mountChart(hostId, baseConfig('pie', {
       data: {
         labels: cards.map((item) => item.label),
         datasets: [{
@@ -2000,25 +1999,8 @@ function bootDashboardRender(force = false) {
         }],
       },
       options: {
-        cutout: '74%',
         plugins: {
           legend: { position: 'right' },
-          anbgCenterText: {
-            lines: [
-              {
-                text: String(resolvedTotal || 0),
-                color: theme.emphasis,
-                font: '800 28px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
-                offsetY: -8,
-              },
-              {
-                text: 'Actions',
-                color: theme.muted,
-                font: '700 11px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
-                offsetY: 16,
-              },
-            ],
-          },
         },
       },
     }), ({ element }) => cards[element?.index]?.href || '');
@@ -2300,29 +2282,6 @@ function bootDashboardRender(force = false) {
   }
 
   function mountReportingCharts() {
-    const statusByUnit = reportingCharts.status_by_unit || { labels: [], datasets: [] };
-
-    mountChart('dashboard-report-status-unit-chart', baseConfig('bar', {
-      data: {
-        labels: statusByUnit.labels,
-        datasets: (statusByUnit.datasets || []).map((dataset, index) => ({
-          label: dataset.label,
-          data: dataset.data,
-          backgroundColor: alphaColor(colorForStatus(dataset.label, index), 0.86),
-          borderColor: colorForStatus(dataset.label, index),
-          borderWidth: 1,
-          maxBarThickness: 28,
-          stack: 'statuses',
-        })),
-      },
-      options: {
-        scales: cartesianScales({
-          x: { stacked: true },
-          y: { stacked: true },
-        }),
-      },
-    }), ({ element }) => (((statusByUnit.urls || [])[element?.datasetIndex] || [])[element?.index]) || '');
-
     const progressWeekly = reportingCharts.progress_weekly || { labels: [], reel: [], theorique: [] };
 
     function buildProgressChartConfig(data) {
@@ -2474,7 +2433,6 @@ function bootDashboardRender(force = false) {
 
     const ptaQuarterly = reportingCharts.pta_quarterly || {};
     const ptaAxisRates = ptaQuarterly.axis_rates || { labels: [], values: [], urls: [] };
-    const ptaServiceRates = ptaQuarterly.service_rates || { labels: [], values: [], urls: [] };
     const ptaMonthlyRates = ptaQuarterly.monthly_rates || { labels: [], values: [], urls: [] };
 
     function ptaRateBarConfig(data, label, color) {
@@ -2492,7 +2450,7 @@ function bootDashboardRender(force = false) {
         },
         options: {
           indexAxis: 'y',
-          scales: percentScales(),
+          scales: horizontalPercentScales(),
           plugins: {
             anbgBarShadow: { enabled: true },
             tooltip: {
@@ -2507,31 +2465,25 @@ function bootDashboardRender(force = false) {
 
     mountChart('dashboard-pta-axis-rate-chart', ptaRateBarConfig(ptaAxisRates, 'Taux PTA', ANBG.primary),
       ({ element }) => (ptaAxisRates.urls || [])[element?.index] || '');
-    mountChart('dashboard-pta-service-rate-chart', ptaRateBarConfig(ptaServiceRates, 'Taux PTA', ANBG.secondary),
-      ({ element }) => (ptaServiceRates.urls || [])[element?.index] || '');
 
-    mountChart('dashboard-pta-monthly-rate-chart', baseConfig('line', {
+    mountChart('dashboard-pta-monthly-rate-chart', baseConfig('bar', {
       data: {
         labels: ptaMonthlyRates.labels || [],
         datasets: [{
           label: 'Taux PTA',
           data: ptaMonthlyRates.values || [],
+          backgroundColor: (context) => barGradient(context.chart, ANBG.primary),
           borderColor: ANBG.primary,
-          backgroundColor: (context) => chartGradient(context.chart, ANBG.primary),
-          fill: true,
-          tension: 0.38,
-          pointRadius: 4,
-          pointHoverRadius: 7,
-          pointBackgroundColor: ANBG.primary,
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 2,
-          borderWidth: 2.5,
+          borderWidth: 1,
+          borderRadius: 12,
+          maxBarThickness: 42,
         }],
       },
       options: {
         scales: percentScales(),
         plugins: {
-          anbgCrosshair: { enabled: true },
+          anbgBarShadow: { enabled: true },
+          datalabels: barDataLabels((value) => (value > 0 ? `${Math.round(value)}%` : '')),
           tooltip: {
             callbacks: {
               label: (ctx) => ` Taux PTA : ${formatNumber(ctx.parsed?.y ?? 0)} %`,
@@ -2646,24 +2598,13 @@ function bootDashboardRender(force = false) {
           window.applyAnbgChartDefaults(window.Chart);
         }
 
-        safeRenderStep('role charts', mountRoleCharts);
         safeRenderStep('kpi gauges', () => mountKpiGaugeSet('dashboard-kpi-gauge-', payload.global_scores || {}, true));
-        safeRenderStep('monthly line', () => {
-          mountMonthlyKpiLine();
-          bindPeriodButtons('[data-period-chart="kpi-line"]', (n) => mountMonthlyKpiLine('dashboard-kpi-line-chart', monthly, n));
-        });
-        safeRenderStep('direction service performance', mountDirectionAndServicePerformance);
-        safeRenderStep('unit summary', mountUnitSummary);
-        safeRenderStep('status donut', () => mountStatusDonut('dashboard-status-mix-chart', statusCards, (payload.totals && payload.totals.actions_total) || 0));
+        safeRenderStep('status pie', () => mountStatusPie('dashboard-status-mix-chart', statusCards));
         safeRenderStep('reporting charts', mountReportingCharts);
       }
 
       if (hasD3) {
         safeRenderStep('gantt', renderGantts);
-      }
-
-      if (hasPlotly) {
-        safeRenderStep('agent performance plotly', mountAgentPerformanceCharts);
       }
 
       safeRenderStep('row links', bindRowLinks);

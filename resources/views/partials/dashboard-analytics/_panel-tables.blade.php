@@ -1,4 +1,4 @@
-<section class="dashboard-tab-panel active" data-dashboard-panel="advanced">
+<section class="dashboard-tab-panel active" data-dashboard-panel="advanced" data-preview-disabled="1">
     <div class="space-y-2">
         @if ($showRoleOverview)
             @include('partials.dashboard-role-overview', [
@@ -131,8 +131,8 @@
                 @endif
 
                 @if ($ptaUnrealized->isNotEmpty() || $ptaMeasures->isNotEmpty())
-                    <div class="grid gap-3 border-t border-slate-200/80 p-3 xl:grid-cols-2">
-                        <div class="overflow-x-auto">
+                    <div class="grid gap-3 border-t border-slate-200/80 p-3">
+                        <div class="app-table-wrapper overflow-x-auto">
                             <h3 class="mb-2 text-sm font-black text-[#17324a]">Écarts</h3>
                             <table class="app-table data-table">
                                 <thead><tr><th>Action</th><th>RMO</th><th>Échéance</th><th>Progression</th></tr></thead>
@@ -150,7 +150,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div>
+                        <div class="rounded-lg border border-[#d8ecf8] bg-white p-3">
                             <h3 class="mb-2 text-sm font-black text-[#17324a]">Mesures correctives</h3>
                             <ul class="space-y-2 text-sm font-semibold text-[#17324a]">
                                 @foreach ($ptaMeasures as $measure)
