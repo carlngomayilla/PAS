@@ -2,14 +2,15 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use App\Models\Action;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\Pta;
 use App\Models\Service;
+use App\Models\SousAction;
 use App\Models\User;
 use App\Services\DocumentPolicySettings;
-use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -106,8 +107,8 @@ class UpdatePtaRequest extends FormRequest
             'actions.*.requires_comment' => ['nullable', 'boolean'],
             'actions.*.allows_difficulty' => ['nullable', 'boolean'],
             'actions.*.sous_actions.*.sub_action_type' => ['nullable', Rule::in([
-                \App\Models\SousAction::TYPE_QUANTITATIVE,
-                \App\Models\SousAction::TYPE_NON_QUANTITATIVE,
+                SousAction::TYPE_QUANTITATIVE,
+                SousAction::TYPE_NON_QUANTITATIVE,
             ])],
             'actions.*.sous_actions.*.weight' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'actions.*.sous_actions.*.requires_proof' => ['nullable', 'boolean'],
@@ -224,6 +225,7 @@ class UpdatePtaRequest extends FormRequest
                     ->where(function ($query) use ($pao): void {
                         if ($pao->exercice_id !== null) {
                             $query->where('exercice_id', (int) $pao->exercice_id);
+
                             return;
                         }
 
@@ -309,7 +311,7 @@ class UpdatePtaRequest extends FormRequest
                 }
 
                 if (! empty($actionPayload['id'])) {
-                    $actionBelongsToPta = \App\Models\Action::query()
+                    $actionBelongsToPta = Action::query()
                         ->whereKey((int) $actionPayload['id'])
                         ->where('pta_id', (int) $this->resolveCurrentPtaId())
                         ->where('objectif_operationnel_id', (int) $this->input('objectif_operationnel_id'))
@@ -395,7 +397,7 @@ class UpdatePtaRequest extends FormRequest
     }
 
     /**
-     * @param array<string, mixed> $actionPayload
+     * @param  array<string, mixed>  $actionPayload
      */
     private function hasExistingFinancingJustificatif(array $actionPayload): bool
     {
@@ -434,7 +436,7 @@ class UpdatePtaRequest extends FormRequest
     }
 
     /**
-     * @param array<int|string, mixed> $actions
+     * @param  array<int|string, mixed>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function normalizeActionsInput(array $actions): array
@@ -482,7 +484,10 @@ class UpdatePtaRequest extends FormRequest
                     $mode = $targetProvided ? Action::MODE_QUANTITATIF : Action::MODE_SANS_QUANTITE;
                 }
 
-                if ($mode !== Action::MODE_QUANTITATIF) {
+                $preserveQuantitativeTarget = $mode === Action::MODE_QUANTITATIF
+                    || ($typeAction === Action::TYPE_COMPOSEE && $targetProvided);
+
+                if (! $preserveQuantitativeTarget) {
                     $action['quantite_cible'] = null;
                     $action['unite_cible'] = null;
                 }
@@ -512,14 +517,14 @@ class UpdatePtaRequest extends FormRequest
 
                         // Workflow V2 : type + poids + conditions de la sous-action.
                         $saType = trim((string) ($subAction['sub_action_type'] ?? ''));
-                        if (! in_array($saType, [\App\Models\SousAction::TYPE_QUANTITATIVE, \App\Models\SousAction::TYPE_NON_QUANTITATIVE], true)) {
+                        if (! in_array($saType, [SousAction::TYPE_QUANTITATIVE, SousAction::TYPE_NON_QUANTITATIVE], true)) {
                             $saType = (filled($subAction['cible_prevue']) && (float) $subAction['cible_prevue'] > 0)
-                                ? \App\Models\SousAction::TYPE_QUANTITATIVE
-                                : \App\Models\SousAction::TYPE_NON_QUANTITATIVE;
+                                ? SousAction::TYPE_QUANTITATIVE
+                                : SousAction::TYPE_NON_QUANTITATIVE;
                         }
                         $subAction['sub_action_type'] = $saType;
                         $subAction['weight'] = ($subAction['weight'] ?? '') === '' ? null : (float) $subAction['weight'];
-                        if ($saType !== \App\Models\SousAction::TYPE_QUANTITATIVE) {
+                        if ($saType !== SousAction::TYPE_QUANTITATIVE) {
                             $subAction['cible_prevue'] = null;
                         }
                         $subAction['requires_proof'] = filter_var($subAction['requires_proof'] ?? true, FILTER_VALIDATE_BOOL);
@@ -551,7 +556,7 @@ class UpdatePtaRequest extends FormRequest
      * navigateurs/anciens rendus, seul leur id cache peut encore etre soumis :
      * on l'ignore pour ne pas valider une action incomplete.
      *
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      */
     private function isExistingActionStub(array $action): bool
     {

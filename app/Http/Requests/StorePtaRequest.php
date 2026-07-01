@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use App\Models\Action;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\Service;
+use App\Models\SousAction;
 use App\Models\User;
 use App\Services\DocumentPolicySettings;
-use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -98,8 +99,8 @@ class StorePtaRequest extends FormRequest
             'actions.*.requires_comment' => ['nullable', 'boolean'],
             'actions.*.allows_difficulty' => ['nullable', 'boolean'],
             'actions.*.sous_actions.*.sub_action_type' => ['nullable', Rule::in([
-                \App\Models\SousAction::TYPE_QUANTITATIVE,
-                \App\Models\SousAction::TYPE_NON_QUANTITATIVE,
+                SousAction::TYPE_QUANTITATIVE,
+                SousAction::TYPE_NON_QUANTITATIVE,
             ])],
             'actions.*.sous_actions.*.weight' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'actions.*.sous_actions.*.requires_proof' => ['nullable', 'boolean'],
@@ -357,7 +358,7 @@ class StorePtaRequest extends FormRequest
     }
 
     /**
-     * @param array<int|string, mixed> $actions
+     * @param  array<int|string, mixed>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function normalizeActionsInput(array $actions): array
@@ -405,7 +406,10 @@ class StorePtaRequest extends FormRequest
                     $mode = $targetProvided ? Action::MODE_QUANTITATIF : Action::MODE_SANS_QUANTITE;
                 }
 
-                if ($mode !== Action::MODE_QUANTITATIF) {
+                $preserveQuantitativeTarget = $mode === Action::MODE_QUANTITATIF
+                    || ($typeAction === Action::TYPE_COMPOSEE && $targetProvided);
+
+                if (! $preserveQuantitativeTarget) {
                     $action['quantite_cible'] = null;
                     $action['unite_cible'] = null;
                 }
@@ -437,14 +441,14 @@ class StorePtaRequest extends FormRequest
 
                         // Workflow V2 : type + poids + conditions de la sous-action.
                         $saType = trim((string) ($subAction['sub_action_type'] ?? ''));
-                        if (! in_array($saType, [\App\Models\SousAction::TYPE_QUANTITATIVE, \App\Models\SousAction::TYPE_NON_QUANTITATIVE], true)) {
+                        if (! in_array($saType, [SousAction::TYPE_QUANTITATIVE, SousAction::TYPE_NON_QUANTITATIVE], true)) {
                             $saType = (filled($subAction['cible_prevue']) && (float) $subAction['cible_prevue'] > 0)
-                                ? \App\Models\SousAction::TYPE_QUANTITATIVE
-                                : \App\Models\SousAction::TYPE_NON_QUANTITATIVE;
+                                ? SousAction::TYPE_QUANTITATIVE
+                                : SousAction::TYPE_NON_QUANTITATIVE;
                         }
                         $subAction['sub_action_type'] = $saType;
                         $subAction['weight'] = ($subAction['weight'] ?? '') === '' ? null : (float) $subAction['weight'];
-                        if ($saType !== \App\Models\SousAction::TYPE_QUANTITATIVE) {
+                        if ($saType !== SousAction::TYPE_QUANTITATIVE) {
                             $subAction['cible_prevue'] = null;
                         }
                         $subAction['requires_proof'] = filter_var($subAction['requires_proof'] ?? true, FILTER_VALIDATE_BOOL);

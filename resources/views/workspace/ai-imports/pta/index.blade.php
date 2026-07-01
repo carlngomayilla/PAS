@@ -93,7 +93,12 @@
                         <tr>
                             <td class="px-3 py-2">{{ $batch->created_at?->format('d/m/Y H:i') }}</td>
                             <td class="px-3 py-2 font-semibold text-[#1c203d]">{{ $batch->original_filename }}</td>
-                            <td class="px-3 py-2">{{ $batch->status }}</td>
+                            <td class="px-3 py-2">
+                                <span>{{ $batch->status }}</span>
+                                @if ($batch->error_message)
+                                    <span class="mt-1 block max-w-xs text-xs font-semibold text-amber-700">{{ $batch->error_message }}</span>
+                                @endif
+                            </td>
                             <td class="px-3 py-2">{{ $batch->confidence_score ?? '-' }}</td>
                             <td class="px-3 py-2">
                                 <div class="flex flex-wrap gap-2">

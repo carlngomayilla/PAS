@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Direction;
 use App\Models\Action;
+use App\Models\Direction;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\Pas;
@@ -142,6 +142,102 @@ class PtaServiceWorkflowTest extends TestCase
         $this->assertSame('qualitative', $action->type_cible);
         $this->assertSame('binary_completion', $action->methode_calcul);
         $this->assertDatabaseCount('sous_actions', 0);
+    }
+
+    public function test_pta_creation_preserves_quantitative_target_for_composite_action(): void
+    {
+        $fixture = $this->fixture();
+
+        $this->actingAs($fixture['serviceUser'])
+            ->post(route('workspace.pta.store'), [
+                'objectif_operationnel_id' => $fixture['ownObjective']->id,
+                'actions' => [
+                    [
+                        'libelle' => 'Action composee avec cible action',
+                        'date_debut' => '2026-03-01',
+                        'date_fin' => '2026-06-30',
+                        'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+                        'type_action' => Action::TYPE_COMPOSEE,
+                        'quantite_cible' => '25',
+                        'unite_cible' => 'dossiers',
+                        'rmo_ids' => [$fixture['agent']->id],
+                        'financement_requis' => '0',
+                        'sous_actions' => [
+                            [
+                                'agent_id' => $fixture['agent']->id,
+                                'libelle' => 'Sous-action composee cible',
+                                'date_debut' => '2026-03-01',
+                                'date_fin' => '2026-04-30',
+                                'sub_action_type' => SousAction::TYPE_NON_QUANTITATIVE,
+                                'resultat_attendu' => 'Livrable signe',
+                                'weight' => '100',
+                            ],
+                        ],
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('workspace.pta.index'))
+            ->assertSessionHasNoErrors();
+
+        $action = Action::query()->where('libelle', 'Action composee avec cible action')->firstOrFail();
+
+        $this->assertSame(Action::TYPE_COMPOSEE, $action->type_action);
+        $this->assertSame(Action::MODE_SOUS_ACTIONS, $action->mode_evaluation);
+        $this->assertEquals(25.0, (float) $action->quantite_cible);
+        $this->assertSame('dossiers', $action->unite_cible);
+        $this->assertSame('mixte', $action->type_cible);
+    }
+
+    public function test_pta_update_preserves_quantitative_target_for_composite_action(): void
+    {
+        $fixture = $this->fixture();
+        $pta = Pta::query()->create([
+            'pao_id' => $fixture['pao']->id,
+            'objectif_operationnel_id' => $fixture['ownObjective']->id,
+            'direction_id' => $fixture['ownService']->direction_id,
+            'service_id' => $fixture['ownService']->id,
+            'titre' => 'PTA update composee',
+        ]);
+
+        $this->actingAs($fixture['serviceUser'])
+            ->put(route('workspace.pta.update', $pta), [
+                'objectif_operationnel_id' => $fixture['ownObjective']->id,
+                'actions' => [
+                    [
+                        'libelle' => 'Action composee update cible',
+                        'date_debut' => '2026-03-01',
+                        'date_fin' => '2026-06-30',
+                        'mode_evaluation' => Action::MODE_SOUS_ACTIONS,
+                        'type_action' => Action::TYPE_COMPOSEE,
+                        'quantite_cible' => '40',
+                        'unite_cible' => 'rapports',
+                        'rmo_ids' => [$fixture['agent']->id],
+                        'financement_requis' => '0',
+                        'sous_actions' => [
+                            [
+                                'agent_id' => $fixture['agent']->id,
+                                'libelle' => 'Sous-action update cible',
+                                'date_debut' => '2026-03-01',
+                                'date_fin' => '2026-04-30',
+                                'sub_action_type' => SousAction::TYPE_QUANTITATIVE,
+                                'cible_prevue' => '10',
+                                'unite' => 'rapports',
+                                'weight' => '100',
+                            ],
+                        ],
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('workspace.pta.index'))
+            ->assertSessionHasNoErrors();
+
+        $action = Action::query()->where('libelle', 'Action composee update cible')->firstOrFail();
+
+        $this->assertSame(Action::TYPE_COMPOSEE, $action->type_action);
+        $this->assertSame(Action::MODE_SOUS_ACTIONS, $action->mode_evaluation);
+        $this->assertEquals(40.0, (float) $action->quantite_cible);
+        $this->assertSame('rapports', $action->unite_cible);
+        $this->assertSame('mixte', $action->type_cible);
     }
 
     public function test_pta_edit_preserves_workflow_v2_options_for_direct_actions(): void

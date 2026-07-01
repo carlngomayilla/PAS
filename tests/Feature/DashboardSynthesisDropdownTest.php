@@ -22,6 +22,7 @@ class DashboardSynthesisDropdownTest extends TestCase
     {
         $view = (string) file_get_contents(resource_path('views/partials/dashboard-analytics.blade.php'));
         $overview = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-overview.blade.php'));
+        $hierarchy = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-synthesis-hierarchy.blade.php'));
         $tables = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-tables.blade.php'));
         $detailTables = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-synthesis-tables.blade.php'));
         $script = (string) file_get_contents(resource_path('js/dashboard-render.js'));
@@ -39,6 +40,11 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringContainsString("const panelKeys = ['overview', 'charts', 'advanced'];", $script);
         $this->assertStringContainsString('$baseSynthesisQuery', $overview);
         $this->assertStringContainsString('Alertes critiques', $overview);
+        $this->assertStringContainsString('_panel-synthesis-hierarchy', $overview);
+        $this->assertStringContainsString('data-dashboard-synthesis-hierarchy', $hierarchy);
+        $this->assertStringContainsString('Vue synthetique d\'avancement PAS', $hierarchy);
+        $this->assertStringContainsString('PAS -> Axes -> Objectifs -> PAO/PTA -> Actions', $hierarchy);
+        $this->assertStringContainsString('Voir pourquoi', $hierarchy);
         $this->assertStringContainsString('$showSynthesisTablesInOverview ?? false', $overview);
         $this->assertStringContainsString('_panel-synthesis-tables', $tables);
         $this->assertStringContainsString('Tableaux de synthese', $detailTables);

@@ -37,4 +37,23 @@ class AiPtaImportPreviewTest extends TestCase
 
         $this->assertContains('champ_difficulte', PlanningExcelImportService::IMPORT_COLUMNS);
     }
+
+    public function test_preview_displays_ai_provider_warning(): void
+    {
+        Storage::fake('local');
+        $user = $this->createAiUser();
+        $batch = AiImportBatch::query()->create([
+            'user_id' => $user->id,
+            'original_filename' => 'source.csv',
+            'file_path' => 'ai-imports/pta/table/source.csv',
+            'file_type' => 'csv',
+            'status' => AiImportBatch::STATUS_VALIDATING,
+            'error_message' => 'L appel IA Openai a ete limite temporairement.',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('workspace.ai-imports.pta.preview', $batch))
+            ->assertOk()
+            ->assertSee('L appel IA Openai a ete limite temporairement.');
+    }
 }

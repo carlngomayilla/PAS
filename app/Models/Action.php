@@ -8,55 +8,82 @@ use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Action extends Model
 {
     use HasFactory, SoftDeletes;
 
     public const CONTEXT_PILOTAGE = 'pilotage';
+
     public const CONTEXT_OPERATIONNEL = 'operationnel';
 
     public const MODE_SOUS_ACTIONS = 'sous_actions';
+
     public const MODE_QUANTITATIF = 'quantitatif';
+
     public const MODE_SANS_QUANTITE = 'sans_quantite';
+
     public const MODE_MIXTE = 'mixte';
 
     // Workflow V2 — type_action pivot (cf. docs/WORKFLOW-SUIVI-V2.md).
     public const TYPE_QUANTITATIVE = 'quantitative';
+
     public const TYPE_NON_QUANTITATIVE = 'non_quantitative';
+
+    public const TYPE_MIXTE = 'mixte';
+
     public const TYPE_COMPOSEE = 'composee';
 
     public const ORIGIN_PAS = 'PAS';
+
     public const ORIGIN_PAO = 'PAO';
+
     public const ORIGIN_PTA = 'PTA';
+
     public const ORIGIN_INTERNE = 'INTERNE';
 
     public const FINANCEMENT_NON_REQUIS = 'non_requis';
+
     public const FINANCEMENT_PRE_SIGNALE_DAF = 'pre_signale_daf';
+
     public const FINANCEMENT_EN_ATTENTE_VALIDATION_CHEF = 'en_attente_validation_chef';
+
     public const FINANCEMENT_SOUMIS_DAF = 'soumis_daf';
+
     public const FINANCEMENT_COMPLEMENT_DEMANDE = 'complement_demande';
+
     public const FINANCEMENT_VALIDE_DAF = 'valide_daf';
+
     public const FINANCEMENT_REJETE_DAF = 'rejete_daf';
+
     public const FINANCEMENT_TRANSMIS_DG = 'transmis_dg';
+
     public const FINANCEMENT_VALIDE_DG = 'valide_dg';
+
     public const FINANCEMENT_REJETE_DG = 'rejete_dg';
 
     public const FINANCEMENT_EN_ATTENTE_DAF = self::FINANCEMENT_PRE_SIGNALE_DAF;
+
     public const FINANCEMENT_EN_COURS_ANALYSE = self::FINANCEMENT_COMPLEMENT_DEMANDE;
+
     public const FINANCEMENT_APPROUVE = self::FINANCEMENT_VALIDE_DAF;
+
     public const FINANCEMENT_REJETE = self::FINANCEMENT_REJETE_DAF;
+
     public const FINANCEMENT_FINANCE = self::FINANCEMENT_VALIDE_DG;
+
     public const FINANCEMENT_NON_FINANCE = self::FINANCEMENT_REJETE_DG;
 
     public const FINANCEMENT_A_TRAITER_DAF = self::FINANCEMENT_SOUMIS_DAF;
+
     public const FINANCEMENT_ACCORDE_DG = self::FINANCEMENT_VALIDE_DG;
+
     public const FINANCEMENT_REFUSE_DG = self::FINANCEMENT_REJETE_DG;
 
     /**
@@ -282,7 +309,7 @@ class Action extends Model
 
     // Relation weeks() supprimee : le suivi hebdomadaire n'existe plus.
     // Stub retournant une collection vide via Builder pour compatibilite.
-    public function weeks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function weeks(): HasMany
     {
         return $this->hasMany(Action::class, 'id', 'id')->whereRaw('1 = 0');
     }
@@ -556,7 +583,7 @@ class Action extends Model
         $query->where(function (Builder $scopedQuery) use ($userId): void {
             $scopedQuery->where('responsable_id', $userId);
 
-            if (\App\Support\SchemaIntrospectionCache::hasTable('action_responsables')) {
+            if (SchemaIntrospectionCache::hasTable('action_responsables')) {
                 $scopedQuery->orWhereHas('responsables', fn (Builder $responsableQuery) => $responsableQuery->whereKey($userId));
             }
         });
@@ -598,6 +625,7 @@ class Action extends Model
     {
         return [
             self::MODE_QUANTITATIF => 'Cible quantitative',
+            self::MODE_MIXTE => 'Cible quantitative et livrable',
             self::MODE_SANS_QUANTITE => 'Sans quantité',
             self::MODE_SOUS_ACTIONS => 'Cible par sous-action',
         ];
@@ -614,6 +642,7 @@ class Action extends Model
     {
         return [
             self::TYPE_QUANTITATIVE => 'Action simple quantitative',
+            self::TYPE_MIXTE => 'Action mixte',
             self::TYPE_NON_QUANTITATIVE => 'Action simple non quantitative',
             self::TYPE_COMPOSEE => 'Action composée (sous-actions)',
         ];
@@ -626,6 +655,11 @@ class Action extends Model
             return $type;
         }
 
+        $mode = trim((string) ($this->mode_evaluation ?? ''));
+        if ($mode === self::MODE_MIXTE) {
+            return self::TYPE_MIXTE;
+        }
+
         // Fallback dérivé : sous-actions → composée, cible quantitative → quantitative.
         if ($this->relationLoaded('sousActions') ? $this->sousActions->isNotEmpty() : $this->sousActions()->exists()) {
             return self::TYPE_COMPOSEE;
@@ -634,6 +668,10 @@ class Action extends Model
         $legacyType = trim((string) ($this->type_cible ?? ''));
         if (in_array($legacyType, ['quantitative', 'quantitatif'], true)) {
             return self::TYPE_QUANTITATIVE;
+        }
+
+        if (in_array($legacyType, ['mixte', 'mixed'], true)) {
+            return self::TYPE_MIXTE;
         }
 
         return self::TYPE_NON_QUANTITATIVE;
@@ -659,6 +697,26 @@ class Action extends Model
         return $this->resolvedTypeAction() === self::TYPE_COMPOSEE;
     }
 
+    public function isMixedTarget(): bool
+    {
+        return $this->resolvedTypeAction() === self::TYPE_MIXTE
+            || $this->resolvedEvaluationMode() === self::MODE_MIXTE;
+    }
+
+    public function tracksQuantitativeTarget(): bool
+    {
+        return in_array($this->resolvedTypeAction(), [self::TYPE_QUANTITATIVE, self::TYPE_MIXTE], true)
+            || in_array($this->resolvedEvaluationMode(), [self::MODE_QUANTITATIF, self::MODE_MIXTE], true)
+            || in_array(trim((string) ($this->type_cible ?? '')), ['quantitative', 'quantitatif', 'mixte'], true);
+    }
+
+    public function tracksDeliverableTarget(): bool
+    {
+        return in_array($this->resolvedTypeAction(), [self::TYPE_NON_QUANTITATIVE, self::TYPE_MIXTE], true)
+            || in_array($this->resolvedEvaluationMode(), [self::MODE_SANS_QUANTITE, self::MODE_MIXTE], true)
+            || in_array(trim((string) ($this->type_cible ?? '')), ['qualitative', 'qualitatif', 'mixte'], true);
+    }
+
     public function resolvedEvaluationMode(): string
     {
         $mode = trim((string) ($this->mode_evaluation ?? ''));
@@ -668,8 +726,25 @@ class Action extends Model
             return $mode;
         }
 
+        $typeAction = trim((string) ($this->type_action ?? ''));
+        if ($typeAction === self::TYPE_MIXTE) {
+            return self::MODE_MIXTE;
+        }
+
+        if ($typeAction === self::TYPE_NON_QUANTITATIVE) {
+            return self::MODE_SANS_QUANTITE;
+        }
+
+        if ($typeAction === self::TYPE_QUANTITATIVE) {
+            return self::MODE_QUANTITATIF;
+        }
+
         if (in_array($legacyType, ['quantitative', 'quantitatif'], true)) {
             return self::MODE_QUANTITATIF;
+        }
+
+        if (in_array($legacyType, ['mixte', 'mixed'], true)) {
+            return self::MODE_MIXTE;
         }
 
         if (in_array($legacyType, ['qualitative', 'qualitatif'], true)) {
@@ -720,12 +795,13 @@ class Action extends Model
 
     public function usesQuantitativeProgress(): bool
     {
-        return in_array($this->resolvedEvaluationMode(), [self::MODE_QUANTITATIF, self::MODE_MIXTE], true);
+        return $this->tracksQuantitativeTarget();
     }
 
     public function usesNoQuantityProgress(): bool
     {
-        return $this->resolvedEvaluationMode() === self::MODE_SANS_QUANTITE;
+        return $this->resolvedEvaluationMode() === self::MODE_SANS_QUANTITE
+            || $this->resolvedTypeAction() === self::TYPE_NON_QUANTITATIVE;
     }
 
     public function getModeEvaluationLabelAttribute(): string
@@ -818,7 +894,7 @@ class Action extends Model
      * `ressources_necessaires` est rempli pour 100 % des lignes (cf. plan
      * Phase 3 du rapport d audit).
      *
-     * @param array<string, string> $options
+     * @param  array<string, string>  $options
      * @return list<string>
      */
     public function legacyResourceLabels(array $options): array
@@ -920,7 +996,7 @@ class Action extends Model
             return true;
         }
 
-        if (! \App\Support\SchemaIntrospectionCache::hasTable('action_responsables')) {
+        if (! SchemaIntrospectionCache::hasTable('action_responsables')) {
             return false;
         }
 

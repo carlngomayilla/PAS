@@ -17,7 +17,10 @@ class AiPromptService
             'Indicateur, livrable, preuve attendue ou justificatif attendu designent justificatif_attendu.',
             'Budget, montant, cout ou financement previsionnel designent montant_financement.',
             'Tu dois normaliser les dates au format YYYY-MM-DD.',
+            'Si le document source est un PDF scanne ou une image OCR, conserve la page source et le niveau de confiance dans un log de controle.',
+            'Toute information normalisee, peu lisible ou incertaine doit avoir score_confiance_ia inferieur a 0.75, commentaire_obligatoire = 1 et champ_difficulte = 1.',
             'Tu dois retourner uniquement du JSON conforme au schema demande.',
+            'Le JSON doit contenir rows[] pour les lignes IMPORT_GLOBAL et, si possible, log[] pour page_pdf, score_confiance_ia et note_normalisation.',
             "Tu ne dois jamais importer les donnees directement : Laravel valide et l'utilisateur confirme.",
             '',
             $this->ptaImportGlobalMappingPrompt(),
@@ -67,6 +70,9 @@ class AiPromptService
             '- Si une cellule du document contient plusieurs sous-actions, renseigne sous_actions et nombre_sous_actions.',
             '- Si le document ne donne pas de valeur, mets null au lieu de deviner.',
             '- Respecte les colonnes du modele meme si le document utilise des mots differents.',
+            '- Si les axes sont en chiffres romains, convertis-les en nombres : I=1, II=2, III=3, IV=4.',
+            '- Le log d extraction ne remplace jamais les colonnes IMPORT_GLOBAL : il sert a tracer page_pdf, score_confiance_ia, note_normalisation et validation humaine.',
+            '- Aligne log[] avec rows[] par ligne_import si disponible, sinon par position.',
         ]));
     }
 

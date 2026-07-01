@@ -17,18 +17,23 @@ use App\Models\Service;
 use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
-use Illuminate\Support\Facades\DB;
+use App\Services\DeletionRequestService;
+use App\Services\ExerciceContext;
 use App\Services\Notifications\WorkspaceNotificationService;
-use App\Services\PlanningModificationLockService;
 use App\Services\PlanningClosureReportService;
+use App\Services\PlanningModificationLockService;
 use App\Services\Security\SecureJustificatifStorage;
 use App\Services\WorkflowSettings;
 use App\Support\SchemaIntrospectionCache;
 use App\Support\UiLabel;
-use App\Services\ExerciceContext;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -101,13 +106,13 @@ class PtaWebController extends Controller
             ->pluck('cnt', 'statut');
         $ptaIdsSubquery = (clone $statsBase)->select('id');
         $ptaStats = [
-            'total'          => (int) $byStatus->sum(),
-            'en_cours'       => (int) ($byStatus[Pta::STATUS_EN_COURS] ?? 0),
-            'clotures'       => (int) ($byStatus[Pta::STATUS_CLOTURE] ?? 0),
-            'archives'       => (int) ($byStatus[Pta::STATUS_ARCHIVE] ?? 0),
-            'sans_action'    => (clone $statsBase)->doesntHave('actions')->count(),
-            'actions_total'  => DB::table('actions')->whereIn('pta_id', $ptaIdsSubquery)->count(),
-            'services'       => (clone $statsBase)->distinct()->count('service_id'),
+            'total' => (int) $byStatus->sum(),
+            'en_cours' => (int) ($byStatus[Pta::STATUS_EN_COURS] ?? 0),
+            'clotures' => (int) ($byStatus[Pta::STATUS_CLOTURE] ?? 0),
+            'archives' => (int) ($byStatus[Pta::STATUS_ARCHIVE] ?? 0),
+            'sans_action' => (clone $statsBase)->doesntHave('actions')->count(),
+            'actions_total' => DB::table('actions')->whereIn('pta_id', $ptaIdsSubquery)->count(),
+            'services' => (clone $statsBase)->distinct()->count('service_id'),
         ];
 
         $rows = $query
@@ -174,7 +179,7 @@ class PtaWebController extends Controller
 
         return view('workspace.pta.form', [
             'mode' => 'create',
-            'row' => tap(new Pta(), function (Pta $pta) use ($prefilledObjectifId): void {
+            'row' => tap(new Pta, function (Pta $pta) use ($prefilledObjectifId): void {
                 $pta->titre = 'PTA - SERVICE';
                 $pta->objectif_operationnel_id = $prefilledObjectifId;
             }),
@@ -234,7 +239,7 @@ class PtaWebController extends Controller
         }
 
         $before = $existingPta?->toArray();
-        $pta = $existingPta instanceof Pta ? $existingPta : new Pta();
+        $pta = $existingPta instanceof Pta ? $existingPta : new Pta;
         if ($existingPta instanceof Pta) {
             $payload['pao_id'] = (int) $existingPta->pao_id;
             $payload['objectif_operationnel_id'] = (int) ($existingPta->objectif_operationnel_id ?: $objectifOperationnel->id);
@@ -440,7 +445,6 @@ class PtaWebController extends Controller
             'exercice_id' => $targetPao->exercice_id,
         ];
 
-
         $before = $pta->toArray();
         $pta->fill($payload);
         // statut n est plus mass-assignable : on conserve l etat workflow courant.
@@ -486,7 +490,7 @@ class PtaWebController extends Controller
         $validated = $request->validate([
             'motif' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
-        $deletionRequests = app(\App\Services\DeletionRequestService::class);
+        $deletionRequests = app(DeletionRequestService::class);
         // Super Admin et DG peuvent supprimer directement avec cascade (Actions et
         // sous-actions). Les autres roles passent par le workflow de demande validee.
         $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
@@ -521,7 +525,7 @@ class PtaWebController extends Controller
      * On encapsule dans un tableau a un element pour reutiliser syncPtaActions(),
      * puis on retourne JSON avec l'id (re)cree et eventuels erreurs de validation.
      */
-    public function upsertActionInline(Request $request, Pta $pta): \Illuminate\Http\JsonResponse
+    public function upsertActionInline(Request $request, Pta $pta): JsonResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -550,12 +554,12 @@ class PtaWebController extends Controller
                 'date_fin' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_debut'],
                 // Workflow V2 : type_action pilote. mode_evaluation devient optionnel
                 // (dérivé ci-dessous) pour compat avec l'ancien front éventuel.
-                'type_action' => ['required', \Illuminate\Validation\Rule::in([
+                'type_action' => ['required', Rule::in([
                     Action::TYPE_QUANTITATIVE,
                     Action::TYPE_NON_QUANTITATIVE,
                     Action::TYPE_COMPOSEE,
                 ])],
-                'mode_evaluation' => ['nullable', \Illuminate\Validation\Rule::in([
+                'mode_evaluation' => ['nullable', Rule::in([
                     Action::MODE_SOUS_ACTIONS,
                     Action::MODE_QUANTITATIF,
                     Action::MODE_SANS_QUANTITE,
@@ -567,7 +571,7 @@ class PtaWebController extends Controller
                 'rmo_ids.*' => ['integer', 'exists:users,id'],
                 'quantite_cible' => ['nullable', 'integer', 'min:1'],
                 'unite_cible' => ['nullable', 'string', 'max:100'],
-                'seuil_mode' => ['nullable', \Illuminate\Validation\Rule::in(['unique', 'trimestriel'])],
+                'seuil_mode' => ['nullable', Rule::in(['unique', 'trimestriel'])],
                 'seuil_minimum' => ['nullable', 'integer', 'min:0', 'max:100'],
                 'justificatif_obligatoire' => ['nullable', 'boolean'],
                 'financement_requis' => ['nullable', 'boolean'],
@@ -577,7 +581,7 @@ class PtaWebController extends Controller
                 'ressources_necessaires.*' => ['string', 'max:255'],
                 'sous_actions' => ['nullable', 'array'],
             ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json([
                 'ok' => false,
                 'message' => $this->validationErrorMessage($e),
@@ -649,7 +653,7 @@ class PtaWebController extends Controller
                     'lock_message' => $lockMessageAfterSave,
                 ],
             ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json([
                 'ok' => false,
                 'message' => $this->validationErrorMessage($e),
@@ -663,7 +667,7 @@ class PtaWebController extends Controller
         }
     }
 
-    private function validationErrorMessage(\Illuminate\Validation\ValidationException $exception): string
+    private function validationErrorMessage(ValidationException $exception): string
     {
         foreach ($exception->errors() as $messages) {
             foreach ((array) $messages as $message) {
@@ -765,7 +769,7 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $report
+     * @param  array<string, mixed>  $report
      */
     private function closureReportErrorMessage(array $report): string
     {
@@ -835,6 +839,7 @@ class PtaWebController extends Controller
             ->where(function ($query) use ($pao): void {
                 if ($pao->exercice_id !== null) {
                     $query->where('exercice_id', (int) $pao->exercice_id);
+
                     return;
                 }
 
@@ -877,7 +882,7 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @param array<int, mixed> $actionsPayload
+     * @param  array<int, mixed>  $actionsPayload
      * @return list<Action>
      */
     private function syncPtaActions(Pta $pta, ObjectifOperationnel $objectifOperationnel, array $actionsPayload, User $actor): array
@@ -910,7 +915,7 @@ class PtaWebController extends Controller
                 : null;
             $isNewAction = $actionId === null;
             $action = $isNewAction
-                ? new Action()
+                ? new Action
                 : Action::query()
                     ->whereKey($actionId)
                     ->where('pta_id', (int) $pta->id)
@@ -920,7 +925,7 @@ class PtaWebController extends Controller
             if (! $isNewAction) {
                 // ensureUnlocked tient compte du role (SA/DG bypassent automatiquement).
                 if ($message = $lockService->ensureUnlocked($action, $actor)) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'actions' => $message,
                     ]);
                 }
@@ -1032,7 +1037,7 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @param array<int, mixed> $actionsPayload
+     * @param  array<int, mixed>  $actionsPayload
      * @return array<int, mixed>
      */
     private function withUploadedActionFiles(array $actionsPayload, Request $request): array
@@ -1057,8 +1062,8 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $actionPayload
-     * @param list<int> $rmoIds
+     * @param  array<string, mixed>  $actionPayload
+     * @param  list<int>  $rmoIds
      * @return array<string, mixed>
      */
     private function normalizePtaActionPayload(
@@ -1078,6 +1083,7 @@ class PtaWebController extends Controller
 
         $quantiteCible = $actionPayload['quantite_cible'] ?? null;
         $quantiteCible = ($quantiteCible === '' || $quantiteCible === null) ? null : (int) round((float) $quantiteCible);
+        $typeAction = trim((string) ($actionPayload['type_action'] ?? ''));
         $modeEvaluation = trim((string) ($actionPayload['mode_evaluation'] ?? ''));
         if ($modeEvaluation === Action::MODE_MIXTE) {
             $modeEvaluation = filled($quantiteCible) ? Action::MODE_QUANTITATIF : Action::MODE_SOUS_ACTIONS;
@@ -1121,6 +1127,8 @@ class PtaWebController extends Controller
             ?? optional($objectifOperationnel->echeance)->format('Y-m-d')
             ?? ($actionPayload['date_debut'] ?? null);
         $isQuantitative = $modeEvaluation === Action::MODE_QUANTITATIF;
+        $preserveQuantitativeTarget = $isQuantitative
+            || ($typeAction === Action::TYPE_COMPOSEE && filled($quantiteCible));
         $actionPaoId = (int) $objectifOperationnel->pao_id;
         $actionObjectifId = (int) $objectifOperationnel->id;
         $thresholdMode = (string) ($actionPayload['seuil_mode'] ?? $existingAction?->seuil_mode ?? 'unique');
@@ -1147,13 +1155,13 @@ class PtaWebController extends Controller
             'description' => ($value = trim((string) ($actionPayload['description'] ?? ''))) !== ''
                 ? $value
                 : ($isNewAction ? null : $existingAction?->description),
-            'type_cible' => $isQuantitative ? 'quantitative' : 'qualitative',
+            'type_cible' => $isQuantitative ? 'quantitative' : ($preserveQuantitativeTarget ? 'mixte' : 'qualitative'),
             'intitule_cible' => $existingAction?->intitule_cible,
             'priorite' => $actionPayload['priorite'] ?? null,
-            'unite_cible' => $isQuantitative
+            'unite_cible' => $preserveQuantitativeTarget
                 ? ($actionPayload['unite_cible'] ?? null)
                 : null,
-            'quantite_cible' => $isQuantitative
+            'quantite_cible' => $preserveQuantitativeTarget
                 ? $quantiteCible
                 : null,
             'seuil_minimum' => (int) round((float) ($actionPayload['seuil_minimum'] ?? $existingAction?->seuil_minimum ?? 80)),
@@ -1229,8 +1237,8 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $actionPayload
-     * @param list<int> $rmoIds
+     * @param  array<string, mixed>  $actionPayload
+     * @param  list<int>  $rmoIds
      */
     private function syncPlannedSubActions(Action $action, array $actionPayload, array $rmoIds): void
     {
@@ -1311,6 +1319,7 @@ class PtaWebController extends Controller
 
             if ($subAction instanceof SousAction) {
                 $subAction->fill($payload)->save();
+
                 continue;
             }
 
@@ -1333,8 +1342,8 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $subActionPayload
-     * @param list<int> $rmoIds
+     * @param  array<string, mixed>  $subActionPayload
+     * @param  list<int>  $rmoIds
      */
     private function resolveSubActionAgentId(array $subActionPayload, ?SousAction $subAction, array $rmoIds, int $defaultAgentId, int $subActionIndex = 0): int
     {
@@ -1362,7 +1371,7 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @param list<int> $rmoIds
+     * @param  list<int>  $rmoIds
      */
     private function syncActionRmos(Action $action, array $rmoIds): void
     {
@@ -1386,7 +1395,7 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, ObjectifOperationnel>
+     * @return Collection<int, ObjectifOperationnel>
      */
     private function objectifOperationnelOptions(User $user, ?int $forceObjectifId = null)
     {
@@ -1435,7 +1444,7 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Pao>
+     * @return Collection<int, Pao>
      */
     private function paoOptions(User $user)
     {
@@ -1465,7 +1474,7 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Service>
+     * @return Collection<int, Service>
      */
     private function serviceOptions(User $user)
     {
@@ -1487,7 +1496,7 @@ class PtaWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, User>
+     * @return Collection<int, User>
      */
     private function responsableOptions(User $user)
     {

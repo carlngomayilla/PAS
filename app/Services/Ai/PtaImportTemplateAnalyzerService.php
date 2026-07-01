@@ -4,13 +4,26 @@ namespace App\Services\Ai;
 
 use Illuminate\Support\Arr;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use RuntimeException;
 
 class PtaImportTemplateAnalyzerService
 {
     /**
-     * @return array{path:string,columns:list<string>,guide:list<array<string,mixed>>,examples:list<array<string,mixed>>,constraints:array<string,mixed>}
+     * @return array{
+     *     path:string,
+     *     columns:list<string>,
+     *     guide:list<array<string,mixed>>,
+     *     examples:list<array<string,mixed>>,
+     *     training:array{
+     *         log_extraction:list<array<string,mixed>>,
+     *         prompt_ia:string,
+     *         pipeline_outils:list<array<string,mixed>>,
+     *         synthese_import:list<array<string,mixed>>
+     *     },
+     *     constraints:array<string,mixed>
+     * }
      */
     public function analyze(?string $path = null): array
     {
@@ -28,6 +41,7 @@ class PtaImportTemplateAnalyzerService
             'columns' => $this->columnsFromSheet($importSheet),
             'guide' => $guideSheet instanceof Worksheet ? $this->rowsFromSheet($guideSheet) : [],
             'examples' => array_slice($this->rowsFromSheet($importSheet), 0, 5),
+            'training' => $this->trainingSheets($spreadsheet),
             'constraints' => $this->constraints(),
         ];
     }
@@ -131,5 +145,59 @@ class PtaImportTemplateAnalyzerService
         }
 
         return $rows;
+    }
+
+    /**
+     * @return array{
+     *     log_extraction:list<array<string,mixed>>,
+     *     prompt_ia:string,
+     *     pipeline_outils:list<array<string,mixed>>,
+     *     synthese_import:list<array<string,mixed>>
+     * }
+     */
+    private function trainingSheets(Spreadsheet $spreadsheet): array
+    {
+        return [
+            'log_extraction' => $this->rowsFromOptionalSheet($spreadsheet, 'LOG_EXTRACTION'),
+            'prompt_ia' => $this->textFromOptionalSheet($spreadsheet, 'PROMPT_IA'),
+            'pipeline_outils' => $this->rowsFromOptionalSheet($spreadsheet, 'PIPELINE_OUTILS'),
+            'synthese_import' => $this->rowsFromOptionalSheet($spreadsheet, 'SYNTHESE_IMPORT'),
+        ];
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function rowsFromOptionalSheet(Spreadsheet $spreadsheet, string $sheetName): array
+    {
+        $sheet = $spreadsheet->getSheetByName($sheetName);
+
+        return $sheet instanceof Worksheet ? $this->rowsFromSheet($sheet) : [];
+    }
+
+    private function textFromOptionalSheet(Spreadsheet $spreadsheet, string $sheetName): string
+    {
+        $sheet = $spreadsheet->getSheetByName($sheetName);
+        if (! $sheet instanceof Worksheet) {
+            return '';
+        }
+
+        $highestRow = $sheet->getHighestDataRow();
+        $highestColumn = $sheet->getHighestDataColumn();
+        $lines = [];
+
+        for ($rowNumber = 1; $rowNumber <= $highestRow; $rowNumber++) {
+            $values = Arr::flatten($sheet->rangeToArray('A'.$rowNumber.':'.$highestColumn.$rowNumber, null, true, false));
+            $line = implode(' | ', array_filter(array_map(
+                static fn (mixed $value): string => trim((string) $value),
+                $values
+            ), static fn (string $value): bool => $value !== ''));
+
+            if ($line !== '') {
+                $lines[] = $line;
+            }
+        }
+
+        return implode("\n", $lines);
     }
 }

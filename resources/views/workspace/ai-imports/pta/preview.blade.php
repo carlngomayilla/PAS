@@ -42,6 +42,9 @@
         @if ($errors->any())
             <div class="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{{ $errors->first() }}</div>
         @endif
+        @if ($batch->error_message)
+            <div class="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">{{ $batch->error_message }}</div>
+        @endif
 
         <div class="mb-5 grid gap-3 sm:grid-cols-5">
             <div class="rounded-lg border border-[#d8ecf8] bg-white p-4"><p class="text-xs font-bold uppercase text-slate-500">Score</p><p class="mt-2 text-2xl font-extrabold">{{ $batch->confidence_score ?? '-' }}</p></div>

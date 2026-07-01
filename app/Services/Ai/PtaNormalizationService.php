@@ -87,6 +87,11 @@ class PtaNormalizationService
         'montant_financement',
         'rmo_raw',
         'etat_realisation_initial',
+        'ligne_import',
+        'page_pdf',
+        'score_confiance_ia',
+        'note_normalisation',
+        'etat_pdf',
     ];
 
     /**
@@ -137,6 +142,11 @@ class PtaNormalizationService
         'observations' => ['observations', 'commentaires', 'commentaire', 'notes'],
         'pta_code' => ['pta code', 'code pta', 'pta'],
         'pta_id' => ['pta id', 'id pta'],
+        'ligne_import' => ['ligne import', 'ligne_import', 'row number', 'numero ligne'],
+        'page_pdf' => ['page pdf', 'page_pdf', 'page source'],
+        'score_confiance_ia' => ['score confiance ia', 'score_confiance_ia', 'score confiance', 'confidence score'],
+        'note_normalisation' => ['note normalisation', 'note_normalisation', 'note ocr'],
+        'etat_pdf' => ['etat pdf', 'etat_pdf', 'etat de realisation pdf'],
     ];
 
     /**
@@ -286,6 +296,7 @@ class PtaNormalizationService
             'seuil_t3',
             'seuil_t4',
             'confidence_score',
+            'score_confiance_ia',
         ], true)) {
             $number = str_replace(['%', ' ', "\u{00A0}"], '', (string) $value);
             $number = str_replace(',', '.', $number);
@@ -294,6 +305,10 @@ class PtaNormalizationService
         }
 
         if ($field === 'nombre_sous_actions') {
+            return is_numeric($value) ? (int) $value : $value;
+        }
+
+        if (in_array($field, ['ligne_import', 'page_pdf'], true)) {
             return is_numeric($value) ? (int) $value : $value;
         }
 

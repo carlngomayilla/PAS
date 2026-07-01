@@ -15,12 +15,13 @@ class PtaExtractionService
     public function __construct(
         private readonly SimpleSpreadsheet $spreadsheet,
         private readonly PtaDocumentTextExtractionService $textExtraction,
+        private readonly PtaExternalAiExtractionService $externalAi,
         private readonly PtaDocumentStructureExtractorService $structureExtractor,
         private readonly PtaDocumentToImportGlobalMapperService $documentMapper
     ) {}
 
     /**
-     * @return array{created:int,confidence:float}
+     * @return array{created:int,confidence:float,warning:?string}
      */
     public function extract(AiImportBatch $batch): array
     {
@@ -31,6 +32,7 @@ class PtaExtractionService
 
         try {
             $rows = $this->extractRows($batch);
+            $warning = $this->externalAi->lastFailureMessage();
 
             $batch->rows()->delete();
             foreach ($rows as $index => $row) {
@@ -48,9 +50,10 @@ class PtaExtractionService
             $batch->forceFill([
                 'status' => AiImportBatch::STATUS_EXTRACTED,
                 'confidence_score' => $confidence,
+                'error_message' => $warning,
             ])->save();
 
-            return ['created' => count($rows), 'confidence' => $confidence];
+            return ['created' => count($rows), 'confidence' => $confidence, 'warning' => $warning];
         } catch (Throwable $exception) {
             $batch->forceFill([
                 'status' => AiImportBatch::STATUS_FAILED,
@@ -71,8 +74,14 @@ class PtaExtractionService
 
         if (in_array($extension, ['csv', 'xlsx'], true)) {
             $workbook = $this->spreadsheet->read($path);
+            $rows = array_values($workbook['rows'] ?? []);
+            $structured = $this->externalAi->extractFromRows($rows, $this->batchMetadata($batch, [
+                'source_type' => $extension,
+                'source_sheet' => $workbook['sheet_name'] ?? null,
+                'source_sheets' => $workbook['sheet_names'] ?? [],
+            ]));
 
-            return array_values($workbook['rows'] ?? []);
+            return $structured === null ? $rows : $this->rowsFromStructured($structured);
         }
 
         if (! Storage::disk('local')->exists($batch->file_path)) {
@@ -101,23 +110,31 @@ class PtaExtractionService
     private function extractDocumentRows(AiImportBatch $batch, string $path, string $extension): array
     {
         $text = $this->textExtraction->extract($path, $extension);
+        $metadata = $this->batchMetadata($batch, [
+            'source_type' => $extension,
+        ]);
+
+        $structured = $this->externalAi->extractFromText($text, $metadata);
+        if ($structured !== null) {
+            return $this->rowsFromStructured($structured);
+        }
+
         $structured = $this->structureExtractor->extractFromText($text);
-        $structured['document'] = array_replace(
-            $structured['document'] ?? [],
-            array_filter([
-                'annee' => $batch->detected_year,
-                'annee_debut_pas' => $batch->detected_year,
-                'annee_fin_pas' => $batch->detected_year,
-                'direction' => $batch->detected_direction,
-                'service_unite' => $batch->detected_service,
-                'source_document' => $batch->original_filename,
-            ], static fn (mixed $value): bool => $value !== null && trim((string) $value) !== '')
-        );
+        $structured['document'] = array_replace($structured['document'] ?? [], $metadata);
 
         if (($structured['items'] ?? []) === []) {
             throw new RuntimeException('Aucune action PTA exploitable n a ete detectee dans le document.');
         }
 
+        return $this->rowsFromStructured($structured);
+    }
+
+    /**
+     * @param  array{document?:array<string,mixed>,items?:list<array<string,mixed>>,rows?:list<array<string,mixed>>,log?:list<array<string,mixed>>}  $structured
+     * @return list<array<string, mixed>>
+     */
+    private function rowsFromStructured(array $structured): array
+    {
         $mapped = $this->documentMapper->map($structured);
         if (($mapped['rows'] ?? []) === []) {
             throw new RuntimeException('Aucune ligne IMPORT_GLOBAL n a pu etre produite depuis le document.');
@@ -127,6 +144,25 @@ class PtaExtractionService
             fn (array $row, int $index): array => $this->withGenericAliases($row, $index + 1),
             $mapped['rows'],
             array_keys($mapped['rows'])
+        ));
+    }
+
+    /**
+     * @param  array<string,mixed>  $extra
+     * @return array<string,mixed>
+     */
+    private function batchMetadata(AiImportBatch $batch, array $extra = []): array
+    {
+        return array_replace(array_filter([
+            'annee' => $batch->detected_year,
+            'annee_debut_pas' => $batch->detected_year,
+            'annee_fin_pas' => $batch->detected_year,
+            'direction' => $batch->detected_direction,
+            'service_unite' => $batch->detected_service,
+            'source_document' => $batch->original_filename,
+        ], static fn (mixed $value): bool => $value !== null && trim((string) $value) !== ''), array_filter(
+            $extra,
+            static fn (mixed $value): bool => ! (is_string($value) && trim($value) === '') && $value !== null
         ));
     }
 

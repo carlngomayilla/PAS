@@ -21,13 +21,28 @@
         .pta-suivi-table th, .pta-suivi-table td { border:1px solid #111; padding:2px; vertical-align:middle; overflow-wrap:anywhere; }
         .pta-suivi-table th { background:#d9d9d9; text-align:center; font-weight:900; }
         .pta-pas-row td { background:#2f75b5; color:#fff; font-weight:900; text-align:center; }
+        .pta-level-axis td { background:#0f2f57; color:#fff; font-weight:900; text-align:center; }
+        .pta-level-strategic-objective td { background:#1e5fa8; color:#fff; font-weight:900; text-align:center; }
+        .pta-level-operational-objective td { background:#d8ecff; color:#0f2f57; font-weight:900; text-align:center; }
+        .pta-level-action td { background:#f8fafc; color:#111827; }
+        .pta-level-sub-action td { background:#f1f5f9; color:#334155; }
+        .pta-sub-action-row td { background:#f1f5f9; color:#334155; }
+        .pta-sub-action-row .pta-action-index-cell, .pta-sub-action-row .pta-action-parent-cell { background:#f8fafc; color:#111827; }
         .pta-strategy-row td { background:#5b9bd5; color:#000; font-weight:900; text-align:center; }
         .pta-strategy-rate { background:#ddebf7 !important; }
         .pta-objective-row td { background:#ddebf7; font-weight:900; text-align:center; }
-        .pta-objective-number { width:20px; background:#fff !important; }
+        .pta-objective-number { width:20px; }
         .pta-center, .pta-status-cell { text-align:center; }
         .pta-status-cell { font-weight:900; }
+        .pta-status-badge { display:inline-block; border-radius:3px; padding:2px 3px; font-size:5.8px; font-weight:900; line-height:1.1; }
+        .pta-progress-track { height:4px; background:#e5e7eb; }
+        .pta-progress-fill { display:block; height:4px; background:#3996d3; }
+        .pta-progress-label { display:block; font-size:5.6px; font-weight:900; }
+        .pta-proof-button { display:inline-block; border:1px solid #1e5fa8; border-radius:3px; background:#eef6fc; color:#0f2f57; padding:2px 3px; font-size:5.8px; font-weight:900; }
+        .pta-proof-button-empty { border-color:#cbd5e1; background:#f1f5f9; color:#64748b; }
         .pta-action-cell { font-weight:700; }
+        .pta-sub-action-cell { font-weight:800; color:#334155; }
+        .pta-sub-action-number { font-weight:900; color:#0f2f57; }
         .pta-empty { text-align:center; color:#666; }
     </style>
 </head>
@@ -58,7 +73,7 @@
             </div>
         </div>
         <div class="pta-suivi-meta">
-            {{ $scopeLabel }} | Total actions : {{ $summary['actions'] ?? 0 }} | Performance moyenne : {{ number_format((float) ($summary['performance'] ?? 0), 0) }}%
+            {{ $scopeLabel }} | Total actions : {{ $summary['actions'] ?? 0 }} | Performance consolidee : {{ number_format((float) ($summary['performance'] ?? 0), 2) }}% | A parametrer : {{ $summary['a_parametrer'] ?? 0 }}
         </div>
         @include('workspace.pta-suivi.partials.table', ['groups' => $groups, 'exportMode' => 'pdf'])
     </section>

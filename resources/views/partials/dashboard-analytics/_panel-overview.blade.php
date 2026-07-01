@@ -290,7 +290,9 @@
         </div>
     @endif
 
-    @if (!in_array($dashboardRole, ['agent'], true))
+    @include('partials.dashboard-analytics._panel-synthesis-hierarchy')
+
+    @if (($showLegacySynthesisProgressCards ?? false) && !in_array($dashboardRole, ['agent'], true))
     <div class="mb-4 w-full space-y-3">
         @php
             $planningHierarchyRows = [

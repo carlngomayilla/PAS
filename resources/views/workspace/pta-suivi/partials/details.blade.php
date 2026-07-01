@@ -6,9 +6,9 @@
                 <h3 class="text-lg font-black text-[#17324a]">{{ $row['libelle'] ?? '-' }}</h3>
             </div>
             <div class="flex flex-wrap gap-2 text-xs font-black">
-                <span class="rounded-md bg-[#3996d3] px-3 py-1 text-white">{{ $row['statut_suivi_label'] ?? '-' }}</span>
-                <span class="rounded-md bg-[#f8fafc] px-3 py-1 text-[#17324a] ring-1 ring-slate-200">{{ $row['statut_delai_label'] ?? '-' }}</span>
-                <span class="rounded-md bg-[#fff2cc] px-3 py-1 text-[#111827]">{{ $row['alerte_echeance_label'] ?? '-' }}</span>
+                <x-pta.status-badge type="action" :status="$row['statut_action'] ?? 'en_cours'" :label="$row['statut_action_label'] ?? null" />
+                <x-pta.status-badge type="suivi" :status="$row['statut_suivi'] ?? 'en_cours'" :label="$row['statut_suivi_label'] ?? null" />
+                <x-pta.status-badge type="delai" :status="$row['statut_delai'] ?? 'dans_les_delais'" :label="$row['statut_delai_label'] ?? null" />
             </div>
         </div>
 
@@ -82,6 +82,7 @@
             <thead>
                 <tr>
                     <th>Piece</th>
+                    <th>Origine</th>
                     <th>Type</th>
                     <th>Ajoutee par</th>
                     <th>Date</th>
@@ -92,6 +93,7 @@
                 @forelse ($attachments as $attachment)
                     <tr>
                         <td>{{ $attachment['nom'] }}</td>
+                        <td>{{ $attachment['source'] ?? 'Action' }}</td>
                         <td>{{ $attachment['type'] }}</td>
                         <td>{{ $attachment['ajoute_par'] }}</td>
                         <td>{{ $attachment['date'] }}</td>
@@ -106,7 +108,7 @@
                     </tr>
                     @if ($attachment['is_previewable'])
                         <tr>
-                            <td colspan="5">
+                            <td colspan="6">
                                 <div class="pta-suivi-attachment-preview">
                                     @if ($attachment['is_image'])
                                         <img src="{{ $attachment['preview_url'] }}" alt="{{ $attachment['nom'] }}">
@@ -118,7 +120,7 @@
                         </tr>
                     @endif
                 @empty
-                    <tr><td colspan="5">Aucune preuve rattachee a cette action.</td></tr>
+                    <tr><td colspan="6">Aucune preuve rattachee a cette action.</td></tr>
                 @endforelse
             </tbody>
         </table>

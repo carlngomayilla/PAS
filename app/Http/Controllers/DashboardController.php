@@ -1721,6 +1721,7 @@ class DashboardController extends Controller
         $statusCards = $this->buildStatusCards($actions);
         $officialStatusCards = $this->buildStatusCards($officialActions);
         $synthesisDecisionSummary = $this->buildSynthesisDecisionSummary($actions);
+        $synthesisHierarchy = $this->buildSynthesisHierarchy($actions);
         $alerts = $this->buildDashboardAlertRows($actions);
         $roleDashboard = $this->buildRoleDashboard($user, $actions, $validatedActions);
 
@@ -1907,6 +1908,7 @@ class DashboardController extends Controller
             'monthly' => $monthly,
             'synthesis_filters' => $this->selectedDashboardSynthesisFilters(),
             'synthesis_decision_summary' => $synthesisDecisionSummary,
+            'synthesis_hierarchy' => $synthesisHierarchy,
             'unit_rows' => $unitRows,
             'synthesis_objective_rows' => $synthesisObjectiveRows,
             'synthesis_pao_rows' => $synthesisPaoRows,
@@ -4589,6 +4591,294 @@ class DashboardController extends Controller
     private function actionSubActions(Action $action): Collection
     {
         return $action->relationLoaded('sousActions') ? $action->sousActions : collect();
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, mixed>
+     */
+    private function buildSynthesisHierarchy(Collection $actions): array
+    {
+        $pas = $actions->first()?->pta?->pao?->pas;
+        $subActions = $actions->flatMap(fn (Action $action): Collection => $this->actionSubActions($action));
+        $progress = $this->synthesisActionsProgress($actions);
+
+        return [
+            'pas' => [
+                'label' => (string) ($pas?->titre ?: 'Plan d\'Acceleration Strategique'),
+                'period' => collect([
+                    $pas?->periode_debut instanceof Carbon ? $pas->periode_debut->format('d/m/Y') : null,
+                    $pas?->periode_fin instanceof Carbon ? $pas->periode_fin->format('d/m/Y') : null,
+                ])->filter()->implode(' - ') ?: $this->exerciceContext->activeLabel(),
+                'target' => '100%',
+                'realized' => $this->formatPercent($progress),
+                'progress' => $progress,
+                'remaining' => $this->formatPercent(max(0.0, 100.0 - $progress)),
+                'axes_total' => $actions->pluck('pta.pao.pasObjectif.pasAxe.id')->filter()->unique()->count(),
+                'strategic_objectives_total' => $actions->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count(),
+                'operational_objectives_total' => $actions
+                    ->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)
+                    ->filter()
+                    ->unique()
+                    ->count(),
+                'actions_total' => $actions->count(),
+                'sub_actions_total' => $subActions->count(),
+                'late_actions_total' => $actions->filter(fn (Action $action): bool => $this->isLateAction($action))->count(),
+                'completed_actions_total' => $actions->filter(fn (Action $action): bool => $this->isCompletedAction($action))->count(),
+                'validation_actions_total' => $actions
+                    ->filter(fn (Action $action): bool => in_array($this->synthesisWorkflowStatus($action), ['validation_chef', 'validation_controleur'], true))
+                    ->count(),
+                'pending_setup_total' => $actions->filter(fn (Action $action): bool => $this->synthesisWorkflowStatus($action) === 'a_parametrer')->count(),
+            ],
+            'axes' => $actions
+                ->groupBy(fn (Action $action): string => (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->id ?? 0))
+                ->map(fn (Collection $rows): array => $this->buildSynthesisAxisNode($rows))
+                ->sortBy('code')
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, mixed>
+     */
+    private function buildSynthesisAxisNode(Collection $actions): array
+    {
+        $axis = $actions->first()?->pta?->pao?->pasObjectif?->pasAxe;
+
+        return array_merge($this->synthesisGroupMetrics($actions), [
+            'code' => (string) ($axis?->code ?: 'AXE'),
+            'label' => (string) ($axis?->libelle ?: 'Axe non renseigne'),
+            'objectives_total' => $actions->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count(),
+            'operational_objectives_total' => $actions
+                ->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)
+                ->filter()
+                ->unique()
+                ->count(),
+            'ptas_total' => $actions->pluck('pta.id')->filter()->unique()->count(),
+            'objectives' => $actions
+                ->groupBy(fn (Action $action): string => (string) ($action->pta?->pao?->pasObjectif?->id ?? 0))
+                ->map(fn (Collection $rows): array => $this->buildSynthesisStrategicObjectiveNode($rows))
+                ->sortBy('code')
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, mixed>
+     */
+    private function buildSynthesisStrategicObjectiveNode(Collection $actions): array
+    {
+        $objective = $actions->first()?->pta?->pao?->pasObjectif;
+
+        return array_merge($this->synthesisGroupMetrics($actions), [
+            'code' => (string) ($objective?->code ?: 'OS'),
+            'label' => (string) ($objective?->libelle ?: 'Objectif strategique non renseigne'),
+            'operational_objectives_total' => $actions
+                ->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)
+                ->filter()
+                ->unique()
+                ->count(),
+            'operational_objectives' => $actions
+                ->groupBy(fn (Action $action): string => (string) ($action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id ?? 0))
+                ->map(fn (Collection $rows): array => $this->buildSynthesisOperationalObjectiveNode($rows))
+                ->sortBy('label')
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, mixed>
+     */
+    private function buildSynthesisOperationalObjectiveNode(Collection $actions): array
+    {
+        $objective = $actions->first()?->objectifOperationnel ?? $actions->first()?->pta?->objectifOperationnel;
+
+        return array_merge($this->synthesisGroupMetrics($actions), [
+            'code' => $objective?->id ? 'OO '.$objective->id : 'OO',
+            'label' => (string) ($objective?->libelle ?: 'Objectif operationnel non renseigne'),
+            'direction' => (string) ($actions->first()?->pta?->direction?->code ?? $actions->first()?->pta?->direction?->libelle ?? '-'),
+            'service' => (string) ($actions->first()?->pta?->service?->libelle ?? $actions->first()?->pta?->service?->code ?? '-'),
+            'ptas_total' => $actions->pluck('pta.id')->filter()->unique()->count(),
+            'ptas' => $actions
+                ->groupBy(fn (Action $action): string => (string) ($action->pta?->id ?? 0))
+                ->map(fn (Collection $rows): array => $this->buildSynthesisPtaNode($rows))
+                ->sortBy('label')
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, mixed>
+     */
+    private function buildSynthesisPtaNode(Collection $actions): array
+    {
+        $pta = $actions->first()?->pta;
+
+        return array_merge($this->synthesisGroupMetrics($actions), [
+            'code' => $pta?->id ? 'PTA '.$pta->id : 'PTA',
+            'label' => (string) ($pta?->titre ?: 'PTA non renseigne'),
+            'direction' => (string) ($pta?->direction?->code ?? $pta?->direction?->libelle ?? '-'),
+            'service' => (string) ($pta?->service?->libelle ?? $pta?->service?->code ?? '-'),
+            'actions' => $actions
+                ->sortBy(fn (Action $action): float => ($this->isLateAction($action) ? 0.0 : 1000.0) + (float) ($action->progression_reelle ?? 0))
+                ->take(8)
+                ->map(fn (Action $action): array => $this->buildSynthesisActionNode($action))
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildSynthesisActionNode(Action $action): array
+    {
+        $progress = round((float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0), 2);
+        $subActions = $this->actionSubActions($action);
+
+        return [
+            'code' => 'ACT '.$action->id,
+            'label' => (string) $action->libelle,
+            'target' => $this->actionTargetLabel($action),
+            'realized' => $this->actionRealizedLabel($action),
+            'progress' => max(0.0, min(100.0, $progress)),
+            'status' => $this->statusLabel($this->normalizeStatus((string) ($action->statut_dynamique ?? ''))),
+            'delay_status' => $this->delayStatusLabel($action),
+            'alert' => $this->synthesisAlertLabel($this->synthesisAlertStatus($action)),
+            'responsible' => $this->actionResponsibleLabel($action),
+            'direction' => (string) ($action->pta?->direction?->code ?? $action->pta?->direction?->libelle ?? '-'),
+            'service' => (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? '-'),
+            'deadline' => $this->actionDeadline($action)?->format('d/m/Y') ?? '-',
+            'blockage_reason' => $this->synthesisBlockageReason($action),
+            'proofs_total' => $this->actionProofs($action)->count(),
+            'detail_url' => route('workspace.actions.suivi', $action),
+            'sub_actions_total' => $subActions->count(),
+            'sub_actions_done' => $subActions->filter(fn ($subAction): bool => (bool) ($subAction->est_effectuee ?? false))->count(),
+            'sub_actions' => $subActions
+                ->take(5)
+                ->map(fn ($subAction): array => $this->buildSynthesisSubActionNode($action, $subAction))
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildSynthesisSubActionNode(Action $action, mixed $subAction): array
+    {
+        $progress = (bool) ($subAction->est_effectuee ?? false)
+            ? 100.0
+            : max(0.0, min(100.0, (float) ($subAction->taux_execution ?? $subAction->taux_realisation ?? 0)));
+
+        return [
+            'code' => 'SA '.(int) ($subAction->id ?? 0),
+            'label' => (string) ($subAction->libelle ?? 'Sous-action'),
+            'target' => '-',
+            'realized' => (bool) ($subAction->est_effectuee ?? false) ? 'Effectuee' : 'En cours',
+            'progress' => $progress,
+            'status' => (string) ($subAction->statut ?? ((bool) ($subAction->est_effectuee ?? false) ? 'Effectuee' : 'En cours')),
+            'responsible' => (string) ($subAction->agent?->name ?? $this->actionResponsibleLabel($action)),
+            'deadline' => ($subAction->date_fin ?? null) instanceof Carbon ? $subAction->date_fin->format('d/m/Y') : '-',
+            'proof_available' => $subAction->relationLoaded('justificatifs') && $subAction->justificatifs->isNotEmpty(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, mixed>
+     */
+    private function synthesisGroupMetrics(Collection $actions): array
+    {
+        $total = $actions->count();
+        $progress = $this->synthesisActionsProgress($actions);
+        $late = $actions->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
+        $completed = $actions->filter(fn (Action $action): bool => $this->isCompletedAction($action))->count();
+        $subActions = $actions->flatMap(fn (Action $action): Collection => $this->actionSubActions($action));
+
+        return [
+            'target' => '100%',
+            'realized' => $this->formatPercent($progress),
+            'progress' => $progress,
+            'status' => $this->groupEvolutionLabel($actions),
+            'alert' => $late > 0 ? $late.' action(s) hors delai' : 'Pas d\'alerte bloquante',
+            'actions_total' => $total,
+            'completed_actions_total' => $completed,
+            'late_actions_total' => $late,
+            'blocked_actions_total' => $actions->filter(fn (Action $action): bool => $this->synthesisBlockageReason($action) !== 'Aucun blocage critique')->count(),
+            'sub_actions_total' => $subActions->count(),
+            'detail_url' => route('synthese.index', array_merge(request()->query(), ['dashboardTab' => 'advanced'])),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     */
+    private function synthesisActionsProgress(Collection $actions): float
+    {
+        if ($actions->isEmpty()) {
+            return 0.0;
+        }
+
+        return round((float) $actions->avg(fn (Action $action): float => (float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0)), 2);
+    }
+
+    private function synthesisAlertLabel(string $status): string
+    {
+        return match ($status) {
+            'cloturee' => 'Cloturee',
+            'en_retard' => 'Hors delai',
+            'critique' => 'Echeance critique',
+            'echeance_proche' => 'Echeance proche',
+            'a_parametrer' => 'A parametrer',
+            default => 'Pas d\'alerte',
+        };
+    }
+
+    private function synthesisBlockageReason(Action $action): string
+    {
+        if ($this->actionStatusService->isPendingSetup($action)) {
+            return 'Action a parametrer';
+        }
+
+        if ($this->actionResponsibleLabel($action) === 'Non assigne') {
+            return 'Responsable non assigne';
+        }
+
+        if ($this->isLateAction($action)) {
+            return 'Echeance depassee';
+        }
+
+        if ($this->actionSubActions($action)->isEmpty()) {
+            return 'Sous-actions non renseignees';
+        }
+
+        if ((float) ($action->progression_reelle ?? 0) <= 0 && ! $this->isCompletedAction($action)) {
+            return 'Action non demarree';
+        }
+
+        if ($this->isCompletedAction($action) && $this->actionProofs($action)->isEmpty()) {
+            return 'Action cloturee sans preuve';
+        }
+
+        if ((string) ($action->statut_validation ?? '') === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
+            return 'En attente de validation chef';
+        }
+
+        $latest = $this->actionLatestActivityDate($action);
+        if ($latest instanceof Carbon && $latest->diffInDays(Carbon::today()) >= 30 && ! $this->isCompletedAction($action)) {
+            return 'Action non mise a jour recemment';
+        }
+
+        return 'Aucun blocage critique';
     }
 
     /**

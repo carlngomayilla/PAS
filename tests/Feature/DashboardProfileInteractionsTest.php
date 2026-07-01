@@ -22,7 +22,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertDontSee('Interactions disponibles pour ce profil');
         $response->assertSee('Synth');
         $response->assertSee('Graphiques');
-        $response->assertSee('Analyse avancee');
+        $response->assertSee('Vue detaillee');
     }
 
     public function test_seeded_service_user_can_open_dashboard_without_scope_error(): void

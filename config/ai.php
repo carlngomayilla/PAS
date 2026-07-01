@@ -117,6 +117,17 @@ return [
             'driver' => 'ollama',
             'key' => env('OLLAMA_API_KEY', ''),
             'url' => env('OLLAMA_URL', 'http://localhost:11434'),
+            'models' => [
+                'text' => [
+                    'default' => env('OLLAMA_TEXT_MODEL', env('AI_PTA_TEXT_MODEL', 'qwen3:14b')),
+                    'cheapest' => env('OLLAMA_TEXT_CHEAPEST_MODEL', env('AI_PTA_TEXT_MODEL', 'qwen3:8b')),
+                    'smartest' => env('OLLAMA_TEXT_SMARTEST_MODEL', env('AI_PTA_REASONING_MODEL', 'deepseek-r1:14b')),
+                ],
+                'embeddings' => [
+                    'default' => env('OLLAMA_EMBEDDINGS_MODEL', 'nomic-embed-text'),
+                    'dimensions' => (int) env('OLLAMA_EMBEDDINGS_DIMENSIONS', 768),
+                ],
+            ],
         ],
 
         'openai' => [

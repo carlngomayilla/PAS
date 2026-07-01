@@ -31,6 +31,9 @@ class PtaAiImportNormalizerService
         );
 
         $subActions = $this->subActionsFrom($source);
+        $confidence = $this->confidenceFrom($this->first($source, ['score_confiance_ia', 'confidence_score', 'score_confiance', 'confidence', 'confiance']));
+        $normalizationNote = $this->string($this->first($source, ['note_normalisation', 'normalisation_note', 'note_ocr', 'source_note']));
+        $requiresHumanControl = $this->requiresHumanControl($confidence, $normalizationNote);
 
         $row['annee_debut_pas'] = $this->first($source, ['annee_debut_pas', 'annee_debut', 'annee']) ?? 2026;
         $row['annee_fin_pas'] = $this->first($source, ['annee_fin_pas', 'annee_fin']) ?? $row['annee_debut_pas'];
@@ -82,14 +85,19 @@ class PtaAiImportNormalizerService
         $row['nombre_sous_actions'] = $subActions === [] ? ($this->first($source, ['nombre_sous_actions']) ?? $parameterization['nombre_sous_actions']) : count($subActions);
         $row['sous_actions'] = $subActions === [] ? ($this->first($source, ['sous_actions']) ?? $this->parameterizer->stringifySubActions($parameterization['sous_actions'])) : implode(' ; ', $subActions);
         $row['niveau_risque'] = $this->first($source, ['niveau_risque']) ?? $parameterization['niveau_risque'];
-        $row['commentaire_obligatoire'] = $this->first($source, ['commentaire_obligatoire']) ?? $parameterization['commentaire_obligatoire'];
-        $row['champ_difficulte'] = $this->first($source, ['champ_difficulte']) ?? $parameterization['champ_difficulte'];
+        $row['commentaire_obligatoire'] = $this->first($source, ['commentaire_obligatoire']) ?? ($requiresHumanControl ? 1 : $parameterization['commentaire_obligatoire']);
+        $row['champ_difficulte'] = $this->first($source, ['champ_difficulte']) ?? ($requiresHumanControl ? 1 : $parameterization['champ_difficulte']);
         $row['justification_type'] = $parameterization['justification_type'];
         $row['validation_warnings'] = implode(' | ', $parameterization['validation_warnings']);
-        $row['confidence_score'] = $parameterization['confidence_score'];
+        $row['confidence_score'] = $confidence ?? $parameterization['confidence_score'];
 
         $row['rmo_raw'] = $rmoRaw;
-        $row['etat_realisation_initial'] = $this->first($source, ['etat_realisation_initial', 'etat_realisation', 'statut_initial']);
+        $row['ligne_import'] = $this->first($source, ['ligne_import', 'row_number', '_row_number']);
+        $row['page_pdf'] = $this->first($source, ['page_pdf', 'page', 'source_page', 'page_source']);
+        $row['score_confiance_ia'] = $confidence;
+        $row['note_normalisation'] = $normalizationNote;
+        $row['etat_pdf'] = $this->first($source, ['etat_pdf']);
+        $row['etat_realisation_initial'] = $this->first($source, ['etat_realisation_initial', 'etat_pdf', 'etat_realisation', 'statut_initial']);
 
         $validation = $this->quality->validateImportGlobalRow($row);
 
@@ -148,6 +156,47 @@ class PtaAiImportNormalizerService
         return is_numeric($number) ? (float) $number : $value;
     }
 
+    private function confidenceFrom(mixed $value): ?float
+    {
+        if ($this->blank($value)) {
+            return null;
+        }
+
+        $number = str_replace(['%', ' ', "\u{00A0}"], '', (string) $value);
+        $number = str_replace(',', '.', $number);
+        if (! is_numeric($number)) {
+            return null;
+        }
+
+        $confidence = (float) $number;
+        if ($confidence > 1 && $confidence <= 100) {
+            $confidence /= 100;
+        }
+
+        return round(max(0, min(1, $confidence)), 2);
+    }
+
+    private function requiresHumanControl(?float $confidence, ?string $normalizationNote): bool
+    {
+        if ($confidence !== null && $confidence < 0.75) {
+            return true;
+        }
+
+        if ($normalizationNote === null) {
+            return false;
+        }
+
+        $note = $this->key($normalizationNote);
+
+        return str_contains($note, 'ocr')
+            || str_contains($note, 'incertain')
+            || str_contains($note, 'illisible')
+            || str_contains($note, 'normalis')
+            || str_contains($note, 'controle')
+            || str_contains($note, 'validation')
+            || str_contains($note, 'verifier');
+    }
+
     /**
      * @param  array<string,mixed>  $source
      * @param  list<string>  $keys
@@ -182,6 +231,16 @@ class PtaAiImportNormalizerService
 
     private function blank(mixed $value): bool
     {
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if (! $this->blank($item)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         return trim((string) $value) === '';
     }
 

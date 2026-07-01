@@ -37,7 +37,12 @@
                             <td class="px-3 py-2">{{ $batch->detected_year ?? '-' }}</td>
                             <td class="px-3 py-2">{{ $batch->detected_direction ?? '-' }}</td>
                             <td class="px-3 py-2">{{ $batch->detected_service ?? '-' }}</td>
-                            <td class="px-3 py-2">{{ $batch->status }}</td>
+                            <td class="px-3 py-2">
+                                <span>{{ $batch->status }}</span>
+                                @if ($batch->error_message)
+                                    <span class="mt-1 block max-w-xs text-xs font-semibold text-amber-700">{{ $batch->error_message }}</span>
+                                @endif
+                            </td>
                             <td class="px-3 py-2">{{ $batch->confidence_score ?? '-' }}</td>
                             <td class="px-3 py-2">{{ $batch->rows_count }}</td>
                             <td class="px-3 py-2">{{ $batch->blocking_rows_count }}</td>

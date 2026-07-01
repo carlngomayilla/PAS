@@ -14,12 +14,18 @@ class SousAction extends Model
 
     // Workflow V2 — type de sous-action (cf. docs/WORKFLOW-SUIVI-V2.md).
     public const TYPE_QUANTITATIVE = 'quantitative';
+
     public const TYPE_NON_QUANTITATIVE = 'non_quantitative';
+
+    public const TYPE_MIXTE = 'mixte';
 
     // Statuts de validation (parallèle au statut de suivi).
     public const VALIDATION_NON_SOUMISE = 'non_soumise';
+
     public const VALIDATION_SOUMISE = 'soumise';
+
     public const VALIDATION_VALIDEE = 'validee';
+
     public const VALIDATION_REJETEE = 'rejetee';
 
     /**
@@ -84,18 +90,40 @@ class SousAction extends Model
     public function resolvedType(): string
     {
         $type = trim((string) ($this->sub_action_type ?? ''));
-        if (in_array($type, [self::TYPE_QUANTITATIVE, self::TYPE_NON_QUANTITATIVE], true)) {
+        if (in_array($type, [self::TYPE_QUANTITATIVE, self::TYPE_NON_QUANTITATIVE, self::TYPE_MIXTE], true)) {
             return $type;
         }
 
-        return (filled($this->cible_prevue) && (float) $this->cible_prevue > 0)
-            ? self::TYPE_QUANTITATIVE
-            : self::TYPE_NON_QUANTITATIVE;
+        $hasQuantity = filled($this->cible_prevue) && (float) $this->cible_prevue > 0;
+        $hasDeliverable = trim((string) ($this->resultat_attendu ?? $this->description ?? '')) !== '';
+
+        if ($hasQuantity && $hasDeliverable) {
+            return self::TYPE_MIXTE;
+        }
+
+        return $hasQuantity ? self::TYPE_QUANTITATIVE : self::TYPE_NON_QUANTITATIVE;
     }
 
     public function isQuantitative(): bool
     {
-        return $this->resolvedType() === self::TYPE_QUANTITATIVE;
+        return $this->tracksQuantitativeTarget();
+    }
+
+    public function isMixedTarget(): bool
+    {
+        return $this->resolvedType() === self::TYPE_MIXTE;
+    }
+
+    public function tracksQuantitativeTarget(): bool
+    {
+        return in_array($this->resolvedType(), [self::TYPE_QUANTITATIVE, self::TYPE_MIXTE], true)
+            || (float) ($this->cible_prevue ?? 0) > 0.0;
+    }
+
+    public function tracksDeliverableTarget(): bool
+    {
+        return in_array($this->resolvedType(), [self::TYPE_NON_QUANTITATIVE, self::TYPE_MIXTE], true)
+            || trim((string) ($this->resultat_attendu ?? $this->description ?? '')) !== '';
     }
 
     protected static function booted(): void

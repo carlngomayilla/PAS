@@ -4,18 +4,16 @@ namespace App\Services\Exports;
 
 use App\Support\Zip\SimpleZipWriter;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Collection;
 use RuntimeException;
 
 class PtaSuiviWorkbookExporter
 {
     public function __construct(
-        private readonly SimpleZipWriter $zipWriter = new SimpleZipWriter()
-    ) {
-    }
+        private readonly SimpleZipWriter $zipWriter = new SimpleZipWriter
+    ) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function create(array $payload): string
     {
@@ -48,7 +46,7 @@ class PtaSuiviWorkbookExporter
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return list<array{cells:list<string>,style:int}>
      */
     private function rows(array $payload): array
@@ -64,15 +62,18 @@ class PtaSuiviWorkbookExporter
             'Indicateurs de mesure',
             'Responsable',
             'Ratio',
-            'Taux de realisation (%)',
             'Cible',
+            'Realise',
+            'Taux (%)',
+            'Progression',
             'Performance en fonction de la cible',
             'Ecart',
             'Echeance',
             'Retard',
+            'Statut action',
             'Statut de suivi',
             'Statut delai',
-            'Alerte echeance',
+            'Preuve',
             'Observations',
         ];
 
@@ -88,16 +89,16 @@ class PtaSuiviWorkbookExporter
                 '',
                 '',
                 'Performance PAS',
-                number_format((float) ($pasGroup['performance'] ?? 0), 0).'%',
+                number_format((float) ($pasGroup['performance'] ?? 0), 2).'%',
             ], 'style' => 3];
 
             foreach (collect($pasGroup['axes'] ?? []) as $axisGroup) {
                 $axisGroup = (array) $axisGroup;
-                $rows[] = ['cells' => ['', (string) ($axisGroup['label'] ?? 'Axe strategique'), '', '', '', '', '', '', number_format((float) ($axisGroup['performance'] ?? 0), 0).'%'], 'style' => 4];
+                $rows[] = ['cells' => ['', 'Axe strategique', (string) ($axisGroup['label'] ?? '-'), '', '', '', '', '', number_format((float) ($axisGroup['performance'] ?? 0), 2).'%'], 'style' => 4];
 
                 foreach (collect($axisGroup['objectifs'] ?? []) as $strategicGroup) {
                     $strategicGroup = (array) $strategicGroup;
-                    $rows[] = ['cells' => ['', 'Objectif strategique', (string) ($strategicGroup['label'] ?? '-'), '', '', '', '', '', number_format((float) ($strategicGroup['performance'] ?? 0), 0).'%'], 'style' => 5];
+                    $rows[] = ['cells' => ['', 'Objectif strategique', (string) ($strategicGroup['label'] ?? '-'), '', '', '', '', '', number_format((float) ($strategicGroup['performance'] ?? 0), 2).'%'], 'style' => 5];
 
                     foreach (collect($strategicGroup['objectifs_operationnels'] ?? []) as $operationalGroup) {
                         $operationalGroup = (array) $operationalGroup;
@@ -110,7 +111,7 @@ class PtaSuiviWorkbookExporter
                             '',
                             '',
                             'Performance',
-                            number_format((float) ($operationalGroup['performance'] ?? 0), 0).'%',
+                            number_format((float) ($operationalGroup['performance'] ?? 0), 2).'%',
                         ], 'style' => 6];
                         $rows[] = ['cells' => $headers, 'style' => 7];
 
@@ -122,15 +123,20 @@ class PtaSuiviWorkbookExporter
                                 (string) ($actionRow['indicateur'] ?? '-'),
                                 (string) ($actionRow['responsable'] ?? '-'),
                                 (string) ($actionRow['ratio'] ?? '-'),
-                                (string) ($actionRow['taux_realisation_label'] ?? '-'),
                                 (string) ($actionRow['cible'] ?? '-'),
+                                (string) ($actionRow['realise'] ?? '-'),
+                                (string) ($actionRow['taux_realisation_label'] ?? '-'),
+                                (string) ($actionRow['taux_realisation_label'] ?? '-'),
                                 (string) ($actionRow['performance_label'] ?? '-'),
                                 (string) ($actionRow['ecart_label'] ?? '-'),
                                 (string) ($actionRow['echeance_label'] ?? '-'),
                                 (string) ($actionRow['retard_label'] ?? (((int) ($actionRow['retard_jours'] ?? 0)).' j')),
+                                (string) ($actionRow['statut_action_label'] ?? '-'),
                                 (string) ($actionRow['statut_suivi_label'] ?? '-'),
                                 (string) ($actionRow['statut_delai_label'] ?? '-'),
-                                (string) ($actionRow['alerte_echeance_label'] ?? '-'),
+                                (bool) ($actionRow['has_preuve'] ?? false)
+                                    ? 'Visualiser la preuve ('.((int) ($actionRow['preuve_count'] ?? 0)).')'
+                                    : 'Aucune preuve',
                                 (string) ($actionRow['observations'] ?? '-'),
                             ], 'style' => 0];
                         }
@@ -149,7 +155,7 @@ class PtaSuiviWorkbookExporter
     }
 
     /**
-     * @param list<array{cells:list<string>,style:int}> $rows
+     * @param  list<array{cells:list<string>,style:int}>  $rows
      */
     private function sheetXml(array $rows): string
     {
@@ -167,7 +173,7 @@ class PtaSuiviWorkbookExporter
         }
 
         $cols = [];
-        $widths = [8, 38, 34, 24, 12, 16, 20, 20, 12, 14, 10, 18, 16, 18, 58];
+        $widths = [8, 38, 34, 24, 12, 20, 20, 14, 16, 20, 12, 14, 10, 16, 18, 16, 20, 58];
         foreach ($widths as $index => $width) {
             $col = $index + 1;
             $cols[] = '<col min="'.$col.'" max="'.$col.'" width="'.$width.'" customWidth="1"/>';
@@ -246,10 +252,10 @@ class PtaSuiviWorkbookExporter
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             .'<fonts count="4"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>'
-            .'<fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F75B5"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB4C7E7"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2F0D9"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9EAD3"/></patternFill></fill></fills>'
+            .'<fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F2F57"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F2F57"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1E5FA8"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD8ECFF"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F5F9"/></patternFill></fill></fills>'
             .'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders>'
             .'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            .'<cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="2" fillId="5" borderId="1" xfId="0" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/></cellXfs>'
+            .'<cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="3" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="2" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/></cellXfs>'
             .'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             .'</styleSheet>';
     }

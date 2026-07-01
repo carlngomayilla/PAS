@@ -20,18 +20,10 @@
 @push('head')
     <style>
         .pta-suivi-page { background:#fff; border:1px solid #d7d7d7; color:#000; overflow:hidden; }
-        .pta-suivi-top { display:grid; grid-template-columns: 260px 1fr 540px; align-items:start; border-bottom:1px solid #d7d7d7; }
+        .pta-suivi-top { display:grid; grid-template-columns:260px 1fr; align-items:stretch; border-bottom:1px solid #d7d7d7; }
         .pta-suivi-logo { padding:10px 12px; min-height:78px; }
         .pta-suivi-logo img { width:128px; height:auto; display:block; }
         .pta-suivi-title { min-height:78px; display:flex; align-items:center; justify-content:center; background:#bdd7ee; border-left:1px solid #d7d7d7; border-right:1px solid #d7d7d7; font-size:18px; font-weight:900; letter-spacing:.02em; text-align:center; }
-        .pta-suivi-legend { display:grid; grid-template-columns:120px 1fr; border-left:1px solid #111; }
-        .pta-suivi-legend-title { grid-row:span 3; display:flex; align-items:center; justify-content:center; background:#d0cece; font-size:18px; font-weight:900; border-right:1px solid #111; }
-        .pta-suivi-legend-group { border-bottom:1px solid #111; }
-        .pta-suivi-legend-heading { padding:5px 8px; background:#f8fafc; font-size:11px; font-weight:900; border-bottom:1px solid #111; }
-        .pta-suivi-legend-items { display:grid; gap:0; }
-        .pta-suivi-legend-item { display:grid; grid-template-columns:68px 1fr; min-height:24px; font-size:11px; font-weight:800; }
-        .pta-suivi-legend-swatch { border-right:1px solid #111; border-bottom:1px solid rgba(0,0,0,.15); }
-        .pta-suivi-legend-label { display:flex; align-items:center; padding:3px 7px; border-bottom:1px solid rgba(0,0,0,.12); }
         .pta-suivi-meta { display:grid; grid-template-columns:1fr auto; gap:10px; padding:12px; border-bottom:1px solid #d7d7d7; }
         .pta-suivi-meta p { margin:0 0 5px; color:#ff6600; font-size:12px; font-weight:700; }
         .pta-suivi-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; justify-content:flex-end; }
@@ -39,22 +31,39 @@
         .pta-suivi-toolbar select { min-width:126px; border:1px solid #b7c7d6; border-radius:6px; padding:6px 8px; font-size:12px; background:#fff; }
         .pta-suivi-actionbar { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; padding:10px 12px; border-bottom:1px solid #d7d7d7; background:#f8fbff; }
         .pta-suivi-table-wrap { width:100%; overflow-x:auto; }
-        .pta-suivi-table { width:100%; min-width:1620px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+        .pta-suivi-table { width:100%; min-width:1880px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
         .pta-suivi-table th, .pta-suivi-table td { border:1px solid #111; padding:6px 6px; vertical-align:middle; overflow-wrap:anywhere; }
         .pta-suivi-table th { background:#d9d9d9; color:#000; text-align:center; font-weight:900; }
         .pta-pas-row td { background:#2f75b5; color:#fff; font-weight:900; text-align:center; }
         .pta-pas-code { width:42px; }
         .pta-pas-rate { font-size:20px; }
+        .pta-level-axis td { background:#0f2f57; color:#fff; font-weight:900; text-align:center; }
+        .pta-level-strategic-objective td { background:#1e5fa8; color:#fff; font-weight:900; text-align:center; }
+        .pta-level-operational-objective td { background:#d8ecff; color:#0f2f57; font-weight:900; text-align:center; }
+        .pta-level-action td { background:#f8fafc; color:#111827; }
+        .pta-level-sub-action td { background:#f1f5f9; color:#334155; }
+        .pta-sub-action-row td { background:#f1f5f9; color:#334155; }
+        .pta-sub-action-row .pta-action-index-cell, .pta-sub-action-row .pta-action-parent-cell { background:#f8fafc; color:#111827; }
+        .pta-hierarchy-rate { font-size:20px; }
+        .pta-hierarchy-title { text-transform:uppercase; }
+        .pta-hierarchy-number, .pta-objective-number { width:42px; }
         .pta-strategy-row td { background:#5b9bd5; color:#000; font-weight:900; text-align:center; }
         .pta-strategy-rate { background:#ddebf7 !important; font-size:20px; }
         .pta-objective-row td { background:#ddebf7; font-weight:900; text-align:center; }
-        .pta-objective-number { width:42px; background:#fff !important; }
         .pta-objective-rate { font-size:20px; }
         .pta-action-cell { font-weight:700; color:#17324a; }
         .pta-action-link { display:inline; border:0; padding:0; background:transparent; color:#17324a; font:inherit; font-weight:800; text-decoration:underline; cursor:pointer; text-align:left; }
         .pta-action-link:hover { color:#3996d3; }
+        .pta-sub-action-cell { font-weight:800; color:#334155; }
+        .pta-sub-action-number { font-weight:900; color:#0f2f57; }
         .pta-center, .pta-status-cell { text-align:center; }
         .pta-status-cell { font-weight:900; line-height:1.15; }
+        .pta-status-badge { display:inline-flex; min-height:24px; align-items:center; justify-content:center; border-radius:6px; padding:4px 7px; font-size:10px; font-weight:900; line-height:1.1; }
+        .pta-proof-button { display:inline-flex; min-height:28px; align-items:center; justify-content:center; gap:5px; border:1px solid #1e5fa8; border-radius:6px; background:#eef6fc; color:#0f2f57; padding:5px 8px; font-size:10px; font-weight:900; line-height:1.1; cursor:pointer; }
+        .pta-proof-button span { display:inline-grid; min-width:18px; height:18px; place-items:center; border-radius:999px; background:#1e5fa8; color:#fff; font-size:10px; }
+        .pta-proof-button:hover { background:#d8ecff; }
+        .pta-proof-button-empty, .pta-proof-button:disabled { border-color:#cbd5e1; background:#f1f5f9; color:#64748b; cursor:not-allowed; }
+        .pta-proof-button-readonly { cursor:default; }
         .pta-observation { font-size:11px; line-height:1.35; }
         .pta-empty { padding:18px; text-align:center; font-weight:800; color:#64748b; }
         .pta-suivi-modal-backdrop { position:fixed; inset:0; z-index:80; display:none; align-items:center; justify-content:center; background:rgba(15,23,42,.58); padding:24px; }
@@ -76,7 +85,7 @@
         .pta-suivi-attachment-preview img { display:block; max-width:100%; height:auto; margin:0 auto; }
         @media (max-width:1180px) {
             .pta-suivi-top { grid-template-columns:1fr; }
-            .pta-suivi-title, .pta-suivi-legend { border-left:0; border-right:0; }
+            .pta-suivi-title { border-left:0; border-right:0; }
             .pta-suivi-meta { grid-template-columns:1fr; }
             .pta-suivi-toolbar { justify-content:flex-start; }
         }
@@ -113,22 +122,6 @@
                 <img src="{{ asset('images/logo-wordmark.png') }}" alt="ANBG">
             </div>
             <div class="pta-suivi-title">{{ $title }}</div>
-            <div class="pta-suivi-legend">
-                <div class="pta-suivi-legend-title">Legende</div>
-                @foreach ($legends as $legendTitle => $items)
-                    <div class="pta-suivi-legend-group">
-                        <div class="pta-suivi-legend-heading">{{ $legendTitle }}</div>
-                        <div class="pta-suivi-legend-items">
-                            @foreach ($items as $item)
-                                <div class="pta-suivi-legend-item">
-                                    <span class="pta-suivi-legend-swatch" style="background:{{ $item['color'] }};"></span>
-                                    <span class="pta-suivi-legend-label" style="color:{{ $item['text'] ?? '#111827' }};">{{ $item['label'] }}</span>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endforeach
-            </div>
         </div>
 
         <div class="pta-suivi-meta">
@@ -136,7 +129,7 @@
                 @foreach (explode(' | ', $scopeLabel) as $scopeLine)
                     <p>{{ $scopeLine }}</p>
                 @endforeach
-                <p>Total actions : {{ $summary['actions'] ?? 0 }} | Performance moyenne : {{ number_format((float) ($summary['performance'] ?? 0), 0) }}%</p>
+                <p>Total actions : {{ $summary['actions'] ?? 0 }} | Performance consolidee : {{ number_format((float) ($summary['performance'] ?? 0), 2) }}% | A parametrer : {{ $summary['a_parametrer'] ?? 0 }}</p>
             </div>
             <form method="GET" action="{{ route('pta.suivi.index') }}" class="pta-suivi-toolbar no-print">
                 <div>
@@ -207,15 +200,7 @@
         @include('workspace.pta-suivi.partials.table', ['groups' => $groups])
     </section>
 
-    <div class="pta-suivi-modal-backdrop" data-pta-modal aria-hidden="true">
-        <div class="pta-suivi-modal" role="dialog" aria-modal="true" aria-labelledby="pta-suivi-modal-title">
-            <div class="pta-suivi-modal-head">
-                <h2 id="pta-suivi-modal-title">Detail de l'action</h2>
-                <button type="button" class="pta-suivi-modal-close" data-pta-modal-close>Fermer</button>
-            </div>
-            <div class="pta-suivi-modal-body" data-pta-modal-body></div>
-        </div>
-    </div>
+    <x-pta.proof-modal />
 @endsection
 
 @push('scripts')

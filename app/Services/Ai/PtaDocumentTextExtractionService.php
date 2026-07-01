@@ -2,14 +2,19 @@
 
 namespace App\Services\Ai;
 
+use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Smalot\PdfParser\Parser;
 use Symfony\Component\Process\ExecutableFinder;
-use Symfony\Component\Process\Process;
 use Throwable;
 
 class PtaDocumentTextExtractionService
 {
+    /**
+     * @var array<string,array{size:int,image_count:int,to_unicode_count:int,text_operator_count:int}>
+     */
+    private array $pdfProfiles = [];
+
     public function extract(string $path, string $extension): string
     {
         if (! is_file($path)) {
@@ -25,34 +30,44 @@ class PtaDocumentTextExtractionService
     private function extractPdf(string $path): string
     {
         $text = $this->normalizeText($this->extractWithConfiguredCommand($path));
-        if ($text !== '' && mb_strlen($text) >= 80) {
+        if ($this->hasEnoughText($text)) {
             return $text;
         }
 
-        $text = $this->extractWithPdftotext($path)
-            ?: $this->extractWithPdfParser($path)
-            ?: $this->extractRawPdfText($path);
-
-        $text = $this->normalizeText($text);
-        if ($text !== '' && mb_strlen($text) >= 80) {
+        $text = $this->normalizeText($this->extractWithPdftotext($path));
+        if ($this->hasEnoughText($text)) {
             return $text;
         }
 
-        if ($this->looksLikeImageOnlyPdf($path) || $this->looksLikeImageDominantPdf($path)) {
-            $text = $this->normalizeText(
-                $this->extractWithConfiguredOcrCommand($path)
-                    ?: $this->extractWithBundledWindowsOcr($path)
-                    ?: $this->extractWithBundledLinuxOcr($path)
-            );
+        $text = $this->normalizeText($this->extractRawPdfText($path));
+        if ($this->hasEnoughText($text)) {
+            return $text;
+        }
 
-            if ($text !== '' && mb_strlen($text) >= 80) {
+        if ($this->shouldPreferOcrBeforePdfParser($path)) {
+            $text = $this->extractWithOcr($path);
+            if ($this->hasEnoughText($text)) {
                 return $text;
             }
 
             throw new RuntimeException($this->scannedPdfMessage());
         }
 
-        throw new RuntimeException('Aucune donnee texte exploitable n a ete extraite du PDF.');
+        $text = $this->normalizeText($this->extractWithPdfParser($path));
+        if ($this->hasEnoughText($text)) {
+            return $text;
+        }
+
+        $guardReason = $this->pdfParserGuardReason($path);
+        if ($guardReason !== null) {
+            throw new RuntimeException($this->pdfParserGuardMessage($path, $guardReason));
+        }
+
+        throw new RuntimeException(
+            'Aucune donnee texte exploitable n a ete extraite du PDF. '
+            .'Configurez AI_PTA_PDF_TEXT_COMMAND ou AI_PTA_PDF_OCR_COMMAND, '
+            .'verifiez les dependances PDF/OCR du serveur, ou importez le modele Excel/source texte.'
+        );
     }
 
     private function extractWithConfiguredCommand(string $path): ?string
@@ -62,7 +77,14 @@ class PtaDocumentTextExtractionService
 
     private function extractWithConfiguredOcrCommand(string $path): ?string
     {
-        return $this->extractWithConfiguredProcess($path, 'pdf_ocr_command');
+        foreach ($this->configuredOcrCommandKeys() as $configKey) {
+            $text = $this->normalizeText($this->extractWithConfiguredProcess($path, $configKey));
+            if ($this->hasEnoughText($text)) {
+                return $text;
+            }
+        }
+
+        return null;
     }
 
     private function extractWithConfiguredProcess(string $path, string $configKey): ?string
@@ -77,11 +99,21 @@ class PtaDocumentTextExtractionService
             ? str_replace('{file}', $escapedPath, $command)
             : $command.' '.$escapedPath;
 
-        $timeout = $configKey === 'pdf_ocr_command'
+        $timeout = $this->isOcrCommandKey($configKey)
             ? max(30, (int) config('ai_training.pta.pdf_ocr_timeout', 900))
             : 120;
 
         return $this->runShellCommand($command, $timeout);
+    }
+
+    private function extractWithBundledOcr(string $path): ?string
+    {
+        if ($this->configuredOcrEngine() === 'none') {
+            return null;
+        }
+
+        return $this->extractWithBundledWindowsOcr($path)
+            ?: $this->extractWithBundledLinuxOcr($path);
     }
 
     private function extractWithBundledWindowsOcr(string $path): ?string
@@ -104,7 +136,7 @@ class PtaDocumentTextExtractionService
                 return null;
             }
 
-            $process = new Process([
+            $result = Process::timeout(max(30, (int) config('ai_training.pta.windows_ocr_timeout', 300)))->run([
                 $binary,
                 '-NoProfile',
                 '-ExecutionPolicy',
@@ -118,10 +150,8 @@ class PtaDocumentTextExtractionService
                 '-RenderWidth',
                 (string) max(0, (int) config('ai_training.pta.windows_ocr_render_width', 2600)),
             ]);
-            $process->setTimeout(max(30, (int) config('ai_training.pta.windows_ocr_timeout', 300)));
-            $process->run();
 
-            return $process->isSuccessful() ? $process->getOutput() : null;
+            return $result->successful() ? $result->output() : null;
         } catch (Throwable) {
             return null;
         }
@@ -144,11 +174,9 @@ class PtaDocumentTextExtractionService
                 return null;
             }
 
-            $process = new Process([$binary, $script, $path]);
-            $process->setTimeout(max(30, (int) config('ai_training.pta.linux_ocr_timeout', 900)));
-            $process->run();
+            $result = Process::timeout(max(30, (int) config('ai_training.pta.linux_ocr_timeout', 900)))->run([$binary, $script, $path]);
 
-            return $process->isSuccessful() ? $process->getOutput() : null;
+            return $result->successful() ? $result->output() : null;
         } catch (Throwable) {
             return null;
         }
@@ -162,11 +190,9 @@ class PtaDocumentTextExtractionService
                 return null;
             }
 
-            $process = new Process([$binary, '-layout', $path, '-']);
-            $process->setTimeout(60);
-            $process->run();
+            $result = Process::timeout(60)->run([$binary, '-layout', $path, '-']);
 
-            return $process->isSuccessful() ? $process->getOutput() : null;
+            return $result->successful() ? $result->output() : null;
         } catch (Throwable) {
             return null;
         }
@@ -174,15 +200,24 @@ class PtaDocumentTextExtractionService
 
     private function extractWithPdfParser(string $path): ?string
     {
+        if ($this->pdfParserGuardReason($path) !== null) {
+            return null;
+        }
+
         if (! $this->pdfParserAvailable()) {
             return null;
         }
 
         try {
-            return (new Parser)->parseFile($path)->getText();
+            return $this->makePdfParser()->parseFile($path)->getText();
         } catch (Throwable) {
             return null;
         }
+    }
+
+    protected function makePdfParser(): Parser
+    {
+        return new Parser;
     }
 
     private function pdfParserAvailable(): bool
@@ -214,7 +249,7 @@ class PtaDocumentTextExtractionService
 
     private function extractRawPdfText(string $path): ?string
     {
-        $content = file_get_contents($path);
+        $content = @file_get_contents($path);
         if (! is_string($content) || $content === '') {
             return null;
         }
@@ -235,11 +270,9 @@ class PtaDocumentTextExtractionService
     private function runShellCommand(string $command, int $timeout = 120): ?string
     {
         try {
-            $process = Process::fromShellCommandline($command);
-            $process->setTimeout($timeout);
-            $process->run();
+            $result = Process::timeout($timeout)->run($command);
 
-            return $process->isSuccessful() ? $process->getOutput() : null;
+            return $result->successful() ? $result->output() : null;
         } catch (Throwable) {
             return null;
         }
@@ -247,35 +280,181 @@ class PtaDocumentTextExtractionService
 
     private function looksLikeImageOnlyPdf(string $path): bool
     {
-        $content = file_get_contents($path);
-        if (! is_string($content)) {
-            return false;
-        }
+        $profile = $this->pdfProfile($path);
 
-        $imageCount = substr_count($content, '/Subtype /Image');
-        $toUnicodeCount = substr_count($content, '/ToUnicode');
-        $textOperators = preg_match_all('/\b(?:Tj|TJ)\b/', $content) ?: 0;
-
-        return $imageCount >= 2 && $toUnicodeCount === 0 && $textOperators < 3;
+        return $profile['image_count'] > 0
+            && $profile['to_unicode_count'] === 0
+            && $profile['text_operator_count'] < 3;
     }
 
     private function looksLikeImageDominantPdf(string $path): bool
     {
-        $content = file_get_contents($path);
-        if (! is_string($content)) {
-            return false;
+        $profile = $this->pdfProfile($path);
+
+        return $profile['image_count'] >= 2
+            && $profile['to_unicode_count'] === 0;
+    }
+
+    private function shouldPreferOcrBeforePdfParser(string $path): bool
+    {
+        return $this->looksLikeImageOnlyPdf($path) || $this->looksLikeImageDominantPdf($path);
+    }
+
+    private function extractWithOcr(string $path): string
+    {
+        return $this->normalizeText(
+            $this->extractWithConfiguredOcrCommand($path)
+                ?: $this->extractWithBundledOcr($path)
+        );
+    }
+
+    private function pdfParserGuardReason(string $path): ?string
+    {
+        if (! (bool) config('ai_training.pta.pdf_parser_enabled', true)) {
+            return 'disabled';
         }
 
-        return substr_count($content, '/Subtype /Image') >= 2
-            && substr_count($content, '/ToUnicode') === 0;
+        if ($this->shouldPreferOcrBeforePdfParser($path)) {
+            return 'image';
+        }
+
+        $maxBytes = max(0, (int) config('ai_training.pta.pdf_parser_max_bytes', 5 * 1024 * 1024));
+        if ($maxBytes > 0 && $this->pdfProfile($path)['size'] > $maxBytes) {
+            return 'size';
+        }
+
+        return null;
+    }
+
+    private function pdfParserGuardMessage(string $path, string $reason): string
+    {
+        if ($reason === 'image') {
+            return $this->scannedPdfMessage();
+        }
+
+        if ($reason === 'disabled') {
+            return 'Le texte du PDF n a pas pu etre extrait par les outils rapides, et l analyse PDF interne Smalot est desactivee. '
+                .'Configurez AI_PTA_PDF_TEXT_COMMAND ou AI_PTA_PDF_OCR_COMMAND, reactivez AI_PTA_PDF_PARSER_ENABLED, '
+                .'ou importez le modele Excel/source texte.';
+        }
+
+        $size = $this->formatBytes($this->pdfProfile($path)['size']);
+        $limit = $this->formatBytes(max(0, (int) config('ai_training.pta.pdf_parser_max_bytes', 5 * 1024 * 1024)));
+
+        return 'Le texte du PDF n a pas pu etre extrait par les outils rapides. '
+            .'L analyse PDF interne Smalot a ete ignoree car le fichier pese '.$size.' et depasse le seuil AI_PTA_PDF_PARSER_MAX_BYTES='.$limit.'. '
+            .'Configurez AI_PTA_PDF_TEXT_COMMAND ou AI_PTA_PDF_OCR_COMMAND, augmentez prudemment ce seuil hors requete web, '
+            .'ou importez le modele Excel/source texte.';
     }
 
     private function scannedPdfMessage(): string
     {
+        $engine = $this->configuredOcrEngine();
+        $commandNames = implode(', ', $this->configuredOcrEnvironmentNames());
+        $commandHint = $commandNames === '' ? 'AI_PTA_PDF_OCR_COMMAND' : $commandNames;
+
         return 'Le PDF semble etre un document scanne ou compose uniquement d images. '
-            .'L OCR automatique n a pas pu extraire assez de texte exploitable. '
-            .'Configurez AI_PTA_PDF_OCR_COMMAND ou AI_PTA_PDF_TEXT_COMMAND, '
+            .'L OCR local'.($engine === 'auto' ? '' : ' '.$engine).' n a pas pu extraire assez de texte exploitable. '
+            .'Configurez AI_PTA_OCR_ENGINE, '.$commandHint.' ou AI_PTA_PDF_TEXT_COMMAND, '
             .'verifiez les dependances OCR du serveur, ou importez le modele Excel/source texte.';
+    }
+
+    private function hasEnoughText(string $text): bool
+    {
+        return $text !== '' && mb_strlen($text) >= max(20, (int) config('ai_training.pta.pdf_min_text_chars', 80));
+    }
+
+    /**
+     * @return array{size:int,image_count:int,to_unicode_count:int,text_operator_count:int}
+     */
+    private function pdfProfile(string $path): array
+    {
+        $cacheKey = realpath($path) ?: $path;
+        if (isset($this->pdfProfiles[$cacheKey])) {
+            return $this->pdfProfiles[$cacheKey];
+        }
+
+        $content = @file_get_contents($path);
+        if (! is_string($content)) {
+            return $this->pdfProfiles[$cacheKey] = [
+                'size' => 0,
+                'image_count' => 0,
+                'to_unicode_count' => 0,
+                'text_operator_count' => 0,
+            ];
+        }
+
+        return $this->pdfProfiles[$cacheKey] = [
+            'size' => mb_strlen($content, '8bit'),
+            'image_count' => substr_count($content, '/Subtype /Image'),
+            'to_unicode_count' => substr_count($content, '/ToUnicode'),
+            'text_operator_count' => preg_match_all('/\b(?:Tj|TJ)\b/', $content) ?: 0,
+        ];
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes >= 1024 * 1024) {
+            return round($bytes / 1024 / 1024, 1).' Mo';
+        }
+
+        if ($bytes >= 1024) {
+            return round($bytes / 1024, 1).' Ko';
+        }
+
+        return $bytes.' octets';
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function configuredOcrCommandKeys(): array
+    {
+        $keys = match ($this->configuredOcrEngine()) {
+            'paddleocr' => ['paddleocr_command', 'pdf_ocr_command'],
+            'surya' => ['surya_ocr_command', 'pdf_ocr_command'],
+            'custom' => ['pdf_ocr_command'],
+            'none' => [],
+            default => ['pdf_ocr_command', 'paddleocr_command', 'surya_ocr_command'],
+        };
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function configuredOcrEnvironmentNames(): array
+    {
+        $names = [
+            'pdf_ocr_command' => 'AI_PTA_PDF_OCR_COMMAND',
+            'paddleocr_command' => 'AI_PTA_PADDLEOCR_COMMAND',
+            'surya_ocr_command' => 'AI_PTA_SURYA_OCR_COMMAND',
+        ];
+
+        return array_values(array_map(
+            static fn (string $key): string => $names[$key],
+            array_filter($this->configuredOcrCommandKeys(), static fn (string $key): bool => isset($names[$key]))
+        ));
+    }
+
+    private function configuredOcrEngine(): string
+    {
+        $engine = strtolower(trim((string) config('ai_training.pta.ocr_engine', 'auto')));
+        $engine = str_replace(['_', '-'], '', $engine);
+
+        return match ($engine) {
+            'paddle', 'paddleocr' => 'paddleocr',
+            'surya', 'suryaocr' => 'surya',
+            'command', 'configured', 'custom' => 'custom',
+            'off', 'disabled', 'none' => 'none',
+            default => 'auto',
+        };
+    }
+
+    private function isOcrCommandKey(string $configKey): bool
+    {
+        return in_array($configKey, ['pdf_ocr_command', 'paddleocr_command', 'surya_ocr_command'], true);
     }
 
     private function normalizeText(?string $text): string

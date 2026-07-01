@@ -76,7 +76,7 @@ class AiPtaImportController extends Controller
         $this->authorizePermission($request, 'ai_pta_import.analyze');
 
         try {
-            $this->extraction->extract($batch);
+            $result = $this->extraction->extract($batch);
             $this->normalization->normalize($batch->refresh());
             $stats = $this->validation->validateBatch($batch->refresh());
             $this->excel->generate($batch->refresh());
@@ -90,7 +90,7 @@ class AiPtaImportController extends Controller
 
         return redirect()
             ->route('workspace.ai-imports.pta.preview', $batch)
-            ->with('status', 'Analyse terminee. Les lignes invalides doivent etre corrigees ou ignorees.');
+            ->with('status', $this->analysisStatusMessage($result['warning'] ?? null));
     }
 
     public function downloadExcel(Request $request, AiImportBatch $batch)
@@ -110,5 +110,14 @@ class AiPtaImportController extends Controller
     private function authorizePermission(Request $request, string $permission): void
     {
         abort_unless($request->user()?->hasPermission($permission), 403);
+    }
+
+    private function analysisStatusMessage(?string $warning): string
+    {
+        if ($warning !== null && trim($warning) !== '') {
+            return 'Analyse terminee avec avertissement: '.$warning;
+        }
+
+        return 'Analyse terminee. Les lignes invalides doivent etre corrigees ou ignorees.';
     }
 }
