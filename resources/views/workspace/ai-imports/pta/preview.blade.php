@@ -20,6 +20,7 @@
         'champ_difficulte',
     ];
     $tableColspan = count($visibleFields) + 4;
+    $rowsForPreview = $previewRows ?? $batch->rows;
 @endphp
 <div class="app-screen-flow">
     <section class="showcase-panel app-screen-block" data-keep-empty="1" data-keep-accordion="0">
@@ -45,6 +46,19 @@
         @if ($batch->error_message)
             <div class="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">{{ $batch->error_message }}</div>
         @endif
+        @if ($isExtractionPending ?? false)
+            <div class="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-100">
+                <p class="font-extrabold">{{ ($isAnalysisRunning ?? false) ? 'Analyse IA/OCR en cours.' : 'Fichier charge, analyse IA a lancer.' }}</p>
+                <p class="mt-1">
+                    {{ ($isAnalysisRunning ?? false) ? 'Le traitement continue en arriere-plan. Actualisez la page pour voir les lignes extraites.' : 'Cliquez sur "Analyser avec IA" pour extraire les lignes PTA. Les PDF scannes peuvent prendre plus de temps, mais cette page reste legere avant le lancement.' }}
+                </p>
+            </div>
+        @endif
+        @if (($isPreviewPaginated ?? false) && $previewRows)
+            <div class="mb-4 rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm font-semibold text-cyan-800">
+                Affichage pagine pour eviter les lenteurs : lignes {{ $previewRows->firstItem() ?? 0 }}-{{ $previewRows->lastItem() ?? 0 }} sur {{ $stats['total'] }}.
+            </div>
+        @endif
 
         <div class="mb-5 grid gap-3 sm:grid-cols-5">
             <div class="rounded-lg border border-[#d8ecf8] bg-white p-4"><p class="text-xs font-bold uppercase text-slate-500">Score</p><p class="mt-2 text-2xl font-extrabold">{{ $batch->confidence_score ?? '-' }}</p></div>
@@ -57,12 +71,16 @@
         <div class="mb-5 flex flex-wrap gap-2">
             <form method="POST" action="{{ route('workspace.ai-imports.pta.analyze', $batch) }}">
                 @csrf
-                <button class="btn btn-secondary" type="submit">Analyser avec IA</button>
+                <button class="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-60" type="submit" @disabled($isAnalysisRunning ?? false)>
+                    {{ ($isAnalysisRunning ?? false) ? 'Analyse en cours' : 'Analyser avec IA' }}
+                </button>
             </form>
-            <form method="POST" action="{{ route('workspace.ai-imports.pta.validate', $batch) }}">
-                @csrf
-                <button class="btn btn-outline" type="submit">Valider</button>
-            </form>
+            @if ($stats['total'] > 0)
+                <form method="POST" action="{{ route('workspace.ai-imports.pta.validate', $batch) }}">
+                    @csrf
+                    <button class="btn btn-outline" type="submit">Valider</button>
+                </form>
+            @endif
             @if ($stats['invalid'] === 0 && $stats['total'] > 0 && $batch->status !== 'imported')
                 <form method="POST" action="{{ route('workspace.ai-imports.pta.import', $batch) }}" data-confirm-message="Confirmer l'import final des lignes validees ?" data-confirm-tone="warning" data-confirm-label="Importer">
                     @csrf
@@ -85,7 +103,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    @forelse ($batch->rows as $row)
+                    @forelse ($rowsForPreview as $row)
                         @php($payload = $row->normalized_payload ?? [])
                         <tr>
                             <form method="POST" action="{{ route('workspace.ai-imports.pta.rows.update', [$batch, $row]) }}">
@@ -155,12 +173,19 @@
                         </tr>
                     @empty
                         <tr>
-                            <td class="px-3 py-8 text-center text-slate-500" colspan="{{ $tableColspan }}">Aucune ligne extraite.</td>
+                            <td class="px-3 py-8 text-center text-slate-500" colspan="{{ $tableColspan }}">
+                                {{ ($isExtractionPending ?? false) ? "Aucune ligne extraite pour le moment. Lancez l'analyse IA pour demarrer le traitement." : 'Aucune ligne extraite.' }}
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
+        @if (($isPreviewPaginated ?? false) && $previewRows)
+            <div class="mt-4">
+                {{ $previewRows->links() }}
+            </div>
+        @endif
     </section>
 </div>
 @endsection

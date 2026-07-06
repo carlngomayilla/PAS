@@ -180,8 +180,72 @@ class WorkflowV2CycleTest extends TestCase
             ->get(route('workspace.actions.suivi', $fixture['action']))
             ->assertOk()
             ->assertSee('Suivi de l\'action', false)
+            ->assertSee('Realise', false)
+            ->assertSee('Soumettre au chef', false)
+            ->assertDontSee('Performance officielle', false)
+            ->assertDontSee('Performance provisoire', false);
+    }
+
+    public function test_agent_sees_official_percentages_after_chef_validation(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 90], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+
+        $this->actingAs($fixture['agent'])
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
             ->assertSee('Performance officielle', false)
-            ->assertSee('Soumettre au chef', false);
+            ->assertSee('Performance provisoire', false)
+            ->assertSee('90%', false);
+    }
+
+    public function test_agent_actions_index_hides_percentages_until_validation(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+        $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 70], $fixture['agent']);
+
+        $this->actingAs($fixture['agent'])
+            ->get(route('workspace.actions.index', ['vue' => 'mes_actions']))
+            ->assertOk()
+            ->assertSee('Realise', false)
+            ->assertSee('En attente de validation.', false)
+            ->assertDontSee('Performance moyenne', false)
+            ->assertDontSee('Performance 70%', false)
+            ->assertDontSee('70%', false);
+    }
+
+    public function test_agent_metrics_stay_hidden_when_action_is_closed_without_validation(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 70], $fixture['agent']);
+        $action->forceFill([
+            'statut' => ActionTrackingService::STATUS_CLOTUREE,
+            'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
+            'cloture_le' => now(),
+            'statut_validation' => ActionTrackingService::VALIDATION_NON_SOUMISE,
+        ])->save();
+
+        $this->actingAs($fixture['agent'])
+            ->get(route('workspace.actions.suivi', $action))
+            ->assertOk()
+            ->assertSee('Realise', false)
+            ->assertDontSee('Performance officielle', false)
+            ->assertDontSee('Performance provisoire', false)
+            ->assertDontSee('70%', false);
+
+        $this->actingAs($fixture['agent'])
+            ->get(route('workspace.actions.index', ['vue' => 'mes_actions']))
+            ->assertOk()
+            ->assertSee('Realise', false)
+            ->assertDontSee('Performance 70%', false)
+            ->assertDontSee('70%', false);
     }
 
     public function test_chef_responsable_can_track_own_pilotage_action(): void
@@ -223,7 +287,10 @@ class WorkflowV2CycleTest extends TestCase
             ->get(route('workspace.actions.suivi', $fixture['action']))
             ->assertOk()
             ->assertSee('SA test', false)
-            ->assertSee('Soumettre', false);
+            ->assertSee('Realise', false)
+            ->assertSee('Soumettre', false)
+            ->assertDontSee('Perf :', false)
+            ->assertDontSee('poids 100%', false);
     }
 
     public function test_chef_sees_validation_when_action_submitted(): void

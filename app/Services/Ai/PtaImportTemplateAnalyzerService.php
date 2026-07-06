@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai;
 
+use App\Services\Imports\PlanningExcelImportService;
 use Illuminate\Support\Arr;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -10,6 +11,11 @@ use RuntimeException;
 
 class PtaImportTemplateAnalyzerService
 {
+    /**
+     * @var array<string,array<string,mixed>>
+     */
+    private array $cache = [];
+
     /**
      * @return array{
      *     path:string,
@@ -27,7 +33,17 @@ class PtaImportTemplateAnalyzerService
      */
     public function analyze(?string $path = null): array
     {
+        $explicitPath = $path !== null;
         $path = $this->templatePath($path);
+        $cacheKey = $path.'|'.((string) (@filemtime($path) ?: '0'));
+        if (isset($this->cache[$cacheKey])) {
+            return $this->cache[$cacheKey];
+        }
+
+        if (! $explicitPath && $this->shouldUseLightweightAnalysis()) {
+            return $this->cache[$cacheKey] = $this->lightweightAnalysis($path);
+        }
+
         $spreadsheet = IOFactory::load($path);
         $importSheet = $spreadsheet->getSheetByName('IMPORT_GLOBAL');
         $guideSheet = $spreadsheet->getSheetByName('GUIDE');
@@ -36,7 +52,7 @@ class PtaImportTemplateAnalyzerService
             throw new RuntimeException('La feuille IMPORT_GLOBAL est introuvable dans le modele officiel.');
         }
 
-        return [
+        $analysis = [
             'path' => $path,
             'columns' => $this->columnsFromSheet($importSheet),
             'guide' => $guideSheet instanceof Worksheet ? $this->rowsFromSheet($guideSheet) : [],
@@ -44,6 +60,10 @@ class PtaImportTemplateAnalyzerService
             'training' => $this->trainingSheets($spreadsheet),
             'constraints' => $this->constraints(),
         ];
+
+        $spreadsheet->disconnectWorksheets();
+
+        return $this->cache[$cacheKey] = $analysis;
     }
 
     /**
@@ -199,5 +219,68 @@ class PtaImportTemplateAnalyzerService
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @return array{
+     *     path:string,
+     *     columns:list<string>,
+     *     guide:list<array<string,string>>,
+     *     examples:list<array<string,mixed>>,
+     *     training:array{
+     *         log_extraction:list<array<string,mixed>>,
+     *         prompt_ia:string,
+     *         pipeline_outils:list<array<string,mixed>>,
+     *         synthese_import:list<array<string,mixed>>
+     *     },
+     *     constraints:array<string,mixed>
+     * }
+     */
+    private function lightweightAnalysis(string $path): array
+    {
+        return [
+            'path' => $path,
+            'columns' => PlanningExcelImportService::IMPORT_COLUMNS,
+            'guide' => array_map(
+                static fn (string $column): array => [
+                    'colonne' => $column,
+                    'description' => 'Colonne officielle IMPORT_GLOBAL PTA.',
+                ],
+                PlanningExcelImportService::IMPORT_COLUMNS
+            ),
+            'examples' => [],
+            'training' => [
+                'log_extraction' => [],
+                'prompt_ia' => '',
+                'pipeline_outils' => [],
+                'synthese_import' => [],
+            ],
+            'constraints' => $this->constraints(),
+        ];
+    }
+
+    private function shouldUseLightweightAnalysis(): bool
+    {
+        $limit = $this->memoryLimitInBytes();
+
+        return $limit > 0 && $limit < 256 * 1024 * 1024;
+    }
+
+    private function memoryLimitInBytes(): int
+    {
+        $value = trim((string) ini_get('memory_limit'));
+        if ($value === '' || $value === '-1') {
+            return -1;
+        }
+
+        $unit = strtolower(substr($value, -1));
+        $number = (int) $value;
+
+        return match ($unit) {
+            'g' => $number * 1024 * 1024 * 1024,
+            'm' => $number * 1024 * 1024,
+            'k' => $number * 1024,
+            default => $number,
+        };
     }
 }

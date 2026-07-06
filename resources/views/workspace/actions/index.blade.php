@@ -21,6 +21,27 @@
             : '0';
         $createRouteParams = $currentViewMode === 'mes_actions' ? ['vue' => 'mes_actions'] : [];
         $listing = collect($rows->items());
+        $currentUser = auth()->user();
+        $isExecutorAgentInterface = $currentUser instanceof \App\Models\User && $currentUser->isAgent();
+        $hideExecutorMetricsFor = static function ($row) use ($currentUser, $isExecutorAgentInterface): bool {
+            if (! $isExecutorAgentInterface || ! $currentUser instanceof \App\Models\User) {
+                return false;
+            }
+
+            $isResponsible = (int) ($row->responsable_id ?? 0) === (int) $currentUser->id;
+            if (! $isResponsible && $row->relationLoaded('responsables')) {
+                $isResponsible = $row->responsables->contains('id', (int) $currentUser->id);
+            }
+
+            if (! $isResponsible) {
+                return false;
+            }
+
+            $validationStatus = (string) ($row->statut_validation ?? '');
+            $isReleased = in_array($validationStatus, ['validee_chef', 'validee_direction'], true);
+
+            return ! $isReleased;
+        };
         $summary = is_array($summary ?? null) ? $summary : [];
         $hasSummaryStatusCounts = is_array($summary['status_counts'] ?? null);
         $summaryStatusCounts = $hasSummaryStatusCounts ? $summary['status_counts'] : [];
@@ -84,6 +105,7 @@
             ['label' => 'Performance moyenne', 'value' => number_format($avgKpi, 0).'%', 'meta' => null, 'href' => route('workspace.actions.index', ['sort' => 'kpi_performance_desc']), 'badge' => null, 'badge_tone' => 'neutral', 'used' => $summaryTotal > 0],
         ];
         $summaryCards = collect($summaryCards)
+            ->reject(fn (array $card): bool => $isExecutorAgentInterface && (string) ($card['label'] ?? '') === 'Performance moyenne')
             ->filter(static fn (array $card): bool => (bool) ($card['used'] ?? true))
             ->values()
             ->all();
@@ -376,6 +398,7 @@
                             @php
                                 $pct = max(0, min(100, (float) ($row->progression_reelle ?? 0)));
                                 $pctColor = $pct >= 80 ? '#178f5f' : ($pct >= 50 ? '#3996d3' : ($pct > 0 ? '#f59e0b' : '#94a3b8'));
+                                $hideRowMetrics = $hideExecutorMetricsFor($row);
                             @endphp
                             <a href="{{ route('workspace.actions.suivi', $row) }}"
                                class="kanban-card"
@@ -386,12 +409,18 @@
                                 <div class="kanban-card-id">ACT-{{ str_pad((string) $row->id, 3, '0', STR_PAD_LEFT) }}</div>
                                 <div class="kanban-card-title">{{ $row->libelle }}</div>
                                 <div class="kanban-card-meta">{{ $row->responsable?->name ?: 'Responsable non assigné' }} · {{ $row->pta?->titre ?: 'PTA non rattaché' }}</div>
-                                <div class="kanban-card-progress">
-                                    <div class="kanban-card-progress-bar" style="width: {{ $pct }}%; background: {{ $pctColor }};"></div>
-                                </div>
+                                @unless ($hideRowMetrics)
+                                    <div class="kanban-card-progress">
+                                        <div class="kanban-card-progress-bar" style="width: {{ $pct }}%; background: {{ $pctColor }};"></div>
+                                    </div>
+                                @endunless
                                 @php $kEcheance = $echeanceOf($row); @endphp
                                 <div class="kanban-card-footer">
-                                    <span class="kanban-card-pct" style="color: {{ $pctColor }};">{{ number_format($pct, 0, ',', ' ') }}%</span>
+                                    @if ($hideRowMetrics)
+                                        <span class="kanban-card-pct" style="color:#178f5f;">Realise</span>
+                                    @else
+                                        <span class="kanban-card-pct" style="color: {{ $pctColor }};">{{ number_format($pct, 0, ',', ' ') }}%</span>
+                                    @endif
                                     <span style="display:flex; align-items:center; gap:0.3rem; min-width:0; font-size:0.68rem; color: var(--app-muted);">
                                         @if ($kEcheance)
                                             <span style="display:inline-block; padding:0.05rem 0.32rem; border-radius:0.4rem; background: rgba(148,163,184,0.16); color: var(--app-text); font-weight:700; font-size:0.62rem;">{{ $trimestreLabel($kEcheance) }}</span>
@@ -612,17 +641,23 @@
                                 $gPct   = max(0, min(100, (float) ($ganttRow->progression_reelle ?? 0)));
                                 $gColor = $statusBarColor($ganttRow->statut_dynamique ?: 'non_demarre');
                                 $gFillW = round($gWidth * $gPct / 100, 3);
+                                $hideGanttMetrics = $hideExecutorMetricsFor($ganttRow);
                             @endphp
                             <div class="gantt-row">
                                 {{-- Background track --}}
                                 <div style="position:absolute; left:{{ $gLeft }}%; width:{{ $gWidth }}%; top:50%; transform:translateY(-50%); height:1.25rem; border-radius:5px; background:{{ $gColor }}; opacity:0.16; pointer-events:none;"></div>
                                 {{-- Progress fill --}}
+                                @if ($hideGanttMetrics)
+                                <div style="position:absolute; left:{{ $gLeft }}%; width:{{ $gWidth }}%; top:50%; transform:translateY(-50%); height:1.25rem; border-radius:5px; color:#0f5132; font-size:0.62rem; font-weight:800; display:flex; align-items:center; padding-left:5px; pointer-events:none;"
+                                     title="{{ $ganttRow->libelle }} - Realise">Realise</div>
+                                @else
                                 <div style="position:absolute; left:{{ $gLeft }}%; width:{{ max(0.3, $gFillW) }}%; top:50%; transform:translateY(-50%); height:1.25rem; border-radius:5px; background:{{ $gColor }};"
                                      title="{{ $ganttRow->libelle }} — {{ number_format($gPct, 0) }}%">
                                     @if ($gWidth > 4)
                                         <span style="position:absolute; left:5px; top:50%; transform:translateY(-50%); font-size:0.6rem; color:#fff; font-weight:700; white-space:nowrap; text-shadow:0 1px 2px rgba(0,0,0,0.3); pointer-events:none;">{{ number_format($gPct, 0) }}%</span>
                                     @endif
                                 </div>
+                                @endif
                             </div>
                         @endforeach
                         @if ($today->gte($ganttMin) && $today->lte($ganttMax))
@@ -657,7 +692,7 @@
                         <th>Responsable</th>
                         <th>Échéance</th>
                         <th>Statut</th>
-                        <th>Progression</th>
+                        <th>{{ $isExecutorAgentInterface ? 'Execution' : 'Progression' }}</th>
                         <th>Validation</th>
                         <th>Actions</th>
                     </tr>
@@ -686,6 +721,7 @@
                             $kpiColor = $kpiPerformance !== null
                                 ? ((float) $kpiPerformance >= 80 ? 'text-[#8fc043]' : ((float) $kpiPerformance >= 60 ? 'text-[#f9b13c]' : 'text-red-500'))
                                 : 'text-slate-400';
+                            $hideRowMetrics = $hideExecutorMetricsFor($row);
                         @endphp
                         <tr>
                             <td class="min-w-[260px]">
@@ -722,6 +758,10 @@
                                 </p>
                             </td>
                             <td class="min-w-[180px]">
+                                @if ($hideRowMetrics)
+                                    <span class="anbg-badge anbg-badge-success px-3">Realise</span>
+                                    <p class="mt-1 text-xs text-slate-500">En attente de validation.</p>
+                                @else
                                 <div class="mb-2 flex items-center justify-between gap-2 text-xs">
                                     <span class="font-semibold text-slate-700">{{ number_format($progressValue, 0) }}%</span>
                                     <span class="text-slate-500">Théo. {{ number_format((float) ($row->progression_theorique ?? 0), 0) }}%</span>
@@ -737,15 +777,18 @@
                                 @else
                                     <p class="mt-1 text-xs text-slate-500">Sous-actions : {{ $semainesRenseignees }}/{{ $semainesTotal }}</p>
                                 @endif
+                                @endif
                             </td>
                             <td>
                                 @php $rowValidationStatus = $row->statut_validation ?: 'non_soumise'; @endphp
                                 <span class="{{ $validationStyles[$rowValidationStatus] ?? 'anbg-badge anbg-badge-neutral' }} px-3">
                                     {{ $validationStatusLabel($rowValidationStatus) }}
                                 </span>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    Performance {{ $kpiPerformance !== null ? number_format((float) $kpiPerformance, 0).'%' : '-' }}
-                                </p>
+                                @unless ($hideRowMetrics)
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Performance {{ $kpiPerformance !== null ? number_format((float) $kpiPerformance, 0).'%' : '-' }}
+                                    </p>
+                                @endunless
                             </td>
                             <td>
                                 <div class="row-actions">

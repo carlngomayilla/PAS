@@ -25,6 +25,8 @@ class DashboardSynthesisDropdownTest extends TestCase
         $hierarchy = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-synthesis-hierarchy.blade.php'));
         $tables = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-tables.blade.php'));
         $detailTables = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-synthesis-tables.blade.php'));
+        $controller = (string) file_get_contents(app_path('Http/Controllers/DashboardController.php'));
+        $css = (string) file_get_contents(resource_path('css/app.css'));
         $script = (string) file_get_contents(resource_path('js/dashboard-render.js'));
 
         $this->assertStringContainsString('data-dashboard-synthesis-filter-form', $view);
@@ -39,17 +41,46 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringContainsString('data-dashboard-panel="advanced"', $tables);
         $this->assertStringContainsString("const panelKeys = ['overview', 'charts', 'advanced'];", $script);
         $this->assertStringContainsString('$baseSynthesisQuery', $overview);
+        $this->assertStringNotContainsString('workspace.tasks._dashboard-card', $overview);
+        $this->assertStringNotContainsString('$personalTaskItems', $overview);
         $this->assertStringContainsString('Alertes critiques', $overview);
         $this->assertStringContainsString('_panel-synthesis-hierarchy', $overview);
         $this->assertStringContainsString('data-dashboard-synthesis-hierarchy', $hierarchy);
         $this->assertStringContainsString('Vue synthetique d\'avancement PAS', $hierarchy);
         $this->assertStringContainsString('PAS -> Axes -> Objectifs -> PAO/PTA -> Actions', $hierarchy);
         $this->assertStringContainsString('Voir pourquoi', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-hierarchy-card', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-node-pas', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-node-axis', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-node-strategic-objective', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-node-operational-objective', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-node-pta', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-node-action', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-node-sub-action', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-kpi-axis', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-kpi-late', $hierarchy);
+        $this->assertStringContainsString('dashboard-synthesis-kpi-sub-action', $hierarchy);
         $this->assertStringContainsString('$showSynthesisTablesInOverview ?? false', $overview);
         $this->assertStringContainsString('_panel-synthesis-tables', $tables);
         $this->assertStringContainsString('Tableaux de synthese', $detailTables);
         $this->assertStringContainsString('dashboard-synthesis-table', $detailTables);
+        $this->assertStringContainsString('$agentActionCellLevels', $view);
+        $this->assertStringContainsString("\$agentActionCellLevels = [1 => 'action', 2 => 'operational-objective', 3 => 'pta', 10 => 'sub-action'];", $view);
+        $this->assertStringContainsString("'cell_levels' => \$agentActionCellLevels", $view);
+        $this->assertStringContainsString('dashboard-synthesis-hierarchy-cell', $detailTables);
+        $this->assertStringContainsString('dashboard-synthesis-level-', $detailTables);
+        $this->assertStringContainsString('dashboard-synthesis-level-operational-objective', $css);
+        $this->assertStringContainsString('dashboard-synthesis-level-sub-action', $css);
+        $this->assertStringContainsString('.dashboard-synthesis-hierarchy-card .dashboard-synthesis-node', $css);
+        $this->assertStringContainsString('.dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-pas', $css);
+        $this->assertStringContainsString('.dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-axis', $css);
+        $this->assertStringContainsString('.dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-axis', $css);
+        $this->assertStringContainsString('.dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-late', $css);
         $this->assertStringContainsString('data-dashboard-row-detail', $detailTables);
+        $this->assertStringContainsString("\$rowUrl = (string) (\$row['url'] ?? '');", $detailTables);
+        $this->assertStringContainsString('<a href="{{ $rowUrl }}"', $detailTables);
+        $this->assertStringContainsString("'url' => (string) (\$row['url'] ?? ''), 'cells' => [", $view);
+        $this->assertStringContainsString("['rmo_id' => (int) \$group['agent_id']]", $controller);
         $this->assertStringNotContainsString('@if (false', $overview);
     }
 

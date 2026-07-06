@@ -151,28 +151,22 @@
                     <div>
                         <label for="current_password">Mot de passe actuel</label>
                         <div class="relative">
-                            <input id="current_password" name="current_password" type="password" @required($passwordExpired)>
-                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="current_password">
-                                Voir
-                            </button>
+                            <input id="current_password" name="current_password" type="password" class="pr-14" @required($passwordExpired)>
+                            <x-auth.password-toggle target="current_password" />
                         </div>
                     </div>
                     <div>
                         <label for="password">Nouveau mot de passe</label>
                         <div class="relative">
-                            <input id="password" name="password" type="password" @required($passwordExpired)>
-                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="password">
-                                Voir
-                            </button>
+                            <input id="password" name="password" type="password" class="pr-14" @required($passwordExpired)>
+                            <x-auth.password-toggle target="password" />
                         </div>
                     </div>
                     <div>
                         <label for="password_confirmation">Confirmation</label>
                         <div class="relative">
-                            <input id="password_confirmation" name="password_confirmation" type="password" @required($passwordExpired)>
-                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="password_confirmation">
-                                Voir
-                            </button>
+                            <input id="password_confirmation" name="password_confirmation" type="password" class="pr-14" @required($passwordExpired)>
+                            <x-auth.password-toggle target="password_confirmation" />
                         </div>
                     </div>
                 </div>
@@ -245,19 +239,4 @@
         </div>
     </section>
     </div>
-
-    <script @cspNonce>
-        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
-            button.addEventListener('click', function () {
-                var input = document.getElementById(button.dataset.passwordToggle);
-                if (! input) {
-                    return;
-                }
-
-                var isHidden = input.type === 'password';
-                input.type = isHidden ? 'text' : 'password';
-                button.textContent = isHidden ? 'Cacher' : 'Voir';
-            });
-        });
-    </script>
 @endsection

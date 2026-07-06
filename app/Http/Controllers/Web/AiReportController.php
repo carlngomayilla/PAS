@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AiGeneratedReport;
 use App\Models\Direction;
 use App\Models\Service;
+use App\Services\Ai\PtaQuarterlyReportPreviewService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -13,6 +14,10 @@ use Illuminate\View\View;
 
 class AiReportController extends Controller
 {
+    public function __construct(
+        private readonly PtaQuarterlyReportPreviewService $ptaQuarterlyPreview
+    ) {}
+
     public function index(Request $request): View
     {
         $this->authorizePermission($request, 'ai_reports.view');
@@ -37,9 +42,12 @@ class AiReportController extends Controller
     {
         $this->authorizePermission($request, 'ai_reports.view');
 
+        $report->load('user:id,name,email,role,custom_role_code');
+
         return view('workspace.ai-reports.show', [
-            'report' => $report->load('user:id,name,email,role,custom_role_code'),
+            'report' => $report,
             'types' => AiGeneratedReport::reportTypes(),
+            'wordPreview' => $this->ptaQuarterlyPreview->build($report),
         ]);
     }
 

@@ -211,8 +211,8 @@ class PtaDocumentStructureExtractorService
             'annee' => $years['annee'],
             'annee_debut_pas' => $years['annee_debut_pas'],
             'annee_fin_pas' => $years['annee_fin_pas'],
-            'direction' => $this->lineAfter($text, 'Direction'),
-            'service_unite' => $this->lineAfter($text, 'Service'),
+            'direction' => $this->documentDirection($text),
+            'service_unite' => $this->documentService($text),
             'responsable' => null,
             'fonction_responsable' => null,
         ];
@@ -266,6 +266,52 @@ class PtaDocumentStructureExtractorService
         }
 
         return trim($matches[1]);
+    }
+
+    private function documentDirection(string $text): ?string
+    {
+        $explicit = $this->lineAfter($text, 'Direction');
+        if ($explicit !== null) {
+            return $this->cleanDocumentEntity($explicit);
+        }
+
+        foreach (array_slice($this->linesFrom($text), 0, 120) as $line) {
+            if (preg_match('/(?:^|\b)(?:de\s+la\s+)?(Direction[^\n\r]+)/iu', $line, $matches) !== 1) {
+                continue;
+            }
+
+            $value = $this->cleanDocumentEntity($matches[1]);
+            if ($value !== null && ! Str::contains($this->key($value), 'axes strategiques')) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function documentService(string $text): ?string
+    {
+        $explicit = $this->lineAfter($text, 'Service');
+        if ($explicit !== null) {
+            return $this->cleanDocumentEntity($explicit);
+        }
+
+        foreach (array_slice($this->linesFrom($text), 0, 160) as $line) {
+            if (preg_match('/^\s*(Service[^\n\r]+)/iu', $line, $matches) === 1) {
+                return $this->cleanDocumentEntity($matches[1]);
+            }
+        }
+
+        return null;
+    }
+
+    private function cleanDocumentEntity(string $value): ?string
+    {
+        $value = trim($value);
+        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+        $value = trim($value, " \t\n\r\0\x0B-");
+
+        return $value === '' ? null : $value;
     }
 
     /**
@@ -426,8 +472,8 @@ class PtaDocumentStructureExtractorService
             'annee' => $years['annee'],
             'annee_debut_pas' => $years['annee_debut_pas'],
             'annee_fin_pas' => $years['annee_fin_pas'],
-            'direction' => $this->lineAfter($text, 'Direction'),
-            'service_unite' => $this->lineAfter($text, 'Service'),
+            'direction' => $this->documentDirection($text),
+            'service_unite' => $this->documentService($text),
             'responsable' => null,
             'fonction_responsable' => null,
         ];

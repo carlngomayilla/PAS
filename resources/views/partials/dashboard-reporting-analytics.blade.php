@@ -23,6 +23,7 @@
     $heatmap = $reportingCharts['retard_heatmap'] ?? ['weeks' => [], 'units' => [], 'matrix' => [], 'max' => 0];
     $criticalGantt = $reportingCharts['critical_gantt'] ?? ['min' => now()->subDays(14)->toDateString(), 'max' => now()->addDays(14)->toDateString(), 'items' => []];
     $resourceTreemap = $reportingCharts['resource_treemap'] ?? ['labels' => [], 'values' => [], 'total' => 0];
+    $statusByUnit = is_array($reportingCharts['status_by_unit'] ?? null) ? $reportingCharts['status_by_unit'] : ['unit_label' => 'unite', 'labels' => [], 'datasets' => [], 'urls' => []];
     $performanceGauge = $reportingCharts['performance_gauge'] ?? ['labels' => [], 'values' => []];
     $performanceGaugeScopeLabel = (string) ($performanceGauge['scope_label'] ?? 'Directions');
     $performanceGaugeEmptyLabel = (string) ($performanceGauge['empty_label'] ?? 'Aucune donnée disponible pour les jauges.');
@@ -67,6 +68,8 @@
     $treemapTotal = max(0.01, (float) ($resourceTreemap['total'] ?? 0));
     $reportingThresholdY = 120 - ($reportingQualityThreshold * 0.9);
     $reportStatusUnitChartHeight = max(20, (count($reportingCharts['status_by_unit']['labels'] ?? []) * 2.15) + 5);
+    $statusUnitRows = $reportingFallbackBars($statusByUnit);
+    $statusUnitUrlRows = collect($statusByUnit['urls'][0] ?? [])->values();
     $reportingSummaryCards = [
         ['label' => 'Périmètres PAS', 'value' => $reportingGlobal['pas_total'] ?? 0, 'tone' => 'navy', 'meta' => 'Stratégie couverte', 'href' => route('workspace.pas.index'), 'badge' => null, 'badge_tone' => 'info'],
         ['label' => 'Mesures d\'indicateur', 'value' => $reportingGlobal['kpi_mesures_total'] ?? 0, 'tone' => 'blue', 'meta' => 'Mesures suivies', 'href' => route('workspace.reporting'), 'badge' => null, 'badge_tone' => 'warning'],
@@ -188,6 +191,40 @@
                             <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'cibles') }}" fill="none" stroke="#20C76B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
                             <polyline points="{{ $reportingFallbackPoints($reportingCharts['kpi_trend'] ?? [], 'seuils') }}" fill="none" stroke="#F4B400" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 5" />
                         </svg>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <article class="dashboard-advanced-card">
+            <div class="dashboard-advanced-head">
+                <div>
+                    <h2 class="showcase-panel-title">Statuts par {{ mb_strtolower((string) ($statusByUnit['unit_label'] ?? 'unite')) }}</h2>
+                </div>
+            </div>
+            <div class="dashboard-chart-scroll-frame">
+                <div class="dashboard-canvas dashboard-canvas-lg" style="min-height: {{ $reportStatusUnitChartHeight }}rem;">
+                    <div id="dashboard-report-status-unit-chart" class="dashboard-chart-host">
+                        <div class="dashboard-chart-fallback">
+                            @if ($statusUnitRows !== [])
+                                <div class="charts-unit-bars">
+                                    @foreach ($statusUnitRows as $row)
+                                        @php
+                                            $value = (float) ($row['value'] ?? 0);
+                                            $targetUrl = (string) ($statusUnitUrlRows[$loop->index] ?? route('workspace.actions.index'));
+                                            $tone = $value > 0 ? '#0F5B66' : '#94A3B8';
+                                        @endphp
+                                        <a class="charts-unit-bar" href="{{ $targetUrl }}">
+                                            <span class="charts-unit-bar-label">{{ $row['label'] }}</span>
+                                            <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: {{ min(100, max(0, $value)) }}%; background: linear-gradient(90deg, {{ $tone }}, {{ $tone }}cc);"></span></span>
+                                            <span class="charts-unit-bar-value" style="color: {{ $tone }};">{{ number_format($value, 0, ',', ' ') }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @else
+                                <x-ui.empty-state title="Aucun statut par unite" message="Les actions validees apparaitront ici apres consolidation." icon="chart" tone="info" />
+                            @endif
+                        </div>
                     </div>
                 </div>
             </div>

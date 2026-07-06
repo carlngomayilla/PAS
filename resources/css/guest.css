@@ -302,20 +302,59 @@
 }
 
 /* ── Bouton "SHOW" mot de passe ─────────────────────────────── */
+.login-input[data-password-toggle-target] {
+    padding-right: 3.15rem;
+}
+
+.auth-password-toggle,
 .login-pwd-show {
     position: absolute;
-    right: 0.75rem;
-    background: none;
-    border: none;
-    padding: 0;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: #3996d3;
+    right: 0.56rem;
+    top: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid #d8ecf8;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #1d75ad;
     cursor: pointer;
-    letter-spacing: 0.04em;
-    transition: color 0.15s;
+    transform: translateY(-50%);
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
-.login-pwd-show:hover { color: #1c203d; }
+
+.auth-password-toggle:hover,
+.login-pwd-show:hover {
+    border-color: #3996d3;
+    background: #eef6fc;
+    color: #1c203d;
+}
+
+.auth-password-toggle:focus-visible,
+.login-pwd-show:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(57, 150, 211, 0.16);
+}
+
+.auth-password-toggle svg,
+.login-pwd-show svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.auth-password-toggle-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
 
 /* ── Options ─────────────────────────────────────────────────── */
 .login-opts {

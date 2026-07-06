@@ -21,7 +21,7 @@ class PtaAiImportNormalizerService
     public function normalizeItem(array $document, array $item): array
     {
         $row = array_fill_keys($this->template->columns(), null);
-        $source = array_merge($document, $item);
+        $source = $this->mergeNonBlank($document, $item);
 
         $rmoRaw = $this->first($source, ['codes_agents_rmo', 'rmo_raw', 'responsable', 'rmo']);
         $agentResolution = $this->agents->resolve(
@@ -116,6 +116,22 @@ class PtaAiImportNormalizerService
     public function normalizeItems(array $document, array $items): array
     {
         return array_map(fn (array $item): array => $this->normalizeItem($document, $item), $items);
+    }
+
+    /**
+     * @param  array<string,mixed>  $base
+     * @param  array<string,mixed>  $override
+     * @return array<string,mixed>
+     */
+    private function mergeNonBlank(array $base, array $override): array
+    {
+        foreach ($override as $key => $value) {
+            if (! $this->blank($value)) {
+                $base[(string) $key] = $value;
+            }
+        }
+
+        return $base;
     }
 
     /**

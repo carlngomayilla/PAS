@@ -17,8 +17,7 @@ class PtaSuiviWebController extends Controller
     public function __construct(
         private readonly PtaSuiviService $ptaSuiviService,
         private readonly PtaSuiviWorkbookExporter $workbookExporter
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -33,7 +32,13 @@ class PtaSuiviWebController extends Controller
         $user = $this->user($request);
         $this->ptaSuiviService->denyUnlessAuthorized($user);
 
-        return view('workspace.pta-suivi.partials.details', $this->ptaSuiviService->buildActionDetails($action, $user));
+        $payload = $this->ptaSuiviService->buildActionDetails($action, $user);
+
+        if ($request->ajax()) {
+            return view('workspace.pta-suivi.partials.details', $payload);
+        }
+
+        return view('workspace.pta-suivi.details', $payload);
     }
 
     public function exportPdf(Request $request)
@@ -93,7 +98,7 @@ class PtaSuiviWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function filename(array $payload, string $extension): string
     {

@@ -69,6 +69,35 @@ class AiReportExportTest extends TestCase
         $this->assertStringContainsString('Les causes probables des ecarts', $text);
         $this->assertStringContainsString('6-Analyse des ecarts constates', $text);
         $this->assertStringContainsString('Le Gestionnaire Suivi-Evaluation Senior', $text);
+        $this->assertStringNotContainsString('DONNEES ACTUALISEES GENEREES PAR L APPLICATION', $text);
+        $this->assertSame([], array_values(array_filter(
+            $this->docxMediaNames(Storage::disk('local')->path($report->exported_docx_path)),
+            static fn (string $name): bool => str_contains($name, 'section_image')
+        )));
+        $this->assertGreaterThanOrEqual(1, $this->docxChartCount(Storage::disk('local')->path($report->exported_docx_path)));
+    }
+
+    public function test_draft_report_cannot_be_exported_before_human_validation(): void
+    {
+        Storage::fake('local');
+        $user = $this->createAiUser();
+        $report = AiGeneratedReport::query()->create([
+            'user_id' => $user->id,
+            'report_type' => AiGeneratedReport::TYPE_PAS_GLOBAL,
+            'title' => 'Rapport brouillon',
+            'metrics_snapshot' => ['totaux' => ['actions' => 1]],
+            'ai_draft' => 'Brouillon avec contenu',
+            'status' => AiGeneratedReport::STATUS_DRAFT,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('workspace.ai-reports.export.pdf', $report))
+            ->assertStatus(422);
+
+        $this->actingAs($user)
+            ->get(route('workspace.ai-reports.show', $report))
+            ->assertOk()
+            ->assertDontSee(route('workspace.ai-reports.export.pdf', $report), false);
     }
 
     private function docxText(string $path): string
@@ -82,5 +111,44 @@ class AiReportExportTest extends TestCase
         $this->assertIsString($xml);
 
         return html_entity_decode(strip_tags((string) $xml), ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    private function docxChartCount(string $path): int
+    {
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($path) === true);
+
+        $count = 0;
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = (string) $zip->getNameIndex($index);
+            if (str_starts_with($name, 'word/charts/') && str_ends_with($name, '.xml')) {
+                $count++;
+            }
+        }
+
+        $zip->close();
+
+        return $count;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function docxMediaNames(string $path): array
+    {
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($path) === true);
+
+        $names = [];
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = (string) $zip->getNameIndex($index);
+            if (str_starts_with($name, 'word/media/')) {
+                $names[] = basename($name);
+            }
+        }
+
+        $zip->close();
+
+        return $names;
     }
 }

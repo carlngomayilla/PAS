@@ -41,22 +41,35 @@
                             <tbody>
                                 @forelse (($synthesisTable['rows'] ?? []) as $row)
                                     @php
+                                        $cellLevels = (array) ($row['cell_levels'] ?? $synthesisTable['cell_levels'] ?? []);
+                                        $rowUrl = (string) ($row['url'] ?? '');
                                         $detailPayload = base64_encode(json_encode([
                                             'title' => (string) ($synthesisTable['title'] ?? 'Tableau'),
                                             'headers' => array_values((array) ($synthesisTable['headers'] ?? [])),
                                             'cells' => array_values((array) ($row['cells'] ?? [])),
-                                            'url' => (string) ($row['url'] ?? ''),
+                                            'url' => $rowUrl,
                                         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
                                     @endphp
                                     <tr>
-                                        @foreach (($row['cells'] ?? []) as $cell)
-                                            <td>{{ $cell }}</td>
+                                        @foreach (($row['cells'] ?? []) as $cellIndex => $cell)
+                                            @php
+                                                $cellLevel = (string) ($cellLevels[$cellIndex] ?? '');
+                                                $cellClass = $cellLevel !== '' ? 'dashboard-synthesis-hierarchy-cell dashboard-synthesis-level-'.$cellLevel : '';
+                                            @endphp
+                                            <td @if ($cellClass !== '') class="{{ $cellClass }}" @endif>{{ $cell }}</td>
                                         @endforeach
                                         <td class="dashboard-no-export">
-                                            <button type="button" class="btn btn-primary btn-sm rounded-xl"
-                                                data-dashboard-row-detail="{{ $detailPayload }}">
-                                                Voir
-                                            </button>
+                                            @if ($rowUrl !== '')
+                                                <a href="{{ $rowUrl }}" class="btn btn-primary btn-sm rounded-xl"
+                                                    data-dashboard-row-detail="{{ $detailPayload }}">
+                                                    Voir
+                                                </a>
+                                            @else
+                                                <button type="button" class="btn btn-primary btn-sm rounded-xl"
+                                                    data-dashboard-row-detail="{{ $detailPayload }}">
+                                                    Voir
+                                                </button>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty

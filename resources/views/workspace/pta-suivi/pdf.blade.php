@@ -28,6 +28,8 @@
         .pta-level-sub-action td { background:#f1f5f9; color:#334155; }
         .pta-sub-action-row td { background:#f1f5f9; color:#334155; }
         .pta-sub-action-row .pta-action-index-cell, .pta-sub-action-row .pta-action-parent-cell { background:#f8fafc; color:#111827; }
+        .pta-hierarchy-action-cell { background:#f8fafc; color:#111827; }
+        .pta-hierarchy-sub-action-cell { background:#f1f5f9; color:#334155; }
         .pta-strategy-row td { background:#5b9bd5; color:#000; font-weight:900; text-align:center; }
         .pta-strategy-rate { background:#ddebf7 !important; }
         .pta-objective-row td { background:#ddebf7; font-weight:900; text-align:center; }
@@ -38,7 +40,10 @@
         .pta-progress-track { height:4px; background:#e5e7eb; }
         .pta-progress-fill { display:block; height:4px; background:#3996d3; }
         .pta-progress-label { display:block; font-size:5.6px; font-weight:900; }
-        .pta-proof-button { display:inline-block; border:1px solid #1e5fa8; border-radius:3px; background:#eef6fc; color:#0f2f57; padding:2px 3px; font-size:5.8px; font-weight:900; }
+        .pta-proof-button { display:inline-flex; align-items:center; gap:1.5px; border:1px solid #1e5fa8; border-radius:3px; background:#eef6fc; color:#0f2f57; padding:2px 3px; font-size:5.8px; font-weight:900; }
+        .pta-proof-button svg { width:6px; height:6px; flex:0 0 6px; }
+        .pta-proof-button-label { line-height:1; }
+        .pta-proof-count { display:inline-block; min-width:7px; border-radius:9px; background:#1e5fa8; color:#fff; font-size:5.6px; line-height:7px; text-align:center; }
         .pta-proof-button-empty { border-color:#cbd5e1; background:#f1f5f9; color:#64748b; }
         .pta-action-cell { font-weight:700; }
         .pta-sub-action-cell { font-weight:800; color:#334155; }

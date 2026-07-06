@@ -260,10 +260,8 @@
                     <div>
                         <label for="password">{{ $isEdit ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe (optionnel)' }}</label>
                         <div class="relative">
-                            <input id="password" name="password" type="password" class="pr-16">
-                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="password">
-                                Voir
-                            </button>
+                            <input id="password" name="password" type="password" class="pr-14">
+                            <x-auth.password-toggle target="password" />
                         </div>
                         @unless($isEdit)
                             <p class="mt-1 text-xs text-slate-500">Laissez vide pour appliquer le mot de passe par défaut : <code>Anbg@2026!Pas</code></p>
@@ -272,10 +270,8 @@
                     <div>
                         <label for="password_confirmation">Confirmation mot de passe</label>
                         <div class="relative">
-                            <input id="password_confirmation" name="password_confirmation" type="password" class="pr-16">
-                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="password_confirmation">
-                                Voir
-                            </button>
+                            <input id="password_confirmation" name="password_confirmation" type="password" class="pr-14">
+                            <x-auth.password-toggle target="password_confirmation" />
                         </div>
                     </div>
                 </div>
@@ -319,18 +315,5 @@
         } else {
             initRoleAgentFieldsToggle();
         }
-
-        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
-            button.addEventListener('click', function () {
-                var input = document.getElementById(button.dataset.passwordToggle);
-                if (! input) {
-                    return;
-                }
-
-                var isHidden = input.type === 'password';
-                input.type = isHidden ? 'text' : 'password';
-                button.textContent = isHidden ? 'Cacher' : 'Voir';
-            });
-        });
     })();
 </script>

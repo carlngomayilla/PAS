@@ -44,6 +44,7 @@
             box-shadow: 0 6px 16px -6px rgba(57, 150, 211, 0.55);
             transition: background .15s ease, transform .15s ease;
         }
+        .form-actions { margin-top: 18px; }
         .btn:hover { background: #2680c0; transform: translateY(-1px); }
         .alert {
             padding: 10px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 18px;
@@ -78,8 +79,9 @@
             @csrf
             <label for="email">Adresse e-mail</label>
             <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="email">
-            <div style="height: 18px"></div>
-            <button class="btn" type="submit">Envoyer le lien</button>
+            <div class="form-actions">
+                <button class="btn" type="submit">Envoyer le lien</button>
+            </div>
         </form>
 
         <div class="links">

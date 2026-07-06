@@ -267,10 +267,8 @@
                 <div>
                     <label for="managed_password">{{ $editingUser ? 'Nouveau mot de passe' : 'Mot de passe (optionnel)' }}</label>
                     <div class="relative">
-                        <input id="managed_password" name="password" type="password" class="pr-16">
-                        <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="managed_password">
-                            Voir
-                        </button>
+                        <input id="managed_password" name="password" type="password" class="pr-14">
+                        <x-auth.password-toggle target="managed_password" />
                     </div>
                     @unless($editingUser)
                         <p class="mt-1 text-xs text-slate-500">Laissez vide pour appliquer le mot de passe par défaut : <code>Anbg@2026!Pas</code></p>
@@ -279,10 +277,8 @@
                 <div>
                     <label for="managed_password_confirmation">Confirmation</label>
                     <div class="relative">
-                        <input id="managed_password_confirmation" name="password_confirmation" type="password" class="pr-16">
-                        <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#3996d3]" data-password-toggle="managed_password_confirmation">
-                            Voir
-                        </button>
+                        <input id="managed_password_confirmation" name="password_confirmation" type="password" class="pr-14">
+                        <x-auth.password-toggle target="managed_password_confirmation" />
                     </div>
                 </div>
                 <div>
@@ -789,19 +785,6 @@
     </section>
 
     <script @cspNonce>
-        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
-            button.addEventListener('click', function () {
-                var input = document.getElementById(button.dataset.passwordToggle);
-                if (! input) {
-                    return;
-                }
-
-                var isHidden = input.type === 'password';
-                input.type = isHidden ? 'text' : 'password';
-                button.textContent = isHidden ? 'Cacher' : 'Voir';
-            });
-        });
-
         document.addEventListener('DOMContentLoaded', function () {
             var toggle = document.querySelector('[data-check-all-users]');
             if (toggle) {

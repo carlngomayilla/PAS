@@ -5,6 +5,13 @@
     $total = $batches->total();
     $imported = \App\Models\AiImportBatch::query()->where('status', 'imported')->count();
     $failed = \App\Models\AiImportBatch::query()->where('status', 'failed')->count();
+    $llmStatus = is_array($llmStatus ?? null) ? $llmStatus : [];
+    $llmTone = (string) ($llmStatus['tone'] ?? 'warning');
+    $llmClasses = match ($llmTone) {
+        'danger' => 'border-red-200 bg-red-50 text-red-800',
+        'info' => 'border-blue-200 bg-blue-50 text-blue-800',
+        default => 'border-amber-200 bg-amber-50 text-amber-800',
+    };
 @endphp
 <div class="app-screen-flow">
     <section class="showcase-panel app-screen-block" data-keep-empty="1" data-keep-accordion="0">
@@ -22,6 +29,20 @@
         @if ($errors->any())
             <div class="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{{ $errors->first() }}</div>
         @endif
+
+        <div class="mb-5 rounded-lg border p-4 {{ $llmClasses }}">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-wide">Etat IA locale</p>
+                    <h2 class="mt-1 text-base font-black">{{ $llmStatus['label'] ?? 'Diagnostic IA indisponible' }}</h2>
+                    <p class="mt-1 text-sm font-semibold">{{ $llmStatus['message'] ?? 'Impossible de lire le diagnostic IA.' }}</p>
+                </div>
+                <div class="text-right text-xs font-black uppercase">
+                    <p>Provider: {{ $llmStatus['provider'] ?? '-' }}</p>
+                    <p class="mt-1 normal-case">Modeles: {{ collect($llmStatus['models'] ?? [])->implode(', ') ?: '-' }}</p>
+                </div>
+            </div>
+        </div>
 
         <div class="mb-5 grid gap-3 sm:grid-cols-3">
             <div class="rounded-lg border border-[#d8ecf8] bg-white p-4">

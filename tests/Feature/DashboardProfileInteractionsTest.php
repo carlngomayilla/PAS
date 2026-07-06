@@ -42,7 +42,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $charts->assertDontSee('Analytique avancee');
         // Graphique « Repartition des statuts » retire pour tous les roles (2026-06-10).
         $charts->assertDontSee('dashboard-role-status-chart', false);
-        $charts->assertSee('dashboard-role-support-chart', false);
+        $charts->assertDontSee('dashboard-role-support-chart', false);
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
@@ -67,7 +67,8 @@ class DashboardProfileInteractionsTest extends TestCase
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
-        $charts->assertSee('dashboard-role-trend-chart', false);
+        $charts->assertSee('Statuts');
+        $charts->assertDontSee('dashboard-role-trend-chart', false);
     }
 
     public function test_seeded_direction_user_sees_direction_dashboard_sections(): void
@@ -113,6 +114,20 @@ class DashboardProfileInteractionsTest extends TestCase
         $charts->assertSee('KPI');
     }
 
+    public function test_dashboard_overview_limits_primary_kpis_for_progressive_density(): void
+    {
+        $this->seed();
+
+        $user = User::query()->where('email', 'r.dogui.anbg@gmail.com')->firstOrFail();
+
+        $content = $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertOk()
+            ->getContent();
+
+        $this->assertLessThanOrEqual(6, substr_count($content, 'data-dashboard-primary-kpi'));
+    }
+
     public function test_seeded_dg_user_sees_dg_dashboard_sections(): void
     {
         $this->seed();
@@ -131,9 +146,10 @@ class DashboardProfileInteractionsTest extends TestCase
         $charts->assertSee('KPI');
         $charts->assertSee('Directions');
         $charts->assertSee('Services');
-        $charts->assertSee('dashboard-direction-performance-chart', false);
-        $charts->assertSee('dashboard-service-performance-chart', false);
-        $charts->assertSee('direction_performance_rows', false);
+        $charts->assertSee('Statuts');
+        $charts->assertSee('Analyse');
+        $charts->assertDontSee('dashboard-direction-performance-chart', false);
+        $charts->assertDontSee('dashboard-service-performance-chart', false);
         $charts->assertDontSee('dashboard-role-support-chart', false);
 
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');

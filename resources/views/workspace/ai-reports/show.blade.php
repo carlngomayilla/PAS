@@ -11,7 +11,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a class="btn btn-outline" href="{{ route('workspace.ai-reports.index') }}">Retour</a>
-                @if ($report->contentForExport() !== '')
+                @if ($report->contentForExport() !== '' && in_array($report->status, [\App\Models\AiGeneratedReport::STATUS_VALIDATED, \App\Models\AiGeneratedReport::STATUS_EXPORTED], true))
                     <a class="btn btn-secondary" href="{{ route('workspace.ai-reports.export.pdf', $report) }}">PDF</a>
                     <a class="btn btn-secondary" href="{{ route('workspace.ai-reports.export.word', $report) }}">Word</a>
                     <a class="btn btn-secondary" href="{{ route('workspace.ai-reports.export.excel', $report) }}">Excel</a>
@@ -46,6 +46,10 @@
                 <button class="btn btn-primary" type="submit">Valider le rapport</button>
             </div>
         </form>
+
+        @if ($wordPreview !== null)
+            @include('workspace.ai-reports.partials.pta-quarterly-preview', ['wordPreview' => $wordPreview])
+        @endif
 
         <details class="mt-4 rounded-lg border border-slate-200 bg-white p-4">
             <summary class="cursor-pointer text-sm font-bold text-slate-700">Snapshot metriques</summary>

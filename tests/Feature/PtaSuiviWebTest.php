@@ -50,7 +50,10 @@ class PtaSuiviWebTest extends TestCase
             'role' => User::ROLE_CHEF_PLANIFICATION,
             'is_active' => true,
         ]);
-        $this->makePtaAction('Action structure PTA', '2026-12-15');
+        $action = $this->makePtaAction('Action structure PTA', '2026-12-15', [
+            'quantite_cible' => 0,
+            'force' => ['quantite_realisee' => 0, 'progression_reelle' => 0],
+        ]);
 
         $this->actingAs($user)
             ->get(route('pta.suivi.index', ['annee' => 'all']))
@@ -62,6 +65,16 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('style="background:#0f2f57;color:#ffffff;"', false)
             ->assertSee('.pta-level-sub-action td { background:#f1f5f9;', false)
             ->assertSee('.pta-sub-action-row td { background:#f1f5f9;', false)
+            ->assertSee('.pta-hierarchy-action-cell { background:#f8fafc;', false)
+            ->assertSee('pta-hierarchy-action-cell" style="background:#f8fafc;color:#111827;"', false)
+            ->assertSee('pta-preview-link', false)
+            ->assertSee('data-pta-action-open', false)
+            ->assertSee('href="'.route('pta.suivi.details', $action).'"', false)
+            ->assertSee(route('pta.suivi.details', $action), false)
+            ->assertDontSee('pta-parameter-link', false)
+            ->assertSee('pta-parameter-pill', false)
+            ->assertSee('focus=action#action-', false)
+            ->assertDontSee('focus=target#action-', false)
             ->assertSee('.pta-hierarchy-number, .pta-objective-number { width:42px; }', false)
             ->assertSee('colspan="14" class="pta-pas-label"', false)
             ->assertSee('colspan="7" class="pta-hierarchy-title"', false)
@@ -110,12 +123,28 @@ class PtaSuiviWebTest extends TestCase
             'est_effectuee' => true,
             'validation_status' => SousAction::VALIDATION_VALIDEE,
         ]);
+        SousAction::query()->create([
+            'action_id' => $action->id,
+            'agent_id' => $agent->id,
+            'libelle' => 'Parametrer dossiers',
+            'resultat_attendu' => 'Cible a definir',
+            'cible_prevue' => 0,
+            'quantite_realisee' => 0,
+            'unite' => 'dossiers',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-12-15',
+            'statut' => 'en_cours',
+        ]);
 
         $this->actingAs($user)
             ->get(route('pta.suivi.index', ['annee' => 'all']))
             ->assertOk()
             ->assertSee('<th>Sous-actions</th>', false)
-            ->assertSee('rowspan="2" class="pta-center pta-action-index-cell"', false)
+            ->assertSee('pta-action-index-cell pta-hierarchy-action-cell', false)
+            ->assertSee('pta-hierarchy-sub-action-cell" style="background:#f1f5f9;color:#334155;"', false)
+            ->assertSee('pta-preview-link', false)
+            ->assertSee(route('pta.suivi.details', $action), false)
+            ->assertDontSee('focus=sub_target&amp;sub_action_id=', false)
             ->assertSeeInOrder([
                 'Action avec sous-actions detaillees',
                 '1.</span>',
@@ -198,8 +227,12 @@ class PtaSuiviWebTest extends TestCase
         $this->actingAs($user)
             ->get(route('pta.suivi.details', $action))
             ->assertOk()
+            ->assertSee("Detail de l'action PTA", false)
             ->assertSee('Action detail modal', false)
             ->assertSee('Retard', false)
+            ->assertSee('Parametrer dans le PTA', false)
+            ->assertSee('href="'.route('workspace.pta.edit', $action->pta_id).'?focus=action#action-'.$action->id.'"', false)
+            ->assertSee(route('workspace.actions.suivi', $action), false)
             ->assertSee("Parcours de l'action", false)
             ->assertSee('Validations', false);
     }
@@ -338,7 +371,7 @@ class PtaSuiviWebTest extends TestCase
             'statut' => 'effectuee',
             'est_effectuee' => true,
         ]);
-        Justificatif::query()->create([
+        $proof = Justificatif::query()->create([
             'justifiable_type' => Action::class,
             'justifiable_id' => $action->id,
             'sous_action_id' => $sousAction->id,
@@ -353,8 +386,40 @@ class PtaSuiviWebTest extends TestCase
         $this->actingAs($user)
             ->get(route('pta.suivi.index', ['annee' => 'all']))
             ->assertOk()
-            ->assertSee('Visualiser la preuve', false)
-            ->assertSee('>1</span>', false);
+            ->assertSee('aria-label="Previsualiser la preuve', false)
+            ->assertSee('pta-proof-button-label">Preuve</span>', false)
+            ->assertSee('data-preview-file', false)
+            ->assertSee('href="'.route('workspace.actions.justificatifs.preview', [$action, $proof]).'"', false)
+            ->assertSee(route('workspace.actions.justificatifs.preview', [$action, $proof]), false)
+            ->assertSee(route('workspace.actions.justificatifs.download', [$action, $proof]), false)
+            ->assertSee('pta-proof-count">1</span>', false);
+    }
+
+    public function test_pta_suivi_uses_contextual_preview_component_for_cells(): void
+    {
+        $table = (string) file_get_contents(resource_path('views/components/tables/pta-suivi-table.blade.php'));
+        $component = (string) file_get_contents(resource_path('views/components/pta/preview-link.blade.php'));
+        $proofButton = (string) file_get_contents(resource_path('views/components/pta/proof-button.blade.php'));
+        $modal = (string) file_get_contents(resource_path('views/components/pta/proof-modal.blade.php'));
+        $suiviView = (string) file_get_contents(resource_path('views/workspace/pta-suivi/index.blade.php'));
+        $detailsView = (string) file_get_contents(resource_path('views/workspace/pta-suivi/partials/details.blade.php'));
+        $css = (string) file_get_contents(resource_path('css/app.css'));
+
+        $this->assertStringContainsString('<x-pta.preview-link', $table);
+        $this->assertStringContainsString('data-pta-action-open', $component);
+        $this->assertStringContainsString('href="{{ $url }}"', $component);
+        $this->assertStringContainsString('href="{{ $previewUrl }}"', $proofButton);
+        $this->assertStringContainsString('display:block; width:100%;', $suiviView);
+        $this->assertStringContainsString('text-decoration:none', $suiviView);
+        $this->assertStringContainsString('box-shadow:none;', $suiviView);
+        $this->assertStringContainsString('pta-proof-count', $proofButton);
+        $this->assertStringContainsString('pta-parameter-pill', $table);
+        $this->assertStringContainsString('Previsualisation PTA', $modal);
+        $this->assertStringContainsString('Parametrer dans le PTA', $detailsView);
+        $this->assertStringContainsString("http_build_query(['focus' => 'action'])", (string) file_get_contents(app_path('Services/PtaSuiviService.php')));
+        $this->assertStringContainsString('.pta-suivi-table tbody tr.pta-level-axis > td', $css);
+        $this->assertStringContainsString('.pta-suivi-table th,', $css);
+        $this->assertStringNotContainsString('workspace.pta.edit', $table);
     }
 
     public function test_planning_control_profile_can_export_pta_suivi_pdf(): void
@@ -376,7 +441,8 @@ class PtaSuiviWebTest extends TestCase
 
         $this->assertStringContainsString('reporting-pta-official', $view);
         $this->assertStringContainsString('<x-tables.pta-suivi-table', $view);
-        $this->assertStringContainsString('export-mode="readonly"', $view);
+        $this->assertStringContainsString('export-mode="web"', $view);
+        $this->assertStringContainsString('dashboardTab=overview', $view);
     }
 
     private function makePtaAction(string $label, string $deadline, array $overrides = []): Action

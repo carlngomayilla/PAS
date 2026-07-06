@@ -2573,3 +2573,351 @@ html.dark body.admin-theme-scope.anbg-glass-theme table tbody td:first-child {
     color: #f8fafc !important;
 }
 
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-table tbody td.dashboard-synthesis-hierarchy-cell {
+    font-weight: 850 !important;
+    white-space: normal;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-table tbody td.dashboard-synthesis-level-pas {
+    background: #2f75b5 !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-table tbody td.dashboard-synthesis-level-axis {
+    background: #0f2f57 !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-table tbody td.dashboard-synthesis-level-strategic-objective {
+    background: #1e5fa8 !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-table tbody td.dashboard-synthesis-level-operational-objective,
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-table tbody td.dashboard-synthesis-level-pao {
+    background: #d8ecff !important;
+    color: #0f2f57 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-table tbody td.dashboard-synthesis-level-pta {
+    background: #eef6fc !important;
+    color: #0f2f57 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-table tbody td.dashboard-synthesis-level-action {
+    background: #f8fafc !important;
+    color: #111827 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-table tbody td.dashboard-synthesis-level-sub-action {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card {
+    --synthesis-pas: #2f75b5;
+    --synthesis-axis: #0f2f57;
+    --synthesis-strategic: #1e5fa8;
+    --synthesis-operational: #d8ecff;
+    --synthesis-pta: #eef6fc;
+    --synthesis-action: #f8fafc;
+    --synthesis-sub-action: #f1f5f9;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node {
+    position: relative;
+    border-color: color-mix(in srgb, var(--node-tone, #3996d3) 34%, rgba(216, 236, 248, 0.84)) !important;
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--node-tone, #3996d3) 14%, transparent), transparent 44%),
+        var(--node-bg, rgba(255, 255, 255, 0.94)) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--node-tone, #3996d3) 12%, transparent) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 0.35rem;
+    border-radius: inherit;
+    background: var(--node-tone, #3996d3);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-summary:hover {
+    background: color-mix(in srgb, var(--node-tone, #3996d3) 10%, transparent);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-pas {
+    --node-tone: var(--synthesis-pas);
+    --node-bg: linear-gradient(135deg, #f8fbff 0%, #eef6fc 100%);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-axis {
+    --node-tone: var(--synthesis-axis);
+    --node-bg: #f8fbff;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-strategic-objective {
+    --node-tone: var(--synthesis-strategic);
+    --node-bg: #f3f8ff;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-operational-objective {
+    --node-tone: #7ab8e8;
+    --node-bg: var(--synthesis-operational);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-pta {
+    --node-tone: #3996d3;
+    --node-bg: var(--synthesis-pta);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-action {
+    --node-tone: #64748b;
+    --node-bg: var(--synthesis-action);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-sub-action {
+    --node-tone: #94a3b8;
+    --node-bg: var(--synthesis-sub-action);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-card {
+    border-color: color-mix(in srgb, var(--synthesis-pas) 24%, #d8ecf8) !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-level-pill {
+    --pill-bg: color-mix(in srgb, var(--node-tone, #3996d3) 15%, #ffffff);
+    --pill-fg: var(--node-tone, #3996d3);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-progress-pill {
+    --pill-bg: color-mix(in srgb, var(--pill-fg, #3996d3) 14%, #ffffff);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-level-label {
+    color: color-mix(in srgb, var(--node-tone, #3996d3) 72%, #334155) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node {
+    border-color: color-mix(in srgb, var(--node-tone, #38bdf8) 34%, #334155) !important;
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--node-tone, #38bdf8) 18%, transparent), transparent 46%),
+        color-mix(in srgb, var(--node-tone, #38bdf8) 8%, #111c2f) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-card {
+    border-color: rgba(125, 211, 252, 0.2) !important;
+    background: linear-gradient(180deg, #111c2f 0%, #162238 100%) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card :where(h2, h3, h4, h5, strong, .text-\[\#17324a\]) {
+    color: #f8fafc !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-level-label {
+    color: color-mix(in srgb, var(--node-tone, #38bdf8) 68%, #e2e8f0) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-pas-row > td {
+    background: #2f75b5 !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    text-align: center;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-level-axis > td {
+    background: #0f2f57 !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    text-align: center;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-level-strategic-objective > td {
+    background: #1e5fa8 !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    text-align: center;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-level-operational-objective > td {
+    background: #d8ecff !important;
+    color: #0f2f57 !important;
+    font-weight: 900 !important;
+    text-align: center;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-level-action > td,
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody td.pta-hierarchy-action-cell {
+    background: #f8fafc !important;
+    color: #111827 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-level-sub-action > td,
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-sub-action-row > td,
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody td.pta-hierarchy-sub-action-cell {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-sub-action-row > td.pta-action-index-cell,
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr.pta-sub-action-row > td.pta-action-parent-cell {
+    background: #f8fafc !important;
+    color: #111827 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    table-layout: fixed !important;
+    font-size: 12px !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table th,
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table td {
+    border: 1px solid #111 !important;
+    padding: 6px !important;
+    vertical-align: middle !important;
+    box-shadow: none !important;
+    overflow-wrap: anywhere;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table th {
+    background: #d9d9d9 !important;
+    color: #000 !important;
+    font-weight: 900 !important;
+    text-align: center !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    white-space: normal !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table tbody tr:hover td {
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-preview-link,
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-action-link {
+    display: block !important;
+    width: 100% !important;
+    color: inherit;
+    text-decoration: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-action-link.pta-preview-link {
+    color: #17324a !important;
+    font-weight: 800 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-parameter-pill {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    margin-top: 5px;
+    border: 1px solid #1e5fa8 !important;
+    border-radius: 6px;
+    background: #1e5fa8 !important;
+    color: #fff !important;
+    padding: 4px 7px;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1.1;
+    text-decoration: none !important;
+}
+
+/* Priorite visuelle pour la hierarchie PAS dans la carte de synthese. */
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card {
+    --synthesis-pas: #2f75b5;
+    --synthesis-axis: #0f2f57;
+    --synthesis-strategic: #1e5fa8;
+    --synthesis-operational: #d8ecff;
+    --synthesis-pta: #eef6fc;
+    --synthesis-action: #f8fafc;
+    --synthesis-sub-action: #f1f5f9;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-card {
+    --kpi-tone: var(--synthesis-pas);
+    --kpi-bg: color-mix(in srgb, var(--kpi-tone) 12%, #ffffff);
+    --kpi-fg: var(--kpi-tone);
+    border-color: color-mix(in srgb, var(--kpi-tone) 36%, #d8ecf8) !important;
+    border-left: 0.42rem solid var(--kpi-tone) !important;
+    background: linear-gradient(135deg, var(--kpi-bg), #ffffff 72%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-axis {
+    --kpi-tone: var(--synthesis-axis);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-late {
+    --kpi-tone: #b42318;
+    --kpi-bg: #fff1ef;
+    --kpi-fg: #b42318;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-sub-action {
+    --kpi-tone: #64748b;
+    --kpi-bg: var(--synthesis-sub-action);
+    --kpi-fg: #334155;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-card p:first-child {
+    color: color-mix(in srgb, var(--kpi-tone) 72%, #475569) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-card p:last-child {
+    color: var(--kpi-fg) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-axis > .dashboard-synthesis-node-summary {
+    background: linear-gradient(135deg, var(--synthesis-axis), #17324a) !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-axis > .dashboard-synthesis-node-summary :where(strong, p, span:not(.btn):not(.dashboard-pill), .text-\[\#17324a\], .text-\[\#667085\]) {
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-axis > .dashboard-synthesis-node-summary .dashboard-synthesis-level-pill {
+    --pill-bg: rgba(255, 255, 255, 0.16);
+    --pill-fg: #ffffff;
+    border-color: rgba(255, 255, 255, 0.34) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-strategic-objective > .dashboard-synthesis-node-summary {
+    border-radius: 0.7rem;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--synthesis-strategic) 16%, #ffffff), #f3f8ff) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-operational-objective > .dashboard-synthesis-node-summary {
+    background: linear-gradient(135deg, var(--synthesis-operational), #eef6fc) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-pta {
+    background: linear-gradient(135deg, var(--synthesis-pta), #ffffff) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-action {
+    background: var(--synthesis-action) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-node-sub-action {
+    background: var(--synthesis-sub-action) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-card {
+    --kpi-bg: color-mix(in srgb, var(--kpi-tone) 18%, #111c2f);
+    border-color: color-mix(in srgb, var(--kpi-tone) 42%, #334155) !important;
+    background: linear-gradient(135deg, var(--kpi-bg), #111c2f 76%) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-card p:first-child {
+    color: color-mix(in srgb, var(--kpi-tone) 58%, #e2e8f0) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy-card .dashboard-synthesis-kpi-card p:last-child {
+    color: color-mix(in srgb, var(--kpi-fg) 76%, #f8fafc) !important;
+}
+

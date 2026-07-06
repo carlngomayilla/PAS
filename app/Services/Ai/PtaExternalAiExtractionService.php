@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Exceptions\InsufficientCreditsException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Files\Image as AiImage;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use Throwable;
 
@@ -29,6 +30,36 @@ class PtaExternalAiExtractionService
     public function extractFromText(string $text, array $metadata = []): ?array
     {
         return $this->extract('pdf', $text, $metadata);
+    }
+
+    /**
+     * @param  list<string>  $imagePaths
+     * @param  array<string,mixed>  $metadata
+     * @return array{document:array<string,mixed>,rows:list<array<string,mixed>>,log:list<array<string,mixed>>}|null
+     */
+    public function extractFromImages(array $imagePaths, array $metadata = []): ?array
+    {
+        if ($this->modelNameForConfigKey('llm_vision_model') === null) {
+            $this->lastFailureMessage = 'Aucun modele vision PTA n est configure. Renseignez AI_PTA_VISION_MODEL pour analyser les images/PDF scannes avec Ollama.';
+
+            return null;
+        }
+
+        $imagePaths = array_values(array_filter($imagePaths, static fn (string $path): bool => is_file($path)));
+        if ($imagePaths === []) {
+            return null;
+        }
+
+        $attachments = array_map(
+            static fn (string $path): AiImage => AiImage::fromPath($path),
+            $imagePaths
+        );
+
+        return $this->extract('image', 'Analyse les images jointes en priorite et reconstruis les lignes IMPORT_GLOBAL PTA visibles.', array_replace($metadata, [
+            'source_type' => $metadata['source_type'] ?? 'image',
+            'extraction_priorite' => 'ia_vision_ollama',
+            'nombre_images' => count($attachments),
+        ]), $attachments);
     }
 
     /**
@@ -61,7 +92,7 @@ class PtaExternalAiExtractionService
      * @param  array<string,mixed>  $metadata
      * @return array{document:array<string,mixed>,rows:list<array<string,mixed>>,log:list<array<string,mixed>>}|null
      */
-    private function extract(string $sourceType, string $content, array $metadata): ?array
+    private function extract(string $sourceType, string $content, array $metadata, array $attachments = []): ?array
     {
         $this->lastFailureMessage = null;
 
@@ -75,16 +106,24 @@ class PtaExternalAiExtractionService
         try {
             $response = $this->agent->prompt(
                 $this->prompt($sourceType, $content, $metadata),
+                attachments: $attachments,
                 provider: $this->providerName(),
                 model: $this->modelName($sourceType),
-                timeout: max(30, (int) config('ai_training.pta.llm_timeout', 120))
+                timeout: $this->timeoutFor($sourceType)
             );
 
-            return $this->normalizeStructuredResponse($response instanceof StructuredAgentResponse ? $response->toArray() : $this->jsonFromText($response->text), $metadata);
-        } catch (Throwable $exception) {
-            $this->lastFailureMessage = $this->failureMessageFor($exception);
+            $structured = $this->normalizeStructuredResponse($response instanceof StructuredAgentResponse ? $response->toArray() : $this->jsonFromText($response->text), $metadata);
+            if ($structured === null) {
+                $this->lastFailureMessage = "L'analyse IA ".$this->providerLabel($this->providerName() ?? 'IA').' n a retourne aucune ligne PTA exploitable. L analyse continue avec l extraction locale.';
+            }
 
-            report($exception);
+            return $structured;
+        } catch (Throwable $exception) {
+            $this->lastFailureMessage = $this->failureMessageFor($exception, $sourceType);
+
+            if ($this->shouldReportFailure($exception)) {
+                report($exception);
+            }
 
             return null;
         }
@@ -97,18 +136,38 @@ class PtaExternalAiExtractionService
     {
         $template = $this->template->analyze();
         $trainingPrompt = trim((string) ($template['training']['prompt_ia'] ?? ''));
+        $examples = $this->listOfRows($template['examples'] ?? []);
+        $content = $this->compactSourceContent($content);
         $maxCharacters = max(5000, (int) config('ai_training.pta.llm_max_chars', 60000));
 
         return implode("\n\n", array_filter([
             'SOURCE_TYPE='.$sourceType,
             'METADONNEES='.json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'MODELES_LOCAUX_CONFIGURES='.json_encode($this->configuredLocalModels(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            $sourceType === 'image' ? 'PRIORITE=Utilise les images jointes avant tout OCR local. Lis les tableaux PTA visibles et retourne les lignes structurees.' : null,
             'COLONNES_IMPORT_GLOBAL='.json_encode($template['columns'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             $trainingPrompt === '' ? null : 'PROMPT_IA_DU_GABARIT='.$trainingPrompt,
-            'EXEMPLES_IMPORT_GLOBAL='.json_encode($template['examples'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            $examples === [] ? null : 'EXEMPLES_IMPORT_GLOBAL='.json_encode($examples, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'CONTENU_SOURCE='.Str::limit($content, $maxCharacters, "\n[CONTENU_TRONQUE]"),
             'Retourne uniquement les donnees structurees. Chaque rows[] doit contenir toutes les colonnes IMPORT_GLOBAL, avec null si absent. log[] doit tracer page_pdf, score_confiance_ia et note_normalisation.',
         ]));
+    }
+
+    private function compactSourceContent(string $content): string
+    {
+        $lines = preg_split('/\R/', str_replace(["\r\n", "\r"], "\n", $content)) ?: [];
+        $lines = array_values(array_filter(array_map(
+            static fn (string $line): string => trim($line),
+            $lines
+        ), static function (string $line): bool {
+            if ($line === '') {
+                return false;
+            }
+
+            return ! str_starts_with($line, '@@OCR_BOX|') && ! str_starts_with($line, '@@OCR_PAGE|');
+        }));
+
+        return $lines === [] ? trim($content) : implode("\n", $lines);
     }
 
     /**
@@ -172,6 +231,15 @@ class PtaExternalAiExtractionService
         return is_string($provider) && trim($provider) !== '' ? trim($provider) : null;
     }
 
+    private function timeoutFor(string $sourceType): int
+    {
+        if ($sourceType === 'image') {
+            return max(10, (int) config('ai_training.pta.llm_vision_timeout', 45));
+        }
+
+        return max(30, (int) config('ai_training.pta.llm_timeout', 120));
+    }
+
     private function explicitModelName(): ?string
     {
         $model = config('ai_training.pta.llm_model');
@@ -188,12 +256,17 @@ class PtaExternalAiExtractionService
 
     private function modelName(string $sourceType): ?string
     {
+        if ($sourceType === 'image') {
+            return $this->modelNameForConfigKey('llm_vision_model');
+        }
+
         $explicitModel = $this->explicitModelName();
         if ($explicitModel !== null) {
             return $explicitModel;
         }
 
         $keys = match ($sourceType) {
+            'image' => ['llm_vision_model', 'llm_text_model', 'llm_reasoning_model'],
             'spreadsheet' => ['llm_reasoning_model', 'llm_text_model'],
             default => ['llm_text_model', 'llm_reasoning_model'],
         };
@@ -327,12 +400,19 @@ class PtaExternalAiExtractionService
         return is_array($configuration) ? (string) ($configuration['driver'] ?? $provider) : $provider;
     }
 
-    private function failureMessageFor(Throwable $exception): string
+    private function failureMessageFor(Throwable $exception, string $sourceType): string
     {
         $provider = $this->providerName() ?? 'IA';
         $providerLabel = $this->providerLabel($provider);
         $providerMessage = $this->providerMessageFrom($exception);
         $normalizedProviderMessage = Str::lower($providerMessage);
+
+        if ($this->isTimeoutFailure($exception)) {
+            $timeout = $this->timeoutFor($sourceType);
+            $model = $this->modelName($sourceType) ?? 'modele configure';
+
+            return "Le modele {$providerLabel} {$model} a depasse le delai de {$timeout} secondes. L analyse continue avec l OCR local et le fallback PTA.";
+        }
 
         if ($this->providerDriver($provider) === 'ollama' && $this->isConnectionFailure($exception)) {
             $url = (string) config('ai.providers.'.$provider.'.url', 'http://localhost:11434');
@@ -374,6 +454,36 @@ class PtaExternalAiExtractionService
 
         while ($current instanceof Throwable) {
             if ($current instanceof ConnectionException || str_contains(Str::lower($current->getMessage()), 'connection')) {
+                return true;
+            }
+
+            $current = $current->getPrevious();
+        }
+
+        return false;
+    }
+
+    private function shouldReportFailure(Throwable $exception): bool
+    {
+        if ($this->isTimeoutFailure($exception)) {
+            return false;
+        }
+
+        $provider = $this->providerName();
+        if ($provider !== null && $this->providerDriver($provider) === 'ollama' && $this->isConnectionFailure($exception)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function isTimeoutFailure(Throwable $exception): bool
+    {
+        $current = $exception;
+
+        while ($current instanceof Throwable) {
+            $message = Str::lower($current->getMessage());
+            if (str_contains($message, 'timed out') || str_contains($message, 'timeout') || str_contains($message, 'curl error 28')) {
                 return true;
             }
 

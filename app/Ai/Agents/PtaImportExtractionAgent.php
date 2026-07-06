@@ -7,11 +7,13 @@ use App\Services\Imports\PlanningExcelImportService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasStructuredOutput;
+use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 use Stringable;
 
-class PtaImportExtractionAgent implements Agent, HasStructuredOutput
+class PtaImportExtractionAgent implements Agent, HasProviderOptions, HasStructuredOutput
 {
     use Promptable;
 
@@ -22,6 +24,21 @@ class PtaImportExtractionAgent implements Agent, HasStructuredOutput
     public function instructions(): Stringable|string
     {
         return $this->prompts->ptaExtractionSystemPrompt();
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function providerOptions(Lab|string $provider): array
+    {
+        $providerName = $provider instanceof Lab ? $provider->value : $provider;
+        if ($providerName !== Lab::Ollama->value) {
+            return [];
+        }
+
+        return [
+            'num_ctx' => max(4096, (int) config('ai_training.pta.llm_context_window', 8192)),
+        ];
     }
 
     public function schema(JsonSchema $schema): array

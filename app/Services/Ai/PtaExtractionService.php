@@ -12,9 +12,12 @@ use Throwable;
 
 class PtaExtractionService
 {
+    private ?string $lastWarning = null;
+
     public function __construct(
         private readonly SimpleSpreadsheet $spreadsheet,
         private readonly PtaDocumentTextExtractionService $textExtraction,
+        private readonly PtaDocumentVisionSourceService $visionSources,
         private readonly PtaExternalAiExtractionService $externalAi,
         private readonly PtaDocumentStructureExtractorService $structureExtractor,
         private readonly PtaDocumentToImportGlobalMapperService $documentMapper
@@ -25,6 +28,8 @@ class PtaExtractionService
      */
     public function extract(AiImportBatch $batch): array
     {
+        $this->lastWarning = null;
+
         $batch->forceFill([
             'status' => AiImportBatch::STATUS_EXTRACTING,
             'error_message' => null,
@@ -32,7 +37,7 @@ class PtaExtractionService
 
         try {
             $rows = $this->extractRows($batch);
-            $warning = $this->externalAi->lastFailureMessage();
+            $warning = $this->lastWarning ?? $this->externalAi->lastFailureMessage();
 
             $batch->rows()->delete();
             foreach ($rows as $index => $row) {
@@ -88,7 +93,7 @@ class PtaExtractionService
             throw new RuntimeException('Le fichier source est introuvable.');
         }
 
-        if ($extension === 'pdf') {
+        if (in_array($extension, ['pdf', 'png', 'jpg', 'jpeg'], true)) {
             return $this->extractDocumentRows($batch, $path, $extension);
         }
 
@@ -109,15 +114,27 @@ class PtaExtractionService
      */
     private function extractDocumentRows(AiImportBatch $batch, string $path, string $extension): array
     {
-        $text = $this->textExtraction->extract($path, $extension);
         $metadata = $this->batchMetadata($batch, [
             'source_type' => $extension,
         ]);
+
+        $structured = $this->extractWithVisionFirst($path, $extension, $metadata);
+        if ($structured !== null) {
+            return $this->rowsFromStructured($structured);
+        }
+        $this->rememberExternalAiWarning();
+
+        if (in_array($extension, ['png', 'jpg', 'jpeg'], true)) {
+            throw new RuntimeException('Ce fichier image PTA necessite une IA vision operationnelle. Verifiez Ollama, AI_PTA_VISION_MODEL et AI_PTA_LLM_ENABLED, ou importez le modele Excel/source texte.');
+        }
+
+        $text = $this->textExtraction->extract($path, $extension);
 
         $structured = $this->externalAi->extractFromText($text, $metadata);
         if ($structured !== null) {
             return $this->rowsFromStructured($structured);
         }
+        $this->rememberExternalAiWarning();
 
         $structured = $this->structureExtractor->extractFromText($text);
         $structured['document'] = array_replace($structured['document'] ?? [], $metadata);
@@ -127,6 +144,40 @@ class PtaExtractionService
         }
 
         return $this->rowsFromStructured($structured);
+    }
+
+    private function rememberExternalAiWarning(): void
+    {
+        $message = $this->externalAi->lastFailureMessage();
+        if ($this->lastWarning !== null || $message === null || trim($message) === '') {
+            return;
+        }
+
+        $this->lastWarning = $message;
+    }
+
+    /**
+     * @param  array<string,mixed>  $metadata
+     * @return array{document:array<string,mixed>,rows:list<array<string,mixed>>,log:list<array<string,mixed>>}|null
+     */
+    private function extractWithVisionFirst(string $path, string $extension, array $metadata): ?array
+    {
+        if (! $this->externalAi->available()) {
+            return null;
+        }
+
+        $sources = $this->visionSources->sources($path, $extension);
+        if (($sources['paths'] ?? []) === []) {
+            return null;
+        }
+
+        try {
+            return $this->externalAi->extractFromImages($sources['paths'], array_replace($metadata, [
+                'source_vision' => $sources['source'] ?? 'image',
+            ]));
+        } finally {
+            $this->visionSources->cleanup($sources);
+        }
     }
 
     /**

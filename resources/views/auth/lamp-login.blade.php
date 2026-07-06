@@ -99,9 +99,10 @@
                         placeholder="Mot de passe"
                         autocomplete="current-password"
                         class="login-input"
+                        data-password-toggle-target
                         required
                     >
-                    <button type="button" class="login-pwd-show" data-password-toggle="loginPwd">VOIR</button>
+                    <x-auth.password-toggle target="loginPwd" class="login-pwd-show" />
                 </div>
 
                 {{-- Options --}}
@@ -129,20 +130,4 @@
 </div>
 </div>
 
-@push('scripts')
-    <script @cspNonce>
-        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
-            button.addEventListener('click', function () {
-                var input = document.getElementById(button.dataset.passwordToggle);
-                if (! input) {
-                    return;
-                }
-
-                var isHidden = input.type === 'password';
-                input.type = isHidden ? 'text' : 'password';
-                button.textContent = isHidden ? 'CACHER' : 'VOIR';
-            });
-        });
-    </script>
-@endpush
 @endsection

@@ -152,6 +152,8 @@ class PtaSuiviService
             'history' => $this->historyRows($action),
             'validations' => $this->validationRows($action),
             'attachments' => $this->attachmentRows($action),
+            'parameterUrl' => $this->actionParameterUrl($action),
+            'trackingUrl' => route('workspace.actions.suivi', $action),
         ];
     }
 
@@ -319,11 +321,21 @@ class PtaSuiviService
         $unit = (string) ($action->unite_cible ?? $kpi?->unite ?? '');
         $indicator = $this->dash($kpi?->libelle ?? $action->indicateurs_attendus ?? $objective?->indicateurs ?? $strategicObjective?->indicateur_global ?? null);
 
+        $detailsUrl = route('pta.suivi.details', $action);
+        $proofPreview = $this->proofPreviewData($action);
+
         return [
             'id' => (int) $action->id,
             'action_id' => (int) $action->id,
             'action_url' => route('workspace.actions.suivi', $action),
-            'details_url' => route('pta.suivi.details', $action),
+            'details_url' => $detailsUrl,
+            'preview_url' => $detailsUrl,
+            'parameter_url' => $this->actionParameterUrl($action),
+            'proof_preview_url' => $proofPreview['preview_url'],
+            'proof_download_url' => $proofPreview['download_url'],
+            'proof_title' => $proofPreview['title'],
+            'proof_subtitle' => $proofPreview['subtitle'],
+            'proof_mime' => $proofPreview['mime'],
             'libelle' => (string) ($action->libelle ?: '-'),
             'pas_key' => (string) ($pas?->id ?? 'pas-none'),
             'pas_code' => $this->pasCode($pas, $pao),
@@ -387,7 +399,7 @@ class PtaSuiviService
         return $action->sousActions
             ->sortBy(fn (SousAction $sousAction): int => (int) $sousAction->id)
             ->values()
-            ->map(function (SousAction $sousAction, int $index) use ($fallbackResponsable, $fallbackIndicator, $fallbackUnit): array {
+            ->map(function (SousAction $sousAction, int $index) use ($action, $fallbackResponsable, $fallbackIndicator, $fallbackUnit): array {
                 $official = $this->officialCalculation->subActionResult($sousAction);
                 $target = (float) $official['target'];
                 $realized = (float) $official['realized'];
@@ -403,9 +415,20 @@ class PtaSuiviService
                 $status = $this->subActionDisplayStatus($official, $delayStatus);
                 $workflowStatus = $this->subActionWorkflowStatus($sousAction, $official);
 
+                $detailsUrl = route('pta.suivi.details', $action);
+                $proofPreview = $this->proofPreviewData($action, $sousAction);
+
                 return [
                     'id' => (int) $sousAction->id,
                     'numero' => $index + 1,
+                    'details_url' => $detailsUrl,
+                    'preview_url' => $detailsUrl,
+                    'parameter_url' => $this->actionParameterUrl($action, $sousAction),
+                    'proof_preview_url' => $proofPreview['preview_url'],
+                    'proof_download_url' => $proofPreview['download_url'],
+                    'proof_title' => $proofPreview['title'],
+                    'proof_subtitle' => $proofPreview['subtitle'],
+                    'proof_mime' => $proofPreview['mime'],
                     'libelle' => (string) ($sousAction->libelle ?: '-'),
                     'indicateur' => $this->dash($sousAction->resultat_attendu ?? $sousAction->description ?? $fallbackIndicator),
                     'responsable' => (string) ($sousAction->agent?->name ?? $fallbackResponsable),
@@ -440,6 +463,78 @@ class PtaSuiviService
                 ];
             })
             ->all();
+    }
+
+    /**
+     * @return array{preview_url:?string,download_url:?string,title:?string,subtitle:?string,mime:?string}
+     */
+    private function proofPreviewData(Action $action, ?SousAction $sousAction = null): array
+    {
+        $proof = $this->firstProof($action, $sousAction);
+        if (! $proof instanceof Justificatif) {
+            return [
+                'preview_url' => null,
+                'download_url' => null,
+                'title' => null,
+                'subtitle' => null,
+                'mime' => null,
+            ];
+        }
+
+        return [
+            'preview_url' => route('workspace.actions.justificatifs.preview', [$action, $proof]),
+            'download_url' => route('workspace.actions.justificatifs.download', [$action, $proof]),
+            'title' => (string) ($proof->nom_original ?? 'Piece justificative'),
+            'subtitle' => trim((string) ($proof->description ?: $proof->categorie)) ?: 'Piece justificative',
+            'mime' => (string) ($proof->mime_type ?? ''),
+        ];
+    }
+
+    private function firstProof(Action $action, ?SousAction $sousAction = null): ?Justificatif
+    {
+        if ($sousAction instanceof SousAction) {
+            if ($sousAction->relationLoaded('justificatifs')) {
+                return $sousAction->justificatifs
+                    ->sortByDesc(fn (Justificatif $proof): int => (int) ($proof->created_at?->timestamp ?? 0))
+                    ->first();
+            }
+
+            return $sousAction->exists
+                ? $sousAction->justificatifs()->latest()->first()
+                : null;
+        }
+
+        if ($action->relationLoaded('justificatifs')) {
+            $proof = $action->justificatifs
+                ->sortByDesc(fn (Justificatif $attachment): int => (int) ($attachment->created_at?->timestamp ?? 0))
+                ->first();
+
+            if ($proof instanceof Justificatif) {
+                return $proof;
+            }
+        } elseif ($action->exists) {
+            $proof = $action->justificatifs()->latest()->first();
+            if ($proof instanceof Justificatif) {
+                return $proof;
+            }
+        }
+
+        if ($action->relationLoaded('sousActions')) {
+            return $action->sousActions
+                ->flatMap(function (SousAction $subAction): Collection {
+                    if ($subAction->relationLoaded('justificatifs')) {
+                        return $subAction->justificatifs;
+                    }
+
+                    return $subAction->exists
+                        ? $subAction->justificatifs()->latest()->get()
+                        : collect();
+                })
+                ->sortByDesc(fn (Justificatif $proof): int => (int) ($proof->created_at?->timestamp ?? 0))
+                ->first();
+        }
+
+        return null;
     }
 
     /**
@@ -1116,6 +1211,19 @@ class PtaSuiviService
             'preview_url' => route('workspace.actions.justificatifs.preview', [$action, $justificatif]),
             'download_url' => route('workspace.actions.justificatifs.download', [$action, $justificatif]),
         ];
+    }
+
+    private function actionParameterUrl(Action $action, ?SousAction $sousAction = null): string
+    {
+        if ($action->pta_id !== null) {
+            $query = $sousAction instanceof SousAction
+                ? http_build_query(['focus' => 'sub_action', 'sub_action_id' => $sousAction->id])
+                : http_build_query(['focus' => 'action']);
+
+            return route('workspace.pta.edit', $action->pta_id).'?'.$query.'#action-'.$action->id;
+        }
+
+        return route('workspace.actions.edit', $action);
     }
 
     private function logDetailsLabel(array $details): string

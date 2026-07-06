@@ -30,8 +30,8 @@
     };
 @endphp
 
-<section class="mb-4 space-y-3" data-dashboard-synthesis-hierarchy>
-    <article class="showcase-panel rounded-lg p-4">
+<section class="dashboard-synthesis-hierarchy-card mb-4 space-y-3" data-dashboard-synthesis-hierarchy>
+    <article class="showcase-panel dashboard-synthesis-node dashboard-synthesis-node-pas rounded-lg p-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
                 <p class="text-[11px] font-black uppercase tracking-wide text-[#3996d3]">Vue synthetique d'avancement PAS</p>
@@ -44,19 +44,19 @@
         </div>
 
         <div class="mt-4 grid gap-3 md:grid-cols-4">
-            <div class="rounded-lg border border-[#d8ecf8] bg-white p-3">
+            <div class="dashboard-synthesis-kpi-card dashboard-synthesis-kpi-pas rounded-lg border border-[#d8ecf8] bg-white p-3">
                 <p class="text-[11px] font-black uppercase text-[#667085]">Avancement global</p>
                 <p class="mt-2 text-2xl font-black text-[#17324a]">{{ $fmtPct($pasProgress) }}</p>
             </div>
-            <div class="rounded-lg border border-[#d8ecf8] bg-white p-3">
+            <div class="dashboard-synthesis-kpi-card dashboard-synthesis-kpi-axis rounded-lg border border-[#d8ecf8] bg-white p-3">
                 <p class="text-[11px] font-black uppercase text-[#667085]">Axes suivis</p>
                 <p class="mt-2 text-2xl font-black text-[#17324a]">{{ $fmtCount($pasNode['axes_total'] ?? 0) }}</p>
             </div>
-            <div class="rounded-lg border border-[#d8ecf8] bg-white p-3">
+            <div class="dashboard-synthesis-kpi-card dashboard-synthesis-kpi-late rounded-lg border border-[#d8ecf8] bg-white p-3">
                 <p class="text-[11px] font-black uppercase text-[#667085]">Actions hors delai</p>
                 <p class="mt-2 text-2xl font-black text-[#B42318]">{{ $fmtCount($pasNode['late_actions_total'] ?? 0) }}</p>
             </div>
-            <div class="rounded-lg border border-[#d8ecf8] bg-white p-3">
+            <div class="dashboard-synthesis-kpi-card dashboard-synthesis-kpi-sub-action rounded-lg border border-[#d8ecf8] bg-white p-3">
                 <p class="text-[11px] font-black uppercase text-[#667085]">Sous-actions</p>
                 <p class="mt-2 text-2xl font-black text-[#17324a]">{{ $fmtCount($pasNode['sub_actions_total'] ?? 0) }}</p>
             </div>
@@ -88,11 +88,11 @@
                 $axisTone = $synthesisTone($axisProgress);
                 $objectiveNodes = collect($axis['objectives'] ?? [])->values();
             @endphp
-            <details class="showcase-panel overflow-hidden rounded-lg p-0" {{ $loop->first ? 'open' : '' }}>
-                <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-4 py-3 list-none">
+            <details class="showcase-panel dashboard-synthesis-node dashboard-synthesis-node-axis overflow-hidden rounded-lg p-0" {{ $loop->first ? 'open' : '' }}>
+                <summary class="dashboard-synthesis-node-summary flex cursor-pointer flex-wrap items-center justify-between gap-3 px-4 py-3 list-none">
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="dashboard-pill" style="--pill-bg:#E8F3FB;--pill-fg:#3996D3;">{{ $axis['code'] ?? 'AXE' }}</span>
+                            <span class="dashboard-pill dashboard-synthesis-level-pill">{{ $axis['code'] ?? 'AXE' }}</span>
                             <strong class="text-[#17324a]">{{ $axis['label'] ?? 'Axe non renseigne' }}</strong>
                         </div>
                         <div class="mt-2 grid gap-2 text-xs font-semibold text-[#667085] md:grid-cols-4">
@@ -119,14 +119,14 @@
                             $objectiveProgress = max(0, min(100, (float) ($objective['progress'] ?? 0)));
                             $operationals = collect($objective['operational_objectives'] ?? [])->values();
                         @endphp
-                        <details class="border-l-2 border-[#3996d3]/30 pl-3" {{ $loop->first ? 'open' : '' }}>
-                            <summary class="cursor-pointer list-none py-2">
+                        <details class="dashboard-synthesis-node dashboard-synthesis-node-strategic-objective border-l-2 border-[#3996d3]/30 pl-3" {{ $loop->first ? 'open' : '' }}>
+                            <summary class="dashboard-synthesis-node-summary cursor-pointer list-none py-2">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                     <div class="min-w-0">
-                                        <p class="text-[11px] font-black uppercase text-[#3996d3]">Objectif strategique {{ $objective['code'] ?? 'OS' }}</p>
+                                        <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#3996d3]">Objectif strategique {{ $objective['code'] ?? 'OS' }}</p>
                                         <h3 class="text-sm font-black text-[#17324a]">{{ $objective['label'] ?? '-' }}</h3>
                                     </div>
-                                    <span class="dashboard-pill" style="--pill-bg:#F2F8E8;--pill-fg:{{ $synthesisTone($objectiveProgress) }};">{{ $fmtPct($objectiveProgress) }}</span>
+                                    <span class="dashboard-pill dashboard-synthesis-progress-pill" style="--pill-fg:{{ $synthesisTone($objectiveProgress) }};">{{ $fmtPct($objectiveProgress) }}</span>
                                 </div>
                             </summary>
 
@@ -136,11 +136,11 @@
                                         $operationalProgress = max(0, min(100, (float) ($operational['progress'] ?? 0)));
                                         $ptas = collect($operational['ptas'] ?? [])->values();
                                     @endphp
-                                    <details class="rounded-lg border border-slate-200 bg-slate-50/80" {{ $loop->first ? 'open' : '' }}>
-                                        <summary class="cursor-pointer list-none px-3 py-2">
+                                    <details class="dashboard-synthesis-node dashboard-synthesis-node-operational-objective rounded-lg border border-slate-200 bg-slate-50/80" {{ $loop->first ? 'open' : '' }}>
+                                        <summary class="dashboard-synthesis-node-summary cursor-pointer list-none px-3 py-2">
                                             <div class="flex flex-wrap items-center justify-between gap-2">
                                                 <div class="min-w-0">
-                                                    <p class="text-[11px] font-black uppercase text-[#667085]">Objectif operationnel / PAO</p>
+                                                    <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#667085]">Objectif operationnel / PAO</p>
                                                     <h4 class="text-sm font-black text-[#17324a]">{{ $operational['label'] ?? '-' }}</h4>
                                                     <p class="mt-1 text-xs font-semibold text-[#667085]">{{ $operational['direction'] ?? '-' }} | {{ $operational['service'] ?? '-' }}</p>
                                                 </div>
@@ -159,23 +159,23 @@
                                                     $ptaProgress = max(0, min(100, (float) ($pta['progress'] ?? 0)));
                                                     $actions = collect($pta['actions'] ?? [])->values();
                                                 @endphp
-                                                <div class="rounded-lg bg-white p-3">
+                                                <div class="dashboard-synthesis-node dashboard-synthesis-node-pta rounded-lg bg-white p-3">
                                                     <div class="flex flex-wrap items-center justify-between gap-2">
                                                         <div class="min-w-0">
-                                                            <p class="text-[11px] font-black uppercase text-[#667085]">{{ $pta['code'] ?? 'PTA' }} | {{ $pta['service'] ?? '-' }}</p>
+                                                            <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#667085]">{{ $pta['code'] ?? 'PTA' }} | {{ $pta['service'] ?? '-' }}</p>
                                                             <strong class="text-sm text-[#17324a]">{{ $pta['label'] ?? '-' }}</strong>
                                                         </div>
-                                                        <span class="dashboard-pill" style="--pill-bg:#E8F3FB;--pill-fg:{{ $synthesisTone($ptaProgress) }};">{{ $fmtPct($ptaProgress) }}</span>
+                                                        <span class="dashboard-pill dashboard-synthesis-progress-pill" style="--pill-fg:{{ $synthesisTone($ptaProgress) }};">{{ $fmtPct($ptaProgress) }}</span>
                                                     </div>
 
                                                     <div class="mt-3 space-y-2">
                                                         @forelse ($actions as $action)
                                                             @php $actionProgress = max(0, min(100, (float) ($action['progress'] ?? 0))); @endphp
-                                                            <details class="rounded-lg border border-slate-200">
-                                                                <summary class="cursor-pointer list-none px-3 py-2">
+                                                            <details class="dashboard-synthesis-node dashboard-synthesis-node-action rounded-lg border border-slate-200">
+                                                                <summary class="dashboard-synthesis-node-summary cursor-pointer list-none px-3 py-2">
                                                                     <div class="flex flex-wrap items-center justify-between gap-2">
                                                                         <div class="min-w-0 flex-1">
-                                                                            <p class="text-[11px] font-black uppercase text-[#667085]">{{ $action['code'] ?? 'ACT' }} | {{ $action['responsible'] ?? '-' }}</p>
+                                                                            <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#667085]">{{ $action['code'] ?? 'ACT' }} | {{ $action['responsible'] ?? '-' }}</p>
                                                                             <h5 class="text-sm font-black text-[#17324a]">{{ $action['label'] ?? '-' }}</h5>
                                                                             <p class="mt-1 text-xs font-semibold text-[#667085]">Cible {{ $action['target'] ?? '-' }} | Realise {{ $action['realized'] ?? '-' }} | {{ $action['alert'] ?? '-' }}</p>
                                                                         </div>
@@ -203,10 +203,10 @@
                                                                         <div class="mt-2 grid gap-2 md:grid-cols-2">
                                                                             @foreach ($action['sub_actions'] as $subAction)
                                                                                 @php $subProgress = max(0, min(100, (float) ($subAction['progress'] ?? 0))); @endphp
-                                                                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                                                                                <div class="dashboard-synthesis-node dashboard-synthesis-node-sub-action rounded-lg border border-slate-200 bg-slate-50 p-2">
                                                                                     <div class="flex items-start justify-between gap-2">
                                                                                         <div class="min-w-0">
-                                                                                            <p class="text-[11px] font-black uppercase text-[#667085]">{{ $subAction['code'] ?? 'SA' }}</p>
+                                                                                            <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#667085]">{{ $subAction['code'] ?? 'SA' }}</p>
                                                                                             <p class="text-xs font-bold text-[#17324a]">{{ $subAction['label'] ?? '-' }}</p>
                                                                                             <p class="mt-1 text-[11px] font-semibold text-[#667085]">{{ $subAction['responsible'] ?? '-' }} | {{ $subAction['deadline'] ?? '-' }}</p>
                                                                                         </div>

@@ -14,7 +14,8 @@ use PhpOffice\PhpWord\PhpWord;
 class ReportExportService
 {
     public function __construct(
-        private readonly PtaQuarterlyNarrativeBuilder $ptaNarratives
+        private readonly PtaQuarterlyNarrativeBuilder $ptaNarratives,
+        private readonly PtaQuarterlyReportPreviewService $ptaQuarterlyPreview
     ) {}
 
     public function pdf(AiGeneratedReport $report)
@@ -22,7 +23,10 @@ class ReportExportService
         $this->ensureValidated($report);
 
         $path = $this->path($report, 'pdf');
-        Pdf::loadView('workspace.ai-reports.export-pdf', ['report' => $report])
+        Pdf::loadView('workspace.ai-reports.export-pdf', [
+            'report' => $report,
+            'wordPreview' => $this->ptaQuarterlyPreview->build($report),
+        ])
             ->save(Storage::disk('local')->path($path));
 
         $report->forceFill([
@@ -81,6 +85,11 @@ class ReportExportService
     private function ensureValidated(AiGeneratedReport $report): void
     {
         abort_unless(trim($report->contentForExport()) !== '', 422, 'Rapport vide.');
+        abort_unless(
+            in_array($report->status, [AiGeneratedReport::STATUS_VALIDATED, AiGeneratedReport::STATUS_EXPORTED], true),
+            422,
+            'Validation humaine requise avant export officiel.'
+        );
     }
 
     private function path(AiGeneratedReport $report, string $extension): string
@@ -127,6 +136,7 @@ class ReportExportService
         $summary = $analysis['synthese'] ?? [];
         $axes = is_array($analysis['axes'] ?? null) ? $analysis['axes'] : [];
         $services = is_array($analysis['services'] ?? null) ? $analysis['services'] : [];
+        $matrix = is_array($analysis['matrice_services_axes'] ?? null) ? $analysis['matrice_services_axes'] : [];
         $monthly = is_array($analysis['evolution_mensuelle'] ?? null) ? $analysis['evolution_mensuelle'] : [];
         $gaps = is_array($analysis['ecarts'] ?? null) ? $analysis['ecarts'] : [];
         $measures = is_array($analysis['mesures_correctives'] ?? null) ? $analysis['mesures_correctives'] : [];
@@ -170,16 +180,19 @@ class ReportExportService
         $this->addPtaAxisNarratives($section, $narrative['axes']);
 
         $this->addPtaSectionTitle($section, '2-Taux de realisation des axes strategiques de la Direction Generale.');
-        $this->addPtaAxisRatesTable($section, $axes, $narrative['taux_axes']);
+        $this->addPtaAxisRatesTable($section, $axes, $matrix, $narrative['taux_axes']);
+        $this->addPtaChart($section, 'Progression des axes du PTA sur la periode', $axes, 'libelle', 'taux_realisation', 'column');
 
         $this->addPtaSectionTitle($section, '3-Evolution des taux de realisation des axes strategiques de la DG');
         $this->addPtaAxisEvolution($section, $narrative['evolution_axes']);
+        $this->addPtaChart($section, 'Evolution du taux de realisation des axes strategiques du DG', $axes, 'libelle', 'taux_global_avancement', 'bar');
 
         $this->addPtaSectionTitle($section, '4- Taux de realisation du PTA de la Direction Generale au '.$periodEnd);
         $this->addPtaServiceRateTable($section, $services, $narrative['taux_pta']);
 
         $this->addPtaSectionTitle($section, '5-Evolution du taux de realisation du PTA de la Direction Generale sur la periode '.$period);
         $this->addPtaMonthlyEvolutionTable($section, $monthly, $narrative['evolution_pta']);
+        $this->addPtaChart($section, 'EVOLUTION DU TAUX DE REALISATION DU PTA DU DG', $monthly, 'mois', 'taux_realisation', 'column');
 
         $this->addPtaSectionTitle($section, '6-Analyse des ecarts constates.');
         $this->addPtaGapAnalysis($section, $gaps, $axes, $services, $narrative);
@@ -285,10 +298,41 @@ class ReportExportService
     /**
      * @param  list<array<string, mixed>>  $axes
      */
-    private function addPtaAxisRatesTable($section, array $axes, string $paragraph): void
+    private function addPtaAxisRatesTable($section, array $axes, array $matrix, string $paragraph): void
     {
         $this->addPtaParagraph($section, $paragraph);
         $section->addText('TAUX DE REALISATION DES AXES GLOBAUX', ['bold' => true, 'size' => 10], ['spaceAfter' => 80]);
+
+        if ($matrix !== []) {
+            $axisLabels = collect($axes)
+                ->map(fn (array $axis): string => (string) ($axis['libelle'] ?? 'Sans axe strategique'))
+                ->unique()
+                ->values()
+                ->all();
+            $headers = array_merge(['PTA / Service'], array_map(
+                static fn (string $axis): string => $axis.' - taux / poids',
+                $axisLabels
+            ));
+            $widths = array_fill(0, count($headers), 2200);
+            $widths[0] = 3000;
+            $table = $section->addTable('ptaReportGrid');
+            $this->addPtaTableHeader($table, $headers, $widths);
+
+            foreach ($matrix as $line) {
+                $axisCells = is_array($line['axes'] ?? null) ? $line['axes'] : [];
+                $values = [(string) ($line['service'] ?? 'Non renseigne')];
+
+                foreach ($axisLabels as $axisLabel) {
+                    $cell = is_array($axisCells[$axisLabel] ?? null) ? $axisCells[$axisLabel] : [];
+                    $values[] = $this->asPercent($cell['taux_realisation'] ?? 0).' / '.(string) ($cell['poids'] ?? '0/0');
+                }
+
+                $this->addPtaTableRow($table, $values, $widths);
+            }
+
+            return;
+        }
+
         $widths = [4400, 1600, 1600, 1800, 2000];
         $table = $section->addTable('ptaReportGrid');
         $this->addPtaTableHeader($table, ['Axe strategique', 'Actions prevues', 'Actions echues', 'Taux de realisation', 'Statut'], $widths);
@@ -349,6 +393,45 @@ class ReportExportService
                 $this->asPercent($row['taux_realisation'] ?? 0),
             ], $widths);
         }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function addPtaChart($section, string $title, array $rows, string $labelKey, string $valueKey, string $type): void
+    {
+        $labels = [];
+        $values = [];
+
+        foreach ($rows as $row) {
+            $label = trim((string) ($row[$labelKey] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+
+            $labels[] = str($label)->limit(38, '...')->toString();
+            $values[] = round((float) ($row[$valueKey] ?? 0), 2);
+        }
+
+        if ($labels === []) {
+            $section->addText($title.' : aucune donnee graphique disponible.', ['italic' => true, 'size' => 9], ['spaceAfter' => 120]);
+
+            return;
+        }
+
+        $section->addText($title, ['bold' => true, 'size' => 10, 'color' => '17324A'], ['spaceBefore' => 160, 'spaceAfter' => 80]);
+        $section->addChart($type, $labels, $values, [
+            'width' => 8500000,
+            'height' => 3000000,
+            '3d' => $type === 'bar',
+            'showAxisLabels' => true,
+            'showLegend' => false,
+            'showVal' => true,
+            'categoryAxisTitle' => 'Rubriques',
+            'valueAxisTitle' => 'Taux (%)',
+            'colors' => ['0EA5D7', '17324A', 'F59E0B', '10B981', 'EF4444'],
+        ]);
+        $section->addTextBreak(1);
     }
 
     /**

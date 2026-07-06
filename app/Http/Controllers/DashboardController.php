@@ -3380,6 +3380,7 @@ class DashboardController extends Controller
                     : 0;
 
                 $groups[$key]['agent'] = (string) ($agent->name ?? 'Non assigne');
+                $groups[$key]['agent_id'] = $agentId;
                 $groups[$key]['service'] = (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? 'Non renseigne');
                 $groups[$key]['actions'][(int) $action->id] = $action;
                 $groups[$key]['sous_actions'] = (int) ($groups[$key]['sous_actions'] ?? 0) + $subActionCount;
@@ -3402,6 +3403,9 @@ class DashboardController extends Controller
                     'en_retard' => $late,
                     'sous_actions' => (int) ($group['sous_actions'] ?? 0),
                     'score' => $this->completionRate($completed, $total),
+                    'url' => (int) ($group['agent_id'] ?? 0) > 0
+                        ? $this->actionIndexRoute(['rmo_id' => (int) $group['agent_id']])
+                        : $this->actionIndexRoute(),
                 ];
             })
             ->sortByDesc('score')

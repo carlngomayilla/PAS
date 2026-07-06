@@ -246,6 +246,18 @@
 
         $kpiStatCards = collect($kpiStatCards)
             ->filter($cardIsUsed)
+            ->sortBy(function (array $card): int {
+                $label = \Illuminate\Support\Str::ascii(mb_strtolower((string) ($card['label'] ?? '')));
+
+                foreach (['execution', 'performance', 'retard', 'critique', 'alerte', 'action', 'validation'] as $index => $needle) {
+                    if (str_contains($label, $needle)) {
+                        return $index;
+                    }
+                }
+
+                return 50;
+            })
+            ->take(6)
             ->values()
             ->all();
     @endphp
@@ -259,7 +271,7 @@
                     $trendUp   = ($ksc['trend'] ?? null) === 'up';
                     $trendDown = ($ksc['trend'] ?? null) === 'down';
                 @endphp
-                <a href="{{ $ksc['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border border-[#3996d3]/30 bg-white px-4 py-3 text-center shadow-sm transition" style="--kpi-accent:{{ $ksc['accent'] }};">
+                <a href="{{ $ksc['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border border-[#3996d3]/30 bg-white px-4 py-3 text-center shadow-sm transition" style="--kpi-accent:{{ $ksc['accent'] }};" data-dashboard-primary-kpi>
                     <div class="flex min-h-[4.5rem] flex-col items-center justify-center gap-2">
                         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style="color:{{ $ksc['accent'] }}; background:color-mix(in srgb, {{ $ksc['accent'] }} 12%, transparent);">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
@@ -492,22 +504,35 @@
                                 <tbody>
                                     @forelse (($synthesisTable['rows'] ?? []) as $row)
                                         @php
+                                            $cellLevels = (array) ($row['cell_levels'] ?? $synthesisTable['cell_levels'] ?? []);
+                                            $rowUrl = (string) ($row['url'] ?? '');
                                             $detailPayload = base64_encode(json_encode([
                                                 'title' => (string) ($synthesisTable['title'] ?? 'Tableau'),
                                                 'headers' => array_values((array) ($synthesisTable['headers'] ?? [])),
                                                 'cells' => array_values((array) ($row['cells'] ?? [])),
-                                                'url' => (string) ($row['url'] ?? ''),
+                                                'url' => $rowUrl,
                                             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
                                         @endphp
                                         <tr>
-                                            @foreach (($row['cells'] ?? []) as $cell)
-                                                <td>{{ $cell }}</td>
+                                            @foreach (($row['cells'] ?? []) as $cellIndex => $cell)
+                                                @php
+                                                    $cellLevel = (string) ($cellLevels[$cellIndex] ?? '');
+                                                    $cellClass = $cellLevel !== '' ? 'dashboard-synthesis-hierarchy-cell dashboard-synthesis-level-'.$cellLevel : '';
+                                                @endphp
+                                                <td @if ($cellClass !== '') class="{{ $cellClass }}" @endif>{{ $cell }}</td>
                                             @endforeach
                                             <td class="dashboard-no-export">
-                                                <button type="button" class="btn btn-primary btn-sm rounded-xl"
-                                                    data-dashboard-row-detail="{{ $detailPayload }}">
-                                                    Voir
-                                                </button>
+                                                @if ($rowUrl !== '')
+                                                    <a href="{{ $rowUrl }}" class="btn btn-primary btn-sm rounded-xl"
+                                                        data-dashboard-row-detail="{{ $detailPayload }}">
+                                                        Voir
+                                                    </a>
+                                                @else
+                                                    <button type="button" class="btn btn-primary btn-sm rounded-xl"
+                                                        data-dashboard-row-detail="{{ $detailPayload }}">
+                                                        Voir
+                                                    </button>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty

@@ -18,6 +18,8 @@
         .reporting-pta-official .pta-sub-action-row td { background:#f1f5f9; color:#334155; }
         .reporting-pta-official .pta-sub-action-row .pta-action-index-cell,
         .reporting-pta-official .pta-sub-action-row .pta-action-parent-cell { background:#f8fafc; color:#111827; }
+        .reporting-pta-official .pta-hierarchy-action-cell { background:#f8fafc; color:#111827; }
+        .reporting-pta-official .pta-hierarchy-sub-action-cell { background:#f1f5f9; color:#334155; }
         .reporting-pta-official .pta-strategy-row td { background:#5b9bd5; color:#000; font-weight:900; text-align:center; }
         .reporting-pta-official .pta-strategy-rate { background:#ddebf7 !important; }
         .reporting-pta-official .pta-objective-row td { background:#ddebf7; font-weight:900; text-align:center; }
@@ -26,11 +28,20 @@
         .reporting-pta-official .pta-status-cell { text-align:center; }
         .reporting-pta-official .pta-status-cell { font-weight:900; line-height:1.15; }
         .reporting-pta-official .pta-status-badge { display:inline-flex; min-height:24px; align-items:center; justify-content:center; border-radius:6px; padding:4px 7px; font-size:10px; font-weight:900; line-height:1.1; }
-        .reporting-pta-official .pta-proof-button { display:inline-flex; min-height:28px; align-items:center; justify-content:center; gap:5px; border:1px solid #1e5fa8; border-radius:6px; background:#eef6fc; color:#0f2f57; padding:5px 8px; font-size:10px; font-weight:900; line-height:1.1; }
-        .reporting-pta-official .pta-proof-button span { display:inline-grid; min-width:18px; height:18px; place-items:center; border-radius:999px; background:#1e5fa8; color:#fff; font-size:10px; }
+        .reporting-pta-official .pta-proof-button { display:inline-flex; min-height:28px; min-width:76px; align-items:center; justify-content:center; gap:4px; border:1px solid #1e5fa8; border-radius:6px; background:#eef6fc; color:#0f2f57; padding:5px 7px; font-size:10px; font-weight:900; line-height:1.1; text-decoration:none; white-space:nowrap; }
+        .reporting-pta-official .pta-proof-button svg { width:13px; height:13px; flex:0 0 13px; }
+        .reporting-pta-official .pta-proof-button-label { line-height:1; }
+        .reporting-pta-official .pta-proof-count { display:inline-grid; min-width:16px; height:16px; place-items:center; border-radius:999px; background:#1e5fa8; color:#fff; font-size:10px; line-height:1; }
         .reporting-pta-official .pta-proof-button-empty,
         .reporting-pta-official .pta-proof-button:disabled { border-color:#cbd5e1; background:#f1f5f9; color:#64748b; }
-        .reporting-pta-official .pta-action-link { display:inline; border:0; padding:0; background:transparent; color:#17324a; font:inherit; font-weight:800; text-decoration:underline; cursor:pointer; text-align:left; }
+        .reporting-pta-official .pta-action-link { display:block; width:100%; border:0; padding:2px 3px; margin:-2px -3px; background:transparent; color:#17324a; font:inherit; font-weight:800; text-decoration:none; cursor:pointer; text-align:left; border-radius:4px; }
+        .reporting-pta-official .pta-preview-link { display:block; width:100%; min-height:100%; margin:-2px -3px; border:0; border-radius:4px; padding:2px 3px; background:transparent; color:inherit; font:inherit; text-align:inherit; text-decoration:none; cursor:pointer; transition:background-color .15s ease, color .15s ease; }
+        .reporting-pta-official .pta-action-link.pta-preview-link { color:#17324a; font-weight:800; }
+        .reporting-pta-official .pta-preview-link:hover { background:rgba(15,47,87,.045); color:inherit; box-shadow:none; }
+        .reporting-pta-official .pta-preview-link:active { background:rgba(57,150,211,.12); }
+        .reporting-pta-official .pta-preview-link:focus-visible { outline:2px solid rgba(57,150,211,.55); outline-offset:2px; }
+        .reporting-pta-official .pta-parameter-pill { display:inline-flex; align-items:center; justify-content:center; margin-top:5px; border:1px solid #1e5fa8; border-radius:6px; background:#1e5fa8; color:#fff; padding:4px 7px; font-size:10px; font-weight:900; line-height:1.1; text-decoration:none; }
+        .reporting-pta-official .pta-parameter-pill:hover { background:#17324a; color:#fff; }
         .reporting-pta-official .pta-sub-action-cell { font-weight:800; color:#334155; }
         .reporting-pta-official .pta-sub-action-number { font-weight:900; color:#0f2f57; }
         .reporting-pta-official .pta-observation { font-size:11px; line-height:1.35; }
@@ -41,7 +52,7 @@
 @section('content')
     @php
         $roleProfile = $roleProfile ?? ['eyebrow' => 'Reporting institutionnel', 'title' => "Centre d'export et de diffusion", 'subtitle' => 'Exports et diffusion du reporting.', 'role_label' => strtoupper((string) ($scope['role'] ?? 'lecture'))];
-        $dashboardAnalyticsUrl = route('dashboard').'?dashboardTab=charts';
+        $dashboardAnalyticsUrl = route('dashboard').'?dashboardTab=overview';
         $statisticalPolicy = is_array($statisticalPolicy ?? null) ? $statisticalPolicy : [];
         $officialPolicy = is_array($officialPolicy ?? null) ? $officialPolicy : [];
         $basePolicy = $statisticalPolicy !== [] ? $statisticalPolicy : $officialPolicy;
@@ -230,7 +241,7 @@
                         </div>
                     </div>
                 </div>
-                <x-tables.pta-suivi-table :groups="$ptaSuiviPayload['groups'] ?? []" export-mode="readonly" />
+                <x-tables.pta-suivi-table :groups="$ptaSuiviPayload['groups'] ?? []" export-mode="web" />
             </article>
         @endif
 

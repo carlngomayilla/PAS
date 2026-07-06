@@ -20,6 +20,15 @@
         $justificatifCategoryLabels = is_array($justificatifCategoryLabels ?? null) ? $justificatifCategoryLabels : [];
         $alertLevelLabels = is_array($alertLevelLabels ?? null) ? $alertLevelLabels : [];
         $validationLabel = $validationStatusLabels[$validationStatus] ?? $validationStatusLabel($validationStatus);
+        $currentUser = auth()->user();
+        $isExecutorAgent = $currentUser instanceof \App\Models\User
+            && $currentUser->isAgent()
+            && (
+                $action->isResponsible($currentUser)
+                || ($action->relationLoaded('sousActions') && $action->sousActions->contains(fn ($subAction): bool => (int) $subAction->agent_id === (int) $currentUser->id))
+            );
+        $executorMetricsReleased = in_array($validationStatus, ['validee_chef', 'validee_direction'], true);
+        $hideExecutorMetrics = $isExecutorAgent && ! $executorMetricsReleased;
         $financingStatusOptions = \App\Models\Action::financingStatusOptions();
         $financingStatus = $action->financementStatus();
         $financingLabel = $financingStatusOptions[$financingStatus] ?? 'A traiter DAF';
@@ -191,6 +200,9 @@
         $stepperIsValidated = in_array($validationStatus, $stepperValidatedStatuses, true);
         $stepperNeedsCorrection = in_array($validationStatus, $stepperCorrectionStatuses, true) || $status === 'a_corriger';
         $stepperIsClosed = $stepperIsValidated;
+        $executionStepCaption = $hideExecutorMetrics
+            ? 'Realise'
+            : number_format($progressionReelle, 0, ',', ' ').'% realise';
         $actionStepperSteps = [
             [
                 'label' => 'Planification',
@@ -199,7 +211,7 @@
             ],
             [
                 'label' => 'Exécution',
-                'caption' => number_format($progressionReelle, 0, ',', ' ').'% réalisé',
+                'caption' => $executionStepCaption,
                 'state' => $stepperIsStopped
                     ? 'blocked'
                     : ($stepperExecutionDone || $stepperIsValidated ? 'done' : ($stepperHasStarted ? 'current' : 'pending')),
@@ -298,7 +310,7 @@
                 <h2 class="action-stepper-title">Étapes de suivi</h2>
             </div>
             <span class="action-stepper-pill">
-                {{ number_format($progressionReelle, 0, ',', ' ') }}% réalisé
+                {{ $hideExecutorMetrics ? 'Realise' : number_format($progressionReelle, 0, ',', ' ').'% realise' }}
             </span>
         </div>
         <ol class="action-stepper">
@@ -314,6 +326,26 @@
         </ol>
     </section>
 
+    @if ($hideExecutorMetrics)
+        <section class="showcase-summary-grid mb-4">
+            <article class="showcase-kpi-card">
+                <p class="showcase-kpi-label">Execution</p>
+                <p class="showcase-kpi-number">Realise</p>
+            </article>
+            <article class="showcase-kpi-card">
+                <p class="showcase-kpi-label">Validation</p>
+                <p class="showcase-kpi-number text-base">{{ $validationLabel }}</p>
+            </article>
+            <article class="showcase-kpi-card">
+                <p class="showcase-kpi-label">Justificatifs</p>
+                <p class="showcase-kpi-number">{{ $action->justificatifs->count() }}</p>
+            </article>
+            <article class="showcase-kpi-card">
+                <p class="showcase-kpi-label">Sous-actions</p>
+                <p class="showcase-kpi-number">{{ $sousActionsDone }}/{{ $sousActionsTotal }}</p>
+            </article>
+        </section>
+    @else
     <section class="showcase-summary-grid mb-4">
         <article class="showcase-kpi-card">
             <p class="showcase-kpi-label">Avancement déclaré</p>
@@ -343,6 +375,7 @@
             <p class="showcase-kpi-meta">Sous-actions planifiées</p>
         </article>
     </section>
+    @endif
 
     {{-- ════════════════════════════════════════════════════════════════════
          SUIVI V2 (cf. docs/WORKFLOW-SUIVI-V2.md)
@@ -368,7 +401,7 @@
         [$tempLabel, $tempClass] = $v2TemporalLabels[$v2TemporalStatus ?? 'sans_echeance'] ?? $v2TemporalLabels['sans_echeance'];
         $v2ValidationStatus = (string) ($action->statut_validation ?? 'non_soumise');
         $v2IsSubmitted = $v2ValidationStatus === 'soumise_chef';
-        $v2IsValidated = $v2ValidationStatus === 'validee_chef';
+        $v2IsValidated = in_array($v2ValidationStatus, ['validee_chef', 'validee_direction'], true);
     @endphp
 
     <section id="action-suivi" class="action-tracking-panel mb-4">
@@ -378,13 +411,28 @@
                 <h2 class="action-tracking-title">Suivi de l'action</h2>
             </div>
             <div class="action-tracking-badges">
-                <span class="anbg-badge {{ $perfClass }} px-3 py-1">{{ $perfLabel }}</span>
-                <span class="anbg-badge {{ $tempClass }} px-3 py-1">{{ $tempLabel }}</span>
+                @if ($hideExecutorMetrics)
+                    <span class="anbg-badge anbg-badge-success px-3 py-1">Realise</span>
+                    <span class="anbg-badge anbg-badge-warning px-3 py-1">{{ $validationLabel }}</span>
+                @else
+                    <span class="anbg-badge {{ $perfClass }} px-3 py-1">{{ $perfLabel }}</span>
+                    <span class="anbg-badge {{ $tempClass }} px-3 py-1">{{ $tempLabel }}</span>
+                @endif
             </div>
         </div>
 
         {{-- Performances : officielle en avant, provisoire en complément --}}
         <div class="action-tracking-metrics">
+            @if ($hideExecutorMetrics)
+                <article class="action-tracking-stat action-tracking-stat-main">
+                    <span class="action-tracking-stat-label">Execution</span>
+                    <strong class="action-tracking-stat-value">Realise</strong>
+                </article>
+                <article class="action-tracking-stat">
+                    <span class="action-tracking-stat-label">Validation</span>
+                    <strong class="action-tracking-type">{{ $validationLabel }}</strong>
+                </article>
+            @else
             <article class="action-tracking-stat action-tracking-stat-main">
                 <span class="action-tracking-stat-label">Performance officielle</span>
                 <strong class="action-tracking-stat-value">{{ number_format((float) $v2OfficialPerf, 0, ',', ' ') }}%</strong>
@@ -395,10 +443,13 @@
                 <strong class="action-tracking-stat-value">{{ number_format((float) $v2ProvisionalPerf, 0, ',', ' ') }}%</strong>
                 <span class="action-tracking-stat-note">Calculée à chaque enregistrement</span>
             </article>
+            @endif
             <article class="action-tracking-stat">
                 <span class="action-tracking-stat-label">Type d'action</span>
                 <strong class="action-tracking-type">{{ $action->typeActionLabel() }}</strong>
-                <span class="action-tracking-stat-note">{{ $action->isComposee() ? $sousActionsTotal.' sous-action(s)' : 'Action simple' }}</span>
+                @unless ($hideExecutorMetrics)
+                    <span class="action-tracking-stat-note">{{ $action->isComposee() ? $sousActionsTotal.' sous-action(s)' : 'Action simple' }}</span>
+                @endunless
             </article>
         </div>
 
@@ -476,8 +527,14 @@
                             <div>
                                 <strong>{{ $sa->libelle }}</strong>
                                 <span class="ml-2 anbg-badge anbg-badge-info px-2 py-0.5 text-[11px]">{{ $sa->isQuantitative() ? 'Quantitative' : 'Non quantitative' }}</span>
-                                @if ($sa->weight !== null)<span class="ml-1 text-xs text-slate-500">poids {{ number_format((float) $sa->weight, 0, ',', ' ') }}%</span>@endif
-                                <p class="text-sm text-slate-600">Perf : <strong>{{ number_format($saPerf, 0, ',', ' ') }}%</strong> · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
+                                @unless ($hideExecutorMetrics)
+                                    @if ($sa->weight !== null)<span class="ml-1 text-xs text-slate-500">poids {{ number_format((float) $sa->weight, 0, ',', ' ') }}%</span>@endif
+                                @endunless
+                                @if ($hideExecutorMetrics)
+                                    <p class="text-sm text-slate-600">Realise · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
+                                @else
+                                    <p class="text-sm text-slate-600">Perf : <strong>{{ number_format($saPerf, 0, ',', ' ') }}%</strong> · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
+                                @endif
                             </div>
                         </div>
 
@@ -614,6 +671,15 @@
             </article>
 
             {{-- Progression --}}
+            @if ($hideExecutorMetrics)
+            <article class="showcase-inline-stat action-detail-card">
+                <h3 class="form-section-title">Execution</h3>
+                <dl class="action-fiche-dl mt-2">
+                    <dt>Etat</dt><dd>Realise</dd>
+                    <dt>Validation</dt><dd>{{ $validationLabel }}</dd>
+                </dl>
+            </article>
+            @else
             <article class="showcase-inline-stat action-detail-card">
                 <h3 class="form-section-title">Progression</h3>
                 <dl class="action-fiche-dl mt-2">
@@ -638,6 +704,7 @@
                     <dt>Progression théor.</dt><dd>{{ number_format((float) ($action->progression_theorique ?? 0), 0, ',', ' ') }}%</dd>
                 </dl>
             </article>
+            @endif
 
             {{-- Ressources --}}
             <article class="showcase-inline-stat action-detail-card">

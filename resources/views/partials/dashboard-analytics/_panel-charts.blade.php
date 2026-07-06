@@ -18,6 +18,7 @@
         $unitSummaryChartHeight = max(15, (count($unitRows) * 2) + 4);
         $unitModeKey = \Illuminate\Support\Str::ascii(mb_strtolower((string) $unitModeLabel));
         $showUnitSummaryChart = ! in_array($unitModeKey, ['services', 'directions'], true);
+        $showAgentPerformanceCharts = ! in_array((string) $dashboardRole, ['agent'], true);
     @endphp
 
     {{-- ─── RANGEE 1 : HERO SCORE + JAUGES KPI ─────────────────────── --}}
@@ -99,6 +100,104 @@
             @endif
         </article>
     </div>
+
+    @if ($showAgentPerformanceCharts)
+        <section class="charts-advanced-section mb-4">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 class="showcase-panel-title">Performance agents</h2>
+                <span class="showcase-chip">{{ (int) ($agentPerformanceSummary['agents_total'] ?? 0) }} agents</span>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <article class="showcase-panel">
+                    <div class="chart-panel-head mb-3">
+                        <h3 class="chart-title">Synthese</h3>
+                    </div>
+                    <div id="dashboard-agent-gauge" class="dashboard-chart-host dashboard-chart-host-compact">
+                        <div class="dashboard-chart-fallback">
+                            <div class="charts-unit-bars">
+                                <div class="charts-unit-bar">
+                                    <span class="charts-unit-bar-label">Agents</span>
+                                    <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: {{ min(100, max(0, (float) ($agentPerformanceSummary['agents_total'] ?? 0) * 10)) }}%; background:#0F5B66;"></span></span>
+                                    <span class="charts-unit-bar-value">{{ (int) ($agentPerformanceSummary['agents_total'] ?? 0) }}</span>
+                                </div>
+                                <div class="charts-unit-bar">
+                                    <span class="charts-unit-bar-label">Actions</span>
+                                    <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: {{ min(100, max(0, (float) ($agentPerformanceSummary['actions_assigned'] ?? 0) * 5)) }}%; background:#3996D3;"></span></span>
+                                    <span class="charts-unit-bar-value">{{ (int) ($agentPerformanceSummary['actions_assigned'] ?? 0) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="showcase-panel">
+                    <div class="chart-panel-head mb-3">
+                        <h3 class="chart-title">Top agents</h3>
+                    </div>
+                    <div id="dashboard-agent-top" class="dashboard-chart-host dashboard-chart-host-compact">
+                        <div class="dashboard-chart-fallback">
+                            <div class="charts-unit-bars">
+                                @forelse (array_slice($agentPerformanceTopRows, 0, 4) as $row)
+                                    <a class="charts-unit-bar" href="{{ $row['url'] ?? route('workspace.actions.index') }}">
+                                        <span class="charts-unit-bar-label">{{ $row['agent'] ?? 'Agent' }}</span>
+                                        <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: {{ min(100, max(0, (float) ($row['execution_rate'] ?? 0))) }}%; background:#20C76B;"></span></span>
+                                        <span class="charts-unit-bar-value">{{ (int) ($row['actions_assigned'] ?? 0) }}</span>
+                                    </a>
+                                @empty
+                                    <x-ui.empty-state title="Aucun agent" message="Les donnees apparaitront apres consolidation." icon="user" tone="info" />
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="showcase-panel">
+                    <div class="chart-panel-head mb-3">
+                        <h3 class="chart-title">Charge</h3>
+                    </div>
+                    <div id="dashboard-agent-3d" class="dashboard-chart-host dashboard-chart-host-compact">
+                        <div class="dashboard-chart-fallback">
+                            <div class="charts-unit-bars">
+                                <div class="charts-unit-bar">
+                                    <span class="charts-unit-bar-label">Cloturees</span>
+                                    <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: {{ min(100, max(0, (float) ($agentPerformanceSummary['actions_closed'] ?? 0) * 5)) }}%; background:#20C76B;"></span></span>
+                                    <span class="charts-unit-bar-value">{{ (int) ($agentPerformanceSummary['actions_closed'] ?? 0) }}</span>
+                                </div>
+                                <div class="charts-unit-bar">
+                                    <span class="charts-unit-bar-label">En retard</span>
+                                    <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: {{ min(100, max(0, (float) ($agentPerformanceSummary['actions_late'] ?? 0) * 5)) }}%; background:#B42318;"></span></span>
+                                    <span class="charts-unit-bar-value">{{ (int) ($agentPerformanceSummary['actions_late'] ?? 0) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="showcase-panel">
+                    <div class="chart-panel-head mb-3">
+                        <h3 class="chart-title">Alertes</h3>
+                    </div>
+                    <div id="dashboard-agent-heatmap" class="dashboard-chart-host dashboard-chart-host-compact">
+                        <div class="dashboard-chart-fallback">
+                            @if ($agentPerformanceAlerts !== [])
+                                <div class="charts-unit-bars">
+                                    @foreach (array_slice($agentPerformanceAlerts, 0, 4) as $alert)
+                                        <a class="charts-unit-bar" href="{{ $alert['url'] ?? route('workspace.actions.index') }}">
+                                            <span class="charts-unit-bar-label">{{ $alert['title'] ?? 'Alerte agent' }}</span>
+                                            <span class="charts-unit-bar-track"><span class="charts-unit-bar-fill" style="width: 100%; background:#F26522;"></span></span>
+                                            <span class="charts-unit-bar-value">!</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @else
+                                <x-ui.empty-state title="Aucune alerte agent" message="Aucun signal critique detecte." icon="check" tone="success" />
+                            @endif
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+    @endif
 
     @php
         $ptaQuarterlyCharts = (array) ($ptaQuarterlyAnalysis['charts'] ?? []);

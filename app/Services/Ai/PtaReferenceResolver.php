@@ -15,9 +15,34 @@ use RuntimeException;
 
 class PtaReferenceResolver
 {
+    /**
+     * @var array<string,string>
+     */
+    private const DIRECTION_ALIASES = [
+        'direction generale' => 'DG',
+        'direction generale anbg' => 'DG',
+        'de la direction generale' => 'DG',
+        'direction des systemes d information et de la communication' => 'DSIC',
+        'direction des systemes' => 'DSIC',
+    ];
+
+    /**
+     * @var array<string,string>
+     */
+    private const SERVICE_ALIASES = [
+        'service controle interne et qualite' => 'SCIQ',
+        'service controle interne et qualite anbg' => 'SCIQ',
+        'controle interne et qualite' => 'SCIQ',
+        'service gestion documentaire et statistique' => 'GDS',
+        'gestion documentaire et statistique' => 'GDS',
+    ];
+
     public function findDirection(?string $value): ?Direction
     {
-        return $this->findByCodeOrLabel(Direction::query()->get(), $value);
+        $items = Direction::query()->get();
+
+        return $this->findByCodeOrLabel($items, $value)
+            ?? $this->findByCodeOrLabel($items, $this->aliasCodeFor($value, self::DIRECTION_ALIASES));
     }
 
     public function findService(?string $value, ?Direction $direction = null): ?Service
@@ -27,7 +52,10 @@ class PtaReferenceResolver
             $query->where('direction_id', $direction->id);
         }
 
-        return $this->findByCodeOrLabel($query->get(), $value);
+        $items = $query->get();
+
+        return $this->findByCodeOrLabel($items, $value)
+            ?? $this->findByCodeOrLabel($items, $this->aliasCodeFor($value, self::SERVICE_ALIASES));
     }
 
     public function findResponsible(?string $value): ?User
@@ -158,6 +186,26 @@ class PtaReferenceResolver
             return $this->key((string) ($item->code ?? '')) === $needle
                 || $this->key((string) ($item->libelle ?? '')) === $needle;
         });
+    }
+
+    /**
+     * @param  array<string,string>  $aliases
+     */
+    private function aliasCodeFor(?string $value, array $aliases): ?string
+    {
+        $needle = $this->key((string) $value);
+        if ($needle === '') {
+            return null;
+        }
+
+        foreach ($aliases as $alias => $code) {
+            $key = $this->key($alias);
+            if ($needle === $key || str_contains($needle, $key)) {
+                return $code;
+            }
+        }
+
+        return null;
     }
 
     private function key(string $value): string

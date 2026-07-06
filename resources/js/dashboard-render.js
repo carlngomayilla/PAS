@@ -36,7 +36,9 @@ function bindDashboardRowDetails() {
     }
 
     button.dataset.dashboardRowDetailBound = '1';
-    button.addEventListener('click', () => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+
       if (!modal || !modalTitle || !modalBody || !modalLink) {
         return;
       }

@@ -911,6 +911,81 @@
                 });
             }
 
+            function openAccordionForField(field) {
+                if (!field) return;
+
+                var section = field.closest('.form-step-accordion');
+                if (section instanceof HTMLDetailsElement) {
+                    section.open = true;
+                }
+            }
+
+            function matchingSubActionRow(block, subActionId) {
+                if (!block || !subActionId) return null;
+
+                var rows = block.querySelectorAll('[data-sub-action-row]');
+                for (var i = 0; i < rows.length; i++) {
+                    var idField = rows[i].querySelector('input[name*="[sous_actions]"][name$="[id]"]');
+                    if (idField && idField.value === subActionId) {
+                        return rows[i];
+                    }
+                }
+
+                return null;
+            }
+
+            function focusFieldInActionContext() {
+                if (!actionsList || !window.location.hash) return;
+
+                var url = new URL(window.location.href);
+                var focus = url.searchParams.get('focus') || 'action';
+                var subActionId = url.searchParams.get('sub_action_id') || '';
+                var block = document.querySelector(window.location.hash);
+
+                if (!(block instanceof HTMLDetailsElement) || !block.matches('[data-action-block]')) {
+                    return;
+                }
+
+                closeOtherActions(block);
+                block.open = true;
+
+                var subRow = matchingSubActionRow(block, subActionId);
+                var focusRoot = subRow || block;
+                var selectors = {
+                    action: 'input[name$="[libelle]"]',
+                    responsible: '[data-rmo-list] select',
+                    deadline: 'input[name$="[date_fin]"]:not([name*="[sous_actions]"])',
+                    target: '[data-target-input], [data-unit-input], input[name$="[seuil_minimum]"]',
+                    status: '[data-mode-select]',
+                    proof: 'input[type="checkbox"][name$="[justificatif_obligatoire]"]',
+                    sub_action: 'input[name*="[sous_actions]"][name$="[libelle]"]',
+                    sub_responsible: '[data-sub-action-agent-select]',
+                    sub_deadline: 'input[name*="[sous_actions]"][name$="[date_fin]"]',
+                    sub_target: 'input[name*="[sous_actions]"][name$="[cible_prevue]"], input[name*="[sous_actions]"][name$="[unite]"], input[name*="[sous_actions]"][name$="[weight]"]',
+                    sub_proof: 'input[type="checkbox"][name*="[sous_actions]"][name$="[requires_proof]"]',
+                };
+
+                var selector = selectors[focus] || selectors.action;
+                var field = focusRoot.querySelector(selector) || block.querySelector(selector) || block.querySelector('input:not([type=hidden]), textarea, select');
+
+                openAccordionForField(field);
+                if (subRow) {
+                    var subSection = subRow.closest('.form-step-accordion');
+                    if (subSection instanceof HTMLDetailsElement) {
+                        subSection.open = true;
+                    }
+                }
+
+                setTimeout(function () {
+                    var target = field || block;
+                    target.classList.add('pta-context-focus');
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (field && typeof field.focus === 'function' && !field.disabled) {
+                        field.focus({ preventScroll: true });
+                    }
+                }, 120);
+            }
+
             function addRmo(block) {
                 if (!block || !rmoTemplate) return;
 
@@ -1400,6 +1475,7 @@
 
             syncScope();
             refreshActionIndexes();
+            focusFieldInActionContext();
         })();
     </script>
 @endpush

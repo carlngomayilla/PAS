@@ -6,6 +6,11 @@
 @php
     $isPdf = (string) $exportMode === 'pdf';
     $isInteractive = ! $isPdf && (string) $exportMode !== 'readonly';
+    $actionCellStyle = 'background:#f8fafc;color:#111827;';
+    $subActionCellStyle = 'background:#f1f5f9;color:#334155;';
+    $previewUrl = static function (array $metricRow, array $row): string {
+        return (string) ($metricRow['preview_url'] ?? $metricRow['details_url'] ?? $row['preview_url'] ?? $row['details_url'] ?? '#');
+    };
 @endphp
 
 <div class="pta-suivi-table-wrap">
@@ -70,61 +75,72 @@
                                     @php
                                         $hasSubAction = is_array($detailRow);
                                         $metricRow = $hasSubAction ? $detailRow : $row;
+                                        $actionPreviewUrl = (string) ($row['preview_url'] ?? $row['details_url'] ?? '#');
+                                        $parameterUrl = (string) ($metricRow['parameter_url'] ?? $row['parameter_url'] ?? '');
+                                        $needsParameter = (bool) (($metricRow['calcul_configured'] ?? $row['calcul_configured'] ?? true) === false);
                                     @endphp
                                     <tr class="pta-action-row {{ $hasSubAction ? 'pta-sub-action-row' : 'pta-level-action' }}">
                                         @if ($loop->first)
-                                            <td rowspan="{{ $rowspan }}" class="pta-center pta-action-index-cell">{{ $actionNumber }}</td>
-                                            <td rowspan="{{ $rowspan }}" class="pta-action-cell pta-action-parent-cell">
-                                                @if (! $isInteractive)
-                                                    {{ $row['libelle'] ?? '-' }}
-                                                @else
-                                                    <button
-                                                        type="button"
-                                                        class="pta-action-link"
-                                                        data-pta-action-open
-                                                        data-url="{{ $row['details_url'] ?? '#' }}"
-                                                    >
-                                                        {{ $row['libelle'] ?? '-' }}
-                                                    </button>
-                                                @endif
+                                            <td rowspan="{{ $rowspan }}" class="pta-center pta-action-index-cell pta-hierarchy-action-cell" style="{{ $actionCellStyle }}">
+                                                <x-pta.preview-link :url="$actionPreviewUrl" :export-mode="$exportMode">{{ $actionNumber }}</x-pta.preview-link>
+                                            </td>
+                                            <td rowspan="{{ $rowspan }}" class="pta-action-cell pta-action-parent-cell pta-hierarchy-action-cell" style="{{ $actionCellStyle }}">
+                                                <x-pta.preview-link :url="$actionPreviewUrl" :export-mode="$exportMode" class="pta-action-link">{{ $row['libelle'] ?? '-' }}</x-pta.preview-link>
                                             </td>
                                         @endif
-                                        <td class="pta-sub-action-cell">
-                                            @if ($hasSubAction)
-                                                <span class="pta-sub-action-number">{{ $metricRow['numero'] ?? $loop->iteration }}.</span>
-                                                {{ $metricRow['libelle'] ?? '-' }}
-                                            @else
-                                                -
+                                        <td class="pta-sub-action-cell {{ $hasSubAction ? 'pta-hierarchy-sub-action-cell' : 'pta-hierarchy-action-cell' }}" style="{{ $hasSubAction ? $subActionCellStyle : $actionCellStyle }}">
+                                            <x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">
+                                                @if ($hasSubAction)
+                                                    <span class="pta-sub-action-number">{{ $metricRow['numero'] ?? $loop->iteration }}.</span>
+                                                    {{ $metricRow['libelle'] ?? '-' }}
+                                                @else
+                                                    -
+                                                @endif
+                                            </x-pta.preview-link>
+                                        </td>
+                                        <td><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['indicateur'] ?? '-' }}</x-pta.preview-link></td>
+                                        <td class="pta-responsable"><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['responsable'] ?? '-' }}</x-pta.preview-link></td>
+                                        <td class="pta-center"><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['ratio'] ?? '-' }}</x-pta.preview-link></td>
+                                        <td>
+                                            <x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['cible'] ?? '-' }}</x-pta.preview-link>
+                                            @if ($needsParameter && $parameterUrl !== '' && $isInteractive)
+                                                <a class="pta-parameter-pill" href="{{ $parameterUrl }}">Parametrer</a>
                                             @endif
                                         </td>
-                                        <td>{{ $metricRow['indicateur'] ?? '-' }}</td>
-                                        <td class="pta-responsable">{{ $metricRow['responsable'] ?? '-' }}</td>
-                                        <td class="pta-center">{{ $metricRow['ratio'] ?? '-' }}</td>
-                                        <td>{{ $metricRow['cible'] ?? '-' }}</td>
-                                        <td>{{ $metricRow['realise'] ?? '-' }}</td>
-                                        <td class="pta-center">{{ $metricRow['taux_realisation_label'] ?? '-' }}</td>
-                                        <td class="pta-center">{{ $metricRow['performance_label'] ?? '-' }}</td>
-                                        <td class="pta-center">{{ $metricRow['ecart_label'] ?? '-' }}</td>
-                                        <td class="pta-center">{{ $metricRow['echeance_label'] ?? '-' }}</td>
-                                        <td class="pta-center">{{ $metricRow['retard_label'] ?? '-' }}</td>
+                                        <td><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['realise'] ?? '-' }}</x-pta.preview-link></td>
+                                        <td class="pta-center"><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['taux_realisation_label'] ?? '-' }}</x-pta.preview-link></td>
+                                        <td class="pta-center"><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['performance_label'] ?? '-' }}</x-pta.preview-link></td>
+                                        <td class="pta-center"><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['ecart_label'] ?? '-' }}</x-pta.preview-link></td>
+                                        <td class="pta-center"><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['echeance_label'] ?? '-' }}</x-pta.preview-link></td>
+                                        <td class="pta-center"><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['retard_label'] ?? '-' }}</x-pta.preview-link></td>
                                         <td class="pta-status-cell">
-                                            <x-pta.status-badge type="action" :status="$metricRow['statut_action'] ?? 'en_cours'" :label="$metricRow['statut_action_label'] ?? null" />
+                                            <x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">
+                                                <x-pta.status-badge type="action" :status="$metricRow['statut_action'] ?? 'en_cours'" :label="$metricRow['statut_action_label'] ?? null" />
+                                            </x-pta.preview-link>
                                         </td>
                                         <td class="pta-status-cell">
-                                            <x-pta.status-badge type="suivi" :status="$metricRow['statut_suivi'] ?? 'en_cours'" :label="$metricRow['statut_suivi_label'] ?? null" />
+                                            <x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">
+                                                <x-pta.status-badge type="suivi" :status="$metricRow['statut_suivi'] ?? 'en_cours'" :label="$metricRow['statut_suivi_label'] ?? null" />
+                                            </x-pta.preview-link>
                                         </td>
                                         <td class="pta-status-cell">
-                                            <x-pta.status-badge type="delai" :status="$metricRow['statut_delai'] ?? 'dans_les_delais'" :label="$metricRow['statut_delai_label'] ?? null" />
+                                            <x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">
+                                                <x-pta.status-badge type="delai" :status="$metricRow['statut_delai'] ?? 'dans_les_delais'" :label="$metricRow['statut_delai_label'] ?? null" />
+                                            </x-pta.preview-link>
                                         </td>
                                         <td class="pta-center">
                                             <x-pta.proof-button
                                                 :has-proof="$metricRow['has_preuve'] ?? false"
                                                 :count="$metricRow['preuve_count'] ?? 0"
-                                                :url="$row['details_url'] ?? '#'"
+                                                :preview-url="$metricRow['proof_preview_url'] ?? $row['proof_preview_url'] ?? '#'"
+                                                :download-url="$metricRow['proof_download_url'] ?? $row['proof_download_url'] ?? '#'"
+                                                :title="$metricRow['proof_title'] ?? $row['proof_title'] ?? 'Piece justificative'"
+                                                :subtitle="$metricRow['proof_subtitle'] ?? $row['proof_subtitle'] ?? 'Preuve de traitement'"
+                                                :mime="$metricRow['proof_mime'] ?? $row['proof_mime'] ?? ''"
                                                 :export-mode="$exportMode"
                                             />
                                         </td>
-                                        <td class="pta-observation">{{ $metricRow['observations'] ?? '-' }}</td>
+                                        <td class="pta-observation"><x-pta.preview-link :url="$previewUrl($metricRow, $row)" :export-mode="$exportMode">{{ $metricRow['observations'] ?? '-' }}</x-pta.preview-link></td>
                                     </tr>
                                 @endforeach
                             @empty

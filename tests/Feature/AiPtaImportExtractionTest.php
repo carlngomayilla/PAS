@@ -9,10 +9,14 @@ use App\Services\Ai\PtaDocumentTextExtractionService;
 use App\Services\Ai\PtaExternalAiExtractionService;
 use App\Services\Ai\PtaExtractionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Exceptions\RateLimitedException;
+use ReflectionClass;
 use RuntimeException;
 use Smalot\PdfParser\Parser;
 use Tests\Concerns\CreatesAiPtaFixtures;
@@ -195,6 +199,31 @@ class AiPtaImportExtractionTest extends TestCase
         Http::assertSent(fn ($request): bool => $request->url() === 'http://127.0.0.1:11434/api/tags');
     }
 
+    public function test_ollama_agent_uses_configured_context_window(): void
+    {
+        config()->set('ai_training.pta.llm_context_window', 8192);
+
+        $options = app(PtaImportExtractionAgent::class)->providerOptions(Lab::Ollama);
+
+        $this->assertSame(8192, $options['num_ctx']);
+    }
+
+    public function test_ocr_box_lines_are_removed_from_text_ai_prompt(): void
+    {
+        $service = app(PtaExternalAiExtractionService::class);
+        $method = (new ReflectionClass($service))->getMethod('prompt');
+        $method->setAccessible(true);
+
+        $prompt = $method->invoke($service, 'pdf', implode("\n", [
+            'DESCRIPTION DES ACTIONS DETAILLEES RMO CIBLE DEBUT FIN',
+            '@@OCR_BOX|1|10|10|bruit technique',
+            'Selectionner les documents perimes Clovis 100% 02/03/26 13/03/26',
+        ]), ['source_type' => 'pdf']);
+
+        $this->assertStringNotContainsString('@@OCR_BOX', $prompt);
+        $this->assertStringContainsString('Selectionner les documents perimes', $prompt);
+    }
+
     public function test_unavailable_ollama_backend_falls_back_to_source_rows_with_warning(): void
     {
         config()->set('ai_training.pta.llm_provider', 'ollama');
@@ -258,6 +287,201 @@ class AiPtaImportExtractionTest extends TestCase
         $this->assertStringContainsString('limite', (string) $result['warning']);
         $this->assertStringContainsString('limite', (string) $batch->refresh()->error_message);
         $this->assertSame('Action brute Excel', AiImportRow::query()->firstOrFail()->raw_payload['action']);
+    }
+
+    public function test_image_import_uses_vision_model_before_local_extraction(): void
+    {
+        $this->createAiReferential();
+        config()->set('ai_training.pta.llm_provider', 'ollama');
+        config()->set('ai_training.pta.llm_vision_model', 'qwen2.5vl:3b');
+
+        PtaImportExtractionAgent::fake(function ($prompt, $attachments, $provider, $model): array {
+            $this->assertSame('ollama', $provider->name());
+            $this->assertSame('qwen2.5vl:3b', $model);
+            $this->assertCount(1, $attachments);
+            $this->assertStringContainsString('SOURCE_TYPE=image', $prompt);
+            $this->assertStringContainsString('PRIORITE=Utilise les images jointes avant tout OCR local', $prompt);
+
+            return $this->visionRows('Action structuree par IA vision');
+        })->preventStrayPrompts();
+
+        Storage::fake('local');
+        $path = 'ai-imports/pta/images/source.png';
+        Storage::disk('local')->put($path, $this->minimalPng());
+
+        $batch = AiImportBatch::query()->create([
+            'original_filename' => 'source.png',
+            'file_path' => $path,
+            'file_type' => 'png',
+            'status' => AiImportBatch::STATUS_UPLOADED,
+            'detected_year' => 2026,
+        ]);
+
+        $result = app(PtaExtractionService::class)->extract($batch);
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(AiImportBatch::STATUS_EXTRACTED, $batch->refresh()->status);
+        $this->assertSame('Action structuree par IA vision', AiImportRow::query()->firstOrFail()->raw_payload['libelle_action']);
+    }
+
+    public function test_scanned_pdf_uses_vision_model_before_ocr_command(): void
+    {
+        $this->createAiReferential();
+        config()->set('ai_training.pta.llm_provider', 'ollama');
+        config()->set('ai_training.pta.llm_vision_model', 'qwen2.5vl:3b');
+        config()->set('ai_training.pta.vision_pdf_render_command', 'fake-render {file} {output}');
+        config()->set('ai_training.pta.pdf_ocr_command', 'fake-ocr {file}');
+
+        Storage::fake('local');
+        $imagePath = 'ai-imports/pta/rendered/page.png';
+        Storage::disk('local')->put($imagePath, $this->minimalPng());
+        $renderedImage = Storage::disk('local')->path($imagePath);
+
+        Process::fake([
+            '*fake-render*' => Process::result(output: $renderedImage.PHP_EOL),
+            '*fake-ocr*' => Process::result(output: $this->ptaOcrText()),
+            '*' => Process::result(exitCode: 1),
+        ])->preventStrayProcesses();
+
+        PtaImportExtractionAgent::fake(function ($prompt, $attachments, $provider, $model): array {
+            $this->assertSame('qwen2.5vl:3b', $model);
+            $this->assertCount(1, $attachments);
+            $this->assertStringContainsString('SOURCE_TYPE=image', $prompt);
+            $this->assertStringContainsString('source_vision', $prompt);
+
+            return $this->visionRows('Action PDF lue par IA vision');
+        })->preventStrayPrompts();
+
+        $path = 'ai-imports/pta/scan/vision-first.pdf';
+        Storage::disk('local')->put($path, implode("\n", [
+            '%PDF-1.3',
+            '1 0 obj << /Subtype /Image /Width 100 /Height 100 >> endobj',
+            '2 0 obj << /Subtype /Image /Width 100 /Height 100 >> endobj',
+            'trailer <<>>',
+            '%%EOF',
+        ]));
+
+        $batch = AiImportBatch::query()->create([
+            'original_filename' => 'vision-first.pdf',
+            'file_path' => $path,
+            'file_type' => 'pdf',
+            'status' => AiImportBatch::STATUS_UPLOADED,
+            'detected_year' => 2026,
+        ]);
+
+        $result = app(PtaExtractionService::class)->extract($batch);
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame('Action PDF lue par IA vision', AiImportRow::query()->firstOrFail()->raw_payload['libelle_action']);
+        Process::assertRan(fn ($process): bool => is_string($process->command) && str_contains($process->command, 'fake-render'));
+        Process::assertNotRan(fn ($process): bool => is_string($process->command) && str_contains($process->command, 'fake-ocr'));
+    }
+
+    public function test_scanned_pdf_falls_back_to_ocr_when_vision_returns_no_rows(): void
+    {
+        $this->createAiReferential();
+        config()->set('ai_training.pta.llm_provider', 'ollama');
+        config()->set('ai_training.pta.llm_vision_model', 'qwen2.5vl:3b');
+        config()->set('ai_training.pta.vision_pdf_render_command', 'fake-render {file} {output}');
+        config()->set('ai_training.pta.pdf_ocr_command', 'fake-ocr {file}');
+
+        Storage::fake('local');
+        $imagePath = 'ai-imports/pta/rendered/page-empty.png';
+        Storage::disk('local')->put($imagePath, $this->minimalPng());
+        $renderedImage = Storage::disk('local')->path($imagePath);
+
+        Process::fake([
+            '*fake-render*' => Process::result(output: $renderedImage.PHP_EOL),
+            '*fake-ocr*' => Process::result(output: $this->ptaOcrText()),
+            '*' => Process::result(exitCode: 1),
+        ])->preventStrayProcesses();
+
+        PtaImportExtractionAgent::fake(fn (): array => ['rows' => [], 'log' => []])
+            ->preventStrayPrompts();
+
+        $path = 'ai-imports/pta/scan/vision-fallback.pdf';
+        Storage::disk('local')->put($path, implode("\n", [
+            '%PDF-1.3',
+            '1 0 obj << /Subtype /Image /Width 100 /Height 100 >> endobj',
+            '2 0 obj << /Subtype /Image /Width 100 /Height 100 >> endobj',
+            'trailer <<>>',
+            '%%EOF',
+        ]));
+
+        $batch = AiImportBatch::query()->create([
+            'original_filename' => 'vision-fallback.pdf',
+            'file_path' => $path,
+            'file_type' => 'pdf',
+            'status' => AiImportBatch::STATUS_UPLOADED,
+            'detected_year' => 2026,
+        ]);
+
+        $result = app(PtaExtractionService::class)->extract($batch);
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame('Selectionner les documents perimes', AiImportRow::query()->firstOrFail()->raw_payload['libelle_action']);
+        Process::assertRan(fn ($process): bool => is_string($process->command) && str_contains($process->command, 'fake-render'));
+        Process::assertRan(fn ($process): bool => is_string($process->command) && str_contains($process->command, 'fake-ocr'));
+        PtaImportExtractionAgent::assertPrompted(fn ($prompt): bool => str_contains($prompt->prompt, 'SOURCE_TYPE=image'));
+    }
+
+    public function test_scanned_pdf_falls_back_to_ocr_when_vision_model_times_out(): void
+    {
+        $this->createAiReferential();
+        config()->set('ai_training.pta.llm_provider', 'ollama');
+        config()->set('ai_training.pta.llm_vision_model', 'qwen2.5vl:3b');
+        config()->set('ai_training.pta.llm_vision_timeout', 10);
+        config()->set('ai_training.pta.vision_pdf_render_command', 'fake-render {file} {output}');
+        config()->set('ai_training.pta.pdf_ocr_command', 'fake-ocr {file}');
+
+        Storage::fake('local');
+        $imagePath = 'ai-imports/pta/rendered/page-timeout.png';
+        Storage::disk('local')->put($imagePath, $this->minimalPng());
+        $renderedImage = Storage::disk('local')->path($imagePath);
+
+        Process::fake([
+            '*fake-render*' => Process::result(output: $renderedImage.PHP_EOL),
+            '*fake-ocr*' => Process::result(output: $this->ptaOcrText()),
+            '*' => Process::result(exitCode: 1),
+        ])->preventStrayProcesses();
+
+        $calls = 0;
+        PtaImportExtractionAgent::fake(function ($prompt, $attachments, $provider, $model) use (&$calls): array {
+            $calls++;
+            if ($calls === 1) {
+                throw new ConnectionException('cURL error 28: Operation timed out after 10010 milliseconds with 0 bytes received');
+            }
+
+            return ['rows' => [], 'log' => []];
+        })->preventStrayPrompts();
+        Exceptions::fake();
+
+        $path = 'ai-imports/pta/scan/vision-timeout.pdf';
+        Storage::disk('local')->put($path, implode("\n", [
+            '%PDF-1.3',
+            '1 0 obj << /Subtype /Image /Width 100 /Height 100 >> endobj',
+            '2 0 obj << /Subtype /Image /Width 100 /Height 100 >> endobj',
+            'trailer <<>>',
+            '%%EOF',
+        ]));
+
+        $batch = AiImportBatch::query()->create([
+            'original_filename' => 'vision-timeout.pdf',
+            'file_path' => $path,
+            'file_type' => 'pdf',
+            'status' => AiImportBatch::STATUS_UPLOADED,
+            'detected_year' => 2026,
+        ]);
+
+        $result = app(PtaExtractionService::class)->extract($batch);
+
+        $this->assertSame(1, $result['created']);
+        $this->assertStringContainsString('a depasse le delai de 10 secondes', (string) $result['warning']);
+        $this->assertSame('Selectionner les documents perimes', AiImportRow::query()->firstOrFail()->raw_payload['libelle_action']);
+        PtaImportExtractionAgent::assertPrompted(fn ($prompt): bool => $prompt->timeout === 10 && str_contains($prompt->prompt, 'SOURCE_TYPE=image'));
+        PtaImportExtractionAgent::assertPrompted(fn ($prompt): bool => str_contains($prompt->prompt, 'SOURCE_TYPE=pdf'));
+        Process::assertRan(fn ($process): bool => is_string($process->command) && str_contains($process->command, 'fake-ocr'));
+        Exceptions::assertNotReported(ConnectionException::class);
     }
 
     public function test_image_only_pdf_requires_ocr_instead_of_creating_placeholder_row(): void
@@ -507,6 +731,50 @@ DETRUIRE LES ARCHIVES PERIMEES
 DESCRIPTION DES ACTIONS DETAILLEES RMO CIBLE DEBUT FIN ETAT DE REALISATION RESSOURCES REQUISES INDICATEURS DE PERFORMANCE RISQUES POTENTIELS
 Selectionner les documents perimes    Clovis    100%    02/03/26    13/03/26    Non demarre    Personnel archives    Objectifs definis    Documents non perimes
 TEXT;
+    }
+
+    /**
+     * @return array{rows:list<array<string,mixed>>,log:list<array<string,mixed>>}
+     */
+    private function visionRows(string $action): array
+    {
+        return [
+            'rows' => [[
+                'annee_debut_pas' => 2026,
+                'annee_fin_pas' => 2026,
+                'ordre_axe' => 1,
+                'libelle_axe' => 'GOUVERNANCE INSTITUTIONNELLE',
+                'ordre_objectif_strategique' => 1,
+                'libelle_objectif_strategique' => 'Piloter le PTA',
+                'direction' => 'Direction SI',
+                'service_unite' => 'Service Applications',
+                'ordre_objectif_operationnel' => 1,
+                'libelle_objectif_operationnel' => 'Suivre les actions',
+                'ordre_action' => 1,
+                'libelle_action' => $action,
+                'date_debut_action' => '2026-01-01',
+                'date_fin_action' => '2026-03-31',
+                'codes_agents_rmo' => 'DG-006',
+                'cible_minimum_execution' => '100',
+                'justificatif_attendu' => 'Piece justificative',
+                'type_action' => 'NQ',
+                'seuil_mode' => 'unique',
+                'page_pdf' => 1,
+                'score_confiance_ia' => 0.74,
+                'note_normalisation' => 'Extraction prioritaire IA vision',
+            ]],
+            'log' => [[
+                'ligne_import' => 1,
+                'page_pdf' => 1,
+                'score_confiance_ia' => 0.74,
+                'note_normalisation' => 'Extraction prioritaire IA vision',
+            ]],
+        ];
+    }
+
+    private function minimalPng(): string
+    {
+        return base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/axarT4AAAAASUVORK5CYII=') ?: '';
     }
 
     private function failIfSmalotParserIsStarted(): void

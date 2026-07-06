@@ -48,6 +48,7 @@ class PtaImportValidationService
 
         $batch->forceFill([
             'status' => $stats['invalid'] > 0 ? AiImportBatch::STATUS_VALIDATING : AiImportBatch::STATUS_VALIDATED,
+            'error_message' => $stats['invalid'] > 0 ? $batch->error_message : null,
         ])->save();
 
         return $stats;

@@ -30,11 +30,20 @@
         }
         input:focus { border-color: #3996d3; box-shadow: 0 0 0 4px rgba(57, 150, 211, 0.15); }
         .password-field { position: relative; }
-        .password-field input { padding-right: 72px; }
-        .password-toggle {
+        .password-field input { padding-right: 54px; }
+        .auth-password-toggle {
             position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-            border: 0; background: transparent; color: #3996d3; cursor: pointer;
-            font-size: 12px; font-weight: 700;
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 34px; height: 34px; border: 1px solid #bfdbfe; border-radius: 999px;
+            background: #eff6ff; color: #1d75ad; cursor: pointer;
+            transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+        }
+        .auth-password-toggle:hover { background: #e0f2fe; border-color: #3996d3; color: #1c203d; }
+        .auth-password-toggle:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(57, 150, 211, 0.18); }
+        .auth-password-toggle svg { width: 17px; height: 17px; }
+        .auth-password-toggle-label {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
         }
         .btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -81,13 +90,13 @@
             <label for="password">Nouveau mot de passe</label>
             <div class="password-field">
                 <input id="password" type="password" name="password" required autocomplete="new-password">
-                <button type="button" class="password-toggle" data-password-toggle="password">Voir</button>
+                <x-auth.password-toggle target="password" />
             </div>
 
             <label for="password_confirmation">Confirmer le mot de passe</label>
             <div class="password-field">
                 <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password">
-                <button type="button" class="password-toggle" data-password-toggle="password_confirmation">Voir</button>
+                <x-auth.password-toggle target="password_confirmation" />
             </div>
 
             <div class="policy">
@@ -102,19 +111,5 @@
         </div>
         <p class="footer"><strong>ANBG Pilotage</strong> - PAS / PAO / PTA</p>
     </main>
-    <script @cspNonce>
-        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
-            button.addEventListener('click', function () {
-                var input = document.getElementById(button.dataset.passwordToggle);
-                if (! input) {
-                    return;
-                }
-
-                var isHidden = input.type === 'password';
-                input.type = isHidden ? 'text' : 'password';
-                button.textContent = isHidden ? 'Cacher' : 'Voir';
-            });
-        });
-    </script>
 </body>
 </html>

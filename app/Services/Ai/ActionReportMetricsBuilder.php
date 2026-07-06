@@ -195,6 +195,7 @@ class ActionReportMetricsBuilder
             ->all();
 
         $monthly = $this->monthlyEvolution($actions, $periodStart, $periodEnd);
+        $serviceAxisMatrix = $this->serviceAxisMatrix($actions, $axes, $periodEnd);
         $lateOrUnrealized = $this->dueActions($actions, $periodEnd)
             ->reject(fn (Action $action): bool => $this->isCompleted($action))
             ->values();
@@ -214,6 +215,7 @@ class ActionReportMetricsBuilder
             'synthese' => $this->analysisRow($actions, $periodEnd),
             'axes' => $axes,
             'services' => $services,
+            'matrice_services_axes' => $serviceAxisMatrix,
             'evolution_mensuelle' => $monthly,
             'ecarts' => [
                 'actions_non_realisees' => $lateOrUnrealized->take(15)->map(fn (Action $action): array => $this->actionLine($action))->all(),
@@ -236,6 +238,56 @@ class ActionReportMetricsBuilder
                 ],
             ],
         ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @param  list<array<string, mixed>>  $axes
+     * @return list<array<string, mixed>>
+     */
+    private function serviceAxisMatrix(Collection $actions, array $axes, Carbon $periodEnd): array
+    {
+        $axisLabels = collect($axes)
+            ->map(fn (array $axis): string => (string) ($axis['libelle'] ?? 'Sans axe strategique'))
+            ->unique()
+            ->values();
+
+        if ($axisLabels->isEmpty()) {
+            return [];
+        }
+
+        return $actions
+            ->groupBy(fn (Action $action): string => $this->serviceKey($action))
+            ->map(function (Collection $rows) use ($axisLabels, $periodEnd): array {
+                $axisCells = [];
+
+                foreach ($axisLabels as $axisLabel) {
+                    $axisRows = $rows
+                        ->filter(fn (Action $action): bool => $this->axisLabel($action) === $axisLabel)
+                        ->values();
+                    $analysis = $this->analysisRow($axisRows, $periodEnd);
+
+                    $axisCells[$axisLabel] = [
+                        'actions_prevues' => $analysis['actions_prevues'],
+                        'actions_echues' => $analysis['actions_echues'],
+                        'taux_realisation' => $analysis['taux_realisation'],
+                        'poids' => $analysis['actions_echues'].'/'.$analysis['actions_prevues'],
+                    ];
+                }
+
+                $serviceAnalysis = $this->analysisRow($rows, $periodEnd);
+
+                return [
+                    'direction' => (string) ($rows->first()?->pta?->direction?->libelle ?? $rows->first()?->pao?->direction?->libelle ?? 'Non renseignee'),
+                    'service' => (string) ($rows->first()?->pta?->service?->libelle ?? 'Non renseigne'),
+                    'taux_realisation' => $serviceAnalysis['taux_realisation'],
+                    'actions_echues' => $serviceAnalysis['actions_echues'],
+                    'axes' => $axisCells,
+                ];
+            })
+            ->sortBy('service')
+            ->values()
+            ->all();
     }
 
     /**

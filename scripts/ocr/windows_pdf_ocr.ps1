@@ -4,7 +4,11 @@ param(
 
     [int] $MaxPages = 0,
 
-    [int] $RenderWidth = 2600
+    [int] $RenderWidth = 2600,
+
+    [string] $ImageOutputDirectory = '',
+
+    [switch] $ImageOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,6 +25,7 @@ Add-Type -AssemblyName System.Runtime.WindowsRuntime
 [Windows.Data.Pdf.PdfDocument, Windows.Data.Pdf, ContentType = WindowsRuntime] | Out-Null
 [Windows.Data.Pdf.PdfPageRenderOptions, Windows.Data.Pdf, ContentType = WindowsRuntime] | Out-Null
 [Windows.Storage.Streams.InMemoryRandomAccessStream, Windows.Storage.Streams, ContentType = WindowsRuntime] | Out-Null
+[Windows.Storage.Streams.DataReader, Windows.Storage.Streams, ContentType = WindowsRuntime] | Out-Null
 [Windows.Graphics.Imaging.BitmapDecoder, Windows.Graphics.Imaging, ContentType = WindowsRuntime] | Out-Null
 [Windows.Graphics.Imaging.SoftwareBitmap, Windows.Graphics.Imaging, ContentType = WindowsRuntime] | Out-Null
 [Windows.Graphics.Imaging.BitmapPixelFormat, Windows.Graphics.Imaging, ContentType = WindowsRuntime] | Out-Null
@@ -155,6 +160,36 @@ function Write-OcrBoxes {
     }
 }
 
+function Write-RenderedPageImage {
+    param(
+        [Parameter(Mandatory = $true)] $Stream,
+        [Parameter(Mandatory = $true)] [int] $PageNumber,
+        [Parameter(Mandatory = $true)] [string] $OutputDirectory
+    )
+
+    if ($OutputDirectory -eq '') {
+        return $null
+    }
+
+    New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+
+    $Stream.Seek(0) | Out-Null
+    $reader = [Windows.Storage.Streams.DataReader]::new($Stream)
+    $bytesToRead = [uint32] $Stream.Size
+    Wait-WinRtOperation ($reader.LoadAsync($bytesToRead)) ([uint32]) | Out-Null
+
+    $bytes = New-Object byte[] $bytesToRead
+    $reader.ReadBytes($bytes)
+    $reader.DetachStream() | Out-Null
+    $reader.Dispose()
+
+    $outputPath = Join-Path $OutputDirectory ("page_{0:D3}.png" -f $PageNumber)
+    [System.IO.File]::WriteAllBytes($outputPath, $bytes)
+    $Stream.Seek(0) | Out-Null
+
+    return $outputPath
+}
+
 function Write-LayoutGroup {
     param([array] $Group)
 
@@ -172,13 +207,16 @@ function Write-LayoutGroup {
     $lineText.TrimEnd()
 }
 
-$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
-if ($null -eq $engine) {
-    $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new('fr-FR'))
-}
+$engine = $null
+if (-not $ImageOnly) {
+    $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+    if ($null -eq $engine) {
+        $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new('fr-FR'))
+    }
 
-if ($null -eq $engine) {
-    throw 'Windows OCR engine is unavailable for the current user languages.'
+    if ($null -eq $engine) {
+        throw 'Windows OCR engine is unavailable for the current user languages.'
+    }
 }
 
 $file = Wait-WinRtOperation ([Windows.Storage.StorageFile]::GetFileFromPathAsync((Resolve-Path -LiteralPath $Path).Path)) ([Windows.Storage.StorageFile])
@@ -200,6 +238,19 @@ for ($pageIndex = 0; $pageIndex -lt $pageCount; $pageIndex++) {
 
     Wait-WinRtAction ($page.RenderToStreamAsync($stream, $options))
     $stream.Seek(0) | Out-Null
+
+    if ($ImageOutputDirectory -ne '') {
+        $renderedPath = Write-RenderedPageImage -Stream $stream -PageNumber ($pageIndex + 1) -OutputDirectory $ImageOutputDirectory
+        if ($ImageOnly -and $null -ne $renderedPath) {
+            $renderedPath
+        }
+    }
+
+    if ($ImageOnly) {
+        $page.Dispose()
+        $stream.Dispose()
+        continue
+    }
 
     $decoder = Wait-WinRtOperation ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
     $bitmap = Wait-WinRtOperation ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])

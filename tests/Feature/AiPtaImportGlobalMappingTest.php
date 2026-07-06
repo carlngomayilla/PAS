@@ -103,6 +103,37 @@ class AiPtaImportGlobalMappingTest extends TestCase
         $this->assertSame('1', $row['champ_difficulte']);
     }
 
+    public function test_blank_item_values_do_not_override_document_metadata(): void
+    {
+        $mapped = app(PtaDocumentToImportGlobalMapperService::class)->map([
+            'document' => [
+                'annee_debut_pas' => 2026,
+                'annee_fin_pas' => 2028,
+                'direction' => 'Direction Generale',
+                'service_unite' => 'Service Controle Interne et Qualite',
+            ],
+            'items' => [[
+                'ordre_axe' => 2,
+                'libelle_axe' => 'REDRESSEMENT DE LA SITUATION FINANCIERE',
+                'ordre_objectif_strategique' => 1,
+                'libelle_objectif_strategique' => 'Rationaliser la depense de bourse',
+                'direction' => null,
+                'service_unite' => null,
+                'ordre_objectif_operationnel' => 1,
+                'libelle_objectif_operationnel' => 'Detruire les archives perimees',
+                'ordre_action' => 1,
+                'libelle_action' => 'Selectionner les documents perimes',
+                'date_debut_action' => '2026-03-02',
+                'date_fin_action' => '2026-03-13',
+                'cible' => '100%',
+                'indicateurs_performance' => 'Objectifs definis',
+            ]],
+        ]);
+
+        $this->assertSame('Direction Generale', $mapped['rows'][0]['direction']);
+        $this->assertSame('Service Controle Interne et Qualite', $mapped['rows'][0]['service_unite']);
+    }
+
     public function test_enriched_import_workbook_training_sheets_are_read(): void
     {
         $spreadsheet = new Spreadsheet;

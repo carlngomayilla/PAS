@@ -51,7 +51,7 @@ class PasswordResetFlowTest extends TestCase
         $this->get(route('password.reset', ['token' => $token, 'email' => $user->email]))
             ->assertOk()
             ->assertSee('Nouveau mot de passe')
-            ->assertSee('Voir');
+            ->assertSee('Afficher le mot de passe');
 
         $this->post(route('password.update'), [
             'token' => $token,
