@@ -3,6 +3,12 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Services\AccessScopeService;
+use App\Services\RolePermissionSettings;
+use App\Services\RoleRegistryService;
+use App\Services\UserProfileService;
+use App\Services\UserWorkspaceService;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,38 +16,60 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     public const ROLE_SUPER_ADMIN = 'super_admin';
+
     public const ROLE_ADMIN = 'admin';
+
     public const ROLE_DG = 'dg';
+
     public const ROLE_PLANIFICATION = 'planification';
+
     public const ROLE_DIRECTION = 'direction';
+
     public const ROLE_SERVICE = 'service';
+
     public const ROLE_AGENT = 'agent';
+
     public const ROLE_CABINET = 'cabinet';
+
     public const ROLE_CHEF_UNITE = 'chef_unite';
+
     public const ROLE_COLLABORATEUR = 'collaborateur';
+
     public const ROLE_SCIQ = 'sciq';
+
     public const ROLE_UCAS = 'ucas';
 
     // Profils ajoutés (Lot 2) — pour aligner l'application sur l'organisation réelle ANBG.
     public const ROLE_ADMIN_FONCTIONNEL = 'admin_fonctionnel';
+
     public const ROLE_SCIQ_SUIVI_GLOBAL = 'sciq_suivi_global';
+
     public const ROLE_CHEF_PLANIFICATION = 'chef_planification';
+
     public const ROLE_CHEF_UNITE_SCIQ = 'chef_unite_sciq';
+
     public const ROLE_CHEF_UNITE_DGA = 'chef_unite_dga';
+
     public const ROLE_CHEF_UNITE_CABINET = 'chef_unite_cabinet';
+
     public const ROLE_CHEF_UNITE_UCAS = 'chef_unite_ucas';
+
     public const ROLE_DGA_SUPERVISION = 'dga_supervision';
+
     public const ROLE_CABINET_SUPERVISION = 'cabinet_supervision';
+
     public const ROLE_AUDITEUR = 'auditeur';
+
     public const ROLE_INVITE_LECTURE = 'invite_lecture';
 
     /**
@@ -130,7 +158,7 @@ class User extends Authenticatable
      * Per-request cache for active delegation lookups. Dashboard policies call
      * these helpers often; keeping the result on the model avoids repeated SQL.
      *
-     * @var array<string, \Illuminate\Support\Collection<int, \App\Models\Delegation>>
+     * @var array<string, Collection<int, Delegation>>
      */
     private array $activeDelegationsCache = [];
 
@@ -178,7 +206,7 @@ class User extends Authenticatable
                 ->map(static fn (string $segment): string => rawurlencode($segment))
                 ->implode('/');
 
-            return '/storage/' . $normalizedPath;
+            return '/storage/'.$normalizedPath;
         });
     }
 
@@ -207,7 +235,7 @@ class User extends Authenticatable
                 $last = Str::upper(Str::substr((string) $parts->get(0), 1, 1));
             }
 
-            $initials = trim($first . $last);
+            $initials = trim($first.$last);
 
             return $initials !== '' ? $initials : 'NA';
         });
@@ -276,6 +304,13 @@ class User extends Authenticatable
             return true;
         }
 
+        if ($this->role !== self::ROLE_SUPER_ADMIN) {
+            $roles = array_values(array_diff($roles, [self::ROLE_SUPER_ADMIN]));
+            if ($roles === []) {
+                return false;
+            }
+        }
+
         if (
             in_array(self::ROLE_SERVICE, $roles, true)
             && in_array((string) $this->role, self::serviceOrUnitChiefRoles(), true)
@@ -292,7 +327,7 @@ class User extends Authenticatable
             return true;
         }
 
-        $baseRole = app(\App\Services\RoleRegistryService::class)->baseRole($customCode);
+        $baseRole = app(RoleRegistryService::class)->baseRole($customCode);
         if (
             in_array(self::ROLE_SERVICE, $roles, true)
             && in_array($baseRole, self::serviceOrUnitChiefRoles(), true)
@@ -312,6 +347,10 @@ class User extends Authenticatable
     {
         $customRoleCode = trim((string) ($this->custom_role_code ?? ''));
 
+        if ($customRoleCode === self::ROLE_SUPER_ADMIN && $this->role !== self::ROLE_SUPER_ADMIN) {
+            return (string) $this->role;
+        }
+
         return $customRoleCode !== '' ? $customRoleCode : (string) $this->role;
     }
 
@@ -322,7 +361,7 @@ class User extends Authenticatable
 
     public function isSuperAdmin(): bool
     {
-        return $this->hasRole(self::ROLE_SUPER_ADMIN);
+        return $this->role === self::ROLE_SUPER_ADMIN;
     }
 
     public function isSuspended(): bool
@@ -335,7 +374,7 @@ class User extends Authenticatable
      */
     public function grantedPermissions(): array
     {
-        $permissions = app(\App\Services\RolePermissionSettings::class)->forUser($this);
+        $permissions = app(RolePermissionSettings::class)->forUser($this);
 
         if (! $this->isServiceOrUnitChief()) {
             return $permissions;
@@ -357,7 +396,7 @@ class User extends Authenticatable
             return false;
         }
 
-        return app(\App\Services\RolePermissionSettings::class)->has($this, $permission);
+        return app(RolePermissionSettings::class)->has($this, $permission);
     }
 
     public function hasAnyPermission(string ...$permissions): bool
@@ -383,7 +422,7 @@ class User extends Authenticatable
 
     public function roleLabel(): string
     {
-        return app(\App\Services\RoleRegistryService::class)->label($this->effectiveRoleCode());
+        return app(RoleRegistryService::class)->label($this->effectiveRoleCode());
     }
 
     public function isAgent(): bool
@@ -407,7 +446,7 @@ class User extends Authenticatable
         }
 
         return in_array(
-            app(\App\Services\RoleRegistryService::class)->baseRole($customCode),
+            app(RoleRegistryService::class)->baseRole($customCode),
             self::serviceOrUnitChiefRoles(),
             true
         );
@@ -429,7 +468,7 @@ class User extends Authenticatable
         }
 
         return in_array(
-            app(\App\Services\RoleRegistryService::class)->baseRole($customCode),
+            app(RoleRegistryService::class)->baseRole($customCode),
             self::planningControlChiefRoles(),
             true
         );
@@ -608,7 +647,7 @@ class User extends Authenticatable
             return $this->profileInteractionsCache;
         }
 
-        return $this->profileInteractionsCache = app(\App\Services\UserProfileService::class)->interactionsFor($this);
+        return $this->profileInteractionsCache = app(UserProfileService::class)->interactionsFor($this);
     }
 
     /**
@@ -618,7 +657,7 @@ class User extends Authenticatable
      */
     public function accessScope(): array
     {
-        return app(\App\Services\AccessScopeService::class)->scopeFor($this);
+        return app(AccessScopeService::class)->scopeFor($this);
     }
 
     /**
@@ -630,6 +669,6 @@ class User extends Authenticatable
             return $this->workspaceModulesCache;
         }
 
-        return $this->workspaceModulesCache = app(\App\Services\UserWorkspaceService::class)->modulesFor($this);
+        return $this->workspaceModulesCache = app(UserWorkspaceService::class)->modulesFor($this);
     }
 }

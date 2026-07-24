@@ -68,4 +68,20 @@ return [
         ],
     ],
 
+    'openai_responses' => [
+        'key' => env('OPENAI_API_KEY'),
+        'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
+        'model' => env('OPENAI_MODEL', 'gpt-5.4-mini'),
+        'model_high' => env('OPENAI_MODEL_HIGH', 'gpt-5.5'),
+        'enabled' => filter_var(env('AI_PTA_LLM_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        'log_usage' => filter_var(env('AI_LOG_USAGE', true), FILTER_VALIDATE_BOOLEAN),
+        'monthly_budget_usd' => (float) env('AI_MONTHLY_BUDGET_USD', 20),
+        'max_input_tokens' => (int) env('AI_MAX_INPUT_TOKENS', 50000),
+        'max_output_tokens' => (int) env('AI_MAX_OUTPUT_TOKENS', 6000),
+        'timeout' => (int) env('OPENAI_TIMEOUT', 120),
+        'connect_timeout' => (int) env('OPENAI_CONNECT_TIMEOUT', 5),
+        'input_cost_per_1m_tokens' => (float) env('OPENAI_INPUT_COST_PER_1M_TOKENS', 0),
+        'output_cost_per_1m_tokens' => (float) env('OPENAI_OUTPUT_COST_PER_1M_TOKENS', 0),
+    ],
+
 ];

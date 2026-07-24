@@ -2,23 +2,37 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CancelDelegationRequest;
+use App\Http\Requests\ResubmitDeletionRequestRequest;
+use App\Http\Requests\RunRetentionRequest;
+use App\Http\Requests\StoreDelegationRequest;
+use App\Models\DataArchive;
 use App\Models\Delegation;
+use App\Models\DeletionRequest;
 use App\Models\Direction;
+use App\Models\RetentionRun;
 use App\Models\Service;
 use App\Models\User;
-use App\Services\Governance\RetentionService;
+use App\Services\DeletionRequestService;
+use App\Services\Governance\DelegationService;
+use App\Services\Governance\GovernanceQueueService;
+use App\Services\Governance\RetentionOperationService;
+use App\Services\Governance\RetentionWorkspaceService;
 use App\Services\Notifications\WorkspaceNotificationService;
-use App\Services\PlanningAutoArchiveService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class GovernanceWebController extends Controller
 {
+    use RecordsAuditTrail;
+
     public function apiDocumentation(Request $request): View
     {
         $user = $request->user();
@@ -56,61 +70,98 @@ class GovernanceWebController extends Controller
         ]);
     }
 
-    public function retentionIndex(Request $request, RetentionService $retentionService, PlanningAutoArchiveService $planningAutoArchiveService): View
+    public function retentionIndex(Request $request, RetentionWorkspaceService $retentionWorkspaceService): View
     {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        if (! $user->hasAnyPermission('retention.read', 'retention.manage')) {
-            abort(403, 'Acces non autorise.');
-        }
+        $user = $this->authorizeRetentionReader($request);
+        $workspace = $retentionWorkspaceService->workspace($request->query());
 
         return view('workspace.governance.retention', [
-            'summary' => $retentionService->summary(),
-            'planningArchiveSummary' => $planningAutoArchiveService->summary(),
+            ...$workspace,
             'canRun' => $user->hasPermission('retention.manage'),
         ]);
     }
 
-    public function retentionRun(Request $request, RetentionService $retentionService, PlanningAutoArchiveService $planningAutoArchiveService): RedirectResponse
-    {
+    public function retentionRun(
+        RunRetentionRequest $request,
+        RetentionOperationService $retentionOperationService
+    ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
         }
 
-        if (! $user->hasPermission('retention.manage')) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        /** @var array{mode:string,scope?:string} $validated */
-        $validated = $request->validate([
-            'mode' => ['required', Rule::in(['dry-run', 'execute'])],
-            'scope' => ['nullable', Rule::in(['data', 'planning'])],
-        ]);
-
-        $scope = (string) ($validated['scope'] ?? 'data');
-        if ($scope === 'planning') {
-            $result = $planningAutoArchiveService->run($validated['mode'] === 'execute', $user);
-            $archived = is_array($result['archived'] ?? null) ? $result['archived'] : [];
-            $message = $validated['mode'] === 'execute'
-                ? sprintf('Archivage PAO/PTA execute : %d PAO, %d PTA.', (int) ($archived['paos'] ?? 0), (int) ($archived['ptas'] ?? 0))
-                : 'Dry-run archivage PAO/PTA effectue.';
-        } else {
-            $result = $retentionService->archive($validated['mode'] === 'execute', $user);
-            $message = $validated['mode'] === 'execute'
-                ? 'Archive de retention enregistree sous le batch '.($result['batch_key'] ?? 'N/A').'.'
-                : 'Dry-run de retention effectue.';
-        }
+        $scope = (string) $request->validated('scope');
+        $execute = $request->validated('mode') === RetentionRun::MODE_EXECUTE;
+        $operation = $retentionOperationService->run(
+            $scope,
+            $execute,
+            $user,
+            'web',
+            $request->ip(),
+            $request->userAgent()
+        );
+        $run = $operation['run'];
+        $counts = $execute ? ($run->processed ?? []) : ($run->candidates ?? []);
+        $message = sprintf(
+            '%s #%d terminée : %d élément(s) %s.',
+            $execute ? 'Exécution' : 'Simulation',
+            (int) $run->id,
+            (int) array_sum($counts),
+            $execute ? 'traité(s)' : 'éligible(s)'
+        );
 
         return redirect()
             ->route('workspace.retention.index')
             ->with('success', $message);
     }
 
-    public function delegationsIndex(Request $request): View
+    public function retentionExportCsv(
+        Request $request,
+        RetentionWorkspaceService $retentionWorkspaceService
+    ): StreamedResponse {
+        $this->authorizeRetentionReader($request);
+        $filters = $retentionWorkspaceService->normalizeFilters($request->query());
+
+        return response()->streamDownload(function () use ($retentionWorkspaceService, $filters): void {
+            $stream = fopen('php://output', 'wb');
+            if ($stream === false) {
+                abort(500, 'Impossible de générer le registre des archives.');
+            }
+
+            try {
+                $retentionWorkspaceService->writeCsv($stream, $filters);
+            } finally {
+                fclose($stream);
+            }
+        }, 'archives-retention-'.now()->format('Ymd-His').'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    public function retentionArchiveDownload(
+        Request $request,
+        DataArchive $dataArchive,
+        RetentionWorkspaceService $retentionWorkspaceService
+    ): StreamedResponse {
+        $this->authorizeRetentionReader($request);
+        $json = $retentionWorkspaceService->archiveJson($dataArchive);
+
+        return response()->streamDownload(
+            static function () use ($json): void {
+                echo $json;
+            },
+            'archive-retention-'.$dataArchive->id.'.json',
+            [
+                'Content-Type' => 'application/json; charset=UTF-8',
+                'Cache-Control' => 'private, no-store, max-age=0',
+                'X-Content-Type-Options' => 'nosniff',
+            ]
+        );
+    }
+
+    public function delegationsIndex(Request $request, DelegationService $delegationService): View
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -121,30 +172,7 @@ class GovernanceWebController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        $delegations = Delegation::query()
-            ->with([
-                'delegant:id,name,role,direction_id,service_id',
-                'delegue:id,name,role,direction_id,service_id',
-                'direction:id,code,libelle',
-                'service:id,code,libelle',
-                'createdBy:id,name',
-                'cancelledBy:id,name',
-            ]);
-
-        return view('workspace.governance.delegations.index', [
-            'rows' => $delegations->latest('id')->paginate(20),
-            'summary' => [
-                'total' => (clone $delegations)->count(),
-                'active' => (clone $delegations)->active()->count(),
-                'expires_soon' => (clone $delegations)
-                    ->where('statut', 'active')
-                    ->whereBetween('date_fin', [now(), now()->addDays(7)])
-                    ->count(),
-                'cancelled' => (clone $delegations)->where('statut', 'cancelled')->count(),
-                'direction_scope' => (clone $delegations)->where('role_scope', Delegation::SCOPE_DIRECTION)->count(),
-                'service_scope' => (clone $delegations)->where('role_scope', Delegation::SCOPE_SERVICE)->count(),
-            ],
-        ]);
+        return view('workspace.governance.delegations.index', $delegationService->directory($request->query()));
     }
 
     public function delegationsCreate(Request $request): View
@@ -168,132 +196,135 @@ class GovernanceWebController extends Controller
             'delegantOptions' => $this->delegationEligibleUsers(),
             'delegateOptions' => $this->delegateReceivers(),
             'directionOptions' => Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
-            'serviceOptions' => Service::query()->orderBy('code')->get(['id', 'direction_id', 'code', 'libelle']),
+            'serviceOptions' => Service::query()->where('actif', true)->orderBy('code')->get(['id', 'direction_id', 'code', 'libelle']),
         ]);
     }
 
-    public function delegationsStore(Request $request, WorkspaceNotificationService $notificationService): RedirectResponse
-    {
+    public function delegationsStore(
+        StoreDelegationRequest $request,
+        DelegationService $delegationService,
+        WorkspaceNotificationService $notificationService
+    ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
         }
 
-        if (! $user->hasPermission('delegations.manage')) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        /** @var array<string, mixed> $validated */
-        $validated = $request->validate([
-            'delegant_id' => ['required', 'integer', 'exists:users,id'],
-            'delegue_id' => ['required', 'integer', 'different:delegant_id', 'exists:users,id'],
-            'role_scope' => ['required', Rule::in([Delegation::SCOPE_DIRECTION, Delegation::SCOPE_SERVICE])],
-            'direction_id' => ['required', 'integer', 'exists:directions,id'],
-            'service_id' => ['nullable', 'integer', 'exists:services,id'],
-            'permissions' => ['required', 'array', 'min:1'],
-            'permissions.*' => ['required', Rule::in(['planning_read', 'planning_write', 'action_review'])],
-            'date_debut' => ['required', 'date'],
-            'date_fin' => ['required', 'date', 'after:date_debut'],
-            'motif' => ['required', 'string', 'min:5'],
-        ]);
-
-        $delegant = User::query()->findOrFail((int) $validated['delegant_id']);
-        $delegate = User::query()->findOrFail((int) $validated['delegue_id']);
-
-        if ($validated['role_scope'] === Delegation::SCOPE_DIRECTION) {
-            if (! $delegant->hasRole(User::ROLE_DIRECTION) || (int) $delegant->direction_id !== (int) $validated['direction_id']) {
-                return back()->withInput()->withErrors([
-                    'delegant_id' => 'Le delegant doit etre un directeur de la direction selectionnee.',
-                ]);
-            }
-            $validated['service_id'] = null;
-        } else {
-            $service = Service::query()->findOrFail((int) $validated['service_id']);
-            if ((int) $service->direction_id !== (int) $validated['direction_id']) {
-                return back()->withInput()->withErrors([
-                    'service_id' => 'Le service selectionne ne correspond pas a la direction choisie.',
-                ]);
-            }
-            if (! $delegant->hasRole(User::ROLE_SERVICE)
-                || (int) $delegant->direction_id !== (int) $validated['direction_id']
-                || (int) $delegant->service_id !== (int) $validated['service_id']
-            ) {
-                return back()->withInput()->withErrors([
-                    'delegant_id' => 'Le delegant doit etre un chef de service du perimetre selectionne.',
-                ]);
-            }
-        }
-
-        if ($delegate->isAgent()) {
-            return back()->withInput()->withErrors([
-                'delegue_id' => 'Le delegue doit etre un profil d encadrement ou de pilotage.',
-            ]);
-        }
-
-        $delegation = Delegation::query()->create([
-            'delegant_id' => $delegant->id,
-            'delegue_id' => $delegate->id,
-            'role_scope' => $validated['role_scope'],
-            'direction_id' => (int) $validated['direction_id'],
-            'service_id' => $validated['service_id'] !== null ? (int) $validated['service_id'] : null,
-            'permissions' => array_values(array_unique($validated['permissions'])),
-            'motif' => (string) $validated['motif'],
-            'date_debut' => $validated['date_debut'],
-            'date_fin' => $validated['date_fin'],
-            'statut' => 'active',
-            'cree_par' => $user->id,
-        ]);
+        $delegation = $delegationService->create($request->validated(), $user);
 
         $notificationService->notifyDelegationCreated($delegation, $user);
+        $this->recordAudit($request, 'delegations', 'create', $delegation, null, $delegation->toArray());
 
         return redirect()
             ->route('workspace.delegations.index')
             ->with('success', 'Delegation enregistree avec succès.');
     }
 
-    public function delegationsCancel(Request $request, Delegation $delegation): RedirectResponse
-    {
+    public function delegationsCancel(
+        CancelDelegationRequest $request,
+        Delegation $delegation,
+        DelegationService $delegationService
+    ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
         }
 
-        if (! $user->hasPermission('delegations.manage')) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        /** @var array{motif_annulation:string} $validated */
-        $validated = $request->validate([
-            'motif_annulation' => ['required', 'string', 'min:5'],
-        ]);
-
-        $delegation->update([
-            'statut' => 'cancelled',
-            'annule_par' => $user->id,
-            'annule_le' => now(),
-            'motif_annulation' => $validated['motif_annulation'],
-        ]);
+        $result = $delegationService->cancel(
+            $delegation,
+            $user,
+            (string) $request->validated('motif_annulation')
+        );
+        $this->recordAudit(
+            $request,
+            'delegations',
+            'cancel',
+            $result['delegation'],
+            $result['before'],
+            $result['delegation']->toArray()
+        );
 
         return redirect()
             ->route('workspace.delegations.index')
             ->with('success', 'Délégation annulée.');
     }
 
-    private function delegationEligibleUsers()
+    public function deletionRequestsIndex(Request $request, GovernanceQueueService $governanceQueueService): View
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        return view(
+            'workspace.governance.deletion-requests.index',
+            $governanceQueueService->deletionRequests($user, $request->query())
+        );
+    }
+
+    public function deletionRequestComplementStore(
+        ResubmitDeletionRequestRequest $request,
+        DeletionRequest $deletionRequest,
+        DeletionRequestService $deletionRequestService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $before = $deletionRequest->toArray();
+        $deletionRequest = $deletionRequestService->resubmitComplement(
+            $deletionRequest,
+            $user,
+            (string) $request->validated('complement')
+        );
+        $this->recordAudit(
+            $request,
+            'deletion_requests',
+            'complement_resubmitted',
+            $deletionRequest,
+            $before,
+            $deletionRequest->toArray()
+        );
+
+        return redirect()
+            ->route('workspace.deletion-requests.index', ['status' => DeletionRequest::STATUS_PENDING])
+            ->with('success', 'Complément transmis pour une nouvelle instruction.');
+    }
+
+    /** @return Collection<int, User> */
+    private function delegationEligibleUsers(): Collection
     {
         return User::query()
             ->whereIn('role', [User::ROLE_DIRECTION, User::ROLE_SERVICE])
+            ->where('is_active', true)
             ->with(['direction:id,code,libelle', 'service:id,code,libelle'])
             ->orderBy('name')
             ->get(['id', 'name', 'role', 'direction_id', 'service_id']);
     }
 
-    private function delegateReceivers()
+    /** @return Collection<int, User> */
+    private function delegateReceivers(): Collection
     {
         return User::query()
             ->whereIn('role', [User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_DIRECTION, User::ROLE_SERVICE])
+            ->where('is_active', true)
             ->with(['direction:id,code,libelle', 'service:id,code,libelle'])
             ->orderBy('name')
             ->get(['id', 'name', 'role', 'direction_id', 'service_id']);
+    }
+
+    private function authorizeRetentionReader(Request $request): User
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        if (! $user->hasAnyPermission('retention.read', 'retention.manage')) {
+            abort(403, 'Accès non autorisé.');
+        }
+
+        return $user;
     }
 }

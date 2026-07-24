@@ -2,9 +2,9 @@
 
 namespace App\Services\Exports;
 
+use App\Support\Zip\SimpleZipWriter;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
-use App\Support\Zip\SimpleZipWriter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -12,9 +12,8 @@ use RuntimeException;
 class ReportingWorkbookExporter
 {
     public function __construct(
-        private readonly SimpleZipWriter $zipWriter = new SimpleZipWriter()
-    ) {
-    }
+        private readonly SimpleZipWriter $zipWriter = new SimpleZipWriter
+    ) {}
 
     public function create(array $payload): string
     {
@@ -107,6 +106,7 @@ class ReportingWorkbookExporter
             $sheets,
             $this->buildInstitutionalServiceSheets($payload),
             [
+                $this->buildConformitySheet($payload),
                 $this->buildAnomaliesSheet($payload),
                 $this->buildFinancingSheet($payload),
             ]
@@ -472,7 +472,7 @@ class ReportingWorkbookExporter
             'PAS PLAN',
             'PAS PLAN',
             $this->standardReportMetaRows($payload, 'Plan d\'actions — Tableau de pilotage consolidé'),
-            ['Axes stratégiques', 'N°', 'Objectifs stratégiques', 'Objectifs opérationnels', 'Actions détaillées', 'Responsable', 'Ressources', 'Cible', 'État', 'Échéances'],
+            ['Axes stratégiques', 'N°', 'Objectifs stratégiques', 'Objectifs opérationnels', 'Actions détaillées', 'Responsable', 'Ressources', 'Quantité à réaliser / livrable', 'État', 'Échéances'],
             ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string'],
             $this->pasPlanSheetRows($payload),
             [1 => 36, 2 => 6, 3 => 36, 4 => 36, 5 => 44, 6 => 26, 7 => 28, 8 => 14, 9 => 18, 10 => 16]
@@ -537,7 +537,7 @@ class ReportingWorkbookExporter
             'ACTIONS',
             'ACTIONS',
             $this->standardReportMetaRows($payload, 'Tableau 3 : Actions détaillées'),
-            ['Direction', 'Service', 'Objectif operationnel', 'Description action', 'RMO', 'Debut', 'Fin', 'Mode execution', 'Cible', 'Avancement reel (%)', 'Financement', 'Risque', 'Ressources', 'KPI global (%)'],
+            ['Direction', 'Service', 'Objectif operationnel', 'Description action', 'RMO', 'Debut', 'Fin', 'Mode execution', 'Quantite a realiser / livrable', 'Avancement reel (%)', 'Financement', 'Risque', 'Ressources', 'KPI global (%)'],
             ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'percent', 'string', 'string', 'string', 'percent'],
             $this->actionFinalSheetRows($payload),
             [1 => 30, 2 => 30, 3 => 36, 4 => 46, 5 => 28, 6 => 14, 7 => 14, 8 => 22, 9 => 28, 10 => 18, 11 => 42, 12 => 44, 13 => 34, 14 => 16],
@@ -585,6 +585,7 @@ class ReportingWorkbookExporter
             [1 => 42, 2 => 36, 3 => 14, 4 => 14, 5 => 18, 6 => 48]
         );
     }
+
     private function buildRmoPerformanceSheet(array $payload): array
     {
         return $this->buildTableSheet(
@@ -673,6 +674,7 @@ class ReportingWorkbookExporter
             [1 => 38, 2 => 34, 3 => 18, 4 => 14, 5 => 14, 6 => 18]
         );
     }
+
     private function standardReportMetaRows(array $payload, string $tableLabel): array
     {
         $exportTemplate = (array) ($payload['export_template'] ?? []);
@@ -901,6 +903,40 @@ class ReportingWorkbookExporter
         );
     }
 
+    private function buildConformitySheet(array $payload): array
+    {
+        return $this->buildTableSheet(
+            'CONFORMITE',
+            'CONTROLE DE CONFORMITE',
+            $this->standardReportMetaRows($payload, 'Rapport Conformite'),
+            ['Direction', 'Service', 'Action', 'RMO', 'Controle', 'Statut', 'Correction attendue', 'Avancement (%)', 'Statut suivi'],
+            ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'percent', 'string'],
+            $this->conformitySheetRows($payload),
+            [1 => 28, 2 => 28, 3 => 42, 4 => 24, 5 => 30, 6 => 18, 7 => 48, 8 => 16, 9 => 22]
+        );
+    }
+
+    /**
+     * @return array<int, array<int, mixed>>
+     */
+    private function conformitySheetRows(array $payload): array
+    {
+        return collect($payload['details']['conformity_report'] ?? [])
+            ->map(fn (array $row): array => [
+                (string) ($row['direction'] ?? '-'),
+                (string) ($row['service'] ?? '-'),
+                (string) ($row['action'] ?? '-'),
+                (string) ($row['rmo'] ?? '-'),
+                (string) ($row['controle'] ?? '-'),
+                (string) ($row['statut'] ?? '-'),
+                (string) ($row['correction'] ?? '-'),
+                (float) ($row['progression'] ?? 0),
+                (string) ($row['statut_suivi'] ?? '-'),
+            ])
+            ->values()
+            ->all();
+    }
+
     /**
      * @return array<int, array<int, mixed>>
      */
@@ -966,7 +1002,7 @@ class ReportingWorkbookExporter
     }
 
     /**
-     * @param array<int, array<string, mixed>> $sheets
+     * @param  array<int, array<string, mixed>>  $sheets
      * @return array<int, array<string, mixed>>
      */
     private function filterSheetsForReportType(array $sheets, string $reportType): array
@@ -977,6 +1013,7 @@ class ReportingWorkbookExporter
             'pta' => ['SYNTHÈSE', 'PAO', 'ACTIONS'],
             'actions' => ['ACTIONS'],
             'kpi' => ['Indicateurs', 'RMO_PERFORMANCE'],
+            'conformite' => ['CONFORMITE'],
             'anomalies' => ['ANOMALIES', 'ALERTES'],
             'financement' => ['FINANCEMENT'],
             default => [],
@@ -1302,7 +1339,7 @@ class ReportingWorkbookExporter
     }
 
     /**
-     * @param Collection<int, array<string, mixed>> $reports
+     * @param  Collection<int, array<string, mixed>>  $reports
      * @return array<int, array<string, mixed>>
      */
     private function buildPtaServiceSheets(Collection $reports, array $payload): array
@@ -1492,8 +1529,8 @@ class ReportingWorkbookExporter
             $this->serviceCell(4, $rowIndex, 'Responsable', 25),
             $this->serviceCell(5, $rowIndex, 'Ratio', 25),
             $this->serviceCell(6, $rowIndex, 'Taux de réalisation (%)', 25),
-            $this->serviceCell(7, $rowIndex, 'Cible', 25),
-            $this->serviceCell(8, $rowIndex, 'Performance en fonction de la cible', 25),
+            $this->serviceCell(7, $rowIndex, 'Quantite a realiser / livrable', 25),
+            $this->serviceCell(8, $rowIndex, 'Performance en fonction du seuil', 25),
             $this->serviceCell(9, $rowIndex, 'Ecart', 25),
             $this->serviceCell(10, $rowIndex, 'Echéance', 25),
             $this->serviceCell(11, $rowIndex, 'Statut', 25),
@@ -1512,7 +1549,7 @@ class ReportingWorkbookExporter
     }
 
     /**
-     * @param Collection<int, array<string, mixed>> $rows
+     * @param  Collection<int, array<string, mixed>>  $rows
      */
     private function serviceGroupPerformance(Collection $rows): float
     {
@@ -1814,6 +1851,7 @@ class ReportingWorkbookExporter
     {
         return ['index' => $rowIndex, 'height' => $height, 'cells' => $cells];
     }
+
     private function sheetXml(
         array $rows,
         array $merges,
@@ -1822,8 +1860,7 @@ class ReportingWorkbookExporter
         ?string $drawingRelationshipId = null,
         bool $freezeHeader = false,
         ?string $autoFilterRef = null
-    ): string
-    {
+    ): string {
         $sheetRows = '';
         $lastRow = 1;
         foreach ($rows as $row) {
@@ -1888,16 +1925,19 @@ class ReportingWorkbookExporter
             if ($type === 'percent') {
                 $number /= 100;
             }
+
             return '<c r="'.$ref.'" s="'.$style.'"><v>'.$this->normalizeNumber($number).'</v></c>';
         }
 
         $escaped = htmlspecialchars((string) $value, ENT_XML1);
+
         return '<c r="'.$ref.'" s="'.$style.'" t="inlineStr"><is><t xml:space="preserve">'.$escaped.'</t></is></c>';
     }
 
     private function normalizeNumber(float $value): string
     {
         $normalized = number_format($value, 6, '.', '');
+
         return rtrim(rtrim($normalized, '0'), '.');
     }
 
@@ -1912,6 +1952,7 @@ class ReportingWorkbookExporter
                 default => 16,
             };
         }
+
         return $widths;
     }
 
@@ -2099,6 +2140,7 @@ class ReportingWorkbookExporter
             .'</c:chart>'
             .'</c:chartSpace>';
     }
+
     private function appPropertiesXml(array $sheetNames): string
     {
         $parts = '';
@@ -2333,6 +2375,7 @@ class ReportingWorkbookExporter
             return str_repeat('-', $segments);
         }
         $filled = (int) round(max(0, min(1, $value / $max)) * $segments);
+
         return str_repeat('#', $filled).str_repeat('-', max(0, $segments - $filled));
     }
 
@@ -2344,6 +2387,7 @@ class ReportingWorkbookExporter
             $name = chr(65 + ($index % 26)).$name;
             $index = intdiv($index, 26);
         }
+
         return $name;
     }
 }

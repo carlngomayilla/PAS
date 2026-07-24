@@ -24,6 +24,9 @@ class ActionStatusService
         'correction_demandee',
         'rejetee_chef',
         'validee_chef',
+        'soumise_controle',
+        'correction_controle',
+        'validee_controle',
         'rejetee_direction',
         'validee_direction',
         'en_validation_chef',
@@ -59,6 +62,9 @@ class ActionStatusService
         'execution_quantitative',
         'action_soumise_validation',
         'action_validee_chef',
+        'action_transmise_controle',
+        'action_validee_controle',
+        'action_rejetee_controle',
         'action_rejetee_chef',
         'action_correction_demandee',
         'action_validee_direction',
@@ -84,6 +90,9 @@ class ActionStatusService
         ActionTrackingService::VALIDATION_SOUMISE_CHEF,
         ActionTrackingService::VALIDATION_REJETEE_CHEF,
         ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+        ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+        ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
         ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
         'en_validation_chef',
         'soumise_direction',
@@ -94,14 +103,13 @@ class ActionStatusService
      * @var list<string>
      */
     private const FINAL_VALIDATION_STATUSES = [
-        ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
     ];
 
     public function __construct(
         private readonly ActionCalculationSettings $actionCalculationSettings
-    ) {
-    }
+    ) {}
 
     public function isStarted(Action $action): bool
     {
@@ -148,8 +156,7 @@ class ActionStatusService
             'termine',
             'terminee',
         ], true)
-            // Validation finale chef de service (etape terminale du workflow ANBG)
-            // ou validation direction historique : l'action est consideree achevee.
+            // Validation finale du controleur, ou validation direction historique.
             || in_array($validationStatus, self::FINAL_VALIDATION_STATUSES, true)
             || $action->cloture_le !== null;
     }

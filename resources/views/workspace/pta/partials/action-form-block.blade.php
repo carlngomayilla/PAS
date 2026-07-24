@@ -3,6 +3,7 @@
     $index = $index ?? 0;
     $number = $isTemplate ? '__NUMBER__' : ((int) $index + 1);
     $rowData = is_array($rowData ?? null) ? $rowData : [];
+    $datesLocked = ! $isTemplate && is_numeric($rowData['id'] ?? null) && (int) $rowData['id'] > 0;
     $actionHeadingLabel = trim((string) ($rowData['libelle'] ?? ''));
     $actionHeadingLabel = $actionHeadingLabel !== '' ? $actionHeadingLabel : 'Nouvelle action';
     $selectedRmos = collect($selectedRmos ?? [null]);
@@ -223,12 +224,12 @@
             <div class="form-grid-compact">
                 <div>
                     <label>Date de début</label>
-                    <input name="actions[{{ $index }}][date_debut]" type="date" value="{{ $rowData['date_debut'] ?? '' }}" required>
+                    <input name="actions[{{ $index }}][date_debut]" type="date" value="{{ $rowData['date_debut'] ?? '' }}" required @readonly($datesLocked)>
                     @error("actions.$index.date_debut") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label>Date de fin</label>
-                    <input name="actions[{{ $index }}][date_fin]" type="date" value="{{ $rowData['date_fin'] ?? '' }}" data-date-fin-input>
+                    <input name="actions[{{ $index }}][date_fin]" type="date" value="{{ $rowData['date_fin'] ?? '' }}" data-date-fin-input @readonly($datesLocked)>
                     @error("actions.$index.date_fin") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
                 <div class="hidden">
@@ -236,15 +237,18 @@
                     <input class="hidden" type="date" value="{{ $rowData['date_fin'] ?? '' }}" readonly data-echeance-preview>
                 </div>
             </div>
+            @if ($datesLocked)
+                <p class="mt-2 text-xs font-semibold text-amber-700">Dates verrouillées : utilisez la demande de report depuis le Suivi PTA.</p>
+            @endif
             </div>
         </details>
 
         <details class="form-step-accordion" open>
-            <summary>4. Cible et seuil</summary>
+            <summary>4. Indicateur et seuil</summary>
             <div class="form-step-body">
             <div class="form-grid">
                 <div>
-                    <label>Type d'action</label>
+                    <label>Type d'indicateur</label>
                     <select name="actions[{{ $index }}][type_action]" data-type-action-select data-mode-select>
                         <option value="quantitative" @selected($typeAction === 'quantitative')>Action simple quantitative</option>
                         <option value="non_quantitative" @selected($typeAction === 'non_quantitative')>Action simple non quantitative</option>
@@ -252,14 +256,14 @@
                     </select>
                     <p class="mt-1 text-xs text-slate-500" data-type-action-hint>
                         @switch($typeAction)
-                            @case('quantitative') Cible chiffrée + unité + seuils numériques. @break
+                            @case('quantitative') Quantite a realiser + unite + seuils numeriques. @break
                             @case('composee') Performance calculée depuis les sous-actions (poids Σ=100%). @break
                             @default Pièce justificative attendue (réalisé = 0 % ou 100 %).
                         @endswitch
                     </p>
                 </div>
                 <div class="{{ $showTargetFields ? '' : 'hidden' }}" data-target-wrapper>
-                    <label>Valeur cible</label>
+                    <label>Quantite a realiser</label>
                     <input name="actions[{{ $index }}][quantite_cible]" data-target-input type="number" step="1" min="0" value="{{ isset($rowData['quantite_cible']) && $rowData['quantite_cible'] !== '' && $rowData['quantite_cible'] !== null ? (int) $rowData['quantite_cible'] : '' }}" @disabled(! $showTargetFields)>
                     @error("actions.$index.quantite_cible") <p class="field-error">{{ $message }}</p> @enderror
                 </div>
@@ -324,6 +328,7 @@
                     @php
                         $saType = $subAction['sub_action_type'] ?? ((filled($subAction['cible_prevue'] ?? null) && (float) ($subAction['cible_prevue'] ?? 0) > 0) ? 'quantitative' : 'non_quantitative');
                         $saRequiresProof = filter_var($subAction['requires_proof'] ?? true, FILTER_VALIDATE_BOOL);
+                        $subActionDatesLocked = is_numeric($subAction['id'] ?? null) && (int) $subAction['id'] > 0;
                         $saRequiresComment = filter_var($subAction['requires_comment'] ?? false, FILTER_VALIDATE_BOOL);
                         $saAllowsDifficulty = filter_var($subAction['allows_difficulty'] ?? true, FILTER_VALIDATE_BOOL);
                     @endphp
@@ -356,14 +361,14 @@
                             </div>
                             <div>
                                 <label>Date de début</label>
-                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][date_debut]" type="date" value="{{ $subAction['date_debut'] ?? ($rowData['date_debut'] ?? '') }}">
+                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][date_debut]" type="date" value="{{ $subAction['date_debut'] ?? ($rowData['date_debut'] ?? '') }}" @readonly($subActionDatesLocked)>
                             </div>
                             <div>
                                 <label>Date de fin</label>
-                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][date_fin]" type="date" value="{{ $subAction['date_fin'] ?? ($rowData['date_fin'] ?? '') }}">
+                                <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][date_fin]" type="date" value="{{ $subAction['date_fin'] ?? ($rowData['date_fin'] ?? '') }}" @readonly($subActionDatesLocked)>
                             </div>
                             <div data-sub-target-wrapper class="{{ $saType === 'quantitative' ? '' : 'hidden' }}">
-                                <label>Cible prévue</label>
+                                <label>Quantite a realiser</label>
                                 <input name="actions[{{ $index }}][sous_actions][{{ $subIndex }}][cible_prevue]" type="number" step="1" min="0" value="{{ isset($subAction['cible_prevue']) && $subAction['cible_prevue'] !== '' && $subAction['cible_prevue'] !== null ? (int) $subAction['cible_prevue'] : '' }}">
                             </div>
                             <div data-sub-target-wrapper class="{{ $saType === 'quantitative' ? '' : 'hidden' }}">

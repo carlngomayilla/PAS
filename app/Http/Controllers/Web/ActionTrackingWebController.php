@@ -6,40 +6,37 @@ use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Concerns\FormatsWorkflowMessages;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ReviewActionFinancingByDafRequest;
+use App\Http\Requests\ReviewActionFinancingByDgRequest;
+use App\Http\Requests\SubmitActionFinancingRequest;
 use App\Models\Action;
 use App\Models\Justificatif;
 use App\Models\SousAction;
 use App\Models\User;
+use App\Services\Actions\ActionFinancingWorkflowService;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\Actions\ActionWorkspacePresenter;
 use App\Services\DocumentPolicySettings;
 use App\Services\DynamicReferentialSettings;
 use App\Services\Governance\DelegationService;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\PlanningModificationLockService;
 use App\Services\Security\SecureJustificatifStorage;
+use App\Services\Workflow\ActionPerformanceCalculator;
 use App\Services\Workflow\ActionWorkflowService;
 use App\Services\WorkflowSettings;
-use App\Support\UiLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 /**
- * Controller de suivi des actions — version réduite après suppression du workflow
- * opérationnel (2026-05-31). Les méthodes restantes couvrent :
- *
- *  - Page de suivi en lecture seule (show)
- *  - Fil de discussion / commentaires (comment)
- *  - Workflow financement DAF → DG (préservé)
- *  - Téléchargement / preview des justificatifs
- *
- * Les méthodes supprimées (updateSubAction, updateQuantitativeProgress,
- * reviewSubAction, reviewClosure, signalAnomaly, resolveAnomaly,
- * storeDeadlineExtensionRequest, reviewDeadlineExtensionBy*) sont à
- * reconstruire from scratch lors de la refonte du workflow opérationnel.
+ * Controller de suivi des actions : saisie Agent/RMO, visa du chef de service,
+ * controle final SCIQ/Planification, financement et justificatifs securises.
  */
 class ActionTrackingWebController extends Controller
 {
@@ -47,8 +44,13 @@ class ActionTrackingWebController extends Controller
     use FormatsWorkflowMessages;
     use RecordsAuditTrail;
 
-    public function show(Request $request, Action $action, ActionTrackingService $trackingService): View
-    {
+    public function show(
+        Request $request,
+        Action $action,
+        ActionTrackingService $trackingService,
+        ActionFinancingWorkflowService $financingWorkflow,
+        ActionWorkspacePresenter $workspacePresenter
+    ): View {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
@@ -61,18 +63,32 @@ class ActionTrackingWebController extends Controller
 
         $trackingService->refreshActionMetrics($action);
         $action->load([
-            'pta:id,pao_id,titre,direction_id,service_id,statut',
+            'pta:id,pao_id,objectif_operationnel_id,titre,direction_id,service_id,statut',
             'pta.direction:id,code,libelle',
             'pta.service:id,code,libelle',
-            'pta.pao:id,pas_id,annee,titre,statut',
+            'pta.pao:id,pas_id,pas_objectif_id,annee,titre,statut,objectif_operationnel',
             'pta.pao.pas:id,titre,periode_debut,periode_fin,statut',
-            'pao:id,pas_id,annee,titre,statut,objectif_operationnel,echeance',
+            'pta.pao.pasObjectif:id,pas_axe_id,code,libelle',
+            'pta.pao.pasObjectif.pasAxe:id,pas_id,code,libelle',
+            'pta.objectifOperationnel:id,pao_id,pas_id,pas_axe_id,pas_objectif_id,libelle',
+            'pta.objectifOperationnel.pasAxe:id,pas_id,code,libelle',
+            'pta.objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
+            'pta.objectifOperationnel.pasObjectif.pasAxe:id,pas_id,code,libelle',
+            'pao:id,pas_id,pas_objectif_id,annee,titre,statut,objectif_operationnel,echeance',
             'pao.pas:id,titre,periode_debut,periode_fin,statut',
-            'objectifOperationnel:id,pao_id,libelle,description,echeance',
+            'pao.pasObjectif:id,pas_axe_id,code,libelle',
+            'pao.pasObjectif.pasAxe:id,pas_id,code,libelle',
+            'objectifOperationnel:id,pao_id,pas_id,pas_axe_id,pas_objectif_id,libelle,description,echeance',
+            'objectifOperationnel.pas:id,titre,periode_debut,periode_fin,statut',
+            'objectifOperationnel.pasAxe:id,pas_id,code,libelle',
+            'objectifOperationnel.pasObjectif:id,pas_axe_id,code,libelle',
+            'objectifOperationnel.pasObjectif.pasAxe:id,pas_id,code,libelle',
             'responsable:id,name,email,agent_matricule,agent_fonction,agent_telephone',
             'responsables:id,name,email,agent_matricule,agent_fonction,agent_telephone',
             'financementDafPar:id,name,email',
             'financementDgPar:id,name,email',
+            'evaluePar:id,name,email',
+            'controleReviewedBy:id,name,email',
             'sousActions' => fn ($q) => $q->with([
                 'agent:id,name,email',
             ])->orderBy('id'),
@@ -80,11 +96,20 @@ class ActionTrackingWebController extends Controller
             'justificatifs' => fn ($q) => $q->with([
                 'ajoutePar:id,name,email',
             ])->latest(),
+            'deadlineExtensionRequests' => fn ($q) => $q->with([
+                'requestedBy:id,name,email',
+                'chefReviewedBy:id,name,email',
+                'sciqReviewedBy:id,name,email',
+                'finalDecidedBy:id,name,email',
+                'dgDecidedBy:id,name,email',
+                'appliedBy:id,name,email',
+                'sousAction:id,action_id,libelle',
+            ])->latest()->limit(20),
             'actionLogs' => fn ($q) => $q->with('utilisateur:id,name,email')->latest()->limit(80),
         ]);
 
         // ── Workflow V2 : performances + permissions de suivi ──────────────────
-        $calculator = app(\App\Services\Workflow\ActionPerformanceCalculator::class);
+        $calculator = app(ActionPerformanceCalculator::class);
         $provisional = $calculator->provisionalPerformance($action);
         $official = (float) ($action->official_progress_percent ?? 0);
         $lockService = app(PlanningModificationLockService::class);
@@ -92,17 +117,50 @@ class ActionTrackingWebController extends Controller
         $canRequestActionUnlock = $isActionModificationLocked && $lockService->canRequestUnlock($user, $action);
         $canProcessActionUnlock = $isActionModificationLocked
             && ($lockService->isUnlockReviewer($user) || $lockService->canGivePlanifAvis($user));
+        $canTrackAction = $this->canTrackAction($user, $action) && ! $action->isComposee();
+        $canTrackSubActions = $action->isComposee()
+            && $this->isExecutionEditable($action)
+            && ($action->isResponsible($user) || $user->isAgent());
+        $canReviewByChef = $this->canReviewByChef($user, $action);
+        $canReviewByController = $this->canReviewByController($user);
+        $canRequestDeadlineExtension = $user->can('requestDeadlineExtension', $action);
+        $canReviewDeadlineExtensionByChef = $user->can('reviewDeadlineExtensionByChef', $action);
+        $canReviewDeadlineExtensionByController = $user->can('reviewDeadlineExtensionByController', $action);
+        $canReviewDeadlineExtensionFinal = $user->can('reviewDeadlineExtensionFinal', $action);
+        $canApplyDeadlineExtension = $user->can('applyDeadlineExtension', $action);
+        $canSubmitFinancing = $user->can('submitFinancing', $action)
+            && $financingWorkflow->canSubmitStatus($action);
+        $canReviewFinancingByDaf = $user->can('reviewFinancingByDaf', $action)
+            && $financingWorkflow->canReviewByDafStatus($action);
+        $canReviewFinancingByDg = $user->can('reviewFinancingByDg', $action)
+            && $financingWorkflow->canReviewByDgStatus($action);
+        $actionWorkspace = $workspacePresenter->present($action, $user, [
+            'track_action' => $canTrackAction,
+            'track_sub_actions' => $canTrackSubActions,
+            'review_chef' => $canReviewByChef,
+            'review_controller' => $canReviewByController,
+            'request_deadline' => $canRequestDeadlineExtension,
+            'review_deadline_chef' => $canReviewDeadlineExtensionByChef,
+            'review_deadline_controller' => $canReviewDeadlineExtensionByController,
+            'review_deadline_final' => $canReviewDeadlineExtensionFinal,
+            'apply_deadline' => $canApplyDeadlineExtension,
+            'submit_financing' => $canSubmitFinancing,
+            'review_financing_daf' => $canReviewFinancingByDaf,
+            'review_financing_dg' => $canReviewFinancingByDg,
+        ]);
 
         return view('workspace.actions.suivi', [
             'action' => $action,
+            'actionWorkspace' => $actionWorkspace,
             // Workflow V2
             'v2ProvisionalPerf' => $provisional,
             'v2OfficialPerf' => $official,
             'v2PerfStatus' => $calculator->performanceStatus($provisional),
             'v2TemporalStatus' => $calculator->temporalStatus($action),
-            'canTrackActionV2' => $this->canTrackAction($user, $action) && ! $action->isComposee(),
-            'canTrackSubActionsV2' => $action->isComposee() && ($action->isResponsible($user) || $user->isAgent()),
-            'canReviewByChefV2' => $this->canReviewByChef($user, $action),
+            'canTrackActionV2' => $canTrackAction,
+            'canTrackSubActionsV2' => $canTrackSubActions,
+            'canReviewByChefV2' => $canReviewByChef,
+            'canReviewByControllerV2' => $canReviewByController,
             // Le responsable VOIT toujours le formulaire (figé si non éditable),
             // tant que l'action est paramétrée. L'édition dépend de canTrackActionV2.
             'v2ActionResponsible' => $action->isResponsible($user)
@@ -117,11 +175,17 @@ class ActionTrackingWebController extends Controller
             'canRequestActionUnlock' => $canRequestActionUnlock,
             'canProcessActionUnlock' => $canProcessActionUnlock,
             'canReviewClosure' => false,
-            'canRequestDeadlineExtension' => false,
-            'canReviewDeadlineExtensionBySciq' => false,
-            'canReviewDeadlineExtensionByDg' => false,
-            'canReviewFinancingByDaf' => $this->canReviewFinancingByDaf($user, $action),
-            'canReviewFinancingByDg' => $this->canReviewFinancingByDg($user, $action),
+            'canRequestDeadlineExtension' => $canRequestDeadlineExtension,
+            'canReviewDeadlineExtensionByChef' => $canReviewDeadlineExtensionByChef,
+            'canReviewDeadlineExtensionByController' => $canReviewDeadlineExtensionByController,
+            'canReviewDeadlineExtensionFinal' => $canReviewDeadlineExtensionFinal,
+            'canApplyDeadlineExtension' => $canApplyDeadlineExtension,
+            // Compatibilité temporaire avec les anciennes clés de la vue.
+            'canReviewDeadlineExtensionBySciq' => $canReviewDeadlineExtensionByController,
+            'canReviewDeadlineExtensionByDg' => $canReviewDeadlineExtensionFinal,
+            'canSubmitFinancing' => $canSubmitFinancing,
+            'canReviewFinancingByDaf' => $canReviewFinancingByDaf,
+            'canReviewFinancingByDg' => $canReviewFinancingByDg,
             'canSignalControlAnomaly' => false,
             'canResolveControlAnomaly' => false,
             'workflowConfig' => $this->workflowSettings()->actionValidationSummary(),
@@ -240,7 +304,7 @@ class ActionTrackingWebController extends Controller
                     ], $user);
                 }
             });
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return back()->withInput()->withErrors(['general' => $e->getMessage()]);
         }
 
@@ -337,7 +401,7 @@ class ActionTrackingWebController extends Controller
 
                 $workflow->refreshCompositeParent($action->fresh(['sousActions']), $user);
             });
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return back()->withInput()->withErrors(['general' => $e->getMessage()]);
         }
 
@@ -391,6 +455,7 @@ class ActionTrackingWebController extends Controller
             'decision' => ['required', Rule::in(['valider', 'rejeter'])],
             'sous_action_id' => ['nullable', 'integer', 'exists:sous_actions,id'],
             'motif' => ['nullable', 'string', 'max:5000'],
+            'progress_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
         $approve = $validated['decision'] === 'valider';
@@ -417,7 +482,17 @@ class ActionTrackingWebController extends Controller
             ]);
         } else {
             $before = $action->toArray();
-            $workflow->reviewAction($action, $approve, $validated['motif'] ?? null, $user);
+            try {
+                $workflow->reviewAction(
+                    $action,
+                    $approve,
+                    $validated['motif'] ?? null,
+                    $user,
+                    isset($validated['progress_percent']) ? (float) $validated['progress_percent'] : null
+                );
+            } catch (InvalidArgumentException $exception) {
+                return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
+            }
             $reviewed = $action->fresh();
             $this->recordAudit($request, 'action', $approve ? 'review_action_validate' : 'review_action_reject', $reviewed, $before, [
                 ...$reviewed->toArray(),
@@ -431,15 +506,76 @@ class ActionTrackingWebController extends Controller
         }
 
         $notificationService->notifyActionReviewedByChef($action->fresh()->loadMissing('pta:id,direction_id,service_id'), $approve, $user);
+        if ($approve && $subActionId === null) {
+            $notificationService->notifyActionSubmittedToController($action->fresh()->loadMissing('pta:id,direction_id,service_id'), $user);
+        }
+
+        $redirect = $source === 'personal_tasks'
+            ? redirect()->route('workspace.tasks.index')
+            : redirect()->route('workspace.actions.suivi', $action);
+
+        return $redirect
+            ->with('success', $approve
+                ? ($subActionId === null ? 'Visa du chef enregistre. Action transmise au controleur.' : 'Validation enregistree.')
+                : 'Renvoi pour correction enregistre.');
+    }
+
+    public function reviewControl(
+        Request $request,
+        Action $action,
+        ActionWorkflowService $workflow,
+        WorkspaceNotificationService $notificationService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
+        if (! $this->canReviewByController($user)) {
+            abort(403, 'Acces reserve aux controleurs SCIQ et Planification.');
+        }
+
+        $validated = $request->validate([
+            'decision' => ['required', Rule::in(['valider', 'rejeter'])],
+            'motif' => ['nullable', 'string', 'max:5000'],
+        ]);
+        $approve = $validated['decision'] === 'valider';
+        $before = $action->toArray();
+
+        try {
+            $workflow->reviewActionByController($action, $approve, $validated['motif'] ?? null, $user);
+        } catch (InvalidArgumentException $exception) {
+            return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
+        }
+
+        $reviewed = $action->fresh();
+        $this->recordAudit($request, 'action', $approve ? 'review_control_validate' : 'review_control_reject', $reviewed, $before, [
+            ...$reviewed->toArray(),
+            'audit_context' => [
+                'intervention_processed' => true,
+                'task_type' => 'validation_controleur',
+                'decision' => $approve ? 'valider' : 'rejeter',
+                'motif' => $validated['motif'] ?? null,
+            ],
+        ]);
+        $notificationService->notifyActionReviewedByController(
+            $reviewed->loadMissing('pta:id,direction_id,service_id'),
+            $approve,
+            $user
+        );
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', $approve ? 'Validation enregistrée.' : 'Renvoi pour correction enregistré.');
+            ->with('success', $approve
+                ? 'Controle final valide. L action est cloturee.'
+                : 'Correction demandee par le controleur.');
     }
 
-    public function reviewFinancingByDaf(
-        Request $request,
+    public function submitFinancing(
+        SubmitActionFinancingRequest $request,
         Action $action,
+        ActionFinancingWorkflowService $financingWorkflow,
         ActionTrackingService $trackingService,
         WorkspaceNotificationService $notificationService,
         SecureJustificatifStorage $secureStorage
@@ -449,46 +585,100 @@ class ActionTrackingWebController extends Controller
             abort(401);
         }
 
-        $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
-        if (! $this->canReviewFinancingByDaf($user, $action)) {
-            abort(403, 'Acces non autorise.');
+        /** @var array{source_financement:string,commentaire_financement:string} $validated */
+        $validated = $request->validated();
+        $before = $action->toArray();
+        $storedFile = $request->hasFile('justificatif_financement')
+            ? $secureStorage->store($request->file('justificatif_financement'), 'justificatifs/'.date('Y/m'))
+            : null;
+
+        try {
+            DB::transaction(function () use ($financingWorkflow, $trackingService, $action, $validated, $user, $storedFile): void {
+                $submitted = $financingWorkflow->submitToDaf($action, $validated, $user);
+
+                if ($storedFile !== null) {
+                    $trackingService->addActionJustificatif(
+                        $submitted,
+                        null,
+                        'financement',
+                        $storedFile['path'],
+                        $storedFile['nom_original'],
+                        $storedFile['mime_type'],
+                        $storedFile['taille_octets'],
+                        'Piece du dossier de financement soumis a la DAF',
+                        $user,
+                        $storedFile['est_chiffre']
+                    );
+                }
+            }, attempts: 3);
+        } catch (InvalidArgumentException $exception) {
+            $secureStorage->deleteByPath($storedFile['path'] ?? null);
+
+            return back()->withErrors(['general' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            $secureStorage->deleteByPath($storedFile['path'] ?? null);
+
+            throw $exception;
         }
 
-        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
-            return back()->withErrors([
-                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Financement'),
-            ]);
-        }
+        $action->refresh();
+        $notificationService->notifyActionFinancingRequested($action, $user);
+        $action = $trackingService->markFinancingNotificationSent($action);
+        $this->recordAudit($request, 'action', 'submit_financing_daf', $action, $before, $action->toArray());
 
-        $currentStatus = $action->financementStatus();
-        if (! in_array($currentStatus, [Action::FINANCEMENT_A_TRAITER_DAF, Action::FINANCEMENT_REFUSE_DG], true)) {
-            return back()->withErrors(['general' => 'Ce financement n est pas en attente de traitement DAF.']);
+        return redirect()
+            ->route('workspace.actions.suivi', $action)
+            ->with('success', 'Dossier de financement soumis a la DAF.');
+    }
+
+    public function reviewFinancingByDaf(
+        ReviewActionFinancingByDafRequest $request,
+        Action $action,
+        ActionFinancingWorkflowService $financingWorkflow,
+        ActionTrackingService $trackingService,
+        WorkspaceNotificationService $notificationService,
+        SecureJustificatifStorage $secureStorage
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
         }
 
         /** @var array<string, mixed> $validated */
-        $validated = $request->validate($this->financeDafValidationRules($request));
-
+        $validated = $request->validated();
         $before = $action->toArray();
-        DB::transaction(function () use ($trackingService, $action, $validated, $request, $user, $secureStorage): void {
-            $trackingService->reviewFinancingByDaf($action, $validated, $user);
+        $storedFile = $request->hasFile('justificatif_financement_daf')
+            ? $secureStorage->store($request->file('justificatif_financement_daf'), 'justificatifs/'.date('Y/m'))
+            : null;
 
-            if ($request->hasFile('justificatif_financement_daf')) {
-                $file = $request->file('justificatif_financement_daf');
-                $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
-                $trackingService->addActionJustificatif(
-                    $action,
-                    null,
-                    'financement_daf',
-                    $storedFile['path'],
-                    $storedFile['nom_original'],
-                    $storedFile['mime_type'],
-                    $storedFile['taille_octets'],
-                    'Justificatif de decision DAF sur financement',
-                    $user,
-                    $storedFile['est_chiffre']
-                );
-            }
-        });
+        try {
+            DB::transaction(function () use ($financingWorkflow, $trackingService, $action, $validated, $user, $storedFile): void {
+                $reviewed = $financingWorkflow->reviewByDaf($action, $validated, $user);
+
+                if ($storedFile !== null) {
+                    $trackingService->addActionJustificatif(
+                        $reviewed,
+                        null,
+                        'financement_daf',
+                        $storedFile['path'],
+                        $storedFile['nom_original'],
+                        $storedFile['mime_type'],
+                        $storedFile['taille_octets'],
+                        'Justificatif de decision DAF sur financement',
+                        $user,
+                        $storedFile['est_chiffre']
+                    );
+                }
+            }, attempts: 3);
+        } catch (InvalidArgumentException $exception) {
+            $secureStorage->deleteByPath($storedFile['path'] ?? null);
+
+            return back()->withErrors(['general' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            $secureStorage->deleteByPath($storedFile['path'] ?? null);
+
+            throw $exception;
+        }
 
         $action->refresh();
         $this->recordAudit($request, 'action', 'review_financing_daf', $action, $before, $action->toArray());
@@ -510,8 +700,9 @@ class ActionTrackingWebController extends Controller
     }
 
     public function reviewFinancingByDg(
-        Request $request,
+        ReviewActionFinancingByDgRequest $request,
         Action $action,
+        ActionFinancingWorkflowService $financingWorkflow,
         ActionTrackingService $trackingService,
         WorkspaceNotificationService $notificationService,
         SecureJustificatifStorage $secureStorage
@@ -521,45 +712,41 @@ class ActionTrackingWebController extends Controller
             abort(401);
         }
 
-        $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
-        if (! $this->canReviewFinancingByDg($user, $action)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
-            return back()->withErrors([
-                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Accord DG'),
-            ]);
-        }
-
-        if (! in_array($action->financementStatus(), [Action::FINANCEMENT_TRANSMIS_DG, Action::FINANCEMENT_VALIDE_DAF], true)) {
-            return back()->withErrors(['general' => 'Ce financement n est pas en attente d accord DG.']);
-        }
-
         /** @var array<string, mixed> $validated */
-        $validated = $request->validate($this->financeDgValidationRules($request));
-
+        $validated = $request->validated();
         $before = $action->toArray();
-        DB::transaction(function () use ($trackingService, $action, $validated, $request, $user, $secureStorage): void {
-            $trackingService->reviewFinancingByDg($action, $validated, $user);
+        $storedFile = $request->hasFile('justificatif_financement_dg')
+            ? $secureStorage->store($request->file('justificatif_financement_dg'), 'justificatifs/'.date('Y/m'))
+            : null;
 
-            if ($request->hasFile('justificatif_financement_dg')) {
-                $file = $request->file('justificatif_financement_dg');
-                $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
-                $trackingService->addActionJustificatif(
-                    $action,
-                    null,
-                    'financement_dg',
-                    $storedFile['path'],
-                    $storedFile['nom_original'],
-                    $storedFile['mime_type'],
-                    $storedFile['taille_octets'],
-                    'Justificatif accord DG sur financement',
-                    $user,
-                    $storedFile['est_chiffre']
-                );
-            }
-        });
+        try {
+            DB::transaction(function () use ($financingWorkflow, $trackingService, $action, $validated, $user, $storedFile): void {
+                $reviewed = $financingWorkflow->reviewByDg($action, $validated, $user);
+
+                if ($storedFile !== null) {
+                    $trackingService->addActionJustificatif(
+                        $reviewed,
+                        null,
+                        'financement_dg',
+                        $storedFile['path'],
+                        $storedFile['nom_original'],
+                        $storedFile['mime_type'],
+                        $storedFile['taille_octets'],
+                        'Justificatif de decision DG sur financement',
+                        $user,
+                        $storedFile['est_chiffre']
+                    );
+                }
+            }, attempts: 3);
+        } catch (InvalidArgumentException $exception) {
+            $secureStorage->deleteByPath($storedFile['path'] ?? null);
+
+            return back()->withErrors(['general' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            $secureStorage->deleteByPath($storedFile['path'] ?? null);
+
+            throw $exception;
+        }
 
         $action->refresh();
         $this->recordAudit($request, 'action', 'review_financing_dg', $action, $before, $action->toArray());
@@ -572,51 +759,6 @@ class ActionTrackingWebController extends Controller
             ->with('success', $decision === ActionTrackingService::FINANCEMENT_DECISION_ACCORDER
                 ? 'Accord DG enregistre pour le financement.'
                 : 'Refus DG enregistre avec tracabilite complete.');
-    }
-
-    public function updateFinancingStatusByDaf(Request $request, Action $action): RedirectResponse
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(401);
-        }
-
-        $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
-        if (! $this->canMarkFinancingByDaf($user, $action)) {
-            abort(403, 'Acces non autorise.');
-        }
-
-        if (in_array((string) $action->pta?->statut, ['cloture', 'archive'], true)) {
-            return back()->withErrors([
-                'general' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'parent', 'Financement'),
-            ]);
-        }
-
-        $validated = $request->validate([
-            'statut_financement' => ['required', Rule::in([
-                Action::FINANCEMENT_EN_COURS_ANALYSE,
-                Action::FINANCEMENT_FINANCE,
-                Action::FINANCEMENT_NON_FINANCE,
-            ])],
-            'commentaire_financement' => ['nullable', 'string'],
-            'montant_valide' => ['nullable', 'integer', 'min:0'],
-        ]);
-
-        $before = $action->toArray();
-        $status = (string) $validated['statut_financement'];
-
-        $action->forceFill([
-            'financement_statut' => $status,
-            'financement_daf_par' => $user->id,
-            'financement_daf_le' => now(),
-            'financement_daf_decision' => $status,
-            'financement_daf_commentaire' => $validated['commentaire_financement'] ?? $action->financement_daf_commentaire,
-            'financement_montant_valide' => isset($validated['montant_valide']) ? (int) $validated['montant_valide'] : $action->financement_montant_valide,
-        ])->save();
-
-        $this->recordAudit($request, 'action', 'update_financing_status_daf', $action, $before, $action->toArray());
-
-        return back()->with('success', 'Statut de financement mis à jour par la DAF.');
     }
 
     public function downloadJustificatif(
@@ -670,47 +812,6 @@ class ActionTrackingWebController extends Controller
     }
 
     // ── HELPERS ──────────────────────────────────────────────────────────────
-
-    private function canReviewFinancingByDaf(User $user, Action $action): bool
-    {
-        if ($action->isResponsible($user)) {
-            return false;
-        }
-
-        if (! (bool) $action->financement_requis) {
-            return false;
-        }
-
-        return $this->isDafFinanceReviewer($user)
-            && in_array($action->financementStatus(), [Action::FINANCEMENT_A_TRAITER_DAF, Action::FINANCEMENT_REFUSE_DG], true);
-    }
-
-    private function canReviewFinancingByDg(User $user, Action $action): bool
-    {
-        if ($action->isResponsible($user)) {
-            return false;
-        }
-
-        if (! (bool) $action->financement_requis) {
-            return false;
-        }
-
-        return $user->hasRole(User::ROLE_DG)
-            && in_array($action->financementStatus(), [Action::FINANCEMENT_TRANSMIS_DG, Action::FINANCEMENT_VALIDE_DAF], true);
-    }
-
-    private function canMarkFinancingByDaf(User $user, Action $action): bool
-    {
-        if ($action->isResponsible($user)) {
-            return false;
-        }
-
-        if (! (bool) $action->financement_requis) {
-            return false;
-        }
-
-        return $this->isDafFinanceReviewer($user);
-    }
 
     private function isDafFinanceReviewer(User $user): bool
     {
@@ -784,10 +885,22 @@ class ActionTrackingWebController extends Controller
      */
     private function isExecutionEditable(Action $action): bool
     {
-        return in_array((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE), [
+        $validationIsEditable = in_array((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE), [
             ActionTrackingService::VALIDATION_NON_SOUMISE,
             ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
             ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+        ], true);
+        $lifecycleStatus = (string) ($action->statut_dynamique ?: $action->statut ?: '');
+
+        return $validationIsEditable && ! in_array($lifecycleStatus, [
+            ActionTrackingService::STATUS_SUSPENDU,
+            ActionTrackingService::STATUS_ANNULE,
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_CLOTUREE,
+            'cloture',
+            'archive',
         ], true);
     }
 
@@ -808,7 +921,10 @@ class ActionTrackingWebController extends Controller
         if ((string) ($action->statut_parametrage ?? '') === 'a_parametrer') {
             return false;
         }
-        if (in_array((string) $sousAction->validation_status, [SousAction::VALIDATION_VALIDEE], true)) {
+        if (! in_array((string) $sousAction->validation_status, [
+            SousAction::VALIDATION_NON_SOUMISE,
+            SousAction::VALIDATION_REJETEE,
+        ], true) || ! $this->isExecutionEditable($action)) {
             return false;
         }
 
@@ -833,51 +949,15 @@ class ActionTrackingWebController extends Controller
             );
     }
 
+    private function canReviewByController(User $user): bool
+    {
+        return app(PlanningModificationLockService::class)->canGivePlanifAvis($user)
+            || $user->isSuperAdmin()
+            || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
+    }
+
     private function workflowSettings(): WorkflowSettings
     {
         return app(WorkflowSettings::class);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function financeDafValidationRules(Request $request): array
-    {
-        $commentRules = ['nullable', 'string'];
-        if (in_array((string) $request->input('decision_financement'), [
-            ActionTrackingService::FINANCEMENT_DECISION_REJETER,
-            ActionTrackingService::FINANCEMENT_DECISION_COMPLEMENT,
-        ], true)) {
-            array_unshift($commentRules, 'required');
-        }
-
-        return [
-            'decision_financement' => ['required', Rule::in([
-                ActionTrackingService::FINANCEMENT_DECISION_VALIDER,
-                ActionTrackingService::FINANCEMENT_DECISION_COMPLEMENT,
-                ActionTrackingService::FINANCEMENT_DECISION_REJETER,
-            ])],
-            'montant_valide' => ['required_if:decision_financement,'.ActionTrackingService::FINANCEMENT_DECISION_VALIDER, 'nullable', 'integer', 'min:0'],
-            'reference_financement' => ['nullable', 'string', 'max:255'],
-            'commentaire_financement' => $commentRules,
-            'justificatif_financement_daf' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function financeDgValidationRules(Request $request): array
-    {
-        $commentRules = ['nullable', 'string'];
-        if ((string) $request->input('decision_financement') === ActionTrackingService::FINANCEMENT_DECISION_REFUSER) {
-            array_unshift($commentRules, 'required');
-        }
-
-        return [
-            'decision_financement' => ['required', Rule::in([ActionTrackingService::FINANCEMENT_DECISION_ACCORDER, ActionTrackingService::FINANCEMENT_DECISION_REFUSER])],
-            'commentaire_financement' => $commentRules,
-            'justificatif_financement_dg' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
-        ];
     }
 }

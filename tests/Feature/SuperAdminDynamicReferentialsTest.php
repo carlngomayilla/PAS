@@ -9,8 +9,8 @@ use Tests\TestCase;
 
 class SuperAdminDynamicReferentialsTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -43,6 +43,7 @@ class SuperAdminDynamicReferentialsTest extends TestCase
                 'alert_level_label_warning' => 'Vigilance',
                 'alert_level_label_critical' => 'Critique',
                 'alert_level_label_urgence' => 'Urgence',
+                'alert_level_label_conforme' => 'Conforme',
                 'alert_level_label_info' => 'Information',
                 'validation_status_label_non_soumise' => 'Brouillon',
                 'validation_status_label_soumise_chef' => 'Soumise service',
@@ -71,6 +72,7 @@ class SuperAdminDynamicReferentialsTest extends TestCase
         $this->assertSame(['%', 'points', 'jours'], $settings->kpiUnitSuggestions());
         $this->assertSame('Piece finale', $settings->justificatifCategoryLabels()['final']);
         $this->assertSame('Vigilance', $settings->alertLevelLabels()['warning']);
+        $this->assertSame('Conforme', $settings->alertLevelLabels()['conforme']);
         $this->assertSame('Officielle', $settings->validationStatusLabels()['validee_direction']);
 
         $this->actingAs($admin)

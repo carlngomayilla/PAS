@@ -6,6 +6,7 @@
     @php
         $readingLevelLabels = ['interne' => 'Interne', 'provisoire' => 'Travail', 'valide' => 'Valide', 'officiel' => 'Consolide'];
         $readingLevelLabel = static fn (?string $value): string => $value ? ($readingLevelLabels[$value] ?? $value) : 'Non borne';
+        $isPublished = $template->isPublished();
     @endphp
 
     <section class="showcase-panel mb-4">
@@ -38,7 +39,7 @@
     </section>
 
     <section class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))] mb-3.5">
-        <article class="ui-card !mb-0"><h2 class="text-base">Métadonnées</h2><p class="mt-2 text-sm text-slate-600">Code : <code>{{ $template->code }}</code></p><p class="mt-1 text-sm text-slate-600">Type de rapport : <strong>{{ $template->report_type }}</strong></p><p class="mt-1 text-sm text-slate-600">Profil cible : <strong>{{ $template->target_profile ?: 'Tous profils' }}</strong></p><p class="mt-1 text-sm text-slate-600">Titre document : <strong>{{ $template->documentTitle() }}</strong></p><p class="mt-1 text-sm text-slate-600">Préfixe fichier : <strong>{{ $template->filenamePrefix() }}</strong></p></article>
+        <article class="ui-card !mb-0"><h2 class="text-base">Métadonnées</h2><p class="mt-2 text-sm text-slate-600">Code : <code>{{ $template->code }}</code></p><p class="mt-1 text-sm text-slate-600">Type de rapport : <strong>{{ $template->report_type }}</strong></p><p class="mt-1 text-sm text-slate-600">Profil destinataire : <strong>{{ $template->target_profile ?: 'Tous profils' }}</strong></p><p class="mt-1 text-sm text-slate-600">Titre document : <strong>{{ $template->documentTitle() }}</strong></p><p class="mt-1 text-sm text-slate-600">Préfixe fichier : <strong>{{ $template->filenamePrefix() }}</strong></p></article>
         <article class="ui-card !mb-0"><h2 class="text-base">Mise en page</h2><p class="mt-2 text-sm text-slate-600">Papier : <strong>{{ $template->paperSize() }}</strong></p><p class="mt-1 text-sm text-slate-600">Orientation : <strong>{{ $template->orientation() }}</strong></p><p class="mt-1 text-sm text-slate-600">Filigrane : <strong>{{ $template->layout_config['watermark_text'] ?? 'Aucun' }}</strong></p><p class="mt-1 text-sm text-slate-600">Police : <strong>{{ $template->style_config['font_family'] ?? 'Inter' }}</strong></p></article>
         <article class="ui-card !mb-0"><h2 class="text-base">Cycle de vie</h2><p class="mt-2 text-sm text-slate-600">Créé par : <strong>{{ $template->creator?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Mis à jour par : <strong>{{ $template->updater?->name ?? 'Système' }}</strong></p><p class="mt-1 text-sm text-slate-600">Publié le : <strong>{{ $template->published_at?->format('Y-m-d H:i') ?? 'Non publié' }}</strong></p></article>
     </section>
@@ -50,11 +51,11 @@
                 <article class="ui-card !mb-0"><p class="text-sm text-slate-500">{{ $block }}</p><p class="mt-2 text-lg font-semibold">{{ $enabled ? 'Active' : 'Inactive' }}</p></article>
             @endforeach
         </div>
-        <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div class="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
             <p class="text-sm font-semibold text-slate-700">Variables dynamiques</p>
             <div class="mt-2 flex flex-wrap gap-2">@forelse (($template->content_config['dynamic_variables'] ?? []) as $variable)<code>{{ $variable }}</code>@empty<span class="text-sm text-slate-500">Aucune variable déclarée.</span>@endforelse</div>
         </div>
-        <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div class="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
             <p class="text-sm font-semibold text-slate-700">Options avancées</p>
             <div class="mt-2 grid gap-2 md:grid-cols-2 text-sm text-slate-600">
                 <div>Excel freeze header : <strong>{{ ($template->layout_config['excel_freeze_header'] ?? true) ? 'Oui' : 'Non' }}</strong></div>
@@ -73,16 +74,25 @@
         <article class="ui-card !mb-0">
             <div class="flex items-center justify-between gap-3"><h2>Affectations</h2><span class="text-sm text-slate-500">{{ $template->assignments->count() }} affectation(s)</span></div>
             <div class="app-table-wrapper overflow-x-auto mt-4">
-                <table class="app-table data-table">
+                <table class="app-table data-table mobile-card-table">
                     <thead><tr><th>Profil</th><th>Niveau</th><th>Périmètre</th><th>État</th><th>Action</th></tr></thead>
                     <tbody>
                         @forelse ($template->assignments as $assignment)
                             <tr>
-                                <td>{{ $assignment->target_profile ?: 'Tous profils' }}</td>
-                                <td>{{ $readingLevelLabel($assignment->reading_level) }}</td>
-                                <td>{{ $assignment->service?->code ?: ($assignment->direction?->code ?: 'Global') }}</td>
-                                <td>{{ $assignment->is_active ? 'Active' : 'Inactive' }}</td>
-                                <td><form method="POST" action="{{ route('workspace.super-admin.templates.assignments.toggle', $assignment) }}">@csrf<button class="btn btn-secondary !px-3 !py-1.5" type="submit">Basculer</button></form></td>
+                                <td data-label="Profil">{{ $assignment->target_profile ?: 'Tous profils' }}</td>
+                                <td data-label="Niveau">{{ $readingLevelLabel($assignment->reading_level) }}</td>
+                                <td data-label="Périmètre">{{ $assignment->service?->code ?: ($assignment->direction?->code ?: 'Global') }}</td>
+                                <td data-label="État">
+                                    <span class="anbg-badge {{ $assignment->is_active ? 'anbg-badge-success' : 'anbg-badge-neutral' }}">{{ $assignment->is_active ? 'Active' : 'Inactive' }}</span>
+                                    @if ($assignment->is_default)<span class="anbg-badge anbg-badge-info">Défaut</span>@endif
+                                </td>
+                                <td data-label="Action">
+                                    @if ($isPublished || $assignment->is_active)
+                                        <form method="POST" action="{{ route('workspace.super-admin.templates.assignments.toggle', $assignment) }}">@csrf<button class="btn btn-secondary !px-3 !py-1.5" type="submit">{{ $assignment->is_active ? 'Désactiver' : 'Activer' }}</button></form>
+                                    @else
+                                        <span class="text-xs text-slate-500">Publication requise</span>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>
@@ -104,16 +114,23 @@
 
         <article class="ui-card !mb-0">
             <h2>Ajouter une affectation</h2>
+            <div class="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+                <p class="font-semibold text-slate-900 dark:text-white">{{ $template->module }} · {{ $template->report_type }} · {{ strtoupper($template->format) }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">L’identité technique est héritée du template et ne peut pas être modifiée ici.</p>
+            </div>
             <form method="POST" action="{{ route('workspace.super-admin.templates.assignments.store', $template) }}" class="mt-4 form-grid">
                 @csrf
-                <div><label for="assign_module">Module</label><select id="assign_module" name="module">@foreach ($moduleOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['module'] === $option)>{{ $option }}</option>@endforeach</select></div>
-                <div><label for="assign_report_type">Type de rapport</label><input id="assign_report_type" name="report_type" type="text" value="{{ $assignmentDefaults['report_type'] }}"></div>
-                <div><label for="assign_format">Format</label><input id="assign_format" name="format" type="text" value="{{ $assignmentDefaults['format'] }}"></div>
+                <input name="module" type="hidden" value="{{ $assignmentDefaults['module'] }}">
+                <input name="report_type" type="hidden" value="{{ $assignmentDefaults['report_type'] }}">
+                <input name="format" type="hidden" value="{{ $assignmentDefaults['format'] }}">
                 <div><label for="assign_target_profile">Profil</label><select id="assign_target_profile" name="target_profile"><option value="">Tous profils</option>@foreach ($profileOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['target_profile'] === $option)>{{ $option }}</option>@endforeach</select></div>
                 <div><label for="assign_reading_level">Niveau</label><select id="assign_reading_level" name="reading_level"><option value="">Non borne</option>@foreach ($readingLevelOptions as $option)<option value="{{ $option }}" @selected($assignmentDefaults['reading_level'] === $option)>{{ $readingLevelLabels[$option] ?? $option }}</option>@endforeach</select></div>
                 <div><label for="assign_direction_id">Direction</label><select id="assign_direction_id" name="direction_id"><option value="">Globale</option>@foreach ($directionOptions as $direction)<option value="{{ $direction->id }}">{{ $direction->code }} - {{ $direction->libelle }}</option>@endforeach</select></div>
                 <div><label for="assign_service_id">Service</label><select id="assign_service_id" name="service_id"><option value="">Aucun</option>@foreach ($serviceOptions as $service)<option value="{{ $service->id }}">{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>@endforeach</select></div>
-                <div class="flex items-end gap-3"><label class="checkbox-pill !mb-0"><input name="is_default" type="checkbox" value="1">Défaut</label><label class="checkbox-pill !mb-0"><input name="is_active" type="checkbox" value="1" checked>Active</label></div>
+                <div class="flex items-end gap-3">
+                    <label class="checkbox-pill !mb-0"><input name="is_default" type="checkbox" value="1" @disabled(! $isPublished)>Défaut</label>
+                    <label class="checkbox-pill !mb-0"><input name="is_active" type="checkbox" value="1" @checked($isPublished) @disabled(! $isPublished)>Active</label>
+                </div>
                 <div class="flex items-end"><button class="btn btn-primary" type="submit">Ajouter</button></div>
             </form>
         </article>

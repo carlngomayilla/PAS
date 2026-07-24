@@ -8,78 +8,54 @@ use App\Models\User;
 
 class ExportTemplateResolver
 {
-    public function __construct(
-        private readonly \App\Services\RoleRegistryService $roleRegistry
-    ) {
-    }
-
     public function resolve(User $user, string $module, string $reportType, string $format, ?string $readingLevel = null): ?ExportTemplate
     {
         $effectiveRole = $user->effectiveRoleCode();
+        $readingLevelScore = $readingLevel !== null
+            ? 'CASE WHEN reading_level IS NOT NULL THEN 10 ELSE 0 END'
+            : '0';
 
-        $assignments = ExportTemplateAssignment::query()
+        $assignment = ExportTemplateAssignment::query()
             ->with('template')
             ->where('module', $module)
             ->where('report_type', $reportType)
             ->where('format', $format)
             ->where('is_active', true)
-            ->orderByDesc('is_default')
-            ->orderByDesc('id')
-            ->get()
-            ->filter(function (ExportTemplateAssignment $assignment) use ($user, $readingLevel, $effectiveRole): bool {
-                $template = $assignment->template;
-                if (! $template instanceof ExportTemplate || ! $template->isPublished()) {
-                    return false;
-                }
-
-                if ($assignment->target_profile !== null && $assignment->target_profile !== $effectiveRole) {
-                    return false;
-                }
-
-                if ($readingLevel !== null && $assignment->reading_level !== null && $assignment->reading_level !== $readingLevel) {
-                    return false;
-                }
-
-                if ($assignment->direction_id !== null && (int) $assignment->direction_id !== (int) $user->direction_id) {
-                    return false;
-                }
-
-                if ($assignment->service_id !== null && (int) $assignment->service_id !== (int) $user->service_id) {
-                    return false;
-                }
-
-                return true;
+            ->whereHas('template', function ($query): void {
+                $query
+                    ->where('status', ExportTemplate::STATUS_PUBLISHED)
+                    ->where('is_active', true);
             })
-            ->sortByDesc(fn (ExportTemplateAssignment $assignment): int => $this->score($assignment, $user, $readingLevel, $effectiveRole))
-            ->values();
+            ->where(function ($query) use ($effectiveRole): void {
+                $query->whereNull('target_profile')->orWhere('target_profile', $effectiveRole);
+            })
+            ->when($readingLevel !== null, function ($query) use ($readingLevel): void {
+                $query->where(function ($scope) use ($readingLevel): void {
+                    $scope->whereNull('reading_level')->orWhere('reading_level', $readingLevel);
+                });
+            })
+            ->where(function ($query) use ($user): void {
+                $query->whereNull('direction_id');
+                if ($user->direction_id !== null) {
+                    $query->orWhere('direction_id', $user->direction_id);
+                }
+            })
+            ->where(function ($query) use ($user): void {
+                $query->whereNull('service_id');
+                if ($user->service_id !== null) {
+                    $query->orWhere('service_id', $user->service_id);
+                }
+            })
+            ->orderByRaw(
+                '(CASE WHEN service_id IS NOT NULL THEN 40 ELSE 0 END
+                + CASE WHEN direction_id IS NOT NULL THEN 30 ELSE 0 END
+                + CASE WHEN target_profile IS NOT NULL THEN 20 ELSE 0 END
+                + '.$readingLevelScore.'
+                + CASE WHEN is_default = true THEN 5 ELSE 0 END) DESC'
+            )
+            ->orderByDesc('id')
+            ->first();
 
-        return $assignments->first()?->template;
-    }
-
-    private function score(ExportTemplateAssignment $assignment, User $user, ?string $readingLevel, string $effectiveRole): int
-    {
-        $score = 0;
-
-        if ($assignment->service_id !== null && (int) $assignment->service_id === (int) $user->service_id) {
-            $score += 40;
-        }
-
-        if ($assignment->direction_id !== null && (int) $assignment->direction_id === (int) $user->direction_id) {
-            $score += 30;
-        }
-
-        if ($assignment->target_profile !== null && $assignment->target_profile === $effectiveRole) {
-            $score += 20;
-        }
-
-        if ($readingLevel !== null && $assignment->reading_level !== null && $assignment->reading_level === $readingLevel) {
-            $score += 10;
-        }
-
-        if ($assignment->is_default) {
-            $score += 5;
-        }
-
-        return ($score * 100000) + (int) $assignment->id;
+        return $assignment?->template;
     }
 }

@@ -105,6 +105,8 @@ return [
         ),
     ],
 
+    'web_execution_time_limit' => (int) env('WEB_EXECUTION_TIME_LIMIT', 120),
+
     /*
     |--------------------------------------------------------------------------
     | Maintenance Mode Driver

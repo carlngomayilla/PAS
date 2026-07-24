@@ -10,7 +10,7 @@ use Illuminate\Support\Collection;
 class ActionSummaryService
 {
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, float|int>
      */
     public function summarize(Collection $actions): array
@@ -31,7 +31,7 @@ class ActionSummaryService
             'actions_total' => $total,
             'actions_validees' => $actions
                 ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
-                    ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                    ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                     ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
                 ], true))
                 ->count(),

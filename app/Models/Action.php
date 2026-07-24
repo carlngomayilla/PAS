@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\TypeIndicateur;
 use App\Services\ActionPerformanceService;
 use App\Support\SchemaIntrospectionCache;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -123,6 +125,7 @@ class Action extends Model
         'mode_evaluation',
         // Workflow V2 (cf. docs/WORKFLOW-SUIVI-V2.md)
         'type_action',
+        'type_indicateur',
         'requires_comment',
         'allows_difficulty',
         'official_progress_percent',
@@ -130,8 +133,10 @@ class Action extends Model
         'description',
         'type_cible',
         'intitule_cible',
+        'cible',
         'priorite',
         'unite_cible',
+        'quantite_a_realiser',
         'quantite_cible',
         'seuil_minimum',
         'seuil_mode',
@@ -150,6 +155,8 @@ class Action extends Model
         'date_debut',
         'date_fin',
         'date_echeance',
+        'statut_echeance',
+        'statut_retard',
         'responsable_id',
         'contexte_action',
         'origine_action',
@@ -190,9 +197,11 @@ class Action extends Model
             'date_debut' => 'date',
             'mode_evaluation' => 'string',
             'type_action' => 'string',
+            'type_indicateur' => 'string',
             'requires_comment' => 'boolean',
             'allows_difficulty' => 'boolean',
             'official_progress_percent' => 'decimal:2',
+            'chef_progress_percent' => 'decimal:2',
             'exercice_id' => 'integer',
             'ordre_import' => 'integer',
             'nombre_sous_actions_prevu' => 'integer',
@@ -200,7 +209,10 @@ class Action extends Model
             'date_fin_reelle' => 'date',
             'date_echeance' => 'date',
             'echeance_cible' => 'date',
+            'statut_echeance' => 'string',
+            'statut_retard' => 'string',
             'quantite_cible' => 'decimal:4',
+            'quantite_a_realiser' => 'decimal:4',
             'quantite_realisee' => 'decimal:4',
             'seuil_minimum' => 'decimal:2',
             'seuil_t1' => 'decimal:2',
@@ -229,6 +241,7 @@ class Action extends Model
             'validation_sans_correction' => 'boolean',
             'soumise_le' => 'datetime',
             'evalue_le' => 'datetime',
+            'controle_reviewed_at' => 'datetime',
             // Casts evaluation_note / taux_valide_chef retires : colonnes supprimees
             // par la migration 2026_05_28_120000_drop_chef_quality_note_and_conformite_kpi
             // (spec v2 : la note du chef et le KPI conformite sortent du modele metier).
@@ -347,6 +360,9 @@ class Action extends Model
                 'action_soumise_validation',
                 'action_validee_chef',
                 'action_rejetee_chef',
+                'action_transmise_controle',
+                'action_validee_controle',
+                'action_rejetee_controle',
                 'action_validee_direction',
                 'action_rejetee_direction',
             ]);
@@ -501,6 +517,11 @@ class Action extends Model
         return $this->belongsTo(User::class, 'evalue_par');
     }
 
+    public function controleReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'controle_reviewed_by');
+    }
+
     // Relation directionValidePar retiree : colonne direction_valide_par
     // supprimee par la migration de purge de la validation direction.
 
@@ -624,16 +645,28 @@ class Action extends Model
     public static function evaluationModeOptions(): array
     {
         return [
-            self::MODE_QUANTITATIF => 'Cible quantitative',
-            self::MODE_MIXTE => 'Cible quantitative et livrable',
+            self::MODE_QUANTITATIF => 'Quantite a realiser',
+            self::MODE_MIXTE => 'Quantite a realiser et livrable',
             self::MODE_SANS_QUANTITE => 'Sans quantité',
-            self::MODE_SOUS_ACTIONS => 'Cible par sous-action',
+            self::MODE_SOUS_ACTIONS => 'Par sous-action',
         ];
     }
 
     // ── WORKFLOW V2 — résolution du type_action pivot ────────────────────────
     // (cf. docs/WORKFLOW-SUIVI-V2.md). type_action ∈ {quantitative,
     // non_quantitative, composee}. Fallback dérivé de l'ancien modèle si null.
+
+    /**
+     * @return array<string, string>
+     */
+    public static function typeIndicateurOptions(): array
+    {
+        return collect(TypeIndicateur::cases())
+            ->mapWithKeys(fn (TypeIndicateur $typeIndicateur): array => [
+                $typeIndicateur->value => $typeIndicateur->label(),
+            ])
+            ->all();
+    }
 
     /**
      * @return array<string, string>
@@ -653,6 +686,15 @@ class Action extends Model
         $type = trim((string) ($this->type_action ?? ''));
         if (array_key_exists($type, self::typeActionOptions())) {
             return $type;
+        }
+
+        $typeIndicateur = trim((string) ($this->attributes['type_indicateur'] ?? ''));
+        if ($typeIndicateur !== '') {
+            return match (TypeIndicateur::fromLegacy($typeIndicateur)) {
+                TypeIndicateur::Quantitatif => self::TYPE_QUANTITATIVE,
+                TypeIndicateur::Mixte => self::TYPE_MIXTE,
+                TypeIndicateur::NonQuantitatif => self::TYPE_NON_QUANTITATIVE,
+            };
         }
 
         $mode = trim((string) ($this->mode_evaluation ?? ''));
@@ -677,19 +719,51 @@ class Action extends Model
         return self::TYPE_NON_QUANTITATIVE;
     }
 
+    public function resolvedTypeIndicateur(): TypeIndicateur
+    {
+        $typeIndicateur = trim((string) ($this->attributes['type_indicateur'] ?? ''));
+        if ($typeIndicateur !== '') {
+            return TypeIndicateur::fromLegacy($typeIndicateur);
+        }
+
+        $typeAction = trim((string) ($this->type_action ?? ''));
+        if ($typeAction === self::TYPE_COMPOSEE) {
+            $subActions = $this->relationLoaded('sousActions')
+                ? $this->sousActions
+                : ($this->exists ? $this->sousActions()->get(['id', 'action_id', 'sub_action_type', 'cible_prevue', 'resultat_attendu', 'description']) : collect());
+
+            $tracksQuantity = $subActions->contains(fn (SousAction $sousAction): bool => $sousAction->tracksQuantitativeTarget());
+            $tracksDeliverable = $subActions->contains(fn (SousAction $sousAction): bool => $sousAction->tracksDeliverableTarget());
+
+            return match (true) {
+                $tracksQuantity && $tracksDeliverable => TypeIndicateur::Mixte,
+                $tracksQuantity => TypeIndicateur::Quantitatif,
+                $tracksDeliverable => TypeIndicateur::NonQuantitatif,
+                default => TypeIndicateur::Mixte,
+            };
+        }
+
+        return TypeIndicateur::fromLegacy($typeAction ?: (string) ($this->mode_evaluation ?: $this->type_cible));
+    }
+
     public function typeActionLabel(): string
     {
         return self::typeActionOptions()[$this->resolvedTypeAction()] ?? 'Action composée (sous-actions)';
     }
 
+    public function getTypeIndicateurLabelAttribute(): string
+    {
+        return $this->resolvedTypeIndicateur()->label();
+    }
+
     public function isQuantitative(): bool
     {
-        return $this->resolvedTypeAction() === self::TYPE_QUANTITATIVE;
+        return $this->resolvedTypeIndicateur() === TypeIndicateur::Quantitatif;
     }
 
     public function isNonQuantitative(): bool
     {
-        return $this->resolvedTypeAction() === self::TYPE_NON_QUANTITATIVE;
+        return $this->resolvedTypeIndicateur() === TypeIndicateur::NonQuantitatif;
     }
 
     public function isComposee(): bool
@@ -699,20 +773,19 @@ class Action extends Model
 
     public function isMixedTarget(): bool
     {
-        return $this->resolvedTypeAction() === self::TYPE_MIXTE
-            || $this->resolvedEvaluationMode() === self::MODE_MIXTE;
+        return $this->resolvedTypeIndicateur() === TypeIndicateur::Mixte;
     }
 
     public function tracksQuantitativeTarget(): bool
     {
-        return in_array($this->resolvedTypeAction(), [self::TYPE_QUANTITATIVE, self::TYPE_MIXTE], true)
+        return $this->resolvedTypeIndicateur()->tracksQuantity()
             || in_array($this->resolvedEvaluationMode(), [self::MODE_QUANTITATIF, self::MODE_MIXTE], true)
             || in_array(trim((string) ($this->type_cible ?? '')), ['quantitative', 'quantitatif', 'mixte'], true);
     }
 
     public function tracksDeliverableTarget(): bool
     {
-        return in_array($this->resolvedTypeAction(), [self::TYPE_NON_QUANTITATIVE, self::TYPE_MIXTE], true)
+        return $this->resolvedTypeIndicateur()->tracksDeliverable()
             || in_array($this->resolvedEvaluationMode(), [self::MODE_SANS_QUANTITE, self::MODE_MIXTE], true)
             || in_array(trim((string) ($this->type_cible ?? '')), ['qualitative', 'qualitatif', 'mixte'], true);
     }
@@ -801,12 +874,55 @@ class Action extends Model
     public function usesNoQuantityProgress(): bool
     {
         return $this->resolvedEvaluationMode() === self::MODE_SANS_QUANTITE
-            || $this->resolvedTypeAction() === self::TYPE_NON_QUANTITATIVE;
+            || $this->resolvedTypeIndicateur() === TypeIndicateur::NonQuantitatif;
     }
 
     public function getModeEvaluationLabelAttribute(): string
     {
         return self::evaluationModeOptions()[$this->resolvedEvaluationMode()] ?? 'Par sous-actions';
+    }
+
+    /**
+     * @return Attribute<string, string>
+     */
+    protected function typeIndicateur(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value): string => $value !== null && $value !== ''
+                ? TypeIndicateur::fromLegacy($value)->value
+                : $this->resolvedTypeIndicateur()->value,
+            set: fn (?string $value): array => [
+                'type_indicateur' => TypeIndicateur::fromLegacy($value)->value,
+            ],
+        );
+    }
+
+    /**
+     * @return Attribute<?string, ?string>
+     */
+    protected function cible(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value): ?string => $value ?: $this->firstFilledText([
+                $this->intitule_cible ?? null,
+                $this->resultat_attendu ?? null,
+                $this->livrable_attendu ?? null,
+            ]),
+            set: fn (?string $value): array => ['cible' => $value],
+        );
+    }
+
+    /**
+     * @return Attribute<?float, ?float>
+     */
+    protected function quantiteARealiser(): Attribute
+    {
+        return Attribute::make(
+            get: fn (mixed $value): ?float => $value !== null
+                ? (float) $value
+                : ($this->quantite_cible !== null ? (float) $this->quantite_cible : null),
+            set: fn (mixed $value): array => ['quantite_a_realiser' => $value],
+        );
     }
 
     /**
@@ -816,15 +932,15 @@ class Action extends Model
     {
         return [
             self::FINANCEMENT_NON_REQUIS => 'Non requis',
-            self::FINANCEMENT_PRE_SIGNALE_DAF => 'Pre-signale DAF',
-            self::FINANCEMENT_EN_ATTENTE_VALIDATION_CHEF => 'En attente validation chef',
+            self::FINANCEMENT_PRE_SIGNALE_DAF => 'A soumettre par le RMO',
+            self::FINANCEMENT_EN_ATTENTE_VALIDATION_CHEF => 'Historique - attente chef',
             self::FINANCEMENT_SOUMIS_DAF => 'Soumis DAF',
-            self::FINANCEMENT_COMPLEMENT_DEMANDE => 'Complement demande',
-            self::FINANCEMENT_VALIDE_DAF => 'Valide DAF',
-            self::FINANCEMENT_REJETE_DAF => 'Rejete DAF',
-            self::FINANCEMENT_TRANSMIS_DG => 'Transmis DG',
-            self::FINANCEMENT_VALIDE_DG => 'Valide DG',
-            self::FINANCEMENT_REJETE_DG => 'Rejete DG',
+            self::FINANCEMENT_COMPLEMENT_DEMANDE => 'Complement DAF attendu',
+            self::FINANCEMENT_VALIDE_DAF => 'Avis favorable DAF',
+            self::FINANCEMENT_REJETE_DAF => 'Rejete par la DAF',
+            self::FINANCEMENT_TRANSMIS_DG => 'Decision DG attendue',
+            self::FINANCEMENT_VALIDE_DG => 'Accorde par la DG',
+            self::FINANCEMENT_REJETE_DG => 'Refuse par la DG',
         ];
     }
 
@@ -971,7 +1087,7 @@ class Action extends Model
 
     public function getFinancementStatusLabelAttribute(): string
     {
-        return self::financingStatusOptions()[$this->financementStatus()] ?? 'Pre-signale DAF';
+        return self::financingStatusOptions()[$this->financementStatus()] ?? 'A soumettre par le RMO';
     }
 
     public function isFundingRequested(): bool
@@ -1005,6 +1121,21 @@ class Action extends Model
         }
 
         return $this->responsables()->whereKey((int) $user->id)->exists();
+    }
+
+    /**
+     * @param  list<mixed>  $values
+     */
+    private function firstFilledText(array $values): ?string
+    {
+        foreach ($values as $value) {
+            $value = trim((string) ($value ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     public function getStatusLabelAttribute(): string

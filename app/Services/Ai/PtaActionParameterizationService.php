@@ -214,11 +214,11 @@ class PtaActionParameterizationService
         }
 
         if ($unit === null) {
-            $warnings[] = 'Unite cible a confirmer pour l action quantitative.';
+            $warnings[] = 'Unite a confirmer pour l action quantitative.';
         }
 
         if ($quantity === null) {
-            $warnings[] = 'Quantite cible exacte a confirmer : elle n est pas deductible sans inventer une valeur.';
+            $warnings[] = 'Quantite a realiser exacte a confirmer : elle n est pas deductible sans inventer une valeur.';
         }
 
         return [$quantity, $unit, $warnings];

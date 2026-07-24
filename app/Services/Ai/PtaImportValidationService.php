@@ -137,7 +137,7 @@ class PtaImportValidationService
         }
 
         if ($this->blank($payload['cible'] ?? null)) {
-            $warnings[] = 'Cible recommandee.';
+            $warnings[] = 'Seuil recommande.';
         }
 
         $this->validateParameterization($payload, $errors, $warnings);
@@ -188,18 +188,18 @@ class PtaImportValidationService
     {
         $type = $this->typeCode($payload['type_action'] ?? null);
         if ($type === null) {
-            $warnings[] = 'Type action IA recommande avant import final.';
+            $warnings[] = 'Type d indicateur IA recommande avant import final.';
 
             return;
         }
 
         if ($type === 'Q') {
             if (! is_numeric($payload['quantite_cible'] ?? null) || (float) $payload['quantite_cible'] <= 0) {
-                $errors[] = 'Quantite cible numerique obligatoire lorsque type_action = Q.';
+                $errors[] = 'Quantite a realiser numerique obligatoire lorsque type_action = Q.';
             }
 
             if ($this->blank($payload['unite_cible'] ?? $payload['unite'] ?? null)) {
-                $errors[] = 'Unite cible obligatoire lorsque type_action = Q.';
+                $errors[] = 'Unite obligatoire lorsque type_action = Q.';
             }
         }
 
@@ -209,7 +209,7 @@ class PtaImportValidationService
 
         $mode = $this->key((string) ($payload['seuil_mode'] ?? ''));
         if ($mode !== '' && ! in_array($mode, ['unique', 'trimestriel'], true)) {
-            $errors[] = 'Seuil mode non autorise.';
+            $errors[] = 'Mode de seuil non autorise.';
         }
 
         if ($mode === 'trimestriel') {

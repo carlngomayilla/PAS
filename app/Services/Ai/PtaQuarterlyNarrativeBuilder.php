@@ -124,7 +124,7 @@ class PtaQuarterlyNarrativeBuilder
 
         return 'L evolution des taux de realisation met en evidence une dynamique differenciee selon les axes. '
             .'Les taux disponibles sont : '.($axisText !== '' ? $axisText : 'donnee non disponible').'. '
-            .$trend.' Les axes dont le taux reste faible doivent faire l objet d une revue ciblee avec les responsables concernes.';
+            .$trend.' Les axes dont le taux reste faible doivent faire l objet d une revue priorisee avec les responsables concernes.';
     }
 
     /**
@@ -226,7 +226,7 @@ class PtaQuarterlyNarrativeBuilder
         }
 
         if (count($this->gapRows($gaps, 'actions_partielles')) > 0) {
-            $items->push('Demander pour chaque action partiellement realisee une preuve d avancement, le reste a faire et une date cible actualisee.');
+            $items->push('Demander pour chaque action partiellement realisee une preuve d avancement, le reste a faire et une date attendue actualisee.');
         }
 
         return $items->unique()->values()->all();
@@ -252,7 +252,7 @@ class PtaQuarterlyNarrativeBuilder
         }
 
         if ($rate >= 50) {
-            return 'La trajectoire de cet axe reste perfectible et necessite un accompagnement cible des actions non cloturees.';
+            return 'La trajectoire de cet axe reste perfectible et necessite un accompagnement specifique des actions non cloturees.';
         }
 
         return 'La trajectoire de cet axe est critique pour la periode et doit etre priorisee dans les arbitrages de suivi.';

@@ -17,7 +17,7 @@ return [
         'pdf_parser_enabled' => (bool) env('AI_PTA_PDF_PARSER_ENABLED', true),
         'pdf_parser_max_bytes' => (int) env('AI_PTA_PDF_PARSER_MAX_BYTES', 5 * 1024 * 1024),
         'llm_enabled' => (bool) env('AI_PTA_LLM_ENABLED', true),
-        'llm_provider' => env('AI_PTA_LLM_PROVIDER'),
+        'llm_provider' => env('AI_PTA_LLM_PROVIDER', 'openai'),
         'llm_model' => env('AI_PTA_LLM_MODEL'),
         'llm_text_model' => env('AI_PTA_TEXT_MODEL'),
         'llm_vision_model' => env('AI_PTA_VISION_MODEL'),

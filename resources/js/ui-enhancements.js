@@ -329,49 +329,6 @@ import { gsap } from 'gsap';
         });
     }
 
-    function initSidebarCollapse() {
-        var sidebar = document.getElementById('admin-sidebar');
-        var toggles = document.querySelectorAll('[data-sidebar-collapse-toggle]');
-        if (!sidebar || toggles.length === 0) return;
-
-        var storageKey = 'anbg:sidebar:collapsed';
-
-        function isCollapsed() {
-            return document.body.classList.contains('sidebar-collapsed');
-        }
-
-        function setCollapsed(collapsed) {
-            document.body.classList.toggle('sidebar-collapsed', collapsed);
-            toggles.forEach(function (toggle) {
-                toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-                toggle.setAttribute('title', collapsed ? 'Agrandir le menu' : 'Reduire le menu');
-            });
-
-            try {
-                window.localStorage.setItem(storageKey, collapsed ? '1' : '0');
-            } catch (error) {
-                // Preference persistence is a progressive enhancement.
-            }
-        }
-
-        if (!sidebar.dataset.collapseBound) {
-            sidebar.dataset.collapseBound = '1';
-            try {
-                setCollapsed(window.localStorage.getItem(storageKey) === '1');
-            } catch (error) {
-                setCollapsed(false);
-            }
-        }
-
-        toggles.forEach(function (toggle) {
-            if (toggle.dataset.bound) return;
-            toggle.dataset.bound = '1';
-            toggle.addEventListener('click', function () {
-                setCollapsed(!isCollapsed());
-            });
-        });
-    }
-
     // ── CLIENT-SIDE FORM VALIDATION ──────────────────────────────────────
     // Runs inline validation as the user types/blurs — server validation remains authoritative
     var VALIDATION_RULES = {
@@ -566,41 +523,6 @@ import { gsap } from 'gsap';
             showToast({ tone: tone, message: text, duration: tone === 'success' ? 5000 : 8000 });
             // Hide original flash so both don't show
             flash.style.display = 'none';
-        });
-    }
-
-    // ── MOBILE SIDEBAR TOGGLE ─────────────────────────────────────────────
-    function initMobileSidebar() {
-        var sidebar = document.getElementById('admin-sidebar');
-        if (!sidebar) return;
-
-        // Create hamburger button if viewport is mobile
-        function checkMobile() {
-            return window.innerWidth < 640;
-        }
-
-        // Close sidebar when clicking overlay (body::before)
-        document.addEventListener('click', function (e) {
-            if (!checkMobile()) return;
-            if (!document.body.classList.contains('sidebar-mobile-open')) return;
-            if (sidebar.contains(e.target)) return;
-            document.body.classList.remove('sidebar-mobile-open');
-        });
-
-        // Close on Escape
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && document.body.classList.contains('sidebar-mobile-open')) {
-                document.body.classList.remove('sidebar-mobile-open');
-            }
-        });
-
-        // Wire existing sidebar collapse toggles to also open on mobile
-        document.querySelectorAll('[data-sidebar-collapse-toggle]').forEach(function (toggle) {
-            toggle.addEventListener('click', function () {
-                if (checkMobile()) {
-                    document.body.classList.toggle('sidebar-mobile-open');
-                }
-            });
         });
     }
 
@@ -959,8 +881,6 @@ import { gsap } from 'gsap';
 
     function init() {
         initDynamicDom();
-        initSidebarCollapse();
-        initMobileSidebar();
         initBrowserNotifications();
         initSpotlight();
         initKeyboardShortcuts();

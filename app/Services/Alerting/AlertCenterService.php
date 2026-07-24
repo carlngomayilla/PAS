@@ -11,11 +11,12 @@ use App\Models\KpiMesure;
 use App\Models\PasObjectif;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Services\DynamicReferentialSettings;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class AlertCenterService
 {
@@ -23,15 +24,11 @@ class AlertCenterService
 
     private const CACHE_TTL_SECONDS = 60;
 
-    // A40 — Une action importee qui reste "a_parametrer" au-dela de ce delai
-    // passe d'info a warning pour relancer le chef de service.
-    private const PENDING_SETUP_WARNING_DAYS = 7;
-
     public function __construct(
         private readonly AlertRoutingService $alertRoutingService,
-        private readonly DynamicReferentialSettings $dynamicReferentialSettings
-    ) {
-    }
+        private readonly DynamicReferentialSettings $dynamicReferentialSettings,
+        private readonly AlertRuleSettings $alertRuleSettings
+    ) {}
 
     /**
      * @return Collection<int, array<string, mixed>>
@@ -48,15 +45,28 @@ class AlertCenterService
     }
 
     /**
-     * @param array<int, string> $readFingerprints
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function allForUser(User $user): Collection
+    {
+        return Cache::remember(
+            $this->cacheKey('items-all', $user),
+            now()->addSeconds(self::CACHE_TTL_SECONDS),
+            fn (): Collection => $this->collectForUser($user, null)
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $readFingerprints
      * @return array{
      *     total: int,
      *     unread: int,
      *     urgence: int,
      *     critical: int,
      *     warning: int,
+     *     conforme: int,
      *     info: int,
-     *     level_unread_counts: array{urgence:int,critical:int,warning:int,info:int}
+     *     level_unread_counts: array{urgence:int,critical:int,warning:int,conforme:int,info:int}
      * }
      */
     public function summaryForUser(User $user, array $readFingerprints = []): array
@@ -69,7 +79,7 @@ class AlertCenterService
             ]),
             now()->addSeconds(self::CACHE_TTL_SECONDS),
             function () use ($user, $readFingerprints): array {
-                $items = $this->collectForUser($user, null);
+                $items = $this->allForUser($user);
 
                 return [
                     'total' => $items->count(),
@@ -79,11 +89,13 @@ class AlertCenterService
                     'urgence' => $items->where('niveau', 'urgence')->count(),
                     'critical' => $items->where('niveau', 'critical')->count(),
                     'warning' => $items->where('niveau', 'warning')->count(),
+                    'conforme' => $items->where('niveau', 'conforme')->count(),
                     'info' => $items->where('niveau', 'info')->count(),
                     'level_unread_counts' => [
                         'urgence' => $items->where('niveau', 'urgence')->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))->count(),
                         'critical' => $items->where('niveau', 'critical')->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))->count(),
                         'warning' => $items->where('niveau', 'warning')->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))->count(),
+                        'conforme' => $items->where('niveau', 'conforme')->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))->count(),
                         'info' => $items->where('niveau', 'info')->reject(fn (array $item): bool => in_array((string) ($item['fingerprint'] ?? ''), $readFingerprints, true))->count(),
                     ],
                 ];
@@ -112,7 +124,7 @@ class AlertCenterService
     }
 
     /**
-     * @param array<string, scalar|null> $context
+     * @param  array<string, scalar|null>  $context
      */
     private function cacheKey(string $segment, User $user, array $context = []): string
     {
@@ -124,7 +136,7 @@ class AlertCenterService
         // l etat des alertes. La cle legacy `alert-center:version` reste
         // additionnee pour retro-compatibilite avec d eventuels incrementations
         // manuelles existantes.
-        $alertsVersion = app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->alertsVersion();
+        $alertsVersion = app(AnalyticsCacheVersionService::class)->alertsVersion();
         $legacyVersion = (int) Cache::get('alert-center:version', 1);
 
         return 'alert-center:'.$segment.':'.sha1(json_encode([
@@ -615,7 +627,7 @@ class AlertCenterService
         $daysLate = max(0, $deadline->diffInDays(Carbon::today()));
         $progression = (float) ($action->progression_reelle ?? 0);
         $isNotStarted = $progression <= 0.0;
-        $level = $daysLate >= 7 || $isNotStarted ? 'critical' : 'warning';
+        $level = $daysLate >= $this->alertRuleSettings->overdueCriticalDays() || $isNotStarted ? 'critical' : 'warning';
         $type = $isNotStarted ? 'action_non_demarre' : 'retard';
         $title = $isNotStarted ? 'Action non démarrée après l\'échéance' : 'Action en retard';
         $message = $isNotStarted
@@ -656,7 +668,7 @@ class AlertCenterService
     {
         $createdAt = $action->created_at ? Carbon::parse($action->created_at) : Carbon::today();
         $daysWaiting = max(0, $createdAt->diffInDays(Carbon::today()));
-        $level = $daysWaiting >= self::PENDING_SETUP_WARNING_DAYS ? 'warning' : 'info';
+        $level = $daysWaiting >= $this->alertRuleSettings->pendingSetupWarningDays() ? 'warning' : 'info';
         $serviceId = (int) ($action->pta?->service_id ?? 0);
 
         return [
@@ -700,7 +712,7 @@ class AlertCenterService
         $action = $mesure->kpi?->action;
         $threshold = (float) ($mesure->kpi?->seuil_alerte ?? 0);
         $value = (float) $mesure->valeur;
-        $isCritical = $threshold > 0 && $value <= ($threshold * 0.8);
+        $isCritical = $threshold > 0 && $value <= ($threshold * $this->alertRuleSettings->kpiCriticalRatio());
         $level = $isCritical ? 'critical' : 'warning';
         $isGlobal = str_contains(mb_strtolower((string) ($mesure->kpi?->libelle ?? '')), 'global');
         $title = $isGlobal ? 'Performance trop faible' : 'Indicateur sous le seuil';
@@ -755,7 +767,7 @@ class AlertCenterService
                 $isManualAnomaly => '#action-controle',
                 default => '#action-logs',
             }
-            : route('workspace.notifications.index', ['tab' => 'alertes']);
+        : route('workspace.notifications.index', ['tab' => 'alertes']);
 
         return [
             'source_type' => 'action_log',
@@ -792,7 +804,7 @@ class AlertCenterService
     {
         $endDate = $delegation->date_fin?->copy() ?? now();
         $daysLeft = max(0, Carbon::today()->diffInDays($endDate, false));
-        $level = $daysLeft <= 1 ? 'warning' : 'info';
+        $level = $daysLeft <= $this->alertRuleSettings->delegationWarningDays() ? 'warning' : 'info';
         $permissions = $delegation->permissionsCollection()->implode(', ');
 
         return [

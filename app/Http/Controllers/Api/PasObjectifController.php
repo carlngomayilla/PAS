@@ -128,7 +128,7 @@ class PasObjectifController extends Controller
         $targetAxe = PasAxe::query()->with('pas:id,statut')->findOrFail((int) $validated['pas_axe_id']);
         if ($targetAxe->pas?->statut === 'archive') {
             return response()->json([
-                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'cible', 'Mise a jour'),
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'lie', 'Mise a jour'),
             ], 409);
         }
 
@@ -175,6 +175,7 @@ class PasObjectifController extends Controller
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             $query->whereHas('pasAxe', fn ($q) => $q->where('direction_id', (int) $user->direction_id));
+
             return;
         }
 
@@ -188,6 +189,7 @@ class PasObjectifController extends Controller
                     fn ($q) => $q->where('service_id', (int) $user->service_id)
                 );
             });
+
             return;
         }
 

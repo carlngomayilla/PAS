@@ -25,6 +25,9 @@ class PlanningWorkflowRulesService
         'realisee',
         'en_attente_validation',
         'validee_chef',
+        'soumise_controle',
+        'correction_controle',
+        'validee_controle',
         'en_attente_directeur',
         'validee_direction',
         'en_retard',
@@ -57,7 +60,7 @@ class PlanningWorkflowRulesService
     }
 
     /**
-     * @param iterable<int, mixed> $steps
+     * @param  iterable<int, mixed>  $steps
      */
     public function performanceFromSteps(iterable $steps): float
     {
@@ -105,7 +108,7 @@ class PlanningWorkflowRulesService
     }
 
     /**
-     * @param array<string, mixed> $signals
+     * @param  array<string, mixed>  $signals
      * @return array{level:string,color:string,score:float,recommendation:string}
      */
     public function riskProfile(array $signals): array
@@ -160,7 +163,7 @@ class PlanningWorkflowRulesService
     }
 
     /**
-     * @param array<string, int|float> $weights
+     * @param  array<string, int|float>  $weights
      */
     public function globalPerformance(
         float|int $performance,

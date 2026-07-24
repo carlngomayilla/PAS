@@ -318,7 +318,7 @@ class StorePtaRequest extends FormRequest
                     if ($quantiteCible === null || $quantiteCible === '' || (float) $quantiteCible <= 0) {
                         $validator->errors()->add(
                             "actions.{$index}.quantite_cible",
-                            'La cible mesurable attendue est obligatoire pour une action quantitative.'
+                            'La quantite a realiser est obligatoire pour une action quantitative.'
                         );
                     }
 

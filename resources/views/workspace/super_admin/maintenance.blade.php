@@ -29,11 +29,27 @@
     <section class="showcase-panel mb-4">
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
             @foreach ($actions as $action => $label)
+                @php($requiresPassword = in_array($action, ['maintenance_on', 'maintenance_off'], true))
                 <article class="ui-card !mb-0">
                     <p class="text-sm font-semibold text-slate-900">{{ $label }}</p>
                     <p class="mt-2 text-sm text-slate-600">Action journalisée automatiquement dans le module `Super Administration`.</p>
                     <form method="POST" action="{{ route('workspace.super-admin.maintenance.run', $action) }}" class="mt-4">
                         @csrf
+                        @if ($requiresPassword)
+                            <div class="mb-3">
+                                <label for="maintenance_password_{{ $action }}">Mot de passe actuel</label>
+                                <input
+                                    id="maintenance_password_{{ $action }}"
+                                    name="current_password"
+                                    type="password"
+                                    autocomplete="current-password"
+                                    required
+                                >
+                                @error('current_password')
+                                    <p class="field-error mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        @endif
                         <button
                             class="btn {{ str_contains($action, 'maintenance_') ? 'btn-warning' : 'btn-primary' }}"
                             type="submit"

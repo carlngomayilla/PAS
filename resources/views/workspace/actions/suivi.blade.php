@@ -21,13 +21,19 @@
         $alertLevelLabels = is_array($alertLevelLabels ?? null) ? $alertLevelLabels : [];
         $validationLabel = $validationStatusLabels[$validationStatus] ?? $validationStatusLabel($validationStatus);
         $currentUser = auth()->user();
+        $isSubActionOnlyDeadlineRequester = $currentUser instanceof \App\Models\User
+            && $currentUser->isAgent()
+            && ! $action->isResponsible($currentUser);
+        $deadlineRequestTargets = $isSubActionOnlyDeadlineRequester
+            ? $action->sousActions->filter(fn ($subAction): bool => (int) $subAction->agent_id === (int) $currentUser->id)
+            : $action->sousActions;
         $isExecutorAgent = $currentUser instanceof \App\Models\User
             && $currentUser->isAgent()
             && (
                 $action->isResponsible($currentUser)
                 || ($action->relationLoaded('sousActions') && $action->sousActions->contains(fn ($subAction): bool => (int) $subAction->agent_id === (int) $currentUser->id))
             );
-        $executorMetricsReleased = in_array($validationStatus, ['validee_chef', 'validee_direction'], true);
+        $executorMetricsReleased = in_array($validationStatus, ['validee_controle', 'validee_direction'], true);
         $hideExecutorMetrics = $isExecutorAgent && ! $executorMetricsReleased;
         $financingStatusOptions = \App\Models\Action::financingStatusOptions();
         $financingStatus = $action->financementStatus();
@@ -48,24 +54,38 @@
             'service_enabled' => true,
             'direction_enabled' => false,
             'submission_target' => 'service',
-            'chain_label' => 'Agent -> Chef de service',
-            'submission_help_text' => "L'action est revue par le chef de service. Le directeur est notifié et conserve la lecture du dossier.",
+            'chain_label' => 'Agent -> Chef de service -> Controleur',
+            'submission_help_text' => "L'action est visee par le chef puis controlee par SCIQ ou Planification.",
             'submission_button_label' => 'Soumettre',
-            'service_review_button_label' => 'Valider la clôture',
-            'service_review_success_text' => 'Action validée par le chef de service.',
-            'final_statistics_hint' => 'Oui après validation finale du chef de service.',
+            'service_review_button_label' => 'Viser et transmettre',
+            'service_review_success_text' => 'Visa chef enregistre.',
+            'final_statistics_hint' => 'Oui apres validation finale du controleur.',
             'rejection_comment_required' => true,
         ];
         $agentLocked = auth()->check()
             && (int) auth()->id() === (int) $action->responsable_id
-            && !in_array($validationStatus, ['non_soumise', 'correction_demandee', 'rejetee_chef', 'rejetee_direction'], true);
+            && !in_array($validationStatus, ['non_soumise', 'correction_demandee', 'rejetee_chef', 'correction_controle', 'rejetee_direction'], true);
         $isAwaitingChef = $workflow['service_enabled'] && $validationStatus === 'soumise_chef';
+        $isAwaitingControl = $validationStatus === 'soumise_controle';
         // L'etape « validation direction » a ete supprimee du circuit metier.
         // Les statuts `validee_direction` / `rejetee_direction` ne sont
         // conserves qu'en lecture historique (actions cloturees avant la
         // suppression). Voir routes/web.php pour les stubs 410.
         $ressources = $action->resourceLabels();
         $financingJustificatif = $action->justificatifs->firstWhere('categorie', 'financement');
+        $financingDafJustificatif = $action->justificatifs->firstWhere('categorie', 'financement_daf');
+        $financingDgJustificatif = $action->justificatifs->firstWhere('categorie', 'financement_dg');
+        $financingStage = match ($financingStatus) {
+            \App\Models\Action::FINANCEMENT_PRE_SIGNALE_DAF,
+            \App\Models\Action::FINANCEMENT_COMPLEMENT_DEMANDE,
+            \App\Models\Action::FINANCEMENT_REJETE_DAF => 1,
+            \App\Models\Action::FINANCEMENT_SOUMIS_DAF => 2,
+            \App\Models\Action::FINANCEMENT_TRANSMIS_DG,
+            \App\Models\Action::FINANCEMENT_VALIDE_DAF => 3,
+            \App\Models\Action::FINANCEMENT_VALIDE_DG,
+            \App\Models\Action::FINANCEMENT_REJETE_DG => 4,
+            default => 0,
+        };
         $rmoNames = $action->relationLoaded('responsables')
             ? $action->responsables->pluck('name')->filter()->values()->all()
             : [];
@@ -78,16 +98,59 @@
                 'action_soumise_validation',
                 'action_validee_chef',
                 'action_rejetee_chef',
+                'action_transmise_controle',
+                'action_validee_controle',
+                'action_rejetee_controle',
                 'action_validee_direction',
                 'action_rejetee_direction',
                 'financement_demande',
+                'financement_prepare',
+                'financement_soumis_daf',
+                'financement_resoumis_daf',
                 'financement_valide_daf',
+                'financement_complement_demande',
                 'financement_rejete_daf',
                 'financement_accord_dg',
                 'financement_refus_dg',
             ], true))
             ->sortBy('created_at')
             ->values();
+        $deadlineExtensionRequests = $action->relationLoaded('deadlineExtensionRequests')
+            ? $action->deadlineExtensionRequests
+            : collect();
+        $activeDeadlineExtensionStatuses = [
+            \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE,
+            \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE,
+            \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE,
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE,
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
+            \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE,
+        ];
+        $activeDeadlineExtensionRequest = $deadlineExtensionRequests
+            ->first(fn ($request): bool => in_array((string) $request->status, $activeDeadlineExtensionStatuses, true));
+        $deadlineExtensionStatusLabels = [
+            \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE => 'Soumise',
+            \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE => 'En analyse',
+            \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE => 'Complement demande',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'Transmise au controleur',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'Validation finale attendue',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'Transmise DG',
+            \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE => 'Approuvee - application controleur attendue',
+            \App\Models\DeadlineExtensionRequest::STATUS_REJETEE => 'Rejetee',
+            \App\Models\DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE => 'Mise a jour appliquee',
+        ];
+        $deadlineExtensionStatusStyles = [
+            \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE => 'anbg-badge anbg-badge-info',
+            \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE => 'anbg-badge anbg-badge-info',
+            \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE => 'anbg-badge anbg-badge-warning',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'anbg-badge anbg-badge-warning',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'anbg-badge anbg-badge-warning',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'anbg-badge anbg-badge-warning',
+            \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE => 'anbg-badge anbg-badge-success',
+            \App\Models\DeadlineExtensionRequest::STATUS_REJETEE => 'anbg-badge anbg-badge-danger',
+            \App\Models\DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE => 'anbg-badge anbg-badge-success',
+        ];
         $activeAnomalyLogs = $action->actionLogs
             ->filter(function ($log): bool {
                 $details = is_array($log->details) ? $log->details : [];
@@ -119,6 +182,9 @@
             'rejetee_chef' => 'anbg-badge anbg-badge-danger',
             'correction_demandee' => 'anbg-badge anbg-badge-warning',
             'validee_chef' => 'anbg-badge anbg-badge-info',
+            'soumise_controle' => 'anbg-badge anbg-badge-info',
+            'correction_controle' => 'anbg-badge anbg-badge-warning',
+            'validee_controle' => 'anbg-badge anbg-badge-success',
             'rejetee_direction' => 'anbg-badge anbg-badge-danger',
             'validee_direction' => 'anbg-badge anbg-badge-success',
         ];
@@ -133,18 +199,25 @@
         $detailSections = [
             'action-validation' => 'Validation',
             'action-fiche' => 'Fiche',
+            'action-echeances' => 'Echeances',
             'action-financement' => 'Financement',
-            'action-status' => 'Avancement',
-            'action-controle' => 'Controle',
             'action-discussion' => 'Discussion',
             'action-justificatifs' => 'Justificatifs',
             'action-logs' => 'Journal',
         ];
-        if ($showSubActionsPanel) {
-            $detailSections = array_slice($detailSections, 0, 4, true)
-                + ['action-weeks' => $usesHistoricalProgress ? 'Suivi historique' : 'Sous-actions']
-                + array_slice($detailSections, 4, null, true);
-        }
+        $actionWorkspace = is_array($actionWorkspace ?? null) ? $actionWorkspace : [];
+        $workspaceNextStep = is_array($actionWorkspace['next_step'] ?? null) ? $actionWorkspace['next_step'] : [];
+        $workspaceHierarchy = is_array($actionWorkspace['hierarchy'] ?? null) ? $actionWorkspace['hierarchy'] : [];
+        $workspaceDeadline = is_array($actionWorkspace['deadline'] ?? null) ? $actionWorkspace['deadline'] : [];
+        $workspaceConfiguration = is_array($actionWorkspace['configuration'] ?? null) ? $actionWorkspace['configuration'] : [];
+        $workspaceDeadlineClasses = [
+            'late' => 'text-red-700 dark:text-red-300',
+            'urgent' => 'text-red-700 dark:text-red-300',
+            'warning' => 'text-amber-700 dark:text-amber-300',
+            'planned' => 'text-emerald-700 dark:text-emerald-300',
+            'closed' => 'text-emerald-700 dark:text-emerald-300',
+            'missing' => 'text-slate-500 dark:text-slate-400',
+        ];
         $progressionReelle = max(0, min(100, (float) ($action->progression_reelle ?? 0)));
         $progressionDeclaree = max(0, min(100, (float) $declaredProgression));
         $progressionTheorique = max(0, min(100, (float) ($action->progression_theorique ?? 0)));
@@ -164,15 +237,15 @@
             'acceptable' => 'Acceptable',
             'satisfaisante' => 'Satisfaisante',
             'excellente' => 'Excellente',
-            'cible_depassee' => 'Cible depassee',
+            'cible_depassee' => 'Seuil depasse',
         ];
         $quantitativeStatusLabels = [
             'non_demarre' => 'Non demarree',
             'faible_avancement' => 'Faible avancement',
             'en_progression' => 'En progression',
             'presque_atteinte' => 'Presque atteinte',
-            'cible_atteinte' => 'Cible atteinte',
-            'cible_depassee' => 'Cible depassee',
+            'cible_atteinte' => 'Seuil atteint',
+            'cible_depassee' => 'Seuil depasse',
         ];
         $statusClass = $statusStyles[$status] ?? $statusStyles['non_demarre'];
         $validationClass = $validationStyles[$validationStatus] ?? $validationStyles['non_soumise'];
@@ -188,15 +261,18 @@
             .(optional($action->date_fin)->format('d/m/Y') ?: '-');
         $stepperStoppedStatuses = ['suspendu', 'annule'];
         $stepperFinishedStatuses = ['acheve_dans_delai', 'acheve_hors_delai', 'cloturee'];
-        $stepperSubmittedStatuses = ['soumise_chef', 'validee_chef', 'correction_demandee', 'rejetee_chef', 'validee_direction', 'rejetee_direction'];
-        $stepperValidatedStatuses = ['validee_chef', 'validee_direction'];
-        $stepperCorrectionStatuses = ['correction_demandee', 'rejetee_chef', 'rejetee_direction'];
+        $stepperSubmittedStatuses = ['soumise_chef', 'validee_chef', 'soumise_controle', 'correction_demandee', 'correction_controle', 'rejetee_chef', 'validee_controle', 'validee_direction', 'rejetee_direction'];
+        $stepperChefApprovedStatuses = ['validee_chef', 'soumise_controle', 'validee_controle', 'validee_direction'];
+        $stepperValidatedStatuses = ['validee_controle', 'validee_direction'];
+        $stepperCorrectionStatuses = ['correction_demandee', 'correction_controle', 'rejetee_chef', 'rejetee_direction'];
         $stepperIsStopped = in_array($status, $stepperStoppedStatuses, true);
         $stepperHasStarted = $progressionReelle > 0
             || ! in_array($status, ['non_demarre'], true)
             || $validationStatus !== 'non_soumise';
         $stepperExecutionDone = $progressionReelle >= 100 || in_array($status, $stepperFinishedStatuses, true);
         $stepperHasSubmitted = in_array($validationStatus, $stepperSubmittedStatuses, true);
+        $stepperChefApproved = in_array($validationStatus, $stepperChefApprovedStatuses, true);
+        $stepperControlPending = in_array($validationStatus, ['validee_chef', 'soumise_controle'], true);
         $stepperIsValidated = in_array($validationStatus, $stepperValidatedStatuses, true);
         $stepperNeedsCorrection = in_array($validationStatus, $stepperCorrectionStatuses, true) || $status === 'a_corriger';
         $stepperIsClosed = $stepperIsValidated;
@@ -217,11 +293,18 @@
                     : ($stepperExecutionDone || $stepperIsValidated ? 'done' : ($stepperHasStarted ? 'current' : 'pending')),
             ],
             [
-                'label' => 'Validation',
-                'caption' => $validationLabel,
+                'label' => 'Visa chef',
+                'caption' => $stepperChefApproved ? 'Visa enregistre' : $validationLabel,
                 'state' => $stepperNeedsCorrection
                     ? 'warning'
-                    : ($stepperIsValidated ? 'done' : ($stepperHasSubmitted ? 'current' : 'pending')),
+                    : ($stepperChefApproved ? 'done' : ($stepperHasSubmitted ? 'current' : 'pending')),
+            ],
+            [
+                'label' => 'Controle',
+                'caption' => $stepperIsValidated ? 'Controle valide' : ($stepperControlPending ? 'Decision attendue' : 'A venir'),
+                'state' => $validationStatus === 'correction_controle'
+                    ? 'warning'
+                    : ($stepperIsValidated ? 'done' : ($stepperControlPending ? 'current' : 'pending')),
             ],
             [
                 'label' => 'Clôture',
@@ -265,40 +348,92 @@
                         </span>
                     @endif
                 </div>
-                <nav class="action-detail-tabs no-print" aria-label="Sections de l'action">
+                <nav class="action-detail-tabs no-print" aria-label="Sections de l'action" role="tablist" data-action-detail-tabs>
                     @foreach ($detailSections as $anchor => $label)
-                        <a class="action-detail-tab" href="#{{ $anchor }}">{{ $label }}</a>
+                        <a
+                            id="{{ $anchor }}-tab"
+                            class="action-detail-tab {{ $loop->first ? 'active' : '' }}"
+                            href="#{{ $anchor }}"
+                            role="tab"
+                            aria-controls="{{ $anchor }}"
+                            aria-selected="{{ $loop->first ? 'true' : 'false' }}"
+                            tabindex="{{ $loop->first ? '0' : '-1' }}"
+                        >
+                            {{ $label }}
+                        </a>
                     @endforeach
                 </nav>
             </div>
             <div class="action-detail-actions no-print">
-                @php
-                    $isModificationLocked = (bool) ($isActionModificationLocked ?? false);
-                    $canRequestUnlock = (bool) ($canRequestActionUnlock ?? false);
-                    $canProcessUnlock = (bool) ($canProcessActionUnlock ?? false);
-                @endphp
-                @if (! $isModificationLocked && $canManageAction)
-                    <a class="btn btn-warning" href="{{ $action->pta_id ? route('workspace.pta.edit', $action->pta_id).'#action-'.$action->id : route('workspace.actions.edit', $action) }}">Modifier action</a>
-                @elseif ($isModificationLocked)
-                    @if ($canProcessUnlock)
-                        <a class="btn btn-warning" href="{{ route('workspace.planning-unlocks.index') }}">
-                            Traiter le deverrouillage
-                        </a>
-                    @endif
-
-                    @if ($canRequestUnlock)
-                        @include('workspace.planning-unlocks._request-inline', [
-                            'target' => $action,
-                            'route' => route('workspace.actions.unlock-requests.store', $action),
-                            'context' => 'Modification action demandee depuis la page de suivi',
-                        ])
-                    @endif
+                @if (($isActionModificationLocked ?? false) && ($canProcessActionUnlock ?? false))
+                    <a class="btn btn-secondary" href="{{ route('workspace.planning-unlocks.index') }}">
+                        Traiter le deverrouillage
+                    </a>
                 @endif
+                <a class="btn btn-warning" href="#action-echeances">Report de l'action</a>
                 <button type="button" onclick="window.print()" class="btn btn-secondary flex items-center gap-2" title="Imprimer la fiche action">
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                     Imprimer
                 </button>
                 <a class="btn btn-secondary" href="{{ route('workspace.actions.index') }}">Retour liste</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="mb-4 border-y border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950" aria-label="Poste de traitement de l'action">
+        <div class="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(19rem,0.8fr)]">
+            <div class="p-4 sm:p-5 lg:border-r lg:border-slate-200 dark:lg:border-slate-700">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">{{ $workspaceNextStep['eyebrow'] ?? 'Traitement' }}</p>
+                        <h2 class="mt-1 text-lg font-bold text-slate-950 dark:text-white">{{ $workspaceNextStep['title'] ?? 'Consulter le dossier' }}</h2>
+                        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">{{ $workspaceNextStep['message'] ?? '' }}</p>
+                    </div>
+                    <a
+                        class="btn btn-primary shrink-0"
+                        href="{{ $workspaceNextStep['anchor'] ?? '#action-fiche' }}"
+                        data-action-workspace-command
+                    >
+                        {{ $workspaceNextStep['action_label'] ?? 'Ouvrir' }}
+                    </a>
+                </div>
+
+                @if ($workspaceHierarchy !== [])
+                    <ol class="mt-5 grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-3 dark:border-slate-700 dark:bg-slate-700" aria-label="Rattachement strategique">
+                        @foreach ($workspaceHierarchy as $hierarchyItem)
+                            <li class="min-w-0 bg-white px-3 py-2.5 dark:bg-slate-950">
+                                <span class="block text-[0.68rem] font-bold uppercase text-slate-500 dark:text-slate-400">{{ $hierarchyItem['label'] }}</span>
+                                <strong class="mt-1 block text-sm text-slate-900 dark:text-slate-100">{{ $hierarchyItem['value'] }}</strong>
+                            </li>
+                        @endforeach
+                    </ol>
+                @endif
+            </div>
+
+            <div class="grid grid-cols-2 divide-x divide-y divide-slate-200 dark:divide-slate-700">
+                <div class="p-4">
+                    <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Profil actif</span>
+                    <strong class="mt-1 block text-sm text-slate-900 dark:text-slate-100">{{ $actionWorkspace['role_label'] ?? '-' }}</strong>
+                </div>
+                <div class="p-4">
+                    <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Echeance</span>
+                    <strong class="mt-1 block text-sm {{ $workspaceDeadlineClasses[$workspaceDeadline['state'] ?? 'missing'] ?? $workspaceDeadlineClasses['missing'] }}">
+                        {{ isset($workspaceDeadline['date']) ? optional($workspaceDeadline['date'])->format('d/m/Y') : '-' }}
+                    </strong>
+                    <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">{{ $workspaceDeadline['label'] ?? 'Non definie' }}</span>
+                </div>
+                <div class="p-4">
+                    <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Cible</span>
+                    <strong class="mt-1 block text-sm text-slate-900 dark:text-slate-100">{{ $workspaceConfiguration['target_label'] ?? '-' }}</strong>
+                </div>
+                <div class="p-4">
+                    <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Preuve</span>
+                    <strong class="mt-1 block text-sm text-slate-900 dark:text-slate-100">{{ $workspaceConfiguration['proof_label'] ?? '-' }}</strong>
+                </div>
+                <div class="col-span-2 p-4">
+                    <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">RMO</span>
+                    <strong class="mt-1 block text-sm text-slate-900 dark:text-slate-100">{{ $workspaceConfiguration['rmo_label'] ?? $responsableDisplay }}</strong>
+                </div>
             </div>
         </div>
     </section>
@@ -387,8 +522,8 @@
             'critique' => ['Critique', 'anbg-badge-danger'],
             'en_alerte' => ['En alerte', 'anbg-badge-warning'],
             'acceptable' => ['Acceptable', 'anbg-badge-info'],
-            'cible_atteinte' => ['Cible atteinte', 'anbg-badge-success'],
-            'cible_depassee' => ['Cible dépassée', 'anbg-badge-success'],
+            'cible_atteinte' => ['Seuil atteint', 'anbg-badge-success'],
+            'cible_depassee' => ['Seuil dépassé', 'anbg-badge-success'],
         ];
         $v2TemporalLabels = [
             'dans_delai' => ['Dans les délais', 'anbg-badge-success'],
@@ -401,10 +536,23 @@
         [$tempLabel, $tempClass] = $v2TemporalLabels[$v2TemporalStatus ?? 'sans_echeance'] ?? $v2TemporalLabels['sans_echeance'];
         $v2ValidationStatus = (string) ($action->statut_validation ?? 'non_soumise');
         $v2IsSubmitted = $v2ValidationStatus === 'soumise_chef';
-        $v2IsValidated = in_array($v2ValidationStatus, ['validee_chef', 'validee_direction'], true);
+        $v2IsAwaitingControl = in_array($v2ValidationStatus, ['validee_chef', 'soumise_controle'], true);
+        $v2IsValidated = in_array($v2ValidationStatus, ['validee_controle', 'validee_direction'], true);
     @endphp
 
-    <section id="action-suivi" class="action-tracking-panel mb-4">
+    <span id="action-suivi" class="block scroll-mt-24" aria-hidden="true"></span>
+    <span id="action-status" class="block scroll-mt-24" aria-hidden="true"></span>
+    <span id="action-controle" class="block scroll-mt-24" aria-hidden="true"></span>
+    <section
+        id="action-validation"
+        class="action-tracking-panel action-detail-tab-panel is-active mb-4"
+        role="tabpanel"
+        aria-labelledby="action-validation-tab"
+        tabindex="0"
+        data-action-workspace-tracking
+        data-action-tab-panel
+        data-has-errors="{{ $errors->hasAny(['general', 'quantite_realisee', 'difficulte', 'justificatif', 'commentaire', 'progress_percent']) ? 'true' : 'false' }}"
+    >
         <div class="action-tracking-head">
             <div>
                 <span class="action-tracking-kicker">Execution</span>
@@ -436,7 +584,7 @@
             <article class="action-tracking-stat action-tracking-stat-main">
                 <span class="action-tracking-stat-label">Performance officielle</span>
                 <strong class="action-tracking-stat-value">{{ number_format((float) $v2OfficialPerf, 0, ',', ' ') }}%</strong>
-                <span class="action-tracking-stat-note">{{ $v2IsValidated ? 'Validée par le chef' : 'En attente de validation' }}</span>
+                <span class="action-tracking-stat-note">{{ $v2IsValidated ? 'Validée par le contrôle' : 'En attente de validation finale' }}</span>
             </article>
             <article class="action-tracking-stat">
                 <span class="action-tracking-stat-label">Performance provisoire</span>
@@ -445,7 +593,7 @@
             </article>
             @endif
             <article class="action-tracking-stat">
-                <span class="action-tracking-stat-label">Type d'action</span>
+                <span class="action-tracking-stat-label">Type d'indicateur</span>
                 <strong class="action-tracking-type">{{ $action->typeActionLabel() }}</strong>
                 @unless ($hideExecutorMetrics)
                     <span class="action-tracking-stat-note">{{ $action->isComposee() ? $sousActionsTotal.' sous-action(s)' : 'Action simple' }}</span>
@@ -455,10 +603,14 @@
 
         @if ($v2IsSubmitted)
             <p class="action-section-note mb-3">Action soumise au chef de service — saisie gelée en attente de sa décision.</p>
+        @elseif ($v2IsAwaitingControl)
+            <p class="action-section-note mb-3">Visa du chef enregistré — saisie gelée en attente du contrôle final SCIQ/Planification.</p>
         @elseif ($v2IsValidated)
-            <p class="action-section-note mb-3">Action validée officiellement par le chef de service.</p>
+            <p class="action-section-note mb-3">Action validée officiellement par le contrôleur et clôturée.</p>
         @elseif ($v2ValidationStatus === 'correction_demandee')
             <p class="action-section-note action-section-note-warning mb-3">Renvoyée pour correction. Motif : <strong>{{ $action->motif_validation_chef ?: '—' }}</strong></p>
+        @elseif ($v2ValidationStatus === 'correction_controle')
+            <p class="action-section-note action-section-note-warning mb-3">Correction demandée par le contrôle. Motif : <strong>{{ $action->controle_comment ?: '—' }}</strong></p>
         @endif
 
         {{-- FORMULAIRE AGENT — action simple (quantitative ou non quantitative).
@@ -467,7 +619,7 @@
         @if (($v2ActionResponsible ?? false))
             @php $v2FormFrozen = ($v2ActionFrozen ?? false); @endphp
             @if ($v2FormFrozen)
-                <p class="action-section-note mb-2">🔒 Formulaire figé — l'action est soumise. Il se rouvrira uniquement si le chef de service la renvoie pour correction avec motif.</p>
+                <p class="action-section-note mb-2">Formulaire figé pendant le visa du chef et le contrôle final. Il se rouvre automatiquement en cas de demande de correction.</p>
             @endif
             <form class="mt-2 rounded-2xl border border-[#3996d3]/25 bg-white p-4 shadow-sm @if ($v2FormFrozen) opacity-70 @endif" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.execution.update', $action) }}">
                 @csrf
@@ -476,7 +628,7 @@
                 <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
                     @if ($action->isQuantitative())
                         <div>
-                            <label for="qr">Quantité réalisée (totale à ce jour) — cible {{ number_format((float) ($action->quantite_cible ?? 0), 0, ',', ' ') }} {{ $action->unite_cible }}</label>
+                            <label for="qr">Quantité réalisée (totale à ce jour) — quantité à réaliser {{ number_format((float) ($action->quantite_cible ?? 0), 0, ',', ' ') }} {{ $action->unite_cible }}</label>
                             <input id="qr" name="quantite_realisee" type="number" step="1" min="0" value="{{ old('quantite_realisee', $action->quantite_realisee !== null ? (int) $action->quantite_realisee : '') }}">
                         </div>
                     @endif
@@ -510,6 +662,7 @@
 
         {{-- FORMULAIRES AGENT — sous-actions (action composée) --}}
         @if ($action->isComposee())
+            <span id="action-weeks" class="block scroll-mt-24" aria-hidden="true"></span>
             <div class="mt-2 space-y-3">
                 @forelse ($action->sousActions as $sa)
                     @php
@@ -548,7 +701,7 @@
                                 <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                                     @if ($sa->isQuantitative())
                                         <div>
-                                            <label>Quantité réalisée — cible {{ number_format((float) ($sa->cible_prevue ?? 0), 0, ',', ' ') }} {{ $sa->unite }}</label>
+                                            <label>Quantité réalisée — quantité à réaliser {{ number_format((float) ($sa->cible_prevue ?? 0), 0, ',', ' ') }} {{ $sa->unite }}</label>
                                             <input name="quantite_realisee" type="number" step="1" min="0" value="{{ $sa->quantite_realisee !== null ? (int) $sa->quantite_realisee : '' }}">
                                         </div>
                                     @endif
@@ -598,14 +751,29 @@
 
         {{-- VALIDATION CHEF — action soumise --}}
         @if (($canReviewByChefV2 ?? false) && $v2IsSubmitted)
-            <div class="mt-3 rounded-2xl border border-[#3996d3]/20 bg-white p-4 shadow-sm">
-                <strong class="text-sm text-[#17324a]">Décision du chef de service</strong>
-                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-2 flex flex-wrap items-end gap-2">
+            <div class="mt-3 rounded-lg border border-[#3996d3]/25 bg-white p-4 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <span class="action-tracking-kicker">Etape 2 sur 3</span>
+                        <strong class="block text-sm text-[#17324a]">Visa du chef de service</strong>
+                        <p class="mt-1 text-xs text-slate-500">Le taux calculé est proposé automatiquement. Tout ajustement doit être justifié.</p>
+                    </div>
+                    <span class="anbg-badge anbg-badge-info">Calcul automatique : {{ number_format((float) $v2ProvisionalPerf, 0, ',', ' ') }}%</span>
+                </div>
+                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-3 grid gap-3 md:grid-cols-[160px_1fr_auto] md:items-end">
                     @csrf
                     <input type="hidden" name="decision" value="valider">
-                    <button class="btn btn-primary" type="submit">Valider l'action</button>
+                    <div>
+                        <label for="chef-progress">Taux proposé (%)</label>
+                        <input id="chef-progress" name="progress_percent" type="number" min="0" max="100" step="0.01" value="{{ old('progress_percent', number_format((float) $v2ProvisionalPerf, 2, '.', '')) }}" required>
+                    </div>
+                    <div>
+                        <label for="chef-reason">Observation / justification d'ajustement</label>
+                        <input id="chef-reason" name="motif" type="text" value="{{ old('motif') }}" placeholder="Obligatoire si le taux est modifié">
+                    </div>
+                    <button class="btn btn-primary" type="submit">Viser et transmettre</button>
                 </form>
-                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-2 flex flex-wrap items-end gap-2">
+                <form method="POST" action="{{ route('workspace.actions.review', $action) }}" class="mt-3 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
                     @csrf
                     <input type="hidden" name="decision" value="rejeter">
                     <input name="motif" type="text" placeholder="Motif de renvoi (obligatoire)" required class="flex-1">
@@ -613,9 +781,52 @@
                 </form>
             </div>
         @endif
+
+        @if (($canReviewByControllerV2 ?? false) && $v2IsAwaitingControl)
+            <div class="mt-3 rounded-lg border border-emerald-200 bg-white p-4 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <span class="action-tracking-kicker text-emerald-700">Etape 3 sur 3</span>
+                        <strong class="block text-sm text-[#17324a]">Décision du contrôleur</strong>
+                        <p class="mt-1 text-xs text-slate-500">SCIQ / Planification valide le taux proposé par le chef ou demande une correction.</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="block text-xs font-bold uppercase text-slate-500">Taux proposé par le chef</span>
+                        <strong class="text-2xl text-[#17324a]">{{ number_format((float) ($action->chef_progress_percent ?? $v2ProvisionalPerf), 0, ',', ' ') }}%</strong>
+                    </div>
+                </div>
+                @if ($action->chef_adjustment_reason)
+                    <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"><strong>Justification du chef :</strong> {{ $action->chef_adjustment_reason }}</p>
+                @endif
+                <div class="mt-3 grid gap-3 lg:grid-cols-2">
+                    <form method="POST" action="{{ route('workspace.actions.control.review', $action) }}" class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
+                        @csrf
+                        <input type="hidden" name="decision" value="valider">
+                        <label for="control-comment">Observation finale <span class="text-xs text-slate-400">(optionnel)</span></label>
+                        <textarea id="control-comment" name="motif" rows="2">{{ old('motif') }}</textarea>
+                        <button class="btn btn-primary mt-2" type="submit">Valider et clôturer</button>
+                    </form>
+                    <form method="POST" action="{{ route('workspace.actions.control.review', $action) }}" class="rounded-md border border-amber-200 bg-amber-50/50 p-3">
+                        @csrf
+                        <input type="hidden" name="decision" value="rejeter">
+                        <label for="control-reason">Motif de correction</label>
+                        <textarea id="control-reason" name="motif" rows="2" required>{{ old('motif') }}</textarea>
+                        <button class="btn btn-secondary mt-2" type="submit">Demander une correction</button>
+                    </form>
+                </div>
+            </div>
+        @endif
     </section>
 
-    <section id="action-fiche" class="showcase-panel mb-4">
+    <section
+        id="action-fiche"
+        class="showcase-panel action-detail-tab-panel mb-4"
+        role="tabpanel"
+        aria-labelledby="action-fiche-tab"
+        tabindex="0"
+        data-action-tab-panel
+        hidden
+    >
         <h2 class="showcase-panel-title">Fiche complète de l'action</h2>
         <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
 
@@ -685,11 +896,11 @@
                 <dl class="action-fiche-dl mt-2">
                     <dt>Mode évaluation</dt><dd>{{ $modeEvaluationLabel }}</dd>
                     @if ($usesQuantitativeProgress)
-                        <dt>Cible attendue</dt><dd>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 0, ',', ' ') : '-' }} {{ $action->unite_cible ?: '' }}</dd>
+                        <dt>Quantite a realiser</dt><dd>{{ $action->quantite_cible !== null ? number_format((float) $action->quantite_cible, 0, ',', ' ') : '-' }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Unité</dt><dd>{{ $action->unite_cible ?: '-' }}</dd>
                         <dt>Réalisé</dt><dd>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 0, ',', ' ') : '0' }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Reste</dt><dd>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 0, ',', ' ') }} {{ $action->unite_cible ?: '' }}</dd>
-                        <dt>Taux cible</dt><dd>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 0, ',', ' ') }}%</dd>
+                        <dt>Taux de realisation</dt><dd>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 0, ',', ' ') }}%</dd>
                         <dt>Dépassement</dt><dd>{{ $overachievementRate > 0 ? '+'.number_format($overachievementRate, 0, ',', ' ').'%' : '-' }}</dd>
                         <dt>Seuil minimum</dt><dd>{{ number_format((float) ($action->seuil_minimum ?? 80), 0, ',', ' ') }}%</dd>
                         <dt>Statut perf.</dt><dd>{{ $performanceLabels[$action->statut_performance ?? 'non_evaluee'] ?? ($action->statut_performance ?: '-') }}</dd>
@@ -745,11 +956,259 @@
         </div>
     </section>
 
-    <section id="action-financement" class="showcase-panel mb-4">
+    <section
+        id="action-echeances"
+        class="showcase-panel action-detail-tab-panel mb-4"
+        role="tabpanel"
+        aria-labelledby="action-echeances-tab"
+        tabindex="0"
+        data-action-tab-panel
+        data-has-errors="{{ $errors->hasAny(['sous_action_id', 'requested_deadline', 'motif', 'justification', 'piece_justificative', 'approved_deadline']) ? 'true' : 'false' }}"
+        hidden
+    >
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 class="showcase-panel-title">Reports d'echeance</h2>
+                <p class="text-sm text-slate-500">Demande avec pièce justificative, avis du chef, contrôle SCIQ / Planification, décision DG ou Chef Planification, puis application par un contrôleur.</p>
+            </div>
+            @if ($activeDeadlineExtensionRequest)
+                <span class="{{ $deadlineExtensionStatusStyles[$activeDeadlineExtensionRequest->status] ?? 'anbg-badge anbg-badge-neutral' }}">
+                    {{ $deadlineExtensionStatusLabels[$activeDeadlineExtensionRequest->status] ?? $activeDeadlineExtensionRequest->status }}
+                </span>
+            @endif
+        </div>
+
+        <div class="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
+            <article class="showcase-inline-stat action-detail-card">
+                <h3 class="form-section-title">Demande</h3>
+                @if (($canRequestDeadlineExtension ?? false) && ! $activeDeadlineExtensionRequest)
+                    <form class="mt-3 space-y-3" method="POST" action="{{ route('workspace.actions.deadline-extension.store', $action) }}" enctype="multipart/form-data">
+                        @csrf
+                        @if ($deadlineRequestTargets->isNotEmpty())
+                            <div>
+                                <label for="deadline_sous_action_id">Élément concerné</label>
+                                <select id="deadline_sous_action_id" name="sous_action_id" @required($isSubActionOnlyDeadlineRequester)>
+                                    @unless ($isSubActionOnlyDeadlineRequester)
+                                        <option value="">Action principale</option>
+                                    @endunless
+                                    @foreach ($deadlineRequestTargets as $sousAction)
+                                        <option value="{{ $sousAction->id }}" @selected((string) old('sous_action_id', request('report_sous_action_id')) === (string) $sousAction->id)>{{ $sousAction->libelle }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+                        <div>
+                            <label for="requested_deadline">Nouvelle echeance demandee</label>
+                            <input id="requested_deadline" name="requested_deadline" type="date" value="{{ old('requested_deadline') }}" required>
+                        </div>
+                        <div>
+                            <label for="deadline_motif">Motif</label>
+                            <input id="deadline_motif" name="motif" type="text" value="{{ old('motif') }}" maxlength="255" required>
+                        </div>
+                        <div>
+                            <label for="deadline_justification">Justification detaillee</label>
+                            <textarea id="deadline_justification" name="justification" rows="4" required>{{ old('justification') }}</textarea>
+                        </div>
+                        <div>
+                            <label for="piece_justificative">Piece justificative</label>
+                            <input id="piece_justificative" name="piece_justificative" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}" required>
+                        </div>
+                        <button class="btn btn-primary" type="submit">Soumettre le report</button>
+                    </form>
+                @elseif ($activeDeadlineExtensionRequest)
+                    <p class="mt-3 text-sm text-slate-600">Une demande est deja en cours pour cette action ou l'une de ses sous-actions.</p>
+                @else
+                    <p class="mt-3 text-sm text-slate-600">Vous n'avez pas les droits pour demander un report sur cette action.</p>
+                @endif
+            </article>
+
+            <article class="showcase-inline-stat action-detail-card">
+                <h3 class="form-section-title">Historique</h3>
+                <div class="mt-3 space-y-3">
+                    @forelse ($deadlineExtensionRequests as $deadlineRequest)
+                        @php
+                            $statusLabel = $deadlineExtensionStatusLabels[$deadlineRequest->status] ?? $deadlineRequest->status;
+                            $statusStyle = $deadlineExtensionStatusStyles[$deadlineRequest->status] ?? 'anbg-badge anbg-badge-neutral';
+                            $canChefReviewThisRequest = ($canReviewDeadlineExtensionByChef ?? false)
+                                && in_array((string) $deadlineRequest->status, [
+                                    \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE,
+                                    \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE,
+                                ], true);
+                            $canControllerReviewThisRequest = ($canReviewDeadlineExtensionByController ?? false)
+                                && (string) $deadlineRequest->status === \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE;
+                            $canFinalReviewThisRequest = ($canReviewDeadlineExtensionFinal ?? false)
+                                && in_array((string) $deadlineRequest->status, [
+                                    \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
+                                    \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
+                                ], true);
+                            $canApplyThisRequest = ($canApplyDeadlineExtension ?? false)
+                                && (string) $deadlineRequest->status === \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE;
+                            $canResubmitThisRequest = $currentUser instanceof \App\Models\User
+                                && (int) $deadlineRequest->requested_by === (int) $currentUser->id
+                                && (string) $deadlineRequest->status === \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE;
+                            $deadlineMetadata = is_array($deadlineRequest->metadata) ? $deadlineRequest->metadata : [];
+                            $revisionCount = (int) ($deadlineMetadata['revision_count'] ?? 0);
+                            $revisionHistory = is_array($deadlineMetadata['revision_history'] ?? null)
+                                ? $deadlineMetadata['revision_history']
+                                : [];
+                            $complementComment = $deadlineRequest->final_decision === \App\Models\DeadlineExtensionRequest::DECISION_COMPLEMENT
+                                ? $deadlineRequest->final_comment
+                                : ($deadlineRequest->sciq_avis === \App\Models\DeadlineExtensionRequest::AVIS_COMPLEMENT
+                                    ? $deadlineRequest->sciq_comment
+                                    : $deadlineRequest->chef_comment);
+                        @endphp
+                        <div class="rounded border border-slate-200 p-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-slate-800">{{ $deadlineRequest->sousAction?->libelle ?? 'Action principale' }}</p>
+                                    <p class="text-xs text-slate-500">
+                                        {{ optional($deadlineRequest->old_deadline)->format('d/m/Y') ?: '-' }}
+                                        vers
+                                        {{ optional($deadlineRequest->requested_deadline)->format('d/m/Y') ?: '-' }}
+                                    </p>
+                                </div>
+                                <span class="{{ $statusStyle }}">{{ $statusLabel }}</span>
+                            </div>
+                            <p class="mt-2 text-sm text-slate-600">{{ $deadlineRequest->motif }}</p>
+                            <dl class="action-fiche-dl mt-2">
+                                <dt>Demandeur</dt><dd>{{ $deadlineRequest->requestedBy?->name ?? '-' }}</dd>
+                                <dt>Pièce justificative</dt><dd><a class="font-semibold text-[#1e5fa8]" href="{{ route('workspace.deadline-extension.attachment', $deadlineRequest) }}">{{ $deadlineRequest->attachment_name ?: 'Télécharger' }}</a></dd>
+                                @if ($revisionHistory !== [])
+                                    <dt>Pièces antérieures</dt>
+                                    <dd class="space-y-1">
+                                        @foreach ($revisionHistory as $revisionIndex => $revision)
+                                            <a class="block font-semibold text-[#1e5fa8]" href="{{ route('workspace.deadline-extension.attachment.revision', [$deadlineRequest, $revisionIndex]) }}">
+                                                Version {{ $revisionIndex + 1 }} · {{ $revision['previous_attachment_name'] ?? 'Pièce justificative' }}
+                                            </a>
+                                        @endforeach
+                                    </dd>
+                                @endif
+                                <dt>Révisions</dt><dd>{{ $revisionCount }}</dd>
+                                <dt>Avis chef</dt><dd>{{ $deadlineRequest->chef_avis ?: '-' }}{{ $deadlineRequest->chefReviewedBy ? ' · '.$deadlineRequest->chefReviewedBy->name : '' }}</dd>
+                                <dt>Avis contrôle</dt><dd>{{ $deadlineRequest->sciq_avis ?: '-' }}{{ $deadlineRequest->sciqReviewedBy ? ' · '.$deadlineRequest->sciqReviewedBy->name : '' }}</dd>
+                                <dt>Décision finale</dt><dd>{{ $deadlineRequest->final_decision ?: $deadlineRequest->dg_decision ?: '-' }}{{ $deadlineRequest->finalDecidedBy ? ' · '.$deadlineRequest->finalDecidedBy->name : '' }}</dd>
+                                <dt>Echeance approuvee</dt><dd>{{ optional($deadlineRequest->approved_deadline)->format('d/m/Y') ?: '-' }}</dd>
+                                <dt>Appliquée par</dt><dd>{{ $deadlineRequest->appliedBy?->name ?? '-' }}</dd>
+                            </dl>
+
+                            @if ($canResubmitThisRequest)
+                                <form class="mt-3 space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3" method="POST" action="{{ route('workspace.deadline-extension.resubmit', $deadlineRequest) }}" enctype="multipart/form-data">
+                                    @csrf
+                                    <div>
+                                        <p class="text-sm font-semibold text-amber-950">Complément demandé</p>
+                                        <p class="mt-1 text-sm text-amber-900">{{ $complementComment ?: 'Veuillez compléter le dossier et joindre une nouvelle pièce justificative.' }}</p>
+                                    </div>
+                                    <div>
+                                        <label for="resubmit_deadline_{{ $deadlineRequest->id }}">Nouvelle échéance demandée</label>
+                                        <input id="resubmit_deadline_{{ $deadlineRequest->id }}" name="requested_deadline" type="date" value="{{ old('requested_deadline', optional($deadlineRequest->requested_deadline)->format('Y-m-d')) }}" required>
+                                    </div>
+                                    <div>
+                                        <label for="resubmit_motif_{{ $deadlineRequest->id }}">Motif actualisé</label>
+                                        <input id="resubmit_motif_{{ $deadlineRequest->id }}" name="motif" type="text" value="{{ old('motif', $deadlineRequest->motif) }}" maxlength="255" required>
+                                    </div>
+                                    <div>
+                                        <label for="resubmit_justification_{{ $deadlineRequest->id }}">Justification complétée</label>
+                                        <textarea id="resubmit_justification_{{ $deadlineRequest->id }}" name="justification" rows="4" required>{{ old('justification', $deadlineRequest->justification) }}</textarea>
+                                    </div>
+                                    <div>
+                                        <label for="resubmit_piece_{{ $deadlineRequest->id }}">Nouvelle pièce justificative</label>
+                                        <input id="resubmit_piece_{{ $deadlineRequest->id }}" name="piece_justificative" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}" required>
+                                    </div>
+                                    <button class="btn btn-primary" type="submit">Compléter et retransmettre</button>
+                                </form>
+                            @endif
+
+                            @if ($canChefReviewThisRequest)
+                                <form class="mt-3 space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3" method="POST" action="{{ route('workspace.deadline-extension.chef', $deadlineRequest) }}">
+                                    @csrf
+                                    <label for="deadline_chef_decision_{{ $deadlineRequest->id }}">Avis du chef de service</label>
+                                    <select id="deadline_chef_decision_{{ $deadlineRequest->id }}" name="decision" required>
+                                        <option value="{{ \App\Models\DeadlineExtensionRequest::AVIS_FAVORABLE }}">Avis favorable</option>
+                                        <option value="{{ \App\Models\DeadlineExtensionRequest::AVIS_DEFAVORABLE }}">Avis defavorable</option>
+                                        <option value="{{ \App\Models\DeadlineExtensionRequest::AVIS_COMPLEMENT }}">Demander complement</option>
+                                    </select>
+                                    <textarea name="comment" rows="2" placeholder="Commentaire"></textarea>
+                                    <button class="btn btn-secondary" type="submit">Enregistrer l'avis</button>
+                                </form>
+                            @endif
+
+                            @if ($canControllerReviewThisRequest)
+                                <form class="mt-3 space-y-2 rounded-md border border-blue-200 bg-blue-50/50 p-3" method="POST" action="{{ route('workspace.deadline-extension.controller', $deadlineRequest) }}">
+                                    @csrf
+                                    <label for="deadline_controller_decision_{{ $deadlineRequest->id }}">Avis du contrôleur</label>
+                                    <select id="deadline_controller_decision_{{ $deadlineRequest->id }}" name="decision" required>
+                                        <option value="{{ \App\Models\DeadlineExtensionRequest::AVIS_FAVORABLE }}">Avis favorable</option>
+                                        <option value="{{ \App\Models\DeadlineExtensionRequest::AVIS_DEFAVORABLE }}">Avis défavorable</option>
+                                        <option value="{{ \App\Models\DeadlineExtensionRequest::AVIS_COMPLEMENT }}">Demander un complément</option>
+                                    </select>
+                                    <textarea name="comment" rows="2" placeholder="Commentaire"></textarea>
+                                    <button class="btn btn-secondary" type="submit">Transmettre à la validation finale</button>
+                                </form>
+                            @endif
+
+                            @if ($canFinalReviewThisRequest)
+                                <form class="mt-3 space-y-2 rounded-md border border-amber-200 bg-amber-50/50 p-3" method="POST" action="{{ route('workspace.deadline-extension.final', $deadlineRequest) }}">
+                                    @csrf
+                                    <label for="deadline_final_decision_{{ $deadlineRequest->id }}">Décision finale DG / Chef Planification</label>
+                                    <select id="deadline_final_decision_{{ $deadlineRequest->id }}" name="decision" required>
+                                        <option value="{{ \App\Models\DeadlineExtensionRequest::DECISION_APPROUVER }}">Approuver</option>
+                                        <option value="{{ \App\Models\DeadlineExtensionRequest::DECISION_REJETER }}">Rejeter</option>
+                                        <option value="{{ \App\Models\DeadlineExtensionRequest::DECISION_COMPLEMENT }}">Demander complement</option>
+                                    </select>
+                                    <label for="approved_deadline_{{ $deadlineRequest->id }}">Echeance approuvee</label>
+                                    <input id="approved_deadline_{{ $deadlineRequest->id }}" name="approved_deadline" type="date" value="{{ optional($deadlineRequest->requested_deadline)->format('Y-m-d') }}">
+                                    <textarea name="comment" rows="2" placeholder="Commentaire"></textarea>
+                                    <button class="btn btn-primary" type="submit">Enregistrer la décision finale</button>
+                                </form>
+                            @endif
+
+                            @if ($canApplyThisRequest)
+                                <form class="mt-3 space-y-2 rounded-md border border-emerald-200 bg-emerald-50/50 p-3" method="POST" action="{{ route('workspace.deadline-extension.apply', $deadlineRequest) }}">
+                                    @csrf
+                                    <p class="text-sm font-semibold text-emerald-900">La date {{ optional($deadlineRequest->approved_deadline)->format('d/m/Y') }} a été approuvée. Elle n’est pas encore appliquée.</p>
+                                    <button class="btn btn-primary" type="submit">Appliquer la date approuvée</button>
+                                </form>
+                            @endif
+                        </div>
+                    @empty
+                        <p class="text-sm text-slate-600">Aucune demande de report n'a encore ete soumise.</p>
+                    @endforelse
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section
+        id="action-financement"
+        class="showcase-panel action-detail-tab-panel mb-4"
+        role="tabpanel"
+        aria-labelledby="action-financement-tab"
+        tabindex="0"
+        data-action-tab-panel
+        data-has-errors="{{ $errors->hasAny(['source_financement', 'justificatif_financement', 'commentaire_financement', 'decision_financement', 'montant_valide', 'reference_financement', 'justificatif_financement_daf', 'justificatif_financement_dg']) ? 'true' : 'false' }}"
+        hidden
+    >
         <h2 class="showcase-panel-title">Financement et validation budgétaire</h2>
         @if ($action->financement_requis)
+            <div class="mb-4 grid min-h-20 grid-cols-2 overflow-hidden border-y border-slate-200 md:grid-cols-4 dark:border-slate-700" aria-label="Circuit de validation du financement">
+                @foreach ([
+                    1 => ['RMO', 'Dossier et pieces'],
+                    2 => ['DAF', 'Instruction financiere'],
+                    3 => ['DG', 'Decision finale'],
+                    4 => ['Resultat', 'Accorde ou refuse'],
+                ] as $stepNumber => [$stepRole, $stepLabel])
+                    <div class="flex min-w-0 items-center gap-3 border-b border-r border-slate-200 px-3 py-3 last:border-r-0 md:border-b-0 dark:border-slate-700 {{ $financingStage >= $stepNumber ? 'bg-emerald-50/80 dark:bg-emerald-950/25' : 'bg-slate-50/70 dark:bg-slate-900/60' }}">
+                        <span class="flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold {{ $financingStage >= $stepNumber ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200' }}">{{ $stepNumber }}</span>
+                        <span class="min-w-0">
+                            <strong class="block truncate text-sm text-slate-950 dark:text-white">{{ $stepRole }}</strong>
+                            <span class="block text-xs text-slate-500 dark:text-slate-400">{{ $stepLabel }}</span>
+                        </span>
+                    </div>
+                @endforeach
+            </div>
+
             <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-                <article class="showcase-inline-stat action-detail-card">
+                <article class="min-w-0 border-l-2 border-sky-500 pl-4">
                     <h3 class="form-section-title">Besoin déclaré</h3>
                     <p class="mt-2 text-slate-600">Statut financement : <strong>{{ $financingLabel }}</strong></p>
                     <p class="text-slate-600">Montant estimé : <strong>{{ $action->montant_estime !== null ? number_format((float) $action->montant_estime, 0) : '-' }}</strong></p>
@@ -775,7 +1234,7 @@
                     <p class="text-slate-600">Soumis au circuit : <strong>{{ optional($action->financement_soumis_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                     <p class="text-slate-600">Notification DAF : <strong>{{ optional($action->financement_notifie_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                 </article>
-                <article class="showcase-inline-stat action-detail-card">
+                <article class="min-w-0 border-l-2 border-emerald-500 pl-4">
                     <h3 class="form-section-title">Décision DAF</h3>
                     <p class="mt-2 text-slate-600">Responsable DAF : <strong>{{ $action->financementDafPar?->name ?? '-' }}</strong></p>
                     <p class="text-slate-600">Date de décision : <strong>{{ optional($action->financement_daf_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
@@ -783,32 +1242,100 @@
                     <p class="text-slate-600">Montant validé : <strong>{{ $action->financement_montant_valide !== null ? number_format((float) $action->financement_montant_valide, 0) : '-' }}</strong></p>
                     <p class="text-slate-600">Référence : <strong>{{ $action->financement_reference ?: '-' }}</strong></p>
                     <p class="text-slate-600">Commentaire : <strong>{{ $action->financement_daf_commentaire ?: '-' }}</strong></p>
+                    @if ($financingDafJustificatif)
+                        <button
+                            class="mt-2 font-semibold text-[#3996d3]"
+                            type="button"
+                            data-preview-file
+                            data-preview-title="{{ $financingDafJustificatif->nom_original }}"
+                            data-preview-subtitle="Avis DAF"
+                            data-preview-mime="{{ $financingDafJustificatif->mime_type }}"
+                            data-preview-url="{{ route('workspace.actions.justificatifs.preview', [$action, $financingDafJustificatif]) }}"
+                            data-download-url="{{ route('workspace.actions.justificatifs.download', [$action, $financingDafJustificatif]) }}"
+                        >Voir la pièce DAF</button>
+                    @endif
                 </article>
-                <article class="showcase-inline-stat action-detail-card">
+                <article class="min-w-0 border-l-2 border-violet-500 pl-4">
                     <h3 class="form-section-title">Accord DG</h3>
                     <p class="mt-2 text-slate-600">Décideur DG : <strong>{{ $action->financementDgPar?->name ?? '-' }}</strong></p>
                     <p class="text-slate-600">Date accord / refus : <strong>{{ optional($action->financement_dg_le)->format('d/m/Y H:i') ?: '-' }}</strong></p>
                     <p class="text-slate-600">Décision : <strong>{{ $action->financement_dg_decision ?: '-' }}</strong></p>
                     <p class="text-slate-600">Commentaire DG : <strong>{{ $action->financement_dg_commentaire ?: '-' }}</strong></p>
+                    @if ($financingDgJustificatif)
+                        <button
+                            class="mt-2 font-semibold text-[#3996d3]"
+                            type="button"
+                            data-preview-file
+                            data-preview-title="{{ $financingDgJustificatif->nom_original }}"
+                            data-preview-subtitle="Décision DG"
+                            data-preview-mime="{{ $financingDgJustificatif->mime_type }}"
+                            data-preview-url="{{ route('workspace.actions.justificatifs.preview', [$action, $financingDgJustificatif]) }}"
+                            data-download-url="{{ route('workspace.actions.justificatifs.download', [$action, $financingDgJustificatif]) }}"
+                        >Voir la pièce DG</button>
+                    @endif
                 </article>
             </div>
+
+            @if ($canSubmitFinancing ?? false)
+                @php
+                    $requiresFinancingCorrectionProof = in_array($financingStatus, [
+                        \App\Models\Action::FINANCEMENT_COMPLEMENT_DEMANDE,
+                        \App\Models\Action::FINANCEMENT_REJETE_DAF,
+                    ], true);
+                @endphp
+                <form class="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.financement.submit', $action) }}">
+                    @csrf
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
+                            {{ $requiresFinancingCorrectionProof ? 'Correction du dossier financier' : 'Soumission du dossier financier' }}
+                        </h3>
+                        <span class="anbg-badge {{ $requiresFinancingCorrectionProof ? 'anbg-badge-warning' : 'anbg-badge-info' }} px-2 py-1 text-xs">
+                            Action attendue du RMO
+                        </span>
+                    </div>
+                    @if ($requiresFinancingCorrectionProof && $action->financement_daf_commentaire)
+                        <div class="mb-3 border-l-4 border-amber-500 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">
+                            <strong>Dernier avis DAF :</strong> {{ $action->financement_daf_commentaire }}
+                        </div>
+                    @endif
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <div>
+                            <label for="source_financement_rmo">Source de financement</label>
+                            <input id="source_financement_rmo" name="source_financement" type="text" maxlength="255" value="{{ old('source_financement', $action->source_financement) }}" required>
+                        </div>
+                        <div>
+                            <label for="justificatif_financement_rmo">
+                                {{ $requiresFinancingCorrectionProof ? 'Nouvelle pièce corrective' : 'Pièce complémentaire' }}
+                            </label>
+                            <input id="justificatif_financement_rmo" name="justificatif_financement" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}" @if($requiresFinancingCorrectionProof) required @endif>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="commentaire_financement_rmo">Note de transmission du RMO</label>
+                            <textarea id="commentaire_financement_rmo" name="commentaire_financement" maxlength="3000" required>{{ old('commentaire_financement', $action->commentaire_financement) }}</textarea>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary mt-3" type="submit">
+                        {{ $requiresFinancingCorrectionProof ? 'Resoumettre à la DAF' : 'Soumettre à la DAF' }}
+                    </button>
+                </form>
+            @endif
 
             @if ($canReviewFinancingByDaf)
                 <form class="mt-4" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.financement.daf', $action) }}">
                     @csrf
-                    <h3 class="mb-2 text-sm font-semibold text-slate-800">Traitement DAF</h3>
+                    <h3 class="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">Instruction et avis DAF</h3>
                     <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
                         <div>
                             <label for="decision_financement_daf">Décision DAF</label>
                             <select id="decision_financement_daf" name="decision_financement" required>
                                 <option value="valider" @selected(old('decision_financement') === 'valider')>Valider et transmettre à la DG</option>
-                                <option value="demander_complement" @selected(old('decision_financement') === 'demander_complement')>Demander un complement</option>
+                                <option value="demander_complement" @selected(old('decision_financement') === 'demander_complement')>Demander un complément</option>
                                 <option value="rejeter" @selected(old('decision_financement') === 'rejeter')>Rejeter</option>
                             </select>
                         </div>
                         <div>
                             <label for="montant_valide">Montant validé</label>
-                            <input id="montant_valide" name="montant_valide" type="number" step="1" min="0" value="{{ old('montant_valide', $action->montant_estime !== null ? (int) round((float) $action->montant_estime) : '') }}">
+                            <input id="montant_valide" name="montant_valide" type="number" step="0.01" min="0.01" value="{{ old('montant_valide', $action->montant_estime) }}">
                         </div>
                         <div>
                             <label for="reference_financement">Référence financement</label>
@@ -820,8 +1347,8 @@
                         </div>
                     </div>
                     <div>
-                        <label for="commentaire_financement_daf">Commentaire DAF (obligatoire au rejet ou complement)</label>
-                        <textarea id="commentaire_financement_daf" name="commentaire_financement">{{ old('commentaire_financement') }}</textarea>
+                        <label for="commentaire_financement_daf">Motivation de l'avis DAF</label>
+                        <textarea id="commentaire_financement_daf" name="commentaire_financement" maxlength="3000" required>{{ old('commentaire_financement') }}</textarea>
                     </div>
                     <button class="btn btn-primary mt-2.5" type="submit">Enregistrer la décision DAF</button>
                 </form>
@@ -830,7 +1357,7 @@
             @if ($canReviewFinancingByDg)
                 <form class="mt-4" method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.financement.dg', $action) }}">
                     @csrf
-                    <h3 class="mb-2 text-sm font-semibold text-slate-800">Accord DG</h3>
+                    <h3 class="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">Décision finale de la Direction Générale</h3>
                     <div class="mb-2 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
                         <div>
                             <label for="decision_financement_dg">Décision DG</label>
@@ -845,10 +1372,10 @@
                         </div>
                     </div>
                     <div>
-                        <label for="commentaire_financement_dg">Commentaire DG (obligatoire au refus)</label>
-                        <textarea id="commentaire_financement_dg" name="commentaire_financement">{{ old('commentaire_financement') }}</textarea>
+                        <label for="commentaire_financement_dg">Motivation de la décision DG</label>
+                        <textarea id="commentaire_financement_dg" name="commentaire_financement" maxlength="3000" required>{{ old('commentaire_financement') }}</textarea>
                     </div>
-                    <button class="btn btn-primary mt-2.5" type="submit">Enregistrer l'accord DG</button>
+                    <button class="btn btn-primary mt-2.5" type="submit">Enregistrer la décision DG</button>
                 </form>
             @endif
         @else
@@ -864,7 +1391,16 @@
          À reconstruire from scratch quand le nouveau workflow sera spécifié. --}}
 
 
-    <section id="action-discussion" class="showcase-panel mb-4">
+    <section
+        id="action-discussion"
+        class="showcase-panel action-detail-tab-panel mb-4"
+        role="tabpanel"
+        aria-labelledby="action-discussion-tab"
+        tabindex="0"
+        data-action-tab-panel
+        data-has-errors="{{ $errors->has('message') ? 'true' : 'false' }}"
+        hidden
+    >
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 class="showcase-panel-title">Discussion et retours de validation</h2>
             <span class="discussion-live-badge" title="Les nouveaux commentaires s'affichent automatiquement">
@@ -872,16 +1408,15 @@
                 En direct
             </span>
         </div>
-        <form id="discussion-form" method="POST" action="{{ route('workspace.actions.comment', $action) }}" class="mb-5">
+        <form method="POST" action="{{ route('workspace.actions.comment', $action) }}" class="mb-5">
             @csrf
             <label for="discussion_message">Ajouter un commentaire</label>
             <textarea id="discussion_message" name="message" rows="3" placeholder="Votre commentaire ou retour…" required>{{ old('message') }}</textarea>
             <div class="mt-2.5 flex items-center gap-3">
-                <button id="discussion-submit" class="btn btn-primary" type="submit">
+                <button class="btn btn-primary" type="submit">
                     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     Publier
                 </button>
-                <span id="discussion-sending" class="text-xs text-slate-400" style="display:none;">Envoi en cours…</span>
             </div>
         </form>
 
@@ -911,67 +1446,47 @@
     </section>
     <script>
     (function () {
-        var actionId = {{ $action->id }};
-        var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-        var form = document.getElementById('discussion-form');
+        var logsUrl = @json(route('v1.actions.logs', $action));
         var feed = document.getElementById('discussion-feed');
-        var textarea = document.getElementById('discussion_message');
-        var submitBtn = document.getElementById('discussion-submit');
-        var sendingLabel = document.getElementById('discussion-sending');
         var lastLogId = {{ $discussionEntries->last()?->id ?? 0 }};
         var validTypes = ['commentaire','action_soumise_validation','action_validee_chef','action_rejetee_chef','action_correction_demandee',
-                          'action_validee_direction','action_rejetee_direction','financement_demande',
-                          'financement_valide_daf','financement_rejete_daf','financement_accord_dg','financement_refus_dg'];
+                          'action_transmise_controle','action_validee_controle','action_rejetee_controle',
+                          'action_validee_direction','action_rejetee_direction','financement_demande','financement_prepare',
+                          'financement_soumis_daf','financement_resoumis_daf','financement_valide_daf',
+                          'financement_complement_demande','financement_rejete_daf','financement_accord_dg','financement_refus_dg'];
+
+        function textElement(tagName, className, value) {
+            var element = document.createElement(tagName);
+            element.className = className;
+            element.textContent = value || '';
+
+            return element;
+        }
 
         function renderEntry(entry) {
             var badge = (entry.type_evenement || '').replace(/_/g, ' ');
             var author = (entry.utilisateur && entry.utilisateur.name) ? entry.utilisateur.name : 'Système';
             var date = entry.created_at ? new Date(entry.created_at).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
             var el = document.createElement('article');
+            var header = document.createElement('div');
+            var authorBlock = document.createElement('div');
+
             el.className = 'showcase-thread-item discussion-new-entry';
             el.setAttribute('data-log-id', entry.id);
-            el.innerHTML = '<div class="flex flex-wrap items-start justify-between gap-2">'
-                + '<div><p class="font-semibold">' + author + '</p>'
-                + '<p class="text-xs text-slate-500">' + date + '</p></div>'
-                + '<span class="anbg-badge anbg-badge-neutral px-3">' + badge + '</span>'
-                + '</div><p class="mt-3 whitespace-pre-line text-slate-700">' + (entry.message || '') + '</p>';
+            header.className = 'flex flex-wrap items-start justify-between gap-2';
+            authorBlock.appendChild(textElement('p', 'font-semibold', author));
+            authorBlock.appendChild(textElement('p', 'text-xs text-slate-500', date));
+            header.appendChild(authorBlock);
+            header.appendChild(textElement('span', 'anbg-badge anbg-badge-neutral px-3', badge));
+            el.appendChild(header);
+            el.appendChild(textElement('p', 'mt-3 whitespace-pre-line text-slate-700', entry.message || ''));
+
             return el;
         }
 
-        if (form) {
-            form.addEventListener('submit', function (e) {
-                e.preventDefault();
-                var message = textarea.value.trim();
-                if (!message) return;
-                submitBtn.disabled = true;
-                sendingLabel.style.display = 'inline';
-                fetch('/api/actions/' + actionId + '/comments', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json'},
-                    body: JSON.stringify({message: message}),
-                }).then(function (res) {
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-                    return res.json();
-                }).then(function (json) {
-                    var empty = document.getElementById('discussion-empty');
-                    if (empty) empty.remove();
-                    var el = renderEntry(json.data);
-                    feed.appendChild(el);
-                    lastLogId = Math.max(lastLogId, json.data.id || 0);
-                    textarea.value = '';
-                    if (window.anbgToast) window.anbgToast('Commentaire publié.', 'success', 3000);
-                }).catch(function () {
-                    if (window.anbgToast) window.anbgToast("Erreur lors de l'envoi. Réessayez.", 'error', 5000);
-                }).finally(function () {
-                    submitBtn.disabled = false;
-                    sendingLabel.style.display = 'none';
-                });
-            });
-        }
-
         function pollDiscussion() {
-            fetch('/api/actions/' + actionId + '/logs?per_page=100', {
-                headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken},
+            fetch(logsUrl + '?per_page=100', {
+                headers: {'Accept': 'application/json'},
             }).then(function (res) { return res.ok ? res.json() : null; })
             .then(function (json) {
                 if (!json) return;
@@ -1000,7 +1515,15 @@
     })();
     </script>
 
-    <section id="action-justificatifs" class="showcase-panel mb-4">
+    <section
+        id="action-justificatifs"
+        class="showcase-panel action-detail-tab-panel mb-4"
+        role="tabpanel"
+        aria-labelledby="action-justificatifs-tab"
+        tabindex="0"
+        data-action-tab-panel
+        hidden
+    >
         <h2 class="showcase-panel-title">Justificatifs action</h2>
         @php
             $fileTypeIcon = static function (string $name): string {
@@ -1073,7 +1596,15 @@
         @endforelse
     </section>
 
-    <section id="action-logs" class="showcase-panel mb-4">
+    <section
+        id="action-logs"
+        class="showcase-panel action-detail-tab-panel mb-4"
+        role="tabpanel"
+        aria-labelledby="action-logs-tab"
+        tabindex="0"
+        data-action-tab-panel
+        hidden
+    >
         <h2 class="showcase-panel-title">Journal d'alertes et événements</h2>
         <div class="app-table-wrapper overflow-x-auto">
             <table class="app-table data-table">
@@ -1083,7 +1614,7 @@
                         <th>Niveau</th>
                         <th>Type</th>
                         <th>Message</th>
-                        <th>Cible</th>
+                        <th>Destinataire</th>
                     </tr>
                 </thead>
                 <tbody>

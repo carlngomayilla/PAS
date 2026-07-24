@@ -48,13 +48,22 @@
                         </span>
                     </header>
 
-                    <div class="mb-4 rounded-2xl border border-[#d8ecf8] bg-[#f7fbfd] p-3">
-                        <p class="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Chef d’unité</p>
+                    <div class="mb-4 rounded-md border border-cyan-200 bg-cyan-50/60 p-3 dark:border-cyan-900 dark:bg-cyan-950/20">
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Chef d’unité</p>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Compte actif déjà rattaché ou porteur du rôle correspondant.</p>
+                            </div>
+                            <span class="anbg-badge {{ $chef ? 'anbg-badge-success' : 'anbg-badge-warning' }}">
+                                {{ $chef ? 'Désigné' : 'Vacant' }}
+                            </span>
+                        </div>
                         <form method="POST" action="{{ route('workspace.super-admin.unites-dg.set-chef', $unite) }}" class="flex flex-wrap items-end gap-2">
                             @csrf
                             @method('PUT')
-                            <div class="flex-1 min-w-[220px]">
-                                <select name="chef_user_id" class="w-full rounded-xl border border-[#cbd5e1] bg-white px-3 py-2 text-sm">
+                            <div class="min-w-[220px] flex-1">
+                                <label class="sr-only" for="chef_user_id_{{ $unite->id }}">Chef de l’unité {{ $unite->code }}</label>
+                                <select id="chef_user_id_{{ $unite->id }}" name="chef_user_id" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
                                     <option value="">— Aucun chef désigné —</option>
                                     @foreach ($candidates as $candidate)
                                         <option value="{{ $candidate->id }}" @selected((int) $unite->chef_user_id === (int) $candidate->id)>
@@ -63,11 +72,11 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-sm rounded-xl">Enregistrer</button>
+                            <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
                         </form>
                         @if ($chef)
-                            <p class="mt-2 text-xs text-slate-500">
-                                Actuel : <strong class="text-slate-700">{{ $chef->name }}</strong> · {{ $chef->email }}
+                            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                Actuel : <strong class="text-slate-700 dark:text-slate-200">{{ $chef->name }}</strong> · {{ $chef->email }}
                             </p>
                         @else
                             <p class="mt-2 text-xs text-amber-700">Aucun chef d’unité désigné pour le moment.</p>
@@ -83,7 +92,7 @@
                         @else
                             <ul class="space-y-1.5">
                                 @foreach ($members as $member)
-                                    <li class="flex items-center justify-between gap-3 rounded-xl border border-[#e2e8f0] bg-white px-3 py-2 text-sm">
+                                    <li class="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
                                         <div class="min-w-0">
                                             <p class="truncate font-semibold text-slate-700">{{ $member->name }}</p>
                                             <p class="truncate text-xs text-slate-500">{{ $member->email }}</p>

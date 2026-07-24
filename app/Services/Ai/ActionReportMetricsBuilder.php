@@ -381,7 +381,7 @@ class ActionReportMetricsBuilder
         }
 
         if ($lateOrUnrealized->count() > 5) {
-            $measures[] = 'Organiser une revue hebdomadaire des ecarts jusqu au retour au taux cible.';
+            $measures[] = 'Organiser une revue hebdomadaire des ecarts jusqu au retour au seuil attendu.';
         }
 
         return $measures;

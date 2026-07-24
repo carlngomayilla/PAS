@@ -23,6 +23,7 @@
             $oldOperationalObjectives = $existingObjectives->isNotEmpty()
                 ? $existingObjectives->map(fn ($objective) => [
                     'id' => $objective->id,
+                    'pas_objectif_id' => $objective->pas_objectif_id,
                     'libelle' => $objective->libelle,
                     'service_id' => $objective->service_id,
                     'echeance' => optional($objective->echeance)->format('Y-m-d'),
@@ -31,6 +32,7 @@
                 ])->values()->all()
                 : [[
                     'id' => null,
+                    'pas_objectif_id' => old('pas_objectif_id', $row->pas_objectif_id),
                     'libelle' => old('objectif_operationnel', $row->objectif_operationnel),
                     'service_id' => old('service_id', $row->service_id),
                     'echeance' => old('echeance', optional($row->echeance)->format('Y-m-d') ?: $row->echeance),
@@ -59,6 +61,17 @@
                     @method('PUT')
                 @endif
 
+                @if ($errors->any())
+                    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+                        <p class="font-bold">Le PAO ne peut pas être enregistré.</p>
+                        <ul class="mt-2 list-disc space-y-1 pl-5">
+                            @foreach ($errors->all() as $message)
+                                <li>{{ $message }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 <div class="form-section">
                     <h2 class="form-section-title">Perimetre PAO</h2>
                     <div class="form-grid">
@@ -74,7 +87,7 @@
                             </select>
                         </div>
                         <div class="md:col-span-2">
-                            <label for="pas_objectif_id">Objectif stratégique</label>
+                            <label for="pas_objectif_id">Objectif stratégique principal</label>
                             <select id="pas_objectif_id" name="pas_objectif_id" required>
                                 <option value="">Sélectionner</option>
                                 @foreach ($objectifOptions as $objectif)
@@ -128,7 +141,7 @@
 
                     <div id="operational-objectives-list" class="space-y-4">
                         @foreach ($oldOperationalObjectives as $objectiveIndex => $objective)
-                            <div class="operational-objective-block rounded-xl border border-[#3996d3]/20 bg-white p-4 shadow-sm" data-operational-objective-block>
+                            <div class="operational-objective-block rounded-lg border border-[#3996d3]/20 bg-white p-4 shadow-sm" data-operational-objective-block>
                                 <input type="hidden" name="objectifs_operationnels[{{ $objectiveIndex }}][id]" value="{{ $objective['id'] ?? '' }}">
                                 <div class="mb-3 flex items-center justify-between gap-3">
                                     <h3 class="text-sm font-bold text-[#1c203d]" data-operational-objective-title>Objectif opérationnel {{ $objectiveIndex + 1 }}</h3>
@@ -136,8 +149,27 @@
                                 </div>
                                 <div class="form-grid">
                                     <div class="md:col-span-2">
+                                        <label for="objectifs_operationnels_{{ $objectiveIndex }}_pas_objectif_id">Objectif stratégique rattaché</label>
+                                        <select id="objectifs_operationnels_{{ $objectiveIndex }}_pas_objectif_id" name="objectifs_operationnels[{{ $objectiveIndex }}][pas_objectif_id]" required data-operational-strategic-objective>
+                                            <option value="">Sélectionner</option>
+                                            @foreach ($objectifOptions as $strategicObjective)
+                                                <option
+                                                    value="{{ $strategicObjective->id }}"
+                                                    data-pas-id="{{ $strategicObjective->pasAxe?->pas_id }}"
+                                                    data-axe-id="{{ $strategicObjective->pas_axe_id }}"
+                                                    data-deadline="{{ optional($strategicObjective->date_echeance)->format('Y-m-d') }}"
+                                                    @selected((int) ($objective['pas_objectif_id'] ?? $selectedObjectifId) === (int) $strategicObjective->id)
+                                                >
+                                                    {{ $strategicObjective->pasAxe?->code }} / {{ $strategicObjective->code }} - {{ $strategicObjective->libelle }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error("objectifs_operationnels.$objectiveIndex.pas_objectif_id") <p class="field-error">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div class="md:col-span-2">
                                         <label for="objectifs_operationnels_{{ $objectiveIndex }}_libelle">Libellé de l'objectif opérationnel</label>
                                         <textarea id="objectifs_operationnels_{{ $objectiveIndex }}_libelle" name="objectifs_operationnels[{{ $objectiveIndex }}][libelle]" required>{{ $objective['libelle'] ?? '' }}</textarea>
+                                        @error("objectifs_operationnels.$objectiveIndex.libelle") <p class="field-error">{{ $message }}</p> @enderror
                                     </div>
                                     <div>
                                         <label for="objectifs_operationnels_{{ $objectiveIndex }}_service_id">Service concerné</label>
@@ -153,10 +185,12 @@
                                                 </option>
                                             @endforeach
                                         </select>
+                                        @error("objectifs_operationnels.$objectiveIndex.service_id") <p class="field-error">{{ $message }}</p> @enderror
                                     </div>
                                     <div>
                                         <label for="objectifs_operationnels_{{ $objectiveIndex }}_echeance">Échéance</label>
                                         <input id="objectifs_operationnels_{{ $objectiveIndex }}_echeance" name="objectifs_operationnels[{{ $objectiveIndex }}][echeance]" type="date" value="{{ $objective['echeance'] ?? '' }}" required data-operational-echeance>
+                                        @error("objectifs_operationnels.$objectiveIndex.echeance") <p class="field-error">{{ $message }}</p> @enderror
                                     </div>
                                     <div class="hidden md:col-span-2">
                                         <label for="objectifs_operationnels_{{ $objectiveIndex }}_description">Description / résultat attendu</label>
@@ -246,7 +280,13 @@
                 var year = (anneeInput.value || '').trim();
                 var hasYear = /^\d{4}$/.test(year);
 
-                document.querySelectorAll('[data-operational-echeance]').forEach(function (input) {
+                document.querySelectorAll('[data-operational-objective-block]').forEach(function (block) {
+                    var input = block.querySelector('[data-operational-echeance]');
+                    var strategicInput = block.querySelector('[data-operational-strategic-objective]');
+                    if (!input) {
+                        return;
+                    }
+
                     if (!hasYear) {
                         input.min = '';
                         input.max = '';
@@ -255,6 +295,14 @@
 
                     input.min = year + '-01-01';
                     input.max = year + '-12-31';
+
+                    if (strategicInput) {
+                        var selectedOption = strategicInput.options[strategicInput.selectedIndex];
+                        var strategicDeadline = selectedOption ? (selectedOption.getAttribute('data-deadline') || '').trim() : '';
+                        if (strategicDeadline && strategicDeadline < input.max) {
+                            input.max = strategicDeadline;
+                        }
+                    }
 
                     if (input.value && (input.value < input.min || input.value > input.max)) {
                         input.value = '';
@@ -288,6 +336,35 @@
                         ? 'Période du PAS parent : ' + meta.periode
                         : 'PAS parent détecté.';
                 }
+
+                filterOperationalObjectivesByPas();
+                syncEcheanceRange();
+            }
+
+            function filterOperationalObjectivesByPas() {
+                var primaryObjectiveId = objectifInput ? (objectifInput.value || '').trim() : '';
+                var selectedPasId = primaryObjectiveId !== '' && objectifMap[primaryObjectiveId]
+                    ? String(objectifMap[primaryObjectiveId].pas_id || '')
+                    : '';
+
+                document.querySelectorAll('[data-operational-strategic-objective]').forEach(function (strategicInput) {
+                    var currentValue = (strategicInput.value || '').trim();
+
+                    Array.prototype.forEach.call(strategicInput.options, function (option, index) {
+                        if (index === 0) {
+                            option.hidden = false;
+                            return;
+                        }
+
+                        var optionPasId = (option.getAttribute('data-pas-id') || '').trim();
+                        var visible = selectedPasId === '' || optionPasId === selectedPasId;
+                        option.hidden = !visible;
+
+                        if (!visible && option.value === currentValue) {
+                            strategicInput.value = '';
+                        }
+                    });
+                });
             }
 
             function filterObjectifsByAxe(resetInvalid) {
@@ -391,8 +468,14 @@
                     field.value = '';
                 });
 
+                var strategicInput = clone.querySelector('[data-operational-strategic-objective]');
+                if (strategicInput && objectifInput) {
+                    strategicInput.value = objectifInput.value;
+                }
+
                 objectivesList.appendChild(clone);
                 renumberObjectives();
+                filterOperationalObjectivesByPas();
                 syncEcheanceRange();
                 filterServicesByDirection();
             }
@@ -408,6 +491,11 @@
                     if (block) {
                         block.remove();
                         renumberObjectives();
+                    }
+                });
+                objectivesList.addEventListener('change', function (event) {
+                    if (event.target.matches('[data-operational-strategic-objective]')) {
+                        syncEcheanceRange();
                     }
                 });
             }
@@ -438,6 +526,7 @@
             syncEcheanceRange();
             filterObjectifsByAxe(false);
             syncStrategicContext();
+            filterOperationalObjectivesByPas();
             filterServicesByDirection();
         })();
     </script>

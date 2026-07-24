@@ -124,17 +124,16 @@
                         <th>Code</th>
                         <th>Titre</th>
                         <th>PAS</th>
-                        <th>Objectif stratégique</th>
+                        <th>Couverture stratégique</th>
                         <th>Direction</th>
+                        <th>Services couverts</th>
                         <th>Année</th>
                         <th>Échéance</th>
                         <th>Statut</th>
                         <th>Nb OO</th>
                         <th>Nb PTA</th>
                         <th>Validateur</th>
-                        @if ($canWrite)
-                            <th>Actions</th>
-                        @endif
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -149,6 +148,17 @@
                             };
                             $canClose = in_array($row->statut, ['en_cours', 'valide'], true);
                             $canArchive = $row->statut === 'cloture';
+                            $strategicCoverage = $row->objectifsOperationnels
+                                ->pluck('pasObjectif')
+                                ->filter()
+                                ->whenEmpty(fn ($collection) => $row->pasObjectif ? collect([$row->pasObjectif]) : $collection)
+                                ->unique('id')
+                                ->values();
+                            $serviceCoverage = $row->objectifsOperationnels
+                                ->pluck('service')
+                                ->filter()
+                                ->unique('id')
+                                ->values();
                         @endphp
                         <tr>
                             <td class="font-mono text-xs text-slate-600">{{ $row->id }}</td>
@@ -156,18 +166,30 @@
                             <td class="font-semibold text-slate-900">{{ $row->titre }}</td>
                             <td>{{ $row->pas?->titre ?? '-' }}</td>
                             <td class="min-w-[240px]">
-                                @if ($row->pasObjectif)
-                                    <div class="font-medium text-slate-900">
-                                        {{ $row->pasObjectif->code }} - {{ $row->pasObjectif->libelle }}
-                                    </div>
-                                    <p class="mt-1 text-xs text-slate-500">
-                                        {{ $row->pasObjectif->pasAxe?->code ? $row->pasObjectif->pasAxe->code.' - '.$row->pasObjectif->pasAxe->libelle : 'Axe non defini' }}
-                                    </p>
-                                @else
-                                    -
-                                @endif
+                                <div class="space-y-2">
+                                    @forelse ($strategicCoverage->take(3) as $strategicObjective)
+                                        <a class="block rounded-md border border-slate-200 px-2 py-1.5 hover:border-[#3996d3] hover:bg-[#f7fbfd]" href="{{ route('workspace.pao.index', ['pas_objectif_id' => $strategicObjective->id]) }}">
+                                            <span class="block text-xs font-bold text-[#17324a]">{{ $strategicObjective->pasAxe?->code }} / {{ $strategicObjective->code }}</span>
+                                            <span class="mt-0.5 block line-clamp-2 text-xs text-slate-600">{{ $strategicObjective->libelle }}</span>
+                                        </a>
+                                    @empty
+                                        <span class="text-slate-500">Non rattaché</span>
+                                    @endforelse
+                                    @if ($strategicCoverage->count() > 3)
+                                        <span class="anbg-badge anbg-badge-info">+{{ $strategicCoverage->count() - 3 }} objectif(s)</span>
+                                    @endif
+                                </div>
                             </td>
                             <td>{{ $row->direction?->code }} {{ $row->direction?->libelle ? '- '.$row->direction->libelle : '' }}</td>
+                            <td class="min-w-[180px]">
+                                <div class="flex flex-wrap gap-1">
+                                    @forelse ($serviceCoverage as $service)
+                                        <span class="anbg-badge anbg-badge-neutral">{{ $service->code ?: $service->libelle }}</span>
+                                    @empty
+                                        <span class="text-slate-500">Aucun service</span>
+                                    @endforelse
+                                </div>
+                            </td>
                             <td class="text-center">{{ $row->annee }}</td>
                             <td class="whitespace-nowrap text-xs text-slate-700">{{ $row->echeance ?? '-' }}</td>
                             <td>
@@ -178,9 +200,10 @@
                             <td class="text-center"><span class="anbg-badge anbg-badge-info px-3">{{ $row->objectifs_operationnels_count ?? 0 }}</span></td>
                             <td class="text-center"><span class="anbg-badge anbg-badge-success px-3">{{ $row->ptas_count }}</span></td>
                             <td>{{ $row->validateur?->name ?? '-' }}</td>
-                            @if ($canWrite)
-                                <td>
-                                    <div class="row-actions">
+                            <td>
+                                <div class="row-actions">
+                                    <a class="btn btn-primary" href="{{ route('workspace.pao.show', $row) }}">Explorer</a>
+                                    @if ($canWrite)
                                         <a class="btn btn-warning" href="{{ route('workspace.pao.edit', $row) }}">Modifier</a>
                                         @if ($canClose)
                                             <form method="POST" action="{{ route('workspace.pao.close', $row) }}" data-confirm-message="Cloturer ce PAO apres controle des anomalies ?" data-confirm-tone="warning" data-confirm-label="Cloturer">
@@ -202,13 +225,13 @@
                                                 <input type="hidden" name="motif" value="Demande de suppression PAO depuis le module PAO">
                                                 <button class="btn btn-danger" type="submit">Supprimer</button>
                                             </form>
-                                    </div>
-                                </td>
-                            @endif
+                                    @endif
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 9 : 8 }}">
+                            <td colspan="14">
                                 <x-ui.empty-state
                                     title="Aucun PAO trouvé"
                                     message="Aucun plan d'actions opérationnel ne correspond aux filtres courants."

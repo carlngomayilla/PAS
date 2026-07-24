@@ -12,13 +12,13 @@ use Illuminate\Support\Facades\DB;
 /**
  * Orchestrateur du workflow de suivi V2 (cf. docs/WORKFLOW-SUIVI-V2.md).
  *
- * Cycle : non_demarre → en_cours → soumis → validé ✓ / rejeté.
+ * Cycle : non_demarre → en_cours → chef → controleur → valide / correction.
  *
  *   - record*Progress() : enregistrement brouillon (Save). Recalcule la
  *     performance PROVISOIRE. Aucune contrainte.
  *   - submit*()         : soumission au chef (Submit). Vérifie la conformité.
- *   - review*()         : décision du chef. Valider fige la performance
- *     OFFICIELLE ; rejeter renvoie à l'agent avec motif.
+ *   - reviewAction()    : visa du chef et ajustement motive eventuel.
+ *   - reviewActionByController() : décision finale et performance officielle.
  *
  * Délègue tout le calcul à ActionPerformanceCalculator (service pur).
  */
@@ -26,18 +26,19 @@ class ActionWorkflowService
 {
     public function __construct(
         private readonly ActionPerformanceCalculator $calculator
-    ) {
-    }
+    ) {}
 
     // ── ACTION SIMPLE (quantitative / non quantitative) ──────────────────────
 
     /**
      * Enregistrement brouillon d'une action simple (Save).
      *
-     * @param array{quantite_realisee?:mixed,commentaire?:?string,difficulte?:?string} $data
+     * @param  array{quantite_realisee?:mixed,commentaire?:?string,difficulte?:?string}  $data
      */
     public function recordActionProgress(Action $action, array $data, ?User $actor = null): Action
     {
+        $this->assertActionExecutionEditable($action);
+
         if ($action->isQuantitative() && array_key_exists('quantite_realisee', $data)) {
             $action->quantite_realisee = max(0.0, (float) ($data['quantite_realisee'] ?? 0));
         }
@@ -54,6 +55,7 @@ class ActionWorkflowService
                 ActionTrackingService::VALIDATION_NON_SOUMISE,
                 ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
                 ActionTrackingService::VALIDATION_REJETEE_CHEF,
+                ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
             ], true) ? $action->statut_validation : ActionTrackingService::VALIDATION_NON_SOUMISE,
         ])->save();
 
@@ -67,12 +69,14 @@ class ActionWorkflowService
     /**
      * Soumission d'une action simple au chef (Submit).
      *
-     * @param array{commentaire?:?string,difficulte?:?string,has_new_proof?:bool} $data
+     * @param  array{commentaire?:?string,difficulte?:?string,has_new_proof?:bool}  $data
      *
      * @throws \InvalidArgumentException si la conformité n'est pas remplie.
      */
     public function submitAction(Action $action, array $data, ?User $actor = null): Action
     {
+        $this->assertActionExecutionEditable($action);
+
         $conformity = $this->calculator->actionConformity(
             $action,
             $data['commentaire'] ?? null,
@@ -96,6 +100,12 @@ class ActionWorkflowService
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
             'soumise_le' => now(),
             'soumise_par' => $actor?->id ?? $action->soumise_par,
+            'chef_progress_percent' => null,
+            'chef_adjustment_reason' => null,
+            'controle_decision' => null,
+            'controle_comment' => null,
+            'controle_reviewed_by' => null,
+            'controle_reviewed_at' => null,
         ])->save();
 
         $this->log($action, 'action_soumise_validation', 'Action soumise au chef de service.', $actor, [
@@ -108,29 +118,45 @@ class ActionWorkflowService
     /**
      * Décision du chef sur une action simple.
      */
-    public function reviewAction(Action $action, bool $approve, ?string $motif, ?User $actor = null): Action
-    {
+    public function reviewAction(
+        Action $action,
+        bool $approve,
+        ?string $motif,
+        ?User $actor = null,
+        ?float $progressPercent = null
+    ): Action {
+        if ((string) $action->statut_validation !== ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
+            throw new \InvalidArgumentException('Cette action n est pas en attente de validation du chef.');
+        }
+
         if ($approve) {
-            $official = $this->calculator->provisionalPerformance($action);
+            $provisional = $this->calculator->provisionalPerformance($action);
+            $proposed = $progressPercent ?? $provisional;
+            if ($proposed < 0.0 || $proposed > 100.0) {
+                throw new \InvalidArgumentException('Le taux propose par le chef doit etre compris entre 0 et 100.');
+            }
+
+            $wasAdjusted = abs($proposed - $provisional) >= 0.01;
+            if ($wasAdjusted && trim((string) $motif) === '') {
+                throw new \InvalidArgumentException('Une justification est obligatoire lorsque le chef ajuste le taux calcule.');
+            }
 
             $action->forceFill([
-                'official_progress_percent' => $official,
-                'progression_reelle' => $official,
-                'statut_performance' => $this->calculator->performanceStatus($official),
-                'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-                'statut' => ActionTrackingService::STATUS_CLOTUREE,
-                'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
-                'date_fin_reelle' => $action->date_fin_reelle ?: now()->toDateString(),
-                'cloture_le' => $action->cloture_le ?: now(),
-                'cloture_par' => $actor?->id ?? $action->cloture_par,
+                'chef_progress_percent' => $proposed,
+                'chef_adjustment_reason' => $wasAdjusted ? trim((string) $motif) : null,
+                'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                'statut' => ActionTrackingService::STATUS_EN_COURS,
+                'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
                 'evalue_le' => now(),
                 'evalue_par' => $actor?->id,
                 'motif_validation_chef' => $motif,
             ])->save();
 
-            $this->log($action, 'action_validee_chef', 'Action validée par le chef de service.', $actor, [
-                'performance_officielle' => $official,
-            ]);
+            $this->log($action, 'action_transmise_controle', 'Action visee par le chef et transmise au controleur.', $actor, [
+                'progression_calculee' => $provisional,
+                'progression_proposee' => $proposed,
+                'ajustement' => $wasAdjusted,
+            ], 'controleur');
 
             return $action->refresh();
         }
@@ -151,15 +177,93 @@ class ActionWorkflowService
         return $action->refresh();
     }
 
+    public function reviewActionByController(
+        Action $action,
+        bool $approve,
+        ?string $comment,
+        User $actor
+    ): Action {
+        if (! $approve && trim((string) $comment) === '') {
+            throw new \InvalidArgumentException('Le motif est obligatoire pour demander une correction.');
+        }
+
+        return DB::transaction(function () use ($action, $approve, $comment, $actor): Action {
+            $lockedAction = Action::query()
+                ->whereKey($action->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ((string) $lockedAction->statut_validation !== ActionTrackingService::VALIDATION_SOUMISE_CONTROLE) {
+                throw new \InvalidArgumentException('Cette action n est pas en attente de controle.');
+            }
+
+            if ($approve) {
+                $official = (float) ($lockedAction->chef_progress_percent
+                    ?? $this->calculator->provisionalPerformance($lockedAction));
+
+                $lockedAction->forceFill([
+                    'official_progress_percent' => $official,
+                    'progression_reelle' => $official,
+                    'statut_performance' => $this->calculator->performanceStatus($official),
+                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
+                    'statut' => ActionTrackingService::STATUS_CLOTUREE,
+                    'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
+                    'date_fin_reelle' => $lockedAction->date_fin_reelle ?: now()->toDateString(),
+                    'cloture_le' => now(),
+                    'cloture_par' => $actor->id,
+                    'controle_decision' => 'valider',
+                    'controle_comment' => $comment,
+                    'controle_reviewed_by' => $actor->id,
+                    'controle_reviewed_at' => now(),
+                ])->save();
+
+                $this->log($lockedAction, 'action_validee_controle', 'Action validee par le controleur.', $actor, [
+                    'performance_officielle' => $official,
+                ], 'responsable');
+
+                return $lockedAction->refresh();
+            }
+
+            $lockedAction->forceFill([
+                'statut_validation' => ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+                'statut' => ActionTrackingService::STATUS_A_CORRIGER,
+                'statut_dynamique' => ActionTrackingService::STATUS_A_CORRIGER,
+                'controle_decision' => 'rejeter',
+                'controle_comment' => trim((string) $comment),
+                'controle_reviewed_by' => $actor->id,
+                'controle_reviewed_at' => now(),
+            ])->save();
+
+            if ($lockedAction->isComposee()) {
+                $lockedAction->sousActions()
+                    ->where('validation_status', SousAction::VALIDATION_VALIDEE)
+                    ->update([
+                        'validation_status' => SousAction::VALIDATION_REJETEE,
+                        'statut' => 'rejetee_a_corriger',
+                        'est_effectuee' => false,
+                        'completed_at' => null,
+                    ]);
+            }
+
+            $this->log($lockedAction, 'action_rejetee_controle', 'Action renvoyee par le controleur pour correction.', $actor, [
+                'motif' => $comment,
+            ], 'responsable');
+
+            return $lockedAction->refresh();
+        });
+    }
+
     // ── SOUS-ACTION (action composée) ────────────────────────────────────────
 
     /**
      * Enregistrement brouillon d'une sous-action (Save).
      *
-     * @param array{quantite_realisee?:mixed,resultat_obtenu?:?string,commentaire?:?string} $data
+     * @param  array{quantite_realisee?:mixed,resultat_obtenu?:?string,commentaire?:?string}  $data
      */
     public function recordSubActionProgress(SousAction $sousAction, array $data, ?User $actor = null): SousAction
     {
+        $this->assertSubActionExecutionEditable($sousAction);
+
         if ($sousAction->isQuantitative() && array_key_exists('quantite_realisee', $data)) {
             $sousAction->quantite_realisee = max(0.0, (float) ($data['quantite_realisee'] ?? 0));
         }
@@ -183,12 +287,13 @@ class ActionWorkflowService
     /**
      * Soumission d'une sous-action au chef.
      *
-     * @param array{commentaire?:?string,difficulte?:?string,has_new_proof?:bool} $data
+     * @param  array{commentaire?:?string,difficulte?:?string,has_new_proof?:bool}  $data
      *
      * @throws \InvalidArgumentException si la conformité n'est pas remplie.
      */
     public function submitSubAction(SousAction $sousAction, array $data, ?User $actor = null): SousAction
     {
+        $this->assertSubActionExecutionEditable($sousAction);
         $this->assertSubActionConformity($sousAction, $data);
 
         $provisional = $this->calculator->subActionPerformance($sousAction);
@@ -211,6 +316,10 @@ class ActionWorkflowService
      */
     public function reviewSubAction(SousAction $sousAction, bool $approve, ?string $motif, ?User $actor = null): SousAction
     {
+        if ((string) $sousAction->validation_status !== SousAction::VALIDATION_SOUMISE) {
+            throw new \InvalidArgumentException('Cette sous-action n est pas en attente de validation du chef.');
+        }
+
         if ($approve) {
             $official = $this->calculator->subActionPerformance($sousAction);
             $sousAction->forceFill([
@@ -238,6 +347,50 @@ class ActionWorkflowService
         return $sousAction;
     }
 
+    private function assertActionExecutionEditable(Action $action): void
+    {
+        if ((string) ($action->statut_parametrage ?? '') === 'a_parametrer') {
+            throw new \InvalidArgumentException('Cette action doit etre parametree avant le suivi.');
+        }
+
+        if (! in_array((string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE), [
+            ActionTrackingService::VALIDATION_NON_SOUMISE,
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+            ActionTrackingService::VALIDATION_REJETEE_CHEF,
+            ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+        ], true)) {
+            throw new \InvalidArgumentException('Cette action est gelee pendant la validation.');
+        }
+
+        $lifecycleStatus = (string) ($action->statut_dynamique ?: $action->statut ?: '');
+        if (in_array($lifecycleStatus, [
+            ActionTrackingService::STATUS_SUSPENDU,
+            ActionTrackingService::STATUS_ANNULE,
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+            ActionTrackingService::STATUS_CLOTUREE,
+            'cloture',
+            'archive',
+        ], true)) {
+            throw new \InvalidArgumentException('Cette action est suspendue, terminee ou cloturee.');
+        }
+    }
+
+    private function assertSubActionExecutionEditable(SousAction $sousAction): void
+    {
+        if (! in_array((string) ($sousAction->validation_status ?? SousAction::VALIDATION_NON_SOUMISE), [
+            SousAction::VALIDATION_NON_SOUMISE,
+            SousAction::VALIDATION_REJETEE,
+        ], true)) {
+            throw new \InvalidArgumentException('Cette sous-action est gelee pendant ou apres sa validation.');
+        }
+
+        $action = $sousAction->action;
+        if ($action instanceof Action) {
+            $this->assertActionExecutionEditable($action);
+        }
+    }
+
     /**
      * Recalcule la performance d'une action composee depuis ses sous-actions.
      * La validation des sous-actions declenche la validation finale du parent.
@@ -252,7 +405,8 @@ class ActionWorkflowService
             && $subActions->every(fn (SousAction $sa): bool => (string) $sa->validation_status === SousAction::VALIDATION_VALIDEE);
         $validationStatus = (string) $action->statut_validation;
         $alreadySubmitted = $validationStatus === ActionTrackingService::VALIDATION_SOUMISE_CHEF;
-        $alreadyValidated = $validationStatus === ActionTrackingService::VALIDATION_VALIDEE_CHEF;
+        $alreadyInControl = $validationStatus === ActionTrackingService::VALIDATION_SOUMISE_CONTROLE;
+        $alreadyValidated = $validationStatus === ActionTrackingService::VALIDATION_VALIDEE_CONTROLE;
 
         $payload = [
             'progression_reelle' => $provisional,
@@ -263,6 +417,9 @@ class ActionWorkflowService
             if ($alreadyValidated) {
                 $payload['statut'] = ActionTrackingService::STATUS_CLOTUREE;
                 $payload['statut_dynamique'] = ActionTrackingService::STATUS_CLOTUREE;
+            } elseif ($alreadyInControl) {
+                $payload['statut'] = ActionTrackingService::STATUS_EN_COURS;
+                $payload['statut_dynamique'] = ActionTrackingService::STATUS_EN_COURS;
             } else {
                 $payload['statut_validation'] = ActionTrackingService::VALIDATION_SOUMISE_CHEF;
                 $payload['statut'] = ActionTrackingService::STATUS_EN_COURS;
@@ -281,7 +438,7 @@ class ActionWorkflowService
 
         $action->forceFill($payload)->save();
 
-        if ($allValidated && ! $alreadySubmitted && ! $alreadyValidated) {
+        if ($allValidated && ! $alreadySubmitted && ! $alreadyInControl && ! $alreadyValidated) {
             $this->log($action, 'action_soumise_validation', 'Action composee soumise au chef de service (toutes les sous-actions sont validees).', $actor, [
                 'progression_provisoire' => $provisional,
             ]);
@@ -291,7 +448,7 @@ class ActionWorkflowService
     }
 
     /**
-     * @param array{commentaire?:?string,difficulte?:?string,has_new_proof?:bool} $data
+     * @param  array{commentaire?:?string,difficulte?:?string,has_new_proof?:bool}  $data
      */
     private function assertSubActionConformity(SousAction $sousAction, array $data): void
     {
@@ -319,18 +476,24 @@ class ActionWorkflowService
     }
 
     /**
-     * @param array<string, mixed> $details
+     * @param  array<string, mixed>  $details
      */
-    private function log(Action $action, string $event, string $message, ?User $actor, array $details = []): void
-    {
-        DB::afterCommit(function () use ($action, $event, $message, $actor, $details): void {
+    private function log(
+        Action $action,
+        string $event,
+        string $message,
+        ?User $actor,
+        array $details = [],
+        string $targetRole = 'chef_service'
+    ): void {
+        DB::afterCommit(function () use ($action, $event, $message, $actor, $details, $targetRole): void {
             ActionLog::query()->create([
                 'action_id' => (int) $action->id,
                 'niveau' => 'info',
                 'type_evenement' => $event,
                 'message' => $message,
                 'details' => $details,
-                'cible_role' => 'chef_service',
+                'cible_role' => $targetRole,
                 'utilisateur_id' => $actor?->id,
             ]);
         });

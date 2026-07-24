@@ -2,8 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\RetentionRun;
 use App\Models\User;
-use App\Services\PlanningAutoArchiveService;
+use App\Services\Governance\RetentionOperationService;
 use Illuminate\Console\Command;
 
 class RunPlanningAutoArchiveCommand extends Command
@@ -12,7 +13,7 @@ class RunPlanningAutoArchiveCommand extends Command
 
     protected $description = 'Execute un dry-run ou l archivage automatique des PAO/PTA clotures.';
 
-    public function handle(PlanningAutoArchiveService $archiveService): int
+    public function handle(RetentionOperationService $retentionOperationService): int
     {
         $actor = null;
         $actorId = $this->option('actor_id');
@@ -20,9 +21,18 @@ class RunPlanningAutoArchiveCommand extends Command
             $actor = User::query()->find((int) $actorId);
         }
 
-        $result = $archiveService->run((bool) $this->option('execute'), $actor);
+        $operation = $retentionOperationService->run(
+            RetentionRun::SCOPE_PLANNING,
+            (bool) $this->option('execute'),
+            $actor,
+            'console',
+            null,
+            'artisan anbg:planning-auto-archive'
+        );
+        $result = $operation['result'];
 
         $this->info('Mode: '.($result['mode'] ?? 'dry-run'));
+        $this->line('Execution: #'.$operation['run']->id);
         $this->line('Archivage actif: '.((bool) ($result['enabled'] ?? false) ? 'oui' : 'non'));
 
         $archived = is_array($result['archived'] ?? null) ? $result['archived'] : [];

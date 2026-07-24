@@ -1,5 +1,4 @@
 @php
-    $parameterUrl = trim((string) ($parameterUrl ?? ''));
     $trackingUrl = trim((string) ($trackingUrl ?? ''));
 @endphp
 
@@ -17,9 +16,6 @@
                     <x-pta.status-badge type="delai" :status="$row['statut_delai'] ?? 'dans_les_delais'" :label="$row['statut_delai_label'] ?? null" />
                 </div>
                 <div class="pta-suivi-detail-actions">
-                    @if ($parameterUrl !== '')
-                        <a class="btn btn-primary btn-sm pta-suivi-detail-primary rounded-lg px-3 py-2 text-xs" href="{{ $parameterUrl }}">Parametrer dans le PTA</a>
-                    @endif
                     @if ($trackingUrl !== '')
                         <a class="btn btn-secondary btn-sm pta-suivi-detail-secondary rounded-lg px-3 py-2 text-xs" href="{{ $trackingUrl }}">Ouvrir le suivi</a>
                     @endif

@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use App\Services\Imports\PlanningExcelImportService;
 use Illuminate\Support\Arr;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -127,7 +128,7 @@ class PtaImportTemplateAnalyzerService
     private function columnsFromSheet(Worksheet $sheet): array
     {
         $highestColumn = $sheet->getHighestDataColumn();
-        $values = Arr::flatten($sheet->rangeToArray('A1:'.$highestColumn.'1', null, true, false));
+        $values = $this->rowValues($sheet, 1, $highestColumn);
 
         return array_values(array_filter(array_map(
             static fn (mixed $value): string => trim((string) $value),
@@ -144,12 +145,12 @@ class PtaImportTemplateAnalyzerService
         $highestColumn = $sheet->getHighestDataColumn();
         $headers = array_map(
             static fn (mixed $value): string => trim((string) $value),
-            Arr::flatten($sheet->rangeToArray('A1:'.$highestColumn.'1', null, true, false))
+            $this->rowValues($sheet, 1, $highestColumn)
         );
 
         $rows = [];
         for ($rowNumber = 2; $rowNumber <= $highestRow; $rowNumber++) {
-            $values = Arr::flatten($sheet->rangeToArray('A'.$rowNumber.':'.$highestColumn.$rowNumber, null, true, false));
+            $values = $this->rowValues($sheet, $rowNumber, $highestColumn);
             if (collect($values)->every(static fn (mixed $value): bool => trim((string) $value) === '')) {
                 continue;
             }
@@ -165,6 +166,45 @@ class PtaImportTemplateAnalyzerService
         }
 
         return $rows;
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private function rowValues(Worksheet $sheet, int $rowNumber, string $highestColumn): array
+    {
+        $values = [];
+        $highestIndex = Coordinate::columnIndexFromString($highestColumn);
+
+        for ($columnIndex = 1; $columnIndex <= $highestIndex; $columnIndex++) {
+            $values[] = $this->normalizeCellValue($sheet->getCell([$columnIndex, $rowNumber])->getCalculatedValue());
+        }
+
+        return $values;
+    }
+
+    private function normalizeCellValue(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '' || $trimmed !== $value) {
+            return $value;
+        }
+
+        if (preg_match('/^-?(?:0|[1-9]\d*)$/', $trimmed) === 1) {
+            $digits = ltrim($trimmed, '-');
+
+            return strlen($digits) < strlen((string) PHP_INT_MAX) ? (int) $trimmed : $value;
+        }
+
+        if (preg_match('/^-?(?:0|[1-9]\d*)\.\d+$/', $trimmed) === 1) {
+            return (float) $trimmed;
+        }
+
+        return $value;
     }
 
     /**

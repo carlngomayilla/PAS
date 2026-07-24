@@ -54,7 +54,8 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/workspace/pilotage')
-            ->assertRedirect('/dashboard');
+            ->assertOk()
+            ->assertSee('Pilotage PAS/PAO/PTA');
 
         $this->actingAs($admin)
             ->get('/workspace/reporting')
@@ -68,7 +69,7 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/workspace/audit')
             ->assertOk()
-            ->assertSee("Journal d'audit", false);
+            ->assertSee('Journal d’audit', false);
 
         $this->actingAs($admin)
             ->get('/workspace/referentiel/directions')
@@ -234,13 +235,16 @@ class WebWorkspaceTest extends TestCase
         $this->actingAs($admin)
             ->get('/dashboard?dashboardTab=charts')
             ->assertOk()
-            ->assertSee('Analyse')
-            ->assertSee('Statuts par')
-            ->assertSee('dashboard-agent-gauge', false)
-            ->assertSee('dashboard-agent-top', false)
-            ->assertSee('dashboard-agent-3d', false)
-            ->assertSee('dashboard-agent-heatmap', false)
-            ->assertSee('dashboard-report-status-unit-chart', false)
+            ->assertSee("Évolution de l'avancement du PAS", false)
+            ->assertSee('Exécution trimestrielle des PTA')
+            ->assertSee('Répartition des actions par statut')
+            ->assertSee('Lecture des niveaux de pilotage')
+            ->assertDontSee('dashboard-agent-gauge', false)
+            ->assertDontSee('dashboard-agent-top', false)
+            ->assertDontSee('dashboard-agent-3d', false)
+            ->assertDontSee('dashboard-agent-heatmap', false)
+            ->assertDontSee('dashboard-report-status-unit-chart', false)
+            ->assertDontSee('dashboard-kpi-gauge-', false)
             ->assertSee('analytics-explorer-title', false);
 
         // Le bloc « Analytique disponible » (qui contenait le bouton « Tableau de bord analytique »)
@@ -257,11 +261,16 @@ class WebWorkspaceTest extends TestCase
     {
         $dg = User::query()->where('email', 'ingrid@anbg.ga')->firstOrFail();
 
-        $this->actingAs($dg)
+        $content = $this->actingAs($dg)
             ->get('/dashboard')
             ->assertOk()
-            ->assertDontSee(route('workspace.actions.index'), false)
-            ->assertSee('status_chart_enabled":false', false);
+            ->assertSee('status_chart_enabled":false', false)
+            ->getContent();
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/<a[^>]+href="'.preg_quote(route('workspace.actions.index'), '/').'"[^>]+data-dashboard-primary-kpi/',
+            $content
+        );
     }
 
     public function test_admin_layout_disables_global_content_auto_refresh(): void
@@ -281,7 +290,8 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($dg)
             ->get('/workspace/pilotage')
-            ->assertRedirect('/dashboard');
+            ->assertOk()
+            ->assertSee('Pilotage PAS/PAO/PTA');
 
         $this->assertStringContainsString('without_pao=1', route('workspace.pas.index', ['without_pao' => 1]));
         $this->assertStringContainsString('without_kpi=1', route('workspace.actions.index', ['without_kpi' => 1]));
@@ -327,7 +337,8 @@ class WebWorkspaceTest extends TestCase
 
         $this->actingAs($serviceUser)
             ->get('/workspace/pilotage')
-            ->assertRedirect('/dashboard');
+            ->assertOk()
+            ->assertSee('Pilotage PAS/PAO/PTA');
 
         $this->actingAs($serviceUser)
             ->get('/workspace/justificatifs')
@@ -681,7 +692,7 @@ class WebWorkspaceTest extends TestCase
             'date_fin' => '2026-11-30',
             'date_echeance' => '2026-11-30',
             'statut_dynamique' => ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             'observations' => 'Liste des formations fournie',
         ]);
         Kpi::query()->create([
@@ -777,7 +788,7 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringContainsString('JUSTIFICATIFS', (string) $workbookXml);
         $this->assertStringNotContainsString('Synthèse graphique', (string) $workbookXml);
         $this->assertStringContainsString('Rapport Consolidé DG - PAS ANBG', (string) $sheetOneXml);
-        $this->assertStringContainsString('Base statistique : Validation chef de service', (string) $sheetOneXml);
+        $this->assertStringContainsString('Base statistique : Validation finale SCIQ / Planification', (string) $sheetOneXml);
         $this->assertStringContainsString('Plan d', (string) $sheetOneXml);
         $this->assertStringContainsString('Axes strat', (string) $sheetOneXml);
         $this->assertStringContainsString('Tableau 1 : Axes &amp; Objectifs stratégiques', (string) $sheetTwoXml);
@@ -804,7 +815,7 @@ class WebWorkspaceTest extends TestCase
         $this->assertNotEmpty($serviceSheetXmls);
         foreach ($serviceSheetXmls as $serviceSheetXml) {
             $this->assertStringContainsString('Indicateurs de mesure', (string) $serviceSheetXml);
-            $this->assertStringContainsString('Performance en fonction de la cible', (string) $serviceSheetXml);
+            $this->assertStringContainsString('Performance en fonction du seuil', (string) $serviceSheetXml);
             $this->assertStringContainsString('TAUX DE REALISATION GLOBAL', (string) $serviceSheetXml);
             $this->assertStringContainsString('Preuves transmises dans les délais définis', (string) $serviceSheetXml);
             $this->assertStringContainsString('dimension ref="A1:L', (string) $serviceSheetXml);
@@ -846,7 +857,7 @@ class WebWorkspaceTest extends TestCase
         $this->assertStringNotContainsString('<th>Direction</th><th>Service</th><th>Axe stratégique</th>', $html);
         $this->assertStringNotContainsString('Provisoire', $html);
         $this->assertStringNotContainsString('Officiel', $html);
-        $this->assertStringContainsString('Base statistique : Validation chef de service', $html);
+        $this->assertStringContainsString('Base statistique : Validation finale SCIQ / Planification', $html);
         $this->assertStringNotContainsString('level-badge level-officiel', $html);
     }
 

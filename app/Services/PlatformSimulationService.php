@@ -16,8 +16,7 @@ class PlatformSimulationService
         private readonly WorkflowSettings $workflowSettings,
         private readonly DashboardProfileSettings $dashboardProfileSettings,
         private readonly ManagedKpiSettings $managedKpiSettings
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, string|int|bool|null>  $payload
@@ -26,7 +25,16 @@ class PlatformSimulationService
     public function simulate(array $payload): array
     {
         $actions = Action::query()
-            ->with('actionKpi:id,action_id,kpi_global')
+            ->select([
+                'id',
+                'progression_reelle',
+                'date_fin_reelle',
+                'cloture_le',
+                'statut',
+                'statut_dynamique',
+                'statut_validation',
+            ])
+            ->with('actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_global')
             ->get();
 
         $currentThreshold = $this->actionCalculationSettings->statisticalScope();
@@ -43,26 +51,21 @@ class PlatformSimulationService
         $simulatedAutoComplete = (string) ($payload['actions_auto_complete_when_target_reached'] ?? ($currentAutoComplete ? '1' : '0')) === '1';
 
         $currentServiceEnabled = $this->workflowSettings->serviceValidationEnabled();
-        $currentDirectionEnabled = false;
-        $simulatedServiceEnabled = (string) ($payload['actions_service_validation_enabled'] ?? ($currentServiceEnabled ? '1' : '0')) === '1';
+        $currentDirectionEnabled = $this->workflowSettings->directionValidationEnabled();
+        $simulatedServiceEnabled = true;
         $simulatedDirectionEnabled = false;
 
         $autoCompleteCandidates = $actions
             ->filter(function (Action $action): bool {
                 return (float) ($action->progression_reelle ?? 0) >= 100
-                    && $action->date_fin_reelle === null
-                    && ! in_array((string) ($action->statut_dynamique ?? ''), [
-                        ActionTrackingService::STATUS_SUSPENDU,
-                        ActionTrackingService::STATUS_ANNULE,
-                    ], true);
+                    && ! $this->isTerminal($action);
             })
             ->count();
 
-        $openActions = $actions->filter(function (Action $action): bool {
-            return ! in_array((string) ($action->statut_validation ?? ''), [
-                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
-            ], true);
-        })->values();
+        $openActions = $actions
+            ->reject(fn (Action $action): bool => $this->isTerminal($action))
+            ->values();
+        $terminalActionsTotal = $actions->count() - $openActions->count();
 
         return [
             'current' => [
@@ -102,6 +105,15 @@ class PlatformSimulationService
                 'official_average_score_delta' => round($this->averageScore($simulatedStatistical) - $this->averageScore($currentStatistical), 2),
                 'closure_eligible_actions_delta' => $this->countClosureEligible($openActions, $simulatedClosureProgress) - $this->countClosureEligible($openActions, $currentClosureProgress),
                 'auto_complete_candidates' => $autoCompleteCandidates,
+                'workflow_changed' => $currentServiceEnabled !== $simulatedServiceEnabled
+                    || $currentDirectionEnabled !== $simulatedDirectionEnabled,
+            ],
+            'population' => [
+                'actions_total' => $actions->count(),
+                'statistical_actions_total' => $simulatedStatistical->count(),
+                'excluded_actions_total' => $actions->count() - $simulatedStatistical->count(),
+                'open_actions_total' => $openActions->count(),
+                'terminal_actions_total' => $terminalActionsTotal,
             ],
             'dashboard_preview' => [
                 'dg' => [
@@ -118,7 +130,12 @@ class PlatformSimulationService
                 $currentServiceEnabled,
                 $simulatedServiceEnabled,
                 $currentDirectionEnabled,
-                $simulatedDirectionEnabled
+                $simulatedDirectionEnabled,
+                $currentClosureProgress,
+                $simulatedClosureProgress,
+                $currentAutoComplete,
+                $simulatedAutoComplete,
+                $autoCompleteCandidates
             ),
             'payload' => [
                 'actions_service_validation_enabled' => '1',
@@ -140,7 +157,7 @@ class PlatformSimulationService
         return [
             'delai' => $average('kpi_delai'),
             'performance' => $average('kpi_performance'),
-            'conformite' => $average('kpi_conformite'),
+            'conformite' => 0.0,
             'global' => $average('kpi_global'),
             'progression' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2),
         ];
@@ -204,11 +221,38 @@ class PlatformSimulationService
         bool $currentServiceEnabled,
         bool $simulatedServiceEnabled,
         bool $currentDirectionEnabled,
-        bool $simulatedDirectionEnabled
+        bool $simulatedDirectionEnabled,
+        int $currentClosureProgress,
+        int $simulatedClosureProgress,
+        bool $currentAutoComplete,
+        bool $simulatedAutoComplete,
+        int $autoCompleteCandidates
     ): array {
         $warnings = [];
 
-        $warnings[] = 'La simulation conserve le circuit cible : agent vers chef de service.';
+        if ($currentServiceEnabled !== $simulatedServiceEnabled) {
+            $warnings[] = 'Le scénario rétablit le visa obligatoire du chef de service.';
+        }
+
+        if ($currentDirectionEnabled !== $simulatedDirectionEnabled) {
+            $warnings[] = 'Le scénario retire la validation de direction du circuit opérationnel.';
+        }
+
+        if ($currentClosureProgress !== $simulatedClosureProgress) {
+            $warnings[] = 'Le seuil de clôture passe de '.$currentClosureProgress.' % à '.$simulatedClosureProgress.' %.';
+        }
+
+        if (! $currentAutoComplete && $simulatedAutoComplete && $autoCompleteCandidates > 0) {
+            $warnings[] = $autoCompleteCandidates.' action(s) à 100 % recevraient automatiquement une date de fin réelle.';
+        }
+
+        if ($currentAutoComplete && ! $simulatedAutoComplete) {
+            $warnings[] = 'La clôture automatique serait désactivée pour les prochains suivis.';
+        }
+
+        if ($warnings === []) {
+            $warnings[] = 'Le scénario respecte la configuration publiée ; aucun écart structurel détecté.';
+        }
 
         return $warnings;
     }
@@ -274,6 +318,42 @@ class PlatformSimulationService
 
     private function chainLabel(bool $serviceEnabled, bool $directionEnabled): string
     {
-        return 'Agent -> Chef de service';
+        $steps = ['Agent'];
+
+        if ($serviceEnabled) {
+            $steps[] = 'Chef de service';
+        }
+
+        if ($directionEnabled) {
+            $steps[] = 'Direction';
+        }
+
+        $steps[] = 'Controleur';
+
+        return implode(' -> ', $steps);
+    }
+
+    private function isTerminal(Action $action): bool
+    {
+        return $action->date_fin_reelle !== null
+            || $action->cloture_le !== null
+            || in_array((string) ($action->statut_validation ?? ''), [
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ], true)
+            || in_array((string) ($action->statut ?? ''), [
+                ActionTrackingService::STATUS_SUSPENDU,
+                ActionTrackingService::STATUS_ANNULE,
+                ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_CLOTUREE,
+            ], true)
+            || in_array((string) ($action->statut_dynamique ?? ''), [
+                ActionTrackingService::STATUS_SUSPENDU,
+                ActionTrackingService::STATUS_ANNULE,
+                ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+                ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+                ActionTrackingService::STATUS_CLOTUREE,
+            ], true);
     }
 }

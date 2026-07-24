@@ -13,8 +13,8 @@ use Tests\TestCase;
 
 class SuperAdminOrgUsersTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -88,20 +88,28 @@ class SuperAdminOrgUsersTest extends TestCase
         $firstPasswordHash = (string) $agent->fresh()->password;
         $secondPasswordHash = (string) $secondAgent->fresh()->password;
 
-        $this->actingAs($superAdmin)
+        $resetResponse = $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.users.bulk'), [
                 'user_ids' => [$agent->id, $secondAgent->id],
                 'bulk_action' => 'reset_password',
             ])
-            ->assertRedirect(route('workspace.super-admin.organization.index'));
+            ->assertRedirect(route('workspace.super-admin.organization.index'))
+            ->assertSessionHas('temporary_credentials');
 
-        // Le mot de passe est aleatoire: on verifie seulement qu il a change sur chaque compte.
         $agent->refresh();
         $secondAgent->refresh();
+        $credentials = collect($resetResponse->getSession()->get('temporary_credentials'));
+        $agentPassword = (string) $credentials->firstWhere('user', $agent->email)['password'];
+        $secondAgentPassword = (string) $credentials->firstWhere('user', $secondAgent->email)['password'];
         $this->assertNotEmpty($agent->password);
         $this->assertNotEmpty($secondAgent->password);
         $this->assertNotSame($firstPasswordHash, $agent->password);
         $this->assertNotSame($secondPasswordHash, $secondAgent->password);
+        $this->assertNotSame($agentPassword, $secondAgentPassword);
+        $this->assertTrue(Hash::check($agentPassword, $agent->password));
+        $this->assertTrue(Hash::check($secondAgentPassword, $secondAgent->password));
+        $this->assertNull($agent->password_changed_at);
+        $this->assertNull($secondAgent->password_changed_at);
         $this->assertDatabaseHas('journal_audit', [
             'module' => 'super_admin',
             'action' => 'organization_user_bulk_reset_password',
@@ -147,6 +155,4 @@ class SuperAdminOrgUsersTest extends TestCase
             'service_id' => $service->id,
         ]);
     }
-
 }
-

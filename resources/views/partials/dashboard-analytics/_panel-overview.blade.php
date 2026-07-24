@@ -261,48 +261,16 @@
             ->values()
             ->all();
     @endphp
-    {{-- Cartes statistiques : memes dimensions et structure que <x-ui.stat-card>
-         utilisee dans les autres pages (min-w-[150px] max-w-[220px], px-4 py-3,
-         label en haut, valeur en bas, badge tendance optionnel). --}}
-    @if ($kpiStatCards !== [])
-        <div class="mx-auto mb-3 flex w-full max-w-5xl flex-wrap justify-center gap-2">
-            @foreach ($kpiStatCards as $ksc)
-                @php
-                    $trendUp   = ($ksc['trend'] ?? null) === 'up';
-                    $trendDown = ($ksc['trend'] ?? null) === 'down';
-                @endphp
-                <a href="{{ $ksc['href'] }}" class="no-kpi-band stat-card app-card min-w-[150px] max-w-[220px] flex-1 rounded-xl border border-[#3996d3]/30 bg-white px-4 py-3 text-center shadow-sm transition" style="--kpi-accent:{{ $ksc['accent'] }};" data-dashboard-primary-kpi>
-                    <div class="flex min-h-[4.5rem] flex-col items-center justify-center gap-2">
-                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style="color:{{ $ksc['accent'] }}; background:color-mix(in srgb, {{ $ksc['accent'] }} 12%, transparent);">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                 stroke-linejoin="round" aria-hidden="true">{!! $ksc['icon'] !!}</svg>
-                        </div>
-                        <div class="min-w-0">
-                            <p class="truncate text-center text-[11px] font-bold uppercase tracking-wide text-[#667085]">{{ $ksc['label'] }}</p>
-                            <p class="mt-1 text-center text-xl font-extrabold leading-none" style="color:{{ $ksc['accent'] }};">{{ $ksc['value'] }}</p>
-                        </div>
-                    </div>
-                    @if (!is_null($ksc['trend'] ?? null))
-                        <div class="mt-2 flex justify-center">
-                            <span class="app-badge app-badge-{{ $trendUp ? 'success' : ($trendDown ? 'danger' : 'neutral') }}">
-                                @if ($trendUp)
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
-                                @elseif ($trendDown)
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
-                                @else
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                @endif
-                                <span class="ml-1">{{ $ksc['trendLabel'] ?? '' }}</span>
-                            </span>
-                        </div>
-                    @endif
-                </a>
-            @endforeach
-        </div>
-    @endif
-
-    @include('partials.dashboard-analytics._panel-synthesis-hierarchy')
+    @include('dashboard.partials.command-center', [
+        'roleHero' => $roleHero,
+        'dashboardRole' => $dashboardRole,
+        'summaryStrip' => $summaryStrip,
+        'deadlineExtensionSummary' => $deadlineExtensionSummary,
+        'workflowCounts' => $workflowCounts,
+        'alertCounts' => $alertCounts,
+        'ptaSuiviQuery' => $ptaSuiviQuery,
+        'canOpenPtaSuivi' => $canOpenPtaSuivi,
+    ])
 
     @if (($showLegacySynthesisProgressCards ?? false) && !in_array($dashboardRole, ['agent'], true))
     <div class="mb-4 w-full space-y-3">
@@ -460,6 +428,8 @@
         @endif
     </div>
     @endif
+
+    @include('partials.dashboard-analytics._panel-synthesis-hierarchy')
 
     @if (($showSynthesisTablesInOverview ?? false) && $directionSynthesisTables !== [])
         <section class="mb-3">

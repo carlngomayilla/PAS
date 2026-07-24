@@ -25,6 +25,7 @@
         'controle' => 'controle',
         'notifications' => 'notifications',
         'financement', 'financements_critiques' => 'financement',
+        'reports_echeance' => 'workflow',
         'synthese_agence' => 'synthese',
         'arbitrages' => 'arbitrages',
         'rapports_consolides' => 'reporting',
@@ -116,24 +117,23 @@
             'display_order' => $moduleOrder('pta', 60),
         ];
     }
-    if ($canSeeModule('imports_excel')) {
+    $visibleImportModuleCodes = collect(['imports_excel', 'ai_imports'])
+        ->filter(fn (string $code): bool => $canSeeModule($code))
+        ->values()
+        ->all();
+    if ($visibleImportModuleCodes !== []) {
+        $hasManualImports = in_array('imports_excel', $visibleImportModuleCodes, true);
         $planningItems[] = [
-            'code' => 'imports_excel',
-            'label' => $moduleLabel('imports_excel', 'Imports Excel'),
-            'route' => 'workspace.imports.index',
+            'code' => 'imports',
+            'module_codes' => $visibleImportModuleCodes,
+            'label' => 'Imports',
+            'route' => $hasManualImports ? 'workspace.imports.index' : 'workspace.ai-imports.pta.index',
             'icon' => 'docs',
-            'patterns' => ['workspace.imports.*'],
-            'display_order' => $moduleOrder('imports_excel', 55),
-        ];
-    }
-    if ($canSeeModule('ai_imports')) {
-        $planningItems[] = [
-            'code' => 'ai_imports',
-            'label' => $moduleLabel('ai_imports', 'IA & Imports'),
-            'route' => 'workspace.ai-imports.pta.index',
-            'icon' => 'docs',
-            'patterns' => ['workspace.ai-imports.*'],
-            'display_order' => $moduleOrder('ai_imports', 56),
+            'patterns' => ['workspace.imports.*', 'workspace.ai-imports.*'],
+            'display_order' => min(
+                $hasManualImports ? $moduleOrder('imports_excel', 55) : PHP_INT_MAX,
+                in_array('ai_imports', $visibleImportModuleCodes, true) ? $moduleOrder('ai_imports', 56) : PHP_INT_MAX,
+            ),
         ];
     }
     if ($planningItems !== []) {
@@ -169,24 +169,23 @@
     }
 
     $pilotageItems = [];
-    if ($canSeeModule('reporting')) {
+    $visibleReportingModuleCodes = collect(['reporting', 'ai_reports'])
+        ->filter(fn (string $code): bool => $canSeeModule($code))
+        ->values()
+        ->all();
+    if ($visibleReportingModuleCodes !== []) {
+        $hasInstitutionalReporting = in_array('reporting', $visibleReportingModuleCodes, true);
         $pilotageItems[] = [
             'code' => 'reporting',
-            'label' => $moduleLabel('reporting', 'Reporting'),
-            'route' => 'workspace.reporting',
+            'module_codes' => $visibleReportingModuleCodes,
+            'label' => 'Reporting',
+            'route' => $hasInstitutionalReporting ? 'workspace.reporting' : 'workspace.ai-reports.index',
             'icon' => 'reporting',
-            'patterns' => ['workspace.reporting', 'workspace.reporting.*'],
-            'display_order' => $moduleOrder('reporting', 70),
-        ];
-    }
-    if ($canSeeModule('ai_reports')) {
-        $pilotageItems[] = [
-            'code' => 'ai_reports',
-            'label' => $moduleLabel('ai_reports', 'Rapports IA'),
-            'route' => 'workspace.ai-reports.index',
-            'icon' => 'reporting',
-            'patterns' => ['workspace.ai-reports.*'],
-            'display_order' => $moduleOrder('ai_reports', 72),
+            'patterns' => ['workspace.reporting', 'workspace.reporting.*', 'workspace.ai-reports.*'],
+            'display_order' => min(
+                $hasInstitutionalReporting ? $moduleOrder('reporting', 70) : PHP_INT_MAX,
+                in_array('ai_reports', $visibleReportingModuleCodes, true) ? $moduleOrder('ai_reports', 72) : PHP_INT_MAX,
+            ),
         ];
     }
     if ($pilotageItems !== []) {
@@ -212,6 +211,16 @@
             'icon' => 'delegations',
             'patterns' => ['workspace.delegations.*'],
             'display_order' => $moduleOrder('delegations', 90),
+        ];
+    }
+    if ($canSeeModule('referentiel') || $canSeeModule('delegations') || $user?->isSuperAdmin()) {
+        $toolItems[] = [
+            'code' => 'deletion_requests',
+            'label' => 'Demandes de suppression',
+            'route' => 'workspace.deletion-requests.index',
+            'icon' => 'deletion_requests',
+            'patterns' => ['workspace.deletion-requests.*'],
+            'display_order' => 95,
         ];
     }
     if ($canSeeModule('retention')) {
@@ -261,7 +270,10 @@
 
     $renderedModuleCodes = collect($sections)
         ->flatMap(fn (array $section): array => $section['items'] ?? [])
-        ->map(fn (array $item): string => (string) ($item['module_code'] ?? $item['code'] ?? ''))
+        ->flatMap(fn (array $item): array => array_values((array) ($item['module_codes'] ?? [
+            $item['module_code'] ?? $item['code'] ?? '',
+        ])))
+        ->map(fn (mixed $code): string => (string) $code)
         ->filter()
         ->unique()
         ->values();
@@ -302,6 +314,20 @@
         }
     }
 
+    $sectionOrder = [
+        'Menu' => 10,
+        'Planification' => 20,
+        'Exécution' => 30,
+        'Pilotage' => 40,
+        'Administration' => 50,
+        'Plateforme' => 60,
+    ];
+    usort(
+        $sections,
+        static fn (array $left, array $right): int => ($sectionOrder[$left['title'] ?? ''] ?? 999)
+            <=> ($sectionOrder[$right['title'] ?? ''] ?? 999)
+    );
+
     $icons = [
         'dashboard' => 'M3 12l9-7 9 7v8a2 2 0 01-2 2h-4v-7H9v7H5a2 2 0 01-2-2v-8z',
         'pas' => 'M12 3v4m0 10v4m9-9h-4M7 12H3m13.364-5.364l-2.828 2.828M9.464 14.536l-2.828 2.828m0-10.728l2.828 2.828m7.072 7.072l-2.828-2.828',
@@ -325,6 +351,7 @@
         'alertes' => 'M12 9v4m0 4h.01M10.29 3.86 2.82 17a2 2 0 001.71 3h14.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
         'referentiel' => 'M10.325 4.317a1.724 1.724 0 013.35 0 1.724 1.724 0 002.573 1.066 1.724 1.724 0 012.37 2.37 1.724 1.724 0 001.065 2.572 1.724 1.724 0 010 3.35 1.724 1.724 0 00-1.066 2.573 1.724 1.724 0 01-2.37 2.37 1.724 1.724 0 00-2.572 1.065 1.724 1.724 0 01-3.35 0 1.724 1.724 0 00-2.573-1.066 1.724 1.724 0 01-2.37-2.37 1.724 1.724 0 00-1.065-2.572 1.724 1.724 0 010-3.35 1.724 1.724 0 001.066-2.573 1.724 1.724 0 012.37-2.37 1.724 1.724 0 002.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
         'delegations' => 'M12 4l7 4-7 4-7-4 7-4zm0 8l7 4-7 4-7-4 7-4z',
+        'deletion_requests' => 'M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6l-8-3zm-3 9 2 2 4-5',
         'retention' => 'M7 3h8l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm8 1v5h5',
         'docs' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
         'audit' => 'M12 3l7 3v6c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V6l7-3z',
@@ -333,7 +360,7 @@
     ];
 @endphp
 
-<aside id="admin-sidebar" class="app-sidebar -translate-x-full transition-transform duration-300 ease-out lg:translate-x-0">
+<aside id="admin-sidebar" class="app-sidebar -translate-x-full transition-transform duration-300 ease-out lg:translate-x-0" data-sidebar-keyboard-expand>
     <div class="app-sidebar-panel flex h-full min-h-0 overflow-hidden">
         <div class="flex min-w-0 flex-1 flex-col">
             <div class="app-sidebar-header">
@@ -350,17 +377,6 @@
                             class="app-sidebar-logo-image app-sidebar-logo-flame"
                         >
                     </a>
-
-                    <button
-                        type="button"
-                        class="app-sidebar-collapse-toggle"
-                        data-sidebar-collapse-toggle
-                        aria-label="Réduire ou agrandir le menu"
-                    >
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
 
                     <button
                         type="button"
@@ -397,6 +413,7 @@
                                     href="{{ $href }}"
                                     class="app-sidebar-link {{ $active ? 'active is-active' : '' }}"
                                     data-sidebar-module="{{ $moduleCode }}"
+                                    title="{{ $item['label'] }}"
                                     @if ($active) aria-current="page" @endif
                                 >
                                     <span class="app-sidebar-link-icon">

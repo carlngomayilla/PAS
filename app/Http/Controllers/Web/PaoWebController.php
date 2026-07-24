@@ -16,11 +16,14 @@ use App\Models\Pas;
 use App\Models\PasObjectif;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\DeletionRequestService;
+use App\Services\ExerciceContext;
 use App\Services\Notifications\WorkspaceNotificationService;
+use App\Services\PaoHierarchyService;
 use App\Services\PlanningClosureReportService;
 use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
-use App\Services\ExerciceContext;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -63,14 +66,19 @@ class PaoWebController extends Controller
 
         $query->when(
             $request->filled('pas_id'),
-            fn ($q) => $q->whereHas(
-                'pasObjectif.pasAxe',
-                fn ($subQuery) => $subQuery->where('pas_id', (int) $request->integer('pas_id'))
-            )
+            fn ($q) => $q->where(function ($pasQuery) use ($request): void {
+                $pasId = (int) $request->integer('pas_id');
+                $pasQuery->where('pas_id', $pasId)
+                    ->orWhereHas('objectifsOperationnels', fn ($objectiveQuery) => $objectiveQuery->where('pas_id', $pasId));
+            })
         );
         $query->when(
             $request->filled('pas_objectif_id'),
-            fn ($q) => $q->where('pas_objectif_id', (int) $request->integer('pas_objectif_id'))
+            fn ($q) => $q->where(function ($objectiveQuery) use ($request): void {
+                $strategicObjectiveId = (int) $request->integer('pas_objectif_id');
+                $objectiveQuery->where('pas_objectif_id', $strategicObjectiveId)
+                    ->orWhereHas('objectifsOperationnels', fn ($operationalQuery) => $operationalQuery->where('pas_objectif_id', $strategicObjectiveId));
+            })
         );
         $query->when(
             $request->filled('direction_id'),
@@ -123,13 +131,13 @@ class PaoWebController extends Controller
             ->groupBy('statut')
             ->pluck('cnt', 'statut');
         $paoStats = [
-            'total'      => (int) $byStatus->sum(),
-            'en_cours'   => (int) ($byStatus[Pao::STATUS_EN_COURS] ?? 0),
-            'valides'    => (int) ($byStatus[Pao::STATUS_VALIDE] ?? 0),
-            'clotures'   => (int) ($byStatus[Pao::STATUS_CLOTURE] ?? 0),
-            'archives'   => (int) ($byStatus[Pao::STATUS_ARCHIVE] ?? 0),
-            'avec_pta'   => (clone $statsBase)->has('ptas')->count(),
-            'sans_pta'   => (clone $statsBase)->doesntHave('ptas')->count(),
+            'total' => (int) $byStatus->sum(),
+            'en_cours' => (int) ($byStatus[Pao::STATUS_EN_COURS] ?? 0),
+            'valides' => (int) ($byStatus[Pao::STATUS_VALIDE] ?? 0),
+            'clotures' => (int) ($byStatus[Pao::STATUS_CLOTURE] ?? 0),
+            'archives' => (int) ($byStatus[Pao::STATUS_ARCHIVE] ?? 0),
+            'avec_pta' => (clone $statsBase)->has('ptas')->count(),
+            'sans_pta' => (clone $statsBase)->doesntHave('ptas')->count(),
             'directions' => (clone $statsBase)->distinct()->count('direction_id'),
         ];
 
@@ -140,7 +148,10 @@ class PaoWebController extends Controller
                 'pasObjectif.pasAxe:id,pas_id,code,libelle,ordre',
                 'direction:id,code,libelle',
                 'service:id,direction_id,code,libelle',
-                'objectifsOperationnels:id,pao_id,service_id,libelle,echeance,statut',
+                'objectifsOperationnels:id,pao_id,pas_axe_id,pas_objectif_id,service_id,libelle,echeance,statut',
+                'objectifsOperationnels.pasObjectif:id,pas_axe_id,code,libelle,ordre',
+                'objectifsOperationnels.pasObjectif.pasAxe:id,pas_id,code,libelle,ordre',
+                'objectifsOperationnels.service:id,direction_id,code,libelle',
                 'validateur:id,name,email',
             ])
             ->withCount(['ptas', 'objectifsOperationnels'])
@@ -172,7 +183,29 @@ class PaoWebController extends Controller
         ]);
     }
 
-    /** Affiche le formulaire de création d'un nouveau PAO. */
+    /** Affiche la fiche de consultation operationnelle d'un PAO. */
+    public function show(Request $request, Pao $pao, PaoHierarchyService $hierarchyService): View
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->denyUnlessPlanningReader($user);
+        if ($user->isAgent()) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $this->authorize('view', $pao);
+
+        return view('workspace.pao.show', [
+            'row' => $pao,
+            'hierarchy' => $hierarchyService->build($pao, $user),
+            'canWrite' => $user->can('update', $pao),
+        ]);
+    }
+
+    /** Affiche le formulaire de creation d'un nouveau PAO. */
     public function create(Request $request): View
     {
         $user = $request->user();
@@ -189,7 +222,7 @@ class PaoWebController extends Controller
         $prefilledDirectionId = $request->filled('direction_id') ? (int) $request->integer('direction_id') : null;
         $prefilledServiceId = $request->filled('service_id') ? (int) $request->integer('service_id') : null;
         $objectifOptions = $this->objectifOptions($user, $prefilledObjectifId);
-        $row = new Pao();
+        $row = new Pao;
         $row->pas_objectif_id = $prefilledObjectifId;
         $row->direction_id = $prefilledDirectionId;
         $row->service_id = $prefilledServiceId;
@@ -226,18 +259,24 @@ class PaoWebController extends Controller
         $this->denyUnlessManagePao($user, (int) $validated['direction_id']);
 
         $objectif = $this->resolveAccessibleObjectif($user, (int) $validated['pas_objectif_id']);
+        $operationalObjectives = $this->validatedOperationalObjectives($validated);
+        $strategicObjectives = $this->resolveOperationalStrategicObjectives($operationalObjectives);
 
-        $pao = DB::transaction(function () use ($validated, $objectif, $statut, $user, $request): Pao {
-            $operationalObjectives = $this->validatedOperationalObjectives($validated);
+        $pao = DB::transaction(function () use ($validated, $objectif, $statut, $user, $request, $operationalObjectives, $strategicObjectives): Pao {
             $payload = $this->paoPayload($objectif, $validated, $operationalObjectives[0], $statut, $user);
-            $pao = new Pao();
+            $pao = new Pao;
             $pao->fill($payload);
             $pao->forceFill(['statut' => $statut])->save();
             $this->recordAudit($request, 'pao', 'create', $pao, null, $pao->toArray());
 
             foreach ($operationalObjectives as $operationalObjective) {
+                $strategicObjective = $strategicObjectives->get($operationalObjective['pas_objectif_id']);
+                if (! $strategicObjective instanceof PasObjectif) {
+                    abort(422, 'Objectif strategique introuvable.');
+                }
+
                 $objective = $pao->objectifsOperationnels()->create(
-                    $this->operationalObjectivePayload($pao, $objectif, $validated, $operationalObjective, $statut)
+                    $this->operationalObjectivePayload($pao, $strategicObjective, $validated, $operationalObjective, $statut)
                 );
                 $this->recordAudit($request, 'objectif_operationnel', 'create', $objective, null, $objective->toArray());
             }
@@ -302,9 +341,10 @@ class PaoWebController extends Controller
         $objectif = $this->resolveAccessibleObjectif($user, (int) $validated['pas_objectif_id']);
 
         $operationalObjectives = $this->validatedOperationalObjectives($validated);
+        $strategicObjectives = $this->resolveOperationalStrategicObjectives($operationalObjectives);
 
         $before = $pao->toArray();
-        DB::transaction(function () use ($pao, $before, $validated, $objectif, $statut, $user, $request, $operationalObjectives): void {
+        DB::transaction(function () use ($pao, $before, $validated, $objectif, $statut, $user, $request, $operationalObjectives, $strategicObjectives): void {
             $firstPayload = $this->paoPayload($objectif, $validated, $operationalObjectives[0], $statut, $user);
             $pao->fill($firstPayload);
             $pao->forceFill(['statut' => $statut])->save();
@@ -313,7 +353,11 @@ class PaoWebController extends Controller
             $keptObjectiveIds = [];
             foreach ($operationalObjectives as $operationalObjective) {
                 $objectiveId = (int) ($operationalObjective['id'] ?? 0);
-                $payload = $this->operationalObjectivePayload($pao, $objectif, $validated, $operationalObjective, $statut);
+                $strategicObjective = $strategicObjectives->get($operationalObjective['pas_objectif_id']);
+                if (! $strategicObjective instanceof PasObjectif) {
+                    abort(422, 'Objectif strategique introuvable.');
+                }
+                $payload = $this->operationalObjectivePayload($pao, $strategicObjective, $validated, $operationalObjective, $statut);
 
                 if ($objectiveId > 0) {
                     $objective = $pao->objectifsOperationnels()->whereKey($objectiveId)->first();
@@ -322,6 +366,7 @@ class PaoWebController extends Controller
                         $objective->update($payload);
                         $this->recordAudit($request, 'objectif_operationnel', 'update', $objective, $beforeObjective, $objective->toArray());
                         $keptObjectiveIds[] = (int) $objective->id;
+
                         continue;
                     }
                 }
@@ -362,7 +407,7 @@ class PaoWebController extends Controller
         $validated = $request->validate([
             'motif' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
-        $deletionRequests = app(\App\Services\DeletionRequestService::class);
+        $deletionRequests = app(DeletionRequestService::class);
         // Super Admin et DG peuvent supprimer directement avec cascade (PTAs, OOs,
         // Actions). Les autres roles passent par le workflow de demande validee.
         $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
@@ -477,7 +522,7 @@ class PaoWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $report
+     * @param  array<string, mixed>  $report
      */
     private function closureReportErrorMessage(array $report): string
     {
@@ -541,7 +586,7 @@ class PaoWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Direction>
+     * @return Collection<int, Direction>
      */
     private function directionOptions(User $user)
     {
@@ -642,11 +687,11 @@ class PaoWebController extends Controller
                 ->where('periode_fin', '>=', $selectedYear));
         }
 
-        return $query->get(['id', 'pas_axe_id', 'code', 'libelle', 'ordre']);
+        return $query->get(['id', 'pas_axe_id', 'code', 'libelle', 'date_echeance', 'ordre']);
     }
 
     /**
-     * @param EloquentCollection<int, PasObjectif> $objectifOptions
+     * @param  EloquentCollection<int, PasObjectif>  $objectifOptions
      * @return array<int, array<string, mixed>>
      */
     private function objectifMap(EloquentCollection $objectifOptions): array
@@ -664,6 +709,7 @@ class PaoWebController extends Controller
                     'periode' => $objectif->pasAxe?->pas
                         ? (string) $objectif->pasAxe->pas->periode_debut.'-'.$objectif->pasAxe->pas->periode_fin
                         : '-',
+                    'date_echeance' => $objectif->date_echeance?->format('Y-m-d'),
                 ],
             ])
             ->all();
@@ -685,8 +731,8 @@ class PaoWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
-     * @return array<int, array{id: int|null, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null}>
+     * @param  array<string, mixed>  $validated
+     * @return array<int, array{id: int|null, pas_objectif_id: int, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null}>
      */
     private function validatedOperationalObjectives(array $validated): array
     {
@@ -694,6 +740,7 @@ class PaoWebController extends Controller
             ->filter(fn ($objective): bool => is_array($objective))
             ->map(fn (array $objective): array => [
                 'id' => isset($objective['id']) && is_numeric($objective['id']) ? (int) $objective['id'] : null,
+                'pas_objectif_id' => (int) ($objective['pas_objectif_id'] ?? $validated['pas_objectif_id']),
                 'libelle' => trim((string) ($objective['libelle'] ?? '')),
                 'service_id' => (int) ($objective['service_id'] ?? 0),
                 'echeance' => isset($objective['echeance']) && $objective['echeance'] !== ''
@@ -708,8 +755,33 @@ class PaoWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
-     * @param array{id: int|null, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null} $operationalObjective
+     * @param  array<int, array{id: int|null, pas_objectif_id: int, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null}>  $operationalObjectives
+     * @return EloquentCollection<int, PasObjectif>
+     */
+    private function resolveOperationalStrategicObjectives(array $operationalObjectives): EloquentCollection
+    {
+        $ids = collect($operationalObjectives)
+            ->pluck('pas_objectif_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        $objectives = PasObjectif::query()
+            ->with('pasAxe.pas:id,titre,periode_debut,periode_fin')
+            ->whereIn('id', $ids->all())
+            ->get()
+            ->keyBy('id');
+
+        if ($objectives->count() !== $ids->count()) {
+            abort(422, 'Un objectif strategique selectionne est introuvable.');
+        }
+
+        return $objectives;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @param  array{id: int|null, pas_objectif_id: int, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null}  $operationalObjective
      * @return array<string, mixed>
      */
     private function paoPayload(PasObjectif $objectif, array $validated, array $operationalObjective, string $statut, User $user): array
@@ -737,8 +809,8 @@ class PaoWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
-     * @param array{id: int|null, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null} $operationalObjective
+     * @param  array<string, mixed>  $validated
+     * @param  array{id: int|null, pas_objectif_id: int, libelle: string, service_id: int, echeance: string|null, description: string|null, indicateurs: string|null}  $operationalObjective
      * @return array<string, mixed>
      */
     private function operationalObjectivePayload(Pao $pao, PasObjectif $objectif, array $validated, array $operationalObjective, string $statut): array

@@ -539,14 +539,14 @@
                 var hint = block.querySelector('[data-type-action-hint]');
                 if (hint) {
                     hint.textContent = isQuantitative
-                        ? 'Cible chiffrée + unité + seuils numériques.'
+                        ? 'Quantite a realiser + unite + quantites numeriques.'
                         : (showSubActions
                             ? 'Performance calculée depuis les sous-actions (poids Σ=100%).'
                             : 'Pièce justificative attendue (réalisé = 0 % ou 100 %).');
                 }
             }
 
-            // Affiche/masque cible+unité d'une sous-action selon son type.
+            // Affiche/masque quantite+unite d'une sous-action selon son type.
             function syncSubActionType(row) {
                 if (!row) return;
                 var typeField = row.querySelector('[data-sub-type-select]');

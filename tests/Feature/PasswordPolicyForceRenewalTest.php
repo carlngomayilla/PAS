@@ -30,6 +30,20 @@ class PasswordPolicyForceRenewalTest extends TestCase
         $this->assertTrue($policy->isExpired($user));
     }
 
+    public function test_password_never_changed_still_forces_renewal_when_periodic_expiration_is_disabled(): void
+    {
+        config(['security.passwords.expire_days' => 0]);
+
+        /** @var PasswordPolicyService $policy */
+        $policy = app(PasswordPolicyService::class);
+
+        $user = User::factory()->create([
+            'password_changed_at' => null,
+        ]);
+
+        $this->assertTrue($policy->isExpired($user));
+    }
+
     public function test_password_is_not_expired_when_recently_changed(): void
     {
         /** @var PasswordPolicyService $policy */
@@ -68,6 +82,29 @@ class PasswordPolicyForceRenewalTest extends TestCase
         ]);
 
         $this->assertFalse($validator->fails(), (string) $validator->errors()->first('password'));
+    }
+
+    public function test_password_policy_never_allows_less_than_eight_characters(): void
+    {
+        config(['security.passwords.min_length' => 4]);
+
+        /** @var PasswordPolicyService $policy */
+        $policy = app(PasswordPolicyService::class);
+
+        $shortPasswordValidator = Validator::make([
+            'password' => 'abc1234',
+        ], [
+            'password' => ['required', 'string', $policy->rule()],
+        ]);
+
+        $validPasswordValidator = Validator::make([
+            'password' => 'abc12345',
+        ], [
+            'password' => ['required', 'string', $policy->rule()],
+        ]);
+
+        $this->assertTrue($shortPasswordValidator->fails());
+        $this->assertFalse($validPasswordValidator->fails(), (string) $validPasswordValidator->errors()->first('password'));
     }
 
     public function test_generate_initial_password_is_long_enough_and_matches_medium_policy(): void

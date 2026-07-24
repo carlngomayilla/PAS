@@ -238,6 +238,7 @@ function bootDashboardRender(force = false) {
   const agentPerformance = payload.agent_performance || {};
   const plotlyFigures = payload.plotly_figures || agentPerformance.plotly_figures || {};
   const reportingCharts = reporting.charts || {};
+  const decisionCharts = payload.decision_charts || {};
   const panelKeys = ['overview', 'charts', 'advanced'];
   const panelAliases = {
     overview: 'overview',
@@ -860,6 +861,22 @@ function bootDashboardRender(force = false) {
     return Array.isArray(chartData.labels) && chartData.labels.length > 0;
   }
 
+  function chartHostIsRenderable(host) {
+    if (!(host instanceof HTMLElement) || !host.isConnected) {
+      return false;
+    }
+
+    const styles = window.getComputedStyle(host);
+
+    if (styles.display === 'none' || styles.visibility === 'hidden') {
+      return false;
+    }
+
+    const bounds = host.getBoundingClientRect();
+
+    return bounds.width > 0 && bounds.height > 0;
+  }
+
   function mountChartEmptyState(host, message) {
     host.innerHTML = '';
     host.dataset.chartState = 'empty';
@@ -979,6 +996,12 @@ function bootDashboardRender(force = false) {
     }
 
     rememberHostFallback(host);
+
+    if (!chartHostIsRenderable(host)) {
+      host.dataset.chartState = 'deferred';
+      return;
+    }
+
     destroyChart(id);
 
     if (typeof window.Chart === 'undefined') {
@@ -1431,6 +1454,7 @@ function bootDashboardRender(force = false) {
           intersect: false,
         },
         plugins: {
+          annotation: false,
           legend: {
             position: 'bottom',
             maxHeight: 44,
@@ -1569,7 +1593,7 @@ function bootDashboardRender(force = false) {
           data: [numeric, Math.max(0, 100 - numeric)],
           backgroundColor: [
             color,
-            theme.isDark ? 'rgba(30,41,59,0.92)' : 'rgba(241,245,249,0.98)',
+            theme.isDark ? 'rgba(30,41,59,0.74)' : 'rgba(241,245,249,0.98)',
           ],
           borderWidth: 0,
           hoverOffset: 4,
@@ -1988,19 +2012,39 @@ function bootDashboardRender(force = false) {
   function mountStatusPie(hostId = 'dashboard-status-mix-chart', cards = statusCards) {
     const theme = dashboardTheme();
 
-    mountChart(hostId, baseConfig('pie', {
+    mountChart(hostId, baseConfig('polarArea', {
       data: {
         labels: cards.map((item) => item.label),
         datasets: [{
           data: cards.map((item) => Number(item.count || 0)),
-          backgroundColor: cards.map((item, index) => alphaColor(item.color || colorForStatus(item.label, index), 0.9)),
+          backgroundColor: cards.map((item, index) => alphaColor(item.color || colorForStatus(item.label, index), 0.74)),
           borderColor: theme.isDark ? '#0f172a' : '#ffffff',
-          borderWidth: 4,
-          hoverOffset: 10,
+          borderWidth: 3,
+          hoverBorderWidth: 4,
           hoverBorderColor: theme.isDark ? '#0f172a' : '#ffffff',
         }],
       },
       options: {
+        scales: {
+          r: {
+            grid: {
+              color: theme.grid,
+            },
+            angleLines: {
+              color: theme.grid,
+            },
+            pointLabels: {
+              color: theme.text,
+              font: {
+                size: 11,
+                weight: '700',
+              },
+            },
+            ticks: {
+              display: false,
+            },
+          },
+        },
         plugins: {
           legend: { position: 'right' },
         },
@@ -2283,6 +2327,969 @@ function bootDashboardRender(force = false) {
     }), ({ element }) => unitRows[element?.index]?.url || '');
   }
 
+  function decisionStatusColor(status, index = 0) {
+    const normalized = String(status || '').toLowerCase();
+
+    if (normalized === 'conforme') {
+      return ANBG.success;
+    }
+
+    if (normalized === 'vigilance') {
+      return ANBG.warning;
+    }
+
+    if (normalized === 'critique') {
+      return ANBG.danger;
+    }
+
+    if (normalized.includes('non')) {
+      return ANBG.muted;
+    }
+
+    return toneForIndex(index);
+  }
+
+  function decisionMetaLabel(chart, index) {
+    const meta = Array.isArray(chart?.meta) ? chart.meta[index] : '';
+
+    return meta ? String(meta) : '';
+  }
+
+  function decisionHierarchyChart() {
+    const sources = [
+      { key: 'axis_progress', prefix: 'Axe', limit: 3 },
+      { key: 'strategic_objectives', prefix: 'OS', limit: 3 },
+      { key: 'operational_objectives', prefix: 'OO', limit: 4 },
+    ];
+    const rows = [];
+
+    sources.forEach((source) => {
+      const chart = decisionCharts[source.key] || {};
+      const labels = Array.isArray(chart.labels) ? chart.labels : [];
+      const values = Array.isArray(chart.values) ? chart.values : [];
+      const meta = Array.isArray(chart.meta) ? chart.meta : [];
+      const statuses = Array.isArray(chart.statuses) ? chart.statuses : [];
+      const urls = Array.isArray(chart.urls) ? chart.urls : [];
+
+      labels.slice(0, source.limit).forEach((label, index) => {
+        rows.push({
+          label: `${source.prefix} - ${truncateLabel(label, 34)}`,
+          value: boundedPercent(values[index] ?? 0),
+          meta: meta[index] || '',
+          status: statuses[index] || '',
+          url: urls[index] || '',
+        });
+      });
+    });
+
+    return {
+      labels: rows.map((row) => row.label),
+      values: rows.map((row) => row.value),
+      meta: rows.map((row) => row.meta),
+      statuses: rows.map((row) => row.status),
+      urls: rows.map((row) => row.url),
+    };
+  }
+
+  function mountDecisionPasEvolution() {
+    const chart = decisionCharts.pas_evolution || {};
+
+    mountChart('dashboard-decision-pas-evolution-chart', baseConfig('line', {
+      data: {
+        labels: chart.labels || [],
+        datasets: [
+          {
+            label: 'PrÃ©vu',
+            data: chart.planned || [],
+            borderColor: ANBG.primary,
+            backgroundColor: (context) => chartGradient(context.chart, ANBG.primary),
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            pointBackgroundColor: ANBG.primary,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            fill: true,
+            tension: 0.48,
+          },
+          {
+            label: 'RÃ©alisÃ©',
+            data: chart.realized || [],
+            borderColor: ANBG.secondary,
+            backgroundColor: (context) => chartGradient(context.chart, ANBG.secondary),
+            borderWidth: 2.75,
+            pointRadius: 0,
+            pointHoverRadius: 7,
+            pointBackgroundColor: ANBG.secondary,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            fill: true,
+            tension: 0.48,
+          },
+        ],
+      },
+      options: {
+        scales: percentScales(),
+        plugins: {
+          anbgCrosshair: { enabled: true },
+          ...kpiAnnotations(chart),
+          tooltip: {
+            callbacks: {
+              title: (items) => items[0]?.label ? `PÃ©riode : ${items[0].label}` : '',
+              label: (ctx) => ` ${ctx.dataset.label} : ${formatNumber(ctx.parsed?.y ?? 0)} %`,
+              afterBody(items) {
+                const index = items[0]?.dataIndex ?? 0;
+                const planned = Number((chart.planned || [])[index] ?? 0);
+                const realized = Number((chart.realized || [])[index] ?? 0);
+                const gap = realized - planned;
+                const sign = gap >= 0 ? '+' : '';
+
+                return [``, ` Ã‰cart rÃ©alisÃ© / prÃ©vu : ${sign}${formatNumber(gap)} pts`];
+              },
+            },
+          },
+        },
+      },
+    }), ({ element }) => (chart.urls || [])[element?.index] || '');
+  }
+
+  function mountDecisionPtaExecution() {
+    const chart = decisionCharts.pta_execution || {};
+    const value = boundedPercent(chart.value || 0);
+    const theme = dashboardTheme();
+    const color = gaugeColor(value, decisionCharts.meta?.quality_threshold);
+
+    mountChart('dashboard-decision-pta-execution-chart', baseConfig('doughnut', {
+      data: {
+        labels: [chart.label || 'PTA exÃ©cutÃ©', 'Reste'],
+        datasets: [{
+          data: [value, Math.max(0, 100 - value)],
+          backgroundColor: [
+            color,
+            theme.isDark ? 'rgba(30,41,59,0.92)' : 'rgba(241,245,249,0.98)',
+          ],
+          borderWidth: 0,
+          hoverOffset: 4,
+          borderRadius: 10,
+        }],
+      },
+      options: {
+        cutout: '72%',
+        circumference: 250,
+        rotation: -125,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            filter: (item) => item.dataIndex === 0,
+            callbacks: {
+              title: () => chart.title || 'ExÃ©cution du PTA',
+              label: () => ` Taux global : ${formatNumber(value)} %`,
+              afterLabel: () => [
+                ` Actions : ${formatNumber(chart.actions_total || 0)}`,
+                ` TerminÃ©es : ${formatNumber(chart.actions_done || 0)}`,
+                ` En retard : ${formatNumber(chart.actions_late || 0)}`,
+              ],
+            },
+          },
+          anbgCenterText: {
+            lines: [
+              {
+                text: `${Math.round(value)}%`,
+                color,
+                font: '800 30px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
+                offsetY: -8,
+              },
+              {
+                text: chart.label || 'PTA exÃ©cutÃ©',
+                color: theme.muted,
+                font: '700 11px Manrope, Public Sans, ui-sans-serif, system-ui, sans-serif',
+                offsetY: 18,
+              },
+            ],
+          },
+        },
+      },
+    }), ({ element }) => element?.index === 0 ? (chart.url || '') : '');
+  }
+
+  function decisionBarDataLabels(chart) {
+    if (typeof window.Chart === 'undefined' || !window.Chart.registry?.plugins?.get('datalabels')) {
+      return false;
+    }
+
+    const theme = dashboardTheme();
+    const labels = Array.isArray(chart?.labels) ? chart.labels : [];
+
+    return {
+      labels: {
+        name: {
+          display(context) {
+            return Number(context.dataset?.data?.[context.dataIndex] ?? 0) > 0;
+          },
+          anchor: 'start',
+          align: 'right',
+          offset: 8,
+          clamp: true,
+          clip: true,
+          color: '#ffffff',
+          font: { size: 11, weight: '800' },
+          formatter(_value, context) {
+            return truncateLabel(labels[context.dataIndex] || '', 18);
+          },
+        },
+        value: {
+          display(context) {
+            return Number(context.dataset?.data?.[context.dataIndex] ?? 0) > 0;
+          },
+          anchor: 'end',
+          align: 'right',
+          offset: 8,
+          clamp: true,
+          clip: false,
+          color: theme.emphasis || theme.text,
+          font: { size: 11, weight: '800' },
+          formatter(value) {
+            return `${Math.round(Number(value) || 0)}%`;
+          },
+        },
+      },
+    };
+  }
+
+  function decisionBarConfig(chart, label, fallbackColor) {
+    const statuses = Array.isArray(chart?.statuses) ? chart.statuses : [];
+    const scales = horizontalPercentScales();
+    scales.y.ticks.display = false;
+    scales.y.grid.display = false;
+
+    return baseConfig('bar', {
+      data: {
+        labels: chart?.labels || [],
+        datasets: [{
+          label,
+          data: chart?.values || [],
+          backgroundColor: (context) => barGradient(
+            context.chart,
+            statuses.length > 0
+              ? decisionStatusColor(statuses[context.dataIndex], context.dataIndex)
+              : fallbackColor
+          ),
+          borderColor: (context) => statuses.length > 0
+            ? decisionStatusColor(statuses[context.dataIndex], context.dataIndex)
+            : fallbackColor,
+          borderWidth: 1,
+          maxBarThickness: 28,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        scales,
+        plugins: {
+          anbgBarShadow: { enabled: true },
+          legend: { display: false },
+          datalabels: decisionBarDataLabels(chart),
+          tooltip: {
+            callbacks: {
+              title: (items) => items[0]?.label || '',
+              label: (ctx) => ` ${ctx.dataset.label} : ${formatNumber(ctx.parsed?.x ?? 0)} %`,
+              afterLabel(context) {
+                return decisionMetaLabel(chart, context.dataIndex);
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function statusRadialDataLabels(labels, values) {
+    if (typeof window.Chart === 'undefined' || !window.Chart.registry?.plugins?.get('datalabels')) {
+      return false;
+    }
+
+    return {
+      display(context) {
+        return context.dataIndex === 0 && Number(values[context.datasetIndex] || 0) > 0;
+      },
+      anchor: 'center',
+      align: 'center',
+      clamp: true,
+      clip: true,
+      color: '#ffffff',
+      font: { size: 10, weight: '800' },
+      formatter(_value, context) {
+        return truncateLabel(labels[context.datasetIndex] || '', 11);
+      },
+    };
+  }
+
+  function mountDecisionActionStatus() {
+    const chart = decisionCharts.action_status || {};
+    const labels = Array.isArray(chart.labels) ? chart.labels : [];
+    const values = Array.isArray(chart.values) ? chart.values.map((value) => Number(value || 0)) : [];
+    const colors = Array.isArray(chart.colors) ? chart.colors : [];
+    const urls = Array.isArray(chart.urls) ? chart.urls : [];
+    const theme = dashboardTheme();
+    const maxValue = Math.max(1, ...values);
+    const trackColor = theme.isDark ? 'rgba(30,41,59,0.76)' : 'rgba(241,245,249,0.98)';
+    const datasets = labels.map((label, index) => ({
+      label,
+      data: [values[index] || 0, Math.max(0, maxValue - (values[index] || 0))],
+      backgroundColor: [
+        colors[index] || colorForStatus(label, index),
+        trackColor,
+      ],
+      borderColor: theme.isDark ? '#0f172a' : '#ffffff',
+      borderWidth: 2,
+      borderRadius: 10,
+      hoverOffset: 3,
+      spacing: 2,
+    }));
+
+    mountChart('dashboard-decision-action-status-chart', baseConfig('doughnut', {
+      data: {
+        labels: ['Actions', 'Reste'],
+        datasets,
+      },
+      options: {
+        cutout: '28%',
+        rotation: -90,
+        plugins: {
+          datalabels: statusRadialDataLabels(labels, values),
+          legend: {
+            position: 'right',
+            labels: {
+              generateLabels() {
+                return labels.map((label, index) => ({
+                  text: label,
+                  fillStyle: colors[index] || colorForStatus(label, index),
+                  strokeStyle: colors[index] || colorForStatus(label, index),
+                  lineWidth: 1,
+                  hidden: false,
+                  datasetIndex: index,
+                }));
+              },
+            },
+          },
+          tooltip: {
+            filter: (item) => item.dataIndex === 0,
+            callbacks: {
+              title(items) {
+                const dataset = items[0]?.dataset;
+                return dataset?.label || '';
+              },
+              label(context) {
+                return ` Actions : ${formatNumber(context.raw || 0)}`;
+              },
+            },
+          },
+        },
+      },
+    }), ({ element }) => urls[element?.datasetIndex] || '');
+  }
+
+  const requestedBluePalette = ['#86bdf2', '#2f83f6', '#2367f2', '#2149d8', '#1f3fb4', '#60a5fa', '#1d4ed8'];
+
+  function requestedRowsFromChart(chart, limit = 6) {
+    const labels = Array.isArray(chart?.labels) ? chart.labels : [];
+    const values = Array.isArray(chart?.values) ? chart.values : [];
+    const meta = Array.isArray(chart?.meta) ? chart.meta : [];
+    const urls = Array.isArray(chart?.urls) ? chart.urls : [];
+
+    return labels.slice(0, limit).map((label, index) => ({
+      label: String(label || 'Non renseigne'),
+      value: boundedPercent(values[index] ?? 0),
+      meta: meta[index] || '',
+      url: urls[index] || '',
+    }));
+  }
+
+  function requestedStatusRows() {
+    const chart = decisionCharts.action_status || {};
+    const labels = Array.isArray(chart.labels) ? chart.labels : [];
+    const values = Array.isArray(chart.values) ? chart.values : [];
+    const colors = Array.isArray(chart.colors) ? chart.colors : [];
+    const urls = Array.isArray(chart.urls) ? chart.urls : [];
+    const rows = labels.map((label, index) => ({
+      label: String(label || 'Statut'),
+      value: Number(values[index] || 0),
+      color: colors[index] || requestedBluePalette[index % requestedBluePalette.length],
+      url: urls[index] || '',
+    })).filter((row) => row.value > 0);
+
+    if (rows.length > 0) {
+      return rows.slice(0, 6);
+    }
+
+    const pta = decisionCharts.pta_execution || {};
+    return [
+      { label: 'Terminees', value: Number(pta.actions_done || 0), color: requestedBluePalette[0], url: pta.url || '' },
+      { label: 'En cours', value: Number(pta.actions_in_progress || 0), color: requestedBluePalette[1], url: pta.url || '' },
+      { label: 'En retard', value: Number(pta.actions_late || 0), color: requestedBluePalette[3], url: pta.url || '' },
+    ].filter((row) => row.value > 0);
+  }
+
+  function requestedHierarchyRows(limit = 5) {
+    const chart = decisionHierarchyChart();
+    const labels = Array.isArray(chart.labels) ? chart.labels : [];
+    const values = Array.isArray(chart.values) ? chart.values : [];
+    const urls = Array.isArray(chart.urls) ? chart.urls : [];
+
+    return labels.slice(0, limit).map((label, index) => ({
+      label: String(label || 'Element'),
+      value: boundedPercent(values[index] || 0),
+      color: requestedBluePalette[index % requestedBluePalette.length],
+      url: urls[index] || '',
+    })).filter((row) => row.value > 0);
+  }
+
+  function requestedPtaEvolutionRows() {
+    const chart = decisionCharts.pta_evolution || {};
+    const labels = Array.isArray(chart.labels) ? chart.labels : [];
+
+    if (labels.length > 0) {
+      return labels.slice(0, 6).map((label, index) => ({
+        label,
+        planned: Number((chart.planned || [])[index] || 0),
+        done: Number((chart.done || [])[index] || 0),
+        late: Number((chart.late || [])[index] || 0),
+      }));
+    }
+
+    const area = decisionCharts.pas_evolution || {};
+    const areaLabels = Array.isArray(area.labels) ? area.labels : [];
+    const startIndex = Math.max(0, areaLabels.length - 6);
+
+    return areaLabels.slice(startIndex).map((label, offset) => {
+      const index = startIndex + offset;
+
+      return {
+      label,
+      planned: Number((area.planned || [])[index] || 0),
+      done: Number((area.realized || [])[index] || 0),
+      late: Math.max(0, Number((area.planned || [])[index] || 0) - Number((area.realized || [])[index] || 0)),
+      };
+    });
+  }
+
+  function requestedBaseConfig(type, overrides = {}) {
+    const config = baseConfig(type, {
+      options: {
+        layout: {
+          padding: {
+            top: 16,
+            right: 22,
+            bottom: 8,
+            left: 12,
+          },
+        },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: '#334155',
+              boxWidth: 10,
+              boxHeight: 10,
+              padding: 18,
+              font: { size: 12, weight: '700' },
+            },
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 47, 87, 0.98)',
+            titleColor: '#ffffff',
+            bodyColor: '#e8f4fb',
+            borderColor: 'rgba(134,189,242,0.65)',
+            borderWidth: 1,
+          },
+          datalabels: false,
+        },
+      },
+    });
+
+    return mergeObjects(config, overrides);
+  }
+
+  function requestedVerticalScales({ suffix = '', title = '' } = {}) {
+    return {
+      x: {
+        grid: { display: false },
+        ticks: {
+          color: '#737373',
+          font: { size: 12, weight: '700' },
+          callback(value) {
+            return truncateLabel(this.getLabelForValue ? this.getLabelForValue(value) : value, 10);
+          },
+        },
+        border: { display: false },
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: '#e7eef4', drawTicks: false },
+        ticks: {
+          color: '#667085',
+          font: { size: 11, weight: '700' },
+          callback(value) {
+            return `${formatNumber(value)}${suffix}`;
+          },
+        },
+        title: {
+          display: Boolean(title),
+          text: title,
+          color: '#667085',
+          font: { size: 11, weight: '800' },
+        },
+        border: { color: '#dbe7ef' },
+      },
+    };
+  }
+
+  function requestedHorizontalScales() {
+    return {
+      x: {
+        beginAtZero: true,
+        max: 100,
+        grid: { color: '#e7eef4', drawTicks: false },
+        ticks: {
+          color: '#667085',
+          font: { size: 11, weight: '700' },
+          callback(value) {
+            return `${formatNumber(value)}%`;
+          },
+        },
+        title: {
+          display: true,
+          text: 'Avancement (%)',
+          color: '#667085',
+          font: { size: 11, weight: '800' },
+        },
+        border: { color: '#dbe7ef' },
+      },
+      y: {
+        grid: { display: false },
+        ticks: {
+          color: '#334155',
+          font: { size: 11, weight: '700' },
+          callback(value) {
+            return truncateLabel(this.getLabelForValue ? this.getLabelForValue(value) : value, 16);
+          },
+        },
+        border: { color: '#dbe7ef' },
+      },
+    };
+  }
+
+  function requestedValueLabels({ color = '#17324a', anchor = 'end', align = 'end', suffix = '' } = {}) {
+    if (typeof window.Chart === 'undefined' || !window.Chart.registry?.plugins?.get('datalabels')) {
+      return false;
+    }
+
+    return {
+      display(context) {
+        return Number(context.dataset?.data?.[context.dataIndex] ?? 0) > 0;
+      },
+      anchor,
+      align,
+      offset: 6,
+      clamp: true,
+      clip: false,
+      color,
+      font: { size: 12, weight: '800' },
+      formatter(value) {
+        return `${Math.round(Number(value) || 0)}${suffix}`;
+      },
+    };
+  }
+
+  function requestedHorizontalBarLabels(labels) {
+    if (typeof window.Chart === 'undefined' || !window.Chart.registry?.plugins?.get('datalabels')) {
+      return false;
+    }
+
+    return {
+      labels: {
+        name: {
+          display(context) {
+            return Number(context.dataset?.data?.[context.dataIndex] ?? 0) > 0;
+          },
+          anchor: 'start',
+          align: 'right',
+          offset: 8,
+          clamp: true,
+          clip: true,
+          color: '#020617',
+          font: { size: 11, weight: '800' },
+          formatter(_value, context) {
+            return truncateLabel(labels[context.dataIndex] || '', 18);
+          },
+        },
+        value: {
+          display(context) {
+            return Number(context.dataset?.data?.[context.dataIndex] ?? 0) > 0;
+          },
+          anchor: 'end',
+          align: 'right',
+          offset: 8,
+          clamp: true,
+          clip: false,
+          color: '#ffffff',
+          font: { size: 11, weight: '800' },
+          formatter(value) {
+            return `${Math.round(Number(value) || 0)}%`;
+          },
+        },
+      },
+    };
+  }
+
+  function mountRequestedAreaInteractive(range = null) {
+    const chart = decisionCharts.pas_evolution || {};
+    const labels = Array.isArray(chart.labels) ? chart.labels : [];
+    const selectedRange = Number(range ?? document.querySelector('[data-requested-area-range]')?.value ?? 12);
+    const sliceCount = selectedRange > 0 ? selectedRange : labels.length;
+    const slicedLabels = labels.slice(-sliceCount);
+    const planned = (chart.planned || []).slice(-sliceCount);
+    const realized = (chart.realized || []).slice(-sliceCount);
+
+    mountChart('dashboard-requested-area-interactive-chart', requestedBaseConfig('line', {
+      data: {
+        labels: slicedLabels,
+        datasets: [
+          {
+            label: 'Prévu',
+            data: planned,
+            borderColor: requestedBluePalette[0],
+            backgroundColor: (context) => chartGradient(context.chart, requestedBluePalette[0]),
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            fill: true,
+            tension: 0.48,
+          },
+          {
+            label: 'Réalisé',
+            data: realized,
+            borderColor: requestedBluePalette[1],
+            backgroundColor: (context) => chartGradient(context.chart, requestedBluePalette[1]),
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            fill: true,
+            tension: 0.48,
+          },
+        ],
+      },
+      options: {
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: '#737373',
+              font: { size: 12, weight: '700' },
+              callback(value) {
+                return truncateLabel(this.getLabelForValue ? this.getLabelForValue(value) : value, 12);
+              },
+            },
+            border: { display: false },
+          },
+          y: {
+            beginAtZero: true,
+            max: 100,
+            grid: { color: '#e7eef4', drawTicks: false },
+            ticks: {
+              color: '#667085',
+              font: { size: 11, weight: '700' },
+              callback(value) {
+                return `${formatNumber(value)}%`;
+              },
+            },
+            title: {
+              display: true,
+              text: 'Avancement (%)',
+              color: '#667085',
+              font: { size: 11, weight: '800' },
+            },
+            border: { color: '#dbe7ef' },
+          },
+        },
+        plugins: {
+          anbgCrosshair: { enabled: true, color: 'rgba(134,189,242,0.32)' },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return ` ${context.dataset.label} : ${formatNumber(context.raw || 0)} %`;
+              },
+            },
+          },
+        },
+      },
+    }), ({ element }) => (chart.urls || [])[element?.index] || '');
+  }
+
+  function bindRequestedAreaRange() {
+    const select = document.querySelector('[data-requested-area-range]');
+    if (!(select instanceof HTMLSelectElement) || select.dataset.boundRequestedArea === '1') {
+      return;
+    }
+
+    select.dataset.boundRequestedArea = '1';
+    select.addEventListener('change', () => mountRequestedAreaInteractive(Number(select.value || 0)));
+  }
+
+  function mountRequestedBarLabel() {
+    const rows = requestedRowsFromChart(decisionCharts.axis_progress || {}, 6);
+
+    mountChart('dashboard-requested-bar-label-chart', requestedBaseConfig('bar', {
+      data: {
+        labels: rows.map((row) => row.label),
+        datasets: [{
+          label: 'Avancement',
+          data: rows.map((row) => row.value),
+          backgroundColor: requestedBluePalette[0],
+          borderRadius: 8,
+          maxBarThickness: 48,
+        }],
+      },
+      options: {
+        scales: requestedVerticalScales({ suffix: '%', title: 'Avancement (%)' }),
+        plugins: {
+          legend: { display: false },
+          datalabels: requestedValueLabels({ suffix: '%' }),
+        },
+      },
+    }), ({ element }) => rows[element?.index]?.url || '');
+  }
+
+  function mountRequestedBarCustomLabel() {
+    let rows = requestedRowsFromChart(decisionCharts.operational_objectives || {}, 6);
+
+    if (rows.length === 0) {
+      rows = requestedRowsFromChart(decisionCharts.strategic_objectives || {}, 6);
+    }
+
+    if (rows.length === 0) {
+      rows = requestedRowsFromChart(decisionCharts.axis_progress || {}, 6);
+    }
+
+    mountChart('dashboard-requested-bar-custom-label-chart', requestedBaseConfig('bar', {
+      data: {
+        labels: rows.map((row) => row.label),
+        datasets: [{
+          label: 'Objectifs',
+          data: rows.map((row) => row.value),
+          backgroundColor: requestedBluePalette[1],
+          borderRadius: 5,
+          maxBarThickness: 34,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        scales: requestedHorizontalScales(),
+        plugins: {
+          legend: { display: false },
+          datalabels: requestedHorizontalBarLabels(rows.map((row) => row.label)),
+        },
+      },
+    }), ({ element }) => rows[element?.index]?.url || '');
+  }
+
+  function mountRequestedBarMultiple() {
+    const rows = requestedPtaEvolutionRows();
+
+    mountChart('dashboard-requested-bar-multiple-chart', requestedBaseConfig('bar', {
+      data: {
+        labels: rows.map((row) => row.label),
+        datasets: [
+          {
+          label: 'Prévues',
+            data: rows.map((row) => row.planned),
+            backgroundColor: requestedBluePalette[0],
+            borderRadius: 6,
+            maxBarThickness: 26,
+          },
+          {
+          label: 'Terminées',
+            data: rows.map((row) => row.done),
+            backgroundColor: requestedBluePalette[1],
+            borderRadius: 6,
+            maxBarThickness: 26,
+          },
+          {
+          label: 'En retard',
+            data: rows.map((row) => row.late),
+            backgroundColor: requestedBluePalette[3],
+            borderRadius: 6,
+            maxBarThickness: 26,
+          },
+        ],
+      },
+      options: {
+        scales: requestedVerticalScales({ title: "Nombre d'actions" }),
+        plugins: {
+          legend: { display: true },
+          datalabels: requestedValueLabels({ suffix: '' }),
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return ` ${context.dataset.label} : ${formatNumber(context.raw || 0)} action(s)`;
+              },
+            },
+          },
+        },
+      },
+    }));
+  }
+
+  function requestedPieConfig() {
+    const rows = requestedStatusRows();
+    const values = rows.map((row) => row.value);
+    const labels = rows.map((row) => row.label);
+    const colors = rows.map((row, index) => row.color || requestedBluePalette[index % requestedBluePalette.length]);
+    const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
+
+    return {
+      rows,
+      config: requestedBaseConfig('pie', {
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          layout: {
+            padding: { top: 18, right: 24, bottom: 18, left: 24 },
+          },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: '#334155',
+                boxWidth: 10,
+                boxHeight: 10,
+                padding: 14,
+                font: { size: 11, weight: '700' },
+                generateLabels(chart) {
+                  const dataset = chart.data.datasets[0] || { data: [] };
+
+                  return chart.data.labels.map((label, index) => {
+                    const value = Number(dataset.data[index] || 0);
+                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+
+                    return {
+                      text: `${label} (${formatNumber(value)} | ${percentage} %)`,
+                      fillStyle: colors[index],
+                      strokeStyle: colors[index],
+                      hidden: !chart.getDataVisibility(index),
+                      index,
+                    };
+                  });
+                },
+              },
+            },
+            datalabels: {
+              display(context) {
+                return Number(context.dataset?.data?.[context.dataIndex] ?? 0) > 0;
+              },
+              color: '#ffffff',
+              font: { size: 11, weight: '800' },
+              formatter(value) {
+                const percentage = total > 0 ? Math.round((Number(value || 0) / total) * 100) : 0;
+
+                return `${percentage}%`;
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label(context) {
+                  const value = Number(context.raw || 0);
+                  const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+
+                  return ` ${formatNumber(value)} action(s) (${percentage} %)`;
+                },
+              },
+            },
+          },
+        },
+      }),
+    };
+  }
+
+  function mountRequestedPieCharts() {
+    const status = requestedPieConfig();
+    mountChart('dashboard-requested-pie-legend-chart', status.config, ({ element }) => status.rows[element?.index]?.url || '');
+  }
+
+  function mountRequestedRadialLabel() {
+    const rows = requestedHierarchyRows(5);
+    const trackColor = '#e7eef4';
+    const datasets = rows.map((row, index) => ({
+      label: row.label,
+      data: [row.value, Math.max(0, 100 - row.value)],
+      backgroundColor: [row.color || requestedBluePalette[index % requestedBluePalette.length], trackColor],
+      borderColor: '#ffffff',
+      borderWidth: 3,
+      borderRadius: 9,
+      spacing: 2,
+    }));
+
+    mountChart('dashboard-requested-radial-label-chart', requestedBaseConfig('doughnut', {
+      data: {
+        labels: ['Progression', 'Reste'],
+        datasets,
+      },
+      options: {
+        cutout: '30%',
+        rotation: -90,
+        plugins: {
+          legend: { display: false },
+          datalabels: statusRadialDataLabels(rows.map((row) => row.label), rows.map((row) => row.value)),
+          tooltip: {
+            filter: (item) => item.dataIndex === 0,
+            callbacks: {
+              title(items) {
+                return items[0]?.dataset?.label || '';
+              },
+              label(context) {
+                return ` Progression : ${formatNumber(context.raw || 0)} %`;
+              },
+            },
+          },
+        },
+      },
+    }), ({ element }) => rows[element?.datasetIndex]?.url || '');
+  }
+
+  function mountRequestedCharts() {
+    bindRequestedAreaRange();
+    mountRequestedAreaInteractive();
+    mountRequestedBarLabel();
+    mountRequestedBarCustomLabel();
+    mountRequestedBarMultiple();
+    mountRequestedPieCharts();
+    mountRequestedRadialLabel();
+  }
+
+  function mountDecisionCharts() {
+    mountDecisionPasEvolution();
+    mountDecisionPtaExecution();
+
+    const axisProgress = decisionCharts.axis_progress || {};
+    mountChart('dashboard-decision-axis-progress-chart', decisionBarConfig(axisProgress, 'Taux d exÃ©cution', ANBG.primary),
+      ({ element }) => (axisProgress.urls || [])[element?.index] || '');
+
+    const operationalObjectives = decisionCharts.operational_objectives || {};
+    mountChart('dashboard-decision-operational-objectives-chart', decisionBarConfig(operationalObjectives, 'Avancement', ANBG.secondary),
+      ({ element }) => (operationalObjectives.urls || [])[element?.index] || '');
+
+    const hierarchyChart = decisionHierarchyChart();
+    mountChart('dashboard-decision-axis-progress-chart', decisionBarConfig(hierarchyChart, 'Avancement', ANBG.secondary),
+      ({ element }) => (hierarchyChart.urls || [])[element?.index] || '');
+
+    mountDecisionActionStatus();
+  }
+
   function mountReportingCharts() {
     const progressWeekly = reportingCharts.progress_weekly || { labels: [], reel: [], theorique: [] };
 
@@ -2378,7 +3385,7 @@ function bootDashboardRender(force = false) {
             },
             {
               type: 'line',
-              label: 'Cible',
+              label: 'Niveau attendu',
               data: data.cibles,
               borderColor: ANBG.success,
               backgroundColor: (context) => chartGradient(context.chart, ANBG.success),
@@ -2551,14 +3558,28 @@ function bootDashboardRender(force = false) {
 
   function resizeCharts() {
     Object.values(chartInstances).forEach((chart) => {
-      if (chart && typeof chart.resize === 'function') {
-        chart.resize();
+      const host = chart?.canvas?.parentElement;
+
+      if (chartHostIsRenderable(host) && typeof chart.resize === 'function') {
+        try {
+          chart.resize();
+        } catch (error) {
+          console.error('Impossible de redimensionner un graphique du tableau de bord.', error);
+        }
       }
     });
 
     if (typeof window.Plotly !== 'undefined') {
       document.querySelectorAll('.dashboard-plotly-host.is-plotly-rendered').forEach((host) => {
-        window.Plotly.Plots.resize(host);
+        if (!chartHostIsRenderable(host)) {
+          return;
+        }
+
+        try {
+          window.Plotly.Plots.resize(host);
+        } catch (error) {
+          console.error('Impossible de redimensionner un graphique Plotly du tableau de bord.', error);
+        }
       });
     }
 
@@ -2600,9 +3621,7 @@ function bootDashboardRender(force = false) {
           window.applyAnbgChartDefaults(window.Chart);
         }
 
-        safeRenderStep('kpi gauges', () => mountKpiGaugeSet('dashboard-kpi-gauge-', payload.global_scores || {}, true));
-        safeRenderStep('status pie', () => mountStatusPie('dashboard-status-mix-chart', statusCards));
-        safeRenderStep('reporting charts', mountReportingCharts);
+        safeRenderStep('requested charts', mountRequestedCharts);
       }
 
       if (hasD3) {

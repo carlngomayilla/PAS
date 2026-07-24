@@ -11,8 +11,8 @@ use ZipArchive;
 
 class ReportingReportCatalogTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -32,9 +32,14 @@ class ReportingReportCatalogTest extends TestCase
             ->assertSee('Rapport PTA')
             ->assertSee('Rapport Actions')
             ->assertSee('Rapport KPI')
+            ->assertSee('Rapport Conformite')
             ->assertSee('Rapport Anomalies')
             ->assertSee('Rapport Financement')
-            ->assertSee('Rapport Consolidé DG');
+            ->assertSee('Rapport Consolidé DG')
+            ->assertSee('Direction / service')
+            ->assertSee('Comparaison visuelle')
+            ->assertSee('data-report-direction-comparison', false)
+            ->assertSee('data-report-service-comparison', false);
     }
 
     public function test_excel_export_can_target_financing_report_only(): void
@@ -122,6 +127,26 @@ class ReportingReportCatalogTest extends TestCase
         $this->assertStringNotContainsString('JUSTIFICATIFS', $workbookXml);
     }
 
+    public function test_conformity_excel_export_is_limited_to_conformity_sheet(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $response = $this->actingAs($admin)
+            ->get(route('workspace.reporting.export.excel', ['report_type' => 'conformite']));
+
+        $response->assertOk();
+        $entries = $this->xlsxEntries($response->streamedContent());
+        $workbookXml = (string) ($entries['xl/workbook.xml'] ?? '');
+        $sheetXml = (string) ($entries['xl/worksheets/sheet1.xml'] ?? '');
+
+        $this->assertStringContainsString('CONFORMITE', $workbookXml);
+        $this->assertStringNotContainsString('ANOMALIES', $workbookXml);
+        $this->assertStringNotContainsString('ALERTES', $workbookXml);
+        $this->assertStringNotContainsString('FINANCEMENT', $workbookXml);
+        $this->assertStringContainsString('Controle', $sheetXml);
+        $this->assertStringContainsString('Correction attendue', $sheetXml);
+    }
+
     public function test_actions_pdf_report_is_limited_to_action_fields(): void
     {
         $html = $this->renderPdfReport('actions');
@@ -161,6 +186,17 @@ class ReportingReportCatalogTest extends TestCase
         $this->assertStringNotContainsString('Financements DAF / DG', $html);
     }
 
+    public function test_conformity_pdf_report_is_limited_to_conformity_section(): void
+    {
+        $html = $this->renderPdfReport('conformite');
+
+        $this->assertStringContainsString('Rapport Conformite - PAS ANBG', $html);
+        $this->assertStringContainsString('Controle de conformite', $html);
+        $this->assertStringContainsString('Correction attendue', $html);
+        $this->assertStringNotContainsString('Financements DAF / DG', $html);
+        $this->assertStringNotContainsString('Anomalies et blocages', $html);
+    }
+
     /**
      * @return array<string, string>
      */
@@ -172,7 +208,7 @@ class ReportingReportCatalogTest extends TestCase
 
         try {
             if (class_exists(ZipArchive::class)) {
-                $zip = new ZipArchive();
+                $zip = new ZipArchive;
                 $this->assertTrue($zip->open($tempFile) === true);
                 $entries = [];
                 for ($index = 0; $index < $zip->numFiles; $index++) {
@@ -200,6 +236,7 @@ class ReportingReportCatalogTest extends TestCase
         $labels = [
             'actions' => 'Rapport Actions',
             'anomalies' => 'Rapport Anomalies',
+            'conformite' => 'Rapport Conformite',
             'financement' => 'Rapport Financement',
         ];
         $label = $labels[$reportType] ?? 'Rapport';

@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Ai\Enums\Lab;
+use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Exceptions\RateLimitedException;
 use ReflectionClass;
 use RuntimeException;
@@ -26,6 +26,17 @@ class AiPtaImportExtractionTest extends TestCase
 {
     use CreatesAiPtaFixtures;
     use RefreshDatabase;
+
+    public function test_openai_is_the_default_provider_for_all_ai_capabilities(): void
+    {
+        $this->assertSame('openai', config('ai.default'));
+        $this->assertSame('openai', config('ai.default_for_images'));
+        $this->assertSame('openai', config('ai.default_for_audio'));
+        $this->assertSame('openai', config('ai.default_for_transcription'));
+        $this->assertSame('openai', config('ai.default_for_embeddings'));
+        $this->assertSame('openai', config('ai.default_for_reranking'));
+        $this->assertSame('openai', config('ai_training.pta.llm_provider'));
+    }
 
     public function test_simulated_ai_extraction_creates_normalized_rows(): void
     {
@@ -199,13 +210,9 @@ class AiPtaImportExtractionTest extends TestCase
         Http::assertSent(fn ($request): bool => $request->url() === 'http://127.0.0.1:11434/api/tags');
     }
 
-    public function test_ollama_agent_uses_configured_context_window(): void
+    public function test_import_agent_has_no_non_openai_provider_options(): void
     {
-        config()->set('ai_training.pta.llm_context_window', 8192);
-
-        $options = app(PtaImportExtractionAgent::class)->providerOptions(Lab::Ollama);
-
-        $this->assertSame(8192, $options['num_ctx']);
+        $this->assertNotInstanceOf(HasProviderOptions::class, app(PtaImportExtractionAgent::class));
     }
 
     public function test_ocr_box_lines_are_removed_from_text_ai_prompt(): void

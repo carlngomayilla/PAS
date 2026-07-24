@@ -1,127 +1,126 @@
 @extends('layouts.workspace')
 
+@section('title', 'Référentiel - Directions')
+
 @section('content')
     @php
         $summary = is_array($summary ?? null) ? $summary : [];
-        $summaryCards = [
-            ['label' => 'Directions', 'value' => $summary['total'] ?? $rows->total(), 'href' => route('workspace.referentiel.directions.index')],
-            ['label' => 'Actives', 'value' => $summary['actifs'] ?? 0, 'href' => route('workspace.referentiel.directions.index', ['actif' => 1])],
-            ['label' => 'Services', 'value' => $summary['services_total'] ?? 0, 'href' => route('workspace.referentiel.services.index')],
+        $filters = is_array($filters ?? null) ? $filters : [];
+        $exportFilters = collect($filters)->except('page')->filter(static fn ($value): bool => $value !== null && $value !== '')->all();
+        $metrics = [
+            ['label' => 'Directions', 'value' => (int) ($summary['total'] ?? 0), 'tone' => 'border-[#17324a] text-[#17324a] dark:border-sky-200 dark:text-sky-100'],
+            ['label' => 'Actives', 'value' => (int) ($summary['actifs'] ?? 0), 'tone' => 'border-[#5D8E25] text-[#4B741E] dark:border-lime-400 dark:text-lime-200'],
+            ['label' => 'Inactives', 'value' => (int) ($summary['inactifs'] ?? 0), 'tone' => 'border-[#B42318] text-[#9B1C13] dark:border-red-400 dark:text-red-200'],
+            ['label' => 'Services rattachés', 'value' => (int) ($summary['services_total'] ?? 0), 'tone' => 'border-[#3996D3] text-[#176A9D] dark:border-cyan-300 dark:text-cyan-200'],
+            ['label' => 'Utilisateurs', 'value' => (int) ($summary['users_total'] ?? 0), 'tone' => 'border-violet-400 text-violet-700 dark:border-violet-400 dark:text-violet-200'],
         ];
-        if ($canManageRoles) {
-            $summaryCards[] = ['label' => 'Utilisateurs', 'value' => $summary['users_total'] ?? 0, 'href' => route('workspace.referentiel.utilisateurs.index')];
-        }
-        $summaryCards[] = ['label' => 'PAO', 'value' => $summary['paos_total'] ?? 0, 'href' => route('workspace.pao.index')];
-        $summaryCards[] = ['label' => 'PTA', 'value' => $summary['ptas_total'] ?? 0, 'href' => route('workspace.pta.index')];
     @endphp
+
     <div class="app-screen-flow">
-    <section class="showcase-panel mb-4 app-screen-block">
-        <h1 class="showcase-panel-title">Référentiel - Directions</h1>
-    </section>
-    <section class="showcase-summary-grid mb-4 app-screen-kpis">
-        @foreach ($summaryCards as $card)
-            <x-stat-card-link :href="$card['href']" :label="$card['label']" :value="$card['value']" :meta="null" />
-        @endforeach
-    </section>
+        <x-ui.page-title class="mb-4 app-screen-block" eyebrow="Administration organisationnelle" title="Référentiel - Directions" subtitle="Structure de premier niveau et couverture opérationnelle.">
+            <x-slot:actions>
+                <a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.referentiel.directions.export.csv', $exportFilters) }}">Exporter CSV</a>
+                @if ($canWrite)
+                    <a class="btn btn-primary min-h-10 px-4" href="{{ route('workspace.referentiel.directions.create') }}">Nouvelle direction</a>
+                @endif
+            </x-slot:actions>
+        </x-ui.page-title>
 
-    <section class="showcase-panel mb-4 app-screen-block">
-        <h2>Navigation</h2>
-        <div class="flex flex-wrap gap-1.5">
-            @if ($canWrite)
-                <a class="btn btn-primary" href="{{ route('workspace.referentiel.directions.create') }}">Nouvelle direction</a>
-            @endif
-            <a class="btn btn-secondary" href="{{ route('workspace.referentiel.directions.index') }}">Directions</a>
-            <a class="btn btn-secondary" href="{{ route('workspace.referentiel.services.index') }}">Services</a>
-            @if ($canManageRoles)
-                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.utilisateurs.index') }}">Utilisateurs</a>
-            @endif
-        </div>
-    </section>
+        @include('workspace.referentiel.partials.navigation', ['active' => 'directions'])
 
-    <section class="showcase-panel mb-4 app-screen-block">
-        <h2>Filtres</h2>
-        <form method="GET" action="{{ route('workspace.referentiel.directions.index') }}">
-            <div class="form-grid-compact mb-2">
-                <div>
-                    <label for="q">Recherche</label>
-                    <input id="q" name="q" type="text" value="{{ $filters['q'] }}" placeholder="Code ou libellé">
-                </div>
-                <div>
-                    <label for="actif">Actif</label>
-                    <select id="actif" name="actif">
-                        <option value="">Tous</option>
-                        <option value="1" @selected($filters['actif'] === 1)>Oui</option>
-                        <option value="0" @selected($filters['actif'] === 0)>Non</option>
+        <section class="app-screen-block border-y border-slate-200 bg-white/70 py-4 dark:border-slate-700 dark:bg-slate-900/55" aria-label="Synthèse des directions">
+            <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(145px,1fr))]">
+                @foreach ($metrics as $metric)
+                    <div class="border-l-4 pl-3 {{ $metric['tone'] }}">
+                        <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">{{ $metric['label'] }}</span>
+                        <strong class="mt-1 block text-2xl">{{ number_format($metric['value'], 0, ',', ' ') }}</strong>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+
+        <section class="app-screen-block" aria-labelledby="directions-list-title">
+            <form method="GET" action="{{ route('workspace.referentiel.directions.index') }}" class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/85 p-3 md:grid-cols-2 xl:grid-cols-5 dark:border-slate-700 dark:bg-slate-900/70">
+                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 md:col-span-2 dark:text-slate-400">
+                    Recherche
+                    <input name="q" type="search" maxlength="100" value="{{ $filters['q'] ?? '' }}" placeholder="Code ou libellé..." class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                </label>
+                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+                    État
+                    <select name="actif" class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                        <option value="" @selected(($filters['actif'] ?? '') === '')>Toutes</option>
+                        <option value="1" @selected(($filters['actif'] ?? '') === '1')>Actives</option>
+                        <option value="0" @selected(($filters['actif'] ?? '') === '0')>Inactives</option>
                     </select>
+                </label>
+                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+                    Tri
+                    <select name="sort" class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                        <option value="code" @selected(($filters['sort'] ?? 'code') === 'code')>Code</option>
+                        <option value="libelle" @selected(($filters['sort'] ?? '') === 'libelle')>Libellé</option>
+                        <option value="size" @selected(($filters['sort'] ?? '') === 'size')>Effectif</option>
+                    </select>
+                </label>
+                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+                    Par page
+                    <select name="per_page" class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                        @foreach ([15, 30, 50, 100] as $perPage)
+                            <option value="{{ $perPage }}" @selected((int) ($filters['per_page'] ?? 30) === $perPage)>{{ $perPage }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <div class="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-5">
+                    <button class="btn btn-primary min-h-10 px-4" type="submit">Filtrer</button>
+                    <a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.referentiel.directions.index') }}">Réinitialiser</a>
                 </div>
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-                <button class="btn btn-primary" type="submit">Appliquer</button>
-                <a class="btn btn-secondary" href="{{ route('workspace.referentiel.directions.index') }}">Réinitialiser</a>
-            </div>
-        </form>
-    </section>
+            </form>
 
-    <section class="showcase-panel mb-4 app-screen-block">
-        <h2>Liste des directions</h2>
-        <div class="app-table-wrapper overflow-x-auto">
-            <table class="app-table data-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Code</th>
-                        <th>Libellé</th>
-                        <th>Actif</th>
-                        <th>Services</th>
-                        <th>Utilisateurs</th>
-                        <th>PAO</th>
-                        <th>PTA</th>
-                        @if ($canWrite)
-                            <th>Opérations</th>
-                        @endif
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($rows as $row)
-                        <tr>
-                            <td>{{ $row->id }}</td>
-                            <td><span class="anbg-badge anbg-badge-neutral px-3">{{ $row->code }}</span></td>
-                            <td>{{ $row->libelle }}</td>
-                            <td>{{ $row->actif ? 'Oui' : 'Non' }}</td>
-                            <td>{{ $row->services_count }}</td>
-                            <td>{{ $row->users_count }}</td>
-                            <td>{{ $row->paos_count }}</td>
-                            <td>{{ $row->ptas_count }}</td>
-                            @if ($canWrite)
+            <div class="mt-5 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h2 id="directions-list-title" class="text-lg font-bold text-[#17324a] dark:text-slate-100">Directions visibles</h2>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ number_format($rows->total(), 0, ',', ' ') }} résultat(s) dans votre périmètre.</p>
+                </div>
+                @if ($rows->total() > 0)
+                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $rows->firstItem() }}-{{ $rows->lastItem() }} sur {{ $rows->total() }}</span>
+                @endif
+            </div>
+
+            <div class="app-table-wrapper mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                <table class="app-table data-table min-w-[920px]">
+                    <thead><tr><th>Direction</th><th>État</th><th>Services</th><th>Utilisateurs</th><th>PAO</th><th>PTA</th>@if ($canWrite)<th>Actions</th>@endif</tr></thead>
+                    <tbody>
+                        @forelse ($rows as $row)
+                            <tr>
                                 <td>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        <a class="btn btn-warning" href="{{ route('workspace.referentiel.directions.edit', $row) }}">Modifier</a>
-                                        <form method="POST" action="{{ route('workspace.referentiel.directions.destroy', $row) }}" data-confirm-message="Supprimer cette direction ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="btn btn-danger" type="submit">Supprimer</button>
-                                        </form>
+                                    <div class="min-w-[240px]">
+                                        <div class="flex items-center gap-2"><span class="anbg-badge anbg-badge-neutral">{{ $row->code }}</span><strong class="text-slate-900 dark:text-slate-100">{{ $row->libelle }}</strong></div>
+                                        <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">Identifiant #{{ $row->id }}</span>
                                     </div>
                                 </td>
-                            @endif
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="{{ $canWrite ? 9 : 8 }}">
-                                <x-ui.empty-state
-                                    title="Aucune direction trouvée"
-                                    message="Aucune direction ne correspond aux filtres courants."
-                                    icon="filter"
-                                    tone="info"
-                                    class="my-4"
-                                />
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        <div class="pagination">{{ $rows->links() }}</div>
-    </section>
+                                <td><span class="anbg-badge {{ $row->actif ? 'anbg-badge-success' : 'anbg-badge-danger' }}">{{ $row->actif ? 'Active' : 'Inactive' }}</span></td>
+                                <td>{{ number_format($row->services_count, 0, ',', ' ') }}</td>
+                                <td>{{ number_format($row->users_count, 0, ',', ' ') }}</td>
+                                <td>{{ number_format($row->paos_count, 0, ',', ' ') }}</td>
+                                <td>{{ number_format($row->ptas_count, 0, ',', ' ') }}</td>
+                                @if ($canWrite)
+                                    <td>
+                                        <div class="flex flex-wrap gap-2">
+                                            <a class="btn btn-secondary btn-sm" href="{{ route('workspace.referentiel.directions.edit', $row) }}">Modifier</a>
+                                            <form method="POST" action="{{ route('workspace.referentiel.directions.destroy', $row) }}" data-confirm-message="Supprimer cette direction ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
+                                                @csrf @method('DELETE')
+                                                <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                @endif
+                            </tr>
+                        @empty
+                            <tr><td colspan="{{ $canWrite ? 7 : 6 }}"><x-ui.empty-state title="Aucune direction trouvée" message="Aucune direction ne correspond aux filtres courants." icon="filter" tone="info" class="my-4" /></td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination mt-4">{{ $rows->links() }}</div>
+        </section>
     </div>
 @endsection

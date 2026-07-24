@@ -22,15 +22,6 @@
                 root.classList.remove('dark');
             }
             root.setAttribute('data-theme', savedTheme);
-            try {
-                if (window.localStorage.getItem('anbg:sidebar:collapsed') === '1') {
-                    document.addEventListener('DOMContentLoaded', function () {
-                        document.body.classList.add('sidebar-collapsed');
-                    }, { once: true });
-                }
-            } catch (error) {
-                // no-op: sidebar preference is optional
-            }
         })();
     </script>
     <title>@yield('title', 'Dashboard') - {{ $platformSettings->get('app_short_name', 'ANBG') }}</title>
@@ -59,11 +50,6 @@
         }
         @media (min-width: 1024px) {
             .admin-content-shell {
-                padding-left: var(--app-sidebar-width);
-                transition: padding-left 220ms ease;
-            }
-
-            body.sidebar-collapsed .admin-content-shell {
                 padding-left: var(--app-sidebar-collapsed-width);
             }
         }
@@ -89,13 +75,6 @@
         'info' => 0,
     ];
     $headerAlertUnreadCount = 0;
-    $exerciseContext = app(\App\Services\ExerciceContext::class);
-    $exerciseOptions = $exerciseContext->options();
-    $quarterOptions = $exerciseContext->quarterOptions();
-    $selectedExercise = $exerciseContext->selectedYear();
-    $selectedQuarter = $exerciseContext->selectedQuarter();
-    $exerciseHiddenQuery = collect(request()->query())->except(['exercice', 'trimestre', 'page']);
-
     if ($layoutUser) {
         $headerNotifications = $layoutUser->notifications()
             ->latest()
@@ -186,6 +165,14 @@
             $headerSidebarBadges['mes_taches'] = $openTasksCount;
         }
 
+        if (\App\Support\SchemaIntrospectionCache::hasTable('deadline_extension_requests')) {
+            $deadlineExtensionTaskCount = app(\App\Services\DeadlineExtensionQueueService::class)
+                ->actionableCount($layoutUser);
+            if ($deadlineExtensionTaskCount > 0) {
+                $headerSidebarBadges['reports_echeance'] = $deadlineExtensionTaskCount;
+            }
+        }
+
     }
 
     $headerBellUnreadCount = $headerNotificationUnreadCount + $headerAlertUnreadCount;
@@ -201,6 +188,46 @@
         'notification' => 'bg-[#3996d3]',
         default => 'bg-[#3996d3]',
     };
+
+    $layoutModuleCodes = collect($layoutUser?->workspaceModules() ?? [])
+        ->pluck('code')
+        ->map(fn (mixed $code): string => (string) $code);
+    $moduleFamilyTabsLabel = null;
+    $moduleFamilyTabs = [];
+
+    if (request()->routeIs('workspace.imports.*', 'workspace.ai-imports.*')) {
+        $moduleFamilyTabsLabel = 'Modes d’import';
+        if ($layoutModuleCodes->contains('imports_excel')) {
+            $moduleFamilyTabs[] = [
+                'label' => 'Import Excel',
+                'href' => route('workspace.imports.index'),
+                'active' => request()->routeIs('workspace.imports.*'),
+            ];
+        }
+        if ($layoutModuleCodes->contains('ai_imports')) {
+            $moduleFamilyTabs[] = [
+                'label' => 'Import assisté par IA',
+                'href' => route('workspace.ai-imports.pta.index'),
+                'active' => request()->routeIs('workspace.ai-imports.*'),
+            ];
+        }
+    } elseif (request()->routeIs('workspace.reporting', 'workspace.reporting.*', 'workspace.ai-reports.*')) {
+        $moduleFamilyTabsLabel = 'Modes de reporting';
+        if ($layoutModuleCodes->contains('reporting')) {
+            $moduleFamilyTabs[] = [
+                'label' => 'Reporting institutionnel',
+                'href' => route('workspace.reporting'),
+                'active' => request()->routeIs('workspace.reporting', 'workspace.reporting.*'),
+            ];
+        }
+        if ($layoutModuleCodes->contains('ai_reports')) {
+            $moduleFamilyTabs[] = [
+                'label' => 'Reporting assisté par IA',
+                'href' => route('workspace.ai-reports.index'),
+                'active' => request()->routeIs('workspace.ai-reports.*'),
+            ];
+        }
+    }
 @endphp
 
 <body class="admin-theme-scope anbg-glass-theme h-full" data-auto-refresh="0" data-alert-unread="{{ (int) $headerAlertUnreadCount }}" data-notification-unread="{{ (int) $headerNotificationUnreadCount }}">
@@ -213,23 +240,12 @@
         <div class="admin-content-shell app-main min-h-screen">
             <div class="admin-shell-frame flex min-h-screen flex-col overflow-hidden">
                 <header id="admin-shell-header" class="admin-page-header app-navbar sticky top-0 z-30">
-                    <div class="admin-navbar-inner flex min-h-[5rem] items-center gap-3 px-5 py-4 sm:px-6 lg:px-8">
-                        <button
-                            type="button"
-                            id="admin-sidebar-open"
-                            class="admin-navbar-icon-button inline-flex items-center justify-center lg:hidden"
-                            aria-label="Ouvrir le menu"
-                        >
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                            </svg>
-                        </button>
-
+                    <div class="admin-navbar-inner flex min-h-16 items-center gap-3 px-4 py-2 sm:px-5 lg:px-6">
                         @unless (in_array($routeName, ['dashboard', 'workspace.index'], true))
                             <button
                                 type="button"
                                 id="admin-back-button"
-                                class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#d8ecf8] bg-white px-3 py-1.5 text-sm font-semibold text-[#17324a] transition hover:border-[#3996d3] hover:bg-[#eef6fc] hover:text-[#3996d3]"
+                                class="admin-navbar-back-button inline-flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm font-semibold transition"
                                 data-fallback-url="{{ route('dashboard') }}"
                                 title="Retour à la page précédente"
                                 aria-label="Retour à la page précédente"
@@ -250,98 +266,63 @@
                             </div>
                         </div>
 
-                        @if ($layoutUser)
-                            @php
-                                $navbarScope = $layoutUser->accessScope();
-                                $navbarScopeType = (string) ($navbarScope['scope_type'] ?? 'limited');
-                                $navbarScopeLabel = match ($navbarScopeType) {
-                                    'global' => 'Vue globale',
-                                    'direction' => 'Direction : '.($layoutUser->direction?->libelle ?? '—'),
-                                    'service' => 'Service : '.($layoutUser->service?->libelle ?? '—'),
-                                    'unite' => 'Unité : '.($layoutUser->uniteDg?->libelle ?? '—'),
-                                    'agent' => 'Mes actions',
-                                    default => 'Accès limité',
-                                };
-                                $navbarScopeTone = match ($navbarScopeType) {
-                                    'global' => 'border-emerald-300 bg-emerald-50 text-emerald-700',
-                                    'direction', 'unite' => 'border-sky-300 bg-sky-50 text-sky-700',
-                                    'service' => 'border-amber-300 bg-amber-50 text-amber-700',
-                                    'agent' => 'border-violet-300 bg-violet-50 text-violet-700',
-                                    default => 'border-slate-300 bg-slate-50 text-slate-700',
-                                };
-                            @endphp
-                            <span
-                                class="admin-navbar-scope-chip hidden sm:inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold {{ $navbarScopeTone }}"
-                                title="Périmètre d'accès : {{ $navbarScopeLabel }}"
-                                data-navbar-scope-chip
+                        <div class="admin-navbar-actions flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
+                            @if ($layoutUser)
+                                @php
+                                    $navbarScope = $layoutUser->accessScope();
+                                    $navbarScopeType = (string) ($navbarScope['scope_type'] ?? 'limited');
+                                    $navbarScopeLabel = match ($navbarScopeType) {
+                                        'global' => 'Vue globale',
+                                        'direction' => 'Direction : '.($layoutUser->direction?->libelle ?? '—'),
+                                        'service' => 'Service : '.($layoutUser->service?->libelle ?? '—'),
+                                        'unite' => 'Unité : '.($layoutUser->uniteDg?->libelle ?? '—'),
+                                        'agent' => 'Mes actions',
+                                        default => 'Accès limité',
+                                    };
+                                    $navbarScopeTone = match ($navbarScopeType) {
+                                        'global' => 'border-emerald-300 bg-emerald-50 text-emerald-700',
+                                        'direction', 'unite' => 'border-sky-300 bg-sky-50 text-sky-700',
+                                        'service' => 'border-amber-300 bg-amber-50 text-amber-700',
+                                        'agent' => 'border-violet-300 bg-violet-50 text-violet-700',
+                                        default => 'border-slate-300 bg-slate-50 text-slate-700',
+                                    };
+                                @endphp
+                                <span
+                                    class="admin-navbar-scope-chip hidden xl:inline-flex shrink-0 items-center gap-1.5 border px-3 py-1 text-[11px] font-semibold {{ $navbarScopeTone }}"
+                                    title="Périmètre d'accès : {{ $navbarScopeLabel }}"
+                                    data-navbar-scope-chip
+                                >
+                                    <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7l9-4 9 4M3 7l9 4m-9-4v10l9 4m0-14l9-4v10l-9 4m0-14v14" />
+                                    </svg>
+                                    <span class="max-w-[180px] truncate">{{ $navbarScopeLabel }}</span>
+                                </span>
+                            @endif
+
+                            <div class="admin-local-clock" id="admin-local-clock" aria-label="Heure locale">
+                                --:--:--
+                            </div>
+
+                            <button
+                                type="button"
+                                id="admin-theme-toggle"
+                                class="admin-navbar-icon-button admin-navbar-action-button inline-flex items-center justify-center"
+                                title="Changer le thème"
+                                aria-label="Changer le thème"
                             >
-                                <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7l9-4 9 4M3 7l9 4m-9-4v10l9 4m0-14l9-4v10l-9 4m0-14v14" />
+                                <svg class="h-5 w-5 dark:hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21.752 15.002A9.718 9.718 0 0 1 18 15.75 9.75 9.75 0 0 1 8.25 6c0-1.33.266-2.597.748-3.752A9.753 9.753 0 1 0 21.752 15.002Z" />
                                 </svg>
-                                <span class="max-w-[180px] truncate">{{ $navbarScopeLabel }}</span>
-                            </span>
-                        @endif
-
-<form method="GET" action="{{ url()->current() }}" class="admin-exercise-filter flex shrink-0 items-center gap-1 px-2 py-1.5 text-[11px]">
-                            @foreach ($exerciseHiddenQuery as $queryKey => $queryValue)
-                                @if (is_array($queryValue))
-                                    @foreach ($queryValue as $itemValue)
-                                        <input type="hidden" name="{{ $queryKey }}[]" value="{{ $itemValue }}">
-                                    @endforeach
-                                @elseif (! is_null($queryValue))
-                                    <input type="hidden" name="{{ $queryKey }}" value="{{ $queryValue }}">
-                                @endif
-                            @endforeach
-                            <select
-                                name="exercice"
-                                class="w-[86px] border-0 bg-transparent px-1 py-1 font-semibold text-[#17324a] outline-none ring-0"
-                                onchange="this.form.submit()"
-                                aria-label="Filtrer par exercice"
-                            >
-                                @foreach ($exerciseOptions as $exerciseOption)
-                                    <option value="{{ $exerciseOption['value'] }}" @selected((string) ($selectedExercise ?? 'all') === $exerciseOption['value'])>
-                                        {{ $exerciseOption['value'] === 'all' ? 'Tous' : $exerciseOption['value'] }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <select
-                                name="trimestre"
-                                class="w-[74px] border-0 bg-transparent px-1 py-1 font-semibold text-[#17324a] outline-none ring-0"
-                                onchange="this.form.submit()"
-                                aria-label="Filtrer par trimestre"
-                            >
-                                @foreach ($quarterOptions as $quarterOption)
-                                    <option value="{{ $quarterOption['value'] }}" @selected((string) ($selectedQuarter ?? 'all') === $quarterOption['value'])>
-                                        {{ $quarterOption['label'] }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </form>
-
-                        <div class="admin-local-clock" id="admin-local-clock" aria-label="Heure locale">
-                            --:--:--
-                        </div>
-
-                        <button
-                            type="button"
-                            id="admin-theme-toggle"
-                            class="admin-navbar-icon-button inline-flex items-center justify-center"
-                            title="Changer le thème"
-                            aria-label="Changer le thème"
-                        >
-                            <svg class="h-5 w-5 dark:hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21.752 15.002A9.718 9.718 0 0 1 18 15.75 9.75 9.75 0 0 1 8.25 6c0-1.33.266-2.597.748-3.752A9.753 9.753 0 1 0 21.752 15.002Z" />
-                            </svg>
-                            <svg class="hidden h-5 w-5 dark:block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.364-6.364-1.591 1.591M7.227 16.773l-1.591 1.591m12.728 0-1.591-1.591M7.227 7.227 5.636 5.636M12 8.25A3.75 3.75 0 1 1 12 15.75a3.75 3.75 0 0 1 0-7.5Z" />
-                            </svg>
-                        </button>
+                                <svg class="hidden h-5 w-5 dark:block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.364-6.364-1.591 1.591M7.227 16.773l-1.591 1.591m12.728 0-1.591-1.591M7.227 7.227 5.636 5.636M12 8.25A3.75 3.75 0 1 1 12 15.75a3.75 3.75 0 0 1 0-7.5Z" />
+                                </svg>
+                            </button>
 
                         <div class="relative" id="header-notifications">
                         <button
                             type="button"
                             id="header-notifications-toggle"
-                            class="admin-navbar-icon-button relative inline-flex items-center justify-center"
+                            class="admin-navbar-icon-button admin-navbar-action-button admin-navbar-notification-button relative inline-flex items-center justify-center"
                             title="Centre de notifications et alertes"
                             aria-label="Centre de notifications et alertes"
                         >
@@ -350,7 +331,7 @@
                             </svg>
                             <span
                                 id="header-notifications-badge"
-                                class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none text-white {{ $headerBellBadgeClass }} {{ $headerBellUnreadCount > 0 ? '' : 'hidden' }}"
+                                class="admin-navbar-notification-badge absolute inline-flex items-center justify-center px-1 text-[10px] font-semibold leading-none text-white {{ $headerBellBadgeClass }} {{ $headerBellUnreadCount > 0 ? '' : 'hidden' }}"
                                 data-notification-unread="{{ (int) $headerNotificationUnreadCount }}"
                                 data-alert-unread="{{ (int) $headerAlertUnreadCount }}"
                                 data-badge-kind="{{ $headerBellBadgeKind }}"
@@ -471,25 +452,33 @@
                         </div>
                     </div>
 
-                        <div class="admin-navbar-user flex items-center gap-3 px-3 py-2">
-                            <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-user-copy text-right transition-opacity hover:opacity-75">
-                                <p class="text-sm font-semibold text-[#17324a]">{{ auth()->user()?->name ?? 'Utilisateur' }}</p>
-                                <p class="text-xs text-[#667085]">{{ auth()->user()?->roleLabel() ?? 'Compte' }}</p>
-                            </a>
-                            <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-avatar inline-flex items-center justify-center transition-opacity hover:opacity-75">
-                                @if (auth()->user()?->profile_photo_url)
-                                    <img src="{{ auth()->user()->profile_photo_url }}" alt="Avatar" class="admin-navbar-avatar-media h-10 w-10 rounded-[1rem] object-cover">
-                                @else
-                                    <div class="admin-navbar-avatar-media flex h-10 w-10 items-center justify-center rounded-[1rem] bg-[#3996d3] text-xs font-bold text-white">
-                                        {{ auth()->user()?->profile_initials ?? 'U' }}
-                                    </div>
-                                @endif
-                            </a>
+                            <div class="admin-navbar-user admin-navbar-profile flex items-center gap-3 px-3 py-2">
+                                <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-user-copy min-w-0 text-left transition-opacity hover:opacity-75" data-navbar-user-copy>
+                                    <p class="truncate text-sm font-semibold text-[#17324a]" title="{{ $layoutUser?->name ?? 'Utilisateur' }}">{{ $layoutUser?->name ?? 'Utilisateur' }}</p>
+                                    <p class="truncate text-xs text-[#667085]">{{ $layoutUser?->roleLabel() ?? 'Compte' }}</p>
+                                </a>
+                                <a href="{{ route('workspace.profile.edit') }}" class="admin-navbar-avatar inline-flex items-center justify-center transition-opacity hover:opacity-75">
+                                    @if ($layoutUser?->profile_photo_url)
+                                        <img src="{{ $layoutUser->profile_photo_url }}" alt="Photo de profil de {{ $layoutUser->name }}" class="admin-navbar-avatar-media h-10 w-10 object-cover">
+                                    @else
+                                        <div class="admin-navbar-avatar-media flex h-10 w-10 items-center justify-center bg-[#3996d3] text-xs font-bold text-white">
+                                            {{ $layoutUser?->profile_initials ?? 'U' }}
+                                        </div>
+                                    @endif
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </header>
 
                 <main id="admin-main-content" data-auto-refresh-region class="app-content min-h-[calc(100vh-5rem)] w-full flex-1">
+                    @if ($moduleFamilyTabsLabel !== null)
+                        <x-ui.module-tabs
+                            :label="$moduleFamilyTabsLabel"
+                            :items="$moduleFamilyTabs"
+                            class="mb-4"
+                        />
+                    @endif
                     @if (session('success'))
                         <div class="flash-success">
                             {{ session('success') }}

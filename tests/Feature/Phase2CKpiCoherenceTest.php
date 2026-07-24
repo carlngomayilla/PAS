@@ -12,9 +12,10 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\SousAction;
 use App\Models\User;
-use App\Services\Actions\ActionTrackingService;
 use App\Services\ActionPerformanceService;
+use App\Services\Actions\ActionTrackingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -130,14 +131,14 @@ class Phase2CKpiCoherenceTest extends TestCase
         ]);
 
         $service = app(ActionPerformanceService::class);
-        $referenceDate = \Illuminate\Support\Carbon::parse('2026-01-05');
+        $referenceDate = Carbon::parse('2026-01-05');
 
         $this->assertSame(100.0, $service->calculateRealProgress($action));
         $this->assertSame(0.0, $service->calculateValidationScore($action));
         $this->assertSame(100.0, $service->calculateGlobalKpi($action, $referenceDate));
 
         $action->forceFill([
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ])->save();
 
         $this->assertSame(0.0, $service->calculateValidationScore($action->fresh()));
@@ -160,13 +161,13 @@ class Phase2CKpiCoherenceTest extends TestCase
             'date_echeance' => '2026-01-10',
             'responsable_id' => $admin->id,
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             'financement_requis' => true,
             'financement_statut' => Action::FINANCEMENT_SOUMIS_DAF,
         ]);
 
         $service = app(ActionPerformanceService::class);
-        $referenceDate = \Illuminate\Support\Carbon::parse('2026-01-05');
+        $referenceDate = Carbon::parse('2026-01-05');
 
         $this->assertSame(0.0, $service->calculateValidationScore($action));
         $this->assertSame(100.0, $service->calculateGlobalKpi($action, $referenceDate));

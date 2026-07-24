@@ -39,7 +39,7 @@ final class UiLabel
             'risque' => 'Point de vigilance',
             'global' => "Performance d'execution",
             'moyen' => 'Score de suivi moyen',
-            default => trim(self::object('kpi') . ' ' . str_replace('_', ' ', $key)),
+            default => trim(self::object('kpi').' '.str_replace('_', ' ', $key)),
         };
     }
 
@@ -55,7 +55,7 @@ final class UiLabel
         return $isManual ? 'À renseigner' : 'Sans saisie';
     }
 
-    public static function actionStatus(string|null $status): string
+    public static function actionStatus(?string $status): string
     {
         return match ((string) $status) {
             'non_demarre' => 'Non démarré',
@@ -81,25 +81,29 @@ final class UiLabel
         };
     }
 
-    public static function validationStatus(string|null $status): string
+    public static function validationStatus(?string $status): string
     {
         return match ((string) $status) {
             'non_soumise' => 'Non soumise',
             'soumise_chef' => 'Soumise service',
             'rejetee_chef' => 'Rejetée service',
             'correction_demandee' => 'Correction demandée',
-            'validee_chef' => 'Validée',
+            'validee_chef' => 'Visa chef enregistré',
+            'soumise_controle' => 'Soumise au contrôle',
+            'correction_controle' => 'Correction demandée par le contrôle',
+            'validee_controle' => 'Validée par le contrôle',
             'rejetee_direction' => 'Rejetée direction',
             'validee_direction' => 'Validée (ancienne direction)',
             default => ucfirst(str_replace('_', ' ', (string) $status)),
         };
     }
 
-    public static function workflowStatus(string|null $status): string
+    public static function workflowStatus(?string $status): string
     {
         return match ((string) $status) {
             'actif' => 'Actif',
             'en_cours' => 'En cours',
+            'controle_sciq' => 'Contrôle SCIQ',
             'cloture' => 'Clôturé',
             'archive' => 'Archivé',
             'brouillon' => 'Brouillon',
@@ -112,7 +116,7 @@ final class UiLabel
         };
     }
 
-    public static function delegationStatus(string|null $status): string
+    public static function delegationStatus(?string $status): string
     {
         return match ((string) $status) {
             'active' => 'Active',

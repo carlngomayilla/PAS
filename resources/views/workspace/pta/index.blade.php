@@ -15,8 +15,15 @@
         $summaryCards = [
             ['label' => 'Total PTA',            'value' => $ps['total'] ?? $rows->total(),   'meta' => null, 'href' => route('workspace.pta.index'),                             'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'En cours',             'value' => $ps['en_cours'] ?? 0,             'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'en_cours']), 'badge' => null, 'badge_tone' => 'neutral'],
+            ['label' => 'Controle SCIQ',        'value' => $ps['controle_sciq'] ?? 0,        'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'controle_sciq']), 'badge' => null, 'badge_tone' => (($ps['controle_sciq'] ?? 0) > 0 ? 'warning' : 'neutral')],
             ['label' => 'Clotures',             'value' => $ps['clotures'] ?? 0,             'meta' => null, 'href' => route('workspace.pta.index', ['statut' => 'cloture']),  'badge' => null, 'badge_tone' => 'neutral'],
             ['label' => 'Sans action',          'value' => $ps['sans_action'] ?? 0,          'meta' => null, 'href' => route('workspace.pta.index', ['without_action' => 1]),    'badge' => null, 'badge_tone' => ($ps['sans_action'] ?? 0) > 0 ? 'warning' : 'neutral'],
+        ];
+        $workflowSteps = [
+            ['status' => 'en_cours', 'label' => 'En cours', 'count' => $ps['en_cours'] ?? 0],
+            ['status' => 'controle_sciq', 'label' => 'Controle SCIQ', 'count' => $ps['controle_sciq'] ?? 0],
+            ['status' => 'cloture', 'label' => 'Cloture', 'count' => $ps['clotures'] ?? 0],
+            ['status' => 'archive', 'label' => 'Archive', 'count' => $ps['archives'] ?? 0],
         ];
     @endphp
 
@@ -32,6 +39,43 @@
             @endif
         </x-slot:actions>
     </x-ui.page-title>
+
+    <section class="showcase-panel mb-4 app-screen-block">
+        <div class="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
+            <div>
+                <p class="text-xs font-black uppercase tracking-[0.16em] text-[#3996d3]">Poste de travail PTA</p>
+                <h2 class="mt-2 text-2xl font-black text-[#17324a]">Objectifs transmis, actions et controle dans un seul flux</h2>
+                <p class="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
+                    Le chef de service travaille par objectif operationnel, la direction suit l'execution, et SCIQ/Planification controle avant cloture.
+                </p>
+                <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-xl border border-slate-200/80 bg-white/80 p-3">
+                        <p class="text-xs font-bold uppercase text-slate-500">Services couverts</p>
+                        <p class="mt-1 text-2xl font-black text-slate-900">{{ $ps['services'] ?? 0 }}</p>
+                    </div>
+                    <div class="rounded-xl border border-slate-200/80 bg-white/80 p-3">
+                        <p class="text-xs font-bold uppercase text-slate-500">Actions rattachees</p>
+                        <p class="mt-1 text-2xl font-black text-slate-900">{{ $ps['actions_total'] ?? 0 }}</p>
+                    </div>
+                    <div class="rounded-xl border border-slate-200/80 bg-white/80 p-3">
+                        <p class="text-xs font-bold uppercase text-slate-500">A parametrer</p>
+                        <p class="mt-1 text-2xl font-black text-slate-900">{{ $ps['sans_action'] ?? 0 }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="rounded-xl border border-slate-200/80 bg-white/85 p-4">
+                <p class="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Workflow valide</p>
+                <div class="mt-4 space-y-3">
+                    @foreach ($workflowSteps as $step)
+                        <a href="{{ route('workspace.pta.index', ['statut' => $step['status']]) }}" class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-[#3996d3] hover:text-[#17324a]">
+                            <span>{{ $loop->iteration }}. {{ $step['label'] }}</span>
+                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{{ $step['count'] }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </section>
 
     <section class="showcase-summary-grid pta-summary-row mb-4 app-screen-kpis">
         @foreach ($summaryCards as $card)
@@ -134,9 +178,7 @@
                         <th>Statut</th>
                         <th>Nb actions</th>
                         <th>Validateur</th>
-                        @if ($canWrite)
-                            <th>Actions</th>
-                        @endif
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -145,14 +187,21 @@
                             $statusClasses = match ((string) $row->statut) {
                                 'brouillon' => 'anbg-badge anbg-badge-neutral',
                                 'en_cours' => 'anbg-badge anbg-badge-warning',
+                                'controle_sciq' => 'anbg-badge anbg-badge-info',
                                 'cloture' => 'anbg-badge anbg-badge-info',
                                 'archive' => 'anbg-badge anbg-badge-neutral',
                                 default => 'anbg-badge anbg-badge-neutral',
                             };
-                            // Pas de cloture possible tant que le PTA est en brouillon (toutes
-                            // les actions doivent etre parametrees avant la cloture).
-                            $canClose = $row->statut === 'en_cours';
+                            // Le meme endpoint fait avancer le PTA dans le circuit canonique.
+                            $canClose = in_array((string) $row->statut, ['en_cours', 'controle_sciq'], true);
                             $canArchive = $row->statut === 'cloture';
+                            $closeButtonLabel = $row->statut === 'controle_sciq' ? 'Cloturer' : 'Envoyer au controle';
+                            $closeConfirmMessage = $row->statut === 'controle_sciq'
+                                ? 'Cloturer ce PTA apres controle SCIQ/Planification ?'
+                                : 'Transmettre ce PTA au controle SCIQ/Planification ?';
+                            $closeMotif = $row->statut === 'controle_sciq'
+                                ? 'Cloture PTA apres controle SCIQ/Planification'
+                                : 'Transmission PTA au controle SCIQ/Planification';
                             $isModificationLocked = $lockService->isLocked($row);
                             $canRequestUnlock = $currentUser && $lockService->canRequestUnlock($currentUser, $row);
                         @endphp
@@ -181,9 +230,10 @@
                             </td>
                             <td class="text-center"><span class="anbg-badge anbg-badge-info px-3">{{ $row->actions_count }}</span></td>
                             <td>{{ $row->validateur?->name ?? '-' }}</td>
-                            @if ($canWrite)
-                                <td>
-                                    <div class="row-actions">
+                            <td>
+                                <div class="row-actions">
+                                    <a class="btn btn-secondary" href="{{ route('workspace.pta.show', $row) }}">Explorer</a>
+                                    @if ($canWrite)
                                         @if (! $isModificationLocked)
                                             <a class="btn btn-warning" href="{{ route('workspace.pta.edit', $row) }}">Modifier</a>
                                         @elseif ($canRequestUnlock)
@@ -194,10 +244,10 @@
                                             ])
                                         @endif
                                         @if ($canClose)
-                                            <form method="POST" action="{{ route('workspace.pta.close', $row) }}" data-confirm-message="Cloturer ce PTA apres controle des anomalies ?" data-confirm-tone="warning" data-confirm-label="Cloturer">
+                                            <form method="POST" action="{{ route('workspace.pta.close', $row) }}" data-confirm-message="{{ $closeConfirmMessage }}" data-confirm-tone="warning" data-confirm-label="{{ $closeButtonLabel }}">
                                                 @csrf
-                                                <input type="hidden" name="motif" value="Cloture PTA demandee depuis la liste">
-                                                <button class="btn btn-primary" type="submit">Cloturer</button>
+                                                <input type="hidden" name="motif" value="{{ $closeMotif }}">
+                                                <button class="btn btn-primary" type="submit">{{ $closeButtonLabel }}</button>
                                             </form>
                                         @endif
                                         @if ($canArchive)
@@ -213,13 +263,13 @@
                                                 <input type="hidden" name="motif" value="Demande de suppression PTA depuis le module PTA">
                                                 <button class="btn btn-danger" type="submit">Supprimer</button>
                                             </form>
-                                    </div>
-                                </td>
-                            @endif
+                                    @endif
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 9 : 8 }}">
+                            <td colspan="12">
                                 <x-ui.empty-state
                                     title="Aucun PTA trouvé"
                                     message="Aucun plan de travail annuel ne correspond aux filtres courants."

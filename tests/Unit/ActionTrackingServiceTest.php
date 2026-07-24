@@ -15,9 +15,9 @@ use App\Models\Pta;
 use App\Models\Service;
 use App\Models\SousAction;
 use App\Models\User;
+use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertCenterService;
-use App\Notifications\WorkspaceModuleNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
@@ -126,7 +126,7 @@ class ActionTrackingServiceTest extends TestCase
         $this->assertSame(ActionTrackingService::STATUS_A_RISQUE, $action->statut_dynamique);
 
         $action->forceFill([
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ])->save();
 
         app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-09'));
@@ -496,7 +496,7 @@ class ActionTrackingServiceTest extends TestCase
             'quantite_realisee' => 500,
             'date_fin' => '2026-01-10',
             'date_echeance' => '2026-01-10',
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ]);
 
         app(ActionTrackingService::class)->refreshActionMetrics($action, Carbon::parse('2026-01-10'));
@@ -584,7 +584,7 @@ class ActionTrackingServiceTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $overrides
+     * @param  array<string, mixed>  $overrides
      */
     private function createQuantitativeAction(array $overrides = []): Action
     {

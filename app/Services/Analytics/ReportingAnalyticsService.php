@@ -19,11 +19,13 @@ use App\Services\Actions\ActionTrackingService;
 use App\Services\ExerciceContext;
 use App\Services\ManagedKpiSettings;
 use App\Support\SafeSql;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ReportingAnalyticsService
@@ -37,7 +39,9 @@ class ReportingAnalyticsService
     // expose `truncation.*.truncated` pour que les vues affichent un bandeau
     // signalant que la liste est tronquee.
     public const DETAIL_LIMIT_LATE_ACTIONS = 200;
+
     public const DETAIL_LIMIT_KPI_BELOW_THRESHOLD = 200;
+
     public const DETAIL_LIMIT_STRUCTURE = 300;
 
     // A33 — Seuil au-dela duquel on emet un warning en logs : les agregats
@@ -53,13 +57,12 @@ class ReportingAnalyticsService
         private readonly KpiAggregatorService $kpiAggregatorService,
         private readonly ActionSummaryService $actionSummaryService,
         private readonly ExerciceContext $exerciceContext,
-        private readonly \App\Services\Actions\ActionTrackingService $actionTrackingService
-    ) {
-    }
+        private readonly ActionTrackingService $actionTrackingService
+    ) {}
 
     /**
      * @return array{
-     *     generatedAt: \Illuminate\Support\Carbon,
+     *     generatedAt: Carbon,
      *     scope: array{role: string, direction_id: int|null, service_id: int|null},
      *     statisticalPolicy: array{scope_status: string, scope_label: string, scope_summary: string},
      *     officialPolicy: array{threshold_status: string, threshold_label: string, scope_summary: string},
@@ -72,10 +75,11 @@ class ReportingAnalyticsService
      *     interannualComparison: array<int, array<string, mixed>>,
      *     charts: array<string, mixed>,
      *     details: array{
-     *         actions_retard: \Illuminate\Support\Collection<int, \App\Models\Action>,
-     *         kpi_sous_seuil: \Illuminate\Support\Collection<int, \App\Models\KpiMesure>,
-     *         structure_rapports: \Illuminate\Support\Collection<int, array<string, string>>,
-     *         direction_service_report: \Illuminate\Support\Collection<int, array<string, mixed>>
+     *         actions_retard: Collection<int, Action>,
+     *         kpi_sous_seuil: Collection<int, KpiMesure>,
+     *         structure_rapports: Collection<int, array<string, string>>,
+     *         direction_service_report: Collection<int, array<string, mixed>>,
+     *         conformity_report: Collection<int, array<string, mixed>>
      *     }
      * }
      */
@@ -114,7 +118,7 @@ class ReportingAnalyticsService
         // mais on sait qu il faudra refacto en chunk/SQL natif a terme).
         $validatedCount = (clone $actionsStatistics)->count();
         if ($validatedCount > self::AGGREGATE_WARN_THRESHOLD) {
-            \Illuminate\Support\Facades\Log::warning('Reporting aggregate volume exceeds safe threshold (A33).', [
+            Log::warning('Reporting aggregate volume exceeds safe threshold (A33).', [
                 'user_id' => $user->id,
                 'validated_actions_count' => $validatedCount,
                 'threshold' => self::AGGREGATE_WARN_THRESHOLD,
@@ -147,6 +151,7 @@ class ReportingAnalyticsService
             'kpi_sous_seuil' => collect(),
             'structure_rapports' => collect(),
             'direction_service_report' => collect(),
+            'conformity_report' => collect(),
             // A25 — Meta-information sur les troncatures appliquees aux details
             // (utilise par les vues / exports pour avertir le lecteur).
             'truncation' => [
@@ -294,6 +299,7 @@ class ReportingAnalyticsService
             ];
 
             $details['direction_service_report'] = $this->buildDirectionServiceReport($user);
+            $details['conformity_report'] = $this->buildConformityReport($details['direction_service_report']);
         }
 
         $kpiSummary = $this->buildKpiSummary($validatedActions);
@@ -624,7 +630,7 @@ class ReportingAnalyticsService
     }
 
     /**
-     * @param array<string, mixed>|null $filters
+     * @param  array<string, mixed>|null  $filters
      */
     private function applyActionReportingFilters(Builder $query, User $user, ?array $filters = null): void
     {
@@ -678,7 +684,7 @@ class ReportingAnalyticsService
     }
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      */
     private function applyMesureReportingFilters(Builder $query, User $user, array $filters): void
     {
@@ -711,10 +717,10 @@ class ReportingAnalyticsService
         };
 
         $query->where(function (Builder $criticalityQuery) use ($values): void {
-            if (\App\Support\SchemaIntrospectionCache::hasColumn('actions', 'priorite')) {
+            if (SchemaIntrospectionCache::hasColumn('actions', 'priorite')) {
                 $criticalityQuery->orWhereIn('priorite', $values);
             }
-            if (\App\Support\SchemaIntrospectionCache::hasColumn('actions', 'niveau_risque')) {
+            if (SchemaIntrospectionCache::hasColumn('actions', 'niveau_risque')) {
                 $criticalityQuery->orWhereIn('niveau_risque', $values);
             }
         });
@@ -753,7 +759,7 @@ class ReportingAnalyticsService
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, int|float>
      */
     private function reportSummary(Collection $actions): array
@@ -762,7 +768,7 @@ class ReportingAnalyticsService
     }
 
     /**
-     * @param Collection<int, array<string, mixed>> $rows
+     * @param  Collection<int, array<string, mixed>>  $rows
      * @return array<string, int|float>
      */
     private function reportSummaryFromRows(Collection $rows): array
@@ -798,6 +804,136 @@ class ReportingAnalyticsService
             'kpi_global' => round((float) $rows->avg(fn (array $row): float => (float) ($row['kpi_global_value'] ?? 0)), 2),
             'kpi_conformite' => round((float) $rows->avg(fn (array $row): float => (float) ($row['kpi_conformite_value'] ?? 0)), 2),
         ];
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $directionServiceReport
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildConformityReport(Collection $directionServiceReport): Collection
+    {
+        return $directionServiceReport
+            ->flatMap(function (array $direction): array {
+                $directionLabel = $this->conformityEntityLabel($direction, 'Direction');
+
+                return collect($direction['services'] ?? [])
+                    ->flatMap(function (array $service) use ($directionLabel): array {
+                        $serviceLabel = $this->conformityEntityLabel($service, 'Service');
+
+                        return collect($service['actions'] ?? [])
+                            ->flatMap(fn (array $row): array => $this->conformityRowsForAction($row, $directionLabel, $serviceLabel))
+                            ->all();
+                    })
+                    ->all();
+            })
+            ->values();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function conformityRowsForAction(array $row, string $directionLabel, string $serviceLabel): array
+    {
+        $progression = (float) ($row['progression_value'] ?? 0);
+        $baseRow = [
+            'direction' => $directionLabel,
+            'service' => $serviceLabel,
+            'action' => (string) ($row['description_action'] ?? $row['action'] ?? '-'),
+            'rmo' => (string) ($row['rmo'] ?? $row['responsable'] ?? '-'),
+            'progression' => $progression,
+            'statut_suivi' => (string) ($row['statut'] ?? '-'),
+        ];
+        $rows = [];
+
+        $addRow = function (string $controle, string $statut, string $correction) use (&$rows, $baseRow): void {
+            $rows[] = array_merge($baseRow, [
+                'controle' => $controle,
+                'statut' => $statut,
+                'correction' => $correction,
+            ]);
+        };
+
+        if ($this->isBlankConformityValue($row['objectif_operationnel'] ?? null)) {
+            $addRow(
+                'Rattachement objectif operationnel',
+                'A corriger',
+                'Rattacher l action a un objectif operationnel du service.'
+            );
+        }
+
+        $indicatorLabel = (string) ($row['kpi'] ?? '');
+        if (
+            $this->isBlankConformityValue($indicatorLabel)
+            || Str::startsWith(Str::lower($indicatorLabel), 'indicateur global:')
+        ) {
+            $addRow(
+                'Indicateur de mesure',
+                'A renseigner',
+                'Completer le type d indicateur et les champs attendus dans le PTA.'
+            );
+        }
+
+        if ($progression > 0 && (array) ($row['justificatifs'] ?? []) === []) {
+            $addRow(
+                'Justificatif',
+                'A completer',
+                'Ajouter au moins un justificatif pour documenter l avancement declare.'
+            );
+        }
+
+        if ((bool) ($row['financement_requis'] ?? false)) {
+            $source = $row['financement_source'] ?? null;
+            $amount = (float) ($row['financement_montant'] ?? 0);
+            if ($this->isBlankConformityValue($source) || $amount <= 0.0) {
+                $addRow(
+                    'Financement',
+                    'A completer',
+                    'Renseigner la source de financement et le montant estime.'
+                );
+            }
+        }
+
+        if ((bool) ($row['est_en_retard'] ?? false)) {
+            $addRow(
+                'Delai / report',
+                'A traiter',
+                'Mettre a jour l avancement, lever le blocage ou engager une demande de report.'
+            );
+        }
+
+        foreach ((array) ($row['anomalies'] ?? []) as $anomaly) {
+            $correction = (string) ($anomaly['correction_attendue'] ?? $anomaly['message'] ?? '');
+            $addRow(
+                'Anomalie declaree: '.(string) ($anomaly['type'] ?? '-'),
+                (string) ($anomaly['niveau'] ?? 'A traiter'),
+                $correction !== '' ? $correction : 'Traiter l anomalie signalee.'
+            );
+        }
+
+        if ($rows === []) {
+            $addRow(
+                'Synthese de controle',
+                'Conforme',
+                'Aucune correction prioritaire.'
+            );
+        }
+
+        return $rows;
+    }
+
+    private function conformityEntityLabel(array $entity, string $fallback): string
+    {
+        $code = trim((string) ($entity['code'] ?? ''));
+        $name = trim((string) ($entity['libelle'] ?? $fallback));
+
+        return $code !== '' ? $code.' - '.$name : $name;
+    }
+
+    private function isBlankConformityValue(mixed $value): bool
+    {
+        $text = Str::lower(trim((string) $value));
+
+        return in_array($text, ['', '-', 'n/a', 'na', 'non renseigne', 'non renseignee'], true);
     }
 
     /**
@@ -892,7 +1028,7 @@ class ReportingAnalyticsService
             'anomalies' => $this->reportActionAnomalies($action),
             'kpi_rows' => $this->reportActionKpiRows($action),
             'est_validee' => in_array($validationStatus, [
-                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true),
             'est_terminee' => $isCompleted,
@@ -992,7 +1128,7 @@ class ReportingAnalyticsService
         $parts = [];
         $target = $this->reportActionTargetLabel($action);
         if ($target !== '') {
-            $parts[] = 'Cible: '.$target;
+            $parts[] = 'Niveau attendu: '.$target;
         }
 
         $period = trim(($action->date_debut?->format('Y-m-d') ?? '').' - '.($action->date_fin?->format('Y-m-d') ?? ''), ' -');
@@ -1036,7 +1172,7 @@ class ReportingAnalyticsService
     }
 
     /**
-     * @param array<int, array<string, string>> $justificatifs
+     * @param  array<int, array<string, string>>  $justificatifs
      */
     private function reportActionObservationLabel(Action $action, array $justificatifs): string
     {
@@ -1166,7 +1302,7 @@ class ReportingAnalyticsService
     }
 
     /**
-     * @param array<int, array<string, string>> $justificatifs
+     * @param  array<int, array<string, string>>  $justificatifs
      */
     private function reportActionJustificatifLabel(array $justificatifs): string
     {
@@ -1313,6 +1449,7 @@ class ReportingAnalyticsService
                     ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
                     ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
             });
+
             return;
         }
 
@@ -1340,6 +1477,7 @@ class ReportingAnalyticsService
                     ->orWhereHas('responsables', fn (Builder $q) => $q->whereKey((int) $user->id))
                     ->orWhereHas('sousActions', fn (Builder $q) => $q->where('agent_id', (int) $user->id));
             });
+
             return;
         }
 
@@ -1633,7 +1771,7 @@ class ReportingAnalyticsService
         // prioritaire) et fond les 11 valeurs de statut_dynamique dans le meme
         // vocabulaire que le dashboard. Corrige les statuts manquants/illisibles
         // signales sur les graphiques (notamment l'absence de "A parametrer").
-        $bucketExpr = "CASE "
+        $bucketExpr = 'CASE '
             ."WHEN actions.statut_parametrage = 'a_parametrer' THEN 'a_parametrer' "
             ."WHEN actions.statut_dynamique IN ('acheve_dans_delai','acheve_hors_delai','cloturee') THEN 'acheve' "
             ."WHEN actions.statut_dynamique = 'en_retard' THEN 'en_retard' "
@@ -2091,7 +2229,7 @@ class ReportingAnalyticsService
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return Collection<int, Action>
      */
     private function validatedActions(Collection $actions): Collection
@@ -2100,7 +2238,7 @@ class ReportingAnalyticsService
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, float>
      */
     private function buildKpiSummary(Collection $actions): array
@@ -2163,7 +2301,7 @@ class ReportingAnalyticsService
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildPerformanceGaugeRows(User $user, Collection $actions): array

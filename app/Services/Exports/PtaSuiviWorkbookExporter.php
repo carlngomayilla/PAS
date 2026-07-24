@@ -59,14 +59,14 @@ class PtaSuiviWorkbookExporter
         $headers = [
             'N',
             'Actions',
+            'Sous-actions',
             'Indicateurs de mesure',
-            'Responsable',
+            'RMO',
             'Ratio',
-            'Cible',
+            'Seuil',
             'Realise',
             'Taux (%)',
-            'Progression',
-            'Performance en fonction de la cible',
+            'Performance',
             'Ecart',
             'Echeance',
             'Retard',
@@ -117,28 +117,29 @@ class PtaSuiviWorkbookExporter
 
                         foreach (collect($operationalGroup['actions'] ?? []) as $actionRow) {
                             $actionRow = (array) $actionRow;
-                            $rows[] = ['cells' => [
-                                (string) $counter++,
-                                (string) ($actionRow['libelle'] ?? '-'),
-                                (string) ($actionRow['indicateur'] ?? '-'),
-                                (string) ($actionRow['responsable'] ?? '-'),
-                                (string) ($actionRow['ratio'] ?? '-'),
-                                (string) ($actionRow['cible'] ?? '-'),
-                                (string) ($actionRow['realise'] ?? '-'),
-                                (string) ($actionRow['taux_realisation_label'] ?? '-'),
-                                (string) ($actionRow['taux_realisation_label'] ?? '-'),
-                                (string) ($actionRow['performance_label'] ?? '-'),
-                                (string) ($actionRow['ecart_label'] ?? '-'),
-                                (string) ($actionRow['echeance_label'] ?? '-'),
-                                (string) ($actionRow['retard_label'] ?? (((int) ($actionRow['retard_jours'] ?? 0)).' j')),
-                                (string) ($actionRow['statut_action_label'] ?? '-'),
-                                (string) ($actionRow['statut_suivi_label'] ?? '-'),
-                                (string) ($actionRow['statut_delai_label'] ?? '-'),
-                                (bool) ($actionRow['has_preuve'] ?? false)
-                                    ? 'Visualiser la preuve ('.((int) ($actionRow['preuve_count'] ?? 0)).')'
-                                    : 'Aucune preuve',
-                                (string) ($actionRow['observations'] ?? '-'),
-                            ], 'style' => 0];
+                            $subActions = collect($actionRow['sous_actions'] ?? []);
+
+                            if ($subActions->isEmpty()) {
+                                $rows[] = [
+                                    'cells' => $this->trackingCells($actionRow, (string) $counter++, (string) ($actionRow['libelle'] ?? '-'), '-'),
+                                    'style' => 0,
+                                ];
+
+                                continue;
+                            }
+
+                            foreach ($subActions->values() as $subActionIndex => $subActionRow) {
+                                $subActionRow = (array) $subActionRow;
+                                $rows[] = [
+                                    'cells' => $this->trackingCells(
+                                        $subActionRow,
+                                        $subActionIndex === 0 ? (string) $counter++ : '',
+                                        $subActionIndex === 0 ? (string) ($actionRow['libelle'] ?? '-') : '',
+                                        trim(((string) ($subActionRow['numero'] ?? ($subActionIndex + 1))).'. '.((string) ($subActionRow['libelle'] ?? '-')))
+                                    ),
+                                    'style' => 0,
+                                ];
+                            }
                         }
 
                         $rows[] = ['cells' => [], 'style' => 0];
@@ -152,6 +153,36 @@ class PtaSuiviWorkbookExporter
         }
 
         return $rows;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return list<string>
+     */
+    private function trackingCells(array $row, string $number, string $actionLabel, string $subActionLabel): array
+    {
+        return [
+            $number,
+            $actionLabel,
+            $subActionLabel,
+            (string) ($row['indicateur_affichage'] ?? $row['indicateur'] ?? '-'),
+            (string) ($row['responsable'] ?? '-'),
+            (string) ($row['ratio'] ?? '-'),
+            (string) ($row['seuil_label'] ?? $row['seuil'] ?? '-'),
+            (string) ($row['realise'] ?? '-'),
+            (string) ($row['taux_realisation_label'] ?? '-'),
+            (string) ($row['performance_label'] ?? '-'),
+            (string) ($row['ecart_label'] ?? '-'),
+            (string) ($row['echeance_label'] ?? '-'),
+            (string) ($row['retard_label'] ?? (((int) ($row['retard_jours'] ?? 0)).' j')),
+            (string) ($row['statut_action_label'] ?? '-'),
+            (string) ($row['statut_suivi_label'] ?? '-'),
+            (string) ($row['statut_delai_label'] ?? '-'),
+            (bool) ($row['has_preuve'] ?? false)
+                ? 'Visualiser la preuve ('.((int) ($row['preuve_count'] ?? 0)).')'
+                : 'Aucune preuve',
+            (string) ($row['observations'] ?? '-'),
+        ];
     }
 
     /**
@@ -173,7 +204,7 @@ class PtaSuiviWorkbookExporter
         }
 
         $cols = [];
-        $widths = [8, 38, 34, 24, 12, 20, 20, 14, 16, 20, 12, 14, 10, 16, 18, 16, 20, 58];
+        $widths = [8, 38, 34, 44, 24, 12, 20, 20, 14, 20, 12, 14, 10, 16, 18, 16, 20, 58];
         foreach ($widths as $index => $width) {
             $col = $index + 1;
             $cols[] = '<col min="'.$col.'" max="'.$col.'" width="'.$width.'" customWidth="1"/>';

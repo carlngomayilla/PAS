@@ -93,9 +93,7 @@
                         <th>Nb Obj. Strat.</th>
                         <th>Nb PAO</th>
                         <th>Validateur</th>
-                        @if ($canWrite)
-                            <th>Actions</th>
-                        @endif
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -128,9 +126,10 @@
                             <td class="text-center"><span class="anbg-badge anbg-badge-info px-3">{{ $objectifsStrategiquesCount }}</span></td>
                             <td class="text-center"><span class="anbg-badge anbg-badge-success px-3">{{ $row->paos_count }}</span></td>
                             <td>{{ $row->validateur?->name ?? '-' }}</td>
-                            @if ($canWrite)
-                                <td>
-                                    <div class="row-actions">
+                            <td>
+                                <div class="row-actions">
+                                    <a class="btn btn-primary" href="{{ route('workspace.pas.show', $row) }}">Explorer</a>
+                                    @if ($canWrite)
                                         @if (! $isModificationLocked)
                                             <a class="btn btn-warning" href="{{ route('workspace.pas.edit', $row) }}">Modifier</a>
                                         @elseif ($canRequestUnlock)
@@ -160,13 +159,13 @@
                                                 <input type="hidden" name="motif" value="Demande de suppression PAS depuis le module PAS">
                                                 <button class="btn btn-danger" type="submit">Supprimer</button>
                                             </form>
-                                    </div>
-                                </td>
-                            @endif
+                                    @endif
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $canWrite ? 7 : 6 }}">
+                            <td colspan="10">
                                 <x-ui.empty-state
                                     title="Aucun PAS trouvé"
                                     message="Aucun plan stratégique ne correspond aux filtres courants."

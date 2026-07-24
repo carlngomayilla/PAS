@@ -16,8 +16,6 @@ class PlanningClosureReportService
 
     private const TERMINAL_FINANCING_STATUSES = [
         Action::FINANCEMENT_NON_REQUIS,
-        Action::FINANCEMENT_VALIDE_DAF,
-        Action::FINANCEMENT_REJETE_DAF,
         Action::FINANCEMENT_VALIDE_DG,
         Action::FINANCEMENT_REJETE_DG,
     ];
@@ -72,16 +70,16 @@ class PlanningClosureReportService
             })->count()),
             $this->issue('actions_en_cours', 'Actions en cours', (clone $actions)->whereIn('statut_dynamique', [ActionTrackingService::STATUS_EN_COURS, ActionTrackingService::STATUS_A_RISQUE])->count()),
             $this->issue('actions_en_attente_validation_chef', 'Actions en attente validation chef', $this->pendingValidations((clone $actions))->count()),
-            $this->issue('actions_en_attente_directeur', 'Actions en attente directeur', (clone $actions)->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_CHEF)->where('financement_requis', true)->whereNotIn('financement_statut', self::TERMINAL_FINANCING_STATUSES)->count()),
+            $this->issue('actions_en_attente_controle', 'Actions en attente controleur', (clone $actions)->whereIn('statut_validation', [ActionTrackingService::VALIDATION_VALIDEE_CHEF, ActionTrackingService::VALIDATION_SOUMISE_CONTROLE])->where('financement_requis', true)->whereNotIn('financement_statut', self::TERMINAL_FINANCING_STATUSES)->count()),
             $this->issue('actions_en_retard', 'Actions en retard', $this->lateActions((clone $actions))->count()),
-            $this->issue('actions_sous_cible', 'Actions sous cible', $this->underTarget((clone $actions))->count()),
+            $this->issue('actions_sous_cible', 'Actions sous seuil', $this->underTarget((clone $actions))->count()),
             $this->issue('financements_non_traites', 'Financements non traites', $this->unprocessedFunding((clone $actions))->count()),
             $this->issue('blocages_controle', 'Blocages SCIQ / Planification', $this->activeControlBlocks((clone $actions))),
         ]);
     }
 
     /**
-     * @param array<string, mixed> $report
+     * @param  array<string, mixed>  $report
      */
     public function hasAnomalies(array $report): bool
     {
@@ -89,7 +87,7 @@ class PlanningClosureReportService
     }
 
     /**
-     * @param list<array{code: string, label: string, count: int}> $issues
+     * @param  list<array{code: string, label: string, count: int}>  $issues
      * @return array<string, mixed>
      */
     private function report(string $module, array $issues): array

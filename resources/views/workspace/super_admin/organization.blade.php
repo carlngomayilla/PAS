@@ -3,6 +3,8 @@
 @section('title', 'Organisation et utilisateurs')
 
 @section('content')
+    @include('workspace.referentiel.partials.temporary-credentials')
+
     <section class="showcase-panel mb-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -106,7 +108,7 @@
     <section class="grid gap-4 xl:grid-cols-[1.2fr,0.8fr] mb-3.5">
         <article class="ui-card !mb-0">
             <h2>Import utilisateurs</h2>
-            <p class="text-slate-600">CSV attendu : <code>name</code>, <code>email</code>, <code>role</code>, <code>base_role</code>, <code>custom_role_code</code>, <code>direction_code</code>, <code>service_code</code>, <code>agent_matricule</code>, <code>agent_fonction</code>, <code>agent_telephone</code>, <code>is_active</code>, <code>is_agent</code>, <code>suspended_until</code>, <code>suspension_reason</code>, <code>password</code>.</p>
+            <p class="text-slate-600">CSV attendu : <code>name</code>, <code>email</code>, <code>role</code>, <code>direction_code</code>, <code>service_code</code>, <code>agent_matricule</code>, <code>agent_fonction</code>, <code>agent_telephone</code>, <code>is_active</code>, <code>is_agent</code>, <code>suspended_until</code>, <code>suspension_reason</code>, <code>password</code>. Le mot de passe est obligatoire pour tout nouveau compte.</p>
             <form class="mt-4 flex flex-wrap items-end gap-3" method="POST" action="{{ route('workspace.super-admin.organization.users.import') }}" enctype="multipart/form-data">
                 @csrf
                 <div class="min-w-[18rem] flex-1">
@@ -120,7 +122,7 @@
             <h2>Actions de masse</h2>
             <p class="text-slate-600">Sélectionne des comptes dans le tableau puis applique un rôle, un scope ou une action de sécurité.</p>
             <div class="mt-4 grid gap-2 text-sm text-slate-600">
-                <div>1. Coche les utilisateurs cibles</div>
+                <div>1. Coche les utilisateurs concernés</div>
                 <div>2. Choisis l action de masse</div>
                 <div>3. Complète le rôle ou le scope si nécessaire</div>
             </div>
@@ -271,7 +273,7 @@
                         <x-auth.password-toggle target="managed_password" />
                     </div>
                     @unless($editingUser)
-                        <p class="mt-1 text-xs text-slate-500">Laissez vide pour appliquer le mot de passe par défaut : <code>Anbg@2026!Pas</code></p>
+                        <p class="mt-1 text-xs text-slate-500">Laissez vide pour générer un mot de passe temporaire unique, affiché une seule fois après création.</p>
                     @endunless
                 </div>
                 <div>
@@ -411,7 +413,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="bulk_role">Rôle cible</label>
+                    <label for="bulk_role">Rôle de destination</label>
                     <select id="bulk_role" name="bulk_role">
                         <option value="">Aucun</option>
                         @foreach ($roleOptions as $role)
@@ -420,7 +422,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="bulk_direction_id">Direction cible</label>
+                    <label for="bulk_direction_id">Direction de destination</label>
                     <select id="bulk_direction_id" name="bulk_direction_id">
                         <option value="">Aucune</option>
                         @foreach ($directionOptions as $direction)
@@ -429,7 +431,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="bulk_service_id">Service cible</label>
+                    <label for="bulk_service_id">Service de destination</label>
                     <select id="bulk_service_id" name="bulk_service_id">
                         <option value="">Aucun</option>
                         @foreach ($serviceOptions as $service)
@@ -597,7 +599,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="merge_target_service_id">Service cible</label>
+                    <label for="merge_target_service_id">Service de destination</label>
                     <select id="merge_target_service_id" name="merge_target_service_id">
                         <option value="">Choisir</option>
                         @foreach ($serviceOptions as $service)
@@ -611,16 +613,21 @@
                 </div>
             </form>
             @if (is_array($mergeSimulation))
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactés</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['users_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactées</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['actions_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactés</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Justificatifs impactés</p><p class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impact']['justificatifs_total'] ?? 0 }}</p></article>
+                <div class="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+                    <span class="font-semibold">{{ $mergeSimulation['source_label'] }}</span>
+                    <span class="mx-2 text-slate-400">→</span>
+                    <span class="font-semibold">{{ $mergeSimulation['target_label'] }}</span>
+                </div>
+                <div class="mt-3 grid gap-3 md:grid-cols-2" data-simulation="merge">
+                    <article class="rounded-md border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactés</p><p data-impact-metric="users" data-impact-value="{{ $mergeSimulation['impacts']['users'] ?? 0 }}" class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impacts']['users'] ?? 0 }}</p></article>
+                    <article class="rounded-md border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactées</p><p data-impact-metric="actions" data-impact-value="{{ $mergeSimulation['impacts']['actions'] ?? 0 }}" class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impacts']['actions'] ?? 0 }}</p></article>
+                    <article class="rounded-md border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactés</p><p data-impact-metric="ptas" data-impact-value="{{ $mergeSimulation['impacts']['ptas'] ?? 0 }}" class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impacts']['ptas'] ?? 0 }}</p></article>
+                    <article class="rounded-md border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Justificatifs impactés</p><p data-impact-metric="justificatifs" data-impact-value="{{ $mergeSimulation['impacts']['justificatifs'] ?? 0 }}" class="mt-2 text-2xl font-bold">{{ $mergeSimulation['impacts']['justificatifs'] ?? 0 }}</p></article>
                 </div>
                 @if (($mergeSimulation['warnings'] ?? []) !== [])
                     <div class="mt-3 space-y-2">
                         @foreach ($mergeSimulation['warnings'] as $warning)
-                            <div class="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $warning }}</div>
+                            <div class="rounded-md border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $warning }}</div>
                         @endforeach
                     </div>
                 @endif
@@ -640,7 +647,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="transfer_direction_id">Direction cible</label>
+                    <label for="transfer_direction_id">Direction de destination</label>
                     <select id="transfer_direction_id" name="transfer_direction_id">
                         <option value="">Choisir</option>
                         @foreach ($directionOptions as $direction)
@@ -654,16 +661,21 @@
                 </div>
             </form>
             @if (is_array($transferSimulation))
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactés</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['users_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactées</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['actions_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactés</p><p class="mt-2 text-2xl font-bold">{{ $transferSimulation['impact']['ptas_total'] ?? 0 }}</p></article>
-                    <article class="rounded-2xl border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Direction cible</p><p class="mt-2 text-lg font-semibold">{{ $transferSimulation['target_direction'] ?? '-' }}</p></article>
+                <div class="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+                    <span class="font-semibold">{{ $transferSimulation['source_label'] }}</span>
+                    <span class="mx-2 text-slate-400">→</span>
+                    <span class="font-semibold">{{ $transferSimulation['target_label'] }}</span>
+                </div>
+                <div class="mt-3 grid gap-3 md:grid-cols-2" data-simulation="transfer">
+                    <article class="rounded-md border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Utilisateurs impactés</p><p data-impact-metric="users" data-impact-value="{{ $transferSimulation['impacts']['users'] ?? 0 }}" class="mt-2 text-2xl font-bold">{{ $transferSimulation['impacts']['users'] ?? 0 }}</p></article>
+                    <article class="rounded-md border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Actions impactées</p><p data-impact-metric="actions" data-impact-value="{{ $transferSimulation['impacts']['actions'] ?? 0 }}" class="mt-2 text-2xl font-bold">{{ $transferSimulation['impacts']['actions'] ?? 0 }}</p></article>
+                    <article class="rounded-md border border-slate-200/80 p-4"><p class="text-sm text-slate-500">PTA impactés</p><p data-impact-metric="ptas" data-impact-value="{{ $transferSimulation['impacts']['ptas'] ?? 0 }}" class="mt-2 text-2xl font-bold">{{ $transferSimulation['impacts']['ptas'] ?? 0 }}</p></article>
+                    <article class="rounded-md border border-slate-200/80 p-4"><p class="text-sm text-slate-500">Direction de destination</p><p class="mt-2 text-lg font-semibold">{{ $transferSimulation['target_label'] ?? '-' }}</p></article>
                 </div>
                 @if (($transferSimulation['warnings'] ?? []) !== [])
                     <div class="mt-3 space-y-2">
                         @foreach ($transferSimulation['warnings'] as $warning)
-                            <div class="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $warning }}</div>
+                            <div class="rounded-md border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $warning }}</div>
                         @endforeach
                     </div>
                 @endif
@@ -681,7 +693,7 @@
         </div>
         <div class="app-table-wrapper overflow-x-auto mt-4">
             <table class="app-table data-table">
-                <thead><tr><th>Date</th><th>Demandeur</th><th>Cible</th><th>Impact</th><th>Decision</th></tr></thead>
+                <thead><tr><th>Date</th><th>Demandeur</th><th>Élément concerné</th><th>Impact</th><th>Decision</th></tr></thead>
                 <tbody>
                     @forelse (($deletionRequests ?? []) as $row)
                         @php

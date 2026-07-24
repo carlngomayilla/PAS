@@ -65,7 +65,7 @@ class PersonalTaskWorkflowTest extends TestCase
                 'source' => 'personal_tasks',
                 'decision' => 'valider',
             ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
+            ->assertRedirect(route('workspace.tasks.index'));
 
         $audit = JournalAudit::query()
             ->where('module', 'action')
@@ -77,6 +77,195 @@ class PersonalTaskWorkflowTest extends TestCase
         $this->assertSame($fixture['chef']->id, $audit->user_id);
         $this->assertSame('personal_tasks', $audit->nouvelle_valeur['audit_context']['source'] ?? null);
         $this->assertTrue((bool) ($audit->nouvelle_valeur['audit_context']['intervention_processed'] ?? false));
+    }
+
+    public function test_inline_rejection_from_personal_tasks_requires_a_reason_and_returns_to_the_queue(): void
+    {
+        $fixture = $this->planningFixture();
+        $action = $this->makeAction($fixture['pta'], $fixture['agent'], 'Action a renvoyer depuis taches');
+        $action->forceFill([
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'soumise_le' => now()->subHour(),
+            'progression_reelle' => 60,
+        ])->save();
+
+        $this->actingAs($fixture['chef'])
+            ->from(route('workspace.tasks.index'))
+            ->post(route('workspace.actions.review', $action), [
+                'source' => 'personal_tasks',
+                'decision' => 'rejeter',
+            ])
+            ->assertRedirect(route('workspace.tasks.index'))
+            ->assertSessionHasErrors('motif');
+
+        $this->assertSame(
+            ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            $action->fresh()->statut_validation
+        );
+
+        $this->actingAs($fixture['chef'])
+            ->post(route('workspace.actions.review', $action), [
+                'source' => 'personal_tasks',
+                'decision' => 'rejeter',
+                'motif' => 'La preuve doit etre completee avant validation.',
+            ])
+            ->assertRedirect(route('workspace.tasks.index'))
+            ->assertSessionHas('success');
+
+        $this->assertSame(
+            ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+            $action->fresh()->statut_validation
+        );
+    }
+
+    public function test_planification_receives_final_control_task_after_chef_visa(): void
+    {
+        $fixture = $this->planningFixture();
+        $controller = User::factory()->create([
+            'role' => User::ROLE_PLANIFICATION,
+            'password_changed_at' => now(),
+        ]);
+        $action = $this->makeAction($fixture['pta'], $fixture['agent'], 'Action a controler');
+        $action->forceFill([
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+            'evalue_le' => now()->subHours(49),
+            'chef_progress_percent' => 80,
+        ])->save();
+
+        $task = collect(app(PersonalTaskService::class)->forUser($controller, 10)['items'])
+            ->firstWhere('key', 'controller-validation:'.$action->id);
+
+        $this->assertNotNull($task);
+        $this->assertSame('validation_controleur', $task['type']);
+        $this->assertSame('en_retard', $task['status']);
+        $this->assertSame('critique', $task['criticality']);
+
+        $this->actingAs($controller)
+            ->get(route('workspace.tasks.index'))
+            ->assertOk()
+            ->assertSee('Controle final')
+            ->assertSee('Action a controler');
+    }
+
+    public function test_personal_task_workspace_filters_and_paginates_the_full_authorized_queue(): void
+    {
+        $fixture = $this->planningFixture();
+
+        foreach (range(1, 81) as $index) {
+            $action = $this->makeAction(
+                $fixture['pta'],
+                $fixture['agent'],
+                sprintf('Lot filtrable validation %02d', $index)
+            );
+            $action->forceFill([
+                'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+                'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                'soumise_le' => now()->subHours($index),
+            ])->save();
+        }
+
+        $this->makeAction($fixture['pta'], $fixture['chef'], 'Execution hors famille validation');
+
+        $service = app(PersonalTaskService::class);
+        $filters = [
+            'q' => 'lot filtrable',
+            'vue' => 'toutes',
+            'famille' => 'validations',
+            'tri' => 'echeance',
+        ];
+        $firstPage = $service->workspaceForUser($fixture['chef'], $filters, 15, 1);
+        $lastPage = $service->workspaceForUser($fixture['chef'], $filters, 15, 6);
+
+        $this->assertSame(81, $firstPage['items']->total());
+        $this->assertCount(15, $firstPage['items']->items());
+        $this->assertCount(6, $lastPage['items']->items());
+        $this->assertSame(81, $firstPage['filtered_summary']['total']);
+        $this->assertTrue(collect($firstPage['items']->items())->every(
+            fn (array $task): bool => $task['family'] === 'validations'
+        ));
+
+        $this->actingAs($fixture['chef'])
+            ->get(route('workspace.tasks.index', [
+                ...$filters,
+                'per_page' => 15,
+            ]))
+            ->assertOk()
+            ->assertSee('File priorisée')
+            ->assertSee('Validations (81)')
+            ->assertSee('1-15 sur 81')
+            ->assertDontSee('Execution hors famille validation');
+    }
+
+    public function test_personal_task_temporal_views_search_and_invalid_filters_are_safe(): void
+    {
+        $fixture = $this->planningFixture();
+
+        $overdue = $this->makeAction($fixture['pta'], $fixture['agent'], 'Validation echeance depassee');
+        $overdue->forceFill([
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'soumise_le' => now()->subHours(60),
+        ])->save();
+
+        $dueSoon = $this->makeAction($fixture['pta'], $fixture['agent'], 'Validation échéance rapide');
+        $dueSoon->forceFill([
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'soumise_le' => now()->subHours(40),
+        ])->save();
+
+        $future = $this->makeAction($fixture['pta'], $fixture['agent'], 'Validation echeance future');
+        $future->forceFill([
+            'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'soumise_le' => now()->subHours(2),
+        ])->save();
+
+        $undated = $this->makeAction($fixture['pta'], $fixture['chef'], 'Execution sans calendrier');
+        $undated->forceFill([
+            'date_fin' => null,
+            'date_echeance' => null,
+        ])->save();
+
+        $service = app(PersonalTaskService::class);
+        $baseFilters = ['q' => '', 'famille' => '', 'tri' => 'priorite'];
+        $overdueTasks = $service->workspaceForUser($fixture['chef'], [
+            ...$baseFilters,
+            'vue' => 'retard',
+        ]);
+        $dueSoonTasks = $service->workspaceForUser($fixture['chef'], [
+            ...$baseFilters,
+            'vue' => 'a_24h',
+        ]);
+        $undatedTasks = $service->workspaceForUser($fixture['chef'], [
+            ...$baseFilters,
+            'vue' => 'sans_echeance',
+        ]);
+        $searchTasks = $service->workspaceForUser($fixture['chef'], [
+            ...$baseFilters,
+            'q' => 'echeance rapide',
+            'vue' => 'toutes',
+        ]);
+
+        $this->assertSame(['Validation echeance depassee'], collect($overdueTasks['items']->items())->pluck('subject')->all());
+        $this->assertSame(['Validation échéance rapide'], collect($dueSoonTasks['items']->items())->pluck('subject')->all());
+        $this->assertSame(['Execution sans calendrier'], collect($undatedTasks['items']->items())->pluck('subject')->all());
+        $this->assertSame(['Validation échéance rapide'], collect($searchTasks['items']->items())->pluck('subject')->all());
+
+        $this->actingAs($fixture['chef'])
+            ->get(route('workspace.tasks.index', [
+                'vue' => ['inconnue'],
+                'famille' => ['interdite'],
+                'tri' => ['aleatoire'],
+                'per_page' => [999],
+                'page' => ['deux'],
+            ]))
+            ->assertOk()
+            ->assertSee('Validation echeance depassee')
+            ->assertSee('Validation échéance rapide')
+            ->assertSee('Execution sans calendrier');
     }
 
     public function test_chef_receives_sub_action_validation_task_with_48h_deadline(): void
@@ -190,9 +379,9 @@ class PersonalTaskWorkflowTest extends TestCase
         $agentTask = collect($agentTasks)->firstWhere('key', 'action-execution:'.$action->id);
 
         $this->assertNotNull($agentTask);
-        $this->assertSame('correction_action', $agentTask['type']);
+        $this->assertSame('correction_financement', $agentTask['type']);
         $this->assertSame('en_retard', $agentTask['status']);
-        $this->assertSame('Retard de correction imputable au responsable de l action.', $agentTask['score_impact']);
+        $this->assertSame('Retard de correction du dossier imputable au RMO.', $agentTask['score_impact']);
 
         $dafTasks = app(PersonalTaskService::class)->forUser($dafDirector, 10)['items'];
         $this->assertNull(collect($dafTasks)->firstWhere('key', 'daf-financing:'.$action->id));
@@ -306,7 +495,7 @@ class PersonalTaskWorkflowTest extends TestCase
         $action = $this->makeAction($fixture['pta'], $fixture['agent'], 'Action evaluee');
         $action->forceFill([
             'statut_dynamique' => ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             'validation_sans_correction' => true,
             'taux_performance' => 72,
             'taux_delai' => 90,
@@ -330,7 +519,7 @@ class PersonalTaskWorkflowTest extends TestCase
             ->get(route('workspace.tasks.index'))
             ->assertOk()
             ->assertSee('Composantes du score personnel')
-            ->assertSee('Qualite Tres bon');
+            ->assertSee('Qualité Tres bon');
     }
 
     public function test_personal_score_quality_labels_follow_canonical_scale(): void
@@ -357,7 +546,7 @@ class PersonalTaskWorkflowTest extends TestCase
             // ce qui isole le mapping label/score.
             $action->forceFill([
                 'statut_dynamique' => ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
-                'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 'taux_performance' => $note,
                 'taux_delai' => $note,
                 'evalue_par' => $fixture['chef']->id,

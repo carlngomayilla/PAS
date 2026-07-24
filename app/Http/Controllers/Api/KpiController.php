@@ -149,7 +149,7 @@ class KpiController extends Controller
 
         if (in_array((string) $targetAction->pta?->statut, ['cloture', 'archive'], true)) {
             return response()->json([
-                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'lie', 'Mise a jour'),
             ], 409);
         }
 

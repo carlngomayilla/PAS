@@ -4,16 +4,17 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
+use App\Support\SchemaIntrospectionCache;
 use Carbon\CarbonInterface;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class PlatformSettings
 {
     private const GROUP_PUBLISHED = 'general';
+
     private const GROUP_DRAFT = 'general_draft';
 
     /**
@@ -345,6 +346,7 @@ class PlatformSettings
         $this->resolved = null;
         $this->draftResolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     /**
@@ -394,6 +396,7 @@ class PlatformSettings
     {
         return $group === self::GROUP_DRAFT ? 'general_draft_'.$key : $key;
     }
+
     private function hasSettingsTable(): bool
     {
         if ($this->shouldSkipDatabaseSettings()) {
@@ -405,7 +408,7 @@ class PlatformSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }
@@ -429,6 +432,7 @@ class PlatformSettings
 
         return false;
     }
+
     private function publicStorageUrl(string $path): string
     {
         $normalizedPath = trim(Str::replace('\\', '/', $path), '/');

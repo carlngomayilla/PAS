@@ -58,4 +58,49 @@ class AuthUiPolishTest extends TestCase
         $this->assertStringContainsString('.auth-password-toggle', $guestCss);
         $this->assertStringContainsString('.login-input[data-password-toggle-target]', $guestCss);
     }
+
+    public function test_admin_navbar_keeps_actions_grouped_without_filters(): void
+    {
+        $layout = (string) file_get_contents(resource_path('views/layouts/admin.blade.php'));
+
+        $this->assertStringContainsString('admin-navbar-actions', $layout);
+        $this->assertStringContainsString('admin-navbar-action-button', $layout);
+        $this->assertStringContainsString('admin-navbar-notification-badge', $layout);
+        $this->assertStringContainsString('admin-navbar-user', $layout);
+        $this->assertStringContainsString('admin-navbar-profile', $layout);
+        $this->assertStringContainsString('data-navbar-user-copy', $layout);
+        $this->assertStringContainsString('$layoutUser?->roleLabel()', $layout);
+        $this->assertStringNotContainsString('admin-exercise-filter', $layout);
+        $this->assertStringNotContainsString('name="exercice"', $layout);
+        $this->assertStringNotContainsString('name="trimestre"', $layout);
+    }
+
+    public function test_admin_navigation_uses_hover_with_keyboard_fallback_and_discreet_back_control(): void
+    {
+        $layout = (string) file_get_contents(resource_path('views/layouts/admin.blade.php'));
+        $sidebar = (string) file_get_contents(resource_path('views/components/admin/sidebar.blade.php'));
+        $script = (string) file_get_contents(resource_path('js/ui-enhancements.js'));
+        $adminShell = (string) file_get_contents(resource_path('js/admin-shell.js'));
+        $css = (string) file_get_contents(resource_path('css/anbg-glass.css'));
+
+        $this->assertStringContainsString('admin-navbar-back-button', $layout);
+        $this->assertStringNotContainsString('anbg:sidebar:collapsed', $layout);
+        $this->assertStringContainsString('data-sidebar-keyboard-expand', $sidebar);
+        $this->assertStringNotContainsString('data-sidebar-auto-expand', $sidebar);
+        $this->assertStringNotContainsString('data-sidebar-collapse-toggle', $sidebar);
+        $this->assertStringNotContainsString('initSidebarCollapse', $script);
+        $this->assertStringContainsString('data-sidebar-keyboard-expanded', $adminShell);
+        $this->assertStringNotContainsString('setSidebarAutoExpanded', $adminShell);
+        $this->assertStringContainsString('#admin-sidebar:hover', $css);
+        $this->assertStringContainsString('#admin-sidebar[data-sidebar-keyboard-expanded="true"]', $css);
+        $this->assertStringNotContainsString('#admin-sidebar:has(:focus-visible)', $css);
+        $this->assertStringNotContainsString('#admin-sidebar:focus-within', $css);
+        $this->assertStringContainsString('.admin-navbar-back-button', $css);
+        $this->assertStringContainsString("url('/images/logo-anbg-flamme.png')", $css);
+        $this->assertStringContainsString('.admin-navbar-notification-badge', $css);
+        $this->assertStringContainsString('.admin-navbar-profile', $css);
+        $this->assertStringContainsString('@media (min-width: 768px) and (max-width: 1180px)', $css);
+        $this->assertFileExists(public_path('images/logo-anbg-flamme.png'));
+        $this->assertGreaterThan(1024, filesize(public_path('images/logo-anbg-flamme.png')));
+    }
 }

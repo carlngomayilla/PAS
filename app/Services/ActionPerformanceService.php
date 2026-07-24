@@ -8,14 +8,14 @@ use App\Services\Actions\ActionBusinessRules;
 use App\Services\Actions\ActionStatusService;
 use App\Services\Actions\ActionTrackingService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class ActionPerformanceService
 {
     public function __construct(
         private readonly ActionStatusService $actionStatusService,
         private readonly ActionBusinessRules $businessRules
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<string, int>
@@ -255,16 +255,21 @@ class ActionPerformanceService
             ActionTrackingService::VALIDATION_REJETEE_CHEF,
             ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
             ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+            ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
         ], true)) {
             return 'rejetee';
         }
 
-        if ($validationStatus === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
+        if (in_array($validationStatus, [
+            ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+        ], true)) {
             return 'en_attente_validation';
         }
 
         if (in_array($validationStatus, [
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
             return 'validee';
@@ -322,7 +327,7 @@ class ActionPerformanceService
      *   - soit le statut explicite "validee" / "cloturee" (validation hierarchique
      *     passe pour la sous-action),
      *   - soit que l action parente ait elle-meme un statut_validation valide
-     *     (validee_chef ou validee_direction), ce qui implique le bouclage
+     *     (validee_controle ou validee_direction historique), ce qui implique le bouclage
      *     workflow.
      *
      * Cela evite qu une simple coche "est_effectuee" suffise a poser un 100 %
@@ -338,8 +343,8 @@ class ActionPerformanceService
 
         $parent = $subAction->action ?? null;
         if ($parent !== null && in_array((string) $parent->statut_validation, [
-            \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-            \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
             return $this->isCompletedSubAction($subAction);
         }
@@ -363,6 +368,7 @@ class ActionPerformanceService
             ActionTrackingService::VALIDATION_REJETEE_CHEF,
             ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
             ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+            ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
         ], true)) {
             return false;
         }
@@ -373,6 +379,8 @@ class ActionPerformanceService
             || in_array($validationStatus, [
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true)
             || in_array(strtolower(trim((string) ($action->statut ?? ''))), ['termine', 'terminee', 'acheve', 'achevee'], true);
@@ -404,9 +412,9 @@ class ActionPerformanceService
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, SousAction>
+     * @return Collection<int, SousAction>
      */
-    private function subActions(Action $action): \Illuminate\Support\Collection
+    private function subActions(Action $action): Collection
     {
         return $action->relationLoaded('sousActions')
             ? $action->sousActions

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use App\Models\Action;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
@@ -9,9 +10,7 @@ use App\Models\Pta;
 use App\Models\User;
 use App\Services\ActionManagementSettings;
 use App\Services\Actions\ActionIndicatorService;
-use App\Services\Actions\ActionTrackingService;
 use App\Services\DocumentPolicySettings;
-use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -243,7 +242,7 @@ class UpdateActionRequest extends FormRequest
     }
 
     /**
-     * @param array<int|string, mixed> $subActions
+     * @param  array<int|string, mixed>  $subActions
      * @return array<int, array<string, mixed>>
      */
     private function normalizeSubActionsInput(array $subActions): array
@@ -272,6 +271,43 @@ class UpdateActionRequest extends FormRequest
             $action = $this->route('action');
             $action = $action instanceof Action ? $action : null;
 
+            if ($action instanceof Action) {
+                $submittedStart = trim((string) $this->input('date_debut', ''));
+                $submittedEnd = trim((string) $this->input('date_fin', ''));
+                $submittedDeadline = trim((string) $this->input('date_echeance', ''));
+
+                if ($submittedStart !== '' && $submittedStart !== optional($action->date_debut)->format('Y-m-d')) {
+                    $validator->errors()->add('date_debut', 'La date de début est verrouillée. Utilisez une demande de report approuvée.');
+                }
+                if ($submittedEnd !== '' && $submittedEnd !== optional($action->date_fin)->format('Y-m-d')) {
+                    $validator->errors()->add('date_fin', 'La date de fin est verrouillée. Utilisez une demande de report approuvée.');
+                }
+                if ($submittedDeadline !== '' && $submittedDeadline !== optional($action->date_echeance)->format('Y-m-d')) {
+                    $validator->errors()->add('date_echeance', 'L’échéance est verrouillée. Utilisez une demande de report approuvée.');
+                }
+
+                $existingSubActions = $action->sousActions()->get(['id', 'date_debut', 'date_fin'])->keyBy('id');
+                foreach ((array) $this->input('sous_actions', []) as $index => $subActionPayload) {
+                    if (! is_array($subActionPayload) || ! is_numeric($subActionPayload['id'] ?? null)) {
+                        continue;
+                    }
+
+                    $existingSubAction = $existingSubActions->get((int) $subActionPayload['id']);
+                    if ($existingSubAction === null) {
+                        continue;
+                    }
+
+                    $subActionStart = trim((string) ($subActionPayload['date_debut'] ?? ''));
+                    $subActionEnd = trim((string) ($subActionPayload['date_fin'] ?? ''));
+                    if ($subActionStart !== '' && $subActionStart !== optional($existingSubAction->date_debut)->format('Y-m-d')) {
+                        $validator->errors()->add("sous_actions.{$index}.date_debut", 'La date de début de la sous-action est verrouillée.');
+                    }
+                    if ($subActionEnd !== '' && $subActionEnd !== optional($existingSubAction->date_fin)->format('Y-m-d')) {
+                        $validator->errors()->add("sous_actions.{$index}.date_fin", 'La date de fin de la sous-action est verrouillée.');
+                    }
+                }
+            }
+
             if ($validator->errors()->isNotEmpty()) {
                 return;
             }
@@ -288,7 +324,7 @@ class UpdateActionRequest extends FormRequest
                 && (float) $indicatorThreshold > (float) $indicatorTarget) {
                 $validator->errors()->add(
                     'kpi_seuil_alerte',
-                    'Le seuil d alerte de l indicateur ne doit pas depasser sa cible.'
+                    'Le seuil d alerte de l indicateur ne doit pas depasser son niveau attendu.'
                 );
             }
 

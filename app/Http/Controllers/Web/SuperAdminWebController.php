@@ -4,6 +4,12 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ManageExportTemplateStateRequest;
+use App\Http\Requests\RestorePlatformSnapshotRequest;
+use App\Http\Requests\RunPlatformMaintenanceRequest;
+use App\Http\Requests\RunPlatformSimulationRequest;
+use App\Http\Requests\SetUniteDgChefRequest;
+use App\Http\Requests\StoreExportTemplateAssignmentRequest;
 use App\Models\DeletionRequest;
 use App\Models\Direction;
 use App\Models\Exercice;
@@ -14,15 +20,19 @@ use App\Models\JournalAudit;
 use App\Models\PlatformSetting;
 use App\Models\PlatformSettingSnapshot;
 use App\Models\Service;
+use App\Models\UniteDg;
 use App\Models\User;
 use App\Services\ActionCalculationSettings;
 use App\Services\ActionManagementSettings;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\AppearanceSettings;
+use App\Services\ChefUniteSyncService;
 use App\Services\DashboardProfileSettings;
 use App\Services\DeletionRequestService;
 use App\Services\DocumentPolicySettings;
 use App\Services\DynamicReferentialSettings;
+use App\Services\Exports\ExportTemplateAssignmentService;
 use App\Services\Exports\ExportTemplatePublisher;
 use App\Services\ManagedKpiSettings;
 use App\Services\NotificationPolicySettings;
@@ -37,6 +47,7 @@ use App\Services\PlatformSnapshotService;
 use App\Services\RolePermissionSettings;
 use App\Services\RoleRegistryService;
 use App\Services\Security\PasswordPolicyService;
+use App\Services\SuperAdminOverviewService;
 use App\Services\UserLifecycleService;
 use App\Services\WorkflowSettings;
 use App\Services\WorkspaceModuleSettings;
@@ -46,8 +57,12 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -58,15 +73,9 @@ class SuperAdminWebController extends Controller
 {
     use RecordsAuditTrail;
 
-    /**
-     * Mot de passe par defaut applique aux nouveaux comptes lorsque le
-     * super-admin ne saisit rien. Conforme a la policy moyenne par defaut
-     * (8+ caracteres, lettres et chiffres; symboles acceptes).
-     */
-    private const DEFAULT_NEW_USER_PASSWORD = 'Anbg@2026!Pas';
-
     public function __construct(
         private readonly ExportTemplatePublisher $templatePublisher,
+        private readonly ExportTemplateAssignmentService $templateAssignmentService,
         private readonly ActionCalculationSettings $actionCalculationSettings,
         private readonly ActionManagementSettings $actionManagementSettings,
         private readonly AppearanceSettings $appearanceSettings,
@@ -85,10 +94,11 @@ class SuperAdminWebController extends Controller
         private readonly PasswordPolicyService $passwordPolicy,
         private readonly RoleRegistryService $roleRegistry,
         private readonly RolePermissionSettings $rolePermissionSettings,
+        private readonly SuperAdminOverviewService $superAdminOverviewService,
         private readonly UserLifecycleService $userLifecycleService,
         private readonly WorkflowSettings $workflowSettings,
         private readonly WorkspaceModuleSettings $workspaceModuleSettings,
-        private readonly \App\Services\ChefUniteSyncService $chefUniteSync
+        private readonly ChefUniteSyncService $chefUniteSync
     ) {}
 
     public function index(Request $request): View
@@ -96,41 +106,7 @@ class SuperAdminWebController extends Controller
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
 
-        $templateQuery = ExportTemplate::query();
-
-        return view('workspace.super_admin.index', [
-            'summary' => [
-                'active_users' => User::query()->where('is_active', true)->count(),
-                'modules_active' => $this->workspaceModuleSettings->activeCount(),
-                'templates_total' => (clone $templateQuery)->count(),
-                'templates_published' => (clone $templateQuery)->where('status', ExportTemplate::STATUS_PUBLISHED)->count(),
-                'assignments_active' => ExportTemplateAssignment::query()->where('is_active', true)->count(),
-                'system_changes' => JournalAudit::query()->whereIn('module', ['super_admin', 'export_template'])->count(),
-                'official_base' => $this->actionCalculationSettings->statisticalScopeLabel(),
-                'default_theme' => $this->appearanceSettings->get('default_theme', 'dark'),
-                'default_locale' => $this->platformSettings->locale(),
-                'default_timezone' => $this->platformSettings->timezone(),
-                'maintenance_active' => $this->maintenanceService->status()['maintenance_active'],
-                'permission_groups' => count($this->rolePermissionSettings->groupedPermissions()),
-                'dashboard_profiles' => count($this->dashboardProfileSettings->all()),
-                'dynamic_referentials' => count($this->dynamicReferentialSettings->all()),
-                'managed_kpis' => $this->managedKpiSettings->summary()['visible'],
-                'notification_events_enabled' => $this->notificationPolicySettings->summary()['events_enabled'],
-                'timeline_rules_enabled' => $this->notificationPolicySettings->summary()['timeline_rules_enabled'],
-                'diagnostic_alerts' => collect($this->platformDiagnosticService->checks())
-                    ->where('status', '!=', 'ok')
-                    ->count(),
-                'sessions_active' => $this->activeSessionsCount(),
-                'configuration_snapshots' => PlatformSettingSnapshot::query()->count(),
-                'action_policy_closure_threshold' => $this->actionManagementSettings->minProgressForClosure(),
-            ],
-            'recentAudits' => JournalAudit::query()
-                ->with('user:id,name,email')
-                ->whereIn('module', ['super_admin', 'export_template'])
-                ->latest('id')
-                ->limit(12)
-                ->get(),
-        ]);
+        return view('workspace.super_admin.index', $this->superAdminOverviewService->build());
     }
 
     public function settingsEdit(Request $request): View
@@ -456,7 +432,7 @@ class SuperAdminWebController extends Controller
             'roles' => $roles,
             'customRoles' => $this->roleRegistry->customRoles(),
             'roleRegistryVersions' => $this->roleRegistry->versions(),
-            'baseRoleOptions' => $this->roleRegistry->systemRoles(),
+            'baseRoleOptions' => $this->roleRegistry->customRoleBaseOptions(),
             'matrix' => $this->rolePermissionSettings->all(),
             'lockedPermissionsByRole' => $this->lockedPermissionsByRole($roles),
             'forcedPermissionsByRole' => $this->forcedPermissionsByRole($roles),
@@ -481,7 +457,7 @@ class SuperAdminWebController extends Controller
             'custom_roles' => ['nullable', 'array'],
             'custom_roles.*.code' => ['nullable', 'string', 'max:64'],
             'custom_roles.*.label' => ['nullable', 'string', 'max:80'],
-            'custom_roles.*.base_role' => ['nullable', Rule::in(array_keys($this->roleRegistry->systemRoles()))],
+            'custom_roles.*.base_role' => ['nullable', Rule::in(array_keys($this->roleRegistry->customRoleBaseOptions()))],
             'custom_roles.*.description' => ['nullable', 'string', 'max:255'],
             'custom_roles.*.active' => ['nullable', 'boolean'],
         ]);
@@ -514,7 +490,7 @@ class SuperAdminWebController extends Controller
         $this->denyUnlessSuperAdmin($user);
 
         $validated = $request->validate([
-            'source_role' => ['required', Rule::in(array_keys($this->roleRegistry->allRoles()))],
+            'source_role' => ['required', Rule::in(array_keys($this->roleRegistry->duplicableRoles()))],
             'target_code' => ['required', 'string', 'max:64'],
             'target_label' => ['required', 'string', 'max:80'],
             'target_description' => ['nullable', 'string', 'max:255'],
@@ -655,7 +631,7 @@ class SuperAdminWebController extends Controller
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
 
-        $unites = \App\Models\UniteDg::query()
+        $unites = UniteDg::query()
             ->with([
                 'chef:id,name,email,role',
                 'direction:id,code,libelle',
@@ -665,18 +641,18 @@ class SuperAdminWebController extends Controller
             ->get();
 
         $roleToCode = [
-            \App\Models\User::ROLE_CHEF_UNITE_SCIQ => \App\Models\UniteDg::CODE_SCIQ,
-            \App\Models\User::ROLE_CHEF_UNITE_DGA => \App\Models\UniteDg::CODE_DGA,
-            \App\Models\User::ROLE_CHEF_UNITE_CABINET => \App\Models\UniteDg::CODE_CABINET,
-            \App\Models\User::ROLE_CHEF_UNITE_UCAS => \App\Models\UniteDg::CODE_UCAS,
+            User::ROLE_CHEF_UNITE_SCIQ => UniteDg::CODE_SCIQ,
+            User::ROLE_CHEF_UNITE_DGA => UniteDg::CODE_DGA,
+            User::ROLE_CHEF_UNITE_CABINET => UniteDg::CODE_CABINET,
+            User::ROLE_CHEF_UNITE_UCAS => UniteDg::CODE_UCAS,
         ];
 
         // Pour chaque unité on liste les candidats : users ayant déjà le rôle
         // chef_unite_X correspondant ou déjà rattachés à l'unité.
-        $candidatesByUnite = $unites->mapWithKeys(function (\App\Models\UniteDg $unite) use ($roleToCode) {
+        $candidatesByUnite = $unites->mapWithKeys(function (UniteDg $unite) use ($roleToCode) {
             $matchingRole = array_search($unite->code, $roleToCode, true) ?: null;
 
-            $query = \App\Models\User::query()
+            $query = User::query()
                 ->where('is_active', true)
                 ->orderBy('name');
 
@@ -699,35 +675,30 @@ class SuperAdminWebController extends Controller
     /**
      * Assigne (ou retire) le chef d'une unité DG.
      */
-    public function unitesDgSetChef(Request $request, \App\Models\UniteDg $uniteDg): RedirectResponse
+    public function unitesDgSetChef(SetUniteDgChefRequest $request, UniteDg $uniteDg): RedirectResponse
     {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
 
-        $validated = $request->validate([
-            'chef_user_id' => ['nullable', 'integer', 'exists:users,id'],
-        ]);
-
+        $validated = $request->validated();
         $before = ['chef_user_id' => $uniteDg->chef_user_id];
+        $uniteDg = DB::transaction(function () use ($request, $uniteDg, $validated, $before): UniteDg {
+            $updatedUnit = $this->chefUniteSync->assignChief(
+                $uniteDg,
+                isset($validated['chef_user_id']) ? (int) $validated['chef_user_id'] : null
+            );
 
-        // Si on désigne un nouveau chef, on aligne son unite_dg_id sur cette unité.
-        if (! empty($validated['chef_user_id'])) {
-            $newChef = \App\Models\User::query()->find($validated['chef_user_id']);
-            if ($newChef && (int) ($newChef->unite_dg_id ?? 0) !== (int) $uniteDg->id) {
-                $newChef->forceFill(['unite_dg_id' => $uniteDg->id])->save();
-            }
-        }
+            $this->recordAudit(
+                $request,
+                'super_admin',
+                'unite_dg_set_chef',
+                $updatedUnit,
+                $before,
+                ['chef_user_id' => $updatedUnit->chef_user_id]
+            );
 
-        $uniteDg->forceFill(['chef_user_id' => $validated['chef_user_id'] ?? null])->save();
-
-        $this->recordAudit(
-            $request,
-            'super_admin',
-            'unite_dg_set_chef',
-            $uniteDg,
-            $before,
-            ['chef_user_id' => $uniteDg->chef_user_id]
-        );
+            return $updatedUnit;
+        });
 
         return redirect()
             ->route('workspace.super-admin.unites-dg.index')
@@ -835,7 +806,7 @@ class SuperAdminWebController extends Controller
                 ->orderBy('name')
                 ->limit(500)
                 ->get(['id', 'name', 'direction_id', 'service_id', 'is_active']),
-            'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
+            'uniteDgOptions' => UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'roleOptions' => $this->profileOptions(),
             'roleLabels' => $this->profileLabels(),
             'bulkActionOptions' => [
@@ -1075,33 +1046,41 @@ class SuperAdminWebController extends Controller
 
         $validated = $this->validateOrganizationUserPayload($request);
         $temporaryPlaceholder = 'temp-password-placeholder';
+        $passwordWasGenerated = trim((string) ($validated['password'] ?? '')) === '';
+        $initialPassword = $passwordWasGenerated
+            ? $this->passwordPolicy->generateInitialPassword()
+            : (string) $validated['password'];
 
-        $managedUser = DB::transaction(function () use ($validated, $request, $temporaryPlaceholder): User {
+        $managedUser = DB::transaction(function () use ($validated, $request, $temporaryPlaceholder, $initialPassword): User {
             $payload = $this->normalizeManagedUserPayload($validated, $request);
-            $plainPassword = trim((string) ($validated['password'] ?? '')) !== ''
-                ? (string) $validated['password']
-                : self::DEFAULT_NEW_USER_PASSWORD;
 
             // forceCreate : role / direction_id / service_id / unite_dg_id / is_active
             // ne sont plus mass-assignables (cf. A02). Voie reservee au super-admin.
             $managedUser = User::query()->forceCreate([
                 ...$payload,
                 'password' => $temporaryPlaceholder,
-                'password_changed_at' => now(),
+                'password_changed_at' => null,
             ]);
 
-            $this->passwordPolicy->persistPassword($managedUser, $plainPassword);
+            $this->passwordPolicy->persistPassword($managedUser, $initialPassword, forceRenewal: true);
+            $this->chefUniteSync->sync($managedUser);
 
             return $managedUser->fresh(['direction:id,code,libelle', 'service:id,direction_id,code,libelle']) ?? $managedUser;
         });
 
-        $this->chefUniteSync->sync($managedUser);
-
         $this->recordAudit($request, 'super_admin', 'organization_user_create', $managedUser, null, Arr::except($managedUser->toArray(), ['password']));
 
-        return redirect()
+        $redirect = redirect()
             ->route('workspace.super-admin.organization.index')
             ->with('success', 'Utilisateur cree avec succès.');
+
+        if ($passwordWasGenerated) {
+            $redirect = $redirect
+                ->with('temporary_password_value', $initialPassword)
+                ->with('temporary_password_user', $managedUser->email);
+        }
+
+        return $redirect;
     }
 
     public function organizationUserUpdate(Request $request, User $managedUser): RedirectResponse
@@ -1162,15 +1141,15 @@ class SuperAdminWebController extends Controller
 
             if ($plainPassword !== null) {
                 $this->passwordPolicy->validateNotReused($managedUser, $plainPassword);
-                $this->passwordPolicy->persistPassword($managedUser, $plainPassword);
+                $this->passwordPolicy->persistPassword($managedUser, $plainPassword, forceRenewal: true);
                 $this->revokeSessionsForUser($managedUser);
             }
+
+            $this->chefUniteSync->sync($managedUser);
         });
 
         $managedUser->refresh();
         $managedUser->loadMissing(['direction:id,code,libelle', 'service:id,direction_id,code,libelle']);
-
-        $this->chefUniteSync->sync($managedUser);
 
         $after = Arr::except($managedUser->toArray(), ['password']);
         if ($lifecycleStats !== null) {
@@ -1268,23 +1247,24 @@ class SuperAdminWebController extends Controller
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
 
-        $temporaryPassword = $this->generateSecureTemporaryPassword();
+        $temporaryPassword = $this->passwordPolicy->generateInitialPassword();
         $before = Arr::except($managedUser->toArray(), ['password']);
 
         DB::transaction(function () use ($managedUser, $temporaryPassword): void {
-            $this->passwordPolicy->persistPassword($managedUser, $temporaryPassword);
+            $this->passwordPolicy->persistPassword($managedUser, $temporaryPassword, forceRenewal: true);
             $this->revokeSessionsForUser($managedUser);
         });
         $managedUser->refresh();
 
         $this->recordAudit($request, 'super_admin', 'organization_user_password_reset', $managedUser, $before, [
             ...Arr::except($managedUser->toArray(), ['password']),
-            'temporary_password_reset' => true,
+            'generated_password_reset' => true,
+            'force_renewal' => true,
         ]);
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Mot de passe temporaire réinitialisé.')
+            ->with('success', 'Mot de passe temporaire généré. Changement requis à la prochaine connexion.')
             ->with('temporary_password_value', $temporaryPassword)
             ->with('temporary_password_user', $managedUser->email);
     }
@@ -1357,8 +1337,23 @@ class SuperAdminWebController extends Controller
                 $isActive = $this->normalizeBooleanValue($row['is_active'] ?? '1');
                 $isAgent = $this->normalizeBooleanValue($row['is_agent'] ?? ($baseRole === User::ROLE_AGENT ? '1' : '0'));
                 $suspendedUntil = trim((string) ($row['suspended_until'] ?? '')) !== ''
-                    ? \Illuminate\Support\Carbon::parse((string) $row['suspended_until'])->endOfDay()
+                    ? Carbon::parse((string) $row['suspended_until'])->endOfDay()
                     : null;
+                $password = trim((string) ($row['password'] ?? ''));
+                if (! ($existing instanceof User) && $password === '') {
+                    $skipped++;
+
+                    continue;
+                }
+
+                if ($password !== '' && Validator::make(
+                    ['password' => $password],
+                    ['password' => ['required', 'string', $this->passwordPolicy->rule()]]
+                )->fails()) {
+                    $skipped++;
+
+                    continue;
+                }
 
                 $payload = [
                     'name' => $name,
@@ -1389,10 +1384,9 @@ class SuperAdminWebController extends Controller
                     $before = Arr::except($existing->toArray(), ['password']);
                     $existing->forceFill($payload)->save();
 
-                    $password = trim((string) ($row['password'] ?? ''));
                     if ($password !== '') {
                         $this->passwordPolicy->validateNotReused($existing, $password);
-                        $this->passwordPolicy->persistPassword($existing, $password);
+                        $this->passwordPolicy->persistPassword($existing, $password, forceRenewal: true);
                         $this->revokeSessionsForUser($existing);
                     }
 
@@ -1402,19 +1396,14 @@ class SuperAdminWebController extends Controller
                     continue;
                 }
 
-                $password = trim((string) ($row['password'] ?? ''));
-                if ($password === '') {
-                    $password = 'TempPass@'.now()->format('mdY');
-                }
-
                 // forceCreate : champs admin (role, direction_id, etc.) ne sont plus
                 // mass-assignables (cf. A02). Import CSV reserve au super-admin.
                 $createdUser = User::query()->forceCreate([
                     ...$payload,
                     'password' => 'temp-password-placeholder',
-                    'password_changed_at' => now(),
+                    'password_changed_at' => null,
                 ]);
-                $this->passwordPolicy->persistPassword($createdUser, $password);
+                $this->passwordPolicy->persistPassword($createdUser, $password, forceRenewal: true);
 
                 $created++;
                 $this->recordAudit($request, 'super_admin', 'organization_user_import_create', $createdUser, null, Arr::except($createdUser->fresh()->toArray(), ['password']));
@@ -1432,7 +1421,7 @@ class SuperAdminWebController extends Controller
         $this->denyUnlessSuperAdmin($user);
 
         $validated = $request->validate([
-            'user_ids' => ['required', 'array', 'min:1'],
+            'user_ids' => ['required', 'array', 'min:1', 'max:100'],
             'user_ids.*' => ['integer', 'exists:users,id'],
             'bulk_action' => ['required', Rule::in(['activate', 'deactivate', 'suspend', 'clear_suspension', 'revoke_sessions', 'reset_password', 'assign_role', 'assign_direction', 'assign_service'])],
             'bulk_role' => ['nullable', Rule::in($this->profileOptions())],
@@ -1450,11 +1439,11 @@ class SuperAdminWebController extends Controller
 
         $processed = 0;
         $skipped = 0;
-        $temporaryPassword = null;
+        $temporaryCredentials = [];
 
-        DB::transaction(function () use ($users, $validated, $request, $user, &$processed, &$skipped, &$temporaryPassword): void {
+        DB::transaction(function () use ($users, $validated, $request, $user, &$processed, &$skipped, &$temporaryCredentials): void {
             foreach ($users as $managedUser) {
-                if ($managedUser->isSuperAdmin() && (string) $validated['bulk_action'] !== 'revoke_sessions') {
+                if ($managedUser->isSuperAdmin() && ! in_array((string) $validated['bulk_action'], ['revoke_sessions', 'reset_password'], true)) {
                     $skipped++;
 
                     continue;
@@ -1494,7 +1483,7 @@ class SuperAdminWebController extends Controller
                         break;
                     case 'suspend':
                         $suspendedUntil = ! empty($validated['bulk_suspended_until'])
-                            ? \Illuminate\Support\Carbon::parse((string) $validated['bulk_suspended_until'])->endOfDay()
+                            ? Carbon::parse((string) $validated['bulk_suspended_until'])->endOfDay()
                             : now()->addDays(7)->endOfDay();
                         $managedUser->forceFill([
                             'suspended_until' => $suspendedUntil,
@@ -1512,9 +1501,13 @@ class SuperAdminWebController extends Controller
                         $this->revokeSessionsForUser($managedUser);
                         break;
                     case 'reset_password':
-                        $temporaryPassword ??= $this->generateSecureTemporaryPassword();
-                        $this->passwordPolicy->persistPassword($managedUser, $temporaryPassword);
+                        $temporaryPassword = $this->passwordPolicy->generateInitialPassword();
+                        $this->passwordPolicy->persistPassword($managedUser, $temporaryPassword, forceRenewal: true);
                         $this->revokeSessionsForUser($managedUser);
+                        $temporaryCredentials[] = [
+                            'user' => (string) $managedUser->email,
+                            'password' => $temporaryPassword,
+                        ];
                         break;
                     case 'assign_role':
                         if (! isset($validated['bulk_role'])) {
@@ -1589,10 +1582,8 @@ class SuperAdminWebController extends Controller
             ->route('workspace.super-admin.organization.index')
             ->with('success', $message);
 
-        if ($temporaryPassword !== null) {
-            $redirect = $redirect
-                ->with('temporary_password_value', $temporaryPassword)
-                ->with('temporary_password_bulk', true);
+        if ($temporaryCredentials !== []) {
+            $redirect = $redirect->with('temporary_credentials', $temporaryCredentials);
         }
 
         return $redirect;
@@ -1614,6 +1605,7 @@ class SuperAdminWebController extends Controller
             ])],
             'reviewer_note' => ['required', 'string', 'min:5', 'max:1000'],
             'transfer_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'return_to' => ['nullable', Rule::in(['organization', 'governance'])],
         ]);
 
         $before = $deletionRequest->toArray();
@@ -1631,8 +1623,12 @@ class SuperAdminWebController extends Controller
             'execution' => $execution,
         ]);
 
+        $returnRoute = ($validated['return_to'] ?? 'organization') === 'governance'
+            ? 'workspace.deletion-requests.index'
+            : 'workspace.super-admin.organization.index';
+
         return redirect()
-            ->route('workspace.super-admin.organization.index')
+            ->route($returnRoute)
             ->with('success', 'Décision de suppression enregistrée.');
     }
 
@@ -1821,6 +1817,7 @@ class SuperAdminWebController extends Controller
             'alert_level_label_warning' => ['required', 'string', 'max:60'],
             'alert_level_label_critical' => ['required', 'string', 'max:60'],
             'alert_level_label_urgence' => ['required', 'string', 'max:60'],
+            'alert_level_label_conforme' => ['required', 'string', 'max:60'],
             'alert_level_label_info' => ['required', 'string', 'max:60'],
             'validation_status_label_non_soumise' => ['required', 'string', 'max:60'],
             'validation_status_label_soumise_chef' => ['required', 'string', 'max:60'],
@@ -2047,7 +2044,7 @@ class SuperAdminWebController extends Controller
             ->with('success', 'Snapshot de configuration créé.');
     }
 
-    public function snapshotsRestore(Request $request, PlatformSettingSnapshot $snapshot): RedirectResponse
+    public function snapshotsRestore(RestorePlatformSnapshotRequest $request, PlatformSettingSnapshot $snapshot): RedirectResponse
     {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
@@ -2058,18 +2055,12 @@ class SuperAdminWebController extends Controller
             'groups.*' => ['string', 'max:80'],
         ]);
 
-        $selectedGroups = collect($validated['groups'] ?? [])
+        $selectedGroups = collect($request->boolean('partial_restore') ? ($validated['groups'] ?? []) : [])
             ->map(fn ($group): string => trim((string) $group))
             ->filter()
             ->unique()
             ->values()
             ->all();
-
-        if ($request->boolean('partial_restore') && $selectedGroups === []) {
-            return back()->withErrors([
-                'groups' => 'Sélectionnez au moins un groupe à restaurer.',
-            ]);
-        }
 
         $before = $this->platformSnapshotService->currentPayload();
         $restoredSnapshot = $selectedGroups === []
@@ -2107,24 +2098,12 @@ class SuperAdminWebController extends Controller
         ]);
     }
 
-    public function simulationRun(Request $request): RedirectResponse
+    public function simulationRun(RunPlatformSimulationRequest $request): RedirectResponse
     {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
 
-        $validated = $request->validate([
-            'actions_service_validation_enabled' => ['nullable', 'in:0,1'],
-            'actions_direction_validation_enabled' => ['nullable', 'in:0,1'],
-            'actions_auto_complete_when_target_reached' => ['nullable', 'in:0,1'],
-            'actions_min_progress_for_closure' => ['required', 'integer', 'min:0', 'max:100'],
-        ]);
-
-        $simulation = $this->platformSimulationService->simulate([
-            'actions_service_validation_enabled' => $request->boolean('actions_service_validation_enabled') ? '1' : '0',
-            'actions_direction_validation_enabled' => $request->boolean('actions_direction_validation_enabled') ? '1' : '0',
-            'actions_auto_complete_when_target_reached' => $request->boolean('actions_auto_complete_when_target_reached') ? '1' : '0',
-            'actions_min_progress_for_closure' => (string) $validated['actions_min_progress_for_closure'],
-        ]);
+        $simulation = $this->platformSimulationService->simulate($request->validated());
 
         $auditTarget = $this->auditAnchor('simulation', 'platform_simulation_last_run', json_encode($simulation['payload'] ?? [], JSON_UNESCAPED_SLASHES));
         $this->recordAudit($request, 'super_admin', 'platform_simulation_run', $auditTarget, null, $simulation);
@@ -2334,7 +2313,7 @@ class SuperAdminWebController extends Controller
         ]);
     }
 
-    public function maintenanceRun(Request $request, string $action): RedirectResponse
+    public function maintenanceRun(RunPlatformMaintenanceRequest $request, string $action): RedirectResponse
     {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
@@ -2342,9 +2321,10 @@ class SuperAdminWebController extends Controller
         abort_unless(array_key_exists($action, $this->maintenanceService->actions()), 404);
 
         $result = $this->maintenanceService->perform($action);
-        $auditTarget = $this->auditAnchor('maintenance', 'maintenance_last_action', json_encode($result, JSON_UNESCAPED_SLASHES));
+        $auditResult = Arr::except($result, ['bypass_url']);
+        $auditTarget = $this->auditAnchor('maintenance', 'maintenance_last_action', json_encode($auditResult, JSON_UNESCAPED_SLASHES));
 
-        $this->recordAudit($request, 'super_admin', 'maintenance_'.$action, $auditTarget, null, $result);
+        $this->recordAudit($request, 'super_admin', 'maintenance_'.$action, $auditTarget, null, $auditResult);
 
         $redirect = redirect()->route('workspace.super-admin.maintenance.index');
 
@@ -2547,30 +2527,25 @@ class SuperAdminWebController extends Controller
         $this->denyUnlessSuperAdmin($user);
 
         $validated = $this->validateTemplate($request);
-        $template = ExportTemplate::query()->create(array_merge(
-            $this->templatePayload($validated, $request),
-            [
+        $template = DB::transaction(function () use ($validated, $request, $user): ExportTemplate {
+            $template = ExportTemplate::query()->create([
+                ...$this->templatePayload($validated, $request),
                 'status' => ExportTemplate::STATUS_DRAFT,
-                'created_by' => $user->id,
-                'updated_by' => $user->id,
-            ]
-        ));
-
-        if ($request->boolean('create_default_assignment', true)) {
-            $template->assignments()->create([
-                'module' => $template->module,
-                'report_type' => $template->report_type,
-                'format' => $template->format,
-                'target_profile' => $template->target_profile,
-                'reading_level' => $template->reading_level,
-                'is_default' => (bool) $template->is_default,
+                'is_default' => false,
                 'is_active' => true,
+                'published_at' => null,
                 'created_by' => $user->id,
                 'updated_by' => $user->id,
             ]);
-        }
 
-        $this->recordAudit($request, 'export_template', 'create', $template, null, $template->toArray());
+            if ($request->boolean('create_default_assignment', true)) {
+                $this->templateAssignmentService->createInitial($template, $user);
+            }
+
+            $this->recordAudit($request, 'export_template', 'create', $template, null, $template->toArray());
+
+            return $template;
+        });
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
@@ -2622,66 +2597,65 @@ class SuperAdminWebController extends Controller
 
         $validated = $this->validateTemplate($request, $template);
         $before = $template->toArray();
-        $template->forceFill(array_merge(
-            $this->templatePayload($validated, $request, $template),
-            ['updated_by' => $user->id]
-        ))->save();
+        $wasPublished = $template->isPublished();
+        $template = DB::transaction(function () use ($validated, $request, $template, $user, $before): ExportTemplate {
+            $updatedTemplate = $this->templatePublisher->updateDraft(
+                $template,
+                $this->templatePayload($validated, $request, $template),
+                $user
+            );
 
-        $this->recordAudit($request, 'export_template', 'update', $template, $before, $template->toArray());
+            $this->recordAudit($request, 'export_template', 'update', $updatedTemplate, $before, $updatedTemplate->toArray());
+
+            return $updatedTemplate;
+        });
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
-            ->with('success', 'Template d\'export mis a jour avec succès.');
+            ->with('success', $wasPublished
+                ? 'La version publiée a été ouverte en brouillon. Publiez-la après vérification.'
+                : 'Brouillon du template mis à jour.');
     }
 
-    public function templatesPublish(Request $request, ExportTemplate $template): RedirectResponse
+    public function templatesPublish(ManageExportTemplateStateRequest $request, ExportTemplate $template): RedirectResponse
     {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
+        $validated = $request->validated();
         $before = $template->toArray();
-
-        if (! $template->assignments()->exists()) {
-            $this->ensureBaseAssignment($template, $user);
-        }
-
-        if ($request->boolean('mark_as_default')) {
-            $this->clearDefaultTemplates($template);
-            $template->is_default = true;
-            $template->save();
-            $this->ensureBaseAssignment($template, $user);
-            $this->clearDefaultAssignments(
-                $template->module,
-                $template->report_type,
-                $template->format,
-                $template->target_profile,
-                $template->reading_level
+        DB::transaction(function () use ($request, $template, $user, $validated, $before): void {
+            $version = $this->templatePublisher->publish(
+                $template,
+                $user,
+                $validated['note'] ?? null,
+                $request->boolean('mark_as_default')
             );
-            $template->assignments()->update(['is_default' => true, 'updated_by' => $user->id]);
-        }
+            $template->refresh();
 
-        $version = $this->templatePublisher->publish($template, $user, (string) $request->string('note'));
-        $template->refresh();
-
-        $this->recordAudit($request, 'export_template', 'publish', $template, $before, [
-            ...$template->toArray(),
-            'version_number' => $version->version_number,
-        ]);
+            $this->recordAudit($request, 'export_template', 'publish', $template, $before, [
+                ...$template->toArray(),
+                'version_number' => $version->version_number,
+            ]);
+        });
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
             ->with('success', 'Template publie avec succès.');
     }
 
-    public function templatesArchive(Request $request, ExportTemplate $template): RedirectResponse
+    public function templatesArchive(ManageExportTemplateStateRequest $request, ExportTemplate $template): RedirectResponse
     {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
+        $validated = $request->validated();
 
         $before = $template->toArray();
-        $this->templatePublisher->archive($template, $user, (string) $request->string('note'));
-        $template->refresh();
+        DB::transaction(function () use ($request, $template, $user, $validated, $before): void {
+            $this->templatePublisher->archive($template, $user, $validated['note'] ?? null);
+            $template->refresh();
 
-        $this->recordAudit($request, 'export_template', 'archive', $template, $before, $template->toArray());
+            $this->recordAudit($request, 'export_template', 'archive', $template, $before, $template->toArray());
+        });
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
@@ -2820,72 +2794,42 @@ class SuperAdminWebController extends Controller
             ->with('success', 'Template JSON importé en brouillon.');
     }
 
-    public function templateVersionRestore(Request $request, ExportTemplate $template, ExportTemplateVersion $version): RedirectResponse
-    {
+    public function templateVersionRestore(
+        ManageExportTemplateStateRequest $request,
+        ExportTemplate $template,
+        ExportTemplateVersion $version
+    ): RedirectResponse {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
-
-        abort_unless((int) $version->export_template_id === (int) $template->id, 404);
+        $validated = $request->validated();
 
         $before = $template->toArray();
-        $this->templatePublisher->restoreVersion($template, $version, $user, (string) $request->string('note'));
-        $template->refresh();
+        DB::transaction(function () use ($request, $template, $version, $user, $validated, $before): void {
+            $this->templatePublisher->restoreVersion($template, $version, $user, $validated['note'] ?? null);
+            $template->refresh();
 
-        $this->recordAudit($request, 'export_template', 'restore_version', $template, $before, [
-            ...$template->toArray(),
-            'restored_version_number' => $version->version_number,
-        ]);
+            $this->recordAudit($request, 'export_template', 'restore_version', $template, $before, [
+                ...$template->toArray(),
+                'restored_version_number' => $version->version_number,
+            ]);
+        });
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
             ->with('success', 'Version restaurée dans le brouillon courant.');
     }
 
-    public function assignmentStore(Request $request, ExportTemplate $template): RedirectResponse
-    {
+    public function assignmentStore(
+        StoreExportTemplateAssignmentRequest $request,
+        ExportTemplate $template
+    ): RedirectResponse {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
-
-        $validated = $request->validate([
-            'module' => ['required', Rule::in($this->moduleOptions())],
-            'report_type' => ['required', 'string', 'max:80'],
-            'format' => ['required', Rule::in(ExportTemplate::formatOptions())],
-            'target_profile' => ['nullable', Rule::in($this->profileOptions())],
-            'reading_level' => ['nullable', Rule::in($this->readingLevelOptions())],
-            'direction_id' => ['nullable', 'integer', 'exists:directions,id'],
-            'service_id' => ['nullable', 'integer', 'exists:services,id'],
-            'is_default' => ['nullable', 'boolean'],
-            'is_active' => ['nullable', 'boolean'],
-        ]);
-
-        $assignment = $template->assignments()->create([
-            'module' => (string) $validated['module'],
-            'report_type' => (string) $validated['report_type'],
-            'format' => (string) $validated['format'],
-            'target_profile' => $validated['target_profile'] ?: null,
-            'reading_level' => $validated['reading_level'] ?: null,
-            'direction_id' => $validated['direction_id'] ?? null,
-            'service_id' => $validated['service_id'] ?? null,
-            'is_default' => $request->boolean('is_default', false),
-            'is_active' => $request->boolean('is_active', true),
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
-        ]);
-
-        if ($assignment->is_default) {
-            $this->clearDefaultAssignments(
-                $assignment->module,
-                $assignment->report_type,
-                $assignment->format,
-                $assignment->target_profile,
-                $assignment->reading_level,
-                $assignment->direction_id,
-                $assignment->service_id,
-                $assignment->id
-            );
-        }
-
-        $this->recordAudit($request, 'export_template', 'assign', $assignment, null, $assignment->toArray());
+        $validated = $request->validated();
+        DB::transaction(function () use ($request, $template, $validated, $user): void {
+            $assignment = $this->templateAssignmentService->create($template, $validated, $user);
+            $this->recordAudit($request, 'export_template', 'assign', $assignment, null, $assignment->toArray());
+        });
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $template)
@@ -2898,12 +2842,12 @@ class SuperAdminWebController extends Controller
         $this->denyUnlessSuperAdmin($user);
 
         $before = $assignment->toArray();
-        $assignment->forceFill([
-            'is_active' => ! $assignment->is_active,
-            'updated_by' => $user->id,
-        ])->save();
+        $assignment = DB::transaction(function () use ($request, $assignment, $user, $before): ExportTemplateAssignment {
+            $updatedAssignment = $this->templateAssignmentService->toggle($assignment, $user);
+            $this->recordAudit($request, 'export_template', 'assignment_toggle', $updatedAssignment, $before, $updatedAssignment->toArray());
 
-        $this->recordAudit($request, 'export_template', 'assignment_toggle', $assignment, $before, $assignment->toArray());
+            return $updatedAssignment;
+        });
 
         return redirect()
             ->route('workspace.super-admin.templates.show', $assignment->template)
@@ -3078,7 +3022,7 @@ class SuperAdminWebController extends Controller
         if ($serviceId !== null) {
             $service = Service::query()->find($serviceId);
             if (! $service instanceof Service) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'service_id' => 'Le service selectionne est introuvable.',
                 ]);
             }
@@ -3087,14 +3031,14 @@ class SuperAdminWebController extends Controller
                 $validated['direction_id'] = $service->direction_id;
                 $directionId = (int) $service->direction_id;
             } elseif ((int) $service->direction_id !== $directionId) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'service_id' => 'Le service selectionne ne correspond pas a la direction choisie.',
                 ]);
             }
         }
 
         if ($role === User::ROLE_DIRECTION && $directionId === null) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'direction_id' => 'Une direction doit etre affectee a ce profil.',
             ]);
         }
@@ -3104,7 +3048,7 @@ class SuperAdminWebController extends Controller
         }
 
         if (in_array($role, [User::ROLE_SERVICE, User::ROLE_AGENT], true) && ($directionId === null || $serviceId === null)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'service_id' => 'Ce profil doit etre rattache a un service.',
             ]);
         }
@@ -3132,7 +3076,7 @@ class SuperAdminWebController extends Controller
         }
 
         $suspendedUntil = ! empty($validated['suspended_until'])
-            ? \Illuminate\Support\Carbon::parse((string) $validated['suspended_until'])->endOfDay()
+            ? Carbon::parse((string) $validated['suspended_until'])->endOfDay()
             : null;
 
         return [
@@ -3327,7 +3271,7 @@ class SuperAdminWebController extends Controller
     private function buildTemplatePreview(ExportTemplate $template, User $user): array
     {
         if ($template->module === 'reporting' && $template->report_type === 'consolidated_reporting') {
-            $payload = app(\App\Services\Analytics\ReportingAnalyticsService::class)->buildPayload($user, true, true);
+            $payload = app(ReportingAnalyticsService::class)->buildPayload($user, true, true);
             $payload['exportTemplate'] = $template;
 
             if ($template->format === ExportTemplate::FORMAT_PDF) {
@@ -3374,85 +3318,6 @@ class SuperAdminWebController extends Controller
                 'layout' => $template->layout_config ?? [],
             ],
         ];
-    }
-
-    private function clearDefaultTemplates(ExportTemplate $template): void
-    {
-        $query = ExportTemplate::query()
-            ->where('module', $template->module)
-            ->where('report_type', $template->report_type)
-            ->where('format', $template->format)
-            ->where('id', '!=', $template->id);
-
-        foreach ([
-            'target_profile' => $template->target_profile,
-            'reading_level' => $template->reading_level,
-        ] as $column => $value) {
-            if ($value === null) {
-                $query->whereNull($column);
-            } else {
-                $query->where($column, $value);
-            }
-        }
-
-        $query->update(['is_default' => false]);
-    }
-
-    private function clearDefaultAssignments(
-        string $module,
-        string $reportType,
-        string $format,
-        ?string $targetProfile = null,
-        ?string $readingLevel = null,
-        ?int $directionId = null,
-        ?int $serviceId = null,
-        ?int $exceptId = null
-    ): void {
-        $query = ExportTemplateAssignment::query()
-            ->where('module', $module)
-            ->where('report_type', $reportType)
-            ->where('format', $format)
-            ->where('is_default', true);
-
-        foreach ([
-            'target_profile' => $targetProfile,
-            'reading_level' => $readingLevel,
-            'direction_id' => $directionId,
-            'service_id' => $serviceId,
-        ] as $column => $value) {
-            if ($value === null) {
-                $query->whereNull($column);
-            } else {
-                $query->where($column, $value);
-            }
-        }
-
-        if ($exceptId !== null) {
-            $query->where('id', '!=', $exceptId);
-        }
-
-        $query->update(['is_default' => false]);
-    }
-
-    private function ensureBaseAssignment(ExportTemplate $template, User $user): void
-    {
-        $template->assignments()->firstOrCreate(
-            [
-                'module' => $template->module,
-                'report_type' => $template->report_type,
-                'format' => $template->format,
-                'target_profile' => $template->target_profile,
-                'reading_level' => $template->reading_level,
-                'direction_id' => null,
-                'service_id' => null,
-            ],
-            [
-                'is_default' => true,
-                'is_active' => true,
-                'created_by' => $user->id,
-                'updated_by' => $user->id,
-            ]
-        );
     }
 
     private function organizationUserQuery(Request $request): Builder
@@ -3714,7 +3579,7 @@ class SuperAdminWebController extends Controller
             return 0;
         }
 
-        return (int) \Illuminate\Support\Facades\Cache::remember(
+        return (int) Cache::remember(
             'super_admin:active_sessions_count',
             now()->addSeconds(30),
             fn (): int => (int) DB::table($table)->count()
@@ -3723,7 +3588,7 @@ class SuperAdminWebController extends Controller
 
     /**
      * @param  array<int, int>  $userIds
-     * @return array<int, array{sessions_total:int,last_activity:\Illuminate\Support\Carbon|null}>
+     * @return array<int, array{sessions_total:int,last_activity:Carbon|null}>
      */
     private function sessionSummariesForUsers(array $userIds): array
     {
@@ -3742,7 +3607,7 @@ class SuperAdminWebController extends Controller
                     (int) $row->user_id => [
                         'sessions_total' => (int) ($row->sessions_total ?? 0),
                         'last_activity' => isset($row->last_activity)
-                            ? \Illuminate\Support\Carbon::createFromTimestamp((int) $row->last_activity)
+                            ? Carbon::createFromTimestamp((int) $row->last_activity)
                             : null,
                     ],
                 ];
@@ -3752,7 +3617,7 @@ class SuperAdminWebController extends Controller
 
     /**
      * @param  array<int, int>  $userIds
-     * @return \Illuminate\Support\Collection<int, JournalAudit>
+     * @return Collection<int, JournalAudit>
      */
     private function loginHistoryForUsers(array $userIds, ?Request $request = null)
     {
@@ -3805,20 +3670,6 @@ class SuperAdminWebController extends Controller
         $table = (string) config('session.table', 'sessions');
 
         return Schema::hasTable($table) ? $table : null;
-    }
-
-    /**
-     * Generates a cryptographically random temporary password.
-     * Format: 4 uppercase + 4 digits + 2 symbols + 2 lowercase = 12 characters.
-     */
-    private function generateSecureTemporaryPassword(): string
-    {
-        $upper = substr(str_shuffle('ABCDEFGHJKLMNPQRSTUVWXYZ'), 0, 4);
-        $digits = substr(str_shuffle('23456789'), 0, 4);
-        $symbols = substr(str_shuffle('@#$!%&'), 0, 2);
-        $lower = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz'), 0, 2);
-
-        return str_shuffle($upper.$digits.$symbols.$lower);
     }
 
     private function auditAnchor(string $group, string $key, string $value): PlatformSetting

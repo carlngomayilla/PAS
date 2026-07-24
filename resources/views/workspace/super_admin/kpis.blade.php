@@ -8,7 +8,7 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Super Administration</p>
                 <h1 class="mt-2">Indicateur de performance et statistiques</h1>
-                <p class="mt-2 text-slate-600">Registre des indicateurs consolides utilises par le reporting et les dashboards. Le calcul devient pilotable sans code via des presets de formule, des sources multiples, des poids et une cible optionnelle.</p>
+                <p class="mt-2 text-slate-600">Registre des indicateurs consolides utilises par le reporting et les dashboards. Le calcul devient pilotable sans code via des presets de formule, des sources multiples, des poids et un niveau attendu optionnel.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
@@ -31,7 +31,7 @@
             <p class="mt-2 text-sm text-slate-600">Délai, performance d'exécution, conformité, qualité, global et progression.</p>
         </article>
         <article class="ui-card !mb-0">
-            <p class="text-sm text-slate-500">Profils cibles distincts</p>
+            <p class="text-sm text-slate-500">Profils destinataires distincts</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['profiles'] }}</p>
             <p class="mt-2 text-sm text-slate-600">Si vide pour un Indicateur de performance, il reste visible pour tous les profils.</p>
         </article>
@@ -44,7 +44,7 @@
 
             <div class="form-section">
                 <h2 class="form-section-title">Registre pilote</h2>
-                <p class="form-section-subtitle">Chaque Indicateur de performance peut maintenant lire une source simple, inverser une source, combiner plusieurs sources, prendre le minimum ou le maximum, ou mesurer un écart à une cible. Les formules restent bornées et auditables.</p>
+                <p class="form-section-subtitle">Chaque Indicateur de performance peut maintenant lire une source simple, inverser une source, combiner plusieurs sources, prendre le minimum ou le maximum, ou mesurer un écart à un niveau attendu. Les formules restent bornées et auditables.</p>
                 <div class="space-y-4">
                     @foreach ($settings as $code => $definition)
                         <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-4">
@@ -113,7 +113,7 @@
                                     <input id="kpi_tertiary_weight_{{ $code }}" name="definitions[{{ $code }}][tertiary_weight]" type="number" min="0" max="100" value="{{ old("definitions.$code.tertiary_weight", $definition['tertiary_weight'] ?? 0) }}">
                                 </div>
                                 <div>
-                                    <label for="kpi_target_value_{{ $code }}">Cible numérique</label>
+                                    <label for="kpi_target_value_{{ $code }}">Niveau attendu numérique</label>
                                     <input id="kpi_target_value_{{ $code }}" name="definitions[{{ $code }}][target_value]" type="number" step="1" min="0" max="100" value="{{ old("definitions.$code.target_value", $definition['target_value'] ?? '') !== '' ? (int) round((float) old("definitions.$code.target_value", $definition['target_value'] ?? 0)) : '' }}">
                                 </div>
                                 <div>
@@ -126,14 +126,14 @@
                                         <span class="font-medium">direct</span>,
                                         <span class="font-medium">inverse</span>,
                                         <span class="font-medium">moyenne pondérée</span>,
-                                        <span class="font-medium">écart à la cible</span>,
+                                        <span class="font-medium">écart au niveau attendu</span>,
                                         <span class="font-medium">minimum</span>,
                                         <span class="font-medium">maximum</span>.
                                         Pour la moyenne pondérée, la source principale récupère automatiquement le poids restant.
                                     </div>
                                 </div>
                                 <div class="md:col-span-2 xl:col-span-3">
-                                    <span class="mb-2 block text-sm font-medium text-slate-700">Profils cibles</span>
+                                    <span class="mb-2 block text-sm font-medium text-slate-700">Profils destinataires</span>
                                     <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                                         @foreach ($profileOptions as $profileCode => $profileLabel)
                                             <label class="checkbox-pill">
@@ -144,7 +144,7 @@
                                     </div>
                                 </div>
                                 <div class="md:col-span-2">
-                                    <label for="kpi_target_directions_{{ $code }}">Directions cibles</label>
+                                    <label for="kpi_target_directions_{{ $code }}">Directions destinataires</label>
                                     <select id="kpi_target_directions_{{ $code }}" name="definitions[{{ $code }}][target_direction_ids][]" multiple size="5">
                                         @foreach ($directionOptions as $direction)
                                             <option value="{{ $direction->id }}" @selected(in_array((int) $direction->id, array_map('intval', old("definitions.$code.target_direction_ids", $definition['target_direction_ids'] ?? [])), true))>{{ $direction->code }} - {{ $direction->libelle }}</option>
@@ -152,7 +152,7 @@
                                     </select>
                                 </div>
                                 <div class="md:col-span-2">
-                                    <label for="kpi_target_services_{{ $code }}">Services cibles</label>
+                                    <label for="kpi_target_services_{{ $code }}">Services destinataires</label>
                                     <select id="kpi_target_services_{{ $code }}" name="definitions[{{ $code }}][target_service_ids][]" multiple size="5">
                                         @foreach ($serviceOptions as $service)
                                             <option value="{{ $service->id }}" @selected(in_array((int) $service->id, array_map('intval', old("definitions.$code.target_service_ids", $definition['target_service_ids'] ?? [])), true))>{{ $service->direction?->code }} / {{ $service->code }} - {{ $service->libelle }}</option>

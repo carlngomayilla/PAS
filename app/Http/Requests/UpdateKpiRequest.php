@@ -40,7 +40,7 @@ class UpdateKpiRequest extends FormRequest
             if ($cible !== null && $seuil !== null && (float) $seuil > (float) $cible) {
                 $validator->errors()->add(
                     'seuil_alerte',
-                    'Le seuil d alerte ne doit pas depasser la cible.'
+                    'Le seuil d alerte ne doit pas depasser le niveau attendu.'
                 );
             }
         });

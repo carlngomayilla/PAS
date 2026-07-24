@@ -127,7 +127,7 @@ class PasAxeController extends Controller
         $targetPas = Pas::query()->findOrFail((int) $validated['pas_id']);
         if ($targetPas->statut === 'archive') {
             return response()->json([
-                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'cible', 'Mise a jour'),
+                'message' => $this->lockedRelatedStateMessage(UiLabel::object('pas'), 'lie', 'Mise a jour'),
             ], 409);
         }
 
@@ -174,6 +174,7 @@ class PasAxeController extends Controller
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             $query->where('direction_id', (int) $user->direction_id);
+
             return;
         }
 
@@ -187,6 +188,7 @@ class PasAxeController extends Controller
                     fn ($q) => $q->where('service_id', (int) $user->service_id)
                 );
             });
+
             return;
         }
 

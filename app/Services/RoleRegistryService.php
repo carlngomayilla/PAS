@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class RoleRegistryService
@@ -48,6 +48,25 @@ class RoleRegistryService
             User::ROLE_SERVICE => ['label' => 'Chef de service', 'base_role' => User::ROLE_SERVICE, 'system' => true],
             User::ROLE_AGENT => ['label' => 'Agent', 'base_role' => User::ROLE_AGENT, 'system' => true],
         ];
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function customRoleBaseOptions(): array
+    {
+        return Arr::except($this->systemRoles(), [User::ROLE_SUPER_ADMIN]);
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function duplicableRoles(): array
+    {
+        return collect($this->allRoles())
+            ->reject(fn (array $definition, string $code): bool => $code === User::ROLE_SUPER_ADMIN
+                || (string) ($definition['base_role'] ?? '') === User::ROLE_SUPER_ADMIN)
+            ->all();
     }
 
     /**
@@ -184,6 +203,10 @@ class RoleRegistryService
             abort(422, 'Role source introuvable.');
         }
 
+        if ($sourceRole === User::ROLE_SUPER_ADMIN || (string) ($source['base_role'] ?? '') === User::ROLE_SUPER_ADMIN) {
+            abort(422, 'Le role Super Admin ne peut pas servir de base a un role personnalise.');
+        }
+
         $normalizedCode = $this->normalizeRoleCode($targetCode);
         if ($normalizedCode === '') {
             abort(422, 'Code de role invalide.');
@@ -310,7 +333,7 @@ class RoleRegistryService
      */
     private function sanitizeCustomRoles(array $roles): array
     {
-        $allowedBases = array_keys($this->systemRoles());
+        $allowedBases = array_keys($this->customRoleBaseOptions());
 
         return collect($roles)
             ->filter(fn ($definition): bool => is_array($definition))
@@ -428,6 +451,7 @@ class RoleRegistryService
             ->values()
             ->all();
     }
+
     private function hasSettingsTable(): bool
     {
         if ($this->tableAvailable !== null) {
@@ -435,7 +459,7 @@ class RoleRegistryService
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }

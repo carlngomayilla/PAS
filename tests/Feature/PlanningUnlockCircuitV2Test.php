@@ -10,8 +10,8 @@ use App\Models\PlanningUnlockRequest;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
-use App\Services\PlanningModificationLockService;
 use App\Services\PersonalTaskService;
+use App\Services\PlanningModificationLockService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -50,16 +50,21 @@ class PlanningUnlockCircuitV2Test extends TestCase
         $this->assertFalse($locks->isLocked($f['action']), 'L\'action est rouverte en écriture.');
     }
 
-    public function test_dg_cannot_decide_before_controller_transmission(): void
+    public function test_dg_can_decide_before_controller_transmission(): void
     {
         $f = $this->fixture();
         $locks = app(PlanningModificationLockService::class);
 
         $req = $locks->requestUnlock($f['action'], $f['chef'], 'Motif valable.');
 
-        // Le DG tente de decider alors que le controleur n'a pas transmis -> 409.
-        $this->expectExceptionMessage('transmise par un controleur');
-        $locks->approve($req, $f['dg'], 'Trop tôt.');
+        $locks->approve($req, $f['dg'], 'Accord direct.');
+        $req->refresh();
+        $f['action']->refresh();
+
+        $this->assertSame(PlanningUnlockRequest::STATUS_APPROUVEE, $req->status);
+        $this->assertSame((int) $f['dg']->id, (int) $req->reviewed_by);
+        $this->assertNotNull($f['action']->modification_unlocked_at);
+
     }
 
     public function test_directeur_cannot_transmit_to_dg(): void
@@ -82,7 +87,7 @@ class PlanningUnlockCircuitV2Test extends TestCase
             ->get(route('workspace.planning-unlocks.index'))
             ->assertOk()
             ->assertSee('Demande #'.$req->id)
-            ->assertSee('Transmettre à la DG');
+            ->assertSee('Enregistrer la decision');
     }
 
     public function test_planning_control_chiefs_can_see_and_transmit_to_dg(): void
@@ -103,7 +108,7 @@ class PlanningUnlockCircuitV2Test extends TestCase
                 ->get(route('workspace.planning-unlocks.index'))
                 ->assertOk()
                 ->assertSee('Demande #'.$req->id)
-                ->assertSee('Transmettre à la DG');
+                ->assertSee('Enregistrer la decision');
 
             $this->actingAs($controller)
                 ->post(route('workspace.planning-unlocks.planif', $req), [
@@ -120,7 +125,33 @@ class PlanningUnlockCircuitV2Test extends TestCase
         }
     }
 
-    public function test_unlock_requests_move_between_controller_and_dg_personal_tasks(): void
+    public function test_planning_control_chiefs_can_decide_directly(): void
+    {
+        foreach ([User::ROLE_CHEF_PLANIFICATION, User::ROLE_CHEF_UNITE_SCIQ] as $index => $role) {
+            $f = $this->fixture('DECIDE'.$index);
+            $locks = app(PlanningModificationLockService::class);
+            $req = $locks->requestUnlock($f['action'], $f['chef'], 'Motif valable.');
+
+            $controller = User::factory()->create([
+                'role' => $role,
+                'is_active' => true,
+            ]);
+
+            $this->assertTrue($locks->isUnlockReviewer($controller));
+
+            $locks->approve($req, $controller, 'Accord controle principal.');
+            $req->refresh();
+            $f['action']->refresh();
+
+            $this->assertSame(PlanningUnlockRequest::STATUS_APPROUVEE, $req->status);
+            $this->assertSame(PlanningUnlockRequest::AVIS_FAVORABLE, $req->planif_avis);
+            $this->assertSame((int) $controller->id, (int) $req->planif_avis_by);
+            $this->assertSame((int) $controller->id, (int) $req->reviewed_by);
+            $this->assertNotNull($f['action']->modification_unlocked_at);
+        }
+    }
+
+    public function test_unlock_requests_are_visible_to_controller_and_dg_personal_tasks(): void
     {
         $f = $this->fixture('TASKS');
         $locks = app(PlanningModificationLockService::class);
@@ -137,12 +168,12 @@ class PlanningUnlockCircuitV2Test extends TestCase
         );
 
         $dgTasksBefore = collect($tasks->forUser($f['dg'])['items'] ?? []);
-        $this->assertFalse(
+        $this->assertTrue(
             $dgTasksBefore->contains(fn (array $task): bool => (string) ($task['type'] ?? '') === 'decision_modification_dg'),
-            'La DG ne doit pas recevoir la tache avant transmission controleur.'
+            'La DG doit recevoir la tache des la demande soumise.'
         );
 
-        $locks->recordPlanifAvis($req, $f['planif'], PlanningUnlockRequest::AVIS_FAVORABLE, 'Transmission DG.');
+        $locks->recordPlanifAvis($req, $f['planif'], PlanningUnlockRequest::AVIS_FAVORABLE, 'Avis controle.');
 
         $dgTasksAfter = collect($tasks->forUser($f['dg'])['items'] ?? []);
         $this->assertTrue(

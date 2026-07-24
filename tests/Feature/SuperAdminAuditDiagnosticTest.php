@@ -9,8 +9,8 @@ use Tests\TestCase;
 
 class SuperAdminAuditDiagnosticTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -108,9 +108,9 @@ class SuperAdminAuditDiagnosticTest extends TestCase
                 'date_to' => now()->toDateString(),
             ]))
             ->assertOk()
-            ->assertSee('Entrees filtrees')
-            ->assertSee('Actions sensibles')
-            ->assertSee('Date debut')
+            ->assertSee('Entrées filtrées')
+            ->assertSee('Sensibles')
+            ->assertSee('Date début')
             ->assertSee('Date fin');
     }
 
@@ -149,7 +149,9 @@ class SuperAdminAuditDiagnosticTest extends TestCase
             ->assertOk()
             ->assertSee('Interventions')
             ->assertSee('review_action_validate')
-            ->assertDontSee('profil_utilisateur');
+            ->assertViewHas('logs', function ($paginator): bool {
+                return $paginator->total() === 1
+                    && collect($paginator->items())->first()['action'] === 'review_action_validate';
+            });
     }
-
 }

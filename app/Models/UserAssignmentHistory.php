@@ -59,4 +59,34 @@ class UserAssignmentHistory extends Model
     {
         return $this->belongsTo(User::class, 'transfer_to_user_id');
     }
+
+    public function previousDirection(): BelongsTo
+    {
+        return $this->belongsTo(Direction::class, 'previous_direction_id');
+    }
+
+    public function newDirection(): BelongsTo
+    {
+        return $this->belongsTo(Direction::class, 'new_direction_id');
+    }
+
+    public function previousService(): BelongsTo
+    {
+        return $this->belongsTo(Service::class, 'previous_service_id');
+    }
+
+    public function newService(): BelongsTo
+    {
+        return $this->belongsTo(Service::class, 'new_service_id');
+    }
+
+    public function previousUniteDg(): BelongsTo
+    {
+        return $this->belongsTo(UniteDg::class, 'previous_unite_dg_id');
+    }
+
+    public function newUniteDg(): BelongsTo
+    {
+        return $this->belongsTo(UniteDg::class, 'new_unite_dg_id');
+    }
 }

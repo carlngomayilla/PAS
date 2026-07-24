@@ -302,15 +302,17 @@ Piloter la réalisation concrète des décisions de planification : assigner une
 2. **Évaluation chef de service** (`actions/{action}/review`, `ActionTrackingWebController::reviewClosure`) : note (`evaluation_note`), commentaire, transition `validee_chef` ou `rejetee_chef`.
 3. **Validation direction** (`actions/{action}/review-direction`, `reviewClosureByDirection`) : note, commentaire, transition `validee_direction` ou `rejetee_direction`. C'est la validation terminale métier.
 
-### 4.6 Étapes — sous-workflow 3 : financement (DAF ↔ DG)
+### 4.6 Étapes — sous-workflow 3 : financement (RMO → DAF → DG)
 
 Routes dédiées sous `/actions/{action}/financement/...` :
 
-1. **Action soumise avec financement requis** → `en_attente_daf`.
-2. **Examen DAF** (`actions.financement.daf`) : DAF peut requalifier en `en_cours_analyse`, `approuve` ou `rejete`. Action `daf/financements-actions` agrège la file DAF.
-3. **Mise à jour du statut financier par DAF** (`actions.financement.daf.status`).
-4. **Décision DG** (`actions.financement.dg`) : `finance` ou `non_finance`. Une action `finance` peut entrer en exécution ; une action `non_finance` ne peut plus engager de ressources.
-5. **Notifications** poussées à chaque transition vers les acteurs concernés via `WorkspaceNotificationService` et `AlertCenterService`.
+1. **Preparation dans le PTA** : le besoin et sa piece initiale placent le dossier en `pre_signale_daf`.
+2. **Soumission RMO** (`actions.financement.submit`) : confirmation de la source et de la note, puis passage a `soumis_daf`.
+3. **Examen DAF** (`actions.financement.daf`) : avis favorable vers `transmis_dg`, complement vers `complement_demande`, ou rejet motive vers `rejete_daf`.
+4. **Correction RMO** : complement ou rejet DAF autorisent une resoumission avec une nouvelle piece corrective.
+5. **Decision DG** (`actions.financement.dg`) : passage terminal a `valide_dg` ou `rejete_dg`.
+6. **Route historique neutralisee** : `actions.financement.daf.status` retourne `410` et ne peut plus produire un resultat DG.
+7. **Notifications, audit et taches** sont emis a chaque transition et diriges vers le prochain acteur.
 
 ### 4.7 Étapes — sous-workflow 4 : suivi opérationnel
 
@@ -456,6 +458,11 @@ Les dashboards sont rôle-aware : le `DashboardController` construit un agrégat
 - Les URLs de téléchargement d'exports asynchrones sont **signed** (anti-tampering) et **throttled** (`api-downloads`, 30 req/min) pour bloquer le scraping massif.
 - Les filtres reporting respectent le périmètre RBAC (`AccessScopeService`).
 - Les caches dashboard sont invalidés par `PlanningCacheObserver` à chaque modification de PAO/PTA/User et par `ActionObserver` à chaque modification d'action.
+- Un template reste en `draft` tant qu'il n'est pas publié. Ses affectations initiales sont inactives et non définies par défaut.
+- La publication verrouille le périmètre, crée un numéro de version unique, active les affectations cohérentes et remplace atomiquement le modèle et l'affectation par défaut du même périmètre.
+- La modification d'un template publié le replace en brouillon ; l'archivage et la restauration neutralisent les affectations jusqu'à une nouvelle publication.
+- Une affectation reprend obligatoirement `module`, `report_type` et `format` du template. Les doublons exacts et plusieurs défauts actifs sur un même périmètre sont interdits en service et par index unique en base.
+- `ExportTemplateResolver` filtre les modèles publiés et choisit en SQL le périmètre le plus précis : service, direction, profil, niveau, puis défaut.
 
 ### 6.5 Données et services impliqués
 
@@ -525,7 +532,10 @@ Maintenir le socle organisationnel et de sécurité : structures (directions, se
 ### 7.5 Sous-workflow 7c : unités DG
 
 - `unites_dg` (DGA, SCIQ, Cabinet, UCAS). Panneau `super-admin/unites-dg`.
-- Désignation du chef d'unité (`unites-dg.set-chef`) — service `ChefUniteSyncService` maintient la cohérence des rôles.
+- Désignation du chef d'unité (`unites-dg.set-chef`) — `ChefUniteSyncService` verrouille utilisateurs et unités dans une transaction, aligne `users.unite_dg_id` et garantit qu'un utilisateur ne dirige qu'une unité.
+- Le compte désigné doit être actif et déjà rattaché à l'unité ou porter le rôle de chef correspondant. Son rôle n'est jamais modifié implicitement.
+- Les créations, mises à jour et désactivations d'utilisateurs exécutent la synchronisation du chef avant le commit ; une erreur annule l'ensemble de l'opération.
+- Les simulations de fusion et de transfert utilisent des agrégations SQL et affichent les utilisateurs, PTA, actions et justificatifs concernés sans écriture métier.
 
 ### 7.6 Sous-workflow 7d : délégations
 
@@ -545,6 +555,15 @@ Maintenir le socle organisationnel et de sécurité : structures (directions, se
 
 - Nombre de délégations actives / expirées.
 - Couverture organisationnelle : % d'utilisateurs avec `direction_id` + `service_id` cohérents.
+
+### 7.9 Centre de commandement Super Administration
+
+- `SuperAdminOverviewService` consolide l'état plateforme, les brouillons, les décisions de gouvernance, les diagnostics, les snapshots, les templates et les opérations sensibles récentes.
+- `workspace.super-admin.index` expose quatre domaines d'accès : Plateforme, Gouvernance, Pilotage métier, Continuité et sorties. Chaque entrée mène à l'écran de gestion correspondant.
+- La file prioritaire remonte la maintenance active, les diagnostics en anomalie, les demandes de suppression, les brouillons, le risque de continuité et les templates non publiés.
+- Le rôle `super_admin` est non délégable : `RoleRegistryService` l'exclut des bases et duplications de rôles personnalisés, et `User` ne reconnaît les privilèges Super Admin que depuis le rôle canonique du compte.
+- Le mode maintenance exige une confirmation du mot de passe pour son activation ou sa désactivation. Son secret de contournement est aléatoire, renouvelé et jamais persisté dans les paramètres ou l'audit.
+- `PlatformSnapshotService` refuse toute restauration de groupe absent du snapshot, y compris lors d'un appel direct au service métier.
 
 ---
 
@@ -568,10 +587,13 @@ Maintenir le socle organisationnel et de sécurité : structures (directions, se
 
 **Mécanique.**
 - Modèle `DataArchive` (créé par `create_data_archives_table`) — entrepôt local des données archivées.
-- Page `workspace.retention.index` (lecture, configuration, exécution manuelle via `workspace.retention.run`).
-- Exécution périodique attendue (job ou commande artisan).
+- Modèle `RetentionRun` — registre persistant des simulations et exécutions web, console ou planificateur.
+- Page `workspace.retention.index` : candidats, politiques, exécutions, recherche et registre des archives.
+- Exécution manuelle via `workspace.retention.run`, protégée par `retention.manage` et par un verrou de concurrence par périmètre.
+- Export CSV filtré via `workspace.retention.export.csv` et téléchargement JSON masqué d'une archive via `workspace.retention.archives.download`.
+- Commandes `anbg:retention-run` et `anbg:planning-auto-archive`, enregistrées avec l'origine `console`.
 
-**Règles.** Le journal d'audit n'est jamais purgé ; seules les données opérationnelles peuvent être archivées selon la politique configurée.
+**Règles.** Le journal d'audit n'est jamais purgé ; seules les données opérationnelles peuvent être archivées selon la politique configurée. Une simulation ne modifie aucune donnée. Une exécution concurrente sur le même périmètre est refusée et tracée. Les secrets sont masqués dans les aperçus et téléchargements d'archives.
 
 ### 8.3 Notifications
 
@@ -623,13 +645,13 @@ Maintenir le socle organisationnel et de sécurité : structures (directions, se
 5. Validation PTA                    (Direction)
 6. Création des actions dans le PTA  (Service)
 7. Génération automatique des semaines
-8. Soumission de l'action            (Service → Chef Service → Direction)
+8. Soumission de l'action            (Agent → Chef de service → Contrôleur)
 9. Demande de financement (optionnel)(Service → DAF → DG)
 10. Exécution + saisie hebdomadaire  (Agent)
 11. Calcul automatique statuts/KPI   (ActionObserver + jobs)
 12. Alertes et escalade              (AlertCenterService + SendAlertDigestJob)
 13. Demande de clôture               (Agent)
-14. Revue chef de service + direction
+14. Visa chef de service + validation finale SCIQ / Planification
 15. Reporting consolidé              (Planification / DG)
 16. Audit immuable                   (transverse à chaque étape)
 ```
@@ -644,7 +666,7 @@ Maintenir le socle organisationnel et de sécurité : structures (directions, se
 | PAO | Direction, DG | idem PAS | descendant sur PTA | ✓ | `missing_pao_coverage` |
 | PTA | Service, Direction | idem PAS | descendant sur actions structurantes | ✓ | dérive des actions |
 | Action — exécution | Service, Agent | non_demarre→en_cours→termine/suspendu/annule (+ statut_dynamique) | sur PTA verrouillé | ✓ | `action_overdue`, `action_non_demarre` |
-| Action — validation hiérarchique | Service, Direction | non_soumise→soumise_chef→validee_chef→validee_direction (+ rejets) | — | ✓ | via `action_log` |
+| Action — validation hiérarchique | Agent, Chef de service, SCIQ / Planification | non_soumise→soumise_chef→validee_chef→soumise_controle→validee_controle (+ corrections/rejets) | — | ✓ | via `action_log` |
 | Action — financement | DAF, DG | non_requis · en_attente_daf · en_cours_analyse · approuve · rejete · finance · non_finance | — | ✓ | via `action_log` |
 | Alertes | Tous (par scope) | non lu / lu | — | lecture journalisée | — |
 | Pilotage / Reporting | DG, Cabinet, Planif. | — | — | — | — |

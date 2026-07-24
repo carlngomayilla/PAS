@@ -27,8 +27,7 @@ class DeletionRequestService
 {
     public function __construct(
         private readonly UserLifecycleService $userLifecycleService
-    ) {
-    }
+    ) {}
 
     public function canRequestUserDeletion(User $actor, User $target): bool
     {
@@ -159,6 +158,57 @@ class DeletionRequestService
         return $request;
     }
 
+    public function resubmitComplement(DeletionRequest $request, User $actor, string $complement): DeletionRequest
+    {
+        if ((int) $request->requested_by !== (int) $actor->id) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $complement = trim($complement);
+        if ($complement === '') {
+            throw ValidationException::withMessages([
+                'complement' => 'Le complément est obligatoire.',
+            ]);
+        }
+
+        $request = DB::transaction(function () use ($request, $actor, $complement): DeletionRequest {
+            $lockedRequest = DeletionRequest::query()
+                ->whereKey($request->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ((int) $lockedRequest->requested_by !== (int) $actor->id) {
+                abort(403, 'Acces non autorise.');
+            }
+
+            if ($lockedRequest->status !== DeletionRequest::STATUS_COMPLEMENT_REQUESTED) {
+                throw ValidationException::withMessages([
+                    'complement' => 'Cette demande n’attend plus de complément.',
+                ]);
+            }
+
+            $target = $this->resolveTarget($lockedRequest);
+            $reason = trim((string) $lockedRequest->reason);
+            $lockedRequest->forceFill([
+                'status' => DeletionRequest::STATUS_PENDING,
+                'reason' => $reason."\n\nComplément du demandeur : ".$complement,
+                'impact_summary' => $target instanceof Model
+                    ? $this->impactForEntity($target)
+                    : (array) ($lockedRequest->impact_summary ?? []),
+                'reviewed_by' => null,
+                'decision' => null,
+                'decided_at' => null,
+                'executed_at' => null,
+            ])->save();
+
+            return $lockedRequest->refresh();
+        });
+
+        $this->notifySuperAdmins($request, $actor);
+
+        return $request;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -166,12 +216,6 @@ class DeletionRequestService
     {
         if (! $actor->isSuperAdmin()) {
             abort(403, 'Acces non autorise.');
-        }
-
-        if (! $request->isPending()) {
-            throw ValidationException::withMessages([
-                'decision' => 'Cette demande a deja ete traitee.',
-            ]);
         }
 
         $note = trim($note);
@@ -182,6 +226,17 @@ class DeletionRequestService
         }
 
         return DB::transaction(function () use ($request, $actor, $decision, $note, $replacementId): array {
+            $request = DeletionRequest::query()
+                ->whereKey($request->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $request->isPending()) {
+                throw ValidationException::withMessages([
+                    'decision' => 'Cette demande a déjà été traitée.',
+                ]);
+            }
+
             $target = $this->resolveTarget($request);
             $impact = $target instanceof Model ? $this->impactForEntity($target) : (array) ($request->impact_summary ?? []);
             $execution = [
@@ -204,7 +259,7 @@ class DeletionRequestService
 
             if ($decision === DeletionRequest::DECISION_DELETE) {
                 if (! $target instanceof Model) {
-                    throw ValidationException::withMessages(['decision' => 'L element cible est introuvable.']);
+                    throw ValidationException::withMessages(['decision' => 'L element concerne est introuvable.']);
                 }
                 if ($target instanceof User && (int) $target->id === (int) $actor->id) {
                     throw ValidationException::withMessages(['decision' => 'Vous ne pouvez pas supprimer votre propre compte.']);
@@ -498,7 +553,7 @@ class DeletionRequestService
     }
 
     /**
-     * @param array<string, int> $linked
+     * @param  array<string, int>  $linked
      */
     private function blockingImpactTotal(Model $target, array $linked): int
     {
@@ -656,7 +711,7 @@ class DeletionRequestService
             'module' => 'super_admin',
             'entity_type' => 'deletion_request',
             'entity_id' => $request->id,
-            'url' => route('workspace.super-admin.organization.index').'#deletion-requests',
+            'url' => route('workspace.deletion-requests.index', ['status' => DeletionRequest::STATUS_PENDING]).'#request-'.$request->id,
             'icon' => 'shield-alert',
             'status' => 'warning',
             'priority' => 'high',
@@ -685,7 +740,7 @@ class DeletionRequestService
             'module' => 'referentiel',
             'entity_type' => 'deletion_request',
             'entity_id' => $request->id,
-            'url' => route('workspace.referentiel.utilisateurs.index'),
+            'url' => route('workspace.deletion-requests.index', ['status' => $request->status]).'#request-'.$request->id,
             'icon' => 'shield-check',
             'status' => in_array((string) $request->status, [DeletionRequest::STATUS_DELETED, DeletionRequest::STATUS_DISABLED], true) ? 'success' : 'info',
             'priority' => 'normal',

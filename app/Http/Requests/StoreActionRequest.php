@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use App\Models\Action;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
@@ -9,9 +10,7 @@ use App\Models\Pta;
 use App\Models\User;
 use App\Services\ActionManagementSettings;
 use App\Services\Actions\ActionIndicatorService;
-use App\Services\Actions\ActionTrackingService;
 use App\Services\DocumentPolicySettings;
-use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -215,7 +214,7 @@ class StoreActionRequest extends FormRequest
     }
 
     /**
-     * @param array<int|string, mixed> $subActions
+     * @param  array<int|string, mixed>  $subActions
      * @return array<int, array<string, mixed>>
      */
     private function normalizeSubActionsInput(array $subActions): array
@@ -269,7 +268,7 @@ class StoreActionRequest extends FormRequest
                 && (float) $indicatorThreshold > (float) $indicatorTarget) {
                 $validator->errors()->add(
                     'kpi_seuil_alerte',
-                    'Le seuil d alerte de l indicateur ne doit pas depasser sa cible.'
+                    'Le seuil d alerte de l indicateur ne doit pas depasser son niveau attendu.'
                 );
             }
 

@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Models\PlatformSetting;
 use App\Models\PlatformSettingSnapshot;
 use App\Models\User;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PlatformSnapshotService
 {
@@ -112,6 +112,20 @@ class PlatformSnapshotService
             ->filter()
             ->unique()
             ->values();
+        $availableGroups = collect($this->groupsForSnapshot($snapshot));
+        $unknownGroups = $selectedGroups->diff($availableGroups)->values();
+
+        if ($selectedGroups->isEmpty()) {
+            throw ValidationException::withMessages([
+                'groups' => 'Ce snapshot ne contient aucun groupe restaurable.',
+            ]);
+        }
+
+        if ($unknownGroups->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'groups' => 'Groupe(s) absent(s) du snapshot : '.$unknownGroups->implode(', ').'.',
+            ]);
+        }
 
         $rows = collect(is_array($snapshot->payload['settings'] ?? null) ? $snapshot->payload['settings'] : [])
             ->filter(function ($row) use ($selectedGroups): bool {

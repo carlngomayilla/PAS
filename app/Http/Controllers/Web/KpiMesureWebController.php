@@ -83,7 +83,7 @@ class KpiMesureWebController extends Controller
 
         if (in_array((string) $targetKpi->action?->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withInput()->withErrors([
-                'kpi_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
+                'kpi_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'lie', 'Mise a jour'),
             ]);
         }
 
@@ -146,5 +146,4 @@ class KpiMesureWebController extends Controller
             || $user->hasRole(User::ROLE_SERVICE)
             || $user->hasDelegatedPermission('planning_write');
     }
-
 }

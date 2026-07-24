@@ -5,6 +5,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\Web\ActionTrackingWebController;
 use App\Http\Controllers\Web\ActionWebController;
+use App\Http\Controllers\Web\AiImportController;
+use App\Http\Controllers\Web\AiImportReviewController;
 use App\Http\Controllers\Web\AiPtaImportController;
 use App\Http\Controllers\Web\AiPtaImportHistoryController;
 use App\Http\Controllers\Web\AiPtaImportPreviewController;
@@ -13,7 +15,9 @@ use App\Http\Controllers\Web\AiReportController;
 use App\Http\Controllers\Web\AiReportExportController;
 use App\Http\Controllers\Web\AiReportGenerationController;
 use App\Http\Controllers\Web\AiReportValidationController;
+use App\Http\Controllers\Web\AiUsageController;
 use App\Http\Controllers\Web\AuditWebController;
+use App\Http\Controllers\Web\DeadlineExtensionWebController;
 use App\Http\Controllers\Web\DependentSelectController;
 use App\Http\Controllers\Web\GlobalSearchWebController;
 use App\Http\Controllers\Web\GovernanceWebController;
@@ -24,6 +28,7 @@ use App\Http\Controllers\Web\NotificationWebController;
 use App\Http\Controllers\Web\PaoWebController;
 use App\Http\Controllers\Web\PasWebController;
 use App\Http\Controllers\Web\PersonalTaskWebController;
+use App\Http\Controllers\Web\PilotageHierarchyController;
 use App\Http\Controllers\Web\PlanningImportWebController;
 use App\Http\Controllers\Web\PlanningUnlockWebController;
 use App\Http\Controllers\Web\ProfileWebController;
@@ -95,6 +100,12 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('pta.suivi.export.excel');
         Route::get('/pta/suivi/export/pdf', [PtaSuiviWebController::class, 'exportPdf'])
             ->name('pta.suivi.export.pdf');
+        Route::patch('/pta/suivi/{action}', [PtaSuiviWebController::class, 'update'])
+            ->whereNumber('action')
+            ->name('pta.suivi.actions.update');
+        Route::delete('/pta/suivi/{action}', [PtaSuiviWebController::class, 'destroy'])
+            ->whereNumber('action')
+            ->name('pta.suivi.actions.destroy');
         Route::get('/pta/suivi/{action}/details', [PtaSuiviWebController::class, 'details'])
             ->whereNumber('action')
             ->name('pta.suivi.details');
@@ -129,6 +140,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         // Gestion des structures organisationnelles accessibles aux administrateurs.
         Route::get('/workspace/referentiel/directions', [ReferentielWebController::class, 'directionsIndex'])
             ->name('workspace.referentiel.directions.index');
+        Route::get('/workspace/referentiel/directions/export.csv', [ReferentielWebController::class, 'directionsExport'])
+            ->name('workspace.referentiel.directions.export.csv');
         Route::get('/workspace/referentiel/directions/create', [ReferentielWebController::class, 'directionsCreate'])
             ->name('workspace.referentiel.directions.create');
         Route::post('/workspace/referentiel/directions', [ReferentielWebController::class, 'directionsStore'])
@@ -142,6 +155,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
 
         Route::get('/workspace/referentiel/services', [ReferentielWebController::class, 'servicesIndex'])
             ->name('workspace.referentiel.services.index');
+        Route::get('/workspace/referentiel/services/export.csv', [ReferentielWebController::class, 'servicesExport'])
+            ->name('workspace.referentiel.services.export.csv');
         Route::get('/workspace/referentiel/services/create', [ReferentielWebController::class, 'servicesCreate'])
             ->name('workspace.referentiel.services.create');
         Route::post('/workspace/referentiel/services', [ReferentielWebController::class, 'servicesStore'])
@@ -155,6 +170,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
 
         Route::get('/workspace/referentiel/utilisateurs', [ReferentielWebController::class, 'utilisateursIndex'])
             ->name('workspace.referentiel.utilisateurs.index');
+        Route::get('/workspace/referentiel/utilisateurs/export.csv', [ReferentielWebController::class, 'utilisateursExport'])
+            ->name('workspace.referentiel.utilisateurs.export.csv');
         Route::get('/workspace/referentiel/utilisateurs/create', [ReferentielWebController::class, 'utilisateursCreate'])
             ->name('workspace.referentiel.utilisateurs.create');
         Route::post('/workspace/referentiel/utilisateurs', [ReferentielWebController::class, 'utilisateursStore'])
@@ -179,6 +196,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.api-docs.spec');
         Route::get('/workspace/retention', [GovernanceWebController::class, 'retentionIndex'])
             ->name('workspace.retention.index');
+        Route::get('/workspace/retention/export.csv', [GovernanceWebController::class, 'retentionExportCsv'])
+            ->name('workspace.retention.export.csv');
+        Route::get('/workspace/retention/archives/{dataArchive}/download', [GovernanceWebController::class, 'retentionArchiveDownload'])
+            ->name('workspace.retention.archives.download');
         Route::post('/workspace/retention/run', [GovernanceWebController::class, 'retentionRun'])
             ->name('workspace.retention.run');
         Route::get('/workspace/referentiel/delegations', [GovernanceWebController::class, 'delegationsIndex'])
@@ -189,6 +210,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.delegations.store');
         Route::post('/workspace/referentiel/delegations/{delegation}/cancel', [GovernanceWebController::class, 'delegationsCancel'])
             ->name('workspace.delegations.cancel');
+        Route::get('/workspace/referentiel/demandes-suppression', [GovernanceWebController::class, 'deletionRequestsIndex'])
+            ->name('workspace.deletion-requests.index');
+        Route::post('/workspace/referentiel/demandes-suppression/{deletionRequest}/complement', [GovernanceWebController::class, 'deletionRequestComplementStore'])
+            ->name('workspace.deletion-requests.complement.store');
 
         // ── WORKSPACE PRINCIPAL ────────────────────────────────────────────────────
         // Contient tous les modules métier : PAS, PAO, PTA, Actions, KPI, Messagerie...
@@ -214,6 +239,15 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::delete('imports-excel/{import}', [PlanningImportWebController::class, 'destroy'])->name('imports.destroy');
 
             Route::prefix('ai-imports')->name('ai-imports.')->group(function (): void {
+                Route::get('/', [AiImportController::class, 'index'])->name('index');
+                Route::post('/upload', [AiImportController::class, 'store'])->name('upload');
+                Route::post('/{session}/analyze', [AiImportController::class, 'analyze'])->whereNumber('session')->name('analyze');
+                Route::get('/{session}/review', [AiImportReviewController::class, 'show'])->whereNumber('session')->name('review');
+                Route::patch('/{session}/rows/{row}', [AiImportReviewController::class, 'updateRow'])->whereNumber(['session', 'row'])->name('rows.update');
+                Route::post('/{session}/validate', [AiImportReviewController::class, 'validateSession'])->whereNumber('session')->name('validate');
+                Route::post('/{session}/import', [AiImportReviewController::class, 'executeImport'])->whereNumber('session')->name('import');
+                Route::get('/{session}/excel', [AiImportController::class, 'downloadExcel'])->whereNumber('session')->name('excel');
+
                 Route::get('/pta', [AiPtaImportController::class, 'index'])->name('pta.index');
                 Route::post('/pta/upload', [AiPtaImportController::class, 'upload'])->name('pta.upload');
                 Route::post('/pta/{batch}/analyze', [AiPtaImportController::class, 'analyze'])->name('pta.analyze');
@@ -237,6 +271,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 Route::get('/{report}/export/excel', [AiReportExportController::class, 'excel'])->name('export.excel');
             });
 
+            Route::get('ai-usage', [AiUsageController::class, 'index'])->name('ai-usage.index');
+
             Route::get('demandes-deverrouillage', [PlanningUnlockWebController::class, 'index'])
                 ->name('planning-unlocks.index');
 
@@ -247,7 +283,6 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             // des stubs no-op retournant une erreur. Le cycle reel est actif →
             // cloture → archive via cloturer/archiver.
             Route::resource('pas', PasWebController::class)
-                ->except(['show'])
                 ->parameters(['pas' => 'pas']);
             Route::post('pas/{pas}/cloturer', [PasWebController::class, 'close'])->name('pas.close');
             Route::post('pas/{pas}/archiver', [PasWebController::class, 'archive'])->name('pas.archive');
@@ -258,7 +293,6 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             // Déclinaison annuelle du PAS par direction, avec objectifs opérationnels.
             // Routes legacy (submit/approve/lock/reopen) SUPPRIMEES (2026-05-29).
             Route::resource('pao', PaoWebController::class)
-                ->except(['show'])
                 ->parameters(['pao' => 'pao']);
             Route::post('pao/{pao}/cloturer', [PaoWebController::class, 'close'])->name('pao.close');
             Route::post('pao/{pao}/archiver', [PaoWebController::class, 'archive'])->name('pao.archive');
@@ -267,7 +301,6 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             // Organisation des actions d'un service pour l'année, rattaché à un PAO.
             // Routes legacy (submit/approve/lock/reopen) SUPPRIMEES (2026-05-29).
             Route::resource('pta', PtaWebController::class)
-                ->except(['show'])
                 ->parameters(['pta' => 'pta']);
             Route::post('pta/{pta}/cloturer', [PtaWebController::class, 'close'])->name('pta.close');
             Route::post('pta/{pta}/archiver', [PtaWebController::class, 'archive'])->name('pta.archive');
@@ -366,9 +399,15 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             // Validation chef (action simple ou sous-action via sous_action_id).
             Route::post('actions/{action}/review', [ActionTrackingWebController::class, 'reviewItem'])
                 ->name('actions.review');
+            Route::post('actions/{action}/controle', [ActionTrackingWebController::class, 'reviewControl'])
+                ->name('actions.control.review');
+            Route::post('actions/{action}/financement/soumettre', [ActionTrackingWebController::class, 'submitFinancing'])
+                ->name('actions.financement.submit');
             Route::post('actions/{action}/financement/daf', [ActionTrackingWebController::class, 'reviewFinancingByDaf'])
                 ->name('actions.financement.daf');
-            Route::post('actions/{action}/financement/daf/statut', [ActionTrackingWebController::class, 'updateFinancingStatusByDaf'])
+            Route::any('actions/{action}/financement/daf/statut', static function () {
+                abort(410, 'La mise a jour directe du statut financier est supprimee : utilisez le circuit RMO, DAF puis DG.');
+            })
                 ->name('actions.financement.daf.status');
             Route::post('actions/{action}/financement/dg', [ActionTrackingWebController::class, 'reviewFinancingByDg'])
                 ->name('actions.financement.dg');
@@ -395,15 +434,31 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             Route::any('actions/{action}/anomalies/{log}/resolve', static function () {
                 abort(410, 'Workflow de gestion d\'anomalies supprime (refonte en cours).');
             })->name('actions.anomalies.resolve');
-            Route::any('actions/{action}/reports-echeance', static function () {
-                abort(410, 'Workflow de report d\'echeance supprime (refonte en cours).');
-            })->name('actions.deadline-extension.store');
-            Route::any('reports-echeance/{deadlineExtensionRequest}/sciq', static function () {
-                abort(410, 'Workflow de report d\'echeance SCIQ supprime (refonte en cours).');
-            })->name('deadline-extension.sciq');
-            Route::any('reports-echeance/{deadlineExtensionRequest}/dg', static function () {
-                abort(410, 'Workflow de report d\'echeance DG supprime (refonte en cours).');
-            })->name('deadline-extension.dg');
+            Route::post('actions/{action}/reports-echeance', [DeadlineExtensionWebController::class, 'store'])
+                ->name('actions.deadline-extension.store');
+            Route::get('reports-echeance', [DeadlineExtensionWebController::class, 'index'])
+                ->name('deadline-extension.index');
+            Route::get('reports-echeance/{deadlineExtensionRequest}', [DeadlineExtensionWebController::class, 'show'])
+                ->name('deadline-extension.show');
+            Route::get('reports-echeance/{deadlineExtensionRequest}/piece', [DeadlineExtensionWebController::class, 'downloadAttachment'])
+                ->name('deadline-extension.attachment');
+            Route::get('reports-echeance/{deadlineExtensionRequest}/piece/revisions/{revision}', [DeadlineExtensionWebController::class, 'downloadRevisionAttachment'])
+                ->whereNumber('revision')
+                ->name('deadline-extension.attachment.revision');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/completer', [DeadlineExtensionWebController::class, 'resubmit'])
+                ->name('deadline-extension.resubmit');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/chef', [DeadlineExtensionWebController::class, 'reviewByChef'])
+                ->name('deadline-extension.chef');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/controle', [DeadlineExtensionWebController::class, 'reviewByController'])
+                ->name('deadline-extension.controller');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/final', [DeadlineExtensionWebController::class, 'reviewFinal'])
+                ->name('deadline-extension.final');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/appliquer', [DeadlineExtensionWebController::class, 'apply'])
+                ->name('deadline-extension.apply');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/sciq', [DeadlineExtensionWebController::class, 'reviewByController'])
+                ->name('deadline-extension.sciq');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/dg', [DeadlineExtensionWebController::class, 'reviewFinal'])
+                ->name('deadline-extension.dg');
             Route::any('actions/{action}/semaines/{week}/soumettre', static function () {
                 abort(410, 'Le suivi hebdomadaire a ete supprime du circuit metier.');
             })->name('actions.weeks.submit');
@@ -427,7 +482,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             // d exports meme avec une URL signed valide.
             ->middleware(['signed', 'throttle:api-downloads'])
             ->name('workspace.reporting.exports.download');
-        Route::redirect('/workspace/pilotage', '/dashboard');
+        Route::get('/workspace/pilotage', PilotageHierarchyController::class)
+            ->name('workspace.pilotage');
         Route::get('/workspace/alertes', [MonitoringWebController::class, 'alertes'])
             ->name('workspace.alertes');
         Route::get('/workspace/alertes/dropdown', [MonitoringWebController::class, 'alertesDropdown'])
@@ -454,6 +510,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
         // Historique de toutes les actions sensibles réalisées dans l'application.
         Route::get('/workspace/audit', [AuditWebController::class, 'index'])
             ->name('workspace.audit.index');
+        Route::get('/workspace/audit/export.csv', [AuditWebController::class, 'exportCsv'])
+            ->name('workspace.audit.export.csv');
 
         // ── SUPER ADMINISTRATION ───────────────────────────────────────────────────
         // Configuration avancée réservée aux super-admins : paramètres système,

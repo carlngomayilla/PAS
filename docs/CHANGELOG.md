@@ -7,6 +7,113 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-07-22 - Navigation compacte et suivi PTA lisible
+
+### Changement
+
+- **Navigation** : la barre latérale de bureau devient un rail compact qui s'ouvre au survol ou au focus, sans commande de repli persistante ; le retour de la barre haute reste discret et devient bleu au survol.
+- **Tableaux de bord** : retrait de la vue synthétique hiérarchique PAS redondante ; la carte Contrôle et suivi-évaluation expose désormais l'avancement global des actions visibles.
+- **Graphiques** : remplacement des intitulés de démonstration et des camemberts dupliqués par cinq lectures métier explicites, avec variable, unité, fréquence, axes chiffrés, légendes et infobulles.
+- **Suivi PTA** : la cellule Indicateur de mesure affiche clairement son état et son accès Paramétrer ou Modifier ; les champs restent accessibles uniquement aux profils de planification et de contrôle autorisés.
+
+### Validation
+
+- Tests fonctionnels ciblés du tableau de bord, de la navigation et du suivi PTA.
+- Cache Blade, build Vite et contrôle visuel Playwright desktop/mobile.
+
+---
+
+## 2026-07-22 - Simulations, unités DG et registre des modèles d'export
+
+### Changement
+
+- **Simulation Actions** : circuit cible verrouillé `Agent -> Chef de service -> Contrôleur`, validation serveur contre la falsification, vrais KPI délai/performance/global et exclusion des actions suspendues, annulées, achevées ou déjà validées du calcul des clôtures potentielles.
+- **Interface de simulation** : vue administrative enrichie avec comparaison actuel/simulé, population ouverte et terminale, impacts de clôture, vigilances, aperçu des dashboards et sorties publiées.
+- **Chefs d'unité** : désignation et synchronisation utilisateur/unité dans une transaction avec verrouillage, refus des comptes inactifs ou incompatibles, déplacement propre d'une unité à l'autre et unicité d'une direction d'unité par utilisateur.
+- **Simulations d'organisation** : correction du contrat de données entre service et vue ; les volumes utilisateurs, PTA, actions et justificatifs sont désormais affichés, avec agrégations SQL sans chargement complet des identifiants.
+- **Modèles d'export** : brouillons et affectations inactifs jusqu'à publication, édition d'un publié ramenée en brouillon, publication/version/défaut atomiques, archivage et restauration neutralisant les anciennes affectations.
+- **Affectations d'export** : identité module/type/format héritée du modèle, rejet des doublons, contrôle direction/service, activation limitée aux modèles publiés et remplacement transactionnel du défaut sur un même périmètre.
+- **Responsive des affectations** : la fiche d'un modèle bascule son tableau d'affectations en cartes lisibles sur mobile, sans débordement horizontal ni commande verticale.
+- **Intégrité en base** : index uniques sur le chef d'unité, le modèle publié par défaut, l'affectation exacte et l'affectation active par défaut ; sélection de l'affectation d'export la plus précise directement en SQL.
+
+### Validation
+
+- `php artisan test --compact tests/Feature/SuperAdminSimulationTest.php`
+- `php artisan test --compact tests/Feature/SuperAdminUniteChiefGovernanceTest.php`
+- `php artisan test --compact tests/Feature/SuperAdminExportTemplateGovernanceTest.php`
+- `php artisan test --compact tests/Feature/OrganizationGovernanceSimulationTest.php`
+- Tests ciblés `SuperAdminWebTest`, `SuperAdminOrgCrudTest`, `SuperAdminOrgUsersTest` et `PlanningControlChiefUserManagementTest`.
+- `vendor/bin/pint --dirty --format agent`
+- `php artisan view:cache`
+- `npm run build`
+- Contrôle Playwright desktop/mobile des écrans Simulation, Unités DG, Organisation et Modèles d'export ; largeur mobile vérifiée à `390px` sans débordement.
+
+---
+
+## 2026-07-21 - Centre de commandement Super Administration
+
+### Changement
+
+- **Pilotage exécutif** : remplacement de l'ancien catalogue de cartes par un centre de commandement compact avec état de la plateforme, utilisateurs actifs, sessions, modules, diagnostics et décisions ouvertes.
+- **Priorités actionnables** : remontée des demandes de suppression, brouillons de configuration, alertes de diagnostic, snapshots absents ou anciens et templates non publiés avec accès direct à leur traitement.
+- **Navigation administrative** : regroupement des réglages en quatre domaines cliquables : Plateforme, Gouvernance, Pilotage métier, Continuité et sorties.
+- **Traçabilité** : activité des sept derniers jours et dernières opérations sensibles Super Admin, templates et rétention visibles sur l'accueil.
+- **Maintenance sécurisée** : confirmation du mot de passe courant, secret d'accès aléatoire renouvelé à chaque activation et exclusion de ce secret des paramètres persistés et du journal d'audit.
+- **Snapshots sécurisés** : une restauration partielle ne peut cibler que les groupes réellement présents dans le snapshot ; la règle est appliquée dans la requête et le service métier.
+- **Privilèges protégés** : le rôle Super Admin ne peut plus servir de base ni de source à un rôle personnalisé ; seul le rôle canonique `super_admin` accorde ces privilèges.
+- **Cohérence** : invalidation du cache d'introspection après modification des réglages et retrait du diagnostic obsolète relatif au suivi hebdomadaire supprimé.
+
+### Validation
+
+- `php artisan test --compact tests/Feature/SuperAdminOverviewTest.php tests/Feature/SuperAdminSecurityHardeningTest.php`
+- `php artisan test --compact tests/Feature/SuperAdminConfigurationSnapshotsTest.php tests/Feature/SuperAdminPlatformConfigurationTest.php tests/Feature/SuperAdminRolePermissionsTest.php tests/Feature/UserHasRoleCustomRoleTest.php tests/Feature/SuperAdminWebTest.php tests/Feature/SuperAdminAuditDiagnosticTest.php`
+- `vendor/bin/pint --dirty --format agent`
+- `php artisan view:cache`
+- `npm run build`
+
+---
+
+## 2026-07-21 - Poste de contrôle de la rétention
+
+### Changement
+
+- **Registre des exécutions** : chaque simulation ou archivage conserve son périmètre, son mode, son origine, son opérateur, ses volumes, son statut, sa durée et son éventuelle erreur.
+- **Concurrence** : un verrou atomique interdit deux exécutions simultanées sur le même périmètre de rétention.
+- **Traçabilité** : les exécutions web et console sont enregistrées dans `retention_runs` et remontent dans le journal d'audit comme opérations sensibles.
+- **Registre des archives** : recherche, filtres par source, lot, opérateur et période, pagination, export CSV et téléchargement JSON individuel.
+- **Protection** : les secrets présents dans les charges archivées sont masqués dans l'interface et les téléchargements ; les cellules CSV sont neutralisées contre l'injection de formules.
+- **Performance** : traitement paresseux des candidats et ajout d'index sur la source, le lot et l'opérateur des archives.
+- **Interface** : refonte de la page Rétention en poste de contrôle administratif responsive et compatible avec le mode sombre.
+
+### Validation
+
+- `php artisan test --compact tests/Feature/RetentionWorkspaceTest.php tests/Feature/AuditWorkspaceTest.php tests/Feature/PlanningAutoArchiveWorkflowTest.php tests/Feature/GovernanceWebTest.php`
+- `vendor/bin/pint --dirty --format agent`
+- `php artisan view:cache`
+- `npm run build`
+
+---
+
+## 2026-07-21 - Centre de gouvernance des délégations et suppressions
+
+### Changement
+
+- **Délégations** : registre filtrable, statuts calculés (active, planifiée, échue, annulée), formulaire contextualisé et annulation motivée.
+- **Intégrité** : création et annulation transactionnelles, verrouillage du bénéficiaire, rejet des périodes qui se chevauchent sur un même périmètre et refus des doubles annulations.
+- **Demandes de suppression** : file dédiée avec filtres, analyse d'impact, décisions super-admin et historique personnel cloisonné pour les demandeurs.
+- **Boucle de correction** : réponse à une demande de complément, recalcul de l'impact, retour en instruction, notification et audit.
+- **Affectations** : affichage des mouvements récents de rôle et de périmètre dans la vue super-admin.
+- **Raccordement** : notifications et tâches personnelles pointent désormais vers la nouvelle file de gouvernance.
+
+### Validation
+
+- `php artisan test --compact tests/Feature/GovernanceWebTest.php tests/Feature/GovernanceQueueWebTest.php tests/Feature/DeletionRequestWorkflowTest.php tests/Feature/BusinessDeletionRequestWorkflowTest.php`
+- `vendor/bin/pint --dirty --format agent`
+- `php artisan view:cache`
+- `npm run build`
+
+---
+
 ## 2026-06-29 - Redaction intelligente des paragraphes PTA
 
 ### Demande

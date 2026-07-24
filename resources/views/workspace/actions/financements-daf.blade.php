@@ -4,17 +4,53 @@
     @php
         $filters = is_array($filters ?? null) ? $filters : [];
         $statusOptions = is_array($financingStatusOptions ?? null) ? $financingStatusOptions : \App\Models\Action::financingStatusOptions();
+        $summary = is_array($queueSummary ?? null) ? $queueSummary : [];
     @endphp
 
     <div class="app-screen-flow">
         <section class="showcase-hero mb-4 app-screen-block">
             <div class="showcase-hero-body">
                 <div>
-                    <span class="showcase-eyebrow">DAF</span>
-                    <h1 class="showcase-title">Demandes de financement des actions</h1>
+                    <span class="showcase-eyebrow">{{ $financeWorkspaceRole ?? 'Circuit financier' }}</span>
+                    <h1 class="showcase-title">Pilotage des financements</h1>
                 </div>
                 <div class="showcase-action-row">
                     <a class="btn btn-secondary" href="{{ route('workspace.actions.index') }}">Retour actions</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-4 border-y border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/70" aria-label="Synthese du portefeuille financier">
+            <div class="grid grid-cols-2 divide-x divide-y divide-slate-200 md:grid-cols-4 xl:grid-cols-7 dark:divide-slate-700">
+                <div class="min-w-0 px-4 py-3">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Dossiers</p>
+                    <p class="mt-1 text-xl font-bold text-slate-950 dark:text-white">{{ number_format((int) ($summary['total'] ?? 0), 0, ',', ' ') }}</p>
+                </div>
+                <div class="min-w-0 px-4 py-3">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Chez le RMO</p>
+                    <p class="mt-1 text-xl font-bold text-amber-700 dark:text-amber-300">{{ number_format((int) ($summary['preparation'] ?? 0), 0, ',', ' ') }}</p>
+                </div>
+                <div class="min-w-0 px-4 py-3">
+                    <p class="text-xs font-semibold uppercase text-slate-500">A instruire DAF</p>
+                    <p class="mt-1 text-xl font-bold text-sky-700 dark:text-sky-300">{{ number_format((int) ($summary['daf'] ?? 0), 0, ',', ' ') }}</p>
+                </div>
+                <div class="min-w-0 px-4 py-3">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Decision DG</p>
+                    <p class="mt-1 text-xl font-bold text-violet-700 dark:text-violet-300">{{ number_format((int) ($summary['dg'] ?? 0), 0, ',', ' ') }}</p>
+                </div>
+                <div class="min-w-0 px-4 py-3">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Accordes</p>
+                    <p class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-300">{{ number_format((int) ($summary['accordes'] ?? 0), 0, ',', ' ') }}</p>
+                </div>
+                <div class="min-w-0 px-4 py-3">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Refuses DG</p>
+                    <p class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-300">{{ number_format((int) ($summary['refuses'] ?? 0), 0, ',', ' ') }}</p>
+                </div>
+                <div class="col-span-2 min-w-0 px-4 py-3 md:col-span-2 xl:col-span-1">
+                    <p class="text-xs font-semibold uppercase text-slate-500">Montant sollicite</p>
+                    <p class="mt-1 truncate text-lg font-bold text-slate-950 dark:text-white" title="{{ number_format((float) ($summary['montant_estime'] ?? 0), 0, ',', ' ') }}">
+                        {{ number_format((float) ($summary['montant_estime'] ?? 0), 0, ',', ' ') }}
+                    </p>
                 </div>
             </div>
         </section>
@@ -89,7 +125,7 @@
 
         <section class="showcase-panel mb-4 app-screen-block">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 class="showcase-panel-title mb-0">Demandes transmises a la DAF</h2>
+                <h2 class="showcase-panel-title mb-0">Portefeuille financier des actions</h2>
                 <span class="anbg-badge anbg-badge-info px-3 py-1 text-xs">{{ $rows->total() }} demande(s)</span>
             </div>
 
@@ -121,6 +157,24 @@
                                 $rmoNames = $action->relationLoaded('responsables') && $action->responsables->isNotEmpty()
                                     ? $action->responsables->pluck('name')->implode(', ')
                                     : ($action->responsable?->name ?? '-');
+                                $canDafReview = ($canTreatDaf ?? false)
+                                    && $status === \App\Models\Action::FINANCEMENT_SOUMIS_DAF;
+                                $canDgReview = ($canTreatDg ?? false)
+                                    && in_array($status, [
+                                        \App\Models\Action::FINANCEMENT_TRANSMIS_DG,
+                                        \App\Models\Action::FINANCEMENT_VALIDE_DAF,
+                                    ], true);
+                                $statusTone = match ($status) {
+                                    \App\Models\Action::FINANCEMENT_PRE_SIGNALE_DAF,
+                                    \App\Models\Action::FINANCEMENT_COMPLEMENT_DEMANDE,
+                                    \App\Models\Action::FINANCEMENT_REJETE_DAF => 'anbg-badge-warning',
+                                    \App\Models\Action::FINANCEMENT_SOUMIS_DAF,
+                                    \App\Models\Action::FINANCEMENT_TRANSMIS_DG,
+                                    \App\Models\Action::FINANCEMENT_VALIDE_DAF => 'anbg-badge-info',
+                                    \App\Models\Action::FINANCEMENT_VALIDE_DG => 'anbg-badge-success',
+                                    \App\Models\Action::FINANCEMENT_REJETE_DG => 'anbg-badge-danger',
+                                    default => 'anbg-badge-neutral',
+                                };
                             @endphp
                             <tr>
                                 <td>
@@ -135,7 +189,7 @@
                                 <td>{{ $action->nature_financement ?: $action->description_financement ?: '-' }}</td>
                                 <td>{{ $action->source_financement ?: '-' }}</td>
                                 <td>{{ $action->commentaire_financement ?: '-' }}</td>
-                                <td><span class="anbg-badge anbg-badge-info px-2 py-1 text-xs">{{ $statusLabel }}</span></td>
+                                <td><span class="anbg-badge {{ $statusTone }} px-2 py-1 text-xs">{{ $statusLabel }}</span></td>
                                 <td>
                                     @if ($doc)
                                         <button
@@ -152,49 +206,13 @@
                                         -
                                     @endif
                                 </td>
-                                <td class="min-w-[280px]">
-                                    @if ($canTreatDaf)
-                                        <details>
-                                            <summary class="cursor-pointer font-semibold text-[#3996d3]">Traiter</summary>
-                                            <div class="mt-3 space-y-3">
-                                                <form method="POST" enctype="multipart/form-data" action="{{ route('workspace.actions.financement.daf', $action) }}">
-                                                    @csrf
-                                                    <input type="hidden" name="decision_financement" value="valider">
-                                                    <label>Montant valide</label>
-                                                    <input name="montant_valide" type="number" step="1" min="0" value="{{ $action->montant_estime !== null ? (int) round((float) $action->montant_estime) : '' }}">
-                                                    <label>Reference financement</label>
-                                                    <input name="reference_financement" type="text" value="{{ $action->financement_reference }}">
-                                                    <label>Commentaire DAF</label>
-                                                    <textarea name="commentaire_financement">{{ $action->financement_daf_commentaire }}</textarea>
-                                                    <button class="btn btn-primary mt-2" type="submit">Approuver</button>
-                                                </form>
-
-                                                <form method="POST" action="{{ route('workspace.actions.financement.daf', $action) }}">
-                                                    @csrf
-                                                    <input type="hidden" name="decision_financement" value="rejeter">
-                                                    <label>Motif DAF</label>
-                                                    <textarea name="commentaire_financement" required>{{ old('commentaire_financement') }}</textarea>
-                                                    <button class="btn btn-danger mt-2" type="submit">Rejeter</button>
-                                                </form>
-
-                                                <form method="POST" action="{{ route('workspace.actions.financement.daf.status', $action) }}">
-                                                    @csrf
-                                                    <label>Statut de traitement financier</label>
-                                                    <select name="statut_financement" required>
-                                                        <option value="{{ \App\Models\Action::FINANCEMENT_EN_COURS_ANALYSE }}">En cours d'analyse</option>
-                                                        <option value="{{ \App\Models\Action::FINANCEMENT_FINANCE }}">Finance</option>
-                                                        <option value="{{ \App\Models\Action::FINANCEMENT_NON_FINANCE }}">Non finance</option>
-                                                    </select>
-                                                    <label>Montant valide</label>
-                                                    <input name="montant_valide" type="number" step="1" min="0" value="{{ ($action->financement_montant_valide ?: $action->montant_estime) !== null ? (int) round((float) ($action->financement_montant_valide ?: $action->montant_estime)) : '' }}">
-                                                    <label>Commentaire DAF</label>
-                                                    <textarea name="commentaire_financement">{{ $action->financement_daf_commentaire }}</textarea>
-                                                    <button class="btn btn-secondary mt-2" type="submit">Mettre à jour le statut</button>
-                                                </form>
-                                            </div>
-                                        </details>
+                                <td class="min-w-[180px]">
+                                    @if ($canDafReview)
+                                        <a class="btn btn-primary" href="{{ route('workspace.actions.suivi', $action) }}#action-financement">Instruire DAF</a>
+                                    @elseif ($canDgReview)
+                                        <a class="btn btn-primary" href="{{ route('workspace.actions.suivi', $action) }}#action-financement">Decision DG</a>
                                     @else
-                                        <a class="text-[#3996d3] font-semibold" href="{{ route('workspace.actions.suivi', $action) }}">Consulter</a>
+                                        <a class="btn btn-secondary" href="{{ route('workspace.actions.suivi', $action) }}#action-financement">Consulter</a>
                                     @endif
                                 </td>
                             </tr>

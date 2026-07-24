@@ -11,6 +11,8 @@ use App\Models\Kpi;
 use App\Models\KpiMesure;
 use App\Models\Pao;
 use App\Models\Pas;
+use App\Models\PasAxe;
+use App\Models\PasObjectif;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
@@ -21,6 +23,7 @@ use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Dashboard\DashboardPythonChartService;
 use App\Services\DashboardProfileSettings;
+use App\Services\DeadlineExtensionQueueService;
 use App\Services\ExerciceContext;
 use App\Services\PersonalTaskService;
 use App\Services\PtaSuiviService;
@@ -39,6 +42,8 @@ class DashboardController extends Controller
 {
     use AuthorizesPlanningScope;
 
+    public const DASHBOARD_CACHE_TTL_MINUTES = 60;
+
     private bool $dashboardDirectionResolved = false;
 
     private ?int $dashboardDirectionId = null;
@@ -46,6 +51,11 @@ class DashboardController extends Controller
     private bool $dashboardServiceResolved = false;
 
     private ?int $dashboardServiceId = null;
+
+    /**
+     * @var array<int, string>
+     */
+    private array $dashboardStatusCache = [];
 
     public function __construct(
         private readonly ActionCalculationSettings $actionCalculationSettings,
@@ -57,7 +67,8 @@ class DashboardController extends Controller
         private readonly ExerciceContext $exerciceContext,
         private readonly ActionStatusService $actionStatusService,
         private readonly PersonalTaskService $personalTaskService,
-        private readonly PtaSuiviService $ptaSuiviService
+        private readonly PtaSuiviService $ptaSuiviService,
+        private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService
     ) {}
 
     public function index(Request $request): View
@@ -77,6 +88,7 @@ class DashboardController extends Controller
 
         $view = $request->routeIs('admin.*') ? 'admin.dashboard' : 'dashboard';
         $payload = $this->dashboardPagePayload($user);
+        $payload['dashboardData']['deadline_extension_summary'] = $this->deadlineExtensionQueueService->summaryFor($user);
 
         return view($view, [
             'user' => $user,
@@ -115,7 +127,7 @@ class DashboardController extends Controller
 
         if ($key !== null) {
             try {
-                Cache::put($key, $payload, now()->addMinutes(5));
+                Cache::put($key, $payload, now()->addMinutes(self::DASHBOARD_CACHE_TTL_MINUTES));
             } catch (Throwable) {
                 // This cache only speeds up the dashboard; rendering can continue without it.
             }
@@ -164,6 +176,7 @@ class DashboardController extends Controller
                 'sousActions.justificatifs:id,sous_action_id,nom_original,description,ajoute_par,created_at',
                 'sousActions.justificatifs.ajoutePar:id,name',
                 'actionKpi:id,action_id,kpi_delai,kpi_performance,kpi_global,progression_reelle,progression_theorique',
+                'actionLogs:id,action_id,type_evenement',
             ])
             ->orderByDesc('date_echeance')
             ->get();
@@ -460,15 +473,7 @@ class DashboardController extends Controller
         $periodStart = $periodRange[0] ?? $this->dashboardPtaPeriodStart($actions);
         $periodEnd = $periodRange[1] ?? $this->dashboardPtaPeriodEnd($actions);
 
-        $axes = $actions
-            ->groupBy(fn (Action $action): string => $this->dashboardPtaAxisKey($action))
-            ->map(fn (Collection $rows): array => $this->dashboardPtaAnalysisRow($rows, $periodEnd) + [
-                'code' => $this->dashboardPtaAxisCode($rows->first()),
-                'libelle' => $this->dashboardPtaAxisLabel($rows->first()),
-            ])
-            ->sortBy('libelle')
-            ->values()
-            ->all();
+        $axes = $this->dashboardPtaAxisRows($user, $actions, $periodEnd);
 
         $services = $actions
             ->groupBy(fn (Action $action): string => $this->dashboardPtaServiceKey($action))
@@ -559,6 +564,46 @@ class DashboardController extends Controller
 
     /**
      * @param  Collection<int, Action>  $actions
+     * @return list<array<string, mixed>>
+     */
+    private function dashboardPtaAxisRows(User $user, Collection $actions, Carbon $periodEnd): array
+    {
+        $axisRows = $this->buildPasScopedQuery($user)
+            ->with(['axes' => fn ($query) => $query->orderBy('ordre')->orderBy('id')])
+            ->get()
+            ->flatMap(fn (Pas $pas): Collection => $pas->axes)
+            ->mapWithKeys(fn (PasAxe $axis): array => [
+                (string) $axis->id => $this->dashboardPtaEmptyAxisRow($axis, $periodEnd),
+            ]);
+
+        $actions
+            ->groupBy(fn (Action $action): string => $this->dashboardPtaAxisKey($action))
+            ->each(function (Collection $rows, string $key) use ($axisRows, $periodEnd): void {
+                $axisRows[$key] = $this->dashboardPtaAnalysisRow($rows, $periodEnd) + [
+                    'code' => $this->dashboardPtaAxisCode($rows->first()),
+                    'libelle' => $this->dashboardPtaAxisLabel($rows->first()),
+                ];
+            });
+
+        return $axisRows
+            ->sortBy(fn (array $row): string => ((string) ($row['code'] ?? '')).' '.((string) ($row['libelle'] ?? '')))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function dashboardPtaEmptyAxisRow(PasAxe $axis, Carbon $periodEnd): array
+    {
+        return $this->dashboardPtaAnalysisRow(collect(), $periodEnd) + [
+            'code' => (string) ($axis->code ?? ''),
+            'libelle' => (string) ($axis->libelle ?: 'Axe strategique sans libelle'),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
      * @return Collection<int, Action>
      */
     private function dashboardPtaDueActions(Collection $actions, Carbon $periodEnd): Collection
@@ -628,7 +673,7 @@ class DashboardController extends Controller
         }
 
         if ($lateOrUnrealized->count() > 5) {
-            $measures[] = 'Organiser une revue hebdomadaire des ecarts jusqu au retour au taux cible.';
+            $measures[] = 'Organiser une revue hebdomadaire des ecarts jusqu au retour au seuil attendu.';
         }
 
         return $measures;
@@ -845,6 +890,7 @@ class DashboardController extends Controller
             'plotly_figures',
             'direction_performance_rows',
             'decision_counts',
+            'decision_charts',
             'decision_service_rows',
             'decision_agent_rows',
             'decision_quarter_rows',
@@ -1509,9 +1555,16 @@ class DashboardController extends Controller
 
         if (in_array($validation, [
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
-            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
         ], true)) {
             return 'validation_controleur';
+        }
+
+        if (in_array($validation, [
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+        ], true)) {
+            return 'cloture';
         }
 
         if ($validation === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
@@ -1721,7 +1774,7 @@ class DashboardController extends Controller
         $statusCards = $this->buildStatusCards($actions);
         $officialStatusCards = $this->buildStatusCards($officialActions);
         $synthesisDecisionSummary = $this->buildSynthesisDecisionSummary($actions);
-        $synthesisHierarchy = $this->buildSynthesisHierarchy($actions);
+        $synthesisHierarchy = $this->buildSynthesisHierarchy($user, $actions);
         $alerts = $this->buildDashboardAlertRows($actions);
         $roleDashboard = $this->buildRoleDashboard($user, $actions, $validatedActions);
 
@@ -1748,6 +1801,18 @@ class DashboardController extends Controller
         $plotlyFigures = $this->dashboardPythonChartService->generate($agentPerformance);
         $operationalMonthly = $this->buildMonthlyScoreRows($actions, $currentYear, $avg, false, $qualityThreshold);
         $monthly = $this->buildMonthlyScoreRows($officialActions, $currentYear, $avg, true, $qualityThreshold);
+        $decisionCharts = $this->buildDecisionChartPayload(
+            $actions,
+            $decisionCounts,
+            $synthesisObjectiveRows,
+            $synthesisPaoRows,
+            $synthesisPtaRows,
+            $decisionPriorityRows,
+            $decisionQuarterRows,
+            $statusCards,
+            $monthly,
+            $qualityThreshold
+        );
 
         $actionRows = $actions
             ->sortByDesc(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0))
@@ -1919,6 +1984,7 @@ class DashboardController extends Controller
             'agent_performance' => $agentPerformance,
             'plotly_figures' => $plotlyFigures,
             'decision_counts' => $decisionCounts,
+            'decision_charts' => $decisionCharts,
             'decision_chain_rows' => $decisionChainRows,
             'decision_service_rows' => $decisionServiceRows,
             'decision_agent_rows' => $decisionAgentRows,
@@ -1962,6 +2028,7 @@ class DashboardController extends Controller
             'service' => $this->buildServiceRoleDashboard($actions),
             'direction' => $this->buildDirectionRoleDashboard($user, $actions, $validatedActions),
             'planification' => $this->buildPlanificationRoleDashboard($user, $actions, $validatedActions),
+            'suivi_evaluation' => $this->buildSuiviEvaluationRoleDashboard($user, $actions, $validatedActions),
             'dg' => $this->buildDgRoleDashboard($user, $actions, $validatedActions),
             'cabinet' => $this->buildCabinetRoleDashboard($user, $actions, $validatedActions),
             default => [
@@ -1984,16 +2051,18 @@ class DashboardController extends Controller
             return 'dg';
         }
 
-        if ($user->hasRole(User::ROLE_ADMIN_FONCTIONNEL, User::ROLE_PLANIFICATION)) {
+        if ($user->hasRole(User::ROLE_ADMIN_FONCTIONNEL)) {
             return 'planification';
         }
 
-        if ($user->isPlanningControlChief()) {
-            return 'planification';
+        if ($user->hasRole(User::ROLE_PLANIFICATION, User::ROLE_SCIQ, User::ROLE_SCIQ_SUIVI_GLOBAL)
+            || $user->isPlanningControlChief()
+        ) {
+            return 'suivi_evaluation';
         }
 
-        if ($user->hasRole(User::ROLE_AUDITEUR)) {
-            return 'global';
+        if ($user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE)) {
+            return 'suivi_evaluation';
         }
 
         if ($user->isAgent()) {
@@ -2023,12 +2092,7 @@ class DashboardController extends Controller
         if ($user->hasRole(
             User::ROLE_ADMIN,
             User::ROLE_ADMIN_FONCTIONNEL,
-            User::ROLE_PLANIFICATION,
-            User::ROLE_SCIQ,
-            User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_PLANIFICATION,
             User::ROLE_CHEF_UNITE,
-            User::ROLE_CHEF_UNITE_SCIQ,
             User::ROLE_CHEF_UNITE_DGA,
             User::ROLE_CHEF_UNITE_CABINET,
         )) {
@@ -2037,7 +2101,7 @@ class DashboardController extends Controller
 
         // Auditeur / invité — vue lecture seule globale
         if ($user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE)) {
-            return 'global';
+            return 'suivi_evaluation';
         }
 
         if ($user->isAgent() || $user->hasRole(User::ROLE_UCAS)) {
@@ -2076,7 +2140,19 @@ class DashboardController extends Controller
             'bg' => $bg,
             'badge' => $badge,
             'badge_tone' => $badgeTone,
+            'used' => $this->roleCardHasData($value),
         ];
+    }
+
+    private function roleCardHasData(string|int $value): bool
+    {
+        if (is_int($value)) {
+            return $value > 0;
+        }
+
+        $normalized = str_replace(',', '.', preg_replace('/[^0-9,.-]/', '', $value) ?? '');
+
+        return is_numeric($normalized) && (float) $normalized > 0;
     }
 
     /**
@@ -2197,8 +2273,8 @@ class DashboardController extends Controller
                 'url' => $this->actionIndexRoute(),
             ],
             [
-                'label' => 'Validees chef',
-                'value' => $actions->where('statut_validation', ActionTrackingService::VALIDATION_VALIDEE_CHEF)->count(),
+                'label' => 'Visees chef',
+                'value' => $actions->whereIn('statut_validation', [ActionTrackingService::VALIDATION_VALIDEE_CHEF, ActionTrackingService::VALIDATION_SOUMISE_CONTROLE])->count(),
                 'url' => $this->actionIndexRoute(),
             ],
         ];
@@ -2307,6 +2383,8 @@ class DashboardController extends Controller
             'actions_valides_service' => $actions
                 ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
                     ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                    ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                    ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                     ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
                 ], true))
                 ->count(),
@@ -2315,6 +2393,7 @@ class DashboardController extends Controller
             'alerts' => $actions->filter(fn (Action $action): bool => $this->isAlertAction($action))->count(),
             'completion_rate' => $this->completionRate($statusCounts['acheve'], $actions->count()),
             'delay_rate' => $this->completionRate(max(0, $actions->count() - $statusCounts['en_retard']), $actions->count()),
+            'global_progress' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2),
             'global_score' => round((float) $actions->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2),
             'directions_total' => collect($directionRows)->count(),
             'services_total' => $actions->pluck('pta.service_id')->filter()->unique()->count(),
@@ -2424,6 +2503,283 @@ class DashboardController extends Controller
 
     /**
      * @param  Collection<int, Action>  $actions
+     * @param  array<string, mixed>  $decisionCounts
+     * @param  list<array<string, mixed>>  $strategicObjectiveRows
+     * @param  list<array<string, mixed>>  $paoRows
+     * @param  list<array<string, mixed>>  $ptaRows
+     * @param  list<array<string, mixed>>  $priorityRows
+     * @param  list<array<string, mixed>>  $quarterRows
+     * @param  list<array<string, mixed>>  $statusCards
+     * @param  list<array<string, mixed>>  $monthlyRows
+     * @return array<string, mixed>
+     */
+    private function buildDecisionChartPayload(
+        Collection $actions,
+        array $decisionCounts,
+        array $strategicObjectiveRows,
+        array $paoRows,
+        array $ptaRows,
+        array $priorityRows,
+        array $quarterRows,
+        array $statusCards,
+        array $monthlyRows,
+        float $qualityThreshold
+    ): array {
+        $monthly = collect($monthlyRows)->values();
+        $labels = $monthly->pluck('label')->map(fn ($label): string => (string) $label)->values();
+        $planned = $monthly->pluck('progression_theorique')->map(fn ($value): float => round((float) $value, 2))->values();
+
+        if ($planned->filter(fn (float $value): bool => $value > 0.0)->isEmpty() && $labels->isNotEmpty()) {
+            $steps = max(1, $labels->count());
+            $planned = collect(range(1, $labels->count()))
+                ->map(fn (int $index): float => round(min(100, ($index / $steps) * 100), 2))
+                ->values();
+        }
+
+        $realized = $monthly->pluck('progression_reelle')->map(fn ($value): float => round((float) $value, 2))->values();
+        $axisRows = $this->buildDecisionAxisProgressRows($actions, $qualityThreshold);
+        $operationalObjectiveRows = $this->buildDecisionOperationalObjectiveRows($actions, $qualityThreshold);
+        $statusRows = collect($statusCards)
+            ->filter(fn (array $row): bool => (int) ($row['count'] ?? 0) > 0)
+            ->values();
+        $lastRealized = (float) ($realized->last() ?? 0);
+        $previousRealized = (float) ($realized->slice(-2, 1)->first() ?? $lastRealized);
+        $ptaExecutionRate = round((float) ($decisionCounts['taux_execution'] ?? 0), 2);
+
+        return [
+            'meta' => [
+                'period' => $this->exerciceContext->activeLabel(),
+                'filter' => $this->ptaSuiviService->periodLabel($this->selectedDashboardSynthesisPeriod()),
+                'quality_threshold' => $qualityThreshold,
+                'last_updated' => Carbon::now()->format('d/m/Y H:i'),
+            ],
+            'pas_evolution' => [
+                'title' => 'Evolution du PAS',
+                'labels' => $labels->all(),
+                'planned' => $planned->all(),
+                'realized' => $realized->all(),
+                'gap' => $planned->map(fn (float $value, int $index): float => round($value - (float) ($realized[$index] ?? 0), 2))->values()->all(),
+                'trend' => round($lastRealized - $previousRealized, 2),
+                'urls' => $monthly->pluck('url')->map(fn ($url): string => (string) $url)->values()->all(),
+            ],
+            'pas_global' => [
+                'title' => 'Taux global d execution du PAS',
+                'label' => 'PAS execute',
+                'value' => $ptaExecutionRate,
+                'axes_total' => (int) ($decisionCounts['axes_concernes'] ?? 0),
+                'axes_conformes' => collect($axisRows)->where('status', 'conforme')->count(),
+                'axes_vigilance' => collect($axisRows)->where('status', 'vigilance')->count(),
+                'axes_critiques' => collect($axisRows)->where('status', 'critique')->count(),
+                'url' => route('workspace.pas.index'),
+            ],
+            'axis_progress' => $this->decisionComparisonPayload('Progression par axe strategique', $axisRows, 'axe', 'progression'),
+            'strategic_objectives' => $this->decisionComparisonPayload(
+                'Avancement des objectifs strategiques',
+                collect($strategicObjectiveRows)->map(fn (array $row): array => [
+                    'label' => (string) ($row['objectif'] ?? 'Objectif strategique'),
+                    'value' => round((float) ($row['progression'] ?? $row['score'] ?? 0), 2),
+                    'meta' => ((int) ($row['actions_total'] ?? 0)).' actions | '.((int) ($row['retards'] ?? 0)).' retard(s)',
+                    'status' => $this->decisionProgressStatus((float) ($row['progression'] ?? 0), (int) ($row['retards'] ?? 0), $qualityThreshold),
+                ])->values()->all(),
+                'label',
+                'value'
+            ),
+            'operational_objectives' => $this->decisionComparisonPayload('Avancement des objectifs operationnels', $operationalObjectiveRows, 'objectif', 'progression'),
+            'pta_execution' => [
+                'title' => 'Taux d execution du PTA',
+                'label' => 'PTA execute',
+                'value' => $ptaExecutionRate,
+                'actions_total' => (int) ($decisionCounts['actions_total'] ?? 0),
+                'actions_done' => (int) ($decisionCounts['actions_terminees'] ?? 0),
+                'actions_late' => (int) ($decisionCounts['actions_en_retard'] ?? 0),
+                'actions_in_progress' => (int) ($decisionCounts['actions_en_cours'] ?? 0),
+                'url' => route('workspace.pta.index'),
+            ],
+            'pta_evolution' => [
+                'title' => 'Evolution trimestrielle du PTA',
+                'labels' => collect($quarterRows)->pluck('trimestre')->map(fn ($label): string => (string) $label)->values()->all(),
+                'planned' => collect($quarterRows)->pluck('actions_prevues')->map(fn ($value): int => (int) $value)->values()->all(),
+                'done' => collect($quarterRows)->pluck('terminees')->map(fn ($value): int => (int) $value)->values()->all(),
+                'late' => collect($quarterRows)->pluck('retard')->map(fn ($value): int => (int) $value)->values()->all(),
+                'rate' => collect($quarterRows)->pluck('taux_execution')->map(fn ($value): float => round((float) $value, 2))->values()->all(),
+            ],
+            'action_status' => [
+                'title' => 'Repartition des actions par statut',
+                'labels' => $statusRows->pluck('label')->map(fn ($label): string => (string) $label)->values()->all(),
+                'values' => $statusRows->pluck('count')->map(fn ($value): int => (int) $value)->values()->all(),
+                'colors' => $statusRows->pluck('color')->map(fn ($color): string => (string) $color)->values()->all(),
+                'urls' => $statusRows->pluck('href')->map(fn ($url): string => (string) $url)->values()->all(),
+            ],
+            'critical_actions' => [
+                'title' => 'Actions les plus critiques',
+                'labels' => collect($priorityRows)->take(8)->pluck('action')->map(fn ($label): string => (string) $label)->values()->all(),
+                'values' => collect($priorityRows)->take(8)->pluck('progression')->map(fn ($value): float => round((float) $value, 2))->values()->all(),
+                'meta' => collect($priorityRows)->take(8)->map(fn (array $row): string => trim(((string) ($row['service'] ?? '-')).' | '.((string) ($row['date_fin'] ?? '-'))))->values()->all(),
+                'urls' => collect($priorityRows)->take(8)->pluck('url')->map(fn ($url): string => (string) $url)->values()->all(),
+            ],
+            'sub_actions' => $this->buildDecisionSubActionPayload($actions),
+            'structure' => [
+                'title' => 'Chaine PAS / PAO / PTA',
+                'labels' => ['PAS', 'Axes', 'Objectifs strat.', 'Objectifs op.', 'PAO', 'PTA', 'Actions', 'Sous-actions'],
+                'values' => [
+                    (int) ($decisionCounts['pas_lies'] ?? 0),
+                    (int) ($decisionCounts['axes_concernes'] ?? 0),
+                    (int) ($decisionCounts['objectifs_strategiques_concernes'] ?? 0),
+                    (int) ($decisionCounts['objectifs_operationnels'] ?? 0),
+                    (int) ($decisionCounts['paos_lies'] ?? 0),
+                    (int) ($decisionCounts['ptas_lies'] ?? 0),
+                    (int) ($decisionCounts['actions_total'] ?? 0),
+                    (int) ($decisionCounts['sous_actions_total'] ?? 0),
+                ],
+            ],
+            'pao' => $this->decisionComparisonPayload(
+                'Avancement des PAO',
+                collect($paoRows)->map(fn (array $row): array => [
+                    'label' => (string) ($row['pao'] ?? 'PAO'),
+                    'value' => round((float) ($row['progression'] ?? $row['score'] ?? 0), 2),
+                    'meta' => ((int) ($row['actions_total'] ?? 0)).' actions | '.((int) ($row['retards'] ?? 0)).' retard(s)',
+                ])->values()->all(),
+                'label',
+                'value'
+            ),
+            'pta' => $this->decisionComparisonPayload(
+                'Avancement des PTA',
+                collect($ptaRows)->map(fn (array $row): array => [
+                    'label' => (string) ($row['pta'] ?? 'PTA'),
+                    'value' => round((float) ($row['progression'] ?? $row['score'] ?? 0), 2),
+                    'meta' => ((int) ($row['actions_total'] ?? 0)).' actions | '.((int) ($row['retards'] ?? 0)).' retard(s)',
+                ])->values()->all(),
+                'label',
+                'value'
+            ),
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return array<string, mixed>
+     */
+    private function decisionComparisonPayload(string $title, array $rows, string $labelKey, string $valueKey): array
+    {
+        $items = collect($rows)->take(10)->values();
+
+        return [
+            'title' => $title,
+            'labels' => $items->pluck($labelKey)->map(fn ($label): string => (string) $label)->values()->all(),
+            'values' => $items->pluck($valueKey)->map(fn ($value): float => round((float) $value, 2))->values()->all(),
+            'meta' => $items->pluck('meta')->map(fn ($value): string => (string) $value)->values()->all(),
+            'statuses' => $items->pluck('status')->map(fn ($value): string => (string) $value)->values()->all(),
+            'urls' => $items->pluck('url')->map(fn ($url): string => (string) $url)->values()->all(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return list<array<string, mixed>>
+     */
+    private function buildDecisionAxisProgressRows(Collection $actions, float $qualityThreshold): array
+    {
+        return $actions
+            ->groupBy(fn (Action $action): string => (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->id ?? 0))
+            ->map(function (Collection $rows) use ($qualityThreshold): array {
+                $first = $rows->first();
+                $axis = $first?->pta?->pao?->pasObjectif?->pasAxe;
+                $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
+                $progress = round((float) $rows->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2);
+                $axisId = (int) ($axis?->id ?? 0);
+
+                return [
+                    'axe' => trim(((string) ($axis?->code ?? '')).' - '.((string) ($axis?->libelle ?? 'Axe non renseigne')), ' -'),
+                    'progression' => $progress,
+                    'meta' => $rows->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count().' objectif(s) | '.$rows->count().' actions | '.$late.' retard(s)',
+                    'status' => $this->decisionProgressStatus($progress, $late, $qualityThreshold),
+                    'url' => $axisId > 0 ? $this->actionIndexRoute(['pas_axe_id' => $axisId]) : $this->actionIndexRoute(),
+                ];
+            })
+            ->sortByDesc('progression')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return list<array<string, mixed>>
+     */
+    private function buildDecisionOperationalObjectiveRows(Collection $actions, float $qualityThreshold): array
+    {
+        return $actions
+            ->groupBy(fn (Action $action): string => (string) ($action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id ?? 0))
+            ->map(function (Collection $rows) use ($qualityThreshold): array {
+                $first = $rows->first();
+                $objective = $first?->objectifOperationnel ?? $first?->pta?->objectifOperationnel;
+                $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
+                $withoutProof = $rows->filter(fn (Action $action): bool => $this->isCompletedAction($action) && $this->actionProofs($action)->isEmpty())->count();
+                $progress = round((float) $rows->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2);
+                $objectiveId = (int) ($objective?->id ?? 0);
+
+                return [
+                    'objectif' => (string) ($objective?->libelle ?: 'Objectif operationnel non renseigne'),
+                    'progression' => $progress,
+                    'meta' => $rows->count().' actions | '.$late.' retard(s) | '.$withoutProof.' sans preuve',
+                    'status' => $withoutProof > 0 ? 'vigilance' : $this->decisionProgressStatus($progress, $late, $qualityThreshold),
+                    'url' => $objectiveId > 0 ? $this->actionIndexRoute(['objectif_operationnel_id' => $objectiveId]) : $this->actionIndexRoute(),
+                ];
+            })
+            ->sortBy(function (array $row): float {
+                return ((float) ($row['progression'] ?? 0)) + ((string) ($row['status'] ?? '') === 'critique' ? -100 : 0);
+            })
+            ->values()
+            ->all();
+    }
+
+    private function decisionProgressStatus(float $progress, int $late, float $qualityThreshold): string
+    {
+        if ($progress <= 0.0) {
+            return 'non_renseigne';
+        }
+
+        if ($late > 0 || $progress < max(1.0, $qualityThreshold * 0.75)) {
+            return 'critique';
+        }
+
+        if ($progress < $qualityThreshold) {
+            return 'vigilance';
+        }
+
+        return 'conforme';
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return array<string, mixed>
+     */
+    private function buildDecisionSubActionPayload(Collection $actions): array
+    {
+        $rows = $actions
+            ->flatMap(fn (Action $action): Collection => $this->actionSubActions($action)
+                ->map(fn ($subAction): array => [
+                    'label' => (string) ($subAction->libelle ?? 'Sous-action'),
+                    'value' => (bool) ($subAction->est_effectuee ?? false)
+                        ? 100.0
+                        : round((float) ($subAction->taux_execution ?? $subAction->taux_realisation ?? 0), 2),
+                    'meta' => (string) ($subAction->agent?->name ?? $this->actionResponsibleLabel($action)),
+                    'url' => route('workspace.actions.suivi', $action),
+                ]))
+            ->sortBy('value')
+            ->take(10)
+            ->values();
+
+        return [
+            'title' => 'Avancement des sous-actions',
+            'labels' => $rows->pluck('label')->map(fn ($label): string => (string) $label)->values()->all(),
+            'values' => $rows->pluck('value')->map(fn ($value): float => round((float) $value, 2))->values()->all(),
+            'meta' => $rows->pluck('meta')->map(fn ($value): string => (string) $value)->values()->all(),
+            'urls' => $rows->pluck('url')->map(fn ($url): string => (string) $url)->values()->all(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildGlobalDirectionRows(Collection $actions, int $limit = 8): array
@@ -2521,6 +2877,7 @@ class DashboardController extends Controller
             ->filter(fn (Action $action): bool => in_array((string) ($action->statut_validation ?? ''), [
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
             ], true))
             ->sortBy(fn (Action $action): string => $action->soumise_le instanceof Carbon ? $action->soumise_le->toIso8601String() : '')
             ->map(function (Action $action): array {
@@ -2584,6 +2941,100 @@ class DashboardController extends Controller
                     'urls' => array_column($directionRows, 'url'),
                     'datasets' => [
                         ['label' => 'Exécution', 'color' => '#F26522', 'data' => array_column($directionRows, 'taux_execution')],
+                        ['label' => 'Validation', 'color' => '#0F5B66', 'data' => array_column($directionRows, 'taux_validation')],
+                        ['label' => 'Retards', 'color' => '#B42318', 'data' => array_column($directionRows, 'retards')],
+                    ],
+                ],
+            ],
+            'primary_rows' => $directionRows,
+            'secondary_rows' => $this->buildDirectionCriticalRows($actions, 8),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @param  Collection<int, Action>  $validatedActions
+     * @return array<string, mixed>
+     */
+    private function buildSuiviEvaluationRoleDashboard(User $user, Collection $actions, Collection $validatedActions): array
+    {
+        $portfolio = $this->buildScopePortfolioMetrics($user, $actions, $validatedActions);
+        $directionRows = $this->buildGlobalDirectionRows($actions, 8);
+        $reviewsControllerStage = $user->hasRole(
+            User::ROLE_PLANIFICATION,
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL
+        ) || $user->isPlanningControlChief();
+        $pendingValidationStatuses = $reviewsControllerStage
+            ? [ActionTrackingService::VALIDATION_SOUMISE_CONTROLE]
+            : [
+                ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+            ];
+        $pendingValidationLabel = $reviewsControllerStage
+            ? 'En attente validation contrôleur'
+            : 'En attente de validation';
+        $pendingValidationCount = $actions
+            ->whereIn('statut_validation', $pendingValidationStatuses)
+            ->count();
+        $summaryCards = [
+            [
+                ...$this->makeRoleCard('Avancement global', number_format((float) $portfolio['global_progress'], 1, ',', ' ').'%', 'Progression moyenne des actions visibles', route('workspace.reporting'), '#2563EB', '#EFF6FF', null, 'info'),
+                'icon' => '<path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/>',
+                'used' => true,
+            ],
+            [
+                ...$this->makeRoleCard('Actions suivies', $portfolio['actions_total'], 'Portefeuille visible', route('workspace.actions.index'), '#0F766E', '#F0FDFA', null, 'info'),
+                'icon' => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+                'used' => true,
+            ],
+            [
+                ...$this->makeRoleCard('Actions en retard', $portfolio['actions_en_retard'], 'Retards a surveiller', $this->actionIndexRoute(['statut' => 'en_retard']), '#DC2626', '#FEF2F2', null, 'warning'),
+                'icon' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M12 17h.01"/>',
+                'used' => true,
+            ],
+            [
+                ...$this->makeRoleCard('Actions clôturées', $portfolio['actions_valides_direction'], 'Circuit de validation terminé', $this->validatedActionIndexRoute(), '#16A34A', '#F0FDF4', null, 'success'),
+                'icon' => '<path d="M20 6 9 17l-5-5"/><path d="M21 12a9 9 0 1 1-5.3-8.2"/>',
+                'used' => true,
+            ],
+            [
+                ...$this->makeRoleCard($pendingValidationLabel, $pendingValidationCount, 'Etape de revue correspondant a votre profil', $this->actionIndexRoute(['vue' => 'validations']), '#7C3AED', '#F5F3FF', null, 'warning'),
+                'icon' => '<path d="M12 3 5 6v5c0 4.6 3 8 7 10 4-2 7-5.4 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/>',
+                'used' => true,
+            ],
+            [
+                ...$this->makeRoleCard('Directions en difficulté', $portfolio['directions_difficulte'], 'Score faible ou retards', route('workspace.reporting'), '#D97706', '#FFFBEB', null, 'warning'),
+                'icon' => '<path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M9 13h6"/><path d="M12 10v6"/>',
+                'used' => true,
+            ],
+        ];
+
+        return [
+            'enabled' => true,
+            'role' => 'suivi_evaluation',
+            'hero' => [
+                'eyebrow' => 'Vue suivi-evaluation',
+                'title' => 'Controle et suivi-evaluation',
+                'subtitle' => 'Lecture globale des alertes, des retards, des preuves attendues et des directions sous vigilance.',
+            ],
+            'summary_cards' => $summaryCards,
+            'trend_chart' => [
+                'title' => 'Evolution du suivi',
+                'subtitle' => 'Actions, achevements et retards sur l annee en cours.',
+                ...$this->buildRoleTrendChart($actions),
+            ],
+            'support_chart' => [
+                'title' => 'Directions sous vigilance',
+                'subtitle' => 'Comparaison des directions sur execution, validation et retards.',
+                ...[
+                    'type' => 'bar',
+                    'index_axis' => 'y',
+                    'stacked' => false,
+                    'labels' => array_column($directionRows, 'direction'),
+                    'urls' => array_column($directionRows, 'url'),
+                    'datasets' => [
+                        ['label' => 'Execution', 'color' => '#F26522', 'data' => array_column($directionRows, 'taux_execution')],
                         ['label' => 'Validation', 'color' => '#0F5B66', 'data' => array_column($directionRows, 'taux_validation')],
                         ['label' => 'Retards', 'color' => '#B42318', 'data' => array_column($directionRows, 'retards')],
                     ],
@@ -2766,6 +3217,8 @@ class DashboardController extends Controller
         $validatedService = $actions
             ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true))
             ->count();
@@ -2786,7 +3239,7 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Actions achevées', $statusCounts['acheve'], 'Actions terminées', $this->actionIndexRoute(['statut' => 'achevees']), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('Actions en retard', $statusCounts['en_retard'], 'Retards du service', $this->actionIndexRoute(['statut' => 'en_retard']), '#B42318', '#FFF1EF', null, 'danger'),
                 $this->makeRoleCard('Actions à valider', $pendingServiceValidation, 'Soumissions en attente', $this->actionIndexRoute(['vue' => 'validations']), '#F9B13C', '#FFF8D6', null, 'warning'),
-                $this->makeRoleCard('Actions validées service', $validatedService, 'Validation chef effectuée', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]), '#1C203D', '#E8F3FB', null, 'info'),
+                $this->makeRoleCard('Actions visees service', $validatedService, 'Visa chef effectue', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CONTROLE]), '#1C203D', '#E8F3FB', null, 'info'),
                 $this->makeRoleCard('Alertes actives', $alertCount, 'Actions critiques', $this->alertCenterRoute(['niveau' => 'warning']), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Taux exécution service', number_format($completionRate, 0).'%', 'Actions achevées / total', route('workspace.actions.index', ['statut' => 'achevees']), '#8FC043', '#F2F8E8', null, 'success'),
             ],
@@ -2820,6 +3273,8 @@ class DashboardController extends Controller
         $validatedService = $actions
             ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true))
             ->count();
@@ -2846,7 +3301,7 @@ class DashboardController extends Controller
                 $this->makeRoleCard('Actions en cours', $statusCounts['en_cours'], 'Exécution active', $this->actionIndexRoute(['statut' => 'en_cours']), '#3996D3', '#E8F3FB', null, 'info'),
                 $this->makeRoleCard('Actions achevées', $statusCounts['acheve'], 'Actions terminées', $this->actionIndexRoute(['statut' => 'achevees']), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('Actions en retard', $statusCounts['en_retard'], 'Retards directionnels', $this->actionIndexRoute(['statut' => 'en_retard']), '#B42318', '#FFF1EF', null, 'danger'),
-                $this->makeRoleCard('Actions validées service', $validatedService, 'Niveau chef atteint', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF]), '#3996D3', '#E8F3FB', null, 'info'),
+                $this->makeRoleCard('Actions visees service', $validatedService, 'Niveau chef atteint', $this->actionIndexRoute(['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CONTROLE]), '#3996D3', '#E8F3FB', null, 'info'),
                 $this->makeRoleCard('Actions validées', $validatedDirection, 'Clôturées dans le circuit de validation actif', $this->validatedActionIndexRoute(), '#8FC043', '#F2F8E8', null, 'success'),
                 $this->makeRoleCard('En attente validation', $pendingValidation, 'Soumises au chef', $this->actionIndexRoute(['vue' => 'validations']), '#F9B13C', '#FFF8D6', null, 'warning'),
                 $this->makeRoleCard('Alertes critiques', $alertCount, 'Actions à traiter', $this->alertCenterRoute(['niveau' => 'critical']), '#B42318', '#FFF1EF', null, 'danger'),
@@ -4013,7 +4468,7 @@ class DashboardController extends Controller
     {
         $validationStatus = (string) ($action->statut_validation ?? '');
         if (in_array($validationStatus, [
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
             return true;
@@ -4460,7 +4915,7 @@ class DashboardController extends Controller
             ActionTrackingService::STATUS_CLOTUREE,
         ], true)
             || in_array($validationStatus, [
-                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true)
             || $action->date_fin_reelle instanceof Carbon
@@ -4529,7 +4984,7 @@ class DashboardController extends Controller
         $status = (string) ($action->statut_performance ?? '');
         if ($status !== '') {
             return match ($status) {
-                'cible_depassee' => 'Cible depassee',
+                'cible_depassee' => 'Seuil depasse',
                 'critique' => 'Critique',
                 'sous_seuil' => 'Sous-seuil',
                 'acceptable' => 'Acceptable',
@@ -4601,25 +5056,40 @@ class DashboardController extends Controller
      * @param  Collection<int, Action>  $actions
      * @return array<string, mixed>
      */
-    private function buildSynthesisHierarchy(Collection $actions): array
+    private function buildSynthesisHierarchy(User $user, Collection $actions): array
     {
-        $pas = $actions->first()?->pta?->pao?->pas;
+        $pasRows = $this->synthesisPasRows($user);
+        $pas = $pasRows->first() ?? $actions->first()?->pta?->pao?->pas;
         $subActions = $actions->flatMap(fn (Action $action): Collection => $this->actionSubActions($action));
         $progress = $this->synthesisActionsProgress($actions);
+        $skeletonAxes = $pasRows
+            ->flatMap(fn (Pas $pas): Collection => $pas->axes->map(fn (PasAxe $axis): array => $this->emptySynthesisAxisNode($axis)))
+            ->values();
+        $actionAxes = $actions
+            ->groupBy(fn (Action $action): string => (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->id ?? 0))
+            ->map(fn (Collection $rows): array => $this->buildSynthesisAxisNode($rows))
+            ->values();
+        $strategicObjectivesTotal = $pasRows
+            ->flatMap(fn (Pas $pas): Collection => $pas->axes->flatMap(fn (PasAxe $axis): Collection => $axis->objectifs))
+            ->pluck('id')
+            ->filter()
+            ->unique()
+            ->count();
 
         return [
             'pas' => [
                 'label' => (string) ($pas?->titre ?: 'Plan d\'Acceleration Strategique'),
-                'period' => collect([
-                    $pas?->periode_debut instanceof Carbon ? $pas->periode_debut->format('d/m/Y') : null,
-                    $pas?->periode_fin instanceof Carbon ? $pas->periode_fin->format('d/m/Y') : null,
-                ])->filter()->implode(' - ') ?: $this->exerciceContext->activeLabel(),
+                'period' => $this->synthesisPasPeriodLabel($pas),
                 'target' => '100%',
                 'realized' => $this->formatPercent($progress),
                 'progress' => $progress,
                 'remaining' => $this->formatPercent(max(0.0, 100.0 - $progress)),
-                'axes_total' => $actions->pluck('pta.pao.pasObjectif.pasAxe.id')->filter()->unique()->count(),
-                'strategic_objectives_total' => $actions->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count(),
+                'axes_total' => $skeletonAxes->isNotEmpty()
+                    ? $skeletonAxes->pluck('key')->filter()->unique()->count()
+                    : $actions->pluck('pta.pao.pasObjectif.pasAxe.id')->filter()->unique()->count(),
+                'strategic_objectives_total' => $strategicObjectivesTotal > 0
+                    ? $strategicObjectivesTotal
+                    : $actions->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count(),
                 'operational_objectives_total' => $actions
                     ->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)
                     ->filter()
@@ -4634,13 +5104,186 @@ class DashboardController extends Controller
                     ->count(),
                 'pending_setup_total' => $actions->filter(fn (Action $action): bool => $this->synthesisWorkflowStatus($action) === 'a_parametrer')->count(),
             ],
-            'axes' => $actions
-                ->groupBy(fn (Action $action): string => (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->id ?? 0))
-                ->map(fn (Collection $rows): array => $this->buildSynthesisAxisNode($rows))
-                ->sortBy('code')
+            'axes' => $this->mergeSynthesisAxisNodes($skeletonAxes, $actionAxes),
+        ];
+    }
+
+    /**
+     * @return Collection<int, Pas>
+     */
+    private function synthesisPasRows(User $user): Collection
+    {
+        return $this->buildPasScopedQuery($user)
+            ->with([
+                'axes' => fn ($query) => $query->orderBy('ordre')->orderBy('id'),
+                'axes.objectifs' => fn ($query) => $query->orderBy('ordre')->orderBy('id'),
+                'axes.objectifs.objectifsOperationnels' => function (Builder|Relation $query) use ($user): void {
+                    $query->orderBy('import_ordre')->orderBy('id');
+                    $this->scopeByUserDirection($query, $user, 'direction_id', 'service_id');
+
+                    if (($directionId = $this->selectedDashboardDirectionId($user)) !== null) {
+                        $query->where('direction_id', $directionId);
+                    }
+
+                    if (($serviceId = $this->selectedDashboardServiceId($user)) !== null) {
+                        $query->where('service_id', $serviceId);
+                    }
+                },
+            ])
+            ->orderByDesc('periode_fin')
+            ->orderBy('titre')
+            ->get();
+    }
+
+    private function synthesisPasPeriodLabel(?Pas $pas): string
+    {
+        return collect([
+            $this->synthesisPeriodValue($pas?->periode_debut),
+            $this->synthesisPeriodValue($pas?->periode_fin),
+        ])->filter()->implode(' - ') ?: $this->exerciceContext->activeLabel();
+    }
+
+    private function synthesisPeriodValue(mixed $value): ?string
+    {
+        if ($value instanceof Carbon) {
+            return $value->format('d/m/Y');
+        }
+
+        if (is_numeric($value)) {
+            return (string) (int) $value;
+        }
+
+        $value = trim((string) $value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $skeletonAxes
+     * @param  Collection<int, array<string, mixed>>  $actionAxes
+     * @return list<array<string, mixed>>
+     */
+    private function mergeSynthesisAxisNodes(Collection $skeletonAxes, Collection $actionAxes): array
+    {
+        $merged = $skeletonAxes->mapWithKeys(fn (array $axis): array => [
+            (string) ($axis['key'] ?? $axis['code'] ?? '0') => $axis,
+        ]);
+
+        foreach ($actionAxes as $axis) {
+            $key = (string) ($axis['key'] ?? '0');
+            $merged[$key] = $merged->has($key)
+                ? $this->mergeSynthesisAxisNode((array) $merged[$key], $axis)
+                : $axis;
+        }
+
+        return $merged
+            ->sortBy(fn (array $axis): string => ((string) ($axis['code'] ?? '')).' '.((string) ($axis['label'] ?? '')))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mergeSynthesisAxisNode(array $skeleton, array $actual): array
+    {
+        $merged = array_merge($skeleton, $actual);
+        $merged['objectives'] = $this->mergeSynthesisChildren(
+            collect($skeleton['objectives'] ?? []),
+            collect($actual['objectives'] ?? []),
+            fn (array $emptyNode, array $actualNode): array => $this->mergeSynthesisStrategicObjectiveNode($emptyNode, $actualNode)
+        );
+
+        return $merged;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mergeSynthesisStrategicObjectiveNode(array $skeleton, array $actual): array
+    {
+        $merged = array_merge($skeleton, $actual);
+        $merged['operational_objectives'] = $this->mergeSynthesisChildren(
+            collect($skeleton['operational_objectives'] ?? []),
+            collect($actual['operational_objectives'] ?? []),
+            fn (array $emptyNode, array $actualNode): array => array_merge($emptyNode, $actualNode)
+        );
+
+        return $merged;
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $skeleton
+     * @param  Collection<int, array<string, mixed>>  $actual
+     * @return list<array<string, mixed>>
+     */
+    private function mergeSynthesisChildren(Collection $skeleton, Collection $actual, callable $merge): array
+    {
+        $merged = $skeleton->mapWithKeys(fn (array $node): array => [
+            (string) ($node['key'] ?? $node['code'] ?? $node['label'] ?? '0') => $node,
+        ]);
+
+        foreach ($actual as $node) {
+            $key = (string) ($node['key'] ?? $node['code'] ?? $node['label'] ?? '0');
+            $merged[$key] = $merged->has($key) ? $merge((array) $merged[$key], $node) : $node;
+        }
+
+        return $merged
+            ->sortBy(fn (array $node): string => ((string) ($node['code'] ?? '')).' '.((string) ($node['label'] ?? '')))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptySynthesisAxisNode(PasAxe $axis): array
+    {
+        return array_merge($this->synthesisGroupMetrics(collect()), [
+            'key' => (string) $axis->id,
+            'code' => (string) ($axis->code ?: 'AXE'),
+            'label' => (string) ($axis->libelle ?: 'Axe non renseigne'),
+            'objectives_total' => $axis->objectifs->count(),
+            'operational_objectives_total' => $axis->objectifs->flatMap(fn (PasObjectif $objective): Collection => $objective->objectifsOperationnels)->count(),
+            'ptas_total' => 0,
+            'objectives' => $axis->objectifs
+                ->map(fn (PasObjectif $objective): array => $this->emptySynthesisStrategicObjectiveNode($objective))
                 ->values()
                 ->all(),
-        ];
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptySynthesisStrategicObjectiveNode(PasObjectif $objective): array
+    {
+        return array_merge($this->synthesisGroupMetrics(collect()), [
+            'key' => (string) $objective->id,
+            'code' => (string) ($objective->code ?: 'OS'),
+            'label' => (string) ($objective->libelle ?: 'Objectif strategique non renseigne'),
+            'operational_objectives_total' => $objective->objectifsOperationnels->count(),
+            'operational_objectives' => $objective->objectifsOperationnels
+                ->map(fn ($operationalObjective): array => $this->emptySynthesisOperationalObjectiveNode($operationalObjective))
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptySynthesisOperationalObjectiveNode(mixed $objective): array
+    {
+        return array_merge($this->synthesisGroupMetrics(collect()), [
+            'key' => (string) ($objective->id ?? '0'),
+            'code' => ($objective->id ?? null) ? 'OO '.$objective->id : 'OO',
+            'label' => (string) ($objective->libelle ?? 'Objectif operationnel non renseigne'),
+            'direction' => '-',
+            'service' => '-',
+            'ptas_total' => 0,
+            'ptas' => [],
+        ]);
     }
 
     /**
@@ -4652,6 +5295,7 @@ class DashboardController extends Controller
         $axis = $actions->first()?->pta?->pao?->pasObjectif?->pasAxe;
 
         return array_merge($this->synthesisGroupMetrics($actions), [
+            'key' => (string) ($axis?->id ?? 0),
             'code' => (string) ($axis?->code ?: 'AXE'),
             'label' => (string) ($axis?->libelle ?: 'Axe non renseigne'),
             'objectives_total' => $actions->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count(),
@@ -4679,6 +5323,7 @@ class DashboardController extends Controller
         $objective = $actions->first()?->pta?->pao?->pasObjectif;
 
         return array_merge($this->synthesisGroupMetrics($actions), [
+            'key' => (string) ($objective?->id ?? 0),
             'code' => (string) ($objective?->code ?: 'OS'),
             'label' => (string) ($objective?->libelle ?: 'Objectif strategique non renseigne'),
             'operational_objectives_total' => $actions
@@ -4704,6 +5349,7 @@ class DashboardController extends Controller
         $objective = $actions->first()?->objectifOperationnel ?? $actions->first()?->pta?->objectifOperationnel;
 
         return array_merge($this->synthesisGroupMetrics($actions), [
+            'key' => (string) ($objective?->id ?? 0),
             'code' => $objective?->id ? 'OO '.$objective->id : 'OO',
             'label' => (string) ($objective?->libelle ?: 'Objectif operationnel non renseigne'),
             'direction' => (string) ($actions->first()?->pta?->direction?->code ?? $actions->first()?->pta?->direction?->libelle ?? '-'),
@@ -5270,7 +5916,10 @@ class DashboardController extends Controller
 
     private function dashboardStatus(Action $action): string
     {
-        return $this->actionStatusService->dashboardStatus($action);
+        $objectId = spl_object_id($action);
+
+        return $this->dashboardStatusCache[$objectId]
+            ??= $this->actionStatusService->dashboardStatus($action);
     }
 
     private function statusLabel(string $status): string

@@ -1,9 +1,10 @@
 <?php
 
+use App\Http\Middleware\AddSecurityHeaders;
+use App\Http\Middleware\EnsureSufficientExecutionTime;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\AddSecurityHeaders;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
 
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
+            EnsureSufficientExecutionTime::class,
             AddSecurityHeaders::class,
         ]);
 

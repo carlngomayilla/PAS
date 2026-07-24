@@ -2,11 +2,12 @@
 
 namespace App\Policies;
 
+use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Models\Action;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Governance\DelegationService;
-use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
+use App\Services\PlanningModificationLockService;
 
 class ActionPolicy
 {
@@ -35,10 +36,22 @@ class ActionPolicy
         }
 
         if ($user->isAgent()) {
-            return (int) $action->responsable_id === (int) $user->id;
+            return (int) $action->responsable_id === (int) $user->id
+                || $action->sousActions()->where('agent_id', $user->id)->exists();
+        }
+
+        if ((bool) $action->financement_requis
+            && ($this->isDafFinanceReviewer($user) || $user->hasRole(User::ROLE_DG))
+        ) {
+            return true;
         }
 
         if ($user->hasGlobalReadAccess()) {
+            return true;
+        }
+
+        $lockService = app(PlanningModificationLockService::class);
+        if ($lockService->isUnlockReviewer($user) || $lockService->canGivePlanifAvis($user)) {
             return true;
         }
 
@@ -87,6 +100,8 @@ class ActionPolicy
         // Sécurité supplémentaire : On ne modifie pas une action déjà validée par la direction
         if (in_array((string) $action->statut_validation, [
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
             return $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL)
@@ -168,6 +183,89 @@ class ActionPolicy
     /**
      * Peut laisser un commentaire (tout utilisateur ayant accès en lecture).
      */
+    public function submitFinancing(User $user, Action $action): bool
+    {
+        return (bool) $action->financement_requis
+            && $action->isResponsible($user);
+    }
+
+    public function reviewFinancingByDaf(User $user, Action $action): bool
+    {
+        return (bool) $action->financement_requis
+            && ! $action->isResponsible($user)
+            && $this->isDafFinanceReviewer($user);
+    }
+
+    public function reviewFinancingByDg(User $user, Action $action): bool
+    {
+        return (bool) $action->financement_requis
+            && ! $action->isResponsible($user)
+            && $user->hasRole(User::ROLE_DG);
+    }
+
+    public function requestDeadlineExtension(User $user, Action $action): bool
+    {
+        if ((string) ($action->statut_parametrage ?? '') === 'a_parametrer') {
+            return false;
+        }
+
+        return $this->view($user, $action);
+    }
+
+    public function reviewDeadlineExtensionByChef(User $user, Action $action): bool
+    {
+        if ($action->isResponsible($user)) {
+            return false;
+        }
+
+        if ($user->isServiceOrUnitChief()
+            && ! $user->isPlanningControlChief()
+            && (int) $user->direction_id === (int) $action->pta?->direction_id
+            && (int) $user->service_id === (int) $action->pta?->service_id
+        ) {
+            return true;
+        }
+
+        return app(DelegationService::class)->canReviewServiceAction(
+            $user,
+            (int) $action->pta?->direction_id,
+            (int) $action->pta?->service_id
+        );
+    }
+
+    public function reviewDeadlineExtensionByController(User $user, Action $action): bool
+    {
+        if ($action->isResponsible($user) || $user->hasRole(User::ROLE_CHEF_PLANIFICATION)) {
+            return false;
+        }
+
+        return $user->hasRole(
+            User::ROLE_PLANIFICATION,
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ
+        );
+    }
+
+    public function reviewDeadlineExtensionFinal(User $user, Action $action): bool
+    {
+        if ($action->isResponsible($user)) {
+            return false;
+        }
+
+        return $user->hasRole(User::ROLE_DG, User::ROLE_CHEF_PLANIFICATION);
+    }
+
+    public function applyDeadlineExtension(User $user, Action $action): bool
+    {
+        return $this->reviewDeadlineExtensionByController($user, $action);
+    }
+
+    public function reviewDeadlineExtensionByDg(User $user, Action $action): bool
+    {
+        return $this->reviewDeadlineExtensionFinal($user, $action);
+    }
+
     public function comment(User $user, Action $action): bool
     {
         return $this->view($user, $action);
@@ -180,5 +278,18 @@ class ActionPolicy
     private function canManageAction(User $user, ?int $directionId, ?int $serviceId): bool
     {
         return ! $user->isAgent() && $this->canWriteService($user, $directionId, $serviceId);
+    }
+
+    private function isDafFinanceReviewer(User $user): bool
+    {
+        if (! $user->hasRole(User::ROLE_DIRECTION) || $user->direction_id === null) {
+            return false;
+        }
+
+        if ($user->relationLoaded('direction')) {
+            return (string) ($user->direction?->code ?? '') === 'DAF';
+        }
+
+        return $user->direction()->where('code', 'DAF')->exists();
     }
 }

@@ -10,14 +10,18 @@ use App\Http\Requests\StoreActionRequest;
 use App\Http\Requests\UpdateActionRequest;
 use App\Models\Action;
 use App\Models\ActionKpi;
+use App\Models\Direction;
 use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\Pta;
+use App\Models\Service;
 use App\Models\SousAction;
 use App\Models\User;
+use App\Services\AccessScopeService;
 use App\Services\ActionCalculationSettings;
 use App\Services\Actions\ActionIndicatorService;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\DeletionRequestService;
 use App\Services\DynamicReferentialSettings;
 use App\Services\ExerciceContext;
 use App\Services\Notifications\WorkspaceNotificationService;
@@ -25,6 +29,8 @@ use App\Services\PlanningModificationLockService;
 use App\Services\Security\SecureJustificatifStorage;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -46,6 +52,9 @@ class ActionWebController extends Controller
     use AuthorizesPlanningScope;
     use FormatsWorkflowMessages;
     use RecordsAuditTrail;
+
+    /** @var list<string> */
+    private const VISUALIZATION_LAYOUTS = ['kanban', 'calendar', 'gantt'];
 
     /** Affiche la liste des actions selon les droits de l'utilisateur connecté. */
     public function index(Request $request): View
@@ -109,9 +118,14 @@ class ActionWebController extends Controller
         };
 
         $perPage = max(15, min(100, (int) $request->integer('per_page', 15)));
+        $layoutMode = $this->actionIndexLayout($request);
+        $visualizationRows = $this->actionVisualizationRows($query, $layoutMode);
+        $rows = $query->paginate($perPage)->withQueryString();
 
         return view('workspace.actions.index', [
-            'rows' => $query->paginate($perPage)->withQueryString(),
+            'rows' => $rows,
+            'visualizationRows' => $visualizationRows,
+            'layoutMode' => $layoutMode,
             'scope' => $user->accessScope(),
             'summary' => $summary,
             'ptaOptions' => $this->ptaOptions($user),
@@ -152,6 +166,52 @@ class ActionWebController extends Controller
         ]);
     }
 
+    private function actionIndexLayout(Request $request): string
+    {
+        $layout = trim((string) $request->string('layout', 'list'));
+
+        return in_array($layout, self::VISUALIZATION_LAYOUTS, true) ? $layout : 'list';
+    }
+
+    /**
+     * @return Collection<int, Action>
+     */
+    private function actionVisualizationRows(Builder $query, string $layoutMode): Collection
+    {
+        if (! in_array($layoutMode, self::VISUALIZATION_LAYOUTS, true)) {
+            return new Collection;
+        }
+
+        $visualizationQuery = clone $query;
+        $visualizationQuery
+            ->select([
+                'actions.id',
+                'actions.pta_id',
+                'actions.responsable_id',
+                'actions.libelle',
+                'actions.date_debut',
+                'actions.date_fin',
+                'actions.date_echeance',
+                'actions.statut_dynamique',
+                'actions.statut_validation',
+                'actions.progression_reelle',
+            ])
+            ->setEagerLoads([]);
+
+        if ($layoutMode === 'kanban') {
+            $visualizationQuery->with([
+                'pta:id,titre',
+                'responsable:id,name',
+            ]);
+        }
+
+        if (in_array($layoutMode, ['kanban', 'gantt'], true) && Schema::hasTable('action_responsables')) {
+            $visualizationQuery->with('responsables:id,name');
+        }
+
+        return $visualizationQuery->get();
+    }
+
     /** Ajoute les compteurs herites du suivi hebdomadaire supprime. */
     private function addLegacyWeekCounters(Builder $query): void
     {
@@ -180,7 +240,7 @@ class ActionWebController extends Controller
     }
 
     /** Mise à jour rapide du statut d'une action via un menu déroulant (appel AJAX). */
-    public function quickStatus(Request $request, Action $action): \Illuminate\Http\JsonResponse
+    public function quickStatus(Request $request, Action $action): JsonResponse
     {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -264,6 +324,23 @@ class ActionWebController extends Controller
             $exerciseContext->applyToAction($query);
         }
 
+        $queueSummary = [
+            'total' => (clone $query)->count(),
+            'preparation' => (clone $query)->whereIn('financement_statut', [
+                Action::FINANCEMENT_PRE_SIGNALE_DAF,
+                Action::FINANCEMENT_COMPLEMENT_DEMANDE,
+                Action::FINANCEMENT_REJETE_DAF,
+            ])->count(),
+            'daf' => (clone $query)->where('financement_statut', Action::FINANCEMENT_SOUMIS_DAF)->count(),
+            'dg' => (clone $query)->whereIn('financement_statut', [
+                Action::FINANCEMENT_TRANSMIS_DG,
+                Action::FINANCEMENT_VALIDE_DAF,
+            ])->count(),
+            'accordes' => (clone $query)->where('financement_statut', Action::FINANCEMENT_VALIDE_DG)->count(),
+            'refuses' => (clone $query)->where('financement_statut', Action::FINANCEMENT_REJETE_DG)->count(),
+            'montant_estime' => (float) ((clone $query)->sum('montant_estime') ?? 0),
+        ];
+
         $statusFilter = trim((string) $request->string('statut_financement'));
         if ($statusFilter !== '') {
             $statuses = [$statusFilter];
@@ -321,10 +398,15 @@ class ActionWebController extends Controller
             'rows' => $rows,
             'financingStatusOptions' => Action::financingStatusOptions(),
             'ptaOptions' => Pta::query()->orderByDesc('id')->get(['id', 'titre']),
-            'directionOptions' => \App\Models\Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
-            'serviceOptions' => \App\Models\Service::query()->orderBy('code')->get(['id', 'direction_id', 'code', 'libelle']),
+            'directionOptions' => Direction::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
+            'serviceOptions' => Service::query()->orderBy('code')->get(['id', 'direction_id', 'code', 'libelle']),
             'rmoOptions' => User::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'email']),
             'canTreatDaf' => $this->isDafFinanceReviewer($user),
+            'canTreatDg' => $user->hasRole(User::ROLE_DG),
+            'queueSummary' => $queueSummary,
+            'financeWorkspaceRole' => $this->isDafFinanceReviewer($user)
+                ? 'Direction administrative et financiere'
+                : ($user->hasRole(User::ROLE_DG) ? 'Direction Generale' : 'Supervision'),
             'filters' => [
                 'q' => (string) $request->string('q'),
                 'pta_id' => $request->filled('pta_id') ? (int) $request->integer('pta_id') : null,
@@ -463,10 +545,6 @@ class ActionWebController extends Controller
 
         $this->recordAudit($request, 'action', $existingAction instanceof Action ? 'update' : 'create', $action, null, $action->toArray());
         $notificationService->notifyActionAssigned($action, $user);
-        if ((bool) $action->financement_requis) {
-            $notificationService->notifyActionFinancingRequested($action, $user);
-            $trackingService->markFinancingNotificationSent($action);
-        }
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
@@ -539,10 +617,13 @@ class ActionWebController extends Controller
         $validated['pao_id'] = (int) $objectifOperationnel->pao_id;
         $validated['pta_id'] = (int) $targetPta->id;
         $validated['objectif_operationnel_id'] = (int) $objectifOperationnel->id;
+        $validated['date_debut'] = optional($action->date_debut)->format('Y-m-d');
+        $validated['date_fin'] = optional($action->date_fin)->format('Y-m-d');
+        $validated['date_echeance'] = optional($action->date_echeance)->format('Y-m-d');
 
         if (in_array((string) $targetPta->statut, ['cloture', 'archive'], true)) {
             return back()->withInput()->withErrors([
-                'pta_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
+                'pta_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'lie', 'Mise a jour'),
             ]);
         }
 
@@ -557,8 +638,8 @@ class ActionWebController extends Controller
             (int) $targetPta->service_id
         );
 
-        $dateChanged = (string) $action->date_debut !== (string) ($validated['date_debut'] ?? null)
-            || (string) $action->date_fin !== (string) ($validated['date_fin'] ?? null);
+        $dateChanged = optional($action->date_debut)->format('Y-m-d') !== ($validated['date_debut'] ?? null)
+            || optional($action->date_fin)->format('Y-m-d') !== ($validated['date_fin'] ?? null);
         $frequencyChanged = false;
         $targetTypeChanged = (string) $action->type_cible !== (string) ($validated['type_cible'] ?? '');
 
@@ -577,7 +658,6 @@ class ActionWebController extends Controller
 
         DB::transaction(function () use ($action, $validated, $indicatorPayload, $request, $trackingService, $indicatorService, $user, $dateChanged, $frequencyChanged, $targetTypeChanged, $secureStorage, $rmoIds, $subActionsPayload): void {
             $payload = $validated;
-            $payload['date_echeance'] = $payload['date_fin'];
             $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds) ?? $action->unite_dg_id;
             $action->fill($payload);
             $action->save();
@@ -621,9 +701,6 @@ class ActionWebController extends Controller
         if ($this->shouldResubmitFinancingRequest($before, $action)) {
             $this->resetFinancingWorkflow($action);
             $trackingService->syncFinancingRequest($action, $user);
-            $action->refresh();
-            $notificationService->notifyActionFinancingRequested($action, $user);
-            $trackingService->markFinancingNotificationSent($action);
             $action->refresh();
         } elseif (! (bool) $action->financement_requis && (bool) ($before['financement_requis'] ?? false)) {
             $trackingService->syncFinancingRequest($action, $user);
@@ -677,7 +754,7 @@ class ActionWebController extends Controller
         $validated = $request->validate([
             'motif' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
-        $deletionRequests = app(\App\Services\DeletionRequestService::class);
+        $deletionRequests = app(DeletionRequestService::class);
         // Super Admin et DG peuvent supprimer directement avec cascade (sous-actions
         // et semaines associees). Les autres roles passent par le workflow de demande.
         $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
@@ -757,7 +834,7 @@ class ActionWebController extends Controller
         $action->forceFill([
             'financement_statut' => Action::FINANCEMENT_PRE_SIGNALE_DAF,
             'financement_soumis_le' => null,
-            'financement_notifie_le' => now(),
+            'financement_notifie_le' => null,
             'financement_daf_par' => null,
             'financement_daf_le' => null,
             'financement_daf_decision' => null,
@@ -954,6 +1031,8 @@ class ActionWebController extends Controller
             ];
 
             if ($subAction instanceof SousAction) {
+                $payload['date_debut'] = optional($subAction->date_debut)->format('Y-m-d');
+                $payload['date_fin'] = optional($subAction->date_fin)->format('Y-m-d');
                 $subAction->fill($payload)->save();
 
                 continue;
@@ -1317,7 +1396,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Pta>
+     * @return Collection<int, Pta>
      */
     private function ptaOptions(User $user)
     {
@@ -1338,7 +1417,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Action>
+     * @return Collection<int, Action>
      */
     private function actionOptions(User $user, ?int $forceActionId = null)
     {
@@ -1383,7 +1462,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, ObjectifOperationnel>
+     * @return Collection<int, ObjectifOperationnel>
      */
     private function objectifOperationnelOptions(User $user, ?int $forceObjectifId = null)
     {
@@ -1429,7 +1508,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Pao>
+     * @return Collection<int, Pao>
      */
     private function paoOptions(User $user)
     {
@@ -1452,7 +1531,7 @@ class ActionWebController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, User>
+     * @return Collection<int, User>
      */
     private function responsableOptions(User $user)
     {
@@ -1496,7 +1575,7 @@ class ActionWebController extends Controller
 
     private function shouldUseDualActionTabs(User $user): bool
     {
-        return app(\App\Services\AccessScopeService::class)->hasDualInterface($user);
+        return app(AccessScopeService::class)->hasDualInterface($user);
     }
 
     private function canUseActionValidationTab(User $user): bool
@@ -1645,7 +1724,8 @@ class ActionWebController extends Controller
         }
 
         $validatedStatuses = [
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
+            ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ];
 
         $pendingValidationCount = (int) $this->wherePendingChefValidation(clone $query)
@@ -1692,6 +1772,9 @@ class ActionWebController extends Controller
             ActionTrackingService::VALIDATION_REJETEE_CHEF,
             ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+            ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ];
     }
 

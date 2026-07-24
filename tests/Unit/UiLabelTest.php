@@ -13,7 +13,8 @@ class UiLabelTest extends TestCase
     {
         self::assertSame('En cours', UiLabel::actionStatus('en_cours'));
         self::assertSame('Achevé hors délai', UiLabel::actionStatus('acheve_hors_delai'));
-        self::assertSame('Validée', UiLabel::validationStatus('validee_chef'));
+        self::assertSame('Visa chef enregistré', UiLabel::validationStatus('validee_chef'));
+        self::assertSame('Validée par le contrôle', UiLabel::validationStatus('validee_controle'));
         self::assertSame('Validée (ancienne direction)', UiLabel::validationStatus('validee_direction'));
     }
 

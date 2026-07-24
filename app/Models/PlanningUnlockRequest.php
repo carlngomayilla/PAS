@@ -11,17 +11,22 @@ class PlanningUnlockRequest extends Model
 {
     use HasFactory;
 
-    // Circuit V3 : soumise (attente controleur SCIQ/Planification) -> transmise
-    // (controleur a transmis, decision DG attendue) -> approuvee | rejetee.
+    // Circuit V3 : soumise (decision DG/SCIQ/Planification possible) -> transmise
+    // (avis controleur enregistre) -> approuvee | rejetee.
     public const STATUS_SOUMISE = 'soumise';
+
     public const STATUS_TRANSMISE = 'transmise';
+
     public const STATUS_APPROUVEE = 'approuvee';
+
     public const STATUS_REJETEE = 'rejetee';
 
     public const DECISION_APPROUVER = 'approuver';
+
     public const DECISION_REJETER = 'rejeter';
 
     public const AVIS_FAVORABLE = 'favorable';
+
     public const AVIS_DEFAVORABLE = 'defavorable';
 
     /**
@@ -35,7 +40,7 @@ class PlanningUnlockRequest extends Model
         'direction_id',
         'service_id',
         'requested_by',
-        // Circuit V3 - transmission controleur vers DG.
+        // Circuit V3 - transmission avis controleur.
         'transferred_by',
         'transferred_at',
         'transfer_comment',

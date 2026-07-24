@@ -37,6 +37,21 @@ class PtaOfficialCalculationServiceTest extends TestCase
         $this->assertSame('en_cours', $result['status']);
     }
 
+    public function test_action_status_uses_configured_completion_threshold(): void
+    {
+        $action = new Action([
+            'quantite_cible' => 100,
+            'seuil_minimum' => 80,
+        ]);
+        $action->quantite_realisee = 80;
+        $action->setRelation('sousActions', collect());
+
+        $result = $this->service->actionResult($action);
+
+        $this->assertSame(80.0, $result['rate']);
+        $this->assertSame('realise', $result['status']);
+    }
+
     public function test_action_composed_from_sub_actions_is_weighted_by_raw_targets(): void
     {
         $action = new Action;
@@ -119,7 +134,7 @@ class PtaOfficialCalculationServiceTest extends TestCase
             'mode_evaluation' => Action::MODE_SANS_QUANTITE,
             'livrable_attendu' => 'Decision signee',
         ]);
-        $action->statut_validation = ActionTrackingService::VALIDATION_VALIDEE_CHEF;
+        $action->statut_validation = ActionTrackingService::VALIDATION_VALIDEE_CONTROLE;
         $action->setRelation('sousActions', collect());
 
         $result = $this->service->actionResult($action);
@@ -171,7 +186,7 @@ class PtaOfficialCalculationServiceTest extends TestCase
         $this->assertSame(72.5, $result['rate']);
     }
 
-    public function test_real_rate_can_exceed_one_hundred_while_display_rate_is_capped(): void
+    public function test_rate_is_capped_at_one_hundred_and_raw_rate_is_available(): void
     {
         $action = new Action(['quantite_cible' => 100]);
         $action->quantite_realisee = 125;
@@ -179,7 +194,8 @@ class PtaOfficialCalculationServiceTest extends TestCase
 
         $result = $this->service->actionResult($action);
 
-        $this->assertSame(125.0, $result['rate']);
+        $this->assertSame(125.0, $result['raw_rate']);
+        $this->assertSame(100.0, $result['rate']);
         $this->assertSame(100.0, $result['display_rate']);
         $this->assertSame('realise', $result['status']);
     }

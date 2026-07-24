@@ -1,0 +1,4 @@
+interface:
+  display_name: "Livraison exhaustive"
+  short_description: "Livrer chaque evolution sans angle mort"
+  default_prompt: "Use $exhaustive-task-delivery to implement this change end to end, including impacts, security, tests, UI, and deployment checks."

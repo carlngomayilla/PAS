@@ -10,10 +10,13 @@ use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertRoutingService;
+use App\Services\Analytics\AnalyticsCacheVersionService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class PersonalTaskService
 {
@@ -21,8 +24,7 @@ class PersonalTaskService
         private readonly UserWorkspaceService $workspaceService,
         private readonly AlertRoutingService $alertRoutingService,
         private readonly PersonalScoreService $personalScoreService
-    ) {
-    }
+    ) {}
 
     /**
      * @return array{items: array<int, array<string, mixed>>, summary: array<string, mixed>}
@@ -38,8 +40,51 @@ class PersonalTaskService
     }
 
     /**
+     * @param  array{q?: string, vue?: string, famille?: string, tri?: string}  $filters
+     * @return array{
+     *     items: LengthAwarePaginator<int, array<string, mixed>>,
+     *     summary: array<string, mixed>,
+     *     filtered_summary: array<string, int>,
+     *     family_options: array<int, array{code: string, count: int}>
+     * }
+     */
+    public function workspaceForUser(
+        User $user,
+        array $filters,
+        int $perPage = 15,
+        int $page = 1
+    ): array {
+        $items = $this->collectCached($user);
+        $filteredItems = $this->filterWorkspaceItems($items, $filters);
+        $sortedItems = $this->sortWorkspaceItems($filteredItems, (string) ($filters['tri'] ?? 'priorite'));
+        $page = max(1, $page);
+        $perPage = in_array($perPage, [15, 25, 50], true) ? $perPage : 15;
+
+        return [
+            'items' => new LengthAwarePaginator(
+                $sortedItems->forPage($page, $perPage)->values(),
+                $sortedItems->count(),
+                $perPage,
+                $page,
+                ['path' => LengthAwarePaginator::resolveCurrentPath()]
+            ),
+            'summary' => $this->summary($user, $items),
+            'filtered_summary' => $this->operationalSummary($filteredItems),
+            'family_options' => $items
+                ->groupBy(fn (array $task): string => (string) ($task['family'] ?? 'autres'))
+                ->map(fn (Collection $tasks, string $code): array => [
+                    'code' => $code,
+                    'count' => $tasks->count(),
+                ])
+                ->sortBy('code')
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
      * Compteur leger des taches ouvertes (badge sidebar) : reutilise la meme
-     * collecte cachee que forUser() — un seul calcul des 8 sources de taches
+     * collecte cachee que forUser() — un seul calcul des sources de taches
      * par fenetre de cache, partage entre le badge et le dashboard.
      */
     public function openTaskCount(User $user): int
@@ -61,7 +106,7 @@ class PersonalTaskService
      */
     private function collectCached(User $user): Collection
     {
-        $version = app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->alertsVersion();
+        $version = app(AnalyticsCacheVersionService::class)->alertsVersion();
 
         return Cache::remember(
             'personal-tasks:collect:'.(int) $user->id.':'.$version,
@@ -82,6 +127,7 @@ class PersonalTaskService
             ->merge($this->subActionExecutionTasks($user))
             ->merge($this->chefValidationTasks($user, $role))
             ->merge($this->chefSubActionValidationTasks($user, $role))
+            ->merge($this->controllerValidationTasks($user, $role))
             ->merge($this->dafFinancingTasks($user, $role))
             ->merge($this->dgFinancingTasks($user, $role))
             ->merge($this->actionAlertTasks($user, $role))
@@ -117,17 +163,22 @@ class PersonalTaskService
                     ->whereNull('statut_validation')
                     ->orWhereNotIn('statut_validation', [
                         ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+                        ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
                         ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                        ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                         ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
                     ])
                     ->orWhere(function (Builder $financingQuery): void {
                         $financingQuery
                             ->where('financement_requis', true)
-                            ->where('financement_statut', Action::FINANCEMENT_COMPLEMENT_DEMANDE);
+                            ->whereIn('financement_statut', [
+                                Action::FINANCEMENT_PRE_SIGNALE_DAF,
+                                Action::FINANCEMENT_COMPLEMENT_DEMANDE,
+                                Action::FINANCEMENT_REJETE_DAF,
+                            ]);
                     });
             })
             ->latest()
-            ->limit(60)
             ->get()
             ->map(function (Action $action): array {
                 $validationStatus = (string) ($action->statut_validation ?? ActionTrackingService::VALIDATION_NON_SOUMISE);
@@ -135,31 +186,57 @@ class PersonalTaskService
                     ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
                     ActionTrackingService::VALIDATION_REJETEE_CHEF,
                     ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
+                    ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
                 ], true);
 
-                if ((bool) $action->financement_requis
-                    && $action->financementStatus() === Action::FINANCEMENT_COMPLEMENT_DEMANDE) {
+                $financingStatus = $action->financementStatus();
+                $hasFinancingSubmission = (bool) $action->financement_requis
+                    && $financingStatus === Action::FINANCEMENT_PRE_SIGNALE_DAF;
+                $hasFinancingCorrection = (bool) $action->financement_requis
+                    && in_array($financingStatus, [
+                        Action::FINANCEMENT_COMPLEMENT_DEMANDE,
+                        Action::FINANCEMENT_REJETE_DAF,
+                    ], true);
+
+                if ($hasFinancingCorrection) {
                     $isCorrection = true;
                 }
 
-                $deadline = $isCorrection
+                $deadline = ($isCorrection || $hasFinancingSubmission)
                     ? $this->carbon($action->updated_at)?->copy()->addHours(48)
                     : $this->actionDeadline($action);
 
+                $title = match (true) {
+                    $hasFinancingSubmission => 'Dossier financement a soumettre',
+                    $hasFinancingCorrection => 'Correction financement DAF',
+                    $isCorrection => 'Correction demandee',
+                    default => 'Execution action',
+                };
+
+                $type = match (true) {
+                    $hasFinancingSubmission => 'financement_rmo',
+                    $hasFinancingCorrection => 'correction_financement',
+                    $isCorrection => 'correction_action',
+                    default => 'execution_action',
+                };
+
                 return $this->task(
                     key: 'action-execution:'.$action->id,
-                    type: $isCorrection ? 'correction_action' : 'execution_action',
-                    title: $isCorrection ? 'Correction demandee' : 'Execution action',
+                    type: $type,
+                    title: $title,
                     subject: (string) $action->libelle,
                     context: $this->actionContext($action),
                     responsible: $action->responsable?->name,
                     receivedAt: $isCorrection ? $this->carbon($action->updated_at) : $this->carbon($action->created_at),
                     deadlineAt: $deadline,
-                    url: route('workspace.actions.suivi', $action),
-                    criticality: $this->criticalityFromDeadline($deadline, $isCorrection ? 'importante' : 'normale'),
-                    scoreImpact: $isCorrection
-                        ? 'Retard de correction imputable au responsable de l action.'
-                        : 'Retard d execution imputable au responsable de l action.'
+                    url: route('workspace.actions.suivi', $action).($hasFinancingSubmission || $hasFinancingCorrection ? '#action-financement' : ''),
+                    criticality: $this->criticalityFromDeadline($deadline, $isCorrection || $hasFinancingSubmission ? 'importante' : 'normale'),
+                    scoreImpact: match (true) {
+                        $hasFinancingSubmission => 'Retard de soumission du dossier imputable au RMO.',
+                        $hasFinancingCorrection => 'Retard de correction du dossier imputable au RMO.',
+                        $isCorrection => 'Retard de correction imputable au responsable de l action.',
+                        default => 'Retard d execution imputable au responsable de l action.',
+                    }
                 );
             });
     }
@@ -179,7 +256,6 @@ class PersonalTaskService
                 'action.pta.service:id,libelle',
             ])
             ->latest()
-            ->limit(60)
             ->get()
             ->map(function (SousAction $subAction): array {
                 $deadline = $this->carbon($subAction->date_fin);
@@ -218,7 +294,6 @@ class PersonalTaskService
             ->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CHEF)
             ->whereHas('pta', fn (Builder $query) => $this->scopeToUserUnit($query, $user))
             ->latest('soumise_le')
-            ->limit(80)
             ->get()
             ->map(function (Action $action): array {
                 $received = $this->carbon($action->soumise_le) ?? $this->carbon($action->updated_at);
@@ -265,7 +340,6 @@ class PersonalTaskService
             ->where('statut', 'en_attente_validation_chef')
             ->whereHas('action.pta', fn (Builder $query) => $this->scopeToUserUnit($query, $user))
             ->latest('completed_at')
-            ->limit(80)
             ->get()
             ->map(function (SousAction $subAction): array {
                 $received = $this->carbon($subAction->completed_at)
@@ -300,6 +374,40 @@ class PersonalTaskService
     /**
      * @return Collection<int, array<string, mixed>>
      */
+    private function controllerValidationTasks(User $user, string $role): Collection
+    {
+        if (! in_array($role, ['sciq_planif', 'super_admin'], true)) {
+            return collect();
+        }
+
+        return Action::query()
+            ->with(['pta:id,direction_id,service_id,titre', 'pta.service:id,libelle', 'responsable:id,name'])
+            ->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_CONTROLE)
+            ->latest('evalue_le')
+            ->get()
+            ->map(function (Action $action): array {
+                $received = $this->carbon($action->evalue_le) ?? $this->carbon($action->updated_at);
+                $deadline = $received?->copy()->addHours(48);
+
+                return $this->task(
+                    key: 'controller-validation:'.$action->id,
+                    type: 'validation_controleur',
+                    title: 'Controle final',
+                    subject: (string) $action->libelle,
+                    context: $this->actionContext($action),
+                    responsible: $action->responsable?->name,
+                    receivedAt: $received,
+                    deadlineAt: $deadline,
+                    url: route('workspace.actions.suivi', $action).'#action-validation',
+                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
+                    scoreImpact: 'Retard impute au controleur, pas au RMO.'
+                );
+            });
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
     private function dafFinancingTasks(User $user, string $role): Collection
     {
         if ($role !== 'directeur_daf') {
@@ -313,7 +421,6 @@ class PersonalTaskService
                 Action::FINANCEMENT_SOUMIS_DAF,
             ])
             ->latest('financement_soumis_le')
-            ->limit(80)
             ->get()
             ->map(function (Action $action): array {
                 $received = $this->carbon($action->financement_soumis_le)
@@ -351,7 +458,6 @@ class PersonalTaskService
             ->where('financement_requis', true)
             ->where('financement_statut', Action::FINANCEMENT_TRANSMIS_DG)
             ->latest('financement_daf_le')
-            ->limit(80)
             ->get()
             ->map(function (Action $action): array {
                 $received = $this->carbon($action->financement_daf_le)
@@ -388,7 +494,6 @@ class PersonalTaskService
                 'action.responsable:id,name',
             ])
             ->latest()
-            ->limit(80)
             ->get()
             ->filter(fn (ActionLog $log): bool => $log->action instanceof Action
                 && $this->alertRoutingService->userCanSeeActionLog($user, $log))
@@ -437,7 +542,6 @@ class PersonalTaskService
                     ->with('requester:id,name')
                     ->where('status', DeletionRequest::STATUS_PENDING)
                     ->latest()
-                    ->limit(80)
                     ->get()
                     ->map(function (DeletionRequest $request): array {
                         $received = $this->carbon($request->created_at);
@@ -452,7 +556,7 @@ class PersonalTaskService
                             responsible: $request->requester?->name,
                             receivedAt: $received,
                             deadlineAt: $deadline,
-                            url: route('workspace.super-admin.organization.index').'#deletion-requests',
+                            url: route('workspace.deletion-requests.index', ['status' => DeletionRequest::STATUS_PENDING]).'#request-'.$request->id,
                             criticality: $this->criticalityFromDeadline($deadline, 'importante'),
                             scoreImpact: 'Retard de decision impute au Super Admin.'
                         );
@@ -465,7 +569,6 @@ class PersonalTaskService
                 ->where('requested_by', (int) $user->id)
                 ->where('status', DeletionRequest::STATUS_COMPLEMENT_REQUESTED)
                 ->latest('updated_at')
-                ->limit(40)
                 ->get()
                 ->map(function (DeletionRequest $request): array {
                     $received = $this->carbon($request->updated_at);
@@ -480,7 +583,7 @@ class PersonalTaskService
                         responsible: $request->reviewer?->name,
                         receivedAt: $received,
                         deadlineAt: $deadline,
-                        url: route('workspace.referentiel.utilisateurs.index'),
+                        url: route('workspace.deletion-requests.index', ['status' => DeletionRequest::STATUS_COMPLEMENT_REQUESTED]).'#request-'.$request->id,
                         criticality: $this->criticalityFromDeadline($deadline, 'importante'),
                         scoreImpact: 'Retard de complement impute au demandeur.'
                     );
@@ -499,26 +602,26 @@ class PersonalTaskService
             return collect();
         }
 
-        $status = $role === 'sciq_planif'
-            ? PlanningUnlockRequest::STATUS_SOUMISE
-            : PlanningUnlockRequest::STATUS_TRANSMISE;
-
         return PlanningUnlockRequest::query()
             ->with(['requester:id,name'])
-            ->where('status', $status)
+            ->whereIn('status', [
+                PlanningUnlockRequest::STATUS_SOUMISE,
+                PlanningUnlockRequest::STATUS_TRANSMISE,
+            ])
             ->latest('updated_at')
-            ->limit(80)
             ->get()
             ->map(function (PlanningUnlockRequest $request) use ($role): array {
-                $received = $role === 'dg'
-                    ? ($this->carbon($request->transferred_at) ?? $this->carbon($request->planif_avis_at) ?? $this->carbon($request->updated_at))
-                    : $this->carbon($request->created_at);
+                $isDg = $role === 'dg';
+                $received = $this->carbon($request->transferred_at)
+                    ?? $this->carbon($request->planif_avis_at)
+                    ?? $this->carbon($request->created_at)
+                    ?? $this->carbon($request->updated_at);
                 $deadline = $received?->copy()->addHours(48);
 
                 return $this->task(
                     key: 'planning-unlock:'.$role.':'.$request->id,
-                    type: $role === 'dg' ? 'decision_modification_dg' : 'controle_modification',
-                    title: $role === 'dg' ? 'Decision DG modification' : 'Controle modification',
+                    type: $isDg ? 'decision_modification_dg' : 'controle_modification',
+                    title: $isDg ? 'Decision modification' : 'Decision SCIQ/Planification',
                     subject: (string) ($request->target_label ?? 'Demande de modification'),
                     context: strtoupper((string) $request->module).' / '.(string) $request->reason,
                     responsible: $request->requester?->name,
@@ -526,9 +629,9 @@ class PersonalTaskService
                     deadlineAt: $deadline,
                     url: route('workspace.planning-unlocks.index').'#unlock-request-'.$request->id,
                     criticality: $this->criticalityFromDeadline($deadline, 'importante'),
-                    scoreImpact: $role === 'dg'
+                    scoreImpact: $isDg
                         ? 'Retard de decision impute au DG.'
-                        : 'Retard de controle impute au profil SCIQ/Planification.'
+                        : 'Retard de decision impute au profil SCIQ/Planification.'
                 );
             });
     }
@@ -623,11 +726,13 @@ class PersonalTaskService
         return [
             'key' => $key,
             'type' => $type,
+            'family' => $this->familyForType($type),
             'title' => $title,
             'subject' => $subject,
             'context' => $context ?: '-',
             'responsible' => $responsible ?: '-',
             'received_at' => $receivedAt,
+            'received_timestamp' => $receivedAt?->timestamp,
             'deadline_at' => $deadlineAt,
             'deadline_timestamp' => $deadlineAt?->timestamp,
             'remaining_minutes' => $remainingMinutes,
@@ -657,35 +762,134 @@ class PersonalTaskService
         return $remainingMinutes < 0 ? 'Retard '.$label : 'Reste '.$label;
     }
 
+    private function familyForType(string $type): string
+    {
+        return match ($type) {
+            'execution_action', 'execution_sous_action' => 'execution',
+            'correction_action', 'correction_financement', 'complement_suppression' => 'corrections',
+            'validation_chef', 'validation_sous_action_chef', 'validation_controleur' => 'validations',
+            'financement_rmo', 'financement_daf', 'financement_dg' => 'financements',
+            'alerte_action' => 'alertes',
+            'decision_suppression', 'decision_modification_dg', 'controle_modification' => 'decisions',
+            default => 'autres',
+        };
+    }
+
     /**
-     * @param Collection<int, array<string, mixed>> $items
+     * @param  Collection<int, array<string, mixed>>  $items
+     * @param  array{q?: string, vue?: string, famille?: string, tri?: string}  $filters
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function filterWorkspaceItems(Collection $items, array $filters): Collection
+    {
+        $search = $this->normalizeSearch((string) ($filters['q'] ?? ''));
+        $view = (string) ($filters['vue'] ?? 'toutes');
+        $family = (string) ($filters['famille'] ?? '');
+
+        return $items
+            ->filter(function (array $task) use ($search, $view, $family): bool {
+                if ($family !== '' && (string) ($task['family'] ?? 'autres') !== $family) {
+                    return false;
+                }
+
+                if ($search !== '') {
+                    $haystack = $this->normalizeSearch(implode(' ', [
+                        (string) ($task['title'] ?? ''),
+                        (string) ($task['subject'] ?? ''),
+                        (string) ($task['context'] ?? ''),
+                        (string) ($task['responsible'] ?? ''),
+                        (string) ($task['type'] ?? ''),
+                    ]));
+
+                    if (! str_contains($haystack, $search)) {
+                        return false;
+                    }
+                }
+
+                $remainingMinutes = $task['remaining_minutes'] ?? null;
+
+                return match ($view) {
+                    'retard' => (bool) ($task['is_overdue'] ?? false),
+                    'a_24h' => is_int($remainingMinutes) && $remainingMinutes >= 0 && $remainingMinutes <= 1440,
+                    'critiques' => (string) ($task['criticality'] ?? '') === 'critique',
+                    'sans_echeance' => ! (($task['deadline_at'] ?? null) instanceof Carbon),
+                    default => true,
+                };
+            })
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $items
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function sortWorkspaceItems(Collection $items, string $sort): Collection
+    {
+        return match ($sort) {
+            'echeance' => $items->sortBy(fn (array $task): string => sprintf(
+                '%d-%012d-%s',
+                ($task['deadline_timestamp'] ?? null) === null ? 1 : 0,
+                (int) ($task['deadline_timestamp'] ?? PHP_INT_MAX),
+                (string) ($task['title'] ?? '')
+            ))->values(),
+            'reception' => $items->sortByDesc(
+                fn (array $task): int => (int) ($task['received_timestamp'] ?? 0)
+            )->values(),
+            default => $items->values(),
+        };
+    }
+
+    private function normalizeSearch(string $value): string
+    {
+        return Str::of($value)
+            ->ascii()
+            ->lower()
+            ->squish()
+            ->toString();
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $items
      * @return array<string, mixed>
      */
     private function summary(User $user, Collection $items): array
     {
-        $total = $items->count();
-        $overdue = $items->where('is_overdue', true)->count();
-        $critical = $items->where('criticality', 'critique')->count();
-        $dueSoon = $items
-            ->filter(fn (array $task): bool => ! (bool) ($task['is_overdue'] ?? false)
-                && ($task['deadline_at'] ?? null) instanceof Carbon
-                && $task['deadline_at']->lessThanOrEqualTo(now()->addDay()))
-            ->count();
-
         $scoreSummary = $this->personalScoreService->summarize(
             $user,
             $this->workspaceService->specSidebarRole($user)
         );
 
         return [
-            'total' => $total,
-            'open' => $total,
-            'overdue' => $overdue,
-            'due_soon' => $dueSoon,
-            'critical' => $critical,
+            ...$this->operationalSummary($items),
             'score' => $scoreSummary['score'],
             'quality_label' => $scoreSummary['quality_label'],
             'components' => $scoreSummary['components'],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $items
+     * @return array{total: int, open: int, overdue: int, due_soon: int, critical: int, undated: int}
+     */
+    private function operationalSummary(Collection $items): array
+    {
+        $total = $items->count();
+
+        return [
+            'total' => $total,
+            'open' => $total,
+            'overdue' => $items->where('is_overdue', true)->count(),
+            'due_soon' => $items
+                ->filter(function (array $task): bool {
+                    $remainingMinutes = $task['remaining_minutes'] ?? null;
+
+                    return is_int($remainingMinutes) && $remainingMinutes >= 0 && $remainingMinutes <= 1440;
+                })
+                ->count(),
+            'critical' => $items->where('criticality', 'critique')->count(),
+            'undated' => $items
+                ->filter(fn (array $task): bool => ! (($task['deadline_at'] ?? null) instanceof Carbon))
+                ->count(),
         ];
     }
 }

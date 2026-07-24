@@ -13,6 +13,7 @@ use App\Models\SousAction;
 use App\Models\User;
 use App\Models\UserAssignmentHistory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\Concerns\CreatesAdminUser;
@@ -20,8 +21,8 @@ use Tests\TestCase;
 
 class SuperAdminOrgCrudTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -39,9 +40,9 @@ class SuperAdminOrgCrudTest extends TestCase
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.directions.store'), [
-                'code'    => 'DTEST',
+                'code' => 'DTEST',
                 'libelle' => 'Direction de test',
-                'actif'   => '1',
+                'actif' => '1',
             ])
             ->assertRedirect(route('workspace.super-admin.organization.index'));
 
@@ -55,14 +56,14 @@ class SuperAdminOrgCrudTest extends TestCase
 
         $this->actingAs($superAdmin)
             ->put(route('workspace.super-admin.organization.directions.update', $direction), [
-                'code'    => 'DTEST',
+                'code' => 'DTEST',
                 'libelle' => 'Direction modifiee',
-                'actif'   => '1',
+                'actif' => '1',
             ])
             ->assertRedirect(route('workspace.super-admin.organization.index'));
 
         $this->assertDatabaseHas('directions', [
-            'code'    => 'DTEST',
+            'code' => 'DTEST',
             'libelle' => 'Direction modifiee',
         ]);
         $this->assertDatabaseHas('journal_audit', [
@@ -74,8 +75,8 @@ class SuperAdminOrgCrudTest extends TestCase
     public function test_super_admin_can_toggle_direction_status(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $direction  = Direction::query()->firstOrFail();
-        $initial    = (bool) $direction->actif;
+        $direction = Direction::query()->firstOrFail();
+        $initial = (bool) $direction->actif;
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.directions.toggle', $direction))
@@ -87,13 +88,13 @@ class SuperAdminOrgCrudTest extends TestCase
     public function test_direction_code_must_be_unique(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $existing   = Direction::query()->firstOrFail();
+        $existing = Direction::query()->firstOrFail();
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.directions.store'), [
-                'code'    => $existing->code,
+                'code' => $existing->code,
                 'libelle' => 'Doublon',
-                'actif'   => '1',
+                'actif' => '1',
             ])
             ->assertSessionHasErrors('code');
     }
@@ -105,14 +106,14 @@ class SuperAdminOrgCrudTest extends TestCase
     public function test_super_admin_can_create_and_update_a_service(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $direction  = Direction::query()->firstOrFail();
+        $direction = Direction::query()->firstOrFail();
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.services.store'), [
                 'direction_id' => $direction->id,
-                'code'         => 'SVTEST',
-                'libelle'      => 'Service de test',
-                'actif'        => '1',
+                'code' => 'SVTEST',
+                'libelle' => 'Service de test',
+                'actif' => '1',
             ])
             ->assertRedirect(route('workspace.super-admin.organization.index'));
 
@@ -126,9 +127,9 @@ class SuperAdminOrgCrudTest extends TestCase
         $this->actingAs($superAdmin)
             ->put(route('workspace.super-admin.organization.services.update', $service), [
                 'direction_id' => $direction->id,
-                'code'         => 'SVTEST',
-                'libelle'      => 'Service modifie',
-                'actif'        => '1',
+                'code' => 'SVTEST',
+                'libelle' => 'Service modifie',
+                'actif' => '1',
             ])
             ->assertRedirect(route('workspace.super-admin.organization.index'));
 
@@ -138,8 +139,8 @@ class SuperAdminOrgCrudTest extends TestCase
     public function test_super_admin_can_toggle_service_status(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $service    = Service::query()->firstOrFail();
-        $initial    = (bool) $service->actif;
+        $service = Service::query()->firstOrFail();
+        $initial = (bool) $service->actif;
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.services.toggle', $service))
@@ -161,17 +162,17 @@ class SuperAdminOrgCrudTest extends TestCase
         // Create
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.users.store'), [
-                'name'                  => 'Agent test unitaire',
-                'email'                 => 'agent.crud@anbg.test',
-                'role'                  => User::ROLE_AGENT,
-                'direction_id'          => $direction->id,
-                'service_id'            => $service->id,
-                'is_active'             => '1',
-                'is_agent'              => '1',
-                'agent_matricule'       => 'MAT-CRUD-001',
-                'agent_fonction'        => 'Agent test',
-                'agent_telephone'       => '060101010',
-                'password'              => 'Password-Crud@123',
+                'name' => 'Agent test unitaire',
+                'email' => 'agent.crud@anbg.test',
+                'role' => User::ROLE_AGENT,
+                'direction_id' => $direction->id,
+                'service_id' => $service->id,
+                'is_active' => '1',
+                'is_agent' => '1',
+                'agent_matricule' => 'MAT-CRUD-001',
+                'agent_fonction' => 'Agent test',
+                'agent_telephone' => '060101010',
+                'password' => 'Password-Crud@123',
                 'password_confirmation' => 'Password-Crud@123',
             ])
             ->assertRedirect(route('workspace.super-admin.organization.index'));
@@ -187,11 +188,11 @@ class SuperAdminOrgCrudTest extends TestCase
         // Update (sans changer le MDP)
         $this->actingAs($superAdmin)
             ->put(route('workspace.super-admin.organization.users.update', $managed), [
-                'name'      => 'Agent test modifie',
-                'email'     => 'agent.crud@anbg.test',
-                'role'      => User::ROLE_AGENT,
+                'name' => 'Agent test modifie',
+                'email' => 'agent.crud@anbg.test',
+                'role' => User::ROLE_AGENT,
                 'is_active' => '1',
-                'is_agent'  => '1',
+                'is_agent' => '1',
             ])
             ->assertRedirect(route('workspace.super-admin.organization.index'));
 
@@ -512,11 +513,11 @@ class SuperAdminOrgCrudTest extends TestCase
 
         $this->actingAs($superAdmin)
             ->put(route('workspace.super-admin.organization.users.update', $superAdmin), [
-                'name'      => $superAdmin->name,
-                'email'     => $superAdmin->email,
-                'role'      => User::ROLE_ADMIN,
+                'name' => $superAdmin->name,
+                'email' => $superAdmin->email,
+                'role' => User::ROLE_ADMIN,
                 'is_active' => '1',
-                'is_agent'  => '0',
+                'is_agent' => '0',
             ])
             ->assertSessionHasErrors('role');
 
@@ -539,12 +540,12 @@ class SuperAdminOrgCrudTest extends TestCase
     // Reset password — sécurité
     // ───────────────────────────────────────────────
 
-    public function test_reset_password_generates_random_password_and_does_not_expose_it_in_success_message(): void
+    public function test_reset_password_generates_temporary_password_and_forces_renewal(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $agent      = User::factory()->create([
-            'role'              => User::ROLE_AGENT,
-            'email'             => 'reset.security@anbg.test',
+        $agent = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'email' => 'reset.security@anbg.test',
             'password_changed_at' => now(),
         ]);
 
@@ -563,11 +564,10 @@ class SuperAdminOrgCrudTest extends TestCase
         // Vérifier que l'agent peut se connecter avec le nouveau MDP
         $temporaryPassword = $response->getSession()->get('temporary_password_value');
         $agent->refresh();
+        $this->assertNotSame('Anbg@2026!Pas', $temporaryPassword);
+        $this->assertGreaterThanOrEqual(12, strlen((string) $temporaryPassword));
         $this->assertTrue(Hash::check($temporaryPassword, $agent->password));
-
-        // Vérifier que le MDP n'est pas prévisible (pas de format TempPass@)
-        $this->assertStringNotContainsString('TempPass@', $temporaryPassword);
-        $this->assertGreaterThanOrEqual(10, strlen($temporaryPassword));
+        $this->assertNull($agent->password_changed_at);
 
         $this->assertDatabaseHas('journal_audit', [
             'module' => 'super_admin',
@@ -588,7 +588,7 @@ class SuperAdminOrgCrudTest extends TestCase
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.users.import'), [
-                'users_file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('too-large.csv', $csv),
+                'users_file' => UploadedFile::fake()->createWithContent('too-large.csv', $csv),
             ])
             ->assertSessionHasErrors('users_file');
     }

@@ -5,12 +5,12 @@ namespace Tests\Feature;
 use App\Jobs\NotifyImportedParametreActionsJob;
 use App\Models\Action;
 use App\Models\Direction;
-use App\Models\PlanningImport;
 use App\Models\Pas;
+use App\Models\PlanningImport;
 use App\Models\Pta;
 use App\Models\Service;
-use App\Models\User;
 use App\Models\SousAction;
+use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\DeletionRequestService;
 use App\Services\Imports\PlanningExcelImportService;
@@ -440,8 +440,8 @@ class PlanningExcelImportServiceTest extends TestCase
         ]));
 
         $this->assertTrue($preview['has_errors']);
-        $this->assertStringContainsString('quantite_cible', $preview['rows'][0]['message']);
-        $this->assertStringContainsString('unite_cible', $preview['rows'][0]['message']);
+        $this->assertStringContainsString('La quantite a realiser', $preview['rows'][0]['message']);
+        $this->assertStringContainsString('L unite', $preview['rows'][0]['message']);
     }
 
     public function test_trimestriel_threshold_requires_quarter_values(): void
@@ -488,6 +488,41 @@ class PlanningExcelImportServiceTest extends TestCase
             'libelle' => 'Action importee',
             'statut_parametrage' => 'a_parametrer',
         ]);
+    }
+
+    public function test_update_import_preserves_existing_action_dates(): void
+    {
+        $fixture = $this->fixture();
+        $this->muteNotifications();
+        $service = app(PlanningExcelImportService::class);
+
+        $initialPreview = $service->validateSheet($this->sheet([$this->row()]));
+        $this->executePreview($service, $fixture['admin'], $initialPreview);
+        $action = Action::query()->where('libelle', 'Action importee')->firstOrFail();
+        $action->forceFill([
+            'echeance_cible' => '2026-06-30',
+        ])->save();
+
+        $updatePreview = $service->validateSheet($this->sheet([
+            $this->row([
+                'libelle_action' => 'Action importee corrigee',
+                'date_debut_action' => '2026-02-01',
+                'date_fin_action' => '2026-11-30',
+            ]),
+        ]));
+        $this->executePreview(
+            $service,
+            $fixture['admin'],
+            $updatePreview,
+            PlanningImport::MODE_UPDATE_EXISTING
+        );
+
+        $action->refresh();
+        $this->assertSame('Action importee corrigee', $action->libelle);
+        $this->assertSame('2026-01-10', $action->date_debut->toDateString());
+        $this->assertSame('2026-06-30', $action->date_fin->toDateString());
+        $this->assertSame('2026-06-30', $action->date_echeance->toDateString());
+        $this->assertSame('2026-06-30', $action->echeance_cible->toDateString());
     }
 
     public function test_typed_import_does_not_queue_assigned_rmo_notifications_before_pta_save(): void
@@ -581,7 +616,17 @@ class PlanningExcelImportServiceTest extends TestCase
         $dashboardData = $payload['dashboardData'] ?? [];
         $statusCards = collect($dashboardData['status_cards'] ?? []);
 
+        $this->assertStringContainsString('dashboard-requested-area-interactive-chart', $content);
+        $this->assertStringContainsString('dashboard-requested-bar-label-chart', $content);
+        $this->assertStringContainsString('dashboard-requested-bar-custom-label-chart', $content);
+        $this->assertStringContainsString('dashboard-requested-bar-multiple-chart', $content);
+        $this->assertStringContainsString('dashboard-requested-pie-legend-chart', $content);
+        $this->assertStringContainsString('dashboard-requested-radial-label-chart', $content);
+        $this->assertStringNotContainsString('dashboard-decision-pta-execution-chart', $content);
         $this->assertSame(1, (int) ($dashboardData['decision_counts']['actions_total'] ?? 0));
+        $this->assertArrayHasKey('decision_charts', $dashboardData);
+        $this->assertArrayHasKey('pas_evolution', $dashboardData['decision_charts'] ?? []);
+        $this->assertArrayHasKey('pta_execution', $dashboardData['decision_charts'] ?? []);
         $this->assertSame(1, (int) ($statusCards->firstWhere('key', 'a_parametrer')['count'] ?? 0));
     }
 
@@ -590,8 +635,12 @@ class PlanningExcelImportServiceTest extends TestCase
         Bus::fake([NotifyImportedParametreActionsJob::class]);
     }
 
-    private function executePreview(PlanningExcelImportService $service, User $admin, array $preview): PlanningImport
-    {
+    private function executePreview(
+        PlanningExcelImportService $service,
+        User $admin,
+        array $preview,
+        string $mode = PlanningImport::MODE_CREATE_ONLY
+    ): PlanningImport {
         $import = PlanningImport::query()->create([
             'user_id' => $admin->id,
             'filename' => 'import.csv',
@@ -602,7 +651,7 @@ class PlanningExcelImportServiceTest extends TestCase
             'status' => 'preview_ready',
         ]);
 
-        return $service->execute($import, PlanningImport::MODE_CREATE_ONLY, $admin, '127.0.0.1');
+        return $service->execute($import, $mode, $admin, '127.0.0.1');
     }
 
     private function dashboardPayloadFrom(string $html): array

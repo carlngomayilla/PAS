@@ -22,9 +22,9 @@ class DashboardSynthesisDropdownTest extends TestCase
     {
         $view = (string) file_get_contents(resource_path('views/partials/dashboard-analytics.blade.php'));
         $overview = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-overview.blade.php'));
-        $hierarchy = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-synthesis-hierarchy.blade.php'));
         $tables = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-tables.blade.php'));
         $detailTables = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-synthesis-tables.blade.php'));
+        $hierarchy = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-synthesis-hierarchy.blade.php'));
         $controller = (string) file_get_contents(app_path('Http/Controllers/DashboardController.php'));
         $css = (string) file_get_contents(resource_path('css/app.css'));
         $script = (string) file_get_contents(resource_path('js/dashboard-render.js'));
@@ -45,21 +45,8 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringNotContainsString('$personalTaskItems', $overview);
         $this->assertStringContainsString('Alertes critiques', $overview);
         $this->assertStringContainsString('_panel-synthesis-hierarchy', $overview);
-        $this->assertStringContainsString('data-dashboard-synthesis-hierarchy', $hierarchy);
-        $this->assertStringContainsString('Vue synthetique d\'avancement PAS', $hierarchy);
-        $this->assertStringContainsString('PAS -> Axes -> Objectifs -> PAO/PTA -> Actions', $hierarchy);
-        $this->assertStringContainsString('Voir pourquoi', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-hierarchy-card', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-node-pas', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-node-axis', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-node-strategic-objective', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-node-operational-objective', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-node-pta', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-node-action', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-node-sub-action', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-kpi-axis', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-kpi-late', $hierarchy);
-        $this->assertStringContainsString('dashboard-synthesis-kpi-sub-action', $hierarchy);
+        $this->assertStringContainsString('Vue synthetique des axes', $hierarchy);
+        $this->assertStringNotContainsString("Vue synthetique d'avancement PAS", $hierarchy);
         $this->assertStringContainsString('$showSynthesisTablesInOverview ?? false', $overview);
         $this->assertStringContainsString('_panel-synthesis-tables', $tables);
         $this->assertStringContainsString('Tableaux de synthese', $detailTables);
@@ -84,7 +71,7 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringNotContainsString('@if (false', $overview);
     }
 
-    public function test_dashboard_charts_focus_on_status_and_pta_evolution_graphs(): void
+    public function test_dashboard_charts_use_requested_visual_renderings_only(): void
     {
         $charts = (string) file_get_contents(resource_path('views/partials/dashboard-analytics/_panel-charts.blade.php'));
 
@@ -92,10 +79,22 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringNotContainsString('Evolution mensuelle', $charts);
         $this->assertStringNotContainsString('Services PTA', $charts);
         $this->assertStringNotContainsString('Meilleures actions', $charts);
-        $this->assertStringContainsString('dashboard-status-mix-chart', $charts);
-        $this->assertStringContainsString('dashboard-pta-axis-rate-chart', $charts);
-        $this->assertStringContainsString('dashboard-pta-monthly-rate-chart', $charts);
-        $this->assertStringContainsString('dashboard-canvas-evolution', $charts);
+        $this->assertStringNotContainsString('dashboard-status-mix-chart', $charts);
+        $this->assertStringNotContainsString('dashboard-pta-axis-rate-chart', $charts);
+        $this->assertStringNotContainsString('dashboard-pta-monthly-rate-chart', $charts);
+        $this->assertStringNotContainsString('dashboard-kpi-gauge-', $charts);
+        $this->assertStringContainsString("Évolution de l'avancement du PAS", $charts);
+        $this->assertStringContainsString('Avancement des axes stratégiques', $charts);
+        $this->assertStringContainsString('Avancement des objectifs opérationnels', $charts);
+        $this->assertStringContainsString('Exécution trimestrielle des PTA', $charts);
+        $this->assertStringContainsString('Répartition des actions par statut', $charts);
+        $this->assertStringContainsString('Lecture des niveaux de pilotage', $charts);
+        $this->assertStringContainsString('charts-requested-meta', $charts);
+        $this->assertStringContainsString('dashboard-requested-area-interactive-chart', $charts);
+        $this->assertStringContainsString('dashboard-requested-pie-legend-chart', $charts);
+        $this->assertStringContainsString('dashboard-requested-radial-label-chart', $charts);
+        $this->assertStringNotContainsString('dashboard-requested-pie-custom-label-chart', $charts);
+        $this->assertStringNotContainsString('dashboard-requested-pie-label-list-chart', $charts);
         $this->assertStringNotContainsString('@if (false', $charts);
     }
 }

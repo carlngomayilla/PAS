@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -80,9 +80,10 @@ class DynamicReferentialSettings
         $settings['alert_level_labels'] = $this->sanitizeKeyValueLabels(
             is_array($settings['alert_level_labels'] ?? null) ? $settings['alert_level_labels'] : [],
             [
-                'warning' => 'Attention',
+                'warning' => 'Vigilance',
                 'critical' => 'Critique',
                 'urgence' => 'Urgence',
+                'conforme' => 'Conforme',
                 'info' => 'Info',
             ]
         );
@@ -93,6 +94,9 @@ class DynamicReferentialSettings
                 'soumise_chef' => 'Soumise au chef',
                 'rejetee_chef' => 'Rejetee par le chef',
                 'validee_chef' => 'Validee chef',
+                'soumise_controle' => 'Soumise au controle',
+                'correction_controle' => 'Correction demandee par le controle',
+                'validee_controle' => 'Validee par le controle',
                 'rejetee_direction' => 'Rejetee direction',
                 'validee_direction' => 'Validee direction',
             ]
@@ -108,8 +112,8 @@ class DynamicReferentialSettings
     {
         return [
             'action_target_type_labels' => [
-                'quantitative' => 'Cible quantitative',
-                'qualitative' => 'Cible par sous-action',
+                'quantitative' => 'Quantite a realiser',
+                'qualitative' => 'Livrable attendu',
             ],
             'action_unit_suggestions' => [
                 'dossiers',
@@ -144,9 +148,10 @@ class DynamicReferentialSettings
                 'financement_dg' => 'Accord DG financement',
             ],
             'alert_level_labels' => [
-                'warning' => 'Attention',
+                'warning' => 'Vigilance',
                 'critical' => 'Critique',
                 'urgence' => 'Urgence',
+                'conforme' => 'Conforme',
                 'info' => 'Info',
             ],
             'validation_status_labels' => [
@@ -154,6 +159,9 @@ class DynamicReferentialSettings
                 'soumise_chef' => 'Soumise au chef',
                 'rejetee_chef' => 'Rejetee par le chef',
                 'validee_chef' => 'Validee chef',
+                'soumise_controle' => 'Soumise au controle',
+                'correction_controle' => 'Correction demandee par le controle',
+                'validee_controle' => 'Validee par le controle',
                 'rejetee_direction' => 'Rejetee direction',
                 'validee_direction' => 'Validee direction',
             ],
@@ -329,6 +337,7 @@ class DynamicReferentialSettings
                 'warning' => Arr::get($payload, 'alert_level_label_warning'),
                 'critical' => Arr::get($payload, 'alert_level_label_critical'),
                 'urgence' => Arr::get($payload, 'alert_level_label_urgence'),
+                'conforme' => Arr::get($payload, 'alert_level_label_conforme'),
                 'info' => Arr::get($payload, 'alert_level_label_info'),
             ], $this->defaults()['alert_level_labels']),
             'validation_status_labels' => $this->sanitizeKeyValueLabels([
@@ -417,6 +426,7 @@ class DynamicReferentialSettings
 
         return $resolved;
     }
+
     private function hasSettingsTable(): bool
     {
         if ($this->tableAvailable !== null) {
@@ -424,10 +434,9 @@ class DynamicReferentialSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }
     }
 }
-

@@ -214,7 +214,7 @@
                         <div class="row">
                             <div class="time"><span class="day">15:00</span>13.03.26</div>
                             <div class="file">align_pas_structure_metadata<span class="ext">.php</span>
-                                <span class="desc">Pose le squelette de gouvernance sur tout l'arbre stratégique. <code class="inline" style="font-size:11px;">created_by</code> + <b>soft deletes</b> sur <code class="inline" style="font-size:11px;">pas</code>, <code class="inline" style="font-size:11px;">pas_axes</code>, <code class="inline" style="font-size:11px;">pas_objectifs</code>. Les axes gagnent leur propre <code class="inline" style="font-size:11px;">periode_debut/fin</code>. L'objectif gagne <code class="inline" style="font-size:11px;">valeurs_cible</code> (JSON) — la cible n'est plus scalaire mais structurée.</span>
+                                <span class="desc">Pose le squelette de gouvernance sur tout l'arbre stratégique. <code class="inline" style="font-size:11px;">created_by</code> + <b>soft deletes</b> sur <code class="inline" style="font-size:11px;">pas</code>, <code class="inline" style="font-size:11px;">pas_axes</code>, <code class="inline" style="font-size:11px;">pas_objectifs</code>. Les axes gagnent leur propre <code class="inline" style="font-size:11px;">periode_debut/fin</code>. L'objectif gagne <code class="inline" style="font-size:11px;">valeurs_cible</code> (JSON) — la valeur attendue n'est plus scalaire mais structurée.</span>
                             </div>
                             <div class="tag"><span class="t gov">gouvernance</span></div>
                             <div class="impact"><div class="v">+3 tbl</div></div>
@@ -342,8 +342,8 @@
                         </div>
                         <div class="impact ok">
                             <div class="h">13.03 · pas</div>
-                            <div class="t">Périodes d'axe & cibles JSON</div>
-                            <div class="d"><code>pas_axes.periode_debut/fin</code> — un PAS pluri-annuel peut porter des axes à horizons distincts. <code>valeurs_cible</code> (JSON) libère la cible d'objectif : structurée, multiple, typée.</div>
+                            <div class="t">Périodes d'axe & valeurs attendues JSON</div>
+                            <div class="d"><code>pas_axes.periode_debut/fin</code> — un PAS pluri-annuel peut porter des axes à horizons distincts. <code>valeurs_cible</code> (JSON) libère la valeur attendue d'objectif : structurée, multiple, typée.</div>
                         </div>
                     </div>
                 </section>

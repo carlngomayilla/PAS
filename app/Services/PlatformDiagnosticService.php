@@ -6,45 +6,19 @@ use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\ExportTemplateAssignment;
 use App\Models\JournalAudit;
+use App\Models\Justificatif;
 use App\Models\Pao;
 use App\Models\Pta;
-use App\Models\Justificatif;
-use App\Models\Service;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 class PlatformDiagnosticService
 {
-    /**
-     * @var list<string>
-     */
-    private const INTERVENTION_MODULES = [
-        'planning_unlock',
-    ];
-
-    /**
-     * @var list<string>
-     */
-    private const INTERVENTION_ACTIONS = [
-        'submit_validation_chef',
-        'submit_sub_action_validation_chef',
-        'review_action_validate',
-        'review_action_reject',
-        'review_sub_action_validate',
-        'review_sub_action_reject',
-        'review_financing_daf',
-        'review_financing_dg',
-        'update_financing_status_daf',
-        'deletion_request_create',
-        'deletion_request_decision',
-    ];
-
     public function __construct(
         private readonly WorkspaceModuleSettings $workspaceModuleSettings
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<string, int>
@@ -89,12 +63,6 @@ class PlatformDiagnosticService
     public function checks(): array
     {
         $rows = [
-            $this->makeCheck(
-                'actions_without_weeks',
-                'Actions sans periodes de suivi',
-                Action::query()->doesntHave('weeks')->count(),
-                'Les actions sans semaines ne remontent pas correctement dans le suivi.'
-            ),
             $this->makeCheck(
                 'actions_without_responsable',
                 'Actions sans responsable',
@@ -215,93 +183,6 @@ class PlatformDiagnosticService
     }
 
     /**
-     * @param  array<string, mixed>  $filters
-     * @return array<string, mixed>
-     */
-    public function filteredAuditSummary(array $filters = []): array
-    {
-        $query = JournalAudit::query();
-
-        if (($filters['module'] ?? '') !== '') {
-            $query->where('module', (string) $filters['module']);
-        }
-
-        if (($filters['action'] ?? '') !== '') {
-            $query->where('action', (string) $filters['action']);
-        }
-
-        if (! empty($filters['user_id'])) {
-            $query->where('user_id', (int) $filters['user_id']);
-        }
-
-        if (($filters['entite_type'] ?? '') !== '') {
-            $query->where('entite_type', (string) $filters['entite_type']);
-        }
-
-        if (! empty($filters['entite_id'])) {
-            $query->where('entite_id', (int) $filters['entite_id']);
-        }
-
-        if (($filters['date_from'] ?? '') !== '') {
-            $query->whereDate('created_at', '>=', (string) $filters['date_from']);
-        }
-
-        if (($filters['date_to'] ?? '') !== '') {
-            $query->whereDate('created_at', '<=', (string) $filters['date_to']);
-        }
-
-        if (($filters['q'] ?? '') !== '') {
-            $search = trim((string) $filters['q']);
-            $query->where(function ($subQuery) use ($search): void {
-                $subQuery->where('module', 'like', "%{$search}%")
-                    ->orWhere('action', 'like', "%{$search}%")
-                    ->orWhere('entite_type', 'like', "%{$search}%");
-            });
-        }
-
-        if (($filters['operation_scope'] ?? '') === 'interventions') {
-            $query->where(function ($interventionQuery): void {
-                $interventionQuery
-                    ->whereIn('module', self::INTERVENTION_MODULES)
-                    ->orWhereIn('action', self::INTERVENTION_ACTIONS)
-                    ->orWhere('action', 'like', '%deletion_request%');
-            });
-        }
-
-        $countQuery = clone $query;
-        $distinctUsers = (clone $query)
-            ->whereNotNull('user_id')
-            ->distinct('user_id')
-            ->count('user_id');
-        $superAdminActions = (clone $query)
-            ->where('module', 'super_admin')
-            ->count();
-        $sensitiveActions = (clone $query)
-            ->where(function ($sensitiveQuery): void {
-                $sensitiveQuery->where('module', 'super_admin')
-                    ->orWhere('action', 'like', 'maintenance_%')
-                    ->orWhere('action', 'like', '%permission%')
-                    ->orWhere('action', 'like', '%workflow%');
-            })
-            ->count();
-        $organizationActions = (clone $query)
-            ->where('action', 'like', 'organization_%')
-            ->count();
-        $modulesTouched = (clone $query)
-            ->distinct('module')
-            ->count('module');
-
-        return [
-            'total' => $countQuery->count(),
-            'distinct_users' => $distinctUsers,
-            'super_admin_actions' => $superAdminActions,
-            'sensitive_actions' => $sensitiveActions,
-            'organization_actions' => $organizationActions,
-            'modules_touched' => $modulesTouched,
-        ];
-    }
-
-    /**
      * @return array<string, mixed>
      */
     private function makeCheck(string $code, string $label, int $count, string $recommendation): array
@@ -316,7 +197,7 @@ class PlatformDiagnosticService
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, JournalAudit>
+     * @return Collection<int, JournalAudit>
      */
     private function sensitiveAuditRows()
     {

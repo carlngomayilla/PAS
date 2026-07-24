@@ -54,7 +54,7 @@ class DashboardDelayStatusTest extends TestCase
             'date_echeance' => Carbon::parse('2026-06-10'),
             'evalue_le' => Carbon::parse('2026-06-12 09:00:00'),
             'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ]);
 
         $this->assertSame('Achevee hors delai', $this->invokeDashboardMethod('delayStatusLabel', $action));

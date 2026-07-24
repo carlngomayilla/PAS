@@ -64,7 +64,7 @@ class PlanningExcelImportService
      * l'enregistre pas officiellement dans le PTA.
      *
      * Format de `sous_actions` (cellule unique) : sous-actions separees par ';',
-     * champs par '|' dans l'ordre  libelle|type|poids|cible|unite.
+     * champs par '|' dans l'ordre  libelle|type|poids|quantite|unite.
      * Codes import : Q = quantitative, NQ = non quantitative, M = composee.
      *   Ex: "Former 20 agents|Q|50|20|agents ; Rediger guide|NQ|50||"
      */
@@ -151,8 +151,7 @@ class PlanningExcelImportService
     public function __construct(
         private readonly SimpleSpreadsheet $spreadsheet,
         private readonly PlanningImportCodeGenerator $codes
-    ) {
-    }
+    ) {}
 
     public function canImport(User $user): bool
     {
@@ -236,7 +235,7 @@ class PlanningExcelImportService
     }
 
     /**
-     * @param array<string,string|null> $mapping target column => source header
+     * @param  array<string,string|null>  $mapping  target column => source header
      */
     public function applyColumnMapping(PlanningImport $import, array $mapping, User $user): PlanningImport
     {
@@ -257,10 +256,12 @@ class PlanningExcelImportService
             $source = trim((string) ($mapping[$targetColumn] ?? ''));
             if ($source === '') {
                 $errors[] = 'La colonne '.$targetColumn.' doit etre associee a une colonne du fichier.';
+
                 continue;
             }
             if (! in_array($source, $headers, true)) {
                 $errors[] = 'La colonne source '.$source.' est introuvable dans le fichier.';
+
                 continue;
             }
             $normalizedMapping[$targetColumn] = $source;
@@ -310,7 +311,7 @@ class PlanningExcelImportService
     }
 
     /**
-     * @param array{sheet_count:int,sheet_name:string,headers:list<string>,rows:list<array<string,mixed>>} $sheet
+     * @param  array{sheet_count:int,sheet_name:string,headers:list<string>,rows:list<array<string,mixed>>}  $sheet
      * @return array<string,mixed>
      */
     public function validateSheet(array $sheet): array
@@ -446,6 +447,7 @@ class PlanningExcelImportService
                 $agent = $this->findAgentByCode($agentCode);
                 if (! $agent instanceof User) {
                     $errors[] = 'Code agent '.$agentCode.' introuvable.';
+
                     continue;
                 }
 
@@ -508,7 +510,7 @@ class PlanningExcelImportService
     }
 
     /**
-     * @param array{sheet_count:int,sheet_name:string,headers:list<string>,rows:list<array<string,mixed>>} $sheet
+     * @param  array{sheet_count:int,sheet_name:string,headers:list<string>,rows:list<array<string,mixed>>}  $sheet
      * @return list<string>
      */
     private function strictWorkbookErrors(array $sheet): array
@@ -540,7 +542,7 @@ class PlanningExcelImportService
     }
 
     /**
-     * @param list<string> $headers
+     * @param  list<string>  $headers
      */
     private function hasExactRequiredHeaders(array $headers): bool
     {
@@ -552,7 +554,7 @@ class PlanningExcelImportService
     }
 
     /**
-     * @param array{sheet_count:int,sheet_name:string,sheet_names?:list<string>} $sheet
+     * @param  array{sheet_count:int,sheet_name:string,sheet_names?:list<string>}  $sheet
      */
     private function hasOptionalGuideSheet(array $sheet): bool
     {
@@ -568,9 +570,9 @@ class PlanningExcelImportService
      * est renseigne. Une cellule `type_action` vide signifie "je parametrerai
      * dans l'appli" : la ligne reste valide et l'action sera 'a_parametrer'.
      *
-     * @param array<string,mixed> $normalized
-     * @param list<string> $errors
-     * @param list<string> $warnings
+     * @param  array<string,mixed>  $normalized
+     * @param  list<string>  $errors
+     * @param  list<string>  $warnings
      */
     private function validateParametrage(array $normalized, array &$errors, array &$warnings): void
     {
@@ -588,10 +590,10 @@ class PlanningExcelImportService
 
         if ($type === Action::TYPE_QUANTITATIVE) {
             if (! is_numeric($normalized['quantite_cible'] ?? null) || (float) $normalized['quantite_cible'] <= 0) {
-                $errors[] = 'quantite_cible doit etre numerique et positive lorsque type_action = Q.';
+                $errors[] = 'La quantite a realiser doit etre numerique et positive lorsque type_action = Q.';
             }
             if (trim((string) ($normalized['unite_cible'] ?? '')) === '') {
-                $errors[] = 'unite_cible est obligatoire lorsque type_action = Q.';
+                $errors[] = 'L unite est obligatoire lorsque type_action = Q.';
             }
         }
 
@@ -632,11 +634,11 @@ class PlanningExcelImportService
 
     /**
      * Parse la cellule `sous_actions`. Format : sous-actions separees par ';',
-     * champs par '|' dans l'ordre  libelle|type|poids|cible|unite.
+     * champs par '|' dans l'ordre  libelle|type|poids|quantite|unite.
      * Le type de sous-action attend les codes Q ou NQ (anciens libelles acceptes).
      *
-     * @param list<string> $warnings
-     * @param list<string> $errors
+     * @param  list<string>  $warnings
+     * @param  list<string>  $errors
      * @return list<array{libelle:string,type:string,weight:?float,cible:?float,unite:string}>
      */
     private function parseSousActions(string $value, array &$warnings = [], array &$errors = []): array
@@ -658,7 +660,8 @@ class PlanningExcelImportService
             $parts = array_map('trim', explode('|', $chunk));
             $libelle = $parts[0] ?? '';
             if ($libelle === '') {
-                $errors[] = 'Chaque sous-action doit avoir un libelle (format attendu: libelle|type|poids|cible|unite).';
+                $errors[] = 'Chaque sous-action doit avoir un libelle (format attendu: libelle|type|poids|quantite|unite).';
+
                 continue;
             }
 
@@ -688,7 +691,7 @@ class PlanningExcelImportService
 
             $cible = ($cibleRaw !== '' && is_numeric($cibleRaw)) ? (float) $cibleRaw : null;
             if ($type === SousAction::TYPE_QUANTITATIVE && $cible === null) {
-                $warnings[] = 'La sous-action "'.$libelle.'" est quantitative sans cible numerique.';
+                $warnings[] = 'La sous-action "'.$libelle.'" est quantitative sans quantite numerique.';
             }
 
             $items[] = [
@@ -708,7 +711,7 @@ class PlanningExcelImportService
     }
 
     /**
-     * @param list<string> $headers
+     * @param  list<string>  $headers
      * @return array<string,string>
      */
     private function suggestedMapping(array $headers): array
@@ -726,8 +729,8 @@ class PlanningExcelImportService
     }
 
     /**
-     * @param array{sheet_count:int,sheet_name:string,headers:list<string>,rows:list<array<string,mixed>>} $sheet
-     * @param list<string> $errors
+     * @param  array{sheet_count:int,sheet_name:string,headers:list<string>,rows:list<array<string,mixed>>}  $sheet
+     * @param  list<string>  $errors
      * @return array<string,mixed>
      */
     private function errorPreview(array $sheet, array $errors): array
@@ -817,8 +820,8 @@ class PlanningExcelImportService
     }
 
     /**
-     * @param array<string,mixed> $stats
-     * @param list<int> $touchedPtaIds
+     * @param  array<string,mixed>  $stats
+     * @param  list<int>  $touchedPtaIds
      */
     private function persistRow(array $row, string $mode, User $user, ?string $ipAddress, array &$stats, array &$touchedPtaIds = []): void
     {
@@ -930,6 +933,7 @@ class PlanningExcelImportService
         }
         if ($action instanceof Action && $mode === PlanningImport::MODE_SKIP_DUPLICATES) {
             $stats['skipped']++;
+
             return;
         }
         if ($action instanceof Action) {
@@ -991,6 +995,10 @@ class PlanningExcelImportService
 
         if ($action instanceof Action) {
             $before = $action->getAttributes();
+            $payload['date_debut'] = optional($action->date_debut)->format('Y-m-d');
+            $payload['date_fin'] = optional($action->date_fin)->format('Y-m-d');
+            $payload['date_echeance'] = optional($action->date_echeance)->format('Y-m-d');
+            $payload['echeance_cible'] = optional($action->echeance_cible)->format('Y-m-d');
             $action->fill($payload)->save();
             $stats['updated']++;
             $this->audit($user, 'update', $action, $before, $action->getAttributes(), $ipAddress);
@@ -1025,7 +1033,7 @@ class PlanningExcelImportService
      * payload de l'action quand `type_action` est renseigne. Mappe type ↔ mode ↔
      * methode_calcul comme PtaWebController::normalizePtaActionPayload.
      *
-     * @param array<string,mixed> $row
+     * @param  array<string,mixed>  $row
      * @return array<string,mixed>
      */
     private function parametragePayload(array $row): array
@@ -1069,7 +1077,7 @@ class PlanningExcelImportService
      * cellule `sous_actions`. Reprend (en version allegee) la logique de
      * PtaWebController::syncPlannedSubActions.
      *
-     * @param array<string,mixed> $row
+     * @param  array<string,mixed>  $row
      */
     private function persistImportedSubActions(Action $action, array $row, ?User $primaryRmo): void
     {
@@ -1117,7 +1125,7 @@ class PlanningExcelImportService
      * Bascule en EN_COURS les PTA en brouillon dont plus aucune action n'est
      * 'a_parametrer'. Mirroir de PtaWebController::maybePromoteBrouillonToEnCours.
      *
-     * @param list<int> $ptaIds
+     * @param  list<int>  $ptaIds
      */
     private function promoteFullyParametrePtas(array $ptaIds): void
     {

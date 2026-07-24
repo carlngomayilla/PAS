@@ -14,7 +14,7 @@ use Illuminate\Support\Carbon;
  * Ce service est PUR : il ne persiste rien, ne déclenche aucune notification.
  * Il calcule uniquement, à partir des règles définies dans le PTA :
  *   - la performance PROVISOIRE d'une action / sous-action,
- *   - le statut de performance (critique → cible dépassée),
+ *   - le statut de performance (critique → seuil dépassé),
  *   - le statut temporel (dimension transverse échéance),
  *   - l'état de conformité (dimension transverse : justificatif / commentaire / difficulté).
  *
@@ -26,22 +26,33 @@ class ActionPerformanceCalculator
 {
     // Paliers de performance quantitative (en %).
     public const SEUIL_CRITIQUE = 50.0;
+
     public const SEUIL_ALERTE = 80.0;
+
     public const SEUIL_CIBLE = 100.0;
 
     // Statuts de performance (6 niveaux, alignés sur le doc V2 §6.1).
     public const PERF_NON_DEMARRE = 'non_demarre';
+
     public const PERF_CRITIQUE = 'critique';       // 1 → 49 %
+
     public const PERF_ALERTE = 'en_alerte';         // 50 → 79 %
+
     public const PERF_ACCEPTABLE = 'acceptable';    // 80 → 99 %
+
     public const PERF_CIBLE_ATTEINTE = 'cible_atteinte';  // 100 %
+
     public const PERF_CIBLE_DEPASSEE = 'cible_depassee';  // > 100 %
 
     // Statuts temporels.
     public const TEMPS_DANS_DELAI = 'dans_delai';
+
     public const TEMPS_BIENTOT_RETARD = 'bientot_retard';
+
     public const TEMPS_EN_RETARD = 'en_retard';
+
     public const TEMPS_CRITIQUE = 'critique';
+
     public const TEMPS_SANS_ECHEANCE = 'sans_echeance';
 
     // Fenêtre (en jours) avant l'échéance pour signaler "bientôt en retard".
@@ -55,9 +66,14 @@ class ActionPerformanceCalculator
         return match ($action->resolvedTypeAction()) {
             Action::TYPE_QUANTITATIVE => $this->quantitativePerformance(
                 (float) ($action->quantite_realisee ?? 0),
-                (float) ($action->quantite_cible ?? 0)
+                (float) ($action->quantite_a_realiser ?? $action->quantite_cible ?? 0)
             ),
             Action::TYPE_NON_QUANTITATIVE => $this->binaryPerformance(
+                $this->actionHasProof($action)
+            ),
+            Action::TYPE_MIXTE => $this->mixedPerformance(
+                (float) ($action->quantite_realisee ?? 0),
+                (float) ($action->quantite_a_realiser ?? $action->quantite_cible ?? 0),
                 $this->actionHasProof($action)
             ),
             Action::TYPE_COMPOSEE => $this->compositePerformance($action),
@@ -71,10 +87,18 @@ class ActionPerformanceCalculator
      */
     public function subActionPerformance(SousAction $sousAction): float
     {
+        if ($sousAction->isMixedTarget()) {
+            return $this->mixedPerformance(
+                (float) ($sousAction->quantite_realisee ?? 0),
+                (float) ($sousAction->quantite_a_realiser ?? $sousAction->cible_prevue ?? 0),
+                $this->subActionHasProof($sousAction)
+            );
+        }
+
         if ($sousAction->isQuantitative()) {
             return $this->quantitativePerformance(
                 (float) ($sousAction->quantite_realisee ?? 0),
-                (float) ($sousAction->cible_prevue ?? 0)
+                (float) ($sousAction->quantite_a_realiser ?? $sousAction->cible_prevue ?? 0)
             );
         }
 
@@ -217,11 +241,16 @@ class ActionPerformanceCalculator
     private function quantitativePerformance(float $realized, float $target): float
     {
         if ($target <= 0.0) {
-            // Pas de cible chiffrée → binaire sur la quantité réalisée.
-            return $realized > 0 ? 100.0 : 0.0;
+            // Une quantite a realiser vide ou nulle reste a parametrer.
+            return 0.0;
         }
 
-        return round(($realized / $target) * 100, 2);
+        return min(100.0, round(($realized / $target) * 100, 2));
+    }
+
+    private function mixedPerformance(float $realized, float $target, bool $hasProof): float
+    {
+        return round(($this->quantitativePerformance($realized, $target) + $this->binaryPerformance($hasProof)) / 2, 2);
     }
 
     private function binaryPerformance(bool $hasProof): float

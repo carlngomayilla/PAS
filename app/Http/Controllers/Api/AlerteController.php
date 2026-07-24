@@ -19,8 +19,7 @@ class AlerteController extends Controller
         private readonly AlertCenterService $alertCenter,
         private readonly AlertReadService $alertReadService,
         private readonly ReportingAnalyticsService $reportingAnalyticsService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -57,12 +56,14 @@ class AlerteController extends Controller
                 'urgence' => $items->where('niveau', 'urgence')->count(),
                 'critical' => $items->where('niveau', 'critical')->count(),
                 'warning' => $items->where('niveau', 'warning')->count(),
+                'conforme' => $items->where('niveau', 'conforme')->count(),
                 'info' => $items->where('niveau', 'info')->count(),
             ],
             'level_unread_counts' => [
                 'urgence' => $items->where('niveau', 'urgence')->where('is_unread', true)->count(),
                 'critical' => $items->where('niveau', 'critical')->where('is_unread', true)->count(),
                 'warning' => $items->where('niveau', 'warning')->where('is_unread', true)->count(),
+                'conforme' => $items->where('niveau', 'conforme')->where('is_unread', true)->count(),
                 'info' => $items->where('niveau', 'info')->where('is_unread', true)->count(),
             ],
             'kpi_summary' => $reportingPayload['kpiSummary'] ?? [],
@@ -110,19 +111,14 @@ class AlerteController extends Controller
         $this->denyUnlessPlanningReader($user);
 
         $limit = max(1, min(100, (int) $request->integer('limit', 20)));
-        $fingerprints = $this->alertCenter
-            ->buildForUser($user, $limit)
-            ->pluck('fingerprint')
-            ->filter(static fn ($value): bool => is_string($value) && trim($value) !== '')
-            ->values()
-            ->all();
+        $alerts = $this->alertCenter->buildForUser($user, $limit);
 
-        $this->alertReadService->markFingerprintsAsRead($user, $fingerprints);
+        $count = $this->alertReadService->markAlertsAsRead($user, $alerts);
         $this->markAlertNotificationsAsRead($user);
 
         return response()->json([
             'message' => 'Alertes visibles marquées comme lues.',
-            'count' => count($fingerprints),
+            'count' => $count,
         ]);
     }
 

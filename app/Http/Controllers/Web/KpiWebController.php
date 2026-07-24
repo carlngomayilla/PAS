@@ -53,7 +53,7 @@ class KpiWebController extends Controller
             && (float) $validated['seuil_alerte'] > (float) $validated['cible']
         ) {
             return back()->withInput()->withErrors([
-                'seuil_alerte' => 'Le seuil d alerte ne doit pas depasser la cible.',
+                'seuil_alerte' => 'Le seuil d alerte ne doit pas depasser le niveau attendu.',
             ]);
         }
 
@@ -87,7 +87,7 @@ class KpiWebController extends Controller
 
         if (in_array((string) $targetAction->pta?->statut, ['cloture', 'archive'], true)) {
             return back()->withInput()->withErrors([
-                'action_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'cible', 'Mise a jour'),
+                'action_id' => $this->lockedRelatedStateMessage(UiLabel::object('pta'), 'lie', 'Mise a jour'),
             ]);
         }
 
@@ -106,7 +106,7 @@ class KpiWebController extends Controller
             && (float) $validated['seuil_alerte'] > (float) $validated['cible']
         ) {
             return back()->withInput()->withErrors([
-                'seuil_alerte' => 'Le seuil d alerte ne doit pas depasser la cible.',
+                'seuil_alerte' => 'Le seuil d alerte ne doit pas depasser le niveau attendu.',
             ]);
         }
 
@@ -158,5 +158,4 @@ class KpiWebController extends Controller
             || $user->hasRole(User::ROLE_SERVICE)
             || $user->hasDelegatedPermission('planning_write');
     }
-
 }

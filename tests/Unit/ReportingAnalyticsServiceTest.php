@@ -38,7 +38,7 @@ class ReportingAnalyticsServiceTest extends TestCase
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
             'progression_reelle' => 80,
             'progression_theorique' => 80,
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ]);
 
         Action::query()->create([

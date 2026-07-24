@@ -21,14 +21,14 @@ class KpiExcludeRejectedActionsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_default_policy_uses_service_chief_validation(): void
+    public function test_default_policy_uses_final_control_validation(): void
     {
         /** @var ActionCalculationSettings $settings */
         $settings = app(ActionCalculationSettings::class);
 
-        $this->assertSame(ActionCalculationSettings::LEVEL_VALIDATION_CHEF, $settings->statisticalScope());
+        $this->assertSame(ActionCalculationSettings::LEVEL_VALIDATION_SCIQ, $settings->statisticalScope());
         $this->assertSame([
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], $settings->statisticalValidationStatuses());
         $this->assertSame([], $settings->rejectedValidationStatuses());
@@ -40,7 +40,7 @@ class KpiExcludeRejectedActionsTest extends TestCase
 
         Action::query()->create([
             'pta_id' => $pta->id,
-            'libelle' => 'Action validee chef',
+            'libelle' => 'Action validee controle',
             'description' => 'Validee',
             'type_cible' => 'qualitative',
             'resultat_attendu' => 'Livrer',
@@ -52,7 +52,7 @@ class KpiExcludeRejectedActionsTest extends TestCase
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
             'progression_reelle' => 80,
             'progression_theorique' => 80,
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ]);
 
         Action::query()->create([
@@ -91,7 +91,7 @@ class KpiExcludeRejectedActionsTest extends TestCase
 
         $payload = app(ReportingAnalyticsService::class)->buildPayload($admin, false, false);
 
-        // 1 seule action (validee_chef) doit compter ; les 2 rejetees sont exclues.
+        // Une seule action validee par le controle doit compter.
         $this->assertSame(1, $payload['global']['actions_validees']);
         $this->assertSame(80.0, (float) $payload['pasConsolidation'][0]['progression_moyenne']);
     }
@@ -115,7 +115,7 @@ class KpiExcludeRejectedActionsTest extends TestCase
         $this->assertCount(2, $settings->filterStatistical($items));
     }
 
-    public function test_filter_statistical_keeps_service_chief_validated_by_default(): void
+    public function test_filter_statistical_keeps_control_validated_by_default(): void
     {
         /** @var ActionCalculationSettings $settings */
         $settings = app(ActionCalculationSettings::class);
@@ -123,14 +123,14 @@ class KpiExcludeRejectedActionsTest extends TestCase
         $items = collect([
             (object) ['statut_validation' => ActionTrackingService::VALIDATION_REJETEE_CHEF],
             (object) ['statut_validation' => ActionTrackingService::VALIDATION_REJETEE_DIRECTION],
-            (object) ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF],
+            (object) ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE],
             (object) ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION],
             (object) ['statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF],
         ]);
 
         $kept = $settings->filterStatistical($items);
         $this->assertCount(2, $kept);
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $kept[0]->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $kept[0]->statut_validation);
         $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_DIRECTION, $kept[1]->statut_validation);
     }
 

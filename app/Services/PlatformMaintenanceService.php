@@ -3,11 +3,10 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Str;
 
 class PlatformMaintenanceService
 {
-    private const MAINTENANCE_SECRET = 'super-admin-bypass';
-
     /**
      * @return array<string, mixed>
      */
@@ -42,12 +41,13 @@ class PlatformMaintenanceService
             abort(422, 'Action de maintenance non prise en charge.');
         }
 
+        $maintenanceSecret = $action === 'maintenance_on' ? Str::random(64) : null;
         $exitCode = match ($action) {
             'clear_cache' => Artisan::call('optimize:clear'),
             'clear_views' => Artisan::call('view:clear'),
             'cache_views' => Artisan::call('view:cache'),
             'planning_auto_archive' => Artisan::call('anbg:planning-auto-archive', ['--execute' => true]),
-            'maintenance_on' => Artisan::call('down', ['--refresh' => 60, '--retry' => 60, '--secret' => self::MAINTENANCE_SECRET]),
+            'maintenance_on' => Artisan::call('down', ['--refresh' => 60, '--retry' => 60, '--secret' => $maintenanceSecret]),
             'maintenance_off' => Artisan::call('up'),
         };
 
@@ -57,7 +57,7 @@ class PlatformMaintenanceService
             'exit_code' => $exitCode,
             'output' => trim(Artisan::output()),
             'status' => $this->status(),
-            'bypass_url' => $action === 'maintenance_on' ? url('/'.self::MAINTENANCE_SECRET) : null,
+            'bypass_url' => $maintenanceSecret !== null ? url('/'.$maintenanceSecret) : null,
         ];
     }
 

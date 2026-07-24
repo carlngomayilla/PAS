@@ -1573,10 +1573,10 @@ html.dark body.anbg-glass-theme .charts-top-action-row:hover {
     ) :where(
         [class*="text-slate-"],
         [class*="text-gray-"],
-        p,
-        span,
-        strong,
-        small
+        p:not([style*="color:"]),
+        span:not([style*="color:"]),
+        strong:not([style*="color:"]),
+        small:not([style*="color:"])
     ) {
         color: #f8fafc !important;
     }
@@ -2131,7 +2131,7 @@ body.admin-theme-scope.anbg-glass-theme .action-stepper {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0;
     margin: 0;
     padding: 0.25rem 0 0;
@@ -2921,3 +2921,3402 @@ html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-synthesis-hierarchy
     color: color-mix(in srgb, var(--kpi-fg) 76%, #f8fafc) !important;
 }
 
+/* ============================================================
+   ANBG Pilotage unified skin
+   Reference: dark navy command bar, pale blue workspace, clean white panels.
+   Sidebar structure is intentionally preserved.
+   ============================================================ */
+
+body.admin-theme-scope.anbg-glass-theme {
+    --anbg-ui-navy: #0d3f68;
+    --anbg-ui-navy-deep: #082a48;
+    --anbg-ui-blue: #0f5f99;
+    --anbg-ui-grid: rgba(15, 95, 153, 0.055);
+    --anbg-ui-border: #d7e5ef;
+    --anbg-ui-border-strong: #b9cfdf;
+    --anbg-ui-text: #17263a;
+    --anbg-ui-muted: #7c8ca1;
+    --anbg-ui-gold: #d6b426;
+    --anbg-ui-success: #4f7d2e;
+    --anbg-ui-danger: #b54444;
+    --anbg-ui-warning: #a26820;
+    --anbg-ui-radius: 1rem;
+    --anbg-ui-shadow: 0 14px 36px rgba(23, 38, 58, 0.10);
+    --anbg-ui-shadow-soft: 0 8px 22px rgba(23, 38, 58, 0.075);
+    --app-bg: #eef6fb;
+    --app-surface: #ffffff;
+    --app-surface-soft: #f6fbff;
+    --app-border: var(--anbg-ui-border);
+    --app-text: var(--anbg-ui-text);
+    --app-muted: var(--anbg-ui-muted);
+    --app-primary: var(--anbg-ui-navy);
+    --app-primary-hover: var(--anbg-ui-blue);
+    --app-primary-light: #edf6fc;
+    --app-blue: var(--anbg-ui-blue);
+    --app-shadow: var(--anbg-ui-shadow);
+    --app-shadow-soft: var(--anbg-ui-shadow-soft);
+    min-height: 100vh !important;
+    background:
+        linear-gradient(var(--anbg-ui-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--anbg-ui-grid) 1px, transparent 1px),
+        linear-gradient(180deg, #f7fbfe 0%, #edf6fb 42%, #e8f2f8 100%) !important;
+    background-attachment: fixed !important;
+    background-size: 48px 48px, 48px 48px, auto !important;
+    color: var(--anbg-ui-text) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme::before {
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.admin-page-root, .admin-content-shell, .admin-shell-frame, .app-shell, .app-main, .app-content, #admin-main-content) {
+    background: transparent !important;
+    color: var(--anbg-ui-text) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-main-content,
+body.admin-theme-scope.anbg-glass-theme .app-content {
+    padding: clamp(1rem, 1.6vw, 1.55rem) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-main-content > footer {
+    border-color: rgba(15, 95, 153, 0.18) !important;
+    color: var(--anbg-ui-muted) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header,
+body.admin-theme-scope.anbg-glass-theme .admin-page-header.app-navbar {
+    background:
+        linear-gradient(115deg, rgba(8, 42, 72, 0.96), rgba(13, 63, 104, 0.94) 48%, rgba(18, 75, 118, 0.92)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px) !important;
+    background-size: auto, 26px 26px !important;
+    border-bottom: 2px solid rgba(214, 180, 38, 0.72) !important;
+    box-shadow: 0 14px 34px rgba(8, 42, 72, 0.22) !important;
+    backdrop-filter: blur(18px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-inner {
+    min-height: 4.35rem !important;
+    gap: 0.85rem !important;
+    padding-block: 0.75rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.admin-navbar-title, .starline-greeting, .admin-navbar-user-copy p) {
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .starline-greeting,
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-user-copy p:last-child {
+    color: rgba(255, 255, 255, 0.72) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.admin-navbar-icon-button, .admin-local-clock, .admin-exercise-filter, .admin-navbar-user, .admin-navbar-scope-chip, #admin-back-button) {
+    min-height: 2.35rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+    border-radius: 0.85rem !important;
+    background: rgba(7, 33, 59, 0.58) !important;
+    color: #f8fbff !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 7px 18px rgba(0, 0, 0, 0.16) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.admin-navbar-icon-button, #admin-back-button):hover {
+    background: rgba(15, 95, 153, 0.72) !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.admin-exercise-filter select, .admin-exercise-filter option) {
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-avatar-media {
+    border: 2px solid rgba(214, 180, 38, 0.72) !important;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.10) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-page-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    margin-bottom: 1rem !important;
+    padding: clamp(1.35rem, 2vw, 1.85rem) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: var(--anbg-ui-radius) !important;
+    background:
+        linear-gradient(135deg, rgba(13, 63, 104, 0.98), rgba(8, 42, 72, 0.98)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px) !important;
+    background-size: auto, 24px 24px !important;
+    color: #ffffff !important;
+    box-shadow: 0 16px 36px rgba(8, 42, 72, 0.18) !important;
+    overflow: hidden !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-page-header::before,
+body.admin-theme-scope.anbg-glass-theme .app-page-header::after,
+body.admin-theme-scope.anbg-glass-theme .showcase-hero::before,
+body.admin-theme-scope.anbg-glass-theme .showcase-hero::after,
+body.admin-theme-scope.anbg-glass-theme .showcase-panel::before,
+body.admin-theme-scope.anbg-glass-theme .showcase-panel::after,
+body.admin-theme-scope.anbg-glass-theme .form-section::before,
+body.admin-theme-scope.anbg-glass-theme .form-section::after,
+body.admin-theme-scope.anbg-glass-theme .app-card::before,
+body.admin-theme-scope.anbg-glass-theme .ui-card::before {
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-page-header .app-title, .app-page-header h1, .app-page-header p, .app-page-header .text-\[var\(--app-muted\)\]) {
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-eyebrow,
+body.admin-theme-scope.anbg-glass-theme .showcase-eyebrow {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.45rem !important;
+    color: #d9bd35 !important;
+    font-size: 0.72rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.105em !important;
+    text-transform: uppercase !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-eyebrow::before,
+body.admin-theme-scope.anbg-glass-theme .showcase-eyebrow::before {
+    content: "" !important;
+    width: 1.45rem !important;
+    height: 2px !important;
+    border-radius: 999px !important;
+    background: currentColor !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-title,
+body.admin-theme-scope.anbg-glass-theme .showcase-title {
+    color: #ffffff !important;
+    font-size: clamp(1.45rem, 2.2vw, 2rem) !important;
+    font-weight: 900 !important;
+    letter-spacing: 0 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.showcase-panel, .showcase-toolbar, .showcase-chart-card, .showcase-inline-stat, .showcase-kpi-card, .dashboard-card, .dashboard-widget, .dashboard-summary-card, .stat-card, .eas-stat-card, .workspace-card, .report-card, .monitoring-card, .alert-card, .referentiel-card, .form-section, .form-shell, .data-table-shell, .app-table-wrapper, .kanban-column, .kanban-card, .cal-day, .gantt-wrapper, .action-detail-card, .action-week-card, .ui-card, .app-card, .reporting-hub-kpi) {
+    border: 1px solid var(--anbg-ui-border) !important;
+    border-radius: var(--anbg-ui-radius) !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    background-image: none !important;
+    color: var(--anbg-ui-text) !important;
+    box-shadow: var(--anbg-ui-shadow-soft) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.showcase-panel, .form-section, .ui-card, .app-card) {
+    padding: clamp(1rem, 1.4vw, 1.35rem) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.showcase-panel-title, .form-section-title, .data-table-title, .ui-card h2, .ui-card h3, .app-card h2, .app-card h3) {
+    color: #16263a !important;
+    font-weight: 900 !important;
+    letter-spacing: 0 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.form-section-subtitle, .showcase-panel-subtitle, .dashboard-summary-meta, .eas-stat-card-meta, .stat-card-meta, .text-\[\#667085\], .text-slate-500, .text-slate-600) {
+    color: var(--anbg-ui-muted) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.showcase-hero, .dashboard-hero, .charts-hero-panel) {
+    border: 1px solid var(--anbg-ui-border) !important;
+    border-radius: var(--anbg-ui-radius) !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    color: var(--anbg-ui-text) !important;
+    box-shadow: var(--anbg-ui-shadow-soft) !important;
+    overflow: hidden !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.showcase-hero .showcase-title, .dashboard-hero h1, .charts-hero-panel h1, .charts-hero-panel h2) {
+    color: #16263a !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.stat-card, .showcase-kpi-card, .showcase-inline-stat, .eas-stat-card, .dashboard-summary-card) {
+    min-height: 4.4rem !important;
+    border-left: 3px solid color-mix(in srgb, var(--tone, var(--anbg-ui-blue)) 82%, #ffffff) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.stat-card p:first-child, .showcase-kpi-card p:first-child, .showcase-inline-stat dt) {
+    color: #7f8da1 !important;
+    font-size: 0.72rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.stat-card p:last-child, .showcase-kpi-card p:last-child, .showcase-inline-stat dd) {
+    color: #16263a !important;
+    font-weight: 900 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, textarea, .app-input, .app-select, .app-textarea, .form-input, .form-select, .form-textarea) {
+    min-height: 2.65rem !important;
+    border: 1px solid #ccdce8 !important;
+    border-radius: 0.75rem !important;
+    background: #ffffff !important;
+    color: #16263a !important;
+    box-shadow: inset 0 1px 0 rgba(15, 95, 153, 0.03) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(input, select, textarea, .app-input, .app-select, .app-textarea):focus {
+    border-color: #79acd0 !important;
+    box-shadow: 0 0 0 4px rgba(15, 95, 153, 0.12) !important;
+    outline: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme label,
+body.admin-theme-scope.anbg-glass-theme .app-label {
+    color: #718197 !important;
+    font-size: 0.72rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.055em !important;
+    text-transform: uppercase !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn, .btn-sm, .app-btn, .chart-period-btn, .view-toggle-btn, .admin-dropdown-link) {
+    min-height: 2.35rem !important;
+    border-radius: 0.75rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0 !important;
+    text-transform: uppercase !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-primary, .btn-blue, .app-btn-primary),
+body.admin-theme-scope.anbg-glass-theme button[type="submit"]:not(.btn-secondary):not(.btn-outline):not(.btn-danger):not(.btn-red):not(.btn-delete):not(.btn-green) {
+    border-color: #0d4d7b !important;
+    background: linear-gradient(180deg, #0f5f99 0%, #0b4774 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 9px 18px rgba(15, 95, 153, 0.18) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-primary, .btn-blue, .app-btn-primary):hover,
+body.admin-theme-scope.anbg-glass-theme button[type="submit"]:not(.btn-secondary):not(.btn-outline):not(.btn-danger):not(.btn-red):not(.btn-delete):not(.btn-green):hover {
+    background: linear-gradient(180deg, #0d6dac 0%, #0b4774 100%) !important;
+    transform: translateY(-1px) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-secondary, .btn-outline, .app-btn-secondary, .app-btn-outline) {
+    border: 1px solid #c9d9e6 !important;
+    background: #f8fbfe !important;
+    color: #22415d !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-warning, .btn-amber) {
+    border-color: #d8bd5a !important;
+    background: #fff8df !important;
+    color: #8b6813 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-danger, .btn-red, .btn-delete) {
+    border-color: #ecc6c6 !important;
+    background: #fff3f3 !important;
+    color: #a33f3f !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-page-header :where(.btn, .app-btn) {
+    border-color: rgba(255, 255, 255, 0.22) !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-page-header :where(.btn, .app-btn):hover {
+    background: rgba(255, 255, 255, 0.18) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-exercise-filter select {
+    min-height: auto !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-exercise-filter option {
+    background: #ffffff !important;
+    color: #16263a !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-table-wrapper, .data-table-shell, .table-wrap, .preview-table-wrapper) {
+    padding: 0 !important;
+    overflow: auto !important;
+    border: 1px solid var(--anbg-ui-border) !important;
+    border-radius: var(--anbg-ui-radius) !important;
+    background: #ffffff !important;
+    box-shadow: var(--anbg-ui-shadow-soft) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) {
+    width: 100% !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    background: #ffffff !important;
+    color: var(--anbg-ui-text) !important;
+    font-size: 0.86rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) thead,
+body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) thead tr {
+    background: #e8f4fb !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2 !important;
+    border: 0 !important;
+    border-bottom: 1px solid #cfe1ee !important;
+    background: #e8f4fb !important;
+    color: #315a78 !important;
+    padding: 0.82rem 0.95rem !important;
+    font-size: 0.72rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.025em !important;
+    line-height: 1.15 !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) tbody td {
+    border: 0 !important;
+    border-bottom: 1px solid #e6eef4 !important;
+    background: #ffffff !important;
+    color: #213148 !important;
+    padding: 0.82rem 0.95rem !important;
+    vertical-align: middle !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) tbody tr:nth-child(odd) td {
+    background: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) tbody tr:hover td {
+    background: #f2f8fc !important;
+    box-shadow: inset 3px 0 0 #0f5f99 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) tbody td:first-child {
+    color: #17476f !important;
+    font-weight: 850 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-badge, .anbg-badge, .badge, .status-badge, .dashboard-pill, .showcase-chip) {
+    min-height: 1.45rem !important;
+    border-radius: 999px !important;
+    border: 1px solid #cddde8 !important;
+    background: #edf5fb !important;
+    color: #315a78 !important;
+    font-size: 0.72rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.anbg-badge-success, .app-badge-success, .badge-success) {
+    border-color: #cfe6bf !important;
+    background: #eff8e9 !important;
+    color: var(--anbg-ui-success) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.anbg-badge-warning, .app-badge-warning, .badge-warning) {
+    border-color: #f0dec0 !important;
+    background: #fff7e8 !important;
+    color: var(--anbg-ui-warning) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.anbg-badge-danger, .app-badge-danger, .badge-danger) {
+    border-color: #efcccc !important;
+    background: #fff2f2 !important;
+    color: var(--anbg-ui-danger) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.anbg-badge-info, .app-badge-info, .badge-info) {
+    border-color: #c9dfef !important;
+    background: #edf6fc !important;
+    color: #24679b !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.flash-success, .flash-warning, .flash-error) {
+    margin: 0 0 0.75rem !important;
+    border-radius: 0.85rem !important;
+    box-shadow: var(--anbg-ui-shadow-soft) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme {
+    --anbg-ui-border: #334b63;
+    --anbg-ui-border-strong: #466984;
+    --anbg-ui-text: #eff6ff;
+    --anbg-ui-muted: #b7c7d6;
+    --app-bg: #081827;
+    --app-surface: #10263a;
+    --app-surface-soft: #17324a;
+    --app-border: #334b63;
+    --app-text: #eff6ff;
+    --app-muted: #b7c7d6;
+    background:
+        linear-gradient(rgba(210, 230, 245, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(210, 230, 245, 0.035) 1px, transparent 1px),
+        linear-gradient(180deg, #081827 0%, #0c2033 100%) !important;
+    background-size: 48px 48px, 48px 48px, auto !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.showcase-panel, .showcase-toolbar, .showcase-chart-card, .showcase-inline-stat, .showcase-kpi-card, .dashboard-card, .dashboard-widget, .dashboard-summary-card, .stat-card, .eas-stat-card, .workspace-card, .report-card, .monitoring-card, .alert-card, .referentiel-card, .form-section, .form-shell, .data-table-shell, .app-table-wrapper, .kanban-column, .kanban-card, .cal-day, .gantt-wrapper, .action-detail-card, .action-week-card, .ui-card, .app-card, .reporting-hub-kpi) {
+    background: #10263a !important;
+    color: #eff6ff !important;
+    border-color: #334b63 !important;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.showcase-panel-title, .form-section-title, .data-table-title, .ui-card h2, .ui-card h3, .app-card h2, .app-card h3, .stat-card p:last-child, .showcase-kpi-card p:last-child, .showcase-inline-stat dd) {
+    color: #eff6ff !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, textarea, .app-input, .app-select, .app-textarea, .form-input, .form-select, .form-textarea) {
+    background: #17324a !important;
+    color: #eff6ff !important;
+    border-color: #42637e !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.app-table-wrapper, .data-table-shell, .table-wrap, .preview-table-wrapper),
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) {
+    background: #10263a !important;
+    border-color: #334b63 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) thead,
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) thead tr,
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) thead th {
+    background: #17324a !important;
+    color: #d8ebf8 !important;
+    border-color: #334b63 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) tbody td {
+    background: #10263a !important;
+    color: #e8f3fb !important;
+    border-color: #2b4158 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.app-table, .data-table, .dashboard-table, .glass-table, .preview-table) tbody tr:hover td {
+    background: #17324a !important;
+}
+
+@media (max-width: 767px) {
+    body.admin-theme-scope.anbg-glass-theme .app-page-header {
+        align-items: flex-start !important;
+        flex-direction: column !important;
+        padding: 1rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-main-content,
+    body.admin-theme-scope.anbg-glass-theme .app-content {
+        padding: 0.85rem !important;
+    }
+}
+
+/* ANBG Pilotage final buttons and tabs refinement */
+body.admin-theme-scope.anbg-glass-theme {
+    --anbg-button-radius: 999px;
+    --anbg-button-soft-corner: 0.7rem;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn, .btn-sm, .app-btn, button[type="submit"], .admin-dropdown-link) {
+    position: relative !important;
+    isolation: isolate !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.45rem !important;
+    min-height: 2.45rem !important;
+    max-width: 100% !important;
+    padding: 0.58rem 1.05rem 0.58rem 1.16rem !important;
+    border-width: 1px !important;
+    border-radius: var(--anbg-button-radius) var(--anbg-button-radius) var(--anbg-button-radius) var(--anbg-button-soft-corner) !important;
+    font-size: 0.74rem !important;
+    font-weight: 900 !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0.02em !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    text-decoration: none !important;
+    overflow: hidden !important;
+    overflow-wrap: anywhere !important;
+    transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background-color 160ms ease,
+        box-shadow 160ms ease,
+        color 160ms ease !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn, .btn-sm, .app-btn, button[type="submit"])::before {
+    content: "" !important;
+    position: absolute !important;
+    inset-block: 0.42rem !important;
+    left: 0.43rem !important;
+    width: 0.18rem !important;
+    border-radius: 999px !important;
+    background: rgba(214, 180, 38, 0.95) !important;
+    opacity: 0.88 !important;
+    z-index: 0 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn:hover, .btn-sm:hover, .app-btn:hover, button[type="submit"]:hover, .admin-dropdown-link:hover) {
+    transform: translateY(-1px) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn:focus-visible, .btn-sm:focus-visible, .app-btn:focus-visible, button[type="submit"]:focus-visible, .admin-dropdown-link:focus-visible) {
+    outline: 3px solid rgba(214, 180, 38, 0.35) !important;
+    outline-offset: 2px !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-sm) {
+    min-height: 2.08rem !important;
+    padding: 0.44rem 0.86rem 0.44rem 1rem !important;
+    font-size: 0.68rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-primary,
+    .btn-blue,
+    .btn-follow,
+    .app-btn-primary,
+    .page-header-button-primary,
+    button[type="submit"]
+) {
+    border-color: rgba(7, 61, 101, 0.9) !important;
+    background:
+        linear-gradient(180deg, rgba(18, 101, 156, 0.98), rgba(8, 65, 110, 0.98)),
+        #0a4d80 !important;
+    color: #ffffff !important;
+    box-shadow:
+        0 12px 22px rgba(10, 77, 128, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-secondary,
+    .btn-outline,
+    .btn-ghost,
+    .app-btn-secondary,
+    .page-header-button-secondary,
+    .admin-dropdown-link
+) {
+    border-color: rgba(150, 177, 198, 0.62) !important;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 248, 253, 0.96)),
+        #f7fbff !important;
+    color: #244963 !important;
+    box-shadow:
+        0 10px 20px rgba(31, 70, 97, 0.09),
+        inset 0 1px 0 rgba(255, 255, 255, 0.82) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-danger, .app-btn-danger) {
+    border-color: rgba(174, 47, 47, 0.42) !important;
+    background:
+        linear-gradient(180deg, rgba(255, 247, 247, 0.98), rgba(255, 235, 235, 0.98)),
+        #fff1f1 !important;
+    color: #8c2d2d !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-danger, .app-btn-danger)::before {
+    background: rgba(199, 70, 70, 0.94) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-warning, .app-btn-warning)::before {
+    background: rgba(214, 152, 35, 0.96) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tabs,
+    .dashboard-tabs,
+    [data-dashboard-tabs],
+    .action-detail-tabs,
+    .appearance-live-preview-tabs
+) {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 0.36rem !important;
+    padding: 0.36rem !important;
+    border: 1px solid rgba(151, 180, 202, 0.64) !important;
+    border-radius: 999px !important;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(241, 248, 253, 0.88)),
+        #f7fbff !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.8),
+        0 10px 22px rgba(28, 62, 86, 0.08) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .view-toggle-btn,
+    .chart-period-btn,
+    .appearance-live-preview-tab,
+    .action-detail-tab
+) {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.4rem !important;
+    min-height: 2.22rem !important;
+    max-width: 100% !important;
+    padding: 0.5rem 0.98rem !important;
+    border: 1px solid transparent !important;
+    border-radius: 999px 999px 999px 0.68rem !important;
+    background: transparent !important;
+    color: #42617b !important;
+    font-size: 0.72rem !important;
+    font-weight: 900 !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0.015em !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    text-decoration: none !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    overflow-wrap: anywhere !important;
+    transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background-color 160ms ease,
+        box-shadow 160ms ease,
+        color 160ms ease !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab:hover,
+    .dashboard-tab:hover,
+    .tab-link:hover,
+    .view-toggle-btn:hover,
+    .chart-period-btn:hover,
+    .appearance-live-preview-tab:hover,
+    .action-detail-tab:hover
+) {
+    border-color: rgba(116, 160, 194, 0.42) !important;
+    background: rgba(231, 242, 249, 0.78) !important;
+    color: #0d4977 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"]
+) {
+    border-color: rgba(214, 180, 38, 0.46) !important;
+    background:
+        linear-gradient(180deg, rgba(21, 100, 155, 0.98), rgba(8, 66, 111, 0.98)),
+        #0a4d80 !important;
+    color: #ffffff !important;
+    box-shadow:
+        0 10px 20px rgba(10, 77, 128, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"]
+)::after {
+    content: "" !important;
+    position: absolute !important;
+    right: 0.76rem !important;
+    bottom: 0.23rem !important;
+    left: 0.76rem !important;
+    height: 0.14rem !important;
+    border-radius: 999px !important;
+    background: rgba(214, 180, 38, 0.98) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab:focus-visible,
+    .dashboard-tab:focus-visible,
+    .tab-link:focus-visible,
+    .view-toggle-btn:focus-visible,
+    .chart-period-btn:focus-visible,
+    .appearance-live-preview-tab:focus-visible,
+    .action-detail-tab:focus-visible
+) {
+    outline: 3px solid rgba(214, 180, 38, 0.35) !important;
+    outline-offset: 2px !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-page-header :where(.btn, .btn-sm, .app-btn) {
+    border-color: rgba(255, 255, 255, 0.26) !important;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.09)),
+        rgba(11, 60, 96, 0.72) !important;
+    color: #ffffff !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        0 10px 18px rgba(1, 24, 45, 0.2) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-secondary,
+    .btn-outline,
+    .btn-ghost,
+    .app-btn-secondary,
+    .page-header-button-secondary,
+    .admin-dropdown-link
+) {
+    border-color: rgba(93, 122, 146, 0.72) !important;
+    background:
+        linear-gradient(180deg, rgba(24, 52, 76, 0.95), rgba(14, 37, 58, 0.95)),
+        #102a42 !important;
+    color: #e5f2fb !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tabs,
+    .dashboard-tabs,
+    [data-dashboard-tabs],
+    .action-detail-tabs,
+    .appearance-live-preview-tabs
+) {
+    border-color: rgba(78, 111, 139, 0.72) !important;
+    background:
+        linear-gradient(180deg, rgba(23, 48, 70, 0.94), rgba(14, 35, 55, 0.94)),
+        #102a42 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .view-toggle-btn,
+    .chart-period-btn,
+    .appearance-live-preview-tab,
+    .action-detail-tab
+) {
+    color: #cfe1ec !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab:hover,
+    .dashboard-tab:hover,
+    .tab-link:hover,
+    .view-toggle-btn:hover,
+    .chart-period-btn:hover,
+    .appearance-live-preview-tab:hover,
+    .action-detail-tab:hover
+) {
+    border-color: rgba(116, 160, 194, 0.5) !important;
+    background: rgba(30, 67, 96, 0.74) !important;
+    color: #ffffff !important;
+}
+
+/* ANBG soft controls: pill buttons, segmented tabs and PTA parameter widgets */
+body.admin-theme-scope.anbg-glass-theme {
+    --anbg-soft-surface: #ffffff;
+    --anbg-soft-canvas: #f4f6f9;
+    --anbg-soft-canvas-strong: #eceff4;
+    --anbg-soft-border: #dbe6ef;
+    --anbg-soft-border-hover: #78b5e5;
+    --anbg-soft-text: #184466;
+    --anbg-soft-muted: #8b96a5;
+    --anbg-soft-blue: #1266b5;
+    --anbg-soft-blue-deep: #0d58a7;
+    --anbg-soft-active: #151619;
+    --anbg-soft-shadow: 0 10px 20px rgba(31, 55, 76, 0.16), 0 2px 6px rgba(31, 55, 76, 0.08);
+    --anbg-soft-shadow-hover: 0 12px 24px rgba(18, 102, 181, 0.18), 0 3px 8px rgba(31, 55, 76, 0.08);
+    --anbg-soft-shadow-active: 0 14px 26px rgba(15, 20, 30, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --anbg-soft-inset: inset 0 2px 5px rgba(22, 31, 45, 0.07), inset 0 -1px 0 rgba(255, 255, 255, 0.72);
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    button[type="submit"],
+    .admin-dropdown-link,
+    .pta-inline-save,
+    .pta-param-change,
+    .pta-parameter-pill,
+    .pta-proof-button
+) {
+    position: relative !important;
+    isolation: isolate !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+    min-height: 2.55rem !important;
+    max-width: 100% !important;
+    padding: 0.62rem 1.12rem !important;
+    border: 1px solid rgba(219, 230, 239, 0.96) !important;
+    border-radius: 999px !important;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 254, 0.98)),
+        var(--anbg-soft-surface) !important;
+    color: var(--anbg-soft-text) !important;
+    box-shadow: var(--anbg-soft-shadow) !important;
+    font-size: 0.86rem !important;
+    font-weight: 750 !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+    text-align: center !important;
+    text-decoration: none !important;
+    text-transform: none !important;
+    overflow: hidden !important;
+    overflow-wrap: anywhere !important;
+    transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background-color 160ms ease,
+        box-shadow 160ms ease,
+        color 160ms ease,
+        opacity 160ms ease !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn, .btn-sm, .app-btn, button[type="submit"], .pta-inline-save)::before {
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn:hover,
+    .btn-sm:hover,
+    .app-btn:hover,
+    button[type="submit"]:hover,
+    .admin-dropdown-link:hover,
+    .pta-inline-save:hover,
+    .pta-param-change:hover,
+    .pta-parameter-pill:hover,
+    .pta-proof-button:hover
+) {
+    border-color: var(--anbg-soft-border-hover) !important;
+    background:
+        linear-gradient(180deg, #ffffff, #f5fbff),
+        var(--anbg-soft-surface) !important;
+    color: var(--anbg-soft-blue-deep) !important;
+    box-shadow: var(--anbg-soft-shadow-hover) !important;
+    transform: translateY(-1px) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn:active,
+    .btn-sm:active,
+    .app-btn:active,
+    button[type="submit"]:active,
+    .pta-inline-save:active,
+    .pta-param-change:active,
+    .pta-parameter-pill:active,
+    .pta-proof-button:active
+) {
+    box-shadow: var(--anbg-soft-inset) !important;
+    transform: translateY(1px) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-primary,
+    .btn-blue,
+    .btn-follow,
+    .app-btn-primary,
+    .page-header-button-primary,
+    button[type="submit"],
+    .pta-inline-save
+) {
+    border-color: rgba(18, 102, 181, 0.78) !important;
+    background:
+        linear-gradient(180deg, var(--anbg-soft-blue), var(--anbg-soft-blue-deep)),
+        var(--anbg-soft-blue) !important;
+    color: #ffffff !important;
+    box-shadow: 0 12px 24px rgba(18, 102, 181, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-primary:hover,
+    .btn-blue:hover,
+    .btn-follow:hover,
+    .app-btn-primary:hover,
+    .page-header-button-primary:hover,
+    button[type="submit"]:hover,
+    .pta-inline-save:hover
+) {
+    border-color: rgba(18, 102, 181, 0.9) !important;
+    background:
+        linear-gradient(180deg, #1672c7, #0d58a7),
+        var(--anbg-soft-blue) !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-secondary,
+    .btn-outline,
+    .btn-ghost,
+    .app-btn-secondary,
+    .app-btn-outline,
+    .page-header-button-secondary,
+    .admin-dropdown-link,
+    .pta-param-change,
+    .pta-proof-button
+) {
+    border-color: rgba(219, 230, 239, 0.96) !important;
+    background:
+        linear-gradient(180deg, #ffffff, #f8fbfe),
+        var(--anbg-soft-surface) !important;
+    color: var(--anbg-soft-text) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-danger, .btn-red, .btn-delete, .app-btn-danger) {
+    border-color: rgba(237, 210, 210, 0.95) !important;
+    background:
+        linear-gradient(180deg, #ffffff, #fff8f8),
+        #ffffff !important;
+    color: #d44949 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-warning, .btn-amber, .btn-delete-warning) {
+    border-color: rgba(244, 216, 160, 0.98) !important;
+    background:
+        linear-gradient(180deg, #ffffff, #fffaf0),
+        #ffffff !important;
+    color: #d79020 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-success, .btn-green, .app-btn-success) {
+    border-color: rgba(189, 224, 196, 0.98) !important;
+    background:
+        linear-gradient(180deg, #ffffff, #f3fff5),
+        #ffffff !important;
+    color: #1d9a50 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn svg,
+    .btn-sm svg,
+    .app-btn svg,
+    button[type="submit"] svg,
+    .pta-inline-save svg,
+    .pta-param-change svg,
+    .pta-parameter-pill svg,
+    .pta-proof-button svg
+) {
+    width: 1.05rem !important;
+    height: 1.05rem !important;
+    flex: 0 0 1.05rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-sm) {
+    min-height: 2.24rem !important;
+    padding: 0.52rem 0.92rem !important;
+    font-size: 0.78rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tabs,
+    .dashboard-tabs,
+    [data-dashboard-tabs],
+    .action-detail-tabs,
+    .appearance-live-preview-tabs,
+    .pagination,
+    .pta-type-grid
+) {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 0.42rem !important;
+    padding: 0.42rem !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: var(--anbg-soft-canvas) !important;
+    box-shadow: var(--anbg-soft-inset) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .pta-type-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    border-radius: 1.35rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .view-toggle-btn,
+    .chart-period-btn,
+    .appearance-live-preview-tab,
+    .action-detail-tab,
+    .pagination a,
+    .pagination span
+) {
+    min-height: 2.35rem !important;
+    padding: 0.58rem 1.05rem !important;
+    border: 1px solid transparent !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--anbg-soft-muted) !important;
+    box-shadow: none !important;
+    font-size: 0.84rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab:hover,
+    .dashboard-tab:hover,
+    .tab-link:hover,
+    .view-toggle-btn:hover,
+    .chart-period-btn:hover,
+    .appearance-live-preview-tab:hover,
+    .action-detail-tab:hover,
+    .pagination a:hover
+) {
+    border-color: rgba(219, 230, 239, 0.9) !important;
+    background: #ffffff !important;
+    color: var(--anbg-soft-active) !important;
+    box-shadow: var(--anbg-soft-shadow) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"],
+    .pagination .active,
+    .pagination [aria-current="page"]
+) {
+    border-color: rgba(0, 0, 0, 0.18) !important;
+    background:
+        linear-gradient(180deg, #202125, var(--anbg-soft-active)),
+        var(--anbg-soft-active) !important;
+    color: #ffffff !important;
+    box-shadow: var(--anbg-soft-shadow-active) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"]
+)::after {
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-param-trigger, .pta-param-panel, .pta-param-readonly, .pta-threshold-card) {
+    border: 1px solid rgba(219, 230, 239, 0.96) !important;
+    border-radius: 1.28rem !important;
+    background:
+        linear-gradient(180deg, #ffffff, #f8fbfe),
+        var(--anbg-soft-surface) !important;
+    box-shadow: var(--anbg-soft-shadow) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .pta-param-trigger {
+    padding: 0.78rem 0.9rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .pta-param-trigger:hover {
+    border-color: var(--anbg-soft-border-hover) !important;
+    box-shadow: var(--anbg-soft-shadow-hover) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-inline-field, .pta-suivi-toolbar select) {
+    border-color: rgba(214, 226, 236, 0.98) !important;
+    border-radius: 0.95rem !important;
+    background: #ffffff !important;
+    box-shadow: var(--anbg-soft-inset) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-inline-field:focus, .pta-suivi-toolbar select:focus) {
+    border-color: var(--anbg-soft-border-hover) !important;
+    box-shadow: 0 0 0 4px rgba(18, 102, 181, 0.14), var(--anbg-soft-inset) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .pta-type-choice span {
+    min-height: 2.48rem !important;
+    border: 1px solid transparent !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--anbg-soft-muted) !important;
+    box-shadow: none !important;
+    font-size: 0.82rem !important;
+    font-weight: 850 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .pta-type-choice:hover span {
+    border-color: rgba(219, 230, 239, 0.95) !important;
+    background: #ffffff !important;
+    color: var(--anbg-soft-active) !important;
+    box-shadow: var(--anbg-soft-shadow) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .pta-type-choice input:checked + span {
+    border-color: rgba(0, 0, 0, 0.18) !important;
+    background:
+        linear-gradient(180deg, #202125, var(--anbg-soft-active)),
+        var(--anbg-soft-active) !important;
+    color: #ffffff !important;
+    box-shadow: var(--anbg-soft-shadow-active) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.pta-param-chip, .pta-param-threshold, .pta-threshold-label) {
+    border-radius: 999px !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .pta-param-chip {
+    border-color: rgba(219, 230, 239, 0.94) !important;
+    background: #ffffff !important;
+    color: var(--anbg-soft-active) !important;
+    box-shadow: 0 6px 12px rgba(31, 55, 76, 0.1) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .pta-param-threshold {
+    border-color: rgba(18, 102, 181, 0.22) !important;
+    background: #eef6ff !important;
+    color: var(--anbg-soft-blue-deep) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .pta-threshold-card strong {
+    color: var(--anbg-soft-active) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(input[type="checkbox"]:not(.sr-only), input[type="radio"]:not([data-pta-type-input])) {
+    border-color: rgba(214, 226, 236, 0.98) !important;
+    border-radius: 0.45rem !important;
+    box-shadow: 0 6px 12px rgba(31, 55, 76, 0.1) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme {
+    --anbg-soft-surface: #12283c;
+    --anbg-soft-canvas: #0d2033;
+    --anbg-soft-canvas-strong: #172f46;
+    --anbg-soft-border: #33516a;
+    --anbg-soft-border-hover: #5a97c8;
+    --anbg-soft-text: #e6f2fb;
+    --anbg-soft-muted: #9fb4c7;
+    --anbg-soft-active: #05070a;
+    --anbg-soft-shadow: 0 10px 20px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --anbg-soft-inset: inset 0 2px 7px rgba(0, 0, 0, 0.24), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    .admin-dropdown-link,
+    .pta-param-change,
+    .pta-proof-button,
+    .pta-param-trigger,
+    .pta-param-panel,
+    .pta-param-readonly,
+    .pta-threshold-card,
+    .pta-inline-field
+) {
+    border-color: var(--anbg-soft-border) !important;
+    background:
+        linear-gradient(180deg, rgba(24, 52, 76, 0.98), rgba(17, 40, 60, 0.98)),
+        var(--anbg-soft-surface) !important;
+    color: var(--anbg-soft-text) !important;
+}
+
+/* ANBG soft pagination: same segmented treatment as tabs */
+body.admin-theme-scope.anbg-glass-theme :where(.app-pagination, nav.app-pagination, .pagination) {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 0.42rem !important;
+    padding: 0.42rem !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: var(--anbg-soft-canvas) !important;
+    box-shadow: var(--anbg-soft-inset) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-pagination > :first-child {
+    padding-inline: 0.75rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-pagination a,
+    .app-pagination span:not(:first-child),
+    .pagination a,
+    .pagination span,
+    .page-link
+) {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 2.24rem !important;
+    padding: 0.52rem 0.92rem !important;
+    border: 1px solid transparent !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--anbg-soft-muted) !important;
+    box-shadow: none !important;
+    font-size: 0.78rem !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+    text-decoration: none !important;
+    text-transform: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-pagination a:hover, .pagination a:hover, .page-link:hover) {
+    border-color: rgba(219, 230, 239, 0.9) !important;
+    background: #ffffff !important;
+    color: var(--anbg-soft-active) !important;
+    box-shadow: var(--anbg-soft-shadow) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .pagination-link-current,
+    .pagination .active,
+    .pagination [aria-current="page"],
+    .page-item.active .page-link
+) {
+    border-color: rgba(0, 0, 0, 0.18) !important;
+    background:
+        linear-gradient(180deg, #202125, var(--anbg-soft-active)),
+        var(--anbg-soft-active) !important;
+    color: #ffffff !important;
+    box-shadow: var(--anbg-soft-shadow-active) !important;
+}
+
+/* ANBG soft-square controls: requested square buttons with golden inner motifs */
+body.admin-theme-scope.anbg-glass-theme {
+    --anbg-square-radius: 0.86rem;
+    --anbg-square-radius-sm: 0.68rem;
+    --anbg-square-panel-radius: 1.05rem;
+    --anbg-gold-motif: #d8b42a;
+    --anbg-gold-motif-soft: rgba(216, 180, 42, 0.28);
+    --anbg-gold-motif-strong: rgba(216, 180, 42, 0.82);
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    button[type="submit"],
+    button[type="button"],
+    .admin-dropdown-link,
+    .admin-navbar-icon-button,
+    .admin-local-clock,
+    .admin-exercise-filter,
+    .admin-navbar-user,
+    .admin-navbar-scope-chip,
+    #admin-back-button,
+    .pta-inline-save,
+    .pta-param-change,
+    .pta-parameter-pill,
+    .pta-proof-button
+) {
+    position: relative !important;
+    isolation: isolate !important;
+    border-radius: var(--anbg-square-radius) !important;
+    overflow: hidden !important;
+    box-shadow:
+        0 10px 18px rgba(24, 48, 71, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.72),
+        inset 0 -1px 0 rgba(18, 50, 80, 0.06) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-sm,
+    .admin-navbar-icon-button,
+    #admin-back-button,
+    .pta-param-change,
+    .pta-proof-button
+) {
+    border-radius: var(--anbg-square-radius-sm) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    button[type="submit"],
+    button[type="button"],
+    .admin-dropdown-link,
+    .admin-navbar-icon-button,
+    .admin-local-clock,
+    .admin-exercise-filter,
+    .admin-navbar-user,
+    .admin-navbar-scope-chip,
+    #admin-back-button,
+    .pta-inline-save,
+    .pta-param-change,
+    .pta-parameter-pill,
+    .pta-proof-button
+)::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0.34rem !important;
+    right: 0.38rem !important;
+    display: block !important;
+    width: 1.02rem !important;
+    height: 1.02rem !important;
+    border-top: 2px solid var(--anbg-gold-motif-strong) !important;
+    border-right: 2px solid var(--anbg-gold-motif-strong) !important;
+    border-radius: 0.2rem !important;
+    background:
+        linear-gradient(135deg, transparent 0 42%, var(--anbg-gold-motif-soft) 43% 54%, transparent 55% 100%) !important;
+    opacity: 0.92 !important;
+    pointer-events: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    button[type="submit"],
+    button[type="button"],
+    .admin-dropdown-link,
+    .pta-inline-save,
+    .pta-param-change,
+    .pta-parameter-pill,
+    .pta-proof-button
+) {
+    padding-right: max(1.16rem, calc(1.12rem + 0.42rem)) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-primary,
+    .btn-blue,
+    .btn-follow,
+    .app-btn-primary,
+    .page-header-button-primary,
+    button[type="submit"],
+    .pta-inline-save
+) {
+    background:
+        linear-gradient(135deg, rgba(216, 180, 42, 0.18) 0 12%, transparent 12% 100%),
+        linear-gradient(180deg, #1268b8, #0d58a7) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-secondary,
+    .btn-outline,
+    .btn-ghost,
+    .app-btn-secondary,
+    .app-btn-outline,
+    .page-header-button-secondary,
+    .admin-dropdown-link,
+    .pta-param-change,
+    .pta-proof-button
+) {
+    background:
+        linear-gradient(135deg, rgba(216, 180, 42, 0.12) 0 10%, transparent 10% 100%),
+        linear-gradient(180deg, #ffffff, #f8fbfe) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tabs,
+    .dashboard-tabs,
+    [data-dashboard-tabs],
+    .action-detail-tabs,
+    .appearance-live-preview-tabs,
+    .view-toggle,
+    .chart-period-toggle,
+    .app-pagination,
+    nav.app-pagination,
+    .pagination,
+    .pta-type-grid
+) {
+    border-radius: var(--anbg-square-panel-radius) !important;
+    background:
+        linear-gradient(180deg, #f7f8fb, #edf1f6),
+        var(--anbg-soft-canvas) !important;
+    box-shadow:
+        inset 0 2px 7px rgba(22, 31, 45, 0.08),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.86) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .view-toggle-btn,
+    .chart-period-btn,
+    .appearance-live-preview-tab,
+    .action-detail-tab,
+    .pagination a,
+    .pagination span,
+    .app-pagination a,
+    .app-pagination span:not(:first-child),
+    .page-link,
+    .pta-type-choice span
+) {
+    position: relative !important;
+    border-radius: var(--anbg-square-radius-sm) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"],
+    .pagination-link-current,
+    .pagination .active,
+    .pagination [aria-current="page"],
+    .page-item.active .page-link,
+    .pta-type-choice input:checked + span
+) {
+    border-color: rgba(0, 0, 0, 0.24) !important;
+    border-radius: var(--anbg-square-radius-sm) !important;
+    background:
+        linear-gradient(135deg, rgba(216, 180, 42, 0.26) 0 13%, transparent 13% 100%),
+        linear-gradient(180deg, #202125, var(--anbg-soft-active)) !important;
+    color: #ffffff !important;
+    box-shadow:
+        0 13px 24px rgba(14, 19, 27, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"],
+    .pagination-link-current,
+    .page-item.active .page-link,
+    .pta-type-choice input:checked + span
+)::after {
+    content: "" !important;
+    position: absolute !important;
+    right: 0.48rem !important;
+    bottom: 0.36rem !important;
+    left: auto !important;
+    display: block !important;
+    width: 1.08rem !important;
+    height: 0.16rem !important;
+    border-radius: 999px !important;
+    background: linear-gradient(90deg, transparent, var(--anbg-gold-motif), transparent) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .pta-param-trigger,
+    .pta-param-panel,
+    .pta-param-readonly,
+    .pta-threshold-card,
+    .pta-inline-field,
+    .pta-suivi-toolbar select
+) {
+    border-radius: var(--anbg-square-panel-radius) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .pta-param-chip,
+    .pta-param-threshold,
+    .pta-threshold-label,
+    .app-badge,
+    .anbg-badge,
+    .badge,
+    .status-badge,
+    .dashboard-pill,
+    .showcase-chip
+) {
+    border-radius: 0.62rem !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-secondary,
+    .btn-outline,
+    .btn-ghost,
+    .app-btn-secondary,
+    .app-btn-outline,
+    .admin-dropdown-link,
+    .pta-param-change,
+    .pta-proof-button
+) {
+    background:
+        linear-gradient(135deg, rgba(216, 180, 42, 0.16) 0 10%, transparent 10% 100%),
+        linear-gradient(180deg, rgba(24, 52, 76, 0.98), rgba(17, 40, 60, 0.98)) !important;
+}
+
+/* ANBG luminous contours: gold, violet and turquoise outlines like the reference */
+body.admin-theme-scope.anbg-glass-theme {
+    --anbg-luminous-contour: linear-gradient(105deg, #f2d48b 0%, #e0b845 18%, #8e5dd8 54%, #42d2bd 100%);
+    --anbg-luminous-contour-soft: linear-gradient(105deg, rgba(242, 212, 139, 0.82) 0%, rgba(224, 184, 69, 0.76) 18%, rgba(142, 93, 216, 0.72) 54%, rgba(66, 210, 189, 0.82) 100%);
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    button[type="submit"],
+    button[type="button"],
+    .admin-dropdown-link,
+    .admin-navbar-icon-button,
+    #admin-back-button,
+    .pta-inline-save,
+    .pta-param-change,
+    .pta-parameter-pill,
+    .pta-proof-button
+) {
+    border: 1.5px solid transparent !important;
+    background:
+        linear-gradient(180deg, #ffffff, #f8fbfe) padding-box,
+        var(--anbg-luminous-contour) border-box !important;
+    box-shadow:
+        0 10px 18px rgba(24, 48, 71, 0.13),
+        0 0 0 1px rgba(255, 255, 255, 0.48) inset !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn:hover,
+    .btn-sm:hover,
+    .app-btn:hover,
+    button[type="submit"]:hover,
+    button[type="button"]:hover,
+    .admin-dropdown-link:hover,
+    .admin-navbar-icon-button:hover,
+    #admin-back-button:hover,
+    .pta-inline-save:hover,
+    .pta-param-change:hover,
+    .pta-parameter-pill:hover,
+    .pta-proof-button:hover
+) {
+    border-color: transparent !important;
+    background:
+        linear-gradient(180deg, #ffffff, #f3fbff) padding-box,
+        var(--anbg-luminous-contour) border-box !important;
+    box-shadow:
+        0 13px 24px rgba(24, 48, 71, 0.16),
+        0 0 0 1px rgba(255, 255, 255, 0.58) inset,
+        0 0 18px rgba(66, 210, 189, 0.16) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-primary,
+    .btn-blue,
+    .btn-follow,
+    .app-btn-primary,
+    .page-header-button-primary,
+    button[type="submit"],
+    .pta-inline-save
+) {
+    border: 1.5px solid transparent !important;
+    background:
+        linear-gradient(180deg, #1268b8, #0d58a7) padding-box,
+        var(--anbg-luminous-contour) border-box !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-danger,
+    .btn-red,
+    .btn-delete,
+    .app-btn-danger
+) {
+    border: 1.5px solid transparent !important;
+    background:
+        linear-gradient(180deg, #fffefe, #fff7f7) padding-box,
+        var(--anbg-luminous-contour-soft) border-box !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-page-header .btn,
+    .app-page-header .btn-sm,
+    .app-page-header .app-btn,
+    .admin-navbar-icon-button,
+    #admin-back-button
+) {
+    border: 1.5px solid transparent !important;
+    background:
+        linear-gradient(180deg, rgba(18, 25, 35, 0.88), rgba(9, 14, 22, 0.88)) padding-box,
+        var(--anbg-luminous-contour) border-box !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .view-toggle-btn,
+    .chart-period-btn,
+    .appearance-live-preview-tab,
+    .action-detail-tab,
+    .pagination a,
+    .pagination span,
+    .app-pagination a,
+    .app-pagination span:not(:first-child),
+    .page-link,
+    .pta-type-choice span
+) {
+    border: 1.5px solid transparent !important;
+    background:
+        linear-gradient(180deg, #f7f8fb, #eef2f7) padding-box,
+        var(--anbg-luminous-contour-soft) border-box !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"],
+    .pagination-link-current,
+    .pagination .active,
+    .pagination [aria-current="page"],
+    .page-item.active .page-link,
+    .pta-type-choice input:checked + span
+) {
+    border: 1.5px solid transparent !important;
+    background:
+        linear-gradient(180deg, #1c1d22, #101115) padding-box,
+        var(--anbg-luminous-contour) border-box !important;
+    color: #ffffff !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    button[type="submit"],
+    button[type="button"],
+    .admin-dropdown-link,
+    .pta-param-change,
+    .pta-proof-button
+) {
+    border: 1.5px solid transparent !important;
+    background:
+        linear-gradient(180deg, rgba(24, 52, 76, 0.98), rgba(17, 40, 60, 0.98)) padding-box,
+        var(--anbg-luminous-contour) border-box !important;
+}
+
+/* ANBG gold accent: vertical line only on primary and active controls */
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    button[type="submit"],
+    button[type="button"],
+    .admin-dropdown-link,
+    .admin-navbar-icon-button,
+    .admin-local-clock,
+    .admin-exercise-filter,
+    .admin-navbar-user,
+    .admin-navbar-scope-chip,
+    #admin-back-button,
+    .pta-inline-save,
+    .pta-param-change,
+    .pta-parameter-pill,
+    .pta-proof-button
+)::before {
+    content: none !important;
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-primary,
+    .btn-blue,
+    .btn-follow,
+    .btn-success,
+    .btn-green,
+    .app-btn-primary,
+    .page-header-button-primary,
+    .pta-inline-save,
+    button[type="submit"]:not(.btn-secondary):not(.btn-outline):not(.btn-ghost):not(.btn-danger):not(.btn-red):not(.btn-delete):not(.btn-warning):not(.btn-amber)
+) {
+    padding-left: 1.42rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn-primary,
+    .btn-blue,
+    .btn-follow,
+    .btn-success,
+    .btn-green,
+    .app-btn-primary,
+    .page-header-button-primary,
+    .pta-inline-save,
+    button[type="submit"]:not(.btn-secondary):not(.btn-outline):not(.btn-ghost):not(.btn-danger):not(.btn-red):not(.btn-delete):not(.btn-warning):not(.btn-amber)
+)::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0.58rem !important;
+    right: auto !important;
+    bottom: 0.58rem !important;
+    left: 0.62rem !important;
+    display: block !important;
+    width: 3px !important;
+    height: auto !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: linear-gradient(180deg, #f6dda0, #d8b42a 52%, #b68c16) !important;
+    box-shadow: 0 0 10px rgba(216, 180, 42, 0.34) !important;
+    opacity: 0.95 !important;
+    pointer-events: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"],
+    .pagination-link-current,
+    .pagination .active,
+    .pagination [aria-current="page"],
+    .page-item.active .page-link,
+    .pta-type-choice input:checked + span
+) {
+    padding-left: 1.3rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"],
+    .pagination-link-current,
+    .pagination .active,
+    .pagination [aria-current="page"],
+    .page-item.active .page-link,
+    .pta-type-choice input:checked + span
+)::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0.5rem !important;
+    right: auto !important;
+    bottom: 0.5rem !important;
+    left: 0.48rem !important;
+    display: block !important;
+    width: 3px !important;
+    height: auto !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: linear-gradient(180deg, #f6dda0, #d8b42a 52%, #b68c16) !important;
+    box-shadow: 0 0 9px rgba(216, 180, 42, 0.34) !important;
+    opacity: 0.96 !important;
+    pointer-events: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .tab-link[aria-selected="true"],
+    .view-toggle-btn.active,
+    .view-toggle-btn[aria-pressed="true"],
+    .chart-period-btn.active,
+    .chart-period-btn[aria-pressed="true"],
+    .appearance-live-preview-tab.is-active,
+    .appearance-live-preview-tab[aria-selected="true"],
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .action-detail-tab[aria-selected="true"],
+    .pagination-link-current,
+    .page-item.active .page-link,
+    .pta-type-choice input:checked + span
+)::after {
+    content: none !important;
+    display: none !important;
+}
+
+/* Professional application shell: compact navigation and unambiguous controls. */
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header,
+body.admin-theme-scope.anbg-glass-theme .admin-page-header.app-navbar {
+    background: var(--app-surface, #ffffff) !important;
+    background-image: none !important;
+    border-bottom: 1px solid var(--app-border, #dbe7ef) !important;
+    box-shadow: 0 8px 24px rgba(15, 47, 87, 0.08) !important;
+    backdrop-filter: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-inner {
+    min-height: 4rem !important;
+    gap: 0.65rem !important;
+    padding: 0.5rem 1rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.admin-navbar-title, .admin-navbar-user-copy p) {
+    color: var(--app-text, #17324a) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-title {
+    font-size: 1.15rem !important;
+    line-height: 1.2 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .starline-greeting,
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-user-copy p:last-child {
+    color: var(--app-muted, #667085) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-actions {
+    max-width: none !important;
+    gap: 0.5rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .admin-navbar-icon-button,
+    .admin-local-clock,
+    .admin-navbar-user,
+    .admin-navbar-scope-chip
+) {
+    min-height: 2.25rem !important;
+    border: 1px solid var(--app-border, #dbe7ef) !important;
+    border-radius: 0.45rem !important;
+    background: var(--app-surface, #ffffff) !important;
+    background-image: none !important;
+    color: var(--app-text, #17324a) !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.admin-navbar-icon-button, .admin-navbar-back-button) {
+    min-width: 2.25rem !important;
+    min-height: 2.25rem !important;
+    border-radius: 0.45rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-back-button,
+body.admin-theme-scope.anbg-glass-theme #admin-back-button {
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    background-image: none !important;
+    color: var(--app-muted, #667085) !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.admin-navbar-icon-button, .admin-navbar-back-button, #admin-back-button):hover {
+    border-color: rgba(57, 150, 211, 0.18) !important;
+    background: #eaf5fc !important;
+    color: #0f6eaa !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-user {
+    width: auto !important;
+    max-width: 13rem !important;
+    padding: 0.2rem 0.3rem 0.2rem 0.65rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-avatar-media {
+    width: 1.9rem !important;
+    height: 1.9rem !important;
+    border: 1px solid rgba(57, 150, 211, 0.34) !important;
+    border-radius: 999px !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .admin-navbar-icon-button,
+    .admin-navbar-back-button,
+    #admin-back-button,
+    .admin-local-clock,
+    .admin-navbar-user,
+    .admin-navbar-scope-chip
+)::before,
+body.admin-theme-scope.anbg-glass-theme :where(
+    .admin-navbar-icon-button,
+    .admin-navbar-back-button,
+    #admin-back-button,
+    .admin-local-clock,
+    .admin-navbar-user,
+    .admin-navbar-scope-chip
+)::after {
+    content: none !important;
+    display: none !important;
+}
+
+@media (max-width: 767px) {
+    body.admin-theme-scope.anbg-glass-theme .admin-navbar-user-copy {
+        display: none !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme .admin-navbar-user {
+        padding: 0.18rem !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    body.admin-theme-scope.anbg-glass-theme :where(.app-main, .admin-content-shell) {
+        padding-left: var(--app-sidebar-collapsed-width, 72px) !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar,
+    body.admin-theme-scope.anbg-glass-theme .app-sidebar {
+        width: var(--app-sidebar-collapsed-width, 72px) !important;
+        min-width: var(--app-sidebar-collapsed-width, 72px) !important;
+        max-width: var(--app-sidebar-collapsed-width, 72px) !important;
+        top: 4rem !important;
+        height: calc(100vh - 4rem) !important;
+        overflow: hidden !important;
+        transition: width 180ms ease, min-width 180ms ease, max-width 180ms ease, box-shadow 180ms ease !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:hover,
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar[data-sidebar-keyboard-expanded="true"] {
+        width: var(--app-sidebar-width, 232px) !important;
+        min-width: var(--app-sidebar-width, 232px) !important;
+        max-width: var(--app-sidebar-width, 232px) !important;
+        box-shadow: 16px 0 32px rgba(15, 47, 87, 0.16) !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-header {
+        padding-inline: 0.45rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo {
+        width: 3.1rem !important;
+        min-width: 3.1rem !important;
+        max-width: 3.1rem !important;
+        height: 3.1rem !important;
+        min-height: 3.1rem !important;
+        max-height: 3.1rem !important;
+        flex-basis: 3.1rem !important;
+        padding: 0 !important;
+        border: 1px solid rgba(57, 150, 211, 0.24) !important;
+        border-radius: 0.5rem !important;
+        background: #ffffff !important;
+        box-shadow: 0 5px 14px rgba(15, 47, 87, 0.14) !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo-full {
+        display: none !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo-flame {
+        display: none !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:hover .app-sidebar-logo-full,
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar[data-sidebar-keyboard-expanded="true"] .app-sidebar-logo-full {
+        display: block !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:hover .app-sidebar-logo-flame,
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar[data-sidebar-keyboard-expanded="true"] .app-sidebar-logo-flame {
+        display: none !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) :where(
+        .app-sidebar-section-title,
+        [data-sidebar-label],
+        .app-sidebar-badge
+    ) {
+        width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) :where(.app-sidebar-link, .app-sidebar-logout) {
+        justify-content: center !important;
+        gap: 0 !important;
+        padding-inline: 0.35rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) :where(.app-sidebar-menu, .app-sidebar-footer) {
+        padding-inline: 0.45rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-footer {
+        flex: 0 0 auto !important;
+        padding-block: 0.7rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-footer > form {
+        width: 2.75rem !important;
+        height: 2.75rem !important;
+        flex: 0 0 2.75rem !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-logout {
+        width: 2.75rem !important;
+        min-width: 2.75rem !important;
+        max-width: 2.75rem !important;
+        height: 2.75rem !important;
+        min-height: 2.75rem !important;
+        max-height: 2.75rem !important;
+        padding: 0 !important;
+        border: 1px solid rgba(255, 255, 255, 0.28) !important;
+        border-radius: 0.5rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-notification-dot {
+        top: 0.35rem !important;
+        right: 0.35rem !important;
+    }
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-actions {
+    gap: 0.75rem !important;
+    overflow: visible;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-action-button {
+    position: relative;
+    width: 2.65rem !important;
+    min-width: 2.65rem !important;
+    height: 2.65rem !important;
+    min-height: 2.65rem !important;
+    flex: 0 0 2.65rem !important;
+    border-radius: 0.5rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-notification-button {
+    overflow: visible;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-notification-badge {
+    top: -0.3rem;
+    right: -0.3rem;
+    z-index: 2;
+    height: 1.25rem;
+    min-width: 1.25rem;
+    border: 2px solid #ffffff;
+    border-radius: 999px;
+    box-shadow: 0 2px 7px rgba(28, 32, 61, 0.24);
+    font-variant-numeric: tabular-nums;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-profile {
+    width: auto;
+    min-width: 10.75rem;
+    max-width: 15rem;
+    height: 2.75rem;
+    padding: 0.25rem 0.3rem 0.25rem 0.7rem !important;
+    gap: 0.6rem !important;
+    border-radius: 0.5rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-user-copy {
+    width: clamp(7.5rem, 10vw, 11rem);
+    max-width: 11rem;
+    line-height: 1.2;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-user-copy p {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header .admin-navbar-user-copy p:first-child {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    text-shadow: 0 1px 2px rgb(3 24 43 / 72%);
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header .admin-navbar-user-copy p:last-child {
+    color: #e6f5ff !important;
+    font-weight: 650 !important;
+    text-shadow: 0 1px 2px rgb(3 24 43 / 65%);
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-avatar {
+    flex: 0 0 auto;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-avatar-media {
+    width: 2.1rem !important;
+    height: 2.1rem !important;
+    border: 2px solid rgba(255, 255, 255, 0.94);
+    border-radius: 0.5rem !important;
+    box-shadow: 0 0 0 1px rgba(57, 150, 211, 0.24);
+}
+
+@media (min-width: 768px) {
+    body.admin-theme-scope.anbg-glass-theme .admin-navbar-user-copy {
+        display: block !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1180px) {
+    body.admin-theme-scope.anbg-glass-theme .admin-local-clock {
+        display: none !important;
+    }
+}
+
+@media (max-width: 767px) {
+    body.admin-theme-scope.anbg-glass-theme .admin-navbar-actions {
+        gap: 0.45rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme .admin-navbar-profile {
+        min-width: 2.65rem;
+        width: 2.65rem;
+        max-width: 2.65rem;
+        padding: 0.25rem !important;
+    }
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .admin-navbar-notification-badge {
+    border-color: #132235;
+}
+
+/* Shell alignment: the desktop navbar and content follow the actual sidebar width. */
+@media (min-width: 1024px) {
+    body.admin-theme-scope.anbg-glass-theme :where(.app-main, .admin-content-shell) {
+        transition: padding-left 180ms ease !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme.sidebar-desktop-expanded :where(.app-main, .admin-content-shell) {
+        padding-left: var(--app-sidebar-width, 232px) !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar,
+    body.admin-theme-scope.anbg-glass-theme .app-sidebar {
+        top: 0 !important;
+        height: 100vh !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo {
+        background: #ffffff !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo-flame {
+        display: block !important;
+        width: 2.4rem !important;
+        height: 2.4rem !important;
+        object-fit: contain !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+}
+
+/* Sidebar rhythm and hierarchy. */
+body.admin-theme-scope.anbg-glass-theme .app-sidebar-menu {
+    padding-block: 0.75rem 1rem !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.38) transparent;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-sidebar-menu > section {
+    margin-bottom: 0.9rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-sidebar-section-title {
+    margin-bottom: 0.4rem !important;
+    letter-spacing: 0.08em !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-sidebar-link {
+    min-height: 2.65rem !important;
+    gap: 0.7rem !important;
+    padding-block: 0.55rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-sidebar-link-icon {
+    flex: 0 0 2rem !important;
+}
+
+/* Header controls: one clean hit area, centered icon, external notification badge. */
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-action-button {
+    display: inline-grid !important;
+    place-items: center !important;
+    isolation: isolate;
+    overflow: visible !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-action-button > svg {
+    position: relative;
+    z-index: 1;
+    margin: 0 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #header-notifications {
+    overflow: visible !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-notification-badge {
+    top: 0 !important;
+    right: 0 !important;
+    transform: translate(42%, -42%);
+    pointer-events: none;
+}
+
+/* Dashboard control cards. */
+body.admin-theme-scope.anbg-glass-theme .dashboard-primary-kpi-card {
+    background:
+        linear-gradient(145deg, var(--dashboard-card-bg, #f7fbfd) 0%, #ffffff 62%) !important;
+    box-shadow: inset 0 3px 0 var(--dashboard-card-accent, #3996d3);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-primary-kpi-card:hover {
+    z-index: 1;
+    background:
+        linear-gradient(145deg, var(--dashboard-card-bg, #f7fbfd) 0%, #ffffff 78%) !important;
+    box-shadow:
+        inset 0 3px 0 var(--dashboard-card-accent, #3996d3),
+        0 14px 30px -20px color-mix(in srgb, var(--dashboard-card-accent, #3996d3) 60%, transparent);
+    transform: translateY(-2px);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-primary-kpi-icon {
+    color: var(--dashboard-card-accent, #3996d3);
+    background: color-mix(in srgb, var(--dashboard-card-accent, #3996d3) 12%, white);
+    border: 1px solid color-mix(in srgb, var(--dashboard-card-accent, #3996d3) 22%, white);
+}
+
+body.admin-theme-scope.anbg-glass-theme .dashboard-primary-kpi-glow {
+    position: absolute;
+    top: -2.5rem;
+    right: -2.5rem;
+    width: 7rem;
+    height: 7rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--dashboard-card-accent, #3996d3) 10%, transparent);
+    pointer-events: none;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-command-kpi-grid {
+    background: rgba(148, 163, 184, 0.18) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-primary-kpi-card,
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-primary-kpi-card:hover {
+    background:
+        linear-gradient(145deg, color-mix(in srgb, var(--dashboard-card-accent, #3996d3) 13%, #132235) 0%, #132235 72%) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .dashboard-primary-kpi-icon {
+    background: color-mix(in srgb, var(--dashboard-card-accent, #3996d3) 20%, #132235);
+    border-color: color-mix(in srgb, var(--dashboard-card-accent, #3996d3) 38%, #132235);
+}
+
+/* Tabs are navigation; buttons remain commands. */
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tabs,
+    [data-dashboard-tabs],
+    .dashboard-tabs,
+    .action-detail-tabs,
+    .appearance-live-preview-tabs
+) {
+    gap: 1.1rem !important;
+    padding: 0 0.2rem !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--app-border, #dbe7ef) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .action-detail-tab,
+    .appearance-live-preview-tab
+) {
+    min-height: 2.75rem !important;
+    padding: 0.65rem 0.15rem 0.55rem !important;
+    border: 0 !important;
+    border-bottom: 3px solid transparent !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    background-image: none !important;
+    color: var(--app-muted, #667085) !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .appearance-live-preview-tab.is-active
+) {
+    border-bottom-color: #1681bd !important;
+    background: transparent !important;
+    color: #0f6eaa !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .action-detail-tab,
+    .appearance-live-preview-tab
+)::before,
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .action-detail-tab,
+    .appearance-live-preview-tab
+)::after {
+    content: none !important;
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    .page-header-button-primary,
+    .page-header-button-secondary,
+    .pta-inline-save,
+    .pta-inline-open,
+    .pta-inline-report,
+    .pta-inline-cancel
+) {
+    border-radius: 0.4rem !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    .page-header-button-primary,
+    .page-header-button-secondary,
+    .pta-inline-save,
+    .pta-inline-open,
+    .pta-inline-report,
+    .pta-inline-cancel
+)::before,
+body.admin-theme-scope.anbg-glass-theme :where(
+    .btn,
+    .btn-sm,
+    .app-btn,
+    .page-header-button-primary,
+    .page-header-button-secondary,
+    .pta-inline-save,
+    .pta-inline-open,
+    .pta-inline-report,
+    .pta-inline-cancel
+)::after {
+    content: none !important;
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-primary, .app-btn-primary, .page-header-button-primary, .pta-inline-save) {
+    border: 1px solid #0f6eaa !important;
+    background: #0f6eaa !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-primary, .app-btn-primary, .page-header-button-primary, .pta-inline-save):hover {
+    border-color: #0b5888 !important;
+    background: #0b5888 !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-secondary, .btn-outline, .app-btn-secondary, .page-header-button-secondary) {
+    border: 1px solid #b8cedd !important;
+    background: #ffffff !important;
+    color: #17324a !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.btn-secondary, .btn-outline, .app-btn-secondary, .page-header-button-secondary):hover {
+    border-color: #3996d3 !important;
+    background: #eaf5fc !important;
+    color: #0f6eaa !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-card,
+    .ui-card,
+    .showcase-panel,
+    .showcase-toolbar,
+    .form-section,
+    .form-shell,
+    .data-table-shell,
+    .app-table-wrapper,
+    .dashboard-card,
+    .dashboard-widget,
+    .report-card,
+    .monitoring-card
+) {
+    border-radius: 0.5rem !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme #admin-shell-header,
+html.dark body.admin-theme-scope.anbg-glass-theme .admin-page-header.app-navbar {
+    background: #132235 !important;
+    border-bottom-color: #29435c !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.admin-navbar-title, .admin-navbar-user-copy p) {
+    color: #f8fafc !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .admin-navbar-icon-button,
+    .admin-local-clock,
+    .admin-navbar-user,
+    .admin-navbar-scope-chip
+) {
+    border-color: #35516b !important;
+    background: #182d42 !important;
+    color: #e2edf5 !important;
+}
+
+@layer theme {
+/* ==========================================================================
+   Institutional shell motif and unified module navigation
+   The motif is drawn in CSS and contains no third-party logo or branding.
+   ========================================================================== */
+
+body.admin-theme-scope.anbg-glass-theme #admin-sidebar,
+body.admin-theme-scope.anbg-glass-theme #admin-sidebar .app-sidebar-panel {
+    background-color: #0b5f93 !important;
+    background-image:
+        linear-gradient(180deg, rgb(5 34 58 / 76%), rgb(7 62 99 / 68%)),
+        linear-gradient(45deg, transparent 31%, rgb(255 255 255 / 7%) 32% 66%, transparent 67%),
+        linear-gradient(-45deg, transparent 31%, rgb(101 202 239 / 10%) 32% 66%, transparent 67%) !important;
+    background-position: 0 0, 0 0, 48px 48px !important;
+    background-repeat: repeat !important;
+    background-size: auto, 96px 96px, 96px 96px !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header.admin-page-header {
+    border-bottom: 1px solid rgb(173 218 244 / 44%) !important;
+    background-color: #0b5f93 !important;
+    background-image:
+        linear-gradient(90deg, rgb(5 34 58 / 78%), rgb(8 65 104 / 67%)),
+        linear-gradient(45deg, transparent 31%, rgb(255 255 255 / 6%) 32% 66%, transparent 67%),
+        linear-gradient(-45deg, transparent 31%, rgb(101 202 239 / 8%) 32% 66%, transparent 67%) !important;
+    background-position: 0 0, 0 0, 44px 44px !important;
+    background-repeat: repeat !important;
+    background-size: auto, 88px 88px, 88px 88px !important;
+    box-shadow: 0 4px 18px rgb(9 45 73 / 18%) !important;
+    backdrop-filter: blur(12px);
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header :where(
+    .admin-navbar-title,
+    .starline-greeting,
+    .admin-navbar-user-copy p
+) {
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header .starline-greeting,
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header .admin-navbar-user-copy p:last-child {
+    color: #cfeaf8 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header :where(
+    .admin-navbar-icon-button,
+    .admin-navbar-action-button,
+    .admin-local-clock,
+    .admin-navbar-user,
+    .admin-navbar-scope-chip,
+    .admin-navbar-back-button
+) {
+    border-color: rgb(255 255 255 / 30%) !important;
+    background-color: rgb(255 255 255 / 12%) !important;
+    background-image: none !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(10px);
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header :where(
+    .admin-navbar-icon-button,
+    .admin-navbar-action-button
+) {
+    display: inline-grid !important;
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+    min-width: 2.75rem !important;
+    min-height: 2.75rem !important;
+    padding: 0 !important;
+    place-items: center !important;
+    line-height: 1 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header :where(
+    .admin-navbar-icon-button,
+    .admin-navbar-action-button,
+    .admin-navbar-avatar
+) > :where(svg, img, div) {
+    flex: none !important;
+    margin: 0 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-theme-toggle > svg:first-child {
+    display: block !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-theme-toggle > svg:last-child {
+    display: none !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme #admin-theme-toggle > svg:first-child {
+    display: none !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme #admin-theme-toggle > svg:last-child {
+    display: block !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme #admin-shell-header :where(
+    .admin-navbar-icon-button,
+    .admin-navbar-action-button,
+    .admin-navbar-back-button
+):hover {
+    border-color: rgb(255 255 255 / 62%) !important;
+    background-color: rgb(57 150 211 / 78%) !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-notification-badge {
+    top: 0 !important;
+    right: 0 !important;
+    min-width: 1.25rem !important;
+    height: 1.25rem !important;
+    padding-inline: 0.25rem !important;
+    border: 2px solid #0b5f93 !important;
+    border-radius: 999px !important;
+    box-shadow: 0 2px 6px rgb(3 23 39 / 30%) !important;
+    transform: translate(38%, -38%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-profile {
+    min-width: 12.5rem !important;
+    justify-content: flex-end !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-user-copy {
+    display: block !important;
+    max-width: 12rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-avatar,
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-avatar-media {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    flex: 0 0 2.5rem !important;
+    border-radius: 50% !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-sidebar-section-title {
+    color: rgb(255 255 255 / 72%) !important;
+}
+
+@media (max-width: 767px) {
+    body.admin-theme-scope.anbg-glass-theme .admin-navbar-user-copy {
+        display: none !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme .admin-navbar-profile {
+        min-width: auto !important;
+        padding-inline: 0 !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo {
+        position: relative !important;
+        display: grid !important;
+        width: 3.4rem !important;
+        min-width: 3.4rem !important;
+        height: 3.4rem !important;
+        min-height: 3.4rem !important;
+        margin-inline: auto !important;
+        padding: 0.45rem !important;
+        border: 1px solid rgb(255 255 255 / 52%) !important;
+        background-color: #ffffff !important;
+        background-image: url('/images/logo-anbg-flamme.png') !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+        background-size: 2.4rem auto !important;
+        place-items: center !important;
+        overflow: hidden !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo-full {
+        display: none !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:not(:hover):not([data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo-flame {
+        position: relative !important;
+        z-index: 1 !important;
+        display: block !important;
+        width: 2.4rem !important;
+        height: 2.4rem !important;
+        max-width: 2.4rem !important;
+        max-height: 2.4rem !important;
+        object-fit: contain !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:is(:hover, [data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo {
+        background-color: #ffffff !important;
+        background-image: none !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:is(:hover, [data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo-full {
+        display: block !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme #admin-sidebar:is(:hover, [data-sidebar-keyboard-expanded="true"]) .app-sidebar-logo-flame {
+        display: none !important;
+    }
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-page-header, .institutional-pattern-soft) {
+    background-image:
+        linear-gradient(45deg, transparent 31%, rgb(15 110 170 / 4%) 32% 66%, transparent 67%),
+        linear-gradient(-45deg, transparent 31%, rgb(57 150 211 / 5%) 32% 66%, transparent 67%) !important;
+    background-position: 0 0, 36px 36px !important;
+    background-repeat: repeat !important;
+    background-size: 72px 72px !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .pattern-card,
+    .app-card,
+    .ui-card,
+    .showcase-panel,
+    .showcase-toolbar,
+    .dashboard-card,
+    .dashboard-widget,
+    .dashboard-summary-card,
+    .stat-card,
+    .showcase-kpi-card,
+    .report-card,
+    .monitoring-card,
+    .form-section,
+    .form-shell,
+    .data-table-shell,
+    .table-container,
+    .app-table-wrapper,
+    .table-wrap
+)::before,
+body.admin-theme-scope.anbg-glass-theme :where(
+    .pattern-card,
+    .app-card,
+    .ui-card,
+    .showcase-panel,
+    .showcase-toolbar,
+    .dashboard-card,
+    .dashboard-widget,
+    .dashboard-summary-card,
+    .stat-card,
+    .showcase-kpi-card,
+    .report-card,
+    .monitoring-card,
+    .form-section,
+    .form-shell,
+    .data-table-shell,
+    .table-container,
+    .app-table-wrapper,
+    .table-wrap
+)::after {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-card,
+    .ui-card,
+    .showcase-panel,
+    .dashboard-card,
+    .dashboard-widget,
+    .dashboard-summary-card,
+    .stat-card,
+    .showcase-kpi-card,
+    .report-card,
+    .monitoring-card,
+    .form-section,
+    .form-shell,
+    .data-table-shell,
+    .table-container,
+    .app-table-wrapper,
+    .table-wrap
+) {
+    background-image: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .module-family-tabs {
+    border: 1px solid #c7dce9 !important;
+    border-radius: 0.5rem !important;
+    background: #ffffff !important;
+    box-shadow: 0 4px 14px rgb(21 55 79 / 7%) !important;
+    overflow-x: auto !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .module-family-tabs-list {
+    display: flex !important;
+    min-width: max-content !important;
+    padding-inline: 0.75rem !important;
+    gap: 0.25rem !important;
+    border-bottom: 1px solid #d8e8f1 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .module-family-tab {
+    position: relative !important;
+    display: inline-flex !important;
+    min-height: 3rem !important;
+    align-items: center !important;
+    padding: 0.75rem 1rem !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #526b7f !important;
+    font-size: 0.875rem !important;
+    font-weight: 650 !important;
+    text-decoration: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .module-family-tab::after {
+    position: absolute !important;
+    right: 0.75rem !important;
+    bottom: -1px !important;
+    left: 0.75rem !important;
+    height: 3px !important;
+    border-radius: 3px 3px 0 0 !important;
+    background: transparent !important;
+    content: "" !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .module-family-tab:hover {
+    background: #f0f8fd !important;
+    color: #0f6eaa !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .module-family-tab.is-active {
+    color: #0b5f93 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .module-family-tab.is-active::after {
+    background: #0f6eaa !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme {
+    --app-bg: #0d1826;
+    --app-surface: #152538;
+    --app-surface-muted: #1a2d42;
+    --app-border: #35516b;
+    --app-text: #edf5fa;
+    --app-muted: #b8c9d7;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-content,
+    .admin-page-root,
+    .admin-shell-frame
+) {
+    background-color: #0d1826 !important;
+    color: #edf5fa !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .bg-white,
+    .bg-slate-50,
+    .bg-slate-100,
+    .bg-gray-50,
+    .bg-gray-100,
+    .bg-\[\#f7fbfd\],
+    .bg-\[\#f8fbfd\],
+    .bg-\[\#f8fbfe\],
+    .bg-\[\#f6fbff\],
+    .bg-\[\#eef6fc\],
+    .bg-\[\#fffaf2\],
+    .bg-\[\#e8f3fb\]
+) {
+    background-color: #1a2d42 !important;
+    background-image: none !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(span, div)[style*="background: color-mix"] {
+    background: color-mix(in srgb, currentColor 20%, #101e2e) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-card,
+    .ui-card,
+    .showcase-panel,
+    .showcase-toolbar,
+    .dashboard-card,
+    .dashboard-widget,
+    .dashboard-summary-card,
+    .stat-card,
+    .showcase-kpi-card,
+    .report-card,
+    .monitoring-card,
+    .form-section,
+    .form-shell,
+    .data-table-shell,
+    .table-container,
+    .app-table-wrapper,
+    .table-wrap,
+    .admin-dropdown-panel
+) {
+    border-color: #35516b !important;
+    background-color: #152538 !important;
+    background-image: none !important;
+    color: #edf5fa !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .text-slate-500,
+    .text-slate-600,
+    .text-slate-700,
+    .text-gray-500,
+    .text-gray-600,
+    .text-\[\#667085\],
+    .form-section-subtitle,
+    .showcase-panel-subtitle,
+    .dashboard-summary-meta,
+    .stat-card-meta
+) {
+    color: #b8c9d7 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .text-slate-800,
+    .text-slate-900,
+    .text-gray-800,
+    .text-gray-900,
+    .text-\[\#17324a\],
+    .text-\[\#1c203d\],
+    h1,
+    h2,
+    h3,
+    h4,
+    label,
+    legend
+) {
+    color: #f5f9fc !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(input, select, textarea) {
+    border-color: #45627b !important;
+    background-color: #101e2e !important;
+    color: #f8fafc !important;
+    color-scheme: dark;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(input, textarea)::placeholder {
+    color: #93a8ba !important;
+    opacity: 1 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-table,
+    .data-table,
+    .dashboard-table,
+    .glass-table,
+    .app-table-wrapper table,
+    .data-table-shell table,
+    .table-wrap table,
+    .preview-table
+) {
+    background: #152538 !important;
+    color: #edf5fa !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-table,
+    .data-table,
+    .dashboard-table,
+    .glass-table,
+    .app-table-wrapper table,
+    .data-table-shell table,
+    .table-wrap table,
+    .preview-table
+) :where(th, td) {
+    border-color: #35516b !important;
+    color: #e5eef5 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-table,
+    .data-table,
+    .dashboard-table,
+    .glass-table,
+    .app-table-wrapper table,
+    .data-table-shell table,
+    .table-wrap table,
+    .preview-table
+) thead th {
+    background: #174c6f !important;
+    color: #ffffff !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-table,
+    .data-table,
+    .dashboard-table,
+    .glass-table,
+    .app-table-wrapper table,
+    .data-table-shell table,
+    .table-wrap table,
+    .preview-table
+) tbody tr:nth-child(even) {
+    background: #182a3e !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .module-family-tabs {
+    border-color: #35516b !important;
+    background: #152538 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .module-family-tabs-list {
+    border-bottom-color: #35516b !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .module-family-tab {
+    color: #b8c9d7 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .module-family-tab:hover {
+    background: #1b3248 !important;
+    color: #8dd0f4 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .module-family-tab.is-active {
+    color: #ffffff !important;
+}
+
+/* Unified statistical cards: same visual language as the control dashboard. */
+body.admin-theme-scope.anbg-glass-theme :where(
+    .stat-card,
+    .stat-card-link,
+    .app-stat-card,
+    .eas-stat-card,
+    .showcase-kpi-card,
+    .dealdeck-kpi-card,
+    .anbg-kpi-stat-card,
+    .dashboard-summary-card,
+    .reporting-hub-kpi
+) {
+    --dashboard-card-accent: #3996d3;
+    --dashboard-card-bg: #f7fbfd;
+    position: relative;
+    min-height: 8rem;
+    overflow: hidden;
+    border: 1px solid #d7e7f0 !important;
+    border-radius: 0.75rem !important;
+    background: linear-gradient(145deg, var(--dashboard-card-bg) 0%, #ffffff 68%) !important;
+    box-shadow: inset 0 3px 0 var(--dashboard-card-accent), 0 10px 24px -22px rgb(15 23 42 / 55%) !important;
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .stat-card,
+    .stat-card-link,
+    .app-stat-card,
+    .eas-stat-card,
+    .showcase-kpi-card,
+    .dealdeck-kpi-card,
+    .anbg-kpi-stat-card,
+    .dashboard-summary-card,
+    .reporting-hub-kpi
+):hover {
+    z-index: 1;
+    border-color: color-mix(in srgb, var(--dashboard-card-accent) 38%, #d7e7f0) !important;
+    box-shadow: inset 0 3px 0 var(--dashboard-card-accent), 0 16px 32px -24px color-mix(in srgb, var(--dashboard-card-accent) 55%, transparent) !important;
+    transform: translateY(-2px);
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.is-success, .kpi-success) {
+    --dashboard-card-accent: #16a34a;
+    --dashboard-card-bg: #f0fdf4;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.is-warning, .kpi-warning) {
+    --dashboard-card-accent: #d97706;
+    --dashboard-card-bg: #fffbeb;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.is-danger, .kpi-danger) {
+    --dashboard-card-accent: #dc2626;
+    --dashboard-card-bg: #fef2f2;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.is-info, .kpi-info) {
+    --dashboard-card-accent: #2563eb;
+    --dashboard-card-bg: #eff6ff;
+}
+
+/* All application tabs inherit the Import module navigation treatment. */
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tabs,
+    [data-dashboard-tabs],
+    .dashboard-tabs,
+    .action-detail-tabs,
+    .appearance-live-preview-tabs
+) {
+    display: flex !important;
+    min-width: 0;
+    gap: 0.25rem !important;
+    padding: 0 0.75rem !important;
+    overflow-x: auto !important;
+    border: 1px solid #c7dce9 !important;
+    border-radius: 0.5rem !important;
+    background: #ffffff !important;
+    box-shadow: 0 4px 14px rgb(21 55 79 / 7%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .action-detail-tab,
+    .appearance-live-preview-tab
+) {
+    position: relative !important;
+    display: inline-flex !important;
+    min-height: 3rem !important;
+    flex: 0 0 auto;
+    align-items: center !important;
+    padding: 0.75rem 1rem !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #526b7f !important;
+    font-size: 0.875rem !important;
+    font-weight: 650 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .action-detail-tab,
+    .appearance-live-preview-tab
+)::after {
+    position: absolute !important;
+    right: 0.75rem !important;
+    bottom: -1px !important;
+    left: 0.75rem !important;
+    display: block !important;
+    height: 3px !important;
+    border-radius: 3px 3px 0 0 !important;
+    background: transparent !important;
+    content: "" !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .appearance-live-preview-tab.is-active
+) {
+    color: #0b5f93 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab.active,
+    .app-tab[aria-selected="true"],
+    .dashboard-tab-active,
+    .tab-link.active,
+    .action-detail-tab.active,
+    .action-detail-tab[aria-current="page"],
+    .appearance-live-preview-tab.is-active
+)::after {
+    background: #0f6eaa !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .stat-card,
+    .stat-card-link,
+    .app-stat-card,
+    .eas-stat-card,
+    .showcase-kpi-card,
+    .dealdeck-kpi-card,
+    .anbg-kpi-stat-card,
+    .dashboard-summary-card,
+    .reporting-hub-kpi
+) {
+    border-color: #35516b !important;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--dashboard-card-accent) 13%, #132235) 0%, #132235 72%) !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tabs,
+    [data-dashboard-tabs],
+    .dashboard-tabs,
+    .action-detail-tabs,
+    .appearance-live-preview-tabs
+) {
+    border-color: #35516b !important;
+    background: #152538 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(
+    .app-tab,
+    .dashboard-tab,
+    .tab-link,
+    .action-detail-tab,
+    .appearance-live-preview-tab
+) {
+    color: #b8c9d7 !important;
+}
+
+/* Shared institutional page header, based on the action tracking header. */
+body.admin-theme-scope.anbg-glass-theme :where(
+    .action-detail-hero,
+    .app-page-header,
+    .showcase-hero
+) {
+    position: relative !important;
+    overflow: hidden !important;
+    border: 1px solid rgb(173 218 244 / 42%) !important;
+    border-radius: 0.5rem !important;
+    background-color: #0b5f93 !important;
+    background-image:
+        linear-gradient(112deg, rgb(5 34 58 / 80%), rgb(8 65 104 / 69%)),
+        linear-gradient(45deg, transparent 31%, rgb(255 255 255 / 6%) 32% 66%, transparent 67%),
+        linear-gradient(-45deg, transparent 31%, rgb(101 202 239 / 9%) 32% 66%, transparent 67%) !important;
+    background-position: 0 0, 0 0, 42px 42px !important;
+    background-repeat: repeat !important;
+    background-size: auto, 84px 84px, 84px 84px !important;
+    color: #ffffff !important;
+    box-shadow: 0 12px 28px rgb(9 45 73 / 17%) !important;
+    backdrop-filter: blur(10px);
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .action-detail-hero,
+    .app-page-header,
+    .showcase-hero
+)::before,
+body.admin-theme-scope.anbg-glass-theme :where(
+    .action-detail-hero,
+    .app-page-header,
+    .showcase-hero
+)::after {
+    content: none !important;
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .action-detail-hero,
+    .app-page-header,
+    .showcase-hero
+) :where(
+    .action-detail-title,
+    .app-title,
+    .showcase-title,
+    .action-detail-eyebrow,
+    .app-eyebrow,
+    .showcase-eyebrow,
+    h1,
+    h2,
+    h3,
+    p
+) {
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .action-detail-hero,
+    .app-page-header,
+    .showcase-hero
+) :where(.action-detail-eyebrow, .app-eyebrow, .showcase-eyebrow) {
+    color: #f4dd62 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(
+    .action-detail-hero,
+    .app-page-header,
+    .showcase-hero
+) :where(.btn-secondary, .btn-outline) {
+    border-color: rgb(255 255 255 / 38%) !important;
+    background: rgb(255 255 255 / 12%) !important;
+    color: #ffffff !important;
+    backdrop-filter: blur(8px);
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-tabs {
+    border-color: rgb(255 255 255 / 25%) !important;
+    background: rgb(4 31 53 / 34%) !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-tab {
+    color: #cfeaf8 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-tab:hover {
+    background: rgb(255 255 255 / 10%) !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-tab.active,
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-tab[aria-selected="true"] {
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-tab.active::after,
+body.admin-theme-scope.anbg-glass-theme .action-detail-hero .action-detail-tab[aria-selected="true"]::after {
+    background: #72c8f2 !important;
+}
+
+/* The workflow stepper is decorative navigation, not a data-entry surface. */
+body.admin-theme-scope.anbg-glass-theme .action-stepper-panel {
+    border-color: rgb(173 218 244 / 36%) !important;
+    background-color: #0d547f !important;
+    background-image:
+        linear-gradient(112deg, rgb(5 34 58 / 76%), rgb(8 65 104 / 65%)),
+        linear-gradient(45deg, transparent 31%, rgb(255 255 255 / 5%) 32% 66%, transparent 67%),
+        linear-gradient(-45deg, transparent 31%, rgb(101 202 239 / 8%) 32% 66%, transparent 67%) !important;
+    background-position: 0 0, 0 0, 38px 38px !important;
+    background-repeat: repeat !important;
+    background-size: auto, 76px 76px, 76px 76px !important;
+    box-shadow: 0 12px 28px rgb(9 45 73 / 15%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-panel::before {
+    background: linear-gradient(90deg, #f4dd62 0%, #72c8f2 52%, #8fc043 100%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-panel :where(
+    .action-stepper-title,
+    .action-stepper-copy strong
+) {
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-panel :where(
+    .action-tracking-kicker,
+    .action-stepper-copy small
+) {
+    color: #c8dfed !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .action-stepper-panel .action-stepper-pill {
+    border-color: rgb(255 255 255 / 30%) !important;
+    background: rgb(255 255 255 / 12%) !important;
+    color: #ffffff !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme[data-action-tabs-ready="true"] [data-action-tab-panel][hidden] {
+    display: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme [data-action-tab-panel].is-active {
+    animation: action-tab-panel-in 160ms ease-out;
+}
+
+@keyframes action-tab-panel-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.admin-theme-scope.anbg-glass-theme [data-action-tab-panel].is-active {
+        animation: none;
+    }
+}
+}

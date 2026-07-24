@@ -2,17 +2,17 @@
 
 namespace Tests\Feature;
 
-use App\Services\ManagedKpiSettings;
 use App\Models\Direction;
 use App\Models\Service;
+use App\Services\ManagedKpiSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesAdminUser;
 use Tests\TestCase;
 
 class SuperAdminKpiSettingsTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -118,6 +118,6 @@ class SuperAdminKpiSettingsTest extends TestCase
         $this->assertSame(85.65, collect($runtimeMetrics)->firstWhere('code', 'global')['value']);
         $this->assertSame(97.0, collect($runtimeMetrics)->firstWhere('code', 'conformite')['value']);
         $this->assertSame(84.0, collect($runtimeMetrics)->firstWhere('code', 'progression')['value']);
-        $this->assertSame('Cible 95', collect($runtimeMetrics)->firstWhere('code', 'conformite')['formula_summary']);
+        $this->assertSame('Niveau attendu 95', collect($runtimeMetrics)->firstWhere('code', 'conformite')['formula_summary']);
     }
 }

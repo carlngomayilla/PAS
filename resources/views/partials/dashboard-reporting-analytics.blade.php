@@ -346,7 +346,7 @@
                         <div class="mt-3 grid gap-2 md:grid-cols-2">
                             <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Ressources:</strong> {{ $row['ressources_requises'] ?: '-' }}</div>
                             <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Indicateurs:</strong> {{ $row['indicateurs_performance'] ?: '-' }}</div>
-                            <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Cible:</strong> {{ $row['cible'] ?: '-' }}</div>
+                            <div class="text-xs text-[#667085]"><strong class="text-[#17324a]">Niveau attendu :</strong> {{ $row['cible'] ?: '-' }}</div>
                         </div>
                     </article>
                 @empty

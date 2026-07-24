@@ -7,19 +7,18 @@ use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateReportJob;
 use App\Models\Action;
+use App\Models\ActionKpi;
 use App\Models\ActionLog;
 use App\Models\ActionWeek;
 use App\Models\Direction;
 use App\Models\ExportTemplate;
-use App\Models\ActionKpi;
-use App\Models\Justificatif;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
 use App\Models\Pao;
-use App\Models\PasAxe;
 use App\Models\PaoObjectifOperationnel;
 use App\Models\PaoObjectifStrategique;
 use App\Models\Pas;
+use App\Models\PasAxe;
 use App\Models\PlatformSetting;
 use App\Models\Pta;
 use App\Models\Service;
@@ -28,13 +27,14 @@ use App\Services\ActionCalculationSettings;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertCenterService;
 use App\Services\Alerting\AlertReadService;
-use App\Services\Exports\ExportTemplateResolver;
-use App\Services\ExerciceContext;
 use App\Services\Analytics\ReportingAnalyticsService;
+use App\Services\ExerciceContext;
+use App\Services\Exports\ExportTemplateResolver;
 use App\Services\Exports\ReportingWorkbookExporter;
 use App\Services\PtaSuiviService;
 use App\Support\SafeSql;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
@@ -62,8 +62,7 @@ class MonitoringWebController extends Controller
         private readonly ExportTemplateResolver $exportTemplateResolver,
         private readonly ActionTrackingService $actionTrackingService,
         private readonly PtaSuiviService $ptaSuiviService
-    ) {
-    }
+    ) {}
 
     public function pilotage(Request $request): View
     {
@@ -190,13 +189,13 @@ class MonitoringWebController extends Controller
 
         $actionsEnCours = (clone $actions)->where('statut_dynamique', 'en_cours')->count();
         $actionsACorriger = (clone $actions)->where('statut_dynamique', 'a_corriger')->count();
-        $actionsRejetees = (clone $actions)->whereIn('statut_validation', ['rejetee_chef', 'rejetee_direction'])->count();
+        $actionsRejetees = (clone $actions)->whereIn('statut_validation', ['rejetee_chef', 'correction_controle', 'rejetee_direction'])->count();
         $actionsCloturees = (clone $actions)->where('statut_dynamique', 'cloturee')->count();
         $actionsAcheveDansDelai = (clone $actions)->where('statut_dynamique', 'acheve_dans_delai')->count();
         $actionsAcheveHorsDelai = (clone $actions)->where('statut_dynamique', 'acheve_hors_delai')->count();
 
         $validationsEnAttente = (clone $actions)
-            ->whereIn('statut_validation', ['soumise_chef', 'validee_chef'])
+            ->whereIn('statut_validation', ['soumise_chef', 'validee_chef', 'soumise_controle'])
             ->count();
 
         $justificatifsManquants = (clone $actions)
@@ -237,7 +236,7 @@ class MonitoringWebController extends Controller
 
         $validationsDetails = (clone $actions)
             ->with(['pta:id,titre,direction_id,service_id', 'pta.direction:id,code,libelle', 'responsable:id,name', 'soumisPar:id,name'])
-            ->whereIn('statut_validation', ['soumise_chef', 'validee_chef'])
+            ->whereIn('statut_validation', ['soumise_chef', 'validee_chef', 'soumise_controle'])
             ->orderBy('soumise_le')
             ->limit(20)
             ->get();
@@ -329,8 +328,8 @@ class MonitoringWebController extends Controller
         $pasOptions = (clone $pas)->orderByDesc('periode_debut')->get(['id', 'titre']);
         $pilotageFilters = [
             'direction_id' => $filterDirectionId,
-            'service_id'   => $filterServiceId,
-            'pas_id'       => $filterPasId,
+            'service_id' => $filterServiceId,
+            'pas_id' => $filterPasId,
         ];
 
         $chartsPayload = $this->reportingAnalyticsService
@@ -581,7 +580,7 @@ class MonitoringWebController extends Controller
 
         try {
             $path = Crypt::decryptString((string) $request->query('path'));
-        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+        } catch (DecryptException) {
             abort(403, 'Lien de telechargement invalide.');
         }
 
@@ -632,15 +631,19 @@ class MonitoringWebController extends Controller
             ],
             'actions' => [
                 'label' => 'Rapport Actions',
-                'description' => 'Actions, responsables, dates, mode d’exécution, cible, avancement, financement, risque, ressources et KPI.',
+                'description' => 'Actions, responsables, dates, mode d’exécution, niveau attendu, avancement, financement, risque, ressources et KPI.',
             ],
             'kpi' => [
                 'label' => 'Rapport KPI',
                 'description' => 'KPI par direction, service, agent/RMO et action, avec scores et retards.',
             ],
+            'conformite' => [
+                'label' => 'Rapport Conformite',
+                'description' => 'Controle des rattachements, indicateurs, justificatifs, financements et delais a traiter.',
+            ],
             'anomalies' => [
                 'label' => 'Rapport Anomalies',
-                'description' => 'Retards, sous-cibles, blocages, validations en attente, anomalies et corrections attendues.',
+                'description' => 'Retards, sous-seuils, blocages, validations en attente, anomalies et corrections attendues.',
             ],
             'financement' => [
                 'label' => 'Rapport Financement',
@@ -780,6 +783,7 @@ class MonitoringWebController extends Controller
             'pta' => 'PTA',
             'actions' => 'ACTIONS',
             'kpi' => 'KPI',
+            'conformite' => 'CONFORMITE',
             'anomalies' => 'ANOMALIES',
             'financement' => 'FINANCEMENT',
             default => 'CONSOLIDE_DG',
@@ -903,8 +907,8 @@ class MonitoringWebController extends Controller
         $this->denyUnlessAlertReader($user);
 
         $filters = array_filter(
-            $request->only(['limit', 'niveau', 'etat']),
-            static fn ($value): bool => $value !== null && $value !== ''
+            $request->only(['limit', 'niveau', 'etat', 'vue', 'q', 'type', 'per_page']),
+            static fn ($value): bool => is_scalar($value) && trim((string) $value) !== ''
         );
 
         return redirect()->route('workspace.notifications.index', array_merge(['tab' => 'alertes'], $filters));
@@ -984,19 +988,14 @@ class MonitoringWebController extends Controller
         }
 
         $this->denyUnlessPlanningReader($user);
+        $this->denyUnlessAlertReader($user);
 
-        $limit = max(1, min(100, (int) $request->integer('limit', 20)));
-        $fingerprints = $this->alertCenter
-            ->buildForUser($user, $limit)
-            ->pluck('fingerprint')
-            ->filter(static fn ($value): bool => is_string($value) && trim($value) !== '')
-            ->values()
-            ->all();
+        $alerts = $this->alertCenter->allForUser($user);
 
-        $this->alertReadService->markFingerprintsAsRead($user, $fingerprints);
+        $this->alertReadService->markAlertsAsRead($user, $alerts);
         $this->markAlertNotificationsAsRead($user);
 
-        return back()->with('success', 'Les alertes visibles ont été marquées comme lues.');
+        return back()->with('success', 'Toutes les alertes actives ont été marquées comme lues.');
     }
 
     private function scopePao(Builder|Relation $query, User $user): void
@@ -1038,7 +1037,7 @@ class MonitoringWebController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return Collection<int, Action>
      */
     private function officialActions(Collection $actions): Collection
@@ -1272,11 +1271,13 @@ class MonitoringWebController extends Controller
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             $query->whereHas('action.pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
             $query->whereHas('action.pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
+
             return;
         }
 
@@ -1293,11 +1294,13 @@ class MonitoringWebController extends Controller
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             $query->whereHas('kpi.action.pta', fn (Builder $q) => $q->where('direction_id', (int) $user->direction_id));
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
             $query->whereHas('kpi.action.pta', fn (Builder $q) => $q->where('service_id', (int) $user->service_id));
+
             return;
         }
 
@@ -1314,6 +1317,7 @@ class MonitoringWebController extends Controller
             $query->whereHas('objectifStrategique.paoAxe.pao', function (Builder $subQuery) use ($user): void {
                 $subQuery->where('direction_id', (int) $user->direction_id);
             });
+
             return;
         }
 
@@ -1321,6 +1325,7 @@ class MonitoringWebController extends Controller
             $query->whereHas('objectifStrategique.paoAxe.pao.ptas', function (Builder $subQuery) use ($user): void {
                 $subQuery->where('service_id', (int) $user->service_id);
             });
+
             return;
         }
 
@@ -1409,6 +1414,7 @@ class MonitoringWebController extends Controller
             $query->whereHas('paoAxe.pao', function (Builder $subQuery) use ($user): void {
                 $subQuery->where('direction_id', (int) $user->direction_id);
             });
+
             return;
         }
 
@@ -1416,6 +1422,7 @@ class MonitoringWebController extends Controller
             $query->whereHas('paoAxe.pao.ptas', function (Builder $subQuery) use ($user): void {
                 $subQuery->where('service_id', (int) $user->service_id);
             });
+
             return;
         }
 
@@ -1437,11 +1444,13 @@ class MonitoringWebController extends Controller
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
             $query->where($directionColumn, (int) $user->direction_id);
+
             return;
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
             $query->where($serviceColumn, (int) $user->service_id);
+
             return;
         }
 
@@ -1574,7 +1583,7 @@ class MonitoringWebController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, float|int>
      */
     private function buildMonitoringSnapshot(Collection $actions): array
@@ -1599,7 +1608,7 @@ class MonitoringWebController extends Controller
     }
 
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<int, array<string, mixed>>
      */
     private function buildMonitoringDirectionComparisonRows(Collection $actions, int $limit = 8): array
@@ -2235,16 +2244,16 @@ class MonitoringWebController extends Controller
 
     /**
      * @return array{
-     *     generatedAt: \Illuminate\Support\Carbon,
+     *     generatedAt: Carbon,
      *     scope: array{role: string, direction_id: int|null, service_id: int|null},
      *     global: array<string, int>,
      *     statuts: array<string, array<string, int>>,
      *     alertes: array<string, int>,
      *     charts: array<string, mixed>,
      *     details: array{
-     *         actions_retard: \Illuminate\Support\Collection<int, \App\Models\Action>,
-     *         kpi_sous_seuil: \Illuminate\Support\Collection<int, \App\Models\KpiMesure>,
-     *         structure_rapports: \Illuminate\Support\Collection<int, array<string, string>>
+     *         actions_retard: Collection<int, Action>,
+     *         kpi_sous_seuil: Collection<int, KpiMesure>,
+     *         structure_rapports: Collection<int, array<string, string>>
      *     }
      * }
      */

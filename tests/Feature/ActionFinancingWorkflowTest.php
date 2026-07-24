@@ -4,15 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\Action;
 use App\Models\Direction;
+use App\Models\Justificatif;
+use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
-use App\Models\Pao;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
-use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -27,21 +27,25 @@ class ActionFinancingWorkflowTest extends TestCase
 
         $trackingService = app(ActionTrackingService::class);
         $trackingService->syncFinancingRequest($action, $fixture['service_user']);
-        app(WorkspaceNotificationService::class)->notifyActionFinancingRequested($action->fresh(), $fixture['service_user']);
+        $this->assertSame(Action::FINANCEMENT_PRE_SIGNALE_DAF, $action->fresh()->financement_statut);
+        $this->assertNull($fixture['daf_director']->fresh()->notifications()->first());
 
-        $this->assertNotNull($fixture['daf_director']->fresh()->notifications()->first());
+        $this->actingAs($fixture['agent'])
+            ->post(route('workspace.actions.financement.submit', $action), [
+                'source_financement' => 'Budget interne',
+                'commentaire_financement' => 'Dossier complet transmis pour instruction.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
 
-        // Le workflow de validation chef a été supprimé (refonte en cours).
-        // On force directement le statut de financement attendu après transmission DAF
-        // pour que la suite du test (POST financement.daf) puisse s'exécuter.
-        $action->forceFill(['financement_statut' => Action::FINANCEMENT_A_TRAITER_DAF])->save();
         $action->refresh();
-        $this->assertSame(Action::FINANCEMENT_A_TRAITER_DAF, $action->financement_statut);
+        $this->assertSame(Action::FINANCEMENT_SOUMIS_DAF, $action->financement_statut);
+        $this->assertNotNull($action->financement_soumis_le);
+        $this->assertNotNull($fixture['daf_director']->fresh()->notifications()->first());
 
         $this->actingAs($fixture['daf_director'])
             ->get(route('workspace.actions.suivi', $action))
             ->assertOk()
-            ->assertSee('Traitement DAF');
+            ->assertSee('Instruction et avis DAF');
 
         $this->actingAs($fixture['daf_director'])
             ->post(route('workspace.actions.financement.daf', $action), [
@@ -108,7 +112,7 @@ class ActionFinancingWorkflowTest extends TestCase
         $this->actingAs($fixture['daf_director'])
             ->get(route('workspace.daf.financements.index'))
             ->assertOk()
-            ->assertSee('Demandes de financement des actions')
+            ->assertSee('Pilotage des financements')
             ->assertSee('Action avec besoin de financement')
             ->assertSee('Budget interne')
             ->assertDontSee('Action sans financement DAF');
@@ -119,16 +123,19 @@ class ActionFinancingWorkflowTest extends TestCase
         $fixture = $this->createFixture();
         $action = $fixture['action'];
 
-        // Le workflow de validation chef a été supprimé (refonte en cours).
-        // On force directement le statut de financement attendu après transmission DAF.
-        $action->forceFill(['financement_statut' => Action::FINANCEMENT_A_TRAITER_DAF])->save();
-        $action->refresh();
-        $this->assertSame(Action::FINANCEMENT_A_TRAITER_DAF, $action->financement_statut);
+        $this->actingAs($fixture['agent'])
+            ->post(route('workspace.actions.financement.submit', $action), [
+                'source_financement' => 'Budget interne',
+                'commentaire_financement' => 'Dossier soumis pour instruction DAF.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->assertSame(Action::FINANCEMENT_SOUMIS_DAF, $action->fresh()->financement_statut);
 
         $this->actingAs($fixture['daf_director'])
             ->get(route('workspace.actions.suivi', $action))
             ->assertOk()
-            ->assertSee('Demander un complement');
+            ->assertSee('Demander un complément');
 
         $this->actingAs($fixture['daf_director'])
             ->post(route('workspace.actions.financement.daf', $action), [
@@ -254,6 +261,7 @@ class ActionFinancingWorkflowTest extends TestCase
             'progression_theorique' => 0,
             'seuil_alerte_progression' => 10,
             'financement_requis' => true,
+            'financement_statut' => Action::FINANCEMENT_PRE_SIGNALE_DAF,
             'description_financement' => 'Besoin logistique et budgetaire.',
             'source_financement' => 'Budget interne',
             'montant_estime' => 1800000,
@@ -261,6 +269,17 @@ class ActionFinancingWorkflowTest extends TestCase
         ]);
 
         app(ActionTrackingService::class)->initializeActionTracking($action, $serviceUser);
+        Justificatif::query()->create([
+            'justifiable_type' => Action::class,
+            'justifiable_id' => $action->id,
+            'categorie' => 'financement',
+            'nom_original' => 'devis-financement.pdf',
+            'chemin_stockage' => 'justificatifs/tests/devis-financement.pdf',
+            'mime_type' => 'application/pdf',
+            'taille_octets' => 128,
+            'description' => 'Piece initiale du dossier financier',
+            'ajoute_par' => $agent->id,
+        ]);
 
         return [
             'action' => $action->fresh(),

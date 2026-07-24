@@ -46,9 +46,15 @@ class WorkflowV2CycleTest extends TestCase
         $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CHEF, $action->statut_validation);
         $this->assertEquals(0.0, (float) $action->official_progress_percent, 'Toujours pas officielle après submit.');
 
-        // VALIDATE chef → officialise.
+        // VISA chef → transmet au controle sans officialiser.
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
+        $this->assertEquals(0.0, (float) $action->official_progress_percent);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut);
+
+        // CONTROLE final → officialise et cloture.
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $action->statut_validation);
         $this->assertEquals(90.0, (float) $action->official_progress_percent);
         $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
     }
@@ -85,7 +91,14 @@ class WorkflowV2CycleTest extends TestCase
 
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
 
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::STATUS_EN_COURS, $action->statut_dynamique);
+        $this->assertNull($action->date_fin_reelle);
+        $this->assertNull($action->cloture_le);
+
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $action->statut_validation);
         $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut_dynamique);
         $this->assertNotNull($action->date_fin_reelle);
         $this->assertNotNull($action->cloture_le);
@@ -123,6 +136,69 @@ class WorkflowV2CycleTest extends TestCase
         $this->assertSame(ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE, $action->statut_validation);
         $this->assertSame('Données incomplètes', $action->motif_validation_chef);
         $this->assertEquals(0.0, (float) $action->official_progress_percent);
+    }
+
+    public function test_chef_adjustment_requires_reason_and_controller_can_return_for_correction(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 80], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+
+        try {
+            $workflow->reviewAction($action, true, null, $fixture['chef'], 72);
+            $this->fail('Un ajustement chef sans justification doit etre refuse.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertStringContainsString('justification', $exception->getMessage());
+        }
+
+        $action = $workflow->reviewAction($action->fresh(), true, 'Piece partiellement conforme', $fixture['chef'], 72);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
+        $this->assertSame('72.00', (string) $action->chef_progress_percent);
+        $this->assertSame('Piece partiellement conforme', $action->chef_adjustment_reason);
+
+        $action = $workflow->reviewActionByController($action, false, 'Completer la preuve', $fixture['controller']);
+        $this->assertSame(ActionTrackingService::VALIDATION_CORRECTION_CONTROLE, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::STATUS_A_CORRIGER, $action->statut);
+        $this->assertSame('Completer la preuve', $action->controle_comment);
+
+        $this->actingAs($fixture['agent'])
+            ->post(route('workspace.actions.execution.update', $action), [
+                'quantite_realisee' => 85,
+                'commentaire' => 'Correction apportee.',
+                'tracking_action' => 'save',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->assertSame('85.00', (string) $action->fresh()->progression_reelle);
+    }
+
+    public function test_controller_endpoint_closes_action_after_chef_visa(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 90], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+
+        $this->actingAs($fixture['chef'])
+            ->post(route('workspace.actions.control.review', $action), ['decision' => 'valider'])
+            ->assertForbidden();
+
+        $this->actingAs($fixture['controller'])
+            ->post(route('workspace.actions.control.review', $action), [
+                'decision' => 'valider',
+                'motif' => 'Controle conforme.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $action->fresh()->statut_validation);
+
+        $this->actingAs($fixture['controller'])
+            ->from(route('workspace.actions.suivi', $action))
+            ->post(route('workspace.actions.control.review', $action), ['decision' => 'valider'])
+            ->assertRedirect(route('workspace.actions.suivi', $action))
+            ->assertSessionHasErrors('general');
     }
 
     public function test_composite_action_requires_parent_validation_after_all_sub_actions_validated(): void
@@ -167,9 +243,45 @@ class WorkflowV2CycleTest extends TestCase
 
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
 
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->statut_validation);
+        $this->assertNotSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
+        $this->assertEquals(0.0, (float) $action->official_progress_percent);
+
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CONTROLE, $action->statut_validation);
         $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut);
         $this->assertEquals(80.0, (float) $action->official_progress_percent);
+    }
+
+    public function test_controller_rejection_reopens_validated_sub_actions(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_COMPOSEE);
+        $action = $fixture['action'];
+        $workflow = app(ActionWorkflowService::class);
+        $subAction = $action->sousActions()->create([
+            'agent_id' => $fixture['agent']->id,
+            'libelle' => 'Sous-action a reprendre',
+            'date_debut' => '2026-01-01',
+            'date_fin' => '2026-06-30',
+            'sub_action_type' => SousAction::TYPE_QUANTITATIVE,
+            'cible_prevue' => 100,
+            'weight' => 100,
+            'requires_proof' => false,
+            'statut' => 'non_demarre',
+            'validation_status' => SousAction::VALIDATION_NON_SOUMISE,
+        ]);
+
+        $workflow->recordSubActionProgress($subAction, ['quantite_realisee' => 100], $fixture['agent']);
+        $workflow->submitSubAction($subAction->fresh(), ['has_new_proof' => false], $fixture['agent']);
+        $workflow->reviewSubAction($subAction->fresh(), true, null, $fixture['chef']);
+        $action = $workflow->reviewAction($action->fresh(), true, null, $fixture['chef']);
+        $workflow->reviewActionByController($action, false, 'Reprendre le livrable', $fixture['controller']);
+
+        $subAction->refresh();
+        $this->assertSame(SousAction::VALIDATION_REJETEE, $subAction->validation_status);
+        $this->assertSame('rejetee_a_corriger', $subAction->statut);
+        $this->assertFalse((bool) $subAction->est_effectuee);
     }
 
     public function test_suivi_page_renders_for_agent_quantitative(): void
@@ -194,6 +306,7 @@ class WorkflowV2CycleTest extends TestCase
         $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 90], $fixture['agent']);
         $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
 
         $this->actingAs($fixture['agent'])
             ->get(route('workspace.actions.suivi', $action))
@@ -303,7 +416,7 @@ class WorkflowV2CycleTest extends TestCase
         $this->actingAs($fixture['chef'])
             ->get(route('workspace.actions.suivi', $fixture['action']))
             ->assertOk()
-            ->assertSee('Décision du chef de service', false);
+            ->assertSee('Visa du chef de service', false);
     }
 
     public function test_unit_chief_can_review_service_action_when_in_scope(): void
@@ -325,7 +438,7 @@ class WorkflowV2CycleTest extends TestCase
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
-        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_CHEF, $action->fresh()->statut_validation);
+        $this->assertSame(ActionTrackingService::VALIDATION_SOUMISE_CONTROLE, $action->fresh()->statut_validation);
     }
 
     public function test_unit_chief_cannot_open_action_from_another_service(): void
@@ -374,8 +487,8 @@ class WorkflowV2CycleTest extends TestCase
         $this->actingAs($fixture['chef'])
             ->get(route('workspace.actions.suivi', $action))
             ->assertOk()
-            ->assertSee('Décision du chef de service', false)
-            ->assertSee('Valider l\'action', false);
+            ->assertSee('Visa du chef de service', false)
+            ->assertSee('Viser et transmettre', false);
     }
 
     public function test_validation_tab_lists_only_actions_waiting_for_validation(): void
@@ -436,6 +549,7 @@ class WorkflowV2CycleTest extends TestCase
         $service = Service::query()->create(['direction_id' => $direction->id, 'code' => 'SWF', 'libelle' => 'Service WF']);
         $agent = User::factory()->create(['role' => User::ROLE_AGENT, 'direction_id' => $direction->id, 'service_id' => $service->id]);
         $chef = User::factory()->create(['role' => User::ROLE_SERVICE, 'direction_id' => $direction->id, 'service_id' => $service->id]);
+        $controller = User::factory()->create(['role' => User::ROLE_PLANIFICATION]);
 
         $pas = Pas::query()->create(['titre' => 'PAS WF', 'periode_debut' => 2026, 'periode_fin' => 2030]);
         $pao = Pao::query()->create(['pas_id' => $pas->id, 'direction_id' => $direction->id, 'service_id' => $service->id, 'titre' => 'PAO WF', 'annee' => 2026]);
@@ -451,6 +565,6 @@ class WorkflowV2CycleTest extends TestCase
             'justificatif_obligatoire' => false,
         ], $actionOverrides));
 
-        return ['action' => $action, 'agent' => $agent, 'chef' => $chef];
+        return ['action' => $action, 'agent' => $agent, 'chef' => $chef, 'controller' => $controller];
     }
 }

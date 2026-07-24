@@ -14,7 +14,15 @@ class Delegation extends Model
     use HasFactory;
 
     public const SCOPE_DIRECTION = 'direction';
+
     public const SCOPE_SERVICE = 'service';
+
+    /** @var list<string> */
+    public const AVAILABLE_PERMISSIONS = [
+        'planning_read',
+        'planning_write',
+        'action_review',
+    ];
 
     /**
      * @var list<string>
@@ -117,5 +125,32 @@ class Delegation extends Model
             && $this->date_fin !== null
             && $this->date_debut->lte($at)
             && $this->date_fin->gte($at);
+    }
+
+    public function displayStatus(?Carbon $at = null): string
+    {
+        $at ??= now();
+
+        if ($this->statut === 'cancelled') {
+            return 'cancelled';
+        }
+
+        if ($this->date_debut !== null && $this->date_debut->gt($at)) {
+            return 'scheduled';
+        }
+
+        if ($this->date_fin !== null && $this->date_fin->lt($at)) {
+            return 'expired';
+        }
+
+        return 'active';
+    }
+
+    public function canBeCancelled(?Carbon $at = null): bool
+    {
+        $at ??= now();
+
+        return $this->statut === 'active'
+            && ($this->date_fin === null || $this->date_fin->gte($at));
     }
 }

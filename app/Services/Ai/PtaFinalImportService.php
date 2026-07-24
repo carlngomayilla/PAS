@@ -60,58 +60,65 @@ class PtaFinalImportService
                 $resources = trim((string) ($payload['ressources_requises'] ?? ''));
                 $subActionsText = trim((string) ($payload['sous_actions'] ?? $this->parameterizer->stringifySubActions($parameterization['sous_actions']) ?? ''));
 
-                $action = Action::query()->updateOrCreate(
-                    ['code' => $code],
-                    [
-                        'exercice_id' => $pta->exercice_id,
-                        'pta_id' => $pta->id,
-                        'pao_id' => $pta->pao_id,
-                        'libelle' => trim((string) $payload['libelle_action']),
-                        'description' => $payload['description_action'] ?: $payload['observations'] ?: null,
-                        'statut_parametrage' => 'parametre',
-                        'nombre_sous_actions_prevu' => (int) ($payload['nombre_sous_actions'] ?? $parameterization['nombre_sous_actions'] ?? 0),
-                        'mode_evaluation' => $mode,
-                        'type_action' => $modelType,
-                        'requires_comment' => $this->boolFrom($payload['commentaire_obligatoire'] ?? $parameterization['commentaire_obligatoire'], false),
-                        'allows_difficulty' => $this->boolFrom($payload['champ_difficulte'] ?? $parameterization['champ_difficulte'], true),
-                        'type_cible' => $typeCode === 'Q' ? 'quantitative' : 'qualitative',
-                        'intitule_cible' => $payload['indicateur'] ?: $payload['cible'] ?: null,
-                        'unite_cible' => $typeCode === 'Q' ? ($payload['unite_cible'] ?? $payload['unite'] ?? $parameterization['unite_cible']) : null,
-                        'quantite_cible' => $typeCode === 'Q' ? $quantiteCible : null,
-                        'seuil_minimum' => $this->numberFrom($payload['cible_minimum_execution'] ?? $parameterization['cible_minimum_execution']) ?? 100,
-                        'seuil_mode' => $thresholdMode,
-                        'seuil_t1' => $thresholdMode === 'trimestriel' ? $this->numberFrom($payload['seuil_t1'] ?? $parameterization['seuil_t1']) : null,
-                        'seuil_t2' => $thresholdMode === 'trimestriel' ? $this->numberFrom($payload['seuil_t2'] ?? $parameterization['seuil_t2']) : null,
-                        'seuil_t3' => $thresholdMode === 'trimestriel' ? $this->numberFrom($payload['seuil_t3'] ?? $parameterization['seuil_t3']) : null,
-                        'seuil_t4' => $thresholdMode === 'trimestriel' ? $this->numberFrom($payload['seuil_t4'] ?? $parameterization['seuil_t4']) : null,
-                        'methode_calcul' => match ($mode) {
-                            Action::MODE_QUANTITATIF => 'cumulative_quantity',
-                            Action::MODE_SOUS_ACTIONS => 'sum_sous_actions',
-                            default => 'binary_completion',
-                        },
-                        'justificatif_obligatoire' => ! $this->blank($payload['indicateur'] ?? null),
-                        'livrable_attendu' => $payload['livrables_attendus'] ?? $payload['indicateur'] ?? null,
-                        'priorite' => $payload['priorite'] ?: 'moyenne',
-                        'date_debut' => $this->validation->parseDate($payload['date_debut'] ?? null)?->toDateString(),
-                        'date_fin' => $dateFin?->toDateString(),
-                        'date_echeance' => $this->validation->parseDate($payload['echeance'] ?? null)?->toDateString(),
-                        'responsable_id' => $responsable?->id,
-                        'contexte_action' => Action::CONTEXT_OPERATIONNEL,
-                        'origine_action' => Action::ORIGIN_PTA,
-                        'statut' => trim((string) ($payload['statut_initial'] ?? '')) ?: 'non_demarre',
-                        'risque_lie' => $riskPotential !== '' ? 'oui' : null,
-                        'risques' => $riskPotential !== '' ? $riskPotential : null,
-                        'risque_potentiel' => $riskPotential !== '' ? $riskPotential : null,
-                        'niveau_risque' => $this->riskLevel($payload['niveau_risque'] ?? $parameterization['niveau_risque']),
-                        'ressources_materielles' => $resources !== '' ? $resources : null,
-                        'ressources_details' => $resources !== '' ? $resources : null,
-                        'financement_requis' => is_numeric($budget) && (float) $budget > 0,
-                        'source_financement' => $payload['source_financement'] ?: null,
-                        'montant_estime' => is_numeric($budget) ? (float) $budget : null,
-                    ]
-                );
+                $existingAction = Action::query()->where('code', $code)->first();
+                $actionPayload = [
+                    'exercice_id' => $pta->exercice_id,
+                    'pta_id' => $pta->id,
+                    'pao_id' => $pta->pao_id,
+                    'libelle' => trim((string) $payload['libelle_action']),
+                    'description' => $payload['description_action'] ?: $payload['observations'] ?: null,
+                    'statut_parametrage' => 'parametre',
+                    'nombre_sous_actions_prevu' => (int) ($payload['nombre_sous_actions'] ?? $parameterization['nombre_sous_actions'] ?? 0),
+                    'mode_evaluation' => $mode,
+                    'type_action' => $modelType,
+                    'requires_comment' => $this->boolFrom($payload['commentaire_obligatoire'] ?? $parameterization['commentaire_obligatoire'], false),
+                    'allows_difficulty' => $this->boolFrom($payload['champ_difficulte'] ?? $parameterization['champ_difficulte'], true),
+                    'type_cible' => $typeCode === 'Q' ? 'quantitative' : 'qualitative',
+                    'intitule_cible' => $payload['indicateur'] ?: $payload['cible'] ?: null,
+                    'unite_cible' => $typeCode === 'Q' ? ($payload['unite_cible'] ?? $payload['unite'] ?? $parameterization['unite_cible']) : null,
+                    'quantite_cible' => $typeCode === 'Q' ? $quantiteCible : null,
+                    'seuil_minimum' => $this->numberFrom($payload['cible_minimum_execution'] ?? $parameterization['cible_minimum_execution']) ?? 100,
+                    'seuil_mode' => $thresholdMode,
+                    'seuil_t1' => $thresholdMode === 'trimestriel' ? $this->numberFrom($payload['seuil_t1'] ?? $parameterization['seuil_t1']) : null,
+                    'seuil_t2' => $thresholdMode === 'trimestriel' ? $this->numberFrom($payload['seuil_t2'] ?? $parameterization['seuil_t2']) : null,
+                    'seuil_t3' => $thresholdMode === 'trimestriel' ? $this->numberFrom($payload['seuil_t3'] ?? $parameterization['seuil_t3']) : null,
+                    'seuil_t4' => $thresholdMode === 'trimestriel' ? $this->numberFrom($payload['seuil_t4'] ?? $parameterization['seuil_t4']) : null,
+                    'methode_calcul' => match ($mode) {
+                        Action::MODE_QUANTITATIF => 'cumulative_quantity',
+                        Action::MODE_SOUS_ACTIONS => 'sum_sous_actions',
+                        default => 'binary_completion',
+                    },
+                    'justificatif_obligatoire' => ! $this->blank($payload['indicateur'] ?? null),
+                    'livrable_attendu' => $payload['livrables_attendus'] ?? $payload['indicateur'] ?? null,
+                    'priorite' => $payload['priorite'] ?: 'moyenne',
+                    'date_debut' => $this->validation->parseDate($payload['date_debut'] ?? null)?->toDateString(),
+                    'date_fin' => $dateFin?->toDateString(),
+                    'date_echeance' => $this->validation->parseDate($payload['echeance'] ?? null)?->toDateString(),
+                    'responsable_id' => $responsable?->id,
+                    'contexte_action' => Action::CONTEXT_OPERATIONNEL,
+                    'origine_action' => Action::ORIGIN_PTA,
+                    'statut' => trim((string) ($payload['statut_initial'] ?? '')) ?: 'non_demarre',
+                    'risque_lie' => $riskPotential !== '' ? 'oui' : null,
+                    'risques' => $riskPotential !== '' ? $riskPotential : null,
+                    'risque_potentiel' => $riskPotential !== '' ? $riskPotential : null,
+                    'niveau_risque' => $this->riskLevel($payload['niveau_risque'] ?? $parameterization['niveau_risque']),
+                    'ressources_materielles' => $resources !== '' ? $resources : null,
+                    'ressources_details' => $resources !== '' ? $resources : null,
+                    'financement_requis' => is_numeric($budget) && (float) $budget > 0,
+                    'source_financement' => $payload['source_financement'] ?: null,
+                    'montant_estime' => is_numeric($budget) ? (float) $budget : null,
+                ];
 
-                if ($typeCode === 'M') {
+                if ($existingAction instanceof Action) {
+                    $actionPayload['date_debut'] = optional($existingAction->date_debut)->format('Y-m-d');
+                    $actionPayload['date_fin'] = optional($existingAction->date_fin)->format('Y-m-d');
+                    $actionPayload['date_echeance'] = optional($existingAction->date_echeance)->format('Y-m-d');
+                    $actionPayload['echeance_cible'] = optional($existingAction->echeance_cible)->format('Y-m-d');
+                }
+
+                $action = Action::query()->updateOrCreate(['code' => $code], $actionPayload);
+
+                if ($typeCode === 'M' && $action->wasRecentlyCreated) {
                     $this->syncSuggestedSubActions($action, $subActionsText, $responsable);
                 }
 

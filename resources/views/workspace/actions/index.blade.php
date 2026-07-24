@@ -16,11 +16,13 @@
             'validations' => 'Validations à traiter',
             default => 'Vue complète',
         };
-        $paginationRange = $rows->total() > 0
-            ? $rows->firstItem().' - '.$rows->lastItem()
-            : '0';
+        $layoutMode = in_array(($layoutMode ?? 'list'), ['list', 'kanban', 'calendar', 'gantt'], true)
+            ? $layoutMode
+            : 'list';
         $createRouteParams = $currentViewMode === 'mes_actions' ? ['vue' => 'mes_actions'] : [];
-        $listing = collect($rows->items());
+        $listing = $layoutMode === 'list'
+            ? collect($rows->items())
+            : collect($visualizationRows ?? []);
         $currentUser = auth()->user();
         $isExecutorAgentInterface = $currentUser instanceof \App\Models\User && $currentUser->isAgent();
         $hideExecutorMetricsFor = static function ($row) use ($currentUser, $isExecutorAgentInterface): bool {
@@ -38,7 +40,7 @@
             }
 
             $validationStatus = (string) ($row->statut_validation ?? '');
-            $isReleased = in_array($validationStatus, ['validee_chef', 'validee_direction'], true);
+            $isReleased = in_array($validationStatus, ['validee_controle', 'validee_direction'], true);
 
             return ! $isReleased;
         };
@@ -92,6 +94,9 @@
             'rejetee_chef'       => 'anbg-badge anbg-badge-danger',
             'correction_demandee'=> 'anbg-badge anbg-badge-warning',
             'validee_chef'       => 'anbg-badge anbg-badge-info',
+            'soumise_controle'   => 'anbg-badge anbg-badge-info',
+            'correction_controle'=> 'anbg-badge anbg-badge-warning',
+            'validee_controle'   => 'anbg-badge anbg-badge-success',
             'rejetee_direction'  => 'anbg-badge anbg-badge-danger',
             'validee_direction'  => 'anbg-badge anbg-badge-success',
         ];
@@ -109,7 +114,6 @@
             ->filter(static fn (array $card): bool => (bool) ($card['used'] ?? true))
             ->values()
             ->all();
-        $layoutMode = request()->query('layout', 'list');
         $kanbanColumns = [
             'non_demarre'       => ['label' => 'Non démarrée',   'color' => '#94a3b8', 'tone' => 'neutral'],
             'en_cours'          => ['label' => 'En cours',        'color' => '#3996d3', 'tone' => 'info'],
@@ -135,21 +139,28 @@
         $echeanceOf = fn ($row) => $row->date_echeance ?? $row->date_fin;
         $debutOf = fn ($row) => $row->date_debut ?? $row->date_echeance ?? $row->date_fin;
         $trimestreLabel = function ($date): ?string {
-            if (!$date) return null;
+            if (! $date) {
+                return null;
+            }
+
             $c = \Carbon\Carbon::parse($date);
-            return 'T' . $c->quarter . ' ' . $c->year;
+
+            return 'T'.$c->quarter.' '.$c->year;
         };
 
         // Calendar: group actions by échéance month/day
         $today = \Carbon\Carbon::today();
-        $calYear  = (int) request()->query('cal_year',  $today->year);
-        $calMonth = (int) request()->query('cal_month', $today->month);
+        $calYear  = max(2000, min(2100, (int) request()->query('cal_year', $today->year)));
+        $calMonth = max(1, min(12, (int) request()->query('cal_month', $today->month)));
         $calStart = \Carbon\Carbon::createFromDate($calYear, $calMonth, 1);
         $calEnd   = $calStart->copy()->endOfMonth();
         $calGrid  = []; // day => [actions]
         foreach ($listing as $row) {
             $echeance = $echeanceOf($row);
-            if (!$echeance) continue;
+            if (! $echeance) {
+                continue;
+            }
+
             $d = \Carbon\Carbon::parse($echeance);
             if ($d->year === $calYear && $d->month === $calMonth) {
                 $calGrid[$d->day][] = $row;
@@ -377,7 +388,7 @@
     <section class="mb-4 app-screen-block">
         <div class="mb-3 flex items-center justify-between gap-3">
             <h2 class="showcase-panel-title">Kanban — {{ $viewModeLabel }}</h2>
-            <span class="showcase-chip text-xs">{{ $listing->count() }} action(s) sur cette page</span>
+            <span class="showcase-chip text-xs">{{ $listing->count() }} action(s) sur le périmètre filtré</span>
         </div>
         <div class="kanban-board">
             @foreach ($kanbanColumns as $statusKey => $col)
@@ -446,7 +457,6 @@
                 @endif
             @endforeach
         </div>
-        <x-ui.pagination :paginator="$rows" label="actions" />
     </section>
     <script>
     (function () {
@@ -672,7 +682,6 @@
                 ({{ $ganttSpanDays }} jour{{ $ganttSpanDays > 1 ? 's' : '' }})
             </div>
         @endif
-        <x-ui.pagination :paginator="$rows" label="actions" />
     </section>
 
     @else
@@ -771,7 +780,7 @@
                                 </div>
                                 @if ($row->usesQuantitativeProgress())
                                     <p class="mt-1 text-xs text-slate-500">
-                                        Cible {{ $row->quantite_cible !== null ? number_format((float) $row->quantite_cible, 0, ',', ' ') : '0' }} {{ $row->unite_cible ?: '' }}
+                                        Quantité à réaliser {{ $row->quantite_cible !== null ? number_format((float) $row->quantite_cible, 0, ',', ' ') : '0' }} {{ $row->unite_cible ?: '' }}
                                         · Réalisé {{ number_format($realizedValue, 0, ',', ' ') }}
                                     </p>
                                 @else
@@ -792,31 +801,12 @@
                             </td>
                             <td>
                                 <div class="row-actions">
-                                    <a class="btn btn-follow btn-sm rounded-xl" href="{{ route('workspace.actions.suivi', $row) }}{{ $isValidationTab ? '#action-validation' : '' }}">
-                                        {{ $isValidationTab ? 'Traiter' : 'Suivi' }}
+                                    <a class="btn btn-follow btn-sm" href="{{ route('workspace.actions.suivi', $row) }}{{ $isValidationTab ? '#action-validation' : '' }}">
+                                        Faire le suivi
                                     </a>
-                                    @if ($canWrite)
-                                        @php
-                                            $lockService = $lockService ?? app(\App\Services\PlanningModificationLockService::class);
-                                            $isModificationLocked = $lockService->isLocked($row);
-                                            $canRequestUnlock = auth()->check() && $lockService->canRequestUnlock(auth()->user(), $row);
-                                        @endphp
-                                        @if (! $isModificationLocked)
-                                            <a class="btn btn-warning btn-sm rounded-xl" href="{{ $row->pta_id ? route('workspace.pta.edit', $row->pta_id).'#action-'.$row->id : route('workspace.actions.edit', $row) }}">Modifier</a>
-                                        @elseif ($canRequestUnlock)
-                                            @include('workspace.planning-unlocks._request-inline', [
-                                                'target' => $row,
-                                                'route' => route('workspace.actions.unlock-requests.store', $row),
-                                                'context' => 'Modification action demandee depuis le module Actions',
-                                            ])
-                                        @endif
-                                        <form method="POST" action="{{ route('workspace.actions.destroy', $row) }}" data-confirm-message="Supprimer cette action ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
-                                            @csrf
-                                            @method('DELETE')
-                                            <input type="hidden" name="motif" value="Demande de suppression action depuis le module Actions">
-                                            <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
-                                        </form>
-                                    @endif
+                                    <a class="btn btn-warning btn-sm" href="{{ route('workspace.actions.suivi', $row) }}#action-echeances">
+                                        Report de l'action
+                                    </a>
                                 </div>
                             </td>
                         </tr>

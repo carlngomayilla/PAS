@@ -5,9 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Pta extends Model
 {
@@ -15,10 +15,17 @@ class Pta extends Model
 
     // Statuts historiques conserves pour compatibilite de lecture/import.
     public const STATUS_BROUILLON = 'brouillon';
+
     public const STATUS_EN_COURS = 'en_cours';
+
+    public const STATUS_CONTROLE_SCIQ = 'controle_sciq';
+
     public const STATUS_CLOTURE = 'cloture';
+
     public const STATUS_ARCHIVE = 'archive';
+
     public const STATUS_VALIDE = 'valide';
+
     public const STATUS_VERROUILLE = 'verrouille';
 
     /**

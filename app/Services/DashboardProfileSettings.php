@@ -67,6 +67,7 @@ class DashboardProfileSettings
             User::ROLE_ADMIN_FONCTIONNEL => 'Administrateur fonctionnel',
             User::ROLE_DG => 'Direction Générale',
             User::ROLE_PLANIFICATION => 'Planification',
+            'suivi_evaluation' => 'Suivi-evaluation (Planification / SCIQ)',
             User::ROLE_DIRECTION => 'Directeur de direction',
             User::ROLE_SERVICE => 'Chef de service',
             User::ROLE_AGENT => 'Agent',
@@ -348,6 +349,21 @@ class DashboardProfileSettings
                     'Directions en difficulte',
                 ]),
             ],
+            'suivi_evaluation' => [
+                'overview_enabled' => true,
+                'comparison_chart_enabled' => true,
+                'status_chart_enabled' => false,
+                'trend_chart_enabled' => true,
+                'support_chart_enabled' => true,
+                'cards' => $this->cards([
+                    'Actions suivies',
+                    'Actions validees',
+                    'Actions en retard',
+                    'Alertes critiques',
+                    'Indicateur global',
+                    'Directions en difficulte',
+                ]),
+            ],
             'dg' => [
                 'overview_enabled' => true,
                 'comparison_chart_enabled' => true,
@@ -478,7 +494,7 @@ class DashboardProfileSettings
     {
         $value = trim((string) $value);
 
-        return in_array($value, ['dashboard', 'actions', 'alertes', 'reporting'], true)
+        return in_array($value, ['dashboard', 'actions', 'alertes', 'reporting', 'pilotage'], true)
             ? $value
             : '';
     }
@@ -496,7 +512,7 @@ class DashboardProfileSettings
             'actions' => route('workspace.actions.index', $filters),
             'alertes' => route('workspace.notifications.index', array_merge(['tab' => 'alertes'], $filters)),
             'reporting' => route('workspace.reporting', $filters),
-            'pilotage' => route('dashboard', $filters),
+            'pilotage' => route('workspace.pilotage', $filters),
             default => route('workspace.actions.index', $filters),
         };
     }

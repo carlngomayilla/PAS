@@ -14,8 +14,7 @@ class PlanningImportWebController extends Controller
     public function __construct(
         private readonly PlanningExcelImportService $importService,
         private readonly SimpleSpreadsheet $spreadsheet
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -128,13 +127,13 @@ class PlanningImportWebController extends Controller
 
         $headers = PlanningExcelImportService::IMPORT_COLUMNS;
 
-        // Un exemple par type d'action. Les colonnes de parametrage pre-remplissent
+        // Un exemple par type d'indicateur. Les colonnes de parametrage pre-remplissent
         // le formulaire PTA, mais l'action reste 'a_parametrer' jusqu'a son
         // enregistrement officiel par le chef de service.
-        // Codes type_action : Q = quantitative, NQ = non quantitative,
+        // Codes type_action : Q = quantitatif, NQ = non quantitatif,
         // M = action composee. Dans sous_actions, utiliser Q ou NQ.
 
-        // Ligne 1 : action simple QUANTITATIVE (cible chiffree + seuils trimestriels).
+        // Ligne 1 : action simple QUANTITATIVE (quantite a realiser + cibles trimestrielles).
         $quantitative = $this->templateRow([
             'ordre_action' => 1,
             'libelle_action' => 'Action quantitative exemple',
@@ -158,7 +157,7 @@ class PlanningImportWebController extends Controller
             'champ_difficulte' => 1,
         ]);
 
-        // Ligne 2 : action simple NON QUANTITATIVE (piece justificative, sans cible).
+        // Ligne 2 : action simple NON QUANTITATIVE (piece justificative, sans quantite).
         $nonQuantitative = $this->templateRow([
             'ordre_action' => 2,
             'libelle_action' => 'Action non quantitative exemple',
@@ -256,7 +255,7 @@ class PlanningImportWebController extends Controller
     }
 
     /**
-     * @param array<string,mixed> $overrides
+     * @param  array<string,mixed>  $overrides
      * @return array<string,mixed>
      */
     private function templateRow(array $overrides = []): array
@@ -316,10 +315,10 @@ class PlanningImportWebController extends Controller
             ['bloc' => 'Perimetre', 'colonne' => 'direction', 'principe' => 'Code ou libelle de direction existant en referentiel.', 'exemple' => 'DSIC'],
             ['bloc' => 'Perimetre', 'colonne' => 'service_unite', 'principe' => 'Code ou libelle de service existant dans la direction.', 'exemple' => 'SIRS'],
             ['bloc' => 'Action', 'colonne' => 'codes_agents_rmo', 'principe' => 'Matricules des RMO separes par point-virgule.', 'exemple' => 'AG001;AG002'],
-            ['bloc' => 'Action', 'colonne' => 'cible_minimum_execution', 'principe' => 'Pourcentage minimum attendu entre 0 et 100.', 'exemple' => '80'],
-            ['bloc' => 'Type et suivi', 'colonne' => 'type_action', 'principe' => 'Vide = action a completer, Q/NQ/M = champs pre-remplis mais statut toujours a parametrer apres import.', 'exemple' => 'Q'],
-            ['bloc' => 'Type et suivi', 'colonne' => 'quantite_cible / unite_cible', 'principe' => 'Obligatoire uniquement pour une action Q.', 'exemple' => '120 / dossiers'],
-            ['bloc' => 'Type et suivi', 'colonne' => 'seuil_mode', 'principe' => 'unique ou trimestriel. Si trimestriel, renseigner seuil_t1 a seuil_t4.', 'exemple' => 'trimestriel'],
+            ['bloc' => 'Action', 'colonne' => 'cible_minimum_execution', 'principe' => 'Seuil minimum attendu entre 0 et 100 %.', 'exemple' => '80'],
+            ['bloc' => 'Type et suivi', 'colonne' => 'type_action', 'principe' => 'Type d indicateur : vide = action a completer, Q/NQ/M = champs pre-remplis mais statut toujours a parametrer apres import.', 'exemple' => 'Q'],
+            ['bloc' => 'Type et suivi', 'colonne' => 'quantite_cible / unite_cible', 'principe' => 'Quantite a realiser et unite, obligatoires uniquement pour une action Q.', 'exemple' => '120 / dossiers'],
+            ['bloc' => 'Type et suivi', 'colonne' => 'seuil_mode', 'principe' => 'Seuil unique ou trimestriel. Si trimestriel, renseigner seuil_t1 a seuil_t4.', 'exemple' => 'trimestriel'],
             ['bloc' => 'Type et suivi', 'colonne' => 'nombre_sous_actions / sous_actions', 'principe' => 'A utiliser pour une action M. Les poids des sous-actions doivent totaliser 100.', 'exemple' => 'Former 20 agents|Q|60|20|agents ; Rediger guide|NQ|40||'],
             ['bloc' => 'Risques', 'colonne' => 'niveau_risque', 'principe' => 'Valeurs acceptees : faible, modere, eleve, critique.', 'exemple' => 'modere'],
             ['bloc' => 'Financement', 'colonne' => 'financement', 'principe' => '0 = pas de financement, 1 = financement requis.', 'exemple' => '1'],

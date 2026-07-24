@@ -8,6 +8,7 @@ use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\User;
+use App\Services\Actions\ActionTrackingService;
 use App\Services\Scope\UserScopeService;
 use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,8 +18,7 @@ class DashboardStatsService
 {
     public function __construct(
         private readonly UserScopeService $scope
-    ) {
-    }
+    ) {}
 
     public function getGlobalStats(User $user): array
     {
@@ -121,7 +121,7 @@ class DashboardStatsService
         $activeStatuses = match ($table) {
             'pas' => ['actif'],
             'paos' => ['en_cours', 'valide'],
-            'ptas' => ['en_cours'],
+            'ptas' => ['en_cours', 'controle_sciq'],
             default => ['actif', 'en_cours', 'valide'],
         };
 
@@ -152,7 +152,7 @@ class DashboardStatsService
         //   sur statut_dynamique='en_retard' uniquement) et reporting (qui
         //   regardait l echeance + l etat).
         $table = $query->getModel()->getTable();
-        $completed = \App\Services\Actions\ActionTrackingService::completedActionStatuses();
+        $completed = ActionTrackingService::completedActionStatuses();
         $today = Carbon::today();
 
         if (SchemaIntrospectionCache::hasColumn($table, 'date_echeance') && SchemaIntrospectionCache::hasColumn($table, 'statut_dynamique')) {
@@ -183,7 +183,7 @@ class DashboardStatsService
         }
 
         return (clone $query)
-            ->whereIn('statut_validation', ['soumise_chef', 'en_attente_validation'])
+            ->whereIn('statut_validation', ['soumise_chef', 'soumise_controle', 'en_attente_validation'])
             ->count();
     }
 

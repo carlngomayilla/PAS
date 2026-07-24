@@ -7,12 +7,15 @@ use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
 use App\Models\Direction;
 use App\Models\Service;
+use App\Models\UniteDg;
 use App\Models\User;
+use App\Services\ChefUniteSyncService;
 use App\Services\DeletionRequestService;
+use App\Services\Organization\OrganizationDirectoryService;
+use App\Services\RoleRegistryService;
 use App\Services\Security\AntivirusScanner;
 use App\Services\Security\MalwareScanException;
 use App\Services\Security\PasswordPolicyService;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,77 +23,47 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReferentielWebController extends Controller
 {
     use AuthorizesPlanningScope;
     use RecordsAuditTrail;
 
-    /**
-     * Mot de passe par defaut applique aux nouveaux comptes lorsque l admin
-     * ne saisit rien dans le formulaire de creation. Conforme a la policy
-     * (8+ caracteres, lettres et chiffres; symboles acceptes).
-     */
-    private const DEFAULT_NEW_USER_PASSWORD = 'Anbg@2026!Pas';
-
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy,
         private readonly AntivirusScanner $scanner,
         private readonly DeletionRequestService $deletionRequestService,
-        private readonly \App\Services\ChefUniteSyncService $chefUniteSync,
-        private readonly \App\Services\RoleRegistryService $roleRegistry
-    ) {
-    }
+        private readonly ChefUniteSyncService $chefUniteSync,
+        private readonly RoleRegistryService $roleRegistry,
+        private readonly OrganizationDirectoryService $organizationDirectoryService
+    ) {}
 
     public function directionsIndex(Request $request): View
     {
         $user = $this->authUser($request);
         $this->denyUnlessReferentielReader($user);
-
-        $query = Direction::query()
-            ->withCount(['services', 'users', 'paos', 'ptas'])
-            ->orderBy('code');
-
-        if ($request->filled('actif')) {
-            $query->where('actif', (bool) $request->boolean('actif'));
-        } else {
-            $query->where('actif', true);
-        }
-        $query->when($request->filled('q'), function (Builder $q) use ($request): void {
-            $search = trim((string) $request->string('q'));
-            $q->where(function (Builder $subQuery) use ($search): void {
-                $subQuery->where('code', 'like', "%{$search}%")
-                    ->orWhere('libelle', 'like', "%{$search}%");
-            });
-        });
-
-        if (! $user->hasGlobalReadAccess()) {
-            if ($user->direction_id !== null) {
-                $query->whereKey((int) $user->direction_id);
-            } else {
-                $query->whereRaw('1 = 0');
-            }
-        }
-
-        $directionSummaryRows = (clone $query)->get();
+        $filters = $this->organizationDirectoryService->normalizeDirectionFilters($request->query());
+        $workspace = $this->organizationDirectoryService->directionsWorkspace($user, $filters);
 
         return view('workspace.referentiel.directions.index', [
-            'rows' => $query->paginate(20)->withQueryString(),
-            'summary' => [
-                'total' => $directionSummaryRows->count(),
-                'actifs' => $directionSummaryRows->where('actif', true)->count(),
-                'services_total' => (int) $directionSummaryRows->sum('services_count'),
-                'users_total' => (int) $directionSummaryRows->sum('users_count'),
-                'paos_total' => (int) $directionSummaryRows->sum('paos_count'),
-                'ptas_total' => (int) $directionSummaryRows->sum('ptas_count'),
-            ],
+            'rows' => $workspace['rows'],
+            'summary' => $workspace['summary'],
             'canWrite' => $this->canWrite($user),
             'canManageRoles' => $this->canManageRoles($user),
-            'filters' => [
-                'q' => (string) $request->string('q'),
-                'actif' => $request->filled('actif') ? (int) $request->integer('actif') : null,
-            ],
+            'filters' => $filters,
         ]);
+    }
+
+    public function directionsExport(Request $request): StreamedResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessReferentielReader($user);
+        $filters = $this->organizationDirectoryService->normalizeDirectionFilters($request->query());
+
+        return $this->streamCsv('referentiel-directions', function ($stream) use ($user, $filters): void {
+            $this->organizationDirectoryService->writeDirectionsCsv($stream, $user, $filters);
+        });
     }
 
     public function directionsCreate(Request $request): View
@@ -100,7 +73,7 @@ class ReferentielWebController extends Controller
 
         return view('workspace.referentiel.directions.form', [
             'mode' => 'create',
-            'row' => new Direction(),
+            'row' => new Direction,
         ]);
     }
 
@@ -181,61 +154,28 @@ class ReferentielWebController extends Controller
     {
         $user = $this->authUser($request);
         $this->denyUnlessReferentielReader($user);
-
-        $query = Service::query()
-            ->with('direction:id,code,libelle')
-            ->withCount(['users', 'ptas'])
-            ->orderBy('direction_id')
-            ->orderBy('code');
-
-        $query->when(
-            $request->filled('direction_id'),
-            fn (Builder $q) => $q->where('direction_id', (int) $request->integer('direction_id'))
-        );
-        $query->when(
-            $request->filled('actif'),
-            fn (Builder $q) => $q->where('actif', (bool) $request->boolean('actif'))
-        );
-        $query->when($request->filled('q'), function (Builder $q) use ($request): void {
-            $search = trim((string) $request->string('q'));
-            $q->where(function (Builder $subQuery) use ($search): void {
-                $subQuery->where('code', 'like', "%{$search}%")
-                    ->orWhere('libelle', 'like', "%{$search}%");
-            });
-        });
-
-        if (! $user->hasGlobalReadAccess()) {
-            if ($user->direction_id !== null) {
-                $query->where('direction_id', (int) $user->direction_id);
-            } else {
-                $query->whereRaw('1 = 0');
-            }
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereKey((int) $user->service_id);
-        }
-
-        $serviceSummaryRows = (clone $query)->get();
+        $filters = $this->organizationDirectoryService->normalizeServiceFilters($request->query());
+        $workspace = $this->organizationDirectoryService->servicesWorkspace($user, $filters);
 
         return view('workspace.referentiel.services.index', [
-            'rows' => $query->paginate(20)->withQueryString(),
-            'summary' => [
-                'total' => $serviceSummaryRows->count(),
-                'actifs' => $serviceSummaryRows->where('actif', true)->count(),
-                'directions_total' => $serviceSummaryRows->pluck('direction_id')->filter()->unique()->count(),
-                'users_total' => (int) $serviceSummaryRows->sum('users_count'),
-                'ptas_total' => (int) $serviceSummaryRows->sum('ptas_count'),
-            ],
+            'rows' => $workspace['rows'],
+            'summary' => $workspace['summary'],
             'directionOptions' => $this->activeDirectionOptions(['id', 'code', 'libelle', 'actif']),
             'canWrite' => $this->canWrite($user),
             'canManageRoles' => $this->canManageRoles($user),
-            'filters' => [
-                'q' => (string) $request->string('q'),
-                'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
-                'actif' => $request->filled('actif') ? (int) $request->integer('actif') : null,
-            ],
+            'filters' => $filters,
         ]);
+    }
+
+    public function servicesExport(Request $request): StreamedResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessReferentielReader($user);
+        $filters = $this->organizationDirectoryService->normalizeServiceFilters($request->query());
+
+        return $this->streamCsv('referentiel-services', function ($stream) use ($user, $filters): void {
+            $this->organizationDirectoryService->writeServicesCsv($stream, $user, $filters);
+        });
     }
 
     public function servicesCreate(Request $request): View
@@ -245,7 +185,7 @@ class ReferentielWebController extends Controller
 
         return view('workspace.referentiel.services.form', [
             'mode' => 'create',
-            'row' => new Service(),
+            'row' => new Service,
             'directionOptions' => $this->activeDirectionOptions(['id', 'code', 'libelle', 'actif']),
         ]);
     }
@@ -351,92 +291,13 @@ class ReferentielWebController extends Controller
         // operationnel. Les operations d'ecriture (create/update/destroy) restent
         // protegees par denyUnlessUserManager dans les methodes correspondantes.
         $this->denyUnlessReferentielReader($user);
-
-        $query = User::query()
-            ->with([
-                'direction:id,code,libelle',
-                'service:id,direction_id,code,libelle',
-            ])
-            ->orderBy('name');
-
-        if (! $user->isSuperAdmin()) {
-            $query->where('role', '!=', User::ROLE_SUPER_ADMIN);
-        }
-
-        if ($user->isPlanningControlChief()) {
-            $query->whereIn('role', $this->planningControlChiefManagedRoles());
-        }
-
-        if (! $user->hasGlobalReadAccess()) {
-            if ($user->direction_id !== null) {
-                $query->where('direction_id', (int) $user->direction_id);
-            } else {
-                $query->whereRaw('1 = 0');
-            }
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->where('service_id', (int) $user->service_id);
-        }
-
-        $query->when(
-            $request->filled('direction_id'),
-            fn (Builder $q) => $q->where('direction_id', (int) $request->integer('direction_id'))
-        );
-        $query->when(
-            $request->filled('service_id'),
-            fn (Builder $q) => $q->where('service_id', (int) $request->integer('service_id'))
-        );
-        $query->when(
-            $request->filled('role'),
-            function (Builder $q) use ($request): void {
-                $selectedRole = (string) $request->string('role');
-
-                if ($this->roleRegistry->isCustomRole($selectedRole)) {
-                    $q->where('custom_role_code', $selectedRole);
-
-                    return;
-                }
-
-                $q->where('role', $selectedRole)
-                    ->where(function (Builder $subQuery): void {
-                        $subQuery->whereNull('custom_role_code')
-                            ->orWhere('custom_role_code', '');
-                    });
-            }
-        );
-        $query->when(
-            $request->filled('is_active'),
-            fn (Builder $q) => $q->where('is_active', $request->string('is_active') === '1')
-        );
-        $query->when($request->filled('q'), function (Builder $q) use ($request): void {
-            $search = trim((string) $request->string('q'));
-            $q->where(function (Builder $subQuery) use ($search): void {
-                $subQuery->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        });
-
-        $userSummaryBase = clone $query;
+        $filters = $this->organizationDirectoryService->normalizeUserFilters($request->query());
+        $workspace = $this->organizationDirectoryService->usersWorkspace($user, $filters);
 
         return view('workspace.referentiel.utilisateurs.index', [
-            'rows' => $query->paginate(20)->withQueryString(),
-            'summary' => [
-                'total' => (clone $userSummaryBase)->count(),
-                'actifs' => (clone $userSummaryBase)->where('is_active', true)->count(),
-                'agents' => (clone $userSummaryBase)->where('is_agent', true)->count(),
-                'encadrement' => (clone $userSummaryBase)
-                    ->whereIn('role', [
-                        User::ROLE_SERVICE,
-                        User::ROLE_DIRECTION,
-                        User::ROLE_PLANIFICATION,
-                        User::ROLE_DG,
-                        User::ROLE_ADMIN_FONCTIONNEL,
-                        User::ROLE_SUPER_ADMIN,
-                    ])->count(),
-                'directions_total' => (clone $userSummaryBase)->whereNotNull('direction_id')->distinct()->count('direction_id'),
-                'services_total' => (clone $userSummaryBase)->whereNotNull('service_id')->distinct()->count('service_id'),
-            ],
+            'rows' => $workspace['rows'],
+            'summary' => $workspace['summary'],
+            'healthByUserId' => $workspace['health'],
             'canWrite' => $this->canManageUsers($user),
             'canDeleteUsers' => $user->isSuperAdmin(),
             'canRequestUserDeletion' => $this->canRequestAnyUserDeletion($user),
@@ -445,14 +306,19 @@ class ReferentielWebController extends Controller
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
             'roleOptions' => $this->roleOptions($user),
-            'filters' => [
-                'q' => (string) $request->string('q'),
-                'direction_id' => $request->filled('direction_id') ? (int) $request->integer('direction_id') : null,
-                'service_id' => $request->filled('service_id') ? (int) $request->integer('service_id') : null,
-                'role' => (string) $request->string('role'),
-                'is_active' => $request->filled('is_active') ? (string) $request->string('is_active') : '',
-            ],
+            'filters' => $filters,
         ]);
+    }
+
+    public function utilisateursExport(Request $request): StreamedResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessReferentielReader($user);
+        $filters = $this->organizationDirectoryService->normalizeUserFilters($request->query());
+
+        return $this->streamCsv('referentiel-utilisateurs', function ($stream) use ($user, $filters): void {
+            $this->organizationDirectoryService->writeUsersCsv($stream, $user, $filters);
+        });
     }
 
     public function utilisateursCreate(Request $request): View
@@ -462,11 +328,11 @@ class ReferentielWebController extends Controller
 
         return view('workspace.referentiel.utilisateurs.form', [
             'mode' => 'create',
-            'row' => new User(),
+            'row' => new User,
             'directionOptions' => $this->activeDirectionOptions(),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
-            'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
+            'uniteDgOptions' => UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'roleOptions' => $this->roleOptions($user),
             'canManageRoles' => $this->canManageRoles($user),
         ]);
@@ -481,8 +347,12 @@ class ReferentielWebController extends Controller
         $this->applyRoleScopeRules($validated);
         $this->enforceManagedUserScope($user, $validated);
         $profilePhotoPath = $this->storeProfilePhoto($request);
+        $passwordWasGenerated = trim((string) ($validated['password'] ?? '')) === '';
+        $initialPassword = $passwordWasGenerated
+            ? $this->passwordPolicy->generateInitialPassword()
+            : (string) $validated['password'];
 
-        $created = DB::transaction(function () use ($validated, $profilePhotoPath, $request): User {
+        $created = DB::transaction(function () use ($validated, $profilePhotoPath, $request, $initialPassword): User {
             // forceCreate : role / direction_id / service_id / unite_dg_id / is_active /
             // is_agent / agent_* ne sont plus mass-assignables (cf. A02). Cette voie
             // est reservee aux admins et tous les champs sont valides en amont.
@@ -501,24 +371,28 @@ class ReferentielWebController extends Controller
                 'service_id' => $validated['service_id'] ?? null,
                 'unite_dg_id' => $validated['unite_dg_id'] ?? null,
                 'password' => 'temp-password-placeholder',
-                'password_changed_at' => now(),
+                'password_changed_at' => null,
             ]);
 
-            $plainPassword = trim((string) ($validated['password'] ?? '')) !== ''
-                ? (string) $validated['password']
-                : self::DEFAULT_NEW_USER_PASSWORD;
-            $this->passwordPolicy->persistPassword($created, $plainPassword);
+            $this->passwordPolicy->persistPassword($created, $initialPassword, forceRenewal: true);
+            $this->chefUniteSync->sync($created);
 
             return $created->fresh();
         });
 
-        $this->chefUniteSync->sync($created);
-
         $this->recordAudit($request, 'referentiel_utilisateur', 'create', $created, null, $created->toArray());
 
-        return redirect()
+        $redirect = redirect()
             ->route('workspace.referentiel.utilisateurs.index')
             ->with('success', 'Utilisateur cree avec succès.');
+
+        if ($passwordWasGenerated) {
+            $redirect = $redirect
+                ->with('temporary_password_value', $initialPassword)
+                ->with('temporary_password_user', $created->email);
+        }
+
+        return $redirect;
     }
 
     public function utilisateursEdit(Request $request, User $utilisateur): View
@@ -534,7 +408,7 @@ class ReferentielWebController extends Controller
             'directionOptions' => $this->activeDirectionOptions(),
             'serviceOptions' => Service::query()->with('direction:id,code')->orderBy('direction_id')->orderBy('code')
                 ->get(['id', 'direction_id', 'code', 'libelle']),
-            'uniteDgOptions' => \App\Models\UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
+            'uniteDgOptions' => UniteDg::query()->where('actif', true)->orderBy('code')->get(['id', 'code', 'libelle']),
             'roleOptions' => $this->roleOptions($user, $utilisateur),
             'canManageRoles' => $this->canManageRoles($user),
         ]);
@@ -580,12 +454,13 @@ class ReferentielWebController extends Controller
             $utilisateur->forceFill($payload)->save();
 
             if (! empty($validated['password'])) {
-                $this->passwordPolicy->persistPassword($utilisateur, (string) $validated['password']);
+                $this->passwordPolicy->persistPassword($utilisateur, (string) $validated['password'], forceRenewal: true);
+                $utilisateur->tokens()->delete();
             }
+
+            $this->chefUniteSync->sync($utilisateur);
         });
         $utilisateur->refresh();
-
-        $this->chefUniteSync->sync($utilisateur);
 
         $this->recordAudit($request, 'referentiel_utilisateur', 'update', $utilisateur, $before, $utilisateur->toArray());
 
@@ -777,7 +652,7 @@ class ReferentielWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function applyRoleScopeRules(array &$validated): void
     {
@@ -915,7 +790,7 @@ class ReferentielWebController extends Controller
             }
 
             $uniteDgId = isset($validated['unite_dg_id']) ? (int) $validated['unite_dg_id'] : null;
-            if ($uniteDgId === null || ! \App\Models\UniteDg::query()->whereKey($uniteDgId)->exists()) {
+            if ($uniteDgId === null || ! UniteDg::query()->whereKey($uniteDgId)->exists()) {
                 throw ValidationException::withMessages([
                     'unite_dg_id' => 'L unite DG est obligatoire pour ce profil chef.',
                 ]);
@@ -951,6 +826,29 @@ class ReferentielWebController extends Controller
     private function operationalDirectionCodes(): array
     {
         return ['DAF', 'DSIC', 'DS'];
+    }
+
+    /**
+     * @param  callable(resource): void  $writer
+     */
+    private function streamCsv(string $prefix, callable $writer): StreamedResponse
+    {
+        return response()->streamDownload(function () use ($writer): void {
+            $stream = fopen('php://output', 'wb');
+            if ($stream === false) {
+                abort(500, 'Impossible de générer le fichier du référentiel.');
+            }
+
+            try {
+                $writer($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, $prefix.'-'.now()->format('Ymd-His').'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     private function authUser(Request $request): User

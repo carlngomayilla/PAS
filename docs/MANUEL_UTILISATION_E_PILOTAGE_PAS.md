@@ -92,6 +92,8 @@ e-Pilotage PAS est l'application de pilotage stratégique et opérationnel de l'
 
 L'espace de travail regroupe les modules par famille : Menu, Planification, Exécution, Pilotage, Administration et Plateforme. Les libellés peuvent être personnalisés par le Super Admin, mais la logique reste identique.
 
+Sur ordinateur, le menu latéral reste compact puis affiche ses libellés au survol ou lorsqu'il reçoit le focus clavier. Les onglets changent de vue ; les commandes lancent une action et conservent un style distinct.
+
 ![Illustration 3 - Carte des menus principaux](manuel-utilisation-e-pilotage-pas-assets/schema-navigation-modules.png)
 *Illustration 3 - Carte des menus principaux*
 
@@ -113,7 +115,7 @@ L'espace de travail regroupe les modules par famille : Menu, Planification, Exé
 
 ## 6. Tableau de bord et Mes tâches
 
-Le tableau de bord affiche une synthèse adaptée au rôle connecté : indicateurs de performance, alertes importantes, tâches ouvertes, score personnel, graphiques et tableaux de suivi.
+Le tableau de bord affiche une synthèse adaptée au rôle connecté : indicateurs de performance, alertes importantes, tâches ouvertes, score personnel, graphiques et tableaux de suivi. Les graphiques précisent leur variable, leur unité et leur période ; leurs légendes et infobulles donnent les volumes et pourcentages associés. Les profils Contrôle et suivi-évaluation disposent d'une carte Avancement global calculée sur les actions de leur périmètre visible.
 
 ### Mes tâches
 
@@ -227,6 +229,12 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 
 > **Point de vigilance :** Pour une action composée, la somme des poids des sous-actions doit être égale à 100 %. Cette règle garantit un calcul cohérent de la performance.
 
+### Paramétrer l'indicateur dans le suivi PTA
+
+- Dans la colonne Indicateurs de mesure, les profils de planification et de contrôle habilités voient une commande Paramétrer ou Modifier directement dans la cellule.
+- Le type d'indicateur détermine les champs disponibles : quantité et unité pour le quantitatif, livrable pour le non quantitatif, les deux pour le mixte.
+- Les profils de suivi conservent les commandes Faire le suivi et Demander un report ; ils ne modifient pas les paramètres de l'action depuis ce tableau.
+
 ## 10. Suivi d'une action
 
 ![Illustration 5 - Workflow de suivi et validation d'une action](manuel-utilisation-e-pilotage-pas-assets/schema-workflow-action.png)
@@ -330,7 +338,16 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 
 - Une délégation donne temporairement à un autre utilisateur la capacité d'intervenir dans un circuit.
 - Elle doit préciser le délégant, le délégué, la période, le périmètre et le motif.
+- Le registre distingue les délégations actives, planifiées, proches de leur fin, échues et annulées.
+- Deux délégations du même bénéficiaire ne peuvent pas se chevaucher sur le même périmètre.
 - Une délégation doit être annulée dès qu'elle n'est plus nécessaire.
+
+### Demandes de suppression
+
+- Chaque demandeur consulte uniquement ses propres demandes et leur décision dans la file de gouvernance.
+- Le super-admin consulte la file globale, l'analyse d'impact et les mouvements d'affectation récents avant de décider.
+- Une demande de complément revient au demandeur ; sa réponse replace la demande dans la file d'instruction.
+- Les suppressions, désactivations, archivages, refus et corrections restent tracés dans le journal d'audit.
 
 ### Audit
 
@@ -341,6 +358,11 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 ### Rétention et documentation API
 
 - La rétention concerne l'archivage et les règles de conservation des données.
+- L'écran distingue les snapshots de données historiques et l'archivage de statut des PAO/PTA.
+- Le bouton **Simuler** calcule les éléments éligibles sans modifier les données ; **Exécuter** applique l'opération après confirmation.
+- Chaque opération apparaît dans l'historique avec son opérateur, ses volumes, sa durée et son statut.
+- Le registre des archives se filtre par source, lot, opérateur ou période et peut être exporté en CSV.
+- Le téléchargement JSON restitue une archive individuelle en masquant les secrets éventuels.
 - La documentation API expose les contrats techniques pour les intégrations autorisées.
 - Ces modules sont réservés aux profils habilités.
 
@@ -348,6 +370,15 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 
 ![Illustration 7 - Zones de paramétrage de la Super Administration](manuel-utilisation-e-pilotage-pas-assets/schema-super-admin.png)
 *Illustration 7 - Zones de paramétrage de la Super Administration*
+
+### Centre de commandement
+
+La page d'accueil Super Administration présente l'état global de la plateforme avant les réglages détaillés : utilisateurs et sessions actifs, modules ouverts, contrôles en anomalie, décisions de gouvernance et brouillons à publier.
+
+- La file **À traiter** classe les interventions prioritaires et ouvre directement l'écran concerné.
+- L'**État des brouillons** distingue les paramètres généraux, les modules et l'apparence avant publication.
+- Les **Domaines d'administration** regroupent tous les réglages en quatre ensembles cliquables : Plateforme, Gouvernance, Pilotage métier, Continuité et sorties.
+- L'activité sur sept jours et les dernières modifications sensibles facilitent le contrôle administratif et l'accès au journal d'audit.
 
 ### Plateforme
 
@@ -360,7 +391,8 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 
 - Rôles : matrice de permissions, registre des rôles et restauration de versions.
 - Organisation : directions, services, comptes utilisateurs et import en masse.
-- Unités DG : SCIQ, DGA, Cabinet, UCAS, chefs d'unité et membres.
+- Unités DG : SCIQ, DGA, Cabinet, UCAS, chefs d'unité et membres. Un chef doit avoir un compte actif et être déjà membre de l'unité ou porter le rôle de chef correspondant. Une même personne ne peut diriger qu'une unité à la fois.
+- Simulations d'organisation : choisir une source et une destination pour lire les volumes d'utilisateurs, PTA, actions et justificatifs concernés, sans modifier les données.
 - Dashboards : cartes et visibilité selon les profils.
 - Diagnostic et audit : contrôle plateforme et actions sensibles.
 
@@ -378,8 +410,16 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 ### Avancé
 
 - Snapshots : sauvegarder, comparer et restaurer une configuration.
-- Simulation : vérifier l'impact d'un changement avant application.
-- Templates d'export : créer, prévisualiser, publier, archiver et affecter des modèles de rapports.
+- Simulation : comparer les paramètres publiés au scénario cible sans modifier les données. Le circuit Actions reste verrouillé sur **Agent → Chef de service → Contrôleur** ; seuls le seuil de clôture et l'auto-clôture sont simulés.
+- Templates d'export : créer et prévisualiser un brouillon, puis le publier pour activer ses affectations. Un brouillon ne peut être ni actif ni modèle par défaut. Modifier un modèle publié ouvre une nouvelle phase de brouillon ; l'archivage ou la restauration désactive ses anciennes affectations jusqu'à une nouvelle publication.
+- Affectations d'export : le module, le type de rapport et le format viennent du modèle. Le profil, le niveau et le périmètre direction/service peuvent être précisés. Une seule affectation active peut être définie par défaut pour un même périmètre.
+
+### Règles de sécurité
+
+- Seul un compte dont le rôle principal est **Super Admin** dispose des privilèges Super Admin. Un rôle personnalisé ne peut ni hériter de ce rôle ni le dupliquer.
+- L'activation et la désactivation du mode maintenance exigent le mot de passe courant. Le lien temporaire généré lors de l'activation doit être utilisé immédiatement et n'est pas conservé dans l'audit.
+- Une restauration partielle ne propose que les groupes contenus dans le snapshot sélectionné. Aucun groupe externe ne peut être injecté dans la demande.
+- Les dates métier restent soumises à leurs circuits de validation ; les réglages techniques Super Admin ne contournent pas ces workflows.
 
 > **Prudence :** Toute modification dans Super Administration peut changer l'expérience de plusieurs profils. Documentez le motif et utilisez les brouillons, snapshots ou simulations lorsqu'ils sont disponibles.
 
@@ -422,7 +462,7 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 | Je ne vois pas un module | Votre rôle ou la configuration de navigation ne l'autorise pas. | Demander à l'administrateur de vérifier vos droits et modules visibles. |
 | Je ne peux pas créer une action depuis Actions | Les actions se créent depuis le PTA. | Aller dans Planification > PTA puis ajouter l'action dans le PTA. |
 | Je ne peux pas soumettre | Un champ obligatoire manque : preuve, commentaire, difficulté ou quantité. | Lire les messages d'erreur, compléter les champs, puis soumettre à nouveau. |
-| Mon action affiche 100 % mais n'est pas dans le reporting | La performance est encore provisoire. | Attendre ou demander la validation du chef. |
+| Mon action affiche 100 % mais n'est pas dans le reporting | La performance est encore provisoire. | Vérifier le visa du chef puis la validation finale SCIQ / Planification. |
 | Je dois modifier une action figée | L'action est enregistrée et verrouillée. | Utiliser Demande de modification et saisir un motif clair. |
 | Un export ne correspond pas à mon attendu | Les filtres ou le périmètre changent le résultat. | Vérifier les filtres, l'exercice, le trimestre, la direction et le service. |
 | Un justificatif est refusé | Format non autorisé ou pièce incomplète. | Utiliser un format accepté et déposer une pièce lisible. |

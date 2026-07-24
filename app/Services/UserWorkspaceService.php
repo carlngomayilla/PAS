@@ -24,6 +24,24 @@ class UserWorkspaceService
     {
         $specRole = $this->specSidebarRole($user);
         $modules = $this->modulesForSpecRole($specRole, $user);
+        if (! collect($modules)->contains(fn (array $module): bool => ($module['code'] ?? null) === 'pta_suivi')) {
+            array_splice($modules, 1, 0, [[
+                'code' => 'pta_suivi',
+                'label' => 'Suivi PTA',
+                'endpoint' => '/pta/suivi',
+                'can_write' => false,
+                'actions' => ['Consulter', 'Faire le suivi', 'Demander un report'],
+            ]]);
+        }
+        if (! collect($modules)->contains(fn (array $module): bool => ($module['code'] ?? null) === 'reports_echeance')) {
+            array_splice($modules, 2, 0, [[
+                'code' => 'reports_echeance',
+                'label' => 'Reports echeance',
+                'endpoint' => '/workspace/reports-echeance',
+                'can_write' => false,
+                'actions' => ['A traiter', 'Mes demandes', 'Consulter'],
+            ]]);
+        }
         $modules = array_values(array_filter(
             $modules,
             fn (array $module): bool => $this->moduleAllowedByPermissions($module, $user)
@@ -93,7 +111,7 @@ class UserWorkspaceService
             'code' => 'pilotage',
             'label' => 'Pilotage',
             'description' => 'Tableau de bord et synthèse de pilotage',
-            'endpoint' => '/dashboard',
+            'endpoint' => '/workspace/pilotage',
             'can_write' => false,
             'actions' => ['Consulter'],
         ]];
@@ -344,7 +362,7 @@ class UserWorkspaceService
             // recables vers les pages fonctionnelles existantes avec les bons
             // filtres URL, evitant l'ecran placeholder "en cours de raccordement".
             'agent' => [
-                $m('pilotage', 'Dashboard', '/dashboard'),
+                $m('pilotage', 'Dashboard', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('execution', 'Action', '/workspace/actions?vue=mes_actions', ['can_write' => true, 'actions' => ['Consulter', 'Saisir suivi']]),
                 // 'corrections' → vue "Mes actions" filtree sur les corrections demandees.
@@ -353,7 +371,7 @@ class UserWorkspaceService
             ],
 
             'chef' => [
-                $m('pilotage', 'Dashboard', '/dashboard'),
+                $m('pilotage', 'Dashboard', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
                 $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Charger', 'Corriger', 'Valider']]),
@@ -367,7 +385,7 @@ class UserWorkspaceService
             ],
 
             'sciq_planif' => [
-                $m('pilotage', 'Dashboard global', '/dashboard'),
+                $m('pilotage', 'Dashboard global', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pas', 'PAS', '/workspace/pas', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
                 $m('pao', 'PAO', '/workspace/pao'),
@@ -386,7 +404,7 @@ class UserWorkspaceService
             ],
 
             'directeur' => [
-                $m('pilotage', 'Dashboard direction', '/dashboard'),
+                $m('pilotage', 'Dashboard direction', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pao', 'PAO', '/workspace/pao', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
                 $m('pta', 'PTA des services', '/workspace/pta'),
@@ -400,7 +418,7 @@ class UserWorkspaceService
             ],
 
             'directeur_daf' => [
-                $m('pilotage', 'Dashboard direction', '/dashboard'),
+                $m('pilotage', 'Dashboard direction', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pao', 'PAO', '/workspace/pao', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
                 $m('pta', 'PTA des services', '/workspace/pta'),
@@ -414,7 +432,7 @@ class UserWorkspaceService
             ],
 
             'dg' => [
-                $m('pilotage', 'Dashboard global', '/dashboard'),
+                $m('pilotage', 'Dashboard global', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 // 'synthese_agence' → reporting global (memes donnees consolidees).
                 $m('synthese_agence', 'Synthèse agence', '/workspace/reporting'),
@@ -430,7 +448,7 @@ class UserWorkspaceService
             ],
 
             'dga_cabinet' => [
-                $m('pilotage', 'Dashboard global', '/dashboard'),
+                $m('pilotage', 'Dashboard global', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('synthese_agence', 'Synthèse agence', '/workspace/reporting'),
                 // 'supervision' → reporting global (vue d'ensemble).
@@ -442,7 +460,7 @@ class UserWorkspaceService
             ],
 
             'ucas' => [
-                $m('pilotage', 'Dashboard unité', '/dashboard'),
+                $m('pilotage', 'Dashboard unité', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier']]),
                 $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Charger', 'Corriger', 'Valider']]),
@@ -455,7 +473,7 @@ class UserWorkspaceService
             ],
 
             'super_admin' => [
-                $m('pilotage', 'Dashboard admin', '/dashboard'),
+                $m('pilotage', 'Dashboard admin', '/workspace/pilotage'),
                 $m('super_admin', 'Super Administration', '/workspace/super-admin', ['can_write' => true]),
                 $m('imports_excel', 'Imports Excel', '/workspace/imports-excel', ['can_write' => true, 'actions' => ['Verifier', 'Mapper colonnes', 'Importer']]),
                 $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Analyser', 'Valider', 'Importer']]),
@@ -471,7 +489,7 @@ class UserWorkspaceService
             ],
 
             default => [
-                $m('pilotage', 'Dashboard', '/dashboard'),
+                $m('pilotage', 'Dashboard', '/workspace/pilotage'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),
             ],
         };

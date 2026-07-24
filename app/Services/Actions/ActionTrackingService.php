@@ -12,8 +12,14 @@ use App\Services\ActionPerformanceService;
 use App\Services\NotificationPolicySettings;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\WorkflowSettings;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+
+use function Illuminate\Support\defer;
 
 /**
  * Service central du suivi des actions.
@@ -78,7 +84,7 @@ class ActionTrackingService
     public const RISK_ALERT_THRESHOLD_DAYS = 3;
 
     // ── CONSTANTES DE VALIDATION ──────────────────────────────────────────────
-    // Circuit de validation : agent → chef de service → direction.
+    // Circuit de validation : agent → chef de service → controleur SCIQ/Planification.
     public const VALIDATION_NON_SOUMISE = 'non_soumise';
 
     public const VALIDATION_SOUMISE_CHEF = 'soumise_chef';
@@ -88,6 +94,12 @@ class ActionTrackingService
     public const VALIDATION_CORRECTION_DEMANDEE = 'correction_demandee';
 
     public const VALIDATION_VALIDEE_CHEF = 'validee_chef';
+
+    public const VALIDATION_SOUMISE_CONTROLE = 'soumise_controle';
+
+    public const VALIDATION_CORRECTION_CONTROLE = 'correction_controle';
+
+    public const VALIDATION_VALIDEE_CONTROLE = 'validee_controle';
 
     /**
      * @deprecated L'etape de validation direction a ete supprimee du circuit.
@@ -213,6 +225,9 @@ class ActionTrackingService
             self::VALIDATION_REJETEE_CHEF,
             self::VALIDATION_CORRECTION_DEMANDEE,
             self::VALIDATION_VALIDEE_CHEF,
+            self::VALIDATION_SOUMISE_CONTROLE,
+            self::VALIDATION_CORRECTION_CONTROLE,
+            self::VALIDATION_VALIDEE_CONTROLE,
         ];
     }
 
@@ -411,25 +426,22 @@ class ActionTrackingService
         ], true)) {
             $action->financement_statut = Action::FINANCEMENT_PRE_SIGNALE_DAF;
             $action->financement_soumis_le = null;
-        }
-
-        if ($action->financement_notifie_le === null) {
-            $action->financement_notifie_le = now();
+            $action->financement_notifie_le = null;
         }
 
         $action->save();
 
         $this->createLogIfMissingToday(
             $action,
-            'financement_demande',
+            'financement_prepare',
             'info',
-            'Besoin de financement transmis au circuit DAF.',
+            'Besoin de financement prepare avant soumission par le RMO.',
             [
                 'montant_estime' => $action->montant_estime,
                 'source_financement' => $action->source_financement,
                 'statut_financement' => $action->financementStatus(),
             ],
-            'daf',
+            'responsable',
             $actor?->id
         );
 
@@ -447,7 +459,7 @@ class ActionTrackingService
      * @param  array<string, mixed>  $payload
      */
     /** La DAF examine la demande de financement et la valide ou la rejette. */
-    public function reviewFinancingByDaf(Action $action, array $payload, User $actor): Action
+    private function legacyReviewFinancingByDaf(Action $action, array $payload, User $actor): Action
     {
         $decision = (string) ($payload['decision_financement'] ?? self::FINANCEMENT_DECISION_REJETER);
         $approved = $decision === self::FINANCEMENT_DECISION_VALIDER;
@@ -531,7 +543,7 @@ class ActionTrackingService
      * @param  array<string, mixed>  $payload
      */
     /** Le DG accorde ou refuse définitivement le financement d'une action. */
-    public function reviewFinancingByDg(Action $action, array $payload, User $actor): Action
+    private function legacyReviewFinancingByDg(Action $action, array $payload, User $actor): Action
     {
         $decision = (string) ($payload['decision_financement'] ?? self::FINANCEMENT_DECISION_REFUSER);
         $approved = $decision === self::FINANCEMENT_DECISION_ACCORDER;
@@ -591,11 +603,11 @@ class ActionTrackingService
         // une transaction avec lockForUpdate sur l action courante : evite la
         // race condition ou une sous-action sauvegarde pendant le calcul vienne
         // corrompre les KPI consolides (lecture partielle / KPI tronques).
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($action, $referenceDate): Action {
+        return DB::transaction(function () use ($action, $referenceDate): Action {
             // Lock pessimiste sur la ligne action courante (PG / MySQL). En
             // SQLite, lockForUpdate est silencieusement ignore mais la
             // transaction reste serialisable au niveau base.
-            \App\Models\Action::query()
+            Action::query()
                 ->whereKey($action->id)
                 ->lockForUpdate()
                 ->first();
@@ -779,7 +791,7 @@ class ActionTrackingService
         ];
 
         foreach ($optionalMetrics as $column => $value) {
-            if (Schema::hasColumn($action->getTable(), $column)) {
+            if (SchemaIntrospectionCache::hasColumn($action->getTable(), $column)) {
                 $updates[$column] = $value;
             }
         }
@@ -942,6 +954,7 @@ class ActionTrackingService
         if (in_array((string) ($action->statut_validation ?? ''), [
             self::VALIDATION_REJETEE_CHEF,
             self::VALIDATION_CORRECTION_DEMANDEE,
+            self::VALIDATION_CORRECTION_CONTROLE,
         ], true)) {
             return self::STATUS_A_CORRIGER;
         }
@@ -1035,12 +1048,12 @@ class ActionTrackingService
     }
 
     /**
-     * @param  \Illuminate\Support\Collection  $weeks  parametre conserve mais ignore (suivi hebdomadaire supprime)
+     * @param  Collection  $weeks  parametre conserve mais ignore (suivi hebdomadaire supprime)
      * @param  array{kpi_delai: float, kpi_performance: float, kpi_global: float}  $kpis
      */
     private function generateAutomaticAlerts(
         Action $action,
-        \Illuminate\Support\Collection $weeks,
+        Collection $weeks,
         float $realProgress,
         float $theoreticalProgress,
         array $kpis,
@@ -1299,10 +1312,45 @@ class ActionTrackingService
         ]);
 
         if (in_array($level, ['warning', 'critical', 'urgence'], true)) {
-            app(WorkspaceNotificationService::class)->notifyActionAlertEscalation($log, $userId);
+            $this->dispatchActionAlertEscalation($log, $userId);
         }
 
         return $log;
+    }
+
+    private function dispatchActionAlertEscalation(ActionLog $log, ?int $userId): void
+    {
+        if (app()->runningInConsole()) {
+            $this->notifyActionAlertEscalation($log, $userId);
+
+            return;
+        }
+
+        $logId = (int) $log->id;
+
+        defer(function () use ($logId, $userId): void {
+            $deferredLog = ActionLog::query()->find($logId);
+
+            if (! $deferredLog instanceof ActionLog) {
+                return;
+            }
+
+            $this->notifyActionAlertEscalation($deferredLog, $userId);
+        })->always();
+    }
+
+    private function notifyActionAlertEscalation(ActionLog $log, ?int $userId): void
+    {
+        try {
+            $this->notificationService->notifyActionAlertEscalation($log, $userId);
+        } catch (Throwable $exception) {
+            Log::warning('Action alert escalation notification failed (non-blocking).', [
+                'action_log_id' => $log->id,
+                'user_id' => $userId,
+                'exception_class' => get_class($exception),
+                'exception_message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -1347,7 +1395,7 @@ class ActionTrackingService
     private function hasFinalValidation(Action $action): bool
     {
         return in_array((string) ($action->statut_validation ?? ''), [
-            self::VALIDATION_VALIDEE_CHEF,
+            self::VALIDATION_VALIDEE_CONTROLE,
             self::VALIDATION_VALIDEE_DIRECTION,
         ], true);
     }

@@ -57,7 +57,10 @@ class RetentionService
         ];
 
         DB::transaction(function () use (&$created, $batchKey, $actor): void {
-            foreach ($this->pasCandidatesQuery()->with(['axes.objectifs', 'directions:id,code,libelle', 'paos.ptas.actions'])->get() as $pas) {
+            $pasCandidates = $this->pasCandidatesQuery()
+                ->with(['axes.objectifs', 'directions:id,code,libelle', 'paos.ptas.actions'])
+                ->lazyById(100);
+            foreach ($pasCandidates as $pas) {
                 DataArchive::query()->create([
                     'entity_type' => 'pas',
                     'entity_id' => (int) $pas->id,
@@ -94,7 +97,7 @@ class RetentionService
                 $created['pas']++;
             }
 
-            foreach ($this->justificatifCandidatesQuery()->get() as $justificatif) {
+            foreach ($this->justificatifCandidatesQuery()->lazyById(250) as $justificatif) {
                 DataArchive::query()->create([
                     'entity_type' => 'justificatif',
                     'entity_id' => (int) $justificatif->id,
@@ -118,7 +121,7 @@ class RetentionService
                 $created['justificatifs']++;
             }
 
-            foreach ($this->actionLogCandidatesQuery()->get() as $log) {
+            foreach ($this->actionLogCandidatesQuery()->lazyById(500) as $log) {
                 DataArchive::query()->create([
                     'entity_type' => 'action_log',
                     'entity_id' => (int) $log->id,
@@ -143,10 +146,18 @@ class RetentionService
             }
 
             $notifications = $this->notificationCandidates()
-                ->get()
-                ->map(static fn ($row): array => (array) $row);
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->lazy(500);
+            foreach ($notifications as $notificationRow) {
+                $notification = (array) $notificationRow;
+                if (is_string($notification['data'] ?? null)) {
+                    $decodedData = json_decode($notification['data'], true);
+                    if (is_array($decodedData)) {
+                        $notification['data'] = $decodedData;
+                    }
+                }
 
-            foreach ($notifications as $notification) {
                 DataArchive::query()->create([
                     'entity_type' => 'notification',
                     'entity_id' => null,
@@ -249,4 +260,3 @@ class RetentionService
             });
     }
 }
-

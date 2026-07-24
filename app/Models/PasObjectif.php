@@ -55,6 +55,13 @@ class PasObjectif extends Model
         return $this->hasMany(Pao::class, 'pas_objectif_id');
     }
 
+    public function objectifsOperationnels(): HasMany
+    {
+        return $this->hasMany(ObjectifOperationnel::class, 'pas_objectif_id')
+            ->orderBy('import_ordre')
+            ->orderBy('id');
+    }
+
     public function createur(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

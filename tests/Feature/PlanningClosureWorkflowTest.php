@@ -19,8 +19,8 @@ use Tests\TestCase;
 
 class PlanningClosureWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     public function test_pao_closure_requires_anomaly_report_or_explicit_justification(): void
     {
@@ -98,7 +98,20 @@ class PlanningClosureWorkflowTest extends TestCase
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.pta.close', $fixture['pta']), [
-                'motif' => 'Cloture PTA avec anomalies assumees',
+                'motif' => 'Transmission PTA au controle avec anomalies assumees',
+                'force_close' => '1',
+            ])
+            ->assertRedirect(route('workspace.pta.index'));
+
+        $this->assertSame(Pta::STATUS_CONTROLE_SCIQ, $fixture['pta']->fresh()->statut);
+        $this->assertDatabaseHas('journal_audit', [
+            'module' => 'pta',
+            'action' => 'submit_control',
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->post(route('workspace.pta.close', $fixture['pta']), [
+                'motif' => 'Cloture PTA apres controle SCIQ',
                 'force_close' => '1',
             ])
             ->assertRedirect(route('workspace.pta.index'));

@@ -14,16 +14,18 @@ use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
 use App\Models\User;
-use App\Services\PasStructureService;
-use App\Services\PlanningModificationLockService;
-use App\Services\PlanningClosureReportService;
+use App\Services\DeletionRequestService;
 use App\Services\ExerciceContext;
+use App\Services\PasHierarchyService;
+use App\Services\PasStructureService;
+use App\Services\PlanningClosureReportService;
+use App\Services\PlanningModificationLockService;
 use App\Services\WorkflowSettings;
 use App\Support\UiLabel;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PasWebController extends Controller
@@ -34,8 +36,7 @@ class PasWebController extends Controller
 
     public function __construct(
         private readonly PasStructureService $pasStructureService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -76,13 +77,13 @@ class PasWebController extends Controller
             ->pluck('cnt', 'statut');
         $pasIdsSubquery = (clone $statsBase)->select('id');
         $pasStats = [
-            'total'           => (int) $byStatus->sum(),
-            'actifs'          => (int) ($byStatus[Pas::STATUS_ACTIF] ?? 0),
-            'clotures'        => (int) ($byStatus[Pas::STATUS_CLOTURE] ?? 0),
-            'archives'        => (int) ($byStatus[Pas::STATUS_ARCHIVE] ?? 0),
-            'sans_pao'        => (clone $statsBase)->doesntHave('paos')->count(),
-            'sans_axe'        => (clone $statsBase)->doesntHave('axes')->count(),
-            'axes_total'      => PasAxe::query()->whereIn('pas_id', $pasIdsSubquery)->count(),
+            'total' => (int) $byStatus->sum(),
+            'actifs' => (int) ($byStatus[Pas::STATUS_ACTIF] ?? 0),
+            'clotures' => (int) ($byStatus[Pas::STATUS_CLOTURE] ?? 0),
+            'archives' => (int) ($byStatus[Pas::STATUS_ARCHIVE] ?? 0),
+            'sans_pao' => (clone $statsBase)->doesntHave('paos')->count(),
+            'sans_axe' => (clone $statsBase)->doesntHave('axes')->count(),
+            'axes_total' => PasAxe::query()->whereIn('pas_id', $pasIdsSubquery)->count(),
             'objectifs_total' => PasObjectif::query()->whereIn(
                 'pas_axe_id',
                 PasAxe::query()->whereIn('pas_id', $pasIdsSubquery)->select('id')
@@ -117,6 +118,27 @@ class PasWebController extends Controller
         ]);
     }
 
+    public function show(Request $request, Pas $pas, PasHierarchyService $hierarchyService): View
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->denyUnlessPlanningReader($user);
+        if ($user->isAgent()) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $this->authorize('view', $pas);
+
+        return view('workspace.pas.show', [
+            'row' => $pas,
+            'hierarchy' => $hierarchyService->build($pas, $user),
+            'canWrite' => $this->canWrite($user),
+        ]);
+    }
+
     public function create(Request $request): View
     {
         $user = $request->user();
@@ -128,7 +150,7 @@ class PasWebController extends Controller
 
         return view('workspace.pas.form', [
             'mode' => 'create',
-            'row' => new Pas(),
+            'row' => new Pas,
             'statusOptions' => $this->statusOptions($user),
             'directionOptions' => $this->directionOptions(),
             'axesPayload' => [],
@@ -155,7 +177,7 @@ class PasWebController extends Controller
         ];
 
         $pas = DB::transaction(function () use ($validated, $payload, $user): Pas {
-            $pas = new Pas();
+            $pas = new Pas;
             $pas->fill($payload);
             $pas->forceFill([
                 'statut' => Pas::STATUS_ACTIF,
@@ -270,7 +292,7 @@ class PasWebController extends Controller
         $validated = $request->validate([
             'motif' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
-        $deletionRequests = app(\App\Services\DeletionRequestService::class);
+        $deletionRequests = app(DeletionRequestService::class);
         // Super Admin et DG peuvent supprimer directement avec cascade (PAOs, PTAs,
         // OOs, Actions, Axes, Objectifs strategiques). Pour les autres roles, la
         // suppression passe par le workflow de demande validee par le Super Admin.
@@ -394,7 +416,7 @@ class PasWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $report
+     * @param  array<string, mixed>  $report
      */
     private function closureReportErrorMessage(array $report): string
     {
@@ -520,7 +542,7 @@ class PasWebController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function generatedPasTitle(array $validated): string
     {

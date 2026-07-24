@@ -4,8 +4,8 @@ namespace App\Services\Notifications;
 
 use App\Models\Action;
 use App\Models\ActionLog;
-use App\Models\Delegation;
 use App\Models\DeadlineExtensionRequest;
+use App\Models\Delegation;
 use App\Models\JournalAudit;
 use App\Models\Pao;
 use App\Models\Pas;
@@ -13,15 +13,15 @@ use App\Models\Pta;
 use App\Models\SousAction;
 use App\Models\UniteDg;
 use App\Models\User;
+use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Alerting\AlertRoutingService;
 use App\Services\Governance\DelegationService;
 use App\Services\NotificationPolicySettings;
-use App\Notifications\WorkspaceModuleNotification;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -32,8 +32,7 @@ class WorkspaceNotificationService
         private readonly AlertRoutingService $alertRoutingService,
         private readonly NotificationPolicySettings $notificationPolicySettings,
         private readonly BrevoMailService $brevoMailService
-    ) {
-    }
+    ) {}
 
     public function notifyActionAssigned(Action $action, ?User $actor = null): void
     {
@@ -41,12 +40,12 @@ class WorkspaceNotificationService
             return;
         }
 
-        if ($action->responsable_id === null && ! Schema::hasTable('action_responsables')) {
+        if ($action->responsable_id === null && ! SchemaIntrospectionCache::hasTable('action_responsables')) {
             return;
         }
 
         /** @var EloquentCollection<int, User> $users */
-        $users = Schema::hasTable('action_responsables')
+        $users = SchemaIntrospectionCache::hasTable('action_responsables')
             ? $action->responsables()->get(['users.id', 'users.name', 'users.email'])
             : User::query()->whereKey((int) $action->responsable_id)->get();
 
@@ -118,7 +117,7 @@ class WorkspaceNotificationService
         );
     }
 
-    public function notifyActionSubmittedToDirection(Action $action, ?User $actor = null): void
+    public function notifyActionSubmittedToController(Action $action, ?User $actor = null): void
     {
         if (! $this->notificationPolicySettings->eventEnabled('action_submitted_to_direction')) {
             return;
@@ -126,23 +125,23 @@ class WorkspaceNotificationService
 
         $action->loadMissing('pta:id,direction_id,service_id');
 
-        $directionId = (int) ($action->pta?->direction_id ?? 0);
         $directionRecipients = $this->mergeRecipients(
-            $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
-            $this->delegationService->delegatedDirectionReviewers($directionId)
+            $this->globalUsers([
+                User::ROLE_SUPER_ADMIN,
+                User::ROLE_ADMIN_FONCTIONNEL,
+                User::ROLE_PLANIFICATION,
+                User::ROLE_SCIQ,
+                User::ROLE_SCIQ_SUIVI_GLOBAL,
+            ]),
+            User::query()->whereIn('role', User::planningControlChiefRoles())->get()
         );
-        $directionRecipients = $this->mergeRecipients(
-            $directionRecipients,
-            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION])
-        );
-        $directionRecipients = $this->mergeRecipients($directionRecipients, $this->unitChiefRecipientsForAction($action));
 
         $this->dispatchEvent(
             'action_submitted_to_direction',
             $directionRecipients,
             [
-                'title' => 'Action transmise à la direction',
-                'message' => sprintf('L\'action « %s » attend votre évaluation finale.', (string) $action->libelle),
+                'title' => 'Action à contrôler',
+                'message' => sprintf('L\'action « %s » a reçu le visa du chef et attend votre contrôle final.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -162,8 +161,8 @@ class WorkspaceNotificationService
             'action_submitted_to_direction',
             $this->agentRecipient($action),
             [
-                'title' => 'Action clôturée',
-                'message' => sprintf('Votre action « %s » a été finalisée dans le circuit actif. Bravo !', (string) $action->libelle),
+                'title' => 'Action transmise au contrôle',
+                'message' => sprintf('Votre action « %s » a reçu le visa du chef et attend la décision du contrôleur.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -178,6 +177,11 @@ class WorkspaceNotificationService
             ],
             $actor?->id
         );
+    }
+
+    public function notifyActionSubmittedToDirection(Action $action, ?User $actor = null): void
+    {
+        $this->notifyActionSubmittedToController($action, $actor);
     }
 
     public function notifyActionReviewedByChef(Action $action, bool $approved, ?User $actor = null): void
@@ -201,8 +205,8 @@ class WorkspaceNotificationService
                 'action_reviewed_by_chef',
                 $directionRecipients,
                 [
-                    'title' => 'Action validée par le chef de service',
-                    'message' => sprintf('L\'action « %s » vient d\'être validée par le chef de service. Vous pouvez la consulter en lecture.', (string) $action->libelle),
+                    'title' => 'Visa chef enregistré',
+                    'message' => sprintf('L\'action « %s » a reçu le visa du chef de service et part au contrôle final.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,
@@ -223,8 +227,8 @@ class WorkspaceNotificationService
                 'action_reviewed_by_chef',
                 $agentRecipients,
                 [
-                    'title' => 'Votre action a été validée',
-                    'message' => sprintf('Bonne nouvelle : votre action « %s » vient d\'être validée par le chef de service.', (string) $action->libelle),
+                    'title' => 'Visa chef enregistré',
+                    'message' => sprintf('Votre action « %s » a reçu le visa du chef et attend maintenant le contrôle final.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,
@@ -273,7 +277,7 @@ class WorkspaceNotificationService
         );
     }
 
-    public function notifyActionReviewedByDirection(Action $action, bool $approved, ?User $actor = null): void
+    public function notifyActionReviewedByController(Action $action, bool $approved, ?User $actor = null): void
     {
         if (! $this->notificationPolicySettings->eventEnabled('action_reviewed_by_direction')) {
             return;
@@ -289,13 +293,14 @@ class WorkspaceNotificationService
             $this->delegationService->delegatedServiceReviewers($directionId, $serviceId)
         );
         $serviceRecipients = $this->mergeRecipients($serviceRecipients, $this->unitChiefRecipientsForAction($action));
+        $serviceRecipients = $this->mergeRecipients($serviceRecipients, $this->agentRecipient($action));
         if ($approved) {
             $this->dispatchEvent(
                 'action_reviewed_by_direction',
                 $serviceRecipients,
                 [
-                    'title' => 'Action validée par la direction',
-                    'message' => sprintf('L\'action « %s » est désormais validée et comptabilisée dans les statistiques.', (string) $action->libelle),
+                    'title' => 'Action validée par le contrôle',
+                    'message' => sprintf('L\'action « %s » est validée, clôturée et comptabilisée dans les statistiques officielles.', (string) $action->libelle),
                     'module' => 'actions',
                     'entity_type' => 'action',
                     'entity_id' => $action->id,
@@ -319,8 +324,8 @@ class WorkspaceNotificationService
             'action_reviewed_by_direction',
             $serviceRecipients,
             [
-                'title' => 'Action renvoyée par la direction',
-                'message' => sprintf('L\'action « %s » doit être corrigée puis resoumise. Consultez les observations de la direction.', (string) $action->libelle),
+                'title' => 'Correction demandée par le contrôle',
+                'message' => sprintf('L\'action « %s » doit être corrigée puis resoumise au chef. Consultez le motif du contrôleur.', (string) $action->libelle),
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
@@ -336,6 +341,11 @@ class WorkspaceNotificationService
             ],
             $actor?->id
         );
+    }
+
+    public function notifyActionReviewedByDirection(Action $action, bool $approved, ?User $actor = null): void
+    {
+        $this->notifyActionReviewedByController($action, $approved, $actor);
     }
 
     public function notifyActionFinalizedByChef(Action $action, ?User $actor = null): void
@@ -1089,7 +1099,7 @@ class WorkspaceNotificationService
 
         $this->dispatchEvent(
             'deadline_extension_requested',
-            $this->controlRecipients(),
+            $this->actionSupervisorRecipients($action),
             [
                 'title' => 'Demande de report d\'échéance',
                 'message' => sprintf('Une demande de report d\'échéance vient d\'être soumise pour l\'action « %s ».', (string) $action->libelle),
@@ -1104,6 +1114,190 @@ class WorkspaceNotificationService
             [
                 'action_label' => (string) $action->libelle,
                 'actor_name' => (string) ($actor?->name ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyDeadlineExtensionResubmitted(DeadlineExtensionRequest $request, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('deadline_extension_requested')) {
+            return;
+        }
+
+        $request->loadMissing('action');
+        $action = $request->action;
+        $recipients = match ((string) $request->status) {
+            DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => $this->controlRecipients(),
+            DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => $this->globalUsers([
+                User::ROLE_DG,
+                User::ROLE_CHEF_PLANIFICATION,
+            ]),
+            default => $this->actionSupervisorRecipients($action),
+        };
+
+        $this->dispatchEvent(
+            'deadline_extension_requested',
+            $recipients,
+            [
+                'title' => 'Complement de report recu',
+                'message' => sprintf('Le complement demande pour le report de l action « %s » a ete ajoute.', (string) $action->libelle),
+                'module' => 'reports_echeance',
+                'entity_type' => 'deadline_extension_request',
+                'entity_id' => $request->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'file-check',
+                'status' => 'info',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'status' => (string) $request->status,
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyDeadlineExtensionChefReviewed(DeadlineExtensionRequest $request, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('deadline_extension_sciq_reviewed')) {
+            return;
+        }
+
+        $request->loadMissing('action');
+        $action = $request->action;
+        $recipients = $request->chef_avis === DeadlineExtensionRequest::AVIS_FAVORABLE
+            ? $this->controlRecipients()
+            : User::query()->whereKey($request->requested_by)->get();
+
+        $this->dispatchEvent(
+            'deadline_extension_sciq_reviewed',
+            $recipients,
+            [
+                'title' => 'Avis du chef sur le report',
+                'message' => sprintf('Le chef de service a rendu son avis sur le report de l’action « %s ».', (string) $action->libelle),
+                'module' => 'reports_echeance',
+                'entity_type' => 'deadline_extension_request',
+                'entity_id' => $request->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'send',
+                'status' => $request->chef_avis === DeadlineExtensionRequest::AVIS_FAVORABLE ? 'info' : 'warning',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'avis' => (string) $request->chef_avis,
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyDeadlineExtensionControllerReviewed(DeadlineExtensionRequest $request, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('deadline_extension_sciq_reviewed')) {
+            return;
+        }
+
+        $request->loadMissing('action');
+        $action = $request->action;
+        $recipients = $request->sciq_avis === DeadlineExtensionRequest::AVIS_FAVORABLE
+            ? $this->globalUsers([User::ROLE_DG, User::ROLE_CHEF_PLANIFICATION])
+            : User::query()->whereKey($request->requested_by)->get();
+
+        $this->dispatchEvent(
+            'deadline_extension_sciq_reviewed',
+            $recipients,
+            [
+                'title' => 'Avis du contrôleur sur le report',
+                'message' => sprintf('Le contrôle SCIQ / Planification a rendu son avis sur le report de l’action « %s ».', (string) $action->libelle),
+                'module' => 'reports_echeance',
+                'entity_type' => 'deadline_extension_request',
+                'entity_id' => $request->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'send',
+                'status' => $request->sciq_avis === DeadlineExtensionRequest::AVIS_FAVORABLE ? 'info' : 'warning',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'avis' => (string) $request->sciq_avis,
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyDeadlineExtensionFinalDecided(DeadlineExtensionRequest $request, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('deadline_extension_dg_decided')) {
+            return;
+        }
+
+        $request->loadMissing('action');
+        $action = $request->action;
+        $recipients = $request->final_decision === DeadlineExtensionRequest::DECISION_APPROUVER
+            ? $this->controlRecipients()
+            : $this->mergeRecipients(
+                User::query()->whereKey($request->requested_by)->get(),
+                $this->actionSupervisorRecipients($action)
+            );
+
+        $this->dispatchEvent(
+            'deadline_extension_dg_decided',
+            $recipients,
+            [
+                'title' => 'Décision finale sur le report',
+                'message' => sprintf('Décision finale « %s » sur le report de l’action « %s ».', (string) $request->final_decision, (string) $action->libelle),
+                'module' => 'reports_echeance',
+                'entity_type' => 'deadline_extension_request',
+                'entity_id' => $request->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'calendar-check',
+                'status' => $request->final_decision === DeadlineExtensionRequest::DECISION_APPROUVER ? 'success' : 'warning',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'decision' => (string) $request->final_decision,
+            ],
+            $actor?->id
+        );
+    }
+
+    public function notifyDeadlineExtensionApplied(DeadlineExtensionRequest $request, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('deadline_extension_dg_decided')) {
+            return;
+        }
+
+        $request->loadMissing('action');
+        $action = $request->action;
+        $recipients = $this->mergeRecipients(
+            User::query()->whereKey($request->requested_by)->get(),
+            $this->actionSupervisorRecipients($action)
+        );
+
+        $this->dispatchEvent(
+            'deadline_extension_dg_decided',
+            $recipients,
+            [
+                'title' => 'Nouvelle échéance appliquée',
+                'message' => sprintf('La nouvelle échéance approuvée de l’action « %s » a été appliquée par le contrôleur.', (string) $action->libelle),
+                'module' => 'reports_echeance',
+                'entity_type' => 'deadline_extension_request',
+                'entity_id' => $request->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'calendar-check',
+                'status' => 'success',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+                'decision' => DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE,
             ],
             $actor?->id
         );
@@ -1412,7 +1606,7 @@ class WorkspaceNotificationService
     }
 
     /**
-     * @param array<int, string> $roles
+     * @param  array<int, string>  $roles
      * @return EloquentCollection<int, User>
      */
     /**
@@ -1603,8 +1797,8 @@ class WorkspaceNotificationService
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, scalar|null> $extraReplacements
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, scalar|null>  $extraReplacements
      */
     private function notifyActionSupervisorEvent(
         string $event,
@@ -1672,6 +1866,7 @@ class WorkspaceNotificationService
             ->whereHas('direction', fn ($query) => $query->where('code', 'DAF'))
             ->get();
     }
+
     private function globalUsers(array $roles): EloquentCollection
     {
         return User::query()
@@ -1697,8 +1892,8 @@ class WorkspaceNotificationService
     }
 
     /**
-     * @param int|array<int, int> $directionIds
-     * @param array<int, string> $roles
+     * @param  int|array<int, int>  $directionIds
+     * @param  array<int, string>  $roles
      * @return EloquentCollection<int, User>
      */
     private function directionUsers(int|array $directionIds, array $roles): EloquentCollection
@@ -1707,7 +1902,7 @@ class WorkspaceNotificationService
         $ids = array_values(array_filter($ids, static fn (int $value): bool => $value > 0));
 
         if ($ids === []) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         return User::query()
@@ -1717,13 +1912,13 @@ class WorkspaceNotificationService
     }
 
     /**
-     * @param array<int, string> $roles
+     * @param  array<int, string>  $roles
      * @return EloquentCollection<int, User>
      */
     private function serviceUsers(int $directionId, int $serviceId, array $roles): EloquentCollection
     {
         if ($directionId <= 0 || $serviceId <= 0) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         return User::query()
@@ -1738,7 +1933,7 @@ class WorkspaceNotificationService
      */
     private function agentRecipient(Action $action): EloquentCollection
     {
-        if (Schema::hasTable('action_responsables')) {
+        if (SchemaIntrospectionCache::hasTable('action_responsables')) {
             $users = $action->responsables()->get(['users.id', 'users.name', 'users.email']);
             if ($users->isNotEmpty()) {
                 return $users;
@@ -1746,7 +1941,7 @@ class WorkspaceNotificationService
         }
 
         if ($action->responsable_id === null) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         return User::query()
@@ -1755,8 +1950,8 @@ class WorkspaceNotificationService
     }
 
     /**
-     * @param Collection<int, User>|EloquentCollection<int, User> $first
-     * @param Collection<int, User>|EloquentCollection<int, User> $second
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $first
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $second
      * @return Collection<int, User>
      */
     private function mergeRecipients(Collection|EloquentCollection $first, Collection|EloquentCollection $second): Collection
@@ -1769,9 +1964,9 @@ class WorkspaceNotificationService
     }
 
     /**
-     * @param Collection<int, User>|EloquentCollection<int, User> $users
-     * @param array<string, mixed> $payload
-     * @param array<string, scalar|null> $replacements
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $users
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, scalar|null>  $replacements
      */
     private function dispatchEvent(
         string $event,
@@ -1853,8 +2048,8 @@ class WorkspaceNotificationService
     }
 
     /**
-     * @param Collection<int, User>|EloquentCollection<int, User> $users
-     * @param array<string, mixed> $payload
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $users
+     * @param  array<string, mixed>  $payload
      */
     private function dispatchAuditTrace(string $event, Collection|EloquentCollection $users, array $payload, ?int $excludeUserId = null): void
     {
@@ -1908,8 +2103,8 @@ class WorkspaceNotificationService
     }
 
     /**
-     * @param Collection<int, User>|EloquentCollection<int, User> $users
-     * @param array<string, mixed> $payload
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $users
+     * @param  array<string, mixed>  $payload
      */
     private function dispatch(Collection|EloquentCollection $users, array $payload, ?int $excludeUserId = null): void
     {

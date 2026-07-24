@@ -4,11 +4,12 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaIntrospectionCache;
 
 class AppearanceSettings
 {
     private const GROUP_PUBLISHED = 'appearance';
+
     private const GROUP_DRAFT = 'appearance_draft';
 
     /**
@@ -394,6 +395,7 @@ class AppearanceSettings
         $this->resolved = null;
         $this->draftResolved = null;
         $this->tableAvailable = null;
+        SchemaIntrospectionCache::flush();
     }
 
     /**
@@ -445,6 +447,7 @@ class AppearanceSettings
             ? 'appearance_draft_'.$key
             : 'appearance_'.$key;
     }
+
     private function hasSettingsTable(): bool
     {
         if ($this->shouldSkipDatabaseSettings()) {
@@ -456,7 +459,7 @@ class AppearanceSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }
@@ -830,7 +833,7 @@ class AppearanceSettings
                 'secondary' => 'var(--app-secondary)',
                 default => 'var(--app-primary)',
             }
-            : '#FFFFFF';
+        : '#FFFFFF';
     }
 
     /**
@@ -867,6 +870,3 @@ class AppearanceSettings
         };
     }
 }
-
-
-

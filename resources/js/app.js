@@ -9,3 +9,4 @@ import './super-admin-menu';
 import './super-admin-preview';
 import './preview-modal';
 import './ui-enhancements';
+import './action-detail-tabs';

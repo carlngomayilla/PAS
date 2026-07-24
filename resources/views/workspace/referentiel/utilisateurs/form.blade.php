@@ -264,7 +264,7 @@
                             <x-auth.password-toggle target="password" />
                         </div>
                         @unless($isEdit)
-                            <p class="mt-1 text-xs text-slate-500">Laissez vide pour appliquer le mot de passe par défaut : <code>Anbg@2026!Pas</code></p>
+                            <p class="mt-1 text-xs text-slate-500">Laissez vide pour générer un mot de passe temporaire unique, affiché une seule fois après création.</p>
                         @endunless
                     </div>
                     <div>

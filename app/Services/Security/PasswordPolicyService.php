@@ -6,6 +6,7 @@ use App\Models\PasswordHistory;
 use App\Models\User;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -13,7 +14,7 @@ class PasswordPolicyService
 {
     public function rule(bool $required = true): Password
     {
-        $rule = Password::min((int) config('security.passwords.min_length', 8));
+        $rule = Password::min($this->minimumLength());
 
         if (config('security.passwords.require_letters', true)) {
             $rule = $rule->letters();
@@ -70,13 +71,13 @@ class PasswordPolicyService
         }
     }
 
-    public function persistPassword(User $user, string $plainPassword): void
+    public function persistPassword(User $user, string $plainPassword, bool $forceRenewal = false): void
     {
         $hashedPassword = Hash::make($plainPassword);
 
         $user->forceFill([
             'password' => $hashedPassword,
-            'password_changed_at' => now(),
+            'password_changed_at' => $forceRenewal ? null : now(),
         ])->save();
 
         PasswordHistory::query()->create([
@@ -103,16 +104,16 @@ class PasswordPolicyService
             return false;
         }
 
-        $expireDays = (int) config('security.passwords.expire_days', 90);
-        if ($expireDays <= 0) {
-            return false;
-        }
-
         // A08 — Force le renouvellement au 1er login pour tout user dont le mot
         // de passe n a jamais ete change (seeder, import CSV, reset admin sans
         // distribution). password_changed_at = NULL est le signal explicite.
         if ($user->password_changed_at === null) {
             return true;
+        }
+
+        $expireDays = (int) config('security.passwords.expire_days', 90);
+        if ($expireDays <= 0) {
+            return false;
         }
 
         return $user->password_changed_at->copy()->addDays($expireDays)->isPast();
@@ -125,9 +126,9 @@ class PasswordPolicyService
      */
     public function generateInitialPassword(): string
     {
-        $minLength = max(8, (int) config('security.passwords.min_length', 8));
+        $minLength = $this->minimumLength();
 
-        return \Illuminate\Support\Str::password(
+        return Str::password(
             length: $minLength + 4,
             letters: (bool) config('security.passwords.require_letters', true),
             numbers: (bool) config('security.passwords.require_numbers', true),
@@ -175,10 +176,15 @@ class PasswordPolicyService
 
         return sprintf(
             'Mot de passe: %d caracteres minimum, %s, expiration tous les %d jours, historique des %d derniers mots de passe.',
-            (int) config('security.passwords.min_length', 8),
+            $this->minimumLength(),
             $requirementsText,
             (int) config('security.passwords.expire_days', 90),
             (int) config('security.passwords.history_size', 5)
         );
+    }
+
+    private function minimumLength(): int
+    {
+        return max(8, (int) config('security.passwords.min_length', 8));
     }
 }

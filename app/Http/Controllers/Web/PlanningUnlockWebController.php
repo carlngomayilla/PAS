@@ -25,8 +25,7 @@ class PlanningUnlockWebController extends Controller
 
     public function __construct(
         private readonly PlanningModificationLockService $locks
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -86,7 +85,7 @@ class PlanningUnlockWebController extends Controller
     }
 
     /**
-     * Route legacy : le transfert se fait desormais par un controleur.
+     * Legacy route: controller roles can still use it to record an avis and transmit.
      */
     public function transferByDirecteur(Request $request, PlanningUnlockRequest $planningUnlockRequest): RedirectResponse
     {
@@ -116,11 +115,11 @@ class PlanningUnlockWebController extends Controller
 
         return redirect()
             ->route('workspace.planning-unlocks.index')
-            ->with('success', 'Demande transmise à la DG pour décision.');
+            ->with('success', 'Demande transmise pour decision.');
     }
 
     /**
-     * Circuit V3 — etape controleur : avis SCIQ/Planification puis transmission DG.
+     * Controller step: record SCIQ/Planification avis and keep the request available for decision.
      */
     public function reviewByPlanification(Request $request, PlanningUnlockRequest $planningUnlockRequest): RedirectResponse
     {
@@ -145,7 +144,7 @@ class PlanningUnlockWebController extends Controller
 
         return redirect()
             ->route('workspace.planning-unlocks.index')
-            ->with('success', 'Avis du controleur enregistré. La demande est transmise à la DG.');
+            ->with('success', 'Avis du controleur enregistre. La demande est transmise pour decision.');
     }
 
     public function reviewByDg(Request $request, PlanningUnlockRequest $planningUnlockRequest): RedirectResponse
@@ -156,21 +155,27 @@ class PlanningUnlockWebController extends Controller
         }
 
         if (! $this->locks->isUnlockReviewer($user)) {
-            abort(403, 'Seul le DG peut traiter une demande de deverrouillage.');
+            abort(403, 'Seuls la DG, le SCIQ ou la Planification peuvent traiter une demande de deverrouillage.');
+        }
+
+        if (! $request->filled('review_comment') && $request->filled('planif_comment')) {
+            $request->merge(['review_comment' => $request->input('planif_comment')]);
         }
 
         $validated = $request->validate([
-            'decision' => ['required', 'in:approuver,rejeter'],
+            'decision' => ['required', 'in:approuver,rejeter,defavorable'],
             'review_comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $before = $planningUnlockRequest->toArray();
 
         if ($validated['decision'] === PlanningUnlockRequest::DECISION_APPROUVER) {
+            $comment = trim((string) ($validated['review_comment'] ?? ''));
+
             $this->locks->approve(
                 $planningUnlockRequest,
                 $user,
-                ($value = trim((string) ($validated['review_comment'] ?? ''))) !== '' ? $value : null
+                $comment !== '' ? $comment : null
             );
         } else {
             $request->validate([
@@ -184,7 +189,7 @@ class PlanningUnlockWebController extends Controller
         $this->recordAudit(
             $request,
             'planning_unlock',
-            'dg_decision',
+            'unlock_decision',
             $planningUnlockRequest,
             $before,
             $planningUnlockRequest->toArray()
@@ -192,7 +197,7 @@ class PlanningUnlockWebController extends Controller
 
         return redirect()
             ->route('workspace.planning-unlocks.index')
-            ->with('success', 'Décision DG enregistrée.');
+            ->with('success', 'Decision de deverrouillage enregistree.');
     }
 
     private function storeForTarget(Request $request, Model $target): RedirectResponse
@@ -211,7 +216,6 @@ class PlanningUnlockWebController extends Controller
             'justificatif' => ['nullable', 'file', 'max:'.app(DocumentPolicySettings::class)->maxUploadKilobytes(), app(DocumentPolicySettings::class)->mimesRule()],
         ]);
 
-        // Justificatif à l'appui (optionnel mais recommandé), stocké chiffré.
         $justificatifPath = null;
         if ($request->hasFile('justificatif')) {
             $stored = app(SecureJustificatifStorage::class)->store($request->file('justificatif'), 'unlock-requests/'.date('Y/m'));
@@ -228,6 +232,6 @@ class PlanningUnlockWebController extends Controller
             $unlockRequest->toArray()
         );
 
-        return back()->with('success', 'Demande de modification transmise aux controleurs SCIQ/Planification.');
+        return back()->with('success', 'Demande de modification transmise aux responsables SCIQ/Planification/DG.');
     }
 }

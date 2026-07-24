@@ -26,7 +26,7 @@
             <p class="mt-2 text-sm text-slate-600">Liste utilisée par les objectifs opérationnels PAO.</p>
         </article>
         <article class="ui-card !mb-0">
-            <p class="text-sm text-slate-500">Types de cible action</p>
+            <p class="text-sm text-slate-500">Types d'indicateur action</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['target_type_count'] }}</p>
             <p class="mt-2 text-sm text-slate-600">Le moteur reste binaire : quantitatif / qualitatif. Seuls les libellés sont pilotables ici.</p>
         </article>
@@ -48,7 +48,7 @@
             @method('PUT')
 
             <div class="form-section">
-                <h2 class="form-section-title">Types de cible action</h2>
+                <h2 class="form-section-title">Types d'indicateur action</h2>
                 <p class="form-section-subtitle">Les codes techniques restent fixes pour conserver la compatibilité des calculs. Seuls les libellés de l'interface sont pilotables.</p>
                 <div class="form-grid">
                     <div>
@@ -109,6 +109,7 @@
                     <div><label for="alert_level_label_warning">Niveau `warning`</label><input id="alert_level_label_warning" name="alert_level_label_warning" type="text" maxlength="60" value="{{ old('alert_level_label_warning', $settings['alert_level_labels']['warning'] ?? 'Attention') }}" required></div>
                     <div><label for="alert_level_label_critical">Niveau `critical`</label><input id="alert_level_label_critical" name="alert_level_label_critical" type="text" maxlength="60" value="{{ old('alert_level_label_critical', $settings['alert_level_labels']['critical'] ?? 'Critique') }}" required></div>
                     <div><label for="alert_level_label_urgence">Niveau `urgence`</label><input id="alert_level_label_urgence" name="alert_level_label_urgence" type="text" maxlength="60" value="{{ old('alert_level_label_urgence', $settings['alert_level_labels']['urgence'] ?? 'Urgence') }}" required></div>
+                    <div><label for="alert_level_label_conforme">Niveau `conforme`</label><input id="alert_level_label_conforme" name="alert_level_label_conforme" type="text" maxlength="60" value="{{ old('alert_level_label_conforme', $settings['alert_level_labels']['conforme'] ?? 'Conforme') }}" required></div>
                     <div><label for="alert_level_label_info">Niveau `info`</label><input id="alert_level_label_info" name="alert_level_label_info" type="text" maxlength="60" value="{{ old('alert_level_label_info', $settings['alert_level_labels']['info'] ?? 'Info') }}" required></div>
                 </div>
             </div>

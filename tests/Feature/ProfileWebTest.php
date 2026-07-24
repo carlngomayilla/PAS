@@ -112,6 +112,30 @@ class ProfileWebTest extends TestCase
         $this->assertTrue(Hash::check('Password-Old@123', $user->password));
     }
 
+    public function test_expired_password_renewal_requires_at_least_eight_characters(): void
+    {
+        $user = User::factory()->create([
+            'password' => Hash::make('Password-Old@123'),
+            'password_changed_at' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('workspace.profile.edit'))
+            ->put(route('workspace.profile.update'), [
+                'name' => $user->name,
+                'email' => $user->email,
+                'current_password' => 'Password-Old@123',
+                'password' => 'abc1234',
+                'password_confirmation' => 'abc1234',
+            ])
+            ->assertRedirect(route('workspace.profile.edit'))
+            ->assertSessionHasErrors('password');
+
+        $user->refresh();
+        $this->assertNull($user->password_changed_at);
+        $this->assertTrue(Hash::check('Password-Old@123', $user->password));
+    }
+
     public function test_expired_password_user_can_renew_password_from_profile(): void
     {
         $user = User::factory()->create([

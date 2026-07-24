@@ -28,7 +28,7 @@
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Niveaux d alerte actifs</p>
             <p class="mt-2 text-3xl font-bold text-slate-900">{{ $summary['levels_enabled'] }}</p>
-            <p class="mt-2 text-sm text-slate-600">Warning, critique et urgence peuvent etre coupes independamment.</p>
+            <p class="mt-2 text-sm text-slate-600">Critique, vigilance, conforme, info et urgence peuvent etre coupes independamment.</p>
         </article>
         <article class="ui-card !mb-0">
             <p class="text-sm text-slate-500">Rôles de surveillance additionnels</p>

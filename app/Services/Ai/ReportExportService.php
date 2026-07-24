@@ -464,12 +464,12 @@ class ReportExportService
             }
         }
 
-        $section->addText('Taux de realisation inferieur a la cible prevue.', ['bold' => true]);
+        $section->addText('Taux de realisation inferieur au seuil prevu.', ['bold' => true]);
         $lowRates = collect(array_merge($axes, $services))
             ->filter(fn (array $row): bool => (float) ($row['taux_realisation'] ?? 0) < 100)
             ->take(8);
         if ($lowRates->isEmpty()) {
-            $section->addText('Aucun taux inferieur a la cible n est signale dans le snapshot.', ['size' => 10]);
+            $section->addText('Aucun taux inferieur au seuil n est signale dans le snapshot.', ['size' => 10]);
         } else {
             $lowRates->each(function (array $row) use ($section): void {
                 $section->addListItem((string) (($row['libelle'] ?? 'Non renseigne').' : '.$this->asPercent($row['taux_realisation'] ?? 0)), 0, ['size' => 10]);

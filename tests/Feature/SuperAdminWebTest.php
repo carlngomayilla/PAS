@@ -15,8 +15,8 @@ use ZipArchive;
 
 class SuperAdminWebTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -37,7 +37,8 @@ class SuperAdminWebTest extends TestCase
         $this->actingAs($superAdmin)
             ->get(route('workspace.super-admin.index'))
             ->assertOk()
-            ->assertSee('Templates d export');
+            ->assertSee('Centre de commandement')
+            ->assertSee(route('workspace.super-admin.templates.index'), false);
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.index'))
@@ -100,7 +101,8 @@ class SuperAdminWebTest extends TestCase
             'report_type' => 'consolidated_reporting',
             'format' => 'pdf',
             'reading_level' => 'officiel',
-            'is_default' => true,
+            'is_default' => false,
+            'is_active' => false,
         ]);
 
         $this->actingAs($superAdmin)
@@ -118,6 +120,11 @@ class SuperAdminWebTest extends TestCase
         $this->assertTrue((bool) $template->is_default);
         $this->assertNotNull($template->published_at);
         $this->assertSame(1, $template->versions()->count());
+        $this->assertDatabaseHas('export_template_assignments', [
+            'export_template_id' => $template->id,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
         $this->assertFalse((bool) $previousTemplate->is_default);
         $this->assertFalse((bool) $previousAssignment->is_default);
 
@@ -214,7 +221,7 @@ class SuperAdminWebTest extends TestCase
         file_put_contents($tempFile, $xlsxBinary);
 
         if (class_exists(ZipArchive::class)) {
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             $this->assertTrue($zip->open($tempFile) === true);
             $workbookXml = $zip->getFromName('xl/workbook.xml');
             $sheetOneXml = $zip->getFromName('xl/worksheets/sheet1.xml');
@@ -276,7 +283,7 @@ class SuperAdminWebTest extends TestCase
             'report_type' => 'consolidated_reporting',
             'reading_level' => 'officiel',
             'status' => ExportTemplate::STATUS_PUBLISHED,
-            'is_default' => true,
+            'is_default' => false,
             'is_active' => true,
             'blocks_config' => [
                 'include_cover' => true,

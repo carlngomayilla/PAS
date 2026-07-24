@@ -14,21 +14,20 @@ use Illuminate\Support\Carbon;
  * théorique (basée sur le temps écoulé) d'une action à une date de référence donnée.
  *
  * Deux modes de calcul :
- * - Quantitatif : progression = quantité réalisée / quantité cible (en %)
+ * - Quantitatif : progression = quantité réalisée / quantité à réaliser (en %)
  * - Sous-actions : progression = nombre de sous-actions terminées / total (en %)
  */
 class ActionProgressService
 {
     public function __construct(
         private readonly ActionPerformanceService $actionPerformanceService
-    ) {
-    }
+    ) {}
 
     /**
      * Calcule tous les indicateurs de progression d'une action.
      *
      * Retourne un tableau avec : progression réelle, progression théorique,
-     * quantité réalisée, reste à réaliser, taux d'atteinte de la cible, etc.
+     * quantité réalisée, reste à réaliser, taux de réalisation, etc.
      *
      * @return array<string, float|string|int|bool>
      */
@@ -128,5 +127,4 @@ class ActionProgressService
 
         return round(min(100.0, ($elapsed / $totalDuration) * 100), 2);
     }
-
 }

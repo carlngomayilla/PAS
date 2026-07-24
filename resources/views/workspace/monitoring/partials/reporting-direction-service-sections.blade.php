@@ -275,7 +275,7 @@
                         <tr>
                             <th>Description action</th>
                             <th>RMO</th>
-                            <th>Cible</th>
+                            <th>Quantité à réaliser / livrable</th>
                             <th>Début</th>
                             <th>Fin</th>
                             <th>Statut</th>

@@ -114,7 +114,7 @@ class PtaReferenceResolver
         $service = $this->findService((string) ($payload['service'] ?? ''), $direction);
 
         if (! $direction instanceof Direction || ! $service instanceof Service) {
-            throw new RuntimeException('Direction ou service introuvable pour creer le PTA cible.');
+            throw new RuntimeException('Direction ou service introuvable pour creer le PTA concerne.');
         }
 
         $exercice = $this->findOrCreateExercice($payload['exercice'] ?? null);

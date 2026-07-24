@@ -56,15 +56,15 @@ class PtaImportQualityControlService
 
         $target = $normalized['cible_minimum_execution'] ?? null;
         if (! $this->blank($target) && (! is_numeric($target) || (float) $target < 0 || (float) $target > 100)) {
-            $errors[] = 'Cible minimum execution doit etre comprise entre 0 et 100.';
+            $errors[] = 'Seuil minimum execution doit etre compris entre 0 et 100.';
         }
 
         $type = strtoupper(trim((string) ($normalized['type_action'] ?? '')));
         if (! in_array($type, ['', 'Q', 'NQ', 'M'], true)) {
-            $errors[] = 'Type action non autorise.';
+            $errors[] = 'Type d indicateur non autorise.';
         }
         if ($type === 'Q' && ($this->blank($normalized['quantite_cible'] ?? null) || $this->blank($normalized['unite_cible'] ?? null))) {
-            $errors[] = 'Quantite cible et unite cible obligatoires pour une action quantitative.';
+            $errors[] = 'Quantite a realiser et unite obligatoires pour une action quantitative.';
         }
         if ($type === 'M' && $this->blank($normalized['sous_actions'] ?? null)) {
             $errors[] = 'Sous-actions obligatoires pour une action composee.';
@@ -72,7 +72,7 @@ class PtaImportQualityControlService
 
         $seuilMode = $this->key((string) ($normalized['seuil_mode'] ?? ''));
         if (! in_array($seuilMode, ['', 'unique', 'trimestriel'], true)) {
-            $errors[] = 'Seuil mode non autorise.';
+            $errors[] = 'Mode de seuil non autorise.';
         }
         if ($seuilMode === 'trimestriel') {
             foreach (['seuil_t1', 'seuil_t2', 'seuil_t3', 'seuil_t4'] as $field) {

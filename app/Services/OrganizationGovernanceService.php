@@ -13,7 +13,7 @@ use Illuminate\Support\Collection;
 class OrganizationGovernanceService
 {
     /**
-     * @return \Illuminate\Support\Collection<int, \App\Models\JournalAudit>
+     * @return Collection<int, JournalAudit>
      */
     public function recentHistory(int $limit = 20): Collection
     {
@@ -39,12 +39,10 @@ class OrganizationGovernanceService
             return null;
         }
 
-        $ptaIds = $source->ptas()->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $ptaIds = $source->ptas()->select('ptas.id');
         $actionIds = Action::query()
-            ->whereIn('pta_id', $ptaIds)
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->all();
+            ->select('actions.id')
+            ->whereIn('pta_id', clone $ptaIds);
 
         return [
             'type' => 'service_merge',
@@ -54,15 +52,11 @@ class OrganizationGovernanceService
             'scope_alignment' => (int) $source->direction_id === (int) $target->direction_id ? 'intra_direction' : 'inter_direction',
             'impacts' => [
                 'users' => $source->users()->count(),
-                'ptas' => count($ptaIds),
-                'actions' => count($actionIds),
+                'ptas' => (clone $ptaIds)->count(),
+                'actions' => (clone $actionIds)->count(),
                 'justificatifs' => Justificatif::query()
-                    ->where(function ($query) use ($actionIds): void {
-                        $query->where(function ($actionQuery) use ($actionIds): void {
-                            $actionQuery->where('justifiable_type', Action::class)
-                                ->whereIn('justifiable_id', $actionIds);
-                        });
-                    })
+                    ->where('justifiable_type', Action::class)
+                    ->whereIn('justifiable_id', clone $actionIds)
                     ->count(),
             ],
             'warnings' => array_values(array_filter([
@@ -85,8 +79,8 @@ class OrganizationGovernanceService
             return null;
         }
 
-        $ptaIds = $service->ptas()->pluck('id')->map(fn ($id): int => (int) $id)->all();
-        $actionCount = Action::query()->whereIn('pta_id', $ptaIds)->count();
+        $ptaIds = $service->ptas()->select('ptas.id');
+        $actionCount = Action::query()->whereIn('pta_id', clone $ptaIds)->count();
 
         return [
             'type' => 'service_transfer',
@@ -95,7 +89,7 @@ class OrganizationGovernanceService
             'target_label' => $targetDirection->code.' - '.$targetDirection->libelle,
             'impacts' => [
                 'users' => $service->users()->count(),
-                'ptas' => count($ptaIds),
+                'ptas' => (clone $ptaIds)->count(),
                 'actions' => $actionCount,
             ],
             'warnings' => array_values(array_filter([

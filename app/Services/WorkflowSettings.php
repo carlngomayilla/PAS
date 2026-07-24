@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaIntrospectionCache;
 
 class WorkflowSettings
 {
@@ -97,7 +97,7 @@ class WorkflowSettings
         $statusOptions = match ($module) {
             'pas' => ['actif', 'cloture', 'archive'],
             'pao' => ['en_cours', 'valide', 'cloture', 'archive'],
-            'pta' => ['en_cours', 'cloture', 'archive'],
+            'pta' => ['en_cours', 'controle_sciq', 'cloture', 'archive'],
             default => [],
         };
 
@@ -115,7 +115,7 @@ class WorkflowSettings
             'chain_label' => match ($module) {
                 'pas' => 'Actif -> Cloture -> Archive',
                 'pao' => 'En cours -> Valide automatiquement -> Cloture -> Archive',
-                'pta' => 'En cours -> Cloture -> Archive',
+                'pta' => 'En cours -> Controle SCIQ -> Cloture -> Archive',
                 default => 'Cycle canonique',
             },
             'submit_button_label' => 'Ancien circuit supprime',
@@ -124,7 +124,7 @@ class WorkflowSettings
             'lock_success_text' => 'Ancien verrouillage supprime.',
             'final_statistics_hint' => match ($module) {
                 'pao' => 'Le PAO est valide automatiquement quand ses champs obligatoires sont complets.',
-                'pta' => 'Le PTA ne possede pas de statut valide.',
+                'pta' => 'Le PTA passe par un controle SCIQ/Planification avant cloture.',
                 default => 'Le PAS est deja valide officiellement avant saisie.',
             },
         ];
@@ -137,7 +137,7 @@ class WorkflowSettings
 
     public function actionFinalStage(): string
     {
-        return 'service';
+        return 'control';
     }
 
     /**
@@ -151,15 +151,16 @@ class WorkflowSettings
         return [
             'service_enabled' => $this->serviceValidationEnabled(),
             'direction_enabled' => false,
+            'control_enabled' => true,
             'rejection_comment_required' => $this->rejectionCommentRequired(),
             'submission_target' => $submissionTarget,
             'final_stage' => $finalStage,
-            'chain_label' => 'Agent -> Chef de service',
-            'submission_help_text' => 'L action est envoyee au chef de service pour validation finale.',
+            'chain_label' => 'Agent -> Chef de service -> Controleur',
+            'submission_help_text' => 'L action est visee par le chef de service, puis validee par SCIQ ou Planification.',
             'submission_button_label' => 'Soumettre',
-            'service_review_button_label' => 'Valider la cloture',
-            'service_review_success_text' => 'Action validee par le chef de service. Le directeur et l agent sont notifies.',
-            'final_statistics_hint' => 'Oui apres validation finale du chef de service.',
+            'service_review_button_label' => 'Viser et transmettre au controle',
+            'service_review_success_text' => 'Visa du chef enregistre. L action est transmise au controleur.',
+            'final_statistics_hint' => 'Oui apres validation finale du controleur.',
         ];
     }
 
@@ -218,6 +219,7 @@ class WorkflowSettings
         $this->resolved = null;
         $this->tableAvailable = null;
     }
+
     private function hasSettingsTable(): bool
     {
         if ($this->tableAvailable !== null) {
@@ -225,7 +227,7 @@ class WorkflowSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }

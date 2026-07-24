@@ -171,3 +171,19 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change to a related file).
 
 </laravel-boost-guidelines>
+
+<exhaustive-delivery-guidelines>
+=== permanent delivery rules ===
+
+# Complete Delivery
+
+- For every feature creation, correction, evolution, refactor, migration, workflow change, or functionality removal, activate and follow the `exhaustive-task-delivery` skill in `.agents/skills/exhaustive-task-delivery/SKILL.md`.
+- Activate every other specialized skill relevant to the task domain. Do not wait until implementation is blocked.
+- Explore the existing code and identify direct and indirect impacts before editing.
+- Implement the smallest complete vertical slice, including applicable business rules, database changes, server authorization, validation, UI states, notifications, audits, dashboards, exports, and tests.
+- A hidden control never replaces server-side authorization.
+- Every business change requires tests for the happy path, invalid data, forbidden access, status conflicts, correction loops, and relevant regressions.
+- Before concluding, inspect the full diff, run the relevant tests and builds, check deployment and rollback needs, and report remaining risks explicitly.
+- Do not declare a task complete while a required impact, failing test, known regression, or mandatory verification remains unresolved.
+
+</exhaustive-delivery-guidelines>

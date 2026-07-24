@@ -110,18 +110,18 @@ class ActionStatusServiceTest extends TestCase
         $this->assertTrue($service->isStarted($actionWithExecutionLog));
     }
 
-    public function test_default_official_validation_accepts_chef_level_and_keeps_direction_history(): void
+    public function test_default_official_validation_requires_control_and_keeps_direction_history(): void
     {
         $service = app(ActionStatusService::class);
 
-        $chefValidated = new Action([
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+        $controlValidated = new Action([
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ]);
         $directionValidated = new Action([
             'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ]);
 
-        $this->assertTrue($service->isOfficiallyValidated($chefValidated));
+        $this->assertTrue($service->isOfficiallyValidated($controlValidated));
         $this->assertTrue($service->isOfficiallyValidated($directionValidated));
     }
 
@@ -178,15 +178,15 @@ class ActionStatusServiceTest extends TestCase
         $this->assertSame('en_cours', $service->dashboardStatus($action));
     }
 
-    public function test_chef_validated_action_is_acheve(): void
+    public function test_control_validated_action_is_acheve(): void
     {
-        // Validation chef de service = etape terminale ANBG => achevee, meme si le
+        // Validation controleur = etape terminale ANBG => achevee, meme si le
         // statut dynamique n'a pas (encore) bascule sur un statut acheve.
         $action = new Action([
             'statut_parametrage' => 'parametre',
             'statut' => ActionTrackingService::STATUS_EN_COURS,
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
-            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             'progression_reelle' => 80,
         ]);
 

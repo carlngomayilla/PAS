@@ -21,19 +21,19 @@
         </div>
 
         <div class="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-lg border border-[#d8ecf8] bg-[#f8fbfe] p-4">
+            <div class="app-stat-card stat-card rounded-lg border border-[#d8ecf8] bg-[#f8fbfe] p-4">
                 <p class="text-xs font-bold uppercase text-slate-500">Imports lances</p>
                 <p class="mt-2 text-3xl font-extrabold text-[#1c203d]">{{ $totalImports }}</p>
             </div>
-            <div class="rounded-lg border border-[#d8ecf8] bg-white p-4">
+            <div class="app-stat-card stat-card rounded-lg border border-[#d8ecf8] bg-white p-4">
                 <p class="text-xs font-bold uppercase text-slate-500">Imports finalises</p>
                 <p class="mt-2 text-3xl font-extrabold text-[#3996d3]">{{ $successfulImports }}</p>
             </div>
-            <div class="rounded-lg border border-[#fde7c3] bg-[#fffaf2] p-4">
+            <div class="app-stat-card stat-card is-warning rounded-lg border border-[#fde7c3] bg-[#fffaf2] p-4">
                 <p class="text-xs font-bold uppercase text-slate-500">Avec erreurs</p>
                 <p class="mt-2 text-3xl font-extrabold text-[#c77700]">{{ $importsWithErrors }}</p>
             </div>
-            <div class="rounded-lg border border-[#d8ecf8] bg-white p-4">
+            <div class="app-stat-card stat-card rounded-lg border border-[#d8ecf8] bg-white p-4">
                 <p class="text-xs font-bold uppercase text-slate-500">Format attendu</p>
                 <p class="mt-2 text-lg font-extrabold text-[#1c203d]">1 feuille / 1 action par ligne</p>
             </div>

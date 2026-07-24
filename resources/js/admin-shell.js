@@ -174,6 +174,7 @@
     var openButton = document.getElementById('admin-sidebar-open');
     var closeButton = document.getElementById('admin-sidebar-close');
     var overlay = document.getElementById('admin-overlay');
+    var sidebarKeyboardNavigation = false;
     var notificationsWrapper = document.getElementById('header-notifications');
     var notificationsToggle = document.getElementById('header-notifications-toggle');
     var notificationsMenu = document.getElementById('header-notifications-menu');
@@ -218,6 +219,82 @@
         }
         sidebar.classList.add('-translate-x-full');
         overlay.classList.add('hidden');
+    }
+
+    function syncDesktopSidebarLayout(forceExpanded) {
+        if (!sidebar) {
+            return;
+        }
+
+        var isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+        var isExpanded = typeof forceExpanded === 'boolean'
+            ? forceExpanded
+            : sidebar.matches(':hover')
+                || sidebar.getAttribute('data-sidebar-keyboard-expanded') === 'true';
+
+        document.body.classList.toggle('sidebar-desktop-expanded', isDesktop && isExpanded);
+    }
+
+    function setSidebarKeyboardExpanded(expanded) {
+        if (!sidebar || !sidebar.hasAttribute('data-sidebar-keyboard-expand')) {
+            return;
+        }
+
+        if (expanded) {
+            sidebar.setAttribute('data-sidebar-keyboard-expanded', 'true');
+            syncDesktopSidebarLayout(true);
+
+            return;
+        }
+
+        sidebar.removeAttribute('data-sidebar-keyboard-expanded');
+        syncDesktopSidebarLayout();
+    }
+
+    if (sidebar && sidebar.hasAttribute('data-sidebar-keyboard-expand')) {
+        sidebar.addEventListener('mouseenter', function () {
+            syncDesktopSidebarLayout(true);
+        });
+
+        sidebar.addEventListener('mouseleave', function () {
+            syncDesktopSidebarLayout(
+                sidebar.getAttribute('data-sidebar-keyboard-expanded') === 'true'
+            );
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Tab') {
+                sidebarKeyboardNavigation = true;
+            }
+        });
+
+        document.addEventListener('pointerdown', function () {
+            sidebarKeyboardNavigation = false;
+            setSidebarKeyboardExpanded(false);
+        }, { passive: true });
+
+        sidebar.addEventListener('focusin', function () {
+            if (sidebarKeyboardNavigation) {
+                setSidebarKeyboardExpanded(true);
+            }
+        });
+
+        sidebar.addEventListener('focusout', function () {
+            window.requestAnimationFrame(function () {
+                if (!sidebar.contains(document.activeElement)) {
+                    setSidebarKeyboardExpanded(false);
+                }
+            });
+        });
+
+        window.addEventListener('blur', function () {
+            sidebarKeyboardNavigation = false;
+            setSidebarKeyboardExpanded(false);
+        });
+
+        window.addEventListener('resize', function () {
+            syncDesktopSidebarLayout();
+        });
     }
 
     if (openButton) {

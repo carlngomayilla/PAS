@@ -2,11 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\RequiresPlanningWriter;
+use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\PasObjectif;
 use App\Models\Service;
 use App\Models\User;
-use App\Http\Requests\Concerns\RequiresPlanningWriter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Validator;
@@ -54,6 +55,11 @@ class UpdatePaoRequest extends FormRequest
         $this->merge([
             'objectifs_operationnels' => collect($objectifs)
                 ->filter(fn ($objectif): bool => is_array($objectif))
+                ->map(function (array $objectif): array {
+                    $objectif['pas_objectif_id'] = $objectif['pas_objectif_id'] ?? $this->input('pas_objectif_id');
+
+                    return $objectif;
+                })
                 ->values()
                 ->all(),
         ]);
@@ -72,6 +78,7 @@ class UpdatePaoRequest extends FormRequest
             'titre' => ['nullable', 'string', 'max:255'],
             'objectifs_operationnels' => ['required', 'array', 'min:1'],
             'objectifs_operationnels.*.id' => ['nullable', 'integer', 'exists:objectifs_operationnels,id'],
+            'objectifs_operationnels.*.pas_objectif_id' => ['required', 'integer', 'exists:pas_objectifs,id'],
             'objectifs_operationnels.*.libelle' => ['required', 'string'],
             'objectifs_operationnels.*.service_id' => ['required', 'integer', 'exists:services,id'],
             'objectifs_operationnels.*.echeance' => ['required', 'date', 'date_format:Y-m-d'],
@@ -86,6 +93,7 @@ class UpdatePaoRequest extends FormRequest
         return [
             'pas_axe_id.required' => 'L axe strategique est obligatoire avant de choisir l objectif strategique.',
             'objectifs_operationnels.required' => 'Ajoutez au moins un objectif operationnel.',
+            'objectifs_operationnels.*.pas_objectif_id.required' => 'Le rattachement strategique de chaque objectif operationnel est obligatoire.',
             'objectifs_operationnels.*.libelle.required' => 'Le libelle de chaque objectif operationnel est obligatoire.',
             'objectifs_operationnels.*.service_id.required' => 'Le service destinataire de chaque objectif operationnel est obligatoire.',
             'objectifs_operationnels.*.echeance.required' => 'L echeance de chaque objectif operationnel est obligatoire.',
@@ -102,6 +110,18 @@ class UpdatePaoRequest extends FormRequest
             $objectif = PasObjectif::query()
                 ->with('pasAxe.pas:id,periode_debut,periode_fin')
                 ->find((int) $this->input('pas_objectif_id'));
+            $strategicObjectiveIds = collect((array) $this->input('objectifs_operationnels', []))
+                ->pluck('pas_objectif_id')
+                ->filter(fn ($id): bool => is_numeric($id))
+                ->map(fn ($id): int => (int) $id)
+                ->push((int) $this->input('pas_objectif_id'))
+                ->unique()
+                ->values();
+            $strategicObjectives = PasObjectif::query()
+                ->with('pasAxe.pas:id,periode_debut,periode_fin')
+                ->whereIn('id', $strategicObjectiveIds->all())
+                ->get()
+                ->keyBy('id');
             $serviceIds = collect((array) $this->input('objectifs_operationnels', []))
                 ->pluck('service_id')
                 ->filter(fn ($id): bool => is_numeric($id))
@@ -136,6 +156,17 @@ class UpdatePaoRequest extends FormRequest
 
                 $serviceId = is_numeric($operationalObjective['service_id'] ?? null) ? (int) $operationalObjective['service_id'] : null;
                 $service = $serviceId !== null ? $services->get($serviceId) : null;
+                $operationalStrategicObjectiveId = (int) ($operationalObjective['pas_objectif_id'] ?? 0);
+                $operationalStrategicObjective = $strategicObjectives->get($operationalStrategicObjectiveId);
+                $operationalPas = $operationalStrategicObjective?->pasAxe?->pas;
+
+                if ($pas !== null && $operationalPas !== null && (int) $operationalPas->id !== (int) $pas->id) {
+                    $validator->errors()->add(
+                        "objectifs_operationnels.{$index}.pas_objectif_id",
+                        'Tous les objectifs operationnels du PAO doivent appartenir au meme PAS.'
+                    );
+                }
+
                 if ($service !== null && (int) $service->direction_id !== (int) $this->input('direction_id')) {
                     $validator->errors()->add(
                         "objectifs_operationnels.{$index}.service_id",
@@ -166,8 +197,8 @@ class UpdatePaoRequest extends FormRequest
                     }
                 }
 
-                if ($objectif?->date_echeance !== null && $echeance !== null) {
-                    $objectiveDeadline = strtotime((string) $objectif->date_echeance);
+                if ($operationalStrategicObjective?->date_echeance !== null && $echeance !== null) {
+                    $objectiveDeadline = strtotime((string) $operationalStrategicObjective->date_echeance);
                     $operationalDeadline = strtotime((string) $echeance);
                     if ($objectiveDeadline !== false && $operationalDeadline !== false && $operationalDeadline > $objectiveDeadline) {
                         $validator->errors()->add(
@@ -185,7 +216,7 @@ class UpdatePaoRequest extends FormRequest
                 }
 
                 $key = implode('|', [
-                    (int) $this->input('pas_objectif_id'),
+                    (int) ($operationalObjective['pas_objectif_id'] ?? 0),
                     (int) $this->input('annee'),
                     (int) $this->input('direction_id'),
                     (int) ($operationalObjective['service_id'] ?? 0),
@@ -214,6 +245,41 @@ class UpdatePaoRequest extends FormRequest
                     'direction_id',
                     'Un PAO existe deja pour cette direction et cette annee. Modifiez le PAO existant pour ajouter ou ajuster les objectifs operationnels.'
                 );
+            }
+
+            $pao = $this->route('pao');
+            if ($pao instanceof Pao) {
+                $submittedObjectiveIds = collect((array) $this->input('objectifs_operationnels', []))
+                    ->pluck('id')
+                    ->filter(fn ($id): bool => is_numeric($id))
+                    ->map(fn ($id): int => (int) $id)
+                    ->values();
+                $foreignObjectiveExists = $submittedObjectiveIds->isNotEmpty()
+                    && ObjectifOperationnel::query()
+                        ->whereIn('id', $submittedObjectiveIds->all())
+                        ->where('pao_id', '!=', $pao->id)
+                        ->exists();
+
+                if ($foreignObjectiveExists) {
+                    $validator->errors()->add(
+                        'objectifs_operationnels',
+                        'Un objectif operationnel transmis ne correspond pas au PAO modifie.'
+                    );
+                }
+
+                $protectedRemovedObjectives = $pao->objectifsOperationnels()
+                    ->whereNotIn('id', $submittedObjectiveIds->all())
+                    ->where(function ($query): void {
+                        $query->whereHas('ptas')->orWhereHas('actions');
+                    })
+                    ->count();
+
+                if ($protectedRemovedObjectives > 0) {
+                    $validator->errors()->add(
+                        'objectifs_operationnels',
+                        'Impossible de retirer un objectif operationnel deja utilise par un PTA ou une action.'
+                    );
+                }
             }
         });
     }

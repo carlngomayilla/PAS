@@ -4,8 +4,7 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -289,7 +288,7 @@ class ManagedKpiSettings
             'direct' => 'Lecture directe',
             'inverse' => 'Lecture inverse (100 - valeur)',
             'weighted_average' => 'Moyenne ponderee multi-sources',
-            'gap_to_target' => 'Ecart a la cible',
+            'gap_to_target' => 'Ecart au niveau attendu',
             'minimum' => 'Minimum des sources',
             'maximum' => 'Maximum des sources',
         ];
@@ -576,7 +575,7 @@ class ManagedKpiSettings
                 $secondaryLabel !== null && (int) ($definition['secondary_weight'] ?? 0) > 0 ? $secondaryLabel.' '.(int) ($definition['secondary_weight'] ?? 0).'%' : null,
                 $tertiaryLabel !== null && (int) ($definition['tertiary_weight'] ?? 0) > 0 ? $tertiaryLabel.' '.(int) ($definition['tertiary_weight'] ?? 0).'%' : null,
             ])->filter()->implode(' | '),
-            'gap_to_target' => 'Cible '.($definition['target_value'] !== null
+            'gap_to_target' => 'Niveau attendu '.($definition['target_value'] !== null
                 ? number_format((float) $definition['target_value'], 0)
                 : ($secondaryLabel ?? '100')),
             'minimum' => collect([$sourceLabel, $secondaryLabel, $tertiaryLabel])->filter()->implode(' / '),
@@ -592,7 +591,7 @@ class ManagedKpiSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }

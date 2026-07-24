@@ -68,7 +68,7 @@
                 <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
                     <input class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" name="actions_auto_complete_when_target_reached" value="1" @checked(($settings['actions_auto_complete_when_target_reached'] ?? '0') === '1')>
                     <span>
-                        <strong class="block text-slate-900">Auto-clôturer une action quand la cible est atteinte</strong>
+                        <strong class="block text-slate-900">Auto-clôturer une action quand le seuil est atteint</strong>
                         <span class="mt-1 block text-slate-500">Quand la progression réelle atteint `100%`, la date de fin réelle est alimentée automatiquement lors du recalcul du suivi.</span>
                     </span>
                 </label>

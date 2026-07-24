@@ -2,10 +2,15 @@
 
 namespace App\Services;
 
+use App\Enums\TypeIndicateur;
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Models\Action;
 use App\Models\Direction;
 use App\Models\Justificatif;
+use App\Models\ObjectifOperationnel;
+use App\Models\Pas;
+use App\Models\PasAxe;
+use App\Models\PasObjectif;
 use App\Models\Service;
 use App\Models\SousAction;
 use App\Models\User;
@@ -31,16 +36,7 @@ class PtaSuiviService
 
     public function canAccess(User $user): bool
     {
-        return $user->hasPermission(self::PERMISSION)
-            || $user->isPlanningControlChief()
-            || $user->hasRole(
-                User::ROLE_SUPER_ADMIN,
-                User::ROLE_ADMIN,
-                User::ROLE_ADMIN_FONCTIONNEL,
-                User::ROLE_PLANIFICATION,
-                User::ROLE_SCIQ,
-                User::ROLE_SCIQ_SUIVI_GLOBAL
-            );
+        return (bool) $user->is_active;
     }
 
     public function denyUnlessAuthorized(User $user): void
@@ -60,10 +56,13 @@ class PtaSuiviService
         $filters = $this->filtersFromRequest($request, $user);
         $actions = $this->filteredActions($filters, $user)->get();
         $rows = $this->applyRowStatusFilters(
-            $actions->map(fn (Action $action): array => $this->actionRow($action))->values(),
+            $actions->map(fn (Action $action): array => $this->actionRow($action, $user))->values(),
             $filters
         );
-        $groups = $this->groupRows($rows);
+        $groups = $this->mergeHierarchyGroups(
+            $this->pasHierarchyGroups($filters, $user),
+            $this->groupRows($rows)
+        );
 
         return [
             'generatedAt' => now(),
@@ -72,6 +71,7 @@ class PtaSuiviService
             'summary' => $this->summary($rows),
             'groups' => $groups,
             'rows' => $rows,
+            'rmoOptions' => $this->rmoOptions($user),
             'title' => 'SUIVI PTA '.$this->titleScopeLabel($filters),
             'scopeLabel' => $this->scopeLabel($filters),
             'legends' => $this->legends(),
@@ -105,7 +105,7 @@ class PtaSuiviService
             'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,progression_reelle,progression_theorique',
             'justificatifs:id,justifiable_type,justifiable_id,categorie,nom_original,description,mime_type,taille_octets,created_at,ajoute_par',
             'justificatifs.ajoutePar:id,name',
-            'sousActions:id,action_id,agent_id,libelle,description,resultat_attendu,cible_prevue,quantite_realisee,unite,resultat_obtenu,taux_realisation,taux_execution,est_effectuee,statut,date_debut,date_fin,completed_at,date_realisation,validation_status,commentaire,sub_action_type,weight',
+            'sousActions:id,action_id,agent_id,libelle,description,resultat_attendu,cible,type_indicateur,quantite_a_realiser,seuil_minimum,livrable_attendu,cible_prevue,quantite_realisee,unite,resultat_obtenu,taux_realisation,taux_execution,est_effectuee,statut,date_debut,date_fin,completed_at,date_realisation,validation_status,commentaire,sub_action_type,weight',
             'sousActions.agent:id,name',
             'sousActions.justificatifs:id,sous_action_id,nom_original,description,mime_type,taille_octets,created_at,ajoute_par',
             'sousActions.justificatifs.ajoutePar:id,name',
@@ -113,10 +113,11 @@ class PtaSuiviService
             'actionLogs.utilisateur:id,name',
             'soumisPar:id,name',
             'evaluePar:id,name',
+            'controleReviewedBy:id,name',
             'clotureePar:id,name',
         ]);
 
-        $row = $this->actionRow($action);
+        $row = $this->actionRow($action, $user);
         $details = [
             'Code action' => $this->dash($action->code ?? null),
             'Libelle complet' => $this->dash($action->libelle),
@@ -126,9 +127,9 @@ class PtaSuiviService
             'Objectif operationnel' => $row['objectif_operationnel_label'],
             'Direction' => $row['direction_label'],
             'Service' => $row['service_label'],
-            'Responsable' => $row['responsable'],
+            'RMO' => $row['responsable'],
             'Indicateur' => $row['indicateur'],
-            'Cible' => $row['cible'],
+            'Seuil' => $row['seuil_label'] ?? '-',
             'Realise' => $row['realise'],
             'Ratio' => $row['ratio'],
             'Taux de realisation' => $row['taux_realisation_label'],
@@ -152,7 +153,6 @@ class PtaSuiviService
             'history' => $this->historyRows($action),
             'validations' => $this->validationRows($action),
             'attachments' => $this->attachmentRows($action),
-            'parameterUrl' => $this->actionParameterUrl($action),
             'trackingUrl' => route('workspace.actions.suivi', $action),
         ];
     }
@@ -162,7 +162,7 @@ class PtaSuiviService
         $query = Action::query()
             ->whereKey((int) $action->id)
             ->whereNotNull('pta_id');
-        $this->scopePlanningActions($query, $user);
+        $this->scopeVisibleActions($query, $user);
 
         if ($query->exists()) {
             return;
@@ -182,13 +182,13 @@ class PtaSuiviService
             ->whereNotNull('pta_id')
             ->orderBy('id');
 
-        $this->scopePlanningActions($query, $user);
+        $this->scopeVisibleActions($query, $user);
         if ($filters['annee'] !== null) {
             $this->exerciceContext->applyToAction($query, $filters['annee']);
         }
 
         if (($directionId = $filters['direction_id']) !== null) {
-            if (! $this->canReadDirection($user, $directionId)) {
+            if (! $this->canReadPtaSuiviDirection($user, $directionId)) {
                 abort(403, 'Direction hors perimetre.');
             }
 
@@ -197,11 +197,24 @@ class PtaSuiviService
 
         if (($serviceId = $filters['service_id']) !== null) {
             $service = Service::query()->find($serviceId);
-            if (! $service instanceof Service || ! $this->canReadService($user, (int) $service->direction_id, (int) $service->id)) {
+            if (! $service instanceof Service || ! $this->canReadPtaSuiviService($user, (int) $service->direction_id, (int) $service->id)) {
                 abort(403, 'Service hors perimetre.');
             }
 
             $query->whereHas('pta', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', $serviceId));
+        }
+
+        if (($objectiveId = $filters['objectif_operationnel_id']) !== null) {
+            $objective = ObjectifOperationnel::query()->find($objectiveId);
+            if (! $objective instanceof ObjectifOperationnel || ! $this->canReadPtaSuiviService($user, (int) $objective->direction_id, (int) $objective->service_id)) {
+                abort(403, 'Objectif operationnel hors perimetre.');
+            }
+
+            $query->where(function (Builder $objectiveQuery) use ($objectiveId): void {
+                $objectiveQuery
+                    ->where('objectif_operationnel_id', $objectiveId)
+                    ->orWhereHas('pta', fn (Builder $ptaQuery) => $ptaQuery->where('objectif_operationnel_id', $objectiveId));
+            });
         }
 
         if (($range = $this->periodRange($filters['annee'], (string) ($filters['periode'] ?? 'all'))) !== null) {
@@ -233,6 +246,7 @@ class PtaSuiviService
 
         $directionId = $this->integerFilter($request->query('direction_id'));
         $serviceId = $this->integerFilter($request->query('service_id'));
+        $objectiveId = $this->integerFilter($request->query('objectif_operationnel_id'));
         if (! $user->hasGlobalReadAccess()) {
             $directionId ??= $user->direction_id !== null ? (int) $user->direction_id : null;
             $serviceId ??= $user->service_id !== null ? (int) $user->service_id : null;
@@ -246,6 +260,7 @@ class PtaSuiviService
         return [
             'direction_id' => $directionId,
             'service_id' => $serviceId,
+            'objectif_operationnel_id' => $objectiveId,
             'annee' => $year,
             'periode' => $period,
             'periode_label' => $this->periodLabel($period),
@@ -281,17 +296,18 @@ class PtaSuiviService
             'actionKpi:id,action_id,kpi_global,kpi_delai,kpi_performance,progression_reelle,progression_theorique',
             'justificatifs:id,justifiable_type,justifiable_id,categorie,nom_original,description,mime_type,taille_octets,created_at,ajoute_par',
             'justificatifs.ajoutePar:id,name',
-            'sousActions:id,action_id,agent_id,libelle,description,resultat_attendu,cible_prevue,quantite_realisee,unite,resultat_obtenu,taux_realisation,taux_execution,est_effectuee,statut,date_debut,date_fin,completed_at,date_realisation,validation_status,commentaire,sub_action_type,weight',
+            'sousActions:id,action_id,agent_id,libelle,description,resultat_attendu,cible,type_indicateur,quantite_a_realiser,seuil_minimum,livrable_attendu,cible_prevue,quantite_realisee,unite,resultat_obtenu,taux_realisation,taux_execution,est_effectuee,statut,date_debut,date_fin,completed_at,date_realisation,validation_status,commentaire,sub_action_type,weight',
             'sousActions.agent:id,name',
             'sousActions.justificatifs:id,sous_action_id,nom_original,description,mime_type,taille_octets,created_at,ajoute_par',
             'sousActions.justificatifs.ajoutePar:id,name',
+            'actionLogs:id,action_id,type_evenement',
         ];
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function actionRow(Action $action): array
+    public function actionRow(Action $action, ?User $user = null): array
     {
         $pta = $action->pta;
         $pao = $pta?->pao;
@@ -303,15 +319,17 @@ class PtaSuiviService
         $official = $this->officialCalculation->actionResult($action);
         $target = (float) $official['target'];
         $realized = (float) $official['realized'];
+        $typeIndicateur = TypeIndicateur::fromLegacy($action->type_indicateur ?? $action->type_action ?? $action->mode_evaluation ?? null);
+        $completionThreshold = $this->completionThreshold($action->seuil_minimum ?? null);
         $progress = $official['rate'] !== null ? (float) $official['rate'] : 0.0;
         $displayProgress = (float) $official['display_rate'];
         $performance = $progress;
         $ecart = round(max(0.0, 100.0 - $displayProgress), 2);
         $deadline = $this->deadline($action);
         $workflowStatus = $this->workflowStatus($action, $official);
-        $delayStatus = $this->delayStatus($action, $official['rate']);
-        $alertStatus = $this->alertStatus($action, $official['rate']);
-        $simpleStatus = $this->actionDisplayStatus($official, $delayStatus, $workflowStatus);
+        $delayStatus = $this->delayStatus($action, $official['rate'], $completionThreshold);
+        $alertStatus = $this->alertStatus($action, $official['rate'], $completionThreshold, $workflowStatus);
+        $simpleStatus = $this->actionDisplayStatus($official, $delayStatus, $workflowStatus, $completionThreshold);
         $proofStatus = $this->proofStatus($action, $delayStatus);
         $delayDays = $this->delayDays($action);
         $proofCount = $this->proofCount($action);
@@ -319,18 +337,53 @@ class PtaSuiviService
             ?: $action->responsables->pluck('name')->filter()->implode(', ');
         $responsable = $responsable !== '' ? $responsable : '-';
         $unit = (string) ($action->unite_cible ?? $kpi?->unite ?? '');
-        $indicator = $this->dash($kpi?->libelle ?? $action->indicateurs_attendus ?? $objective?->indicateurs ?? $strategicObjective?->indicateur_global ?? null);
+        $indicatorText = $this->firstFilledText([
+            $kpi?->libelle ?? null,
+            $action->indicateurs_attendus ?? null,
+            $objective?->indicateurs ?? null,
+            $strategicObjective?->indicateur_global ?? null,
+        ]);
+        $indicator = $indicatorText ?? 'A renseigner';
 
         $detailsUrl = route('pta.suivi.details', $action);
         $proofPreview = $this->proofPreviewData($action);
+        $inlineEditable = $user instanceof User && $this->canInlineEditAction($action, $user);
+        $canRequestDeadlineExtension = $user instanceof User && $user->can('requestDeadlineExtension', $action);
+        $thresholdLabel = $this->thresholdLabel($completionThreshold);
+        $deliverable = (string) ($this->firstFilledText([
+            $action->livrable_attendu ?? null,
+            $action->cible ?? null,
+            $action->resultat_attendu ?? null,
+            $action->intitule_cible ?? null,
+        ]) ?? '');
+        $quantityToRealize = $this->rawDecimal($action->quantite_a_realiser ?? $action->quantite_cible ?? null);
 
         return [
             'id' => (int) $action->id,
             'action_id' => (int) $action->id,
             'action_url' => route('workspace.actions.suivi', $action),
+            'report_url' => route('workspace.actions.suivi', $action).'#action-echeances',
+            'can_request_report' => $canRequestDeadlineExtension,
             'details_url' => $detailsUrl,
             'preview_url' => $detailsUrl,
             'parameter_url' => $this->actionParameterUrl($action),
+            'inline_editable' => $inlineEditable,
+            'inline_update_url' => route('pta.suivi.actions.update', $action),
+            'inline_delete_url' => route('pta.suivi.actions.destroy', $action),
+            'indicator_type_options' => $this->indicatorTypeOptions(),
+            'inline_values' => [
+                'libelle' => (string) ($action->libelle ?? ''),
+                'type_indicateur' => $typeIndicateur->value,
+                'indicateur' => (string) ($indicatorText ?? ''),
+                'livrable_attendu' => $deliverable,
+                'quantite_a_realiser' => $quantityToRealize,
+                'seuil_minimum' => $this->rawDecimal($completionThreshold),
+                'unite' => (string) ($action->unite_cible ?? $kpi?->unite ?? ''),
+                'rmo_id' => $this->rawInteger($action->responsable_id ?? $action->responsables->first()?->id ?? null),
+                'date_debut' => $this->rawDate($action->date_debut ?? null),
+                'date_fin' => $this->rawDate($this->deadline($action)),
+                'observations' => (string) ($action->observations ?? ''),
+            ],
             'proof_preview_url' => $proofPreview['preview_url'],
             'proof_download_url' => $proofPreview['download_url'],
             'proof_title' => $proofPreview['title'],
@@ -349,12 +402,17 @@ class PtaSuiviService
             'direction_label' => $this->entityLabel($pta?->direction?->code ?? null, $pta?->direction?->libelle ?? null, 'Direction non renseignee'),
             'service_label' => $this->entityLabel($pta?->service?->code ?? null, $pta?->service?->libelle ?? null, 'Service non renseigne'),
             'responsable' => $responsable,
+            'type_indicateur' => $typeIndicateur->value,
+            'type_indicateur_label' => $typeIndicateur->label(),
             'indicateur' => $indicator,
+            'indicateur_affichage' => $this->indicatorDisplayLabel($typeIndicateur, $indicatorText, $quantityToRealize, $unit, $deliverable),
             'ratio' => $target > 0 ? $this->numberLabel($realized).' / '.$this->numberLabel($target) : $this->ratioFromSubActions($action),
             'taux_realisation' => $progress,
             'taux_realisation_display' => $displayProgress,
             'taux_realisation_label' => $this->percentLabel($progress),
-            'cible' => $target > 0 ? trim($this->numberLabel($target).' '.$unit) : 'A parametrer',
+            'cible' => $thresholdLabel,
+            'seuil' => $thresholdLabel,
+            'seuil_label' => $thresholdLabel,
             'realise' => $target > 0 ? trim($this->numberLabel($realized).' '.$unit) : $this->dash($action->intitule_cible ?? $strategicObjective?->valeur_cible ?? null),
             'performance' => $performance,
             'performance_label' => $this->percentLabel($performance),
@@ -382,7 +440,7 @@ class PtaSuiviService
             'calcul_configured' => (bool) $official['is_configured'],
             'calcul_status' => (string) $official['status'],
             'calcul_status_label' => (string) $official['status_label'],
-            'sous_actions' => $this->subActionRows($action, $responsable, $indicator, $unit),
+            'sous_actions' => $this->subActionRows($action, $responsable, $indicator, $unit, $inlineEditable, $canRequestDeadlineExtension),
             'ordre' => (int) ($action->ordre_import ?? $action->id),
         ];
     }
@@ -390,8 +448,14 @@ class PtaSuiviService
     /**
      * @return list<array<string, mixed>>
      */
-    private function subActionRows(Action $action, string $fallbackResponsable, string $fallbackIndicator, string $fallbackUnit): array
-    {
+    private function subActionRows(
+        Action $action,
+        string $fallbackResponsable,
+        string $fallbackIndicator,
+        string $fallbackUnit,
+        bool $inlineEditable,
+        bool $canRequestDeadlineExtension
+    ): array {
         if (! $action->relationLoaded('sousActions')) {
             return [];
         }
@@ -399,7 +463,7 @@ class PtaSuiviService
         return $action->sousActions
             ->sortBy(fn (SousAction $sousAction): int => (int) $sousAction->id)
             ->values()
-            ->map(function (SousAction $sousAction, int $index) use ($action, $fallbackResponsable, $fallbackIndicator, $fallbackUnit): array {
+            ->map(function (SousAction $sousAction, int $index) use ($action, $fallbackResponsable, $fallbackIndicator, $fallbackUnit, $inlineEditable, $canRequestDeadlineExtension): array {
                 $official = $this->officialCalculation->subActionResult($sousAction);
                 $target = (float) $official['target'];
                 $realized = (float) $official['realized'];
@@ -407,13 +471,27 @@ class PtaSuiviService
                 $displayRate = (float) $official['display_rate'];
                 $deadline = $this->subActionDeadline($sousAction);
                 $completedAt = $this->subActionCompletedAt($sousAction);
-                $delayStatus = $this->delayStatusForDates($deadline, $completedAt, $rate);
                 $delayDays = $this->delayDaysForDates($deadline, $completedAt);
                 $ecart = $rate !== null ? round(max(0.0, 100.0 - $displayRate), 2) : null;
                 $unit = trim((string) ($sousAction->unite ?? '')) ?: $fallbackUnit;
                 $proofCount = $this->subActionProofCount($sousAction);
-                $status = $this->subActionDisplayStatus($official, $delayStatus);
                 $workflowStatus = $this->subActionWorkflowStatus($sousAction, $official);
+                $typeIndicateur = TypeIndicateur::fromLegacy($sousAction->type_indicateur ?? $sousAction->sub_action_type ?? null);
+                $completionThreshold = $this->completionThreshold($sousAction->seuil_minimum ?? $action->seuil_minimum ?? null);
+                $delayStatus = $this->delayStatusForDates($deadline, $completedAt, $rate, $completionThreshold);
+                $status = $this->subActionDisplayStatus($official, $delayStatus, $completionThreshold);
+                $thresholdLabel = $this->thresholdLabel($completionThreshold);
+                $indicatorText = $this->firstFilledText([
+                    $sousAction->resultat_attendu ?? null,
+                    $sousAction->description ?? null,
+                    $fallbackIndicator,
+                ]);
+                $deliverable = (string) ($this->firstFilledText([
+                    $sousAction->livrable_attendu ?? null,
+                    $sousAction->cible ?? null,
+                    $sousAction->resultat_attendu ?? null,
+                ]) ?? '');
+                $quantityToRealize = $this->rawDecimal($sousAction->quantite_a_realiser ?? $sousAction->cible_prevue ?? null);
 
                 $detailsUrl = route('pta.suivi.details', $action);
                 $proofPreview = $this->proofPreviewData($action, $sousAction);
@@ -423,20 +501,48 @@ class PtaSuiviService
                     'numero' => $index + 1,
                     'details_url' => $detailsUrl,
                     'preview_url' => $detailsUrl,
+                    'action_url' => route('workspace.actions.suivi', $action),
+                    'report_url' => route('workspace.actions.suivi', [
+                        'action' => $action,
+                        'report_sous_action_id' => $sousAction->id,
+                    ]).'#action-echeances',
+                    'can_request_report' => $canRequestDeadlineExtension,
                     'parameter_url' => $this->actionParameterUrl($action, $sousAction),
+                    'inline_editable' => $inlineEditable,
+                    'inline_update_url' => route('pta.suivi.actions.update', $action),
+                    'inline_delete_url' => route('pta.suivi.actions.destroy', $action),
+                    'indicator_type_options' => $this->indicatorTypeOptions(),
+                    'inline_values' => [
+                        'libelle' => (string) ($sousAction->libelle ?? ''),
+                        'type_indicateur' => $typeIndicateur->value,
+                        'indicateur' => (string) ($indicatorText ?? ''),
+                        'livrable_attendu' => $deliverable,
+                        'quantite_a_realiser' => $quantityToRealize,
+                        'seuil_minimum' => $this->rawDecimal($completionThreshold),
+                        'unite' => (string) ($sousAction->unite ?? $fallbackUnit),
+                        'rmo_id' => $this->rawInteger($sousAction->agent_id ?? null),
+                        'date_debut' => $this->rawDate($sousAction->date_debut ?? null),
+                        'date_fin' => $this->rawDate($deadline),
+                        'observations' => (string) ($sousAction->commentaire ?? ''),
+                    ],
                     'proof_preview_url' => $proofPreview['preview_url'],
                     'proof_download_url' => $proofPreview['download_url'],
                     'proof_title' => $proofPreview['title'],
                     'proof_subtitle' => $proofPreview['subtitle'],
                     'proof_mime' => $proofPreview['mime'],
                     'libelle' => (string) ($sousAction->libelle ?: '-'),
-                    'indicateur' => $this->dash($sousAction->resultat_attendu ?? $sousAction->description ?? $fallbackIndicator),
+                    'type_indicateur' => $typeIndicateur->value,
+                    'type_indicateur_label' => $typeIndicateur->label(),
+                    'indicateur' => $indicatorText ?? 'A renseigner',
+                    'indicateur_affichage' => $this->indicatorDisplayLabel($typeIndicateur, $indicatorText, $quantityToRealize, $unit, $deliverable),
                     'responsable' => (string) ($sousAction->agent?->name ?? $fallbackResponsable),
                     'ratio' => $target > 0 ? $this->numberLabel($realized).' / '.$this->numberLabel($target) : 'A parametrer',
                     'taux_realisation' => $rate ?? 0.0,
                     'taux_realisation_display' => $displayRate,
                     'taux_realisation_label' => $this->percentLabel($rate),
-                    'cible' => $target > 0 ? trim($this->numberLabel($target).' '.$unit) : 'A parametrer',
+                    'cible' => $thresholdLabel,
+                    'seuil' => $thresholdLabel,
+                    'seuil_label' => $thresholdLabel,
                     'realise' => $target > 0 ? trim($this->numberLabel($realized).' '.$unit) : $this->subActionRealizationLabel($sousAction),
                     'performance' => $rate ?? 0.0,
                     'performance_label' => $this->percentLabel($rate),
@@ -463,6 +569,19 @@ class PtaSuiviService
                 ];
             })
             ->all();
+    }
+
+    private function actionParameterUrl(Action $action, ?SousAction $sousAction = null): string
+    {
+        if ($action->pta_id === null) {
+            return '';
+        }
+
+        $query = $sousAction instanceof SousAction
+            ? '?focus=sub_action&sub_action_id='.(int) $sousAction->id
+            : '?focus=action';
+
+        return route('workspace.pta.edit', $action->pta_id).$query.'#action-'.(int) $action->id;
     }
 
     /**
@@ -535,6 +654,298 @@ class PtaSuiviService
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function pasHierarchyGroups(array $filters, User $user): Collection
+    {
+        $query = Pas::query()
+            ->with([
+                'axes' => fn ($axisQuery) => $axisQuery->orderBy('ordre')->orderBy('id'),
+                'axes.objectifs' => fn ($objectiveQuery) => $objectiveQuery->orderBy('ordre')->orderBy('id'),
+                'axes.objectifs.objectifsOperationnels' => function ($objectiveQuery) use ($filters, $user): void {
+                    $objectiveQuery->select([
+                        'id',
+                        'pao_id',
+                        'pas_id',
+                        'pas_axe_id',
+                        'pas_objectif_id',
+                        'direction_id',
+                        'service_id',
+                        'code',
+                        'libelle',
+                        'echeance',
+                        'import_ordre',
+                    ]);
+                    if (! $this->hasInlineControlProfile($user)) {
+                        $this->scopeByUserDirection($objectiveQuery, $user, 'direction_id', 'service_id');
+                    }
+
+                    if (($directionId = $filters['direction_id']) !== null) {
+                        $objectiveQuery->where('direction_id', (int) $directionId);
+                    }
+
+                    if (($serviceId = $filters['service_id']) !== null) {
+                        $objectiveQuery->where('service_id', (int) $serviceId);
+                    }
+
+                    if (($objectiveId = $filters['objectif_operationnel_id']) !== null) {
+                        $objectiveQuery->whereKey((int) $objectiveId);
+                    }
+
+                    if (($year = $filters['annee']) !== null) {
+                        $objectiveQuery->whereHas('pao', fn (Builder $paoQuery) => $paoQuery->where('annee', (int) $year));
+                    }
+                },
+            ])
+            ->orderByDesc('periode_fin')
+            ->orderBy('titre');
+
+        $this->scopePasByUser($query, $user);
+        if (($year = $filters['annee']) !== null) {
+            $this->exerciceContext->applyToPas($query, (int) $year);
+        } else {
+            $this->exerciceContext->applyToPas($query);
+        }
+
+        if (($directionId = $filters['direction_id']) !== null) {
+            $query->where(function (Builder $pasQuery) use ($directionId): void {
+                $pasQuery->whereHas('paos', fn (Builder $paoQuery) => $paoQuery->where('direction_id', (int) $directionId))
+                    ->orWhereHas('directions', fn (Builder $directionQuery) => $directionQuery->whereKey((int) $directionId));
+            });
+        }
+
+        if (($serviceId = $filters['service_id']) !== null) {
+            $query->where(function (Builder $pasQuery) use ($serviceId): void {
+                $pasQuery->whereHas('paos.objectifsOperationnels', fn (Builder $objectiveQuery) => $objectiveQuery->where('service_id', (int) $serviceId))
+                    ->orWhereHas('paos.ptas', fn (Builder $ptaQuery) => $ptaQuery->where('service_id', (int) $serviceId));
+            });
+        }
+
+        if (($objectiveId = $filters['objectif_operationnel_id']) !== null) {
+            $query->whereHas('paos.objectifsOperationnels', fn (Builder $objectiveQuery) => $objectiveQuery->whereKey((int) $objectiveId));
+        }
+
+        return $query
+            ->get()
+            ->map(fn (Pas $pas): array => $this->emptyPasGroup($pas, $filters['objectif_operationnel_id']))
+            ->values();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyPasGroup(Pas $pas, ?int $filteredOperationalObjectiveId = null): array
+    {
+        $axes = $pas->axes
+            ->sortBy(fn (PasAxe $axis): int => (int) ($axis->ordre ?? $axis->id))
+            ->values()
+            ->map(fn (PasAxe $axis): array => $this->emptyAxisGroup($axis, $filteredOperationalObjectiveId))
+            ->when(
+                $filteredOperationalObjectiveId !== null,
+                fn (Collection $groups): Collection => $groups
+                    ->filter(fn (array $axisGroup): bool => collect($axisGroup['objectifs'] ?? [])->isNotEmpty())
+                    ->values()
+            )
+            ->values();
+
+        return array_merge($this->emptyRollup(), [
+            'key' => (string) $pas->id,
+            'code' => $this->pasCode($pas, null),
+            'label' => $this->pasLabel($pas, null),
+            'axes' => $axes,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyAxisGroup(PasAxe $axis, ?int $filteredOperationalObjectiveId = null): array
+    {
+        $objectives = $axis->objectifs
+            ->sortBy(fn (PasObjectif $objective): int => (int) ($objective->ordre ?? $objective->id))
+            ->values()
+            ->map(fn (PasObjectif $objective): array => $this->emptyStrategicObjectiveGroup($objective, $filteredOperationalObjectiveId))
+            ->when(
+                $filteredOperationalObjectiveId !== null,
+                fn (Collection $groups): Collection => $groups
+                    ->filter(fn (array $objectiveGroup): bool => collect($objectiveGroup['objectifs_operationnels'] ?? [])->isNotEmpty())
+                    ->values()
+            )
+            ->values();
+
+        if ($objectives->isEmpty() && $filteredOperationalObjectiveId === null) {
+            $objectives = collect([$this->emptyStrategicPlaceholderGroup('os-empty-'.$axis->id)]);
+        }
+
+        return array_merge($this->emptyRollup(), [
+            'key' => (string) $axis->id,
+            'label' => $this->entityLabel($axis->code, $axis->libelle, 'Axe strategique sans libelle'),
+            'objectifs' => $objectives,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyStrategicObjectiveGroup(PasObjectif $objective, ?int $filteredOperationalObjectiveId = null): array
+    {
+        $operationalObjectives = $objective->objectifsOperationnels
+            ->values()
+            ->map(fn (ObjectifOperationnel $operationalObjective): array => $this->emptyOperationalObjectiveGroup($operationalObjective))
+            ->values();
+
+        if ($operationalObjectives->isEmpty() && $filteredOperationalObjectiveId === null) {
+            $operationalObjectives = collect([$this->emptyOperationalPlaceholderGroup('oo-empty-'.$objective->id)]);
+        }
+
+        return array_merge($this->emptyRollup(), [
+            'key' => (string) $objective->id,
+            'label' => $this->entityLabel($objective->code, $objective->libelle, 'Objectif strategique sans libelle'),
+            'objectifs_operationnels' => $operationalObjectives,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyOperationalObjectiveGroup(ObjectifOperationnel $objective): array
+    {
+        return array_merge($this->emptyRollup(), [
+            'key' => (string) $objective->id,
+            'label' => $this->entityLabel($objective->code, $objective->libelle, 'Objectif operationnel sans libelle'),
+            'actions' => collect(),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyStrategicPlaceholderGroup(string $key): array
+    {
+        return array_merge($this->emptyRollup(), [
+            'key' => $key,
+            'label' => 'Aucun objectif strategique rattache',
+            'objectifs_operationnels' => collect([$this->emptyOperationalPlaceholderGroup($key.'-oo')]),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyOperationalPlaceholderGroup(string $key): array
+    {
+        return array_merge($this->emptyRollup(), [
+            'key' => $key,
+            'label' => 'Aucun objectif operationnel rattache',
+            'actions' => collect(),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyRollup(): array
+    {
+        return [
+            'performance' => 0.0,
+            'performance_display' => 0.0,
+            'performance_label' => $this->percentLabel(null),
+            'cible_cumulee' => 0.0,
+            'realisation_cumulee' => 0.0,
+            'calcul_configured' => false,
+            'calcul_status' => PtaOfficialCalculationService::STATUS_TO_CONFIGURE,
+            'calcul_status_label' => 'A parametrer',
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $skeleton
+     * @param  Collection<int, array<string, mixed>>  $actual
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function mergeHierarchyGroups(Collection $skeleton, Collection $actual): Collection
+    {
+        return $this->mergeGroupCollections($skeleton, $actual, fn (array $base, array $row): array => $this->mergePasGroup($base, $row));
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $base
+     * @param  Collection<int, array<string, mixed>>  $actual
+     * @param  callable(array<string, mixed>, array<string, mixed>): array<string, mixed>  $merge
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function mergeGroupCollections(Collection $base, Collection $actual, callable $merge): Collection
+    {
+        $groups = $base->keyBy(fn (array $group): string => (string) ($group['key'] ?? ''));
+
+        foreach ($actual as $actualGroup) {
+            $key = (string) ($actualGroup['key'] ?? '');
+            $groups[$key] = $groups->has($key)
+                ? $merge($groups[$key], $actualGroup)
+                : $actualGroup;
+        }
+
+        return $groups->values();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mergePasGroup(array $base, array $actual): array
+    {
+        $merged = array_merge($base, $actual);
+        $merged['axes'] = $this->mergeGroupCollections(
+            collect($base['axes'] ?? []),
+            collect($actual['axes'] ?? []),
+            fn (array $baseAxis, array $actualAxis): array => $this->mergeAxisGroup($baseAxis, $actualAxis)
+        );
+
+        return $merged;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mergeAxisGroup(array $base, array $actual): array
+    {
+        $merged = array_merge($base, $actual);
+        $merged['objectifs'] = $this->mergeGroupCollections(
+            collect($base['objectifs'] ?? []),
+            collect($actual['objectifs'] ?? []),
+            fn (array $baseObjective, array $actualObjective): array => $this->mergeStrategicObjectiveGroup($baseObjective, $actualObjective)
+        );
+
+        return $merged;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mergeStrategicObjectiveGroup(array $base, array $actual): array
+    {
+        $merged = array_merge($base, $actual);
+        $merged['objectifs_operationnels'] = $this->mergeGroupCollections(
+            collect($base['objectifs_operationnels'] ?? []),
+            collect($actual['objectifs_operationnels'] ?? []),
+            fn (array $baseOperationalObjective, array $actualOperationalObjective): array => $this->mergeOperationalObjectiveGroup($baseOperationalObjective, $actualOperationalObjective)
+        );
+
+        return $merged;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mergeOperationalObjectiveGroup(array $base, array $actual): array
+    {
+        $merged = array_merge($base, $actual);
+        $merged['actions'] = collect($actual['actions'] ?? $base['actions'] ?? [])->values();
+
+        return $merged;
     }
 
     /**
@@ -648,19 +1059,45 @@ class PtaSuiviService
     private function filterOptions(array $filters, User $user): array
     {
         $directionQuery = Direction::query()->where('actif', true)->orderBy('code')->orderBy('libelle');
-        if (! $this->canReadAllPlanning($user)) {
-            $directionQuery->whereHas('services', function (Builder $serviceQuery) use ($user): void {
-                $this->scopeByUserDirection($serviceQuery, $user, 'direction_id', 'id');
-            });
+        if (! $this->hasInlineControlProfile($user) && ! $user->hasGlobalReadAccess()) {
+            if ($user->direction_id !== null) {
+                $directionQuery->whereKey((int) $user->direction_id);
+            } else {
+                $directionQuery->whereRaw('1 = 0');
+            }
         }
         $directions = $directionQuery->get(['id', 'code', 'libelle']);
 
         $serviceQuery = Service::query()->where('actif', true)->orderBy('code')->orderBy('libelle');
-        if ($filters['direction_id'] !== null) {
-            $serviceQuery->where('direction_id', (int) $filters['direction_id']);
+        if (! $this->hasInlineControlProfile($user) && ! $user->hasGlobalReadAccess()) {
+            if ($user->service_id !== null) {
+                $serviceQuery->whereKey((int) $user->service_id);
+            } elseif ($user->direction_id !== null) {
+                $serviceQuery->where('direction_id', (int) $user->direction_id);
+            } else {
+                $serviceQuery->whereRaw('1 = 0');
+            }
         }
-        $this->scopeByUserDirection($serviceQuery, $user, 'direction_id', 'id');
         $services = $serviceQuery->get(['id', 'direction_id', 'code', 'libelle']);
+
+        $objectiveQuery = ObjectifOperationnel::query()
+            ->with('service:id,direction_id,code,libelle')
+            ->orderBy('import_ordre')
+            ->orderBy('code')
+            ->orderBy('libelle');
+        if (! $this->hasInlineControlProfile($user) && ! $user->hasGlobalReadAccess()) {
+            if ($user->service_id !== null) {
+                $objectiveQuery->where('service_id', (int) $user->service_id);
+            } elseif ($user->direction_id !== null) {
+                $objectiveQuery->where('direction_id', (int) $user->direction_id);
+            } else {
+                $objectiveQuery->whereRaw('1 = 0');
+            }
+        }
+        if ($filters['annee'] !== null) {
+            $objectiveQuery->whereHas('pao', fn (Builder $paoQuery) => $paoQuery->where('annee', (int) $filters['annee']));
+        }
+        $objectives = $objectiveQuery->get(['id', 'pao_id', 'direction_id', 'service_id', 'code', 'libelle']);
 
         return [
             'directions' => $directions->map(fn (Direction $direction): array => [
@@ -672,6 +1109,15 @@ class PtaSuiviService
                 'direction_id' => (int) $service->direction_id,
                 'label' => $this->entityLabel($service->code, $service->libelle, 'Service'),
             ])->values()->all(),
+            'objectifs_operationnels' => $objectives->map(fn (ObjectifOperationnel $objective): array => [
+                'id' => (int) $objective->id,
+                'direction_id' => (int) $objective->direction_id,
+                'service_id' => (int) $objective->service_id,
+                'label' => $this->entityLabel($objective->code, $objective->libelle, 'Objectif operationnel'),
+                'service_label' => $objective->service instanceof Service
+                    ? $this->entityLabel($objective->service->code, $objective->service->libelle, 'Service')
+                    : '',
+            ])->values()->all(),
             'exercices' => $this->exerciceContext->options(),
             'periodes' => $this->periodOptions(),
             'trimestres' => $this->periodOptions(),
@@ -682,6 +1128,34 @@ class PtaSuiviService
             ],
             'alerte_echeance' => $this->alertStatusOptions(),
         ];
+    }
+
+    /**
+     * @return list<array{id:int,label:string}>
+     */
+    private function rmoOptions(User $user): array
+    {
+        $query = User::query()
+            ->where('is_active', true)
+            ->orderBy('role')
+            ->orderBy('name');
+
+        if (! $this->hasInlineControlProfile($user) && ! $user->hasGlobalReadAccess() && $user->direction_id !== null) {
+            $query->where('direction_id', (int) $user->direction_id);
+        }
+
+        if (! $this->hasInlineControlProfile($user) && $this->hasOwnServicePlanningScope($user)) {
+            $query->where('service_id', (int) $user->service_id);
+        }
+
+        return $query
+            ->get(['id', 'name', 'email', 'role', 'direction_id', 'service_id'])
+            ->map(fn (User $rmo): array => [
+                'id' => (int) $rmo->id,
+                'label' => trim((string) $rmo->name) !== '' ? (string) $rmo->name : (string) $rmo->email,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -767,8 +1241,12 @@ class PtaSuiviService
             return 'cloture';
         }
 
-        if (in_array($validation, ['validee_chef', 'validee_direction'], true)) {
+        if (in_array($validation, ['validee_chef', 'soumise_controle'], true)) {
             return 'validation_controleur';
+        }
+
+        if (in_array($validation, ['validee_controle', 'validee_direction'], true)) {
+            return 'cloture';
         }
 
         if (in_array($validation, ['soumise_chef', 'en_validation_chef'], true)) {
@@ -782,12 +1260,12 @@ class PtaSuiviService
         return 'en_cours';
     }
 
-    private function delayStatus(Action $action, ?float $rate = null): string
+    private function delayStatus(Action $action, ?float $rate = null, float $completionThreshold = 100.0): string
     {
-        return $this->delayStatusForDates($this->deadline($action), $this->completedAt($action), $rate);
+        return $this->delayStatusForDates($this->deadline($action), $this->completedAt($action), $rate, $completionThreshold);
     }
 
-    private function delayStatusForDates(?Carbon $deadline, ?Carbon $completedAt = null, ?float $rate = null): string
+    private function delayStatusForDates(?Carbon $deadline, ?Carbon $completedAt = null, ?float $rate = null, float $completionThreshold = 100.0): string
     {
         if ($deadline === null) {
             return 'dans_les_delais';
@@ -797,16 +1275,23 @@ class PtaSuiviService
             return $completedAt->gt($deadline->copy()->endOfDay()) ? 'hors_delai' : 'dans_les_delais';
         }
 
-        if ($rate !== null && $rate >= 100.0) {
+        if ($rate !== null && $rate >= $completionThreshold) {
             return 'dans_les_delais';
         }
 
         return now()->startOfDay()->gt($deadline->copy()->endOfDay()) ? 'hors_delai' : 'dans_les_delais';
     }
 
-    private function alertStatus(Action $action, ?float $rate = null): string
-    {
-        if ($this->completedAt($action) !== null || $this->workflowStatus($action) === 'cloture' || ($rate !== null && $rate >= 100.0)) {
+    private function alertStatus(
+        Action $action,
+        ?float $rate = null,
+        float $completionThreshold = 100.0,
+        ?string $workflowStatus = null
+    ): string {
+        if ($this->completedAt($action) !== null
+            || ($workflowStatus ?? $this->workflowStatus($action)) === 'cloture'
+            || ($rate !== null && $rate >= $completionThreshold)
+        ) {
             return 'cloturee';
         }
 
@@ -848,7 +1333,7 @@ class PtaSuiviService
     /**
      * @param  array<string, mixed>  $officialResult
      */
-    private function actionDisplayStatus(array $officialResult, string $delayStatus, string $workflowStatus): string
+    private function actionDisplayStatus(array $officialResult, string $delayStatus, string $workflowStatus, float $completionThreshold = 100.0): string
     {
         if ($workflowStatus === 'a_parametrer' || ! (bool) ($officialResult['is_configured'] ?? false)) {
             return PtaOfficialCalculationService::STATUS_TO_CONFIGURE;
@@ -856,13 +1341,13 @@ class PtaSuiviService
 
         $rate = $officialResult['rate'] !== null ? (float) $officialResult['rate'] : null;
 
-        return $this->officialCalculation->statusForRate($rate, $delayStatus === 'hors_delai');
+        return $this->officialCalculation->statusForRate($rate, $delayStatus === 'hors_delai', $completionThreshold);
     }
 
     /**
      * @param  array<string, mixed>  $officialResult
      */
-    private function subActionDisplayStatus(array $officialResult, string $delayStatus): string
+    private function subActionDisplayStatus(array $officialResult, string $delayStatus, float $completionThreshold = 100.0): string
     {
         if (! (bool) ($officialResult['is_configured'] ?? false)) {
             return PtaOfficialCalculationService::STATUS_TO_CONFIGURE;
@@ -870,7 +1355,7 @@ class PtaSuiviService
 
         $rate = $officialResult['rate'] !== null ? (float) $officialResult['rate'] : null;
 
-        return $this->officialCalculation->statusForRate($rate, $delayStatus === 'hors_delai');
+        return $this->officialCalculation->statusForRate($rate, $delayStatus === 'hors_delai', $completionThreshold);
     }
 
     /**
@@ -1047,6 +1532,157 @@ class PtaSuiviService
         return $days <= 1 ? $days.' j' : $days.' j';
     }
 
+    public function canInlineEditAction(Action $action, User $user): bool
+    {
+        $pta = $action->pta;
+        if ($pta === null || (string) ($pta->statut ?? '') === 'archive') {
+            return false;
+        }
+
+        if (! $this->canAccess($user)) {
+            return false;
+        }
+
+        return $this->hasInlineControlProfile($user);
+    }
+
+    public function hasInlineControlProfile(User $user): bool
+    {
+        return $user->hasRole(
+            User::ROLE_SUPER_ADMIN,
+            User::ROLE_ADMIN,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_PLANIFICATION,
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ
+        ) || $user->isPlanningControlChief();
+    }
+
+    private function canReadPtaSuiviDirection(User $user, ?int $directionId): bool
+    {
+        if ($this->hasInlineControlProfile($user) || $user->hasGlobalReadAccess()) {
+            return true;
+        }
+
+        return $directionId !== null && (int) $user->direction_id === $directionId;
+    }
+
+    private function canReadPtaSuiviService(User $user, ?int $directionId, ?int $serviceId): bool
+    {
+        if ($this->hasInlineControlProfile($user) || $user->hasGlobalReadAccess()) {
+            return true;
+        }
+
+        if ($directionId === null || (int) $user->direction_id !== $directionId) {
+            return false;
+        }
+
+        return $user->service_id === null || ($serviceId !== null && (int) $user->service_id === $serviceId);
+    }
+
+    /**
+     * @param  Builder<Action>  $query
+     */
+    private function scopeVisibleActions(Builder $query, User $user): void
+    {
+        if ($this->hasInlineControlProfile($user) || $user->hasGlobalReadAccess()) {
+            return;
+        }
+
+        if ($user->isAgent()) {
+            $query->where(function (Builder $responsibilityQuery) use ($user): void {
+                $responsibilityQuery
+                    ->where('responsable_id', $user->id)
+                    ->orWhereHas('responsables', fn (Builder $responsableQuery) => $responsableQuery->whereKey($user->id))
+                    ->orWhereHas('sousActions', fn (Builder $subActionQuery) => $subActionQuery->where('agent_id', $user->id));
+            });
+
+            return;
+        }
+
+        if ($user->service_id !== null) {
+            $query->whereHas('pta', fn (Builder $ptaQuery) => $ptaQuery
+                ->where('direction_id', (int) $user->direction_id)
+                ->where('service_id', (int) $user->service_id));
+
+            return;
+        }
+
+        if ($user->direction_id !== null) {
+            $query->whereHas('pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', (int) $user->direction_id));
+
+            return;
+        }
+
+        $query->whereRaw('1 = 0');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function indicatorTypeOptions(): array
+    {
+        return collect(TypeIndicateur::cases())
+            ->mapWithKeys(fn (TypeIndicateur $type): array => [$type->value => $type->label()])
+            ->all();
+    }
+
+    private function rawDate(mixed $value): string
+    {
+        if ($value instanceof Carbon) {
+            return $value->format('Y-m-d');
+        }
+
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return Carbon::parse($value)->format('Y-m-d');
+    }
+
+    private function rawDecimal(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return rtrim(rtrim(number_format((float) $value, 4, '.', ''), '0'), '.');
+    }
+
+    private function rawInteger(mixed $value): string
+    {
+        if ($value === null || $value === '' || ! is_numeric($value)) {
+            return '';
+        }
+
+        $value = (int) $value;
+
+        return $value > 0 ? (string) $value : '';
+    }
+
+    private function indicatorDisplayLabel(TypeIndicateur $type, ?string $indicator, string $quantity, string $unit, string $deliverable): string
+    {
+        $indicator = trim((string) $indicator);
+        $quantity = trim($quantity.' '.$unit);
+        $deliverable = trim($deliverable);
+        $parts = [
+            'Type : '.$type->label(),
+            'Indicateur : '.($indicator !== '' ? $indicator : 'A renseigner'),
+        ];
+
+        if ($type->tracksQuantity()) {
+            $parts[] = 'Quantite a realiser : '.($quantity !== '' ? $quantity : 'A renseigner');
+        }
+
+        if ($type->tracksDeliverable()) {
+            $parts[] = 'Livrable attendu : '.($deliverable !== '' ? $deliverable : 'A renseigner');
+        }
+
+        return implode(' | ', $parts);
+    }
+
     private function ratioFromSubActions(Action $action): string
     {
         if (! $action->relationLoaded('sousActions')) {
@@ -1157,9 +1793,9 @@ class PtaSuiviService
             [
                 'niveau' => 'Controleur',
                 'statut' => $this->workflowStatus($action) === 'cloture' ? 'Cloture' : ($this->workflowStatus($action) === 'validation_controleur' ? 'En attente controle' : 'Non transmis'),
-                'validateur' => (string) ($action->clotureePar?->name ?? '-'),
-                'date' => $action->cloture_le?->format('Y-m-d H:i') ?? '-',
-                'commentaire' => $this->dash($action->justification_cloture ?? $action->rapport_final ?? null),
+                'validateur' => (string) ($action->controleReviewedBy?->name ?? $action->clotureePar?->name ?? '-'),
+                'date' => $action->controle_reviewed_at?->format('Y-m-d H:i') ?? $action->cloture_le?->format('Y-m-d H:i') ?? '-',
+                'commentaire' => $this->dash($action->controle_comment ?? $action->justification_cloture ?? $action->rapport_final ?? null),
             ],
         ];
     }
@@ -1213,19 +1849,6 @@ class PtaSuiviService
         ];
     }
 
-    private function actionParameterUrl(Action $action, ?SousAction $sousAction = null): string
-    {
-        if ($action->pta_id !== null) {
-            $query = $sousAction instanceof SousAction
-                ? http_build_query(['focus' => 'sub_action', 'sub_action_id' => $sousAction->id])
-                : http_build_query(['focus' => 'action']);
-
-            return route('workspace.pta.edit', $action->pta_id).'?'.$query.'#action-'.$action->id;
-        }
-
-        return route('workspace.actions.edit', $action);
-    }
-
     private function logDetailsLabel(array $details): string
     {
         if ($details === []) {
@@ -1259,10 +1882,14 @@ class PtaSuiviService
     {
         $service = ($filters['service_id'] ?? null) !== null ? Service::query()->with('direction:id,code,libelle')->find((int) $filters['service_id']) : null;
         $direction = ($filters['direction_id'] ?? null) !== null ? Direction::query()->find((int) $filters['direction_id']) : null;
+        $objective = ($filters['objectif_operationnel_id'] ?? null) !== null
+            ? ObjectifOperationnel::query()->find((int) $filters['objectif_operationnel_id'])
+            : null;
 
         return implode(' | ', array_filter([
             $service instanceof Service ? 'Service : '.$this->entityLabel($service->code, $service->libelle, 'Service') : null,
             $direction instanceof Direction ? 'Direction : '.$this->entityLabel($direction->code, $direction->libelle, 'Direction') : null,
+            $objective instanceof ObjectifOperationnel ? 'Objectif operationnel : '.$this->entityLabel($objective->code, $objective->libelle, 'Objectif operationnel') : null,
             ($filters['annee'] ?? null) !== null ? 'Annee : '.$filters['annee'] : 'Annee : Tous exercices',
             'Periode : '.(string) ($filters['periode_label'] ?? 'Annuelle'),
         ]));
@@ -1391,6 +2018,35 @@ class PtaSuiviService
         }
 
         return $label !== '' ? $label : ($code !== '' ? $code : $fallback);
+    }
+
+    private function thresholdLabel(float $completionThreshold): string
+    {
+        return $this->numberLabel($completionThreshold).'%';
+    }
+
+    private function completionThreshold(mixed $value): float
+    {
+        if ($value === null || $value === '') {
+            return 80.0;
+        }
+
+        return min(100.0, max(0.0, (float) $value));
+    }
+
+    /**
+     * @param  list<mixed>  $values
+     */
+    private function firstFilledText(array $values): ?string
+    {
+        foreach ($values as $value) {
+            $value = trim((string) ($value ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     private function dash(mixed $value): string

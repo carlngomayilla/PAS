@@ -4,15 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Controller;
-use App\Models\Direction;
-use App\Models\Service;
 use App\Models\User;
+use App\Services\Organization\OrganizationDirectoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ReferentielController extends Controller
 {
     use AuthorizesPlanningScope;
+
+    public function __construct(
+        private readonly OrganizationDirectoryService $organizationDirectoryService
+    ) {}
 
     public function directions(Request $request): JsonResponse
     {
@@ -23,16 +26,12 @@ class ReferentielController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        $query = Direction::query()->orderBy('code');
-
-        if (! $user->hasGlobalReadAccess() && $user->direction_id !== null) {
-            $query->where('id', (int) $user->direction_id);
-        }
-
-        $query->when(
-            $request->boolean('actif_only', true),
-            fn ($q) => $q->where('actif', true)
-        );
+        $input = $request->query();
+        $input['actif'] = $request->boolean('actif_only', true) ? '1' : '';
+        $filters = $this->organizationDirectoryService->normalizeDirectionFilters($input);
+        $query = $this->organizationDirectoryService
+            ->directionQuery($user, $filters)
+            ->orderBy('code');
 
         return response()->json([
             'data' => $query->get(['id', 'code', 'libelle', 'actif']),
@@ -48,28 +47,13 @@ class ReferentielController extends Controller
 
         $this->denyUnlessPlanningReader($user);
 
-        $query = Service::query()
-            ->with('direction:id,code,libelle')
+        $input = $request->query();
+        $input['actif'] = $request->boolean('actif_only', true) ? '1' : '';
+        $filters = $this->organizationDirectoryService->normalizeServiceFilters($input);
+        $query = $this->organizationDirectoryService
+            ->serviceQuery($user, $filters)
             ->orderBy('direction_id')
             ->orderBy('code');
-
-        if (! $user->hasGlobalReadAccess() && $user->direction_id !== null) {
-            $query->where('direction_id', (int) $user->direction_id);
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->where('id', (int) $user->service_id);
-        }
-
-        $query->when(
-            $request->filled('direction_id'),
-            fn ($q) => $q->where('direction_id', (int) $request->integer('direction_id'))
-        );
-
-        $query->when(
-            $request->boolean('actif_only', true),
-            fn ($q) => $q->where('actif', true)
-        );
 
         return response()->json([
             'data' => $query->get(['id', 'direction_id', 'code', 'libelle', 'actif']),
@@ -87,67 +71,18 @@ class ReferentielController extends Controller
             abort(403, 'Acces non autorise.');
         }
 
-        $perPage = max(1, min(100, (int) $request->integer('per_page', 20)));
-
-        $query = User::query()
-            ->with([
-                'direction:id,code,libelle',
-                'service:id,direction_id,code,libelle',
-            ])
-            ->orderBy('name');
-
-        if (! $user->isSuperAdmin()) {
-            $query->where('role', '!=', User::ROLE_SUPER_ADMIN);
-        }
-
-        if ($user->isPlanningControlChief()) {
-            $query->whereIn('role', [
-                User::ROLE_DIRECTION,
-                User::ROLE_SERVICE,
-                User::ROLE_AGENT,
-            ]);
-        }
-
-        if (! $user->hasGlobalReadAccess()) {
-            if ($user->direction_id !== null) {
-                $query->where('direction_id', (int) $user->direction_id);
-            } else {
-                $query->whereRaw('1 = 0');
-            }
-        }
-
-        if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->where('service_id', (int) $user->service_id);
-        }
-
-        $query->when(
-            $request->filled('direction_id'),
-            fn ($q) => $q->where('direction_id', (int) $request->integer('direction_id'))
-        );
-
-        $query->when(
-            $request->filled('service_id'),
-            fn ($q) => $q->where('service_id', (int) $request->integer('service_id'))
-        );
-
-        $query->when(
-            $request->filled('role'),
-            fn ($q) => $q->where('role', (string) $request->string('role'))
-        );
-        $query->when(
-            $request->filled('is_active'),
-            fn ($q) => $q->where('is_active', $request->string('is_active') === '1')
-        );
-        $query->when($request->filled('q'), function ($q) use ($request): void {
-            $search = trim((string) $request->string('q'));
-            $q->where(function ($subQuery) use ($search): void {
-                $subQuery->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        });
+        $input = $request->query();
+        $filters = $this->organizationDirectoryService->normalizeUserFilters($input);
+        $requestedPerPage = is_scalar($input['per_page'] ?? null)
+            ? filter_var($input['per_page'], FILTER_VALIDATE_INT)
+            : false;
+        $filters['per_page'] = $requestedPerPage !== false
+            ? max(1, min(100, (int) $requestedPerPage))
+            : 20;
+        $query = $this->organizationDirectoryService->userQuery($user, $filters);
 
         return response()->json(
-            $query->paginate($perPage, [
+            $this->organizationDirectoryService->paginateUsers($query, $filters, [
                 'id',
                 'name',
                 'email',
@@ -158,7 +93,7 @@ class ReferentielController extends Controller
                 'agent_telephone',
                 'direction_id',
                 'service_id',
-            ])->withQueryString()
+            ])
         );
     }
 }

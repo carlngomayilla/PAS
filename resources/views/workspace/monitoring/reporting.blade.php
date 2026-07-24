@@ -62,6 +62,10 @@
         $officialCompletedText = 'Achevées sur '.$officialBaseLabel;
         $officialFilters = (array) ($basePolicy['route_filters'] ?? []);
         $directionServiceReport = collect($details['direction_service_report'] ?? []);
+        $conformityRows = collect($details['conformity_report'] ?? []);
+        $conformityIssueRows = $conformityRows
+            ->filter(fn (array $row): bool => (string) ($row['statut'] ?? '') !== 'Conforme')
+            ->values();
         // Cartes synthèse PAS / PAO / Actions / Alertes retirées du module Reporting
         // (non alignées avec la nouvelle logique métier — accessibles via leur module dédié).
         $summaryCards = [];
@@ -85,6 +89,7 @@
             ->only(['report_type', 'exercice', 'periode', 'trimestre', 'direction_id', 'service_id', 'statut', 'type_action', 'responsable_id', 'criticite', 'periode_debut', 'periode_fin'])
             ->filter(fn ($value): bool => trim((string) $value) !== '' && trim((string) $value) !== 'all')
             ->all();
+        $metricPercent = static fn ($value): float => min(100, max(0, (float) $value));
     @endphp
 
     <x-ui.page-title
@@ -179,7 +184,7 @@
                 </select>
             </div>
             <div>
-                <label for="type_action">Type d'action</label>
+                <label for="type_action">Type d'indicateur</label>
                 <select id="type_action" name="type_action">
                     <option value="all">Tous</option>
                     @foreach (($reportFilterOptions['types_action'] ?? []) as $value => $label)
@@ -226,6 +231,60 @@
 
     <div class="grid gap-4">
 
+        @if ($activeReportType === 'conformite')
+            <article class="showcase-panel">
+                <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 class="showcase-panel-title">Controle de conformite</h2>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <span class="anbg-badge anbg-badge-neutral px-3">{{ $conformityRows->count() }} controles</span>
+                        <span class="anbg-badge anbg-badge-warning px-3">{{ $conformityIssueRows->count() }} a traiter</span>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-[980px] w-full border-collapse text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                                <th class="px-3 py-2">Direction</th>
+                                <th class="px-3 py-2">Service</th>
+                                <th class="px-3 py-2">Action</th>
+                                <th class="px-3 py-2">RMO</th>
+                                <th class="px-3 py-2">Controle</th>
+                                <th class="px-3 py-2">Statut</th>
+                                <th class="px-3 py-2">Correction attendue</th>
+                                <th class="px-3 py-2 text-right">Avancement</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse ($conformityRows->take(120) as $row)
+                                @php
+                                    $isCompliant = (string) ($row['statut'] ?? '') === 'Conforme';
+                                @endphp
+                                <tr>
+                                    <td class="px-3 py-2 text-slate-600">{{ $row['direction'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 text-slate-600">{{ $row['service'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 font-semibold text-slate-900">{{ $row['action'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 text-slate-600">{{ $row['rmo'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 text-slate-700">{{ $row['controle'] ?? '-' }}</td>
+                                    <td class="px-3 py-2">
+                                        <span class="anbg-badge {{ $isCompliant ? 'anbg-badge-success' : 'anbg-badge-warning' }} px-3">{{ $row['statut'] ?? '-' }}</span>
+                                    </td>
+                                    <td class="px-3 py-2 text-slate-600">{{ $row['correction'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 text-right font-semibold text-slate-700">{{ number_format((float) ($row['progression'] ?? 0), 0) }}%</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="px-3 py-8 text-center text-sm font-semibold text-slate-500">Aucun controle de conformite disponible.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        @endif
+
         @if ($activeReportType === 'pta')
             <article class="showcase-panel reporting-pta-official overflow-hidden p-0">
                 <div class="border-b border-slate-200 bg-white px-4 py-3">
@@ -241,7 +300,11 @@
                         </div>
                     </div>
                 </div>
-                <x-tables.pta-suivi-table :groups="$ptaSuiviPayload['groups'] ?? []" export-mode="web" />
+                @include('components.tables.pta-suivi-table', [
+                    'groups' => $ptaSuiviPayload['groups'] ?? [],
+                    'rmoOptions' => $ptaSuiviPayload['rmoOptions'] ?? [],
+                    'exportMode' => 'web',
+                ])
             </article>
         @endif
 
@@ -274,6 +337,28 @@
                             </div>
                         </div>
 
+                        <div class="mt-4 space-y-2" data-report-direction-comparison>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Comparaison visuelle</p>
+                            @foreach ([
+                                ['label' => 'Realisation', 'value' => $directionSummary['taux_realisation'] ?? 0, 'color' => '#20C76B'],
+                                ['label' => 'Retard', 'value' => $directionSummary['taux_retard'] ?? 0, 'color' => '#B42318'],
+                                ['label' => 'Performance', 'value' => $directionSummary['kpi_global'] ?? 0, 'color' => '#3996D3'],
+                            ] as $metric)
+                                @php
+                                    $metricValue = $metricPercent($metric['value']);
+                                @endphp
+                                <div class="grid gap-1">
+                                    <div class="flex items-center justify-between gap-3 text-xs">
+                                        <span class="font-semibold text-slate-600">{{ $metric['label'] }}</span>
+                                        <span class="font-semibold text-slate-700">{{ number_format($metricValue, 0) }}%</span>
+                                    </div>
+                                    <div class="h-2 overflow-hidden rounded-full bg-white">
+                                        <div class="h-full rounded-full" style="width: {{ $metricValue }}%; background: {{ $metric['color'] }};"></div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
                         <div class="mt-4 space-y-3">
                             @forelse ($services as $service)
                                 @php
@@ -291,6 +376,27 @@
                                             <span class="anbg-badge anbg-badge-success px-3">{{ number_format((float) ($serviceSummary['taux_realisation'] ?? 0), 0) }}%</span>
                                             <span class="anbg-badge anbg-badge-info px-3">Performance d'exécution {{ number_format((float) ($serviceSummary['kpi_global'] ?? 0), 0) }}</span>
                                         </div>
+                                    </div>
+
+                                    <div class="mt-3 grid gap-2 md:grid-cols-3" data-report-service-comparison>
+                                        @foreach ([
+                                            ['label' => 'Realisation', 'value' => $serviceSummary['taux_realisation'] ?? 0, 'color' => '#20C76B'],
+                                            ['label' => 'Retard', 'value' => $serviceSummary['taux_retard'] ?? 0, 'color' => '#B42318'],
+                                            ['label' => 'Performance', 'value' => $serviceSummary['kpi_global'] ?? 0, 'color' => '#3996D3'],
+                                        ] as $metric)
+                                            @php
+                                                $metricValue = $metricPercent($metric['value']);
+                                            @endphp
+                                            <div class="grid gap-1">
+                                                <div class="flex items-center justify-between gap-2 text-xs">
+                                                    <span class="font-semibold text-slate-500">{{ $metric['label'] }}</span>
+                                                    <span class="font-semibold text-slate-700">{{ number_format($metricValue, 0) }}%</span>
+                                                </div>
+                                                <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                                    <div class="h-full rounded-full" style="width: {{ $metricValue }}%; background: {{ $metric['color'] }};"></div>
+                                                </div>
+                                            </div>
+                                        @endforeach
                                     </div>
                                 </div>
                             @empty

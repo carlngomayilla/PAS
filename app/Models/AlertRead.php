@@ -18,6 +18,11 @@ class AlertRead extends Model
         'fingerprint',
         'source_type',
         'source_id',
+        'niveau',
+        'titre',
+        'message',
+        'target_url',
+        'metadata',
         'read_at',
     ];
 
@@ -28,6 +33,7 @@ class AlertRead extends Model
     {
         return [
             'source_id' => 'integer',
+            'metadata' => 'array',
             'read_at' => 'datetime',
         ];
     }

@@ -17,7 +17,7 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1>{{ $isEdit ? "Modifier le template d'export" : "Nouveau template d'export" }}</h1>
-                <p class="text-slate-600">Paramétrez l'identité, la cible, la mise en page, les blocs et les colonnes exportées.</p>
+                <p class="text-slate-600">Paramétrez l'identité, le profil destinataire, la mise en page, les blocs et les colonnes exportées.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @include('workspace.super_admin.partials.menu', ['buttonLabel' => 'Accès'])
@@ -32,16 +32,19 @@
             @csrf
             @if ($isEdit) @method('PUT') @endif
 
-            <x-ui.collapsible-section title="Identité et cible" open>
+            <x-ui.collapsible-section title="Identité et profil destinataire" open>
                 <div class="form-grid">
                     <div><label for="name">Nom</label><input id="name" name="name" type="text" value="{{ old('name', $template->name) }}" required></div>
                     <div><label for="code">Code</label><input id="code" name="code" type="text" value="{{ old('code', $template->code) }}" required></div>
                     <div><label for="format">Format</label><select id="format" name="format" required>@foreach ($formatOptions as $option)<option value="{{ $option }}" @selected(old('format', $template->format) === $option)>{{ strtoupper($option) }}</option>@endforeach</select></div>
                     <div><label for="module">Module</label><select id="module" name="module" required>@foreach ($moduleOptions as $option)<option value="{{ $option }}" @selected(old('module', $template->module) === $option)>{{ $option }}</option>@endforeach</select></div>
                     <div><label for="report_type">Type de rapport</label><input id="report_type" name="report_type" type="text" value="{{ old('report_type', $template->report_type ?: 'consolidated_reporting') }}" required></div>
-                    <div><label for="target_profile">Profil cible</label><select id="target_profile" name="target_profile"><option value="">Tous profils</option>@foreach ($profileOptions as $option)<option value="{{ $option }}" @selected(old('target_profile', $template->target_profile) === $option)>{{ $option }}</option>@endforeach</select></div>
+                    <div><label for="target_profile">Profil destinataire</label><select id="target_profile" name="target_profile"><option value="">Tous profils</option>@foreach ($profileOptions as $option)<option value="{{ $option }}" @selected(old('target_profile', $template->target_profile) === $option)>{{ $option }}</option>@endforeach</select></div>
                     <div><label for="reading_level">Niveau</label><select id="reading_level" name="reading_level"><option value="">Non borne</option>@foreach ($readingLevelOptions as $option)<option value="{{ $option }}" @selected(old('reading_level', $template->reading_level) === $option)>{{ $readingLevelLabels[$option] ?? $option }}</option>@endforeach</select></div>
-                    <div class="flex items-end gap-3"><label class="checkbox-pill !mb-0"><input name="is_default" type="checkbox" value="1" @checked(old('is_default', $template->is_default))>Par défaut</label><label class="checkbox-pill !mb-0"><input name="is_active" type="checkbox" value="1" @checked(old('is_active', $template->exists ? (int) $template->is_active : 1))>Actif</label></div>
+                    <div class="rounded-md border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-950 dark:border-cyan-900 dark:bg-cyan-950/30 dark:text-cyan-100">
+                        <p class="font-semibold">Cycle contrôlé</p>
+                        <p class="mt-1 text-xs">L’enregistrement reste en brouillon. Le statut actif et le modèle par défaut sont attribués lors de la publication.</p>
+                    </div>
                     <div class="md:col-span-2 xl:col-span-4"><label for="description">Description</label><textarea id="description" name="description" rows="3">{{ old('description', $template->description) }}</textarea></div>
                 </div>
             </x-ui.collapsible-section>
@@ -105,7 +108,8 @@
 
             @unless ($isEdit)
                 <x-ui.collapsible-section title="Affectation initiale">
-                    <label class="checkbox-pill !mb-0"><input name="create_default_assignment" type="checkbox" value="1" @checked(old('create_default_assignment', 1))>Créer automatiquement une affectation par défaut avec les métadonnées du template</label>
+                    <label class="checkbox-pill !mb-0"><input name="create_default_assignment" type="checkbox" value="1" @checked(old('create_default_assignment', 1))>Préparer l’affectation globale avec les métadonnées du template</label>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Elle restera inactive jusqu’à la première publication.</p>
                 </x-ui.collapsible-section>
             @endunless
 

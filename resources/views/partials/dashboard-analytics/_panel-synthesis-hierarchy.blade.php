@@ -1,8 +1,6 @@
 @php
     $synthesisHierarchy = is_array($analytics['synthesis_hierarchy'] ?? null) ? $analytics['synthesis_hierarchy'] : [];
-    $pasNode = is_array($synthesisHierarchy['pas'] ?? null) ? $synthesisHierarchy['pas'] : [];
     $axisNodes = collect($synthesisHierarchy['axes'] ?? [])->values();
-    $pasProgress = max(0, min(100, (float) ($pasNode['progress'] ?? 0)));
     $synthesisDetailUrl = route('synthese.index', array_merge($baseSynthesisQuery, ['dashboardTab' => 'advanced']));
     $synthesisTone = static function (float $value): string {
         if ($value >= 100) {
@@ -31,54 +29,18 @@
 @endphp
 
 <section class="dashboard-synthesis-hierarchy-card mb-4 space-y-3" data-dashboard-synthesis-hierarchy>
-    <article class="showcase-panel dashboard-synthesis-node dashboard-synthesis-node-pas rounded-lg p-4">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-                <p class="text-[11px] font-black uppercase tracking-wide text-[#3996d3]">Vue synthetique d'avancement PAS</p>
-                <h2 class="mt-1 text-xl font-black text-[#17324a]">{{ $pasNode['label'] ?? 'Plan d\'Acceleration Strategique' }}</h2>
-                <p class="mt-1 text-sm font-semibold text-[#667085]">{{ $pasNode['period'] ?? ($exerciseFilter['label'] ?? 'Periode courante') }}</p>
-            </div>
-            <a href="{{ $synthesisDetailUrl }}" class="btn btn-primary btn-sm rounded-lg px-3 py-2 text-xs">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+            <p class="text-[11px] font-black uppercase tracking-wide text-[#3996d3]">Vue synthetique des axes</p>
+            <h2 class="showcase-panel-title mt-1">Axes -> Objectifs -> PAO/PTA -> Actions</h2>
+            <p class="mt-1 text-sm font-semibold text-[#667085]">Ouvrez un axe pour comprendre rapidement son avancement, ses retards et les elements qui le composent.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="showcase-chip">{{ $axisNodes->count() }} axe(s)</span>
+            <a href="{{ $synthesisDetailUrl }}" class="btn btn-secondary btn-sm rounded-lg px-3 py-1.5 text-xs">
                 Vue detaillee
             </a>
         </div>
-
-        <div class="mt-4 grid gap-3 md:grid-cols-4">
-            <div class="dashboard-synthesis-kpi-card dashboard-synthesis-kpi-pas rounded-lg border border-[#d8ecf8] bg-white p-3">
-                <p class="text-[11px] font-black uppercase text-[#667085]">Avancement global</p>
-                <p class="mt-2 text-2xl font-black text-[#17324a]">{{ $fmtPct($pasProgress) }}</p>
-            </div>
-            <div class="dashboard-synthesis-kpi-card dashboard-synthesis-kpi-axis rounded-lg border border-[#d8ecf8] bg-white p-3">
-                <p class="text-[11px] font-black uppercase text-[#667085]">Axes suivis</p>
-                <p class="mt-2 text-2xl font-black text-[#17324a]">{{ $fmtCount($pasNode['axes_total'] ?? 0) }}</p>
-            </div>
-            <div class="dashboard-synthesis-kpi-card dashboard-synthesis-kpi-late rounded-lg border border-[#d8ecf8] bg-white p-3">
-                <p class="text-[11px] font-black uppercase text-[#667085]">Actions hors delai</p>
-                <p class="mt-2 text-2xl font-black text-[#B42318]">{{ $fmtCount($pasNode['late_actions_total'] ?? 0) }}</p>
-            </div>
-            <div class="dashboard-synthesis-kpi-card dashboard-synthesis-kpi-sub-action rounded-lg border border-[#d8ecf8] bg-white p-3">
-                <p class="text-[11px] font-black uppercase text-[#667085]">Sous-actions</p>
-                <p class="mt-2 text-2xl font-black text-[#17324a]">{{ $fmtCount($pasNode['sub_actions_total'] ?? 0) }}</p>
-            </div>
-        </div>
-
-        <div class="mt-4">
-            <div class="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm font-bold text-[#17324a]">
-                <span>Cible globale : {{ $pasNode['target'] ?? '100%' }}</span>
-                <span>Realise : {{ $pasNode['realized'] ?? $fmtPct($pasProgress) }} | Ecart restant : {{ $pasNode['remaining'] ?? $fmtPct(max(0, 100 - $pasProgress)) }}</span>
-            </div>
-            <div class="h-4 overflow-hidden rounded-full bg-slate-200">
-                <div class="h-full rounded-full" style="{{ $synthesisProgressStyle($pasProgress) }}"></div>
-            </div>
-        </div>
-    </article>
-
-    <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-            <h2 class="showcase-panel-title">PAS -> Axes -> Objectifs -> PAO/PTA -> Actions</h2>
-            <p class="mt-1 text-sm font-semibold text-[#667085]">Ouvrez un axe pour comprendre rapidement ce qui avance, ce qui bloque et ou aller en detail.</p>
-        </div>
-        <span class="showcase-chip">{{ $axisNodes->count() }} axe(s)</span>
     </div>
 
     <div class="grid gap-3">
@@ -96,7 +58,7 @@
                             <strong class="text-[#17324a]">{{ $axis['label'] ?? 'Axe non renseigne' }}</strong>
                         </div>
                         <div class="mt-2 grid gap-2 text-xs font-semibold text-[#667085] md:grid-cols-4">
-                            <span>Cible {{ $axis['target'] ?? '100%' }}</span>
+                            <span>Niveau attendu {{ $axis['target'] ?? '100%' }}</span>
                             <span>Realise {{ $axis['realized'] ?? $fmtPct($axisProgress) }}</span>
                             <span>{{ $fmtCount($axis['actions_total'] ?? 0) }} action(s)</span>
                             <span>{{ $fmtCount($axis['late_actions_total'] ?? 0) }} retard(s)</span>
@@ -177,7 +139,7 @@
                                                                         <div class="min-w-0 flex-1">
                                                                             <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#667085]">{{ $action['code'] ?? 'ACT' }} | {{ $action['responsible'] ?? '-' }}</p>
                                                                             <h5 class="text-sm font-black text-[#17324a]">{{ $action['label'] ?? '-' }}</h5>
-                                                                            <p class="mt-1 text-xs font-semibold text-[#667085]">Cible {{ $action['target'] ?? '-' }} | Realise {{ $action['realized'] ?? '-' }} | {{ $action['alert'] ?? '-' }}</p>
+                                                                            <p class="mt-1 text-xs font-semibold text-[#667085]">Niveau attendu {{ $action['target'] ?? '-' }} | Realise {{ $action['realized'] ?? '-' }} | {{ $action['alert'] ?? '-' }}</p>
                                                                         </div>
                                                                         <div class="flex min-w-[170px] items-center gap-2">
                                                                             <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">

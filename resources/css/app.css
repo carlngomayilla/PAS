@@ -24,6 +24,190 @@
     --color-textMuted: #667085;
 }
 
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-section {
+    display: grid !important;
+    grid-column: 1 / -1;
+    gap: 1rem;
+    min-width: 0;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-card {
+    display: flex !important;
+    min-width: 0;
+    min-height: 28.5rem;
+    flex-direction: column;
+    border: 1px solid #dbe7ef !important;
+    border-radius: 0.5rem !important;
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #17324a !important;
+    box-shadow: 0 8px 20px rgba(31, 57, 83, 0.06) !important;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-card-wide {
+    grid-column: 1 / -1;
+    min-height: 32rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-title {
+    margin: 0;
+    color: #17324a !important;
+    font-size: 1.02rem;
+    font-weight: 900;
+    line-height: 1.2;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-description {
+    margin: 0.32rem 0 0;
+    color: #667085 !important;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.32;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.38rem 0.9rem;
+    margin: 0.7rem 0 0;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-meta div {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.28rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-meta dt {
+    color: #667085;
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-meta dd {
+    margin: 0;
+    color: #17324a;
+    font-size: 0.72rem;
+    font-weight: 900;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-select-wrap {
+    flex: 0 0 auto;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-select {
+    min-width: 11.8rem;
+    border: 1px solid #cbddeb !important;
+    border-radius: 0.5rem !important;
+    background: #f8fbfd !important;
+    color: #17324a !important;
+    padding: 0.78rem 2.25rem 0.78rem 0.95rem;
+    font-size: 0.88rem;
+    font-weight: 850;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-requested {
+    flex: 1 1 auto;
+    height: 19rem !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    padding: 0.35rem !important;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-requested-area {
+    height: 24rem !important;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-requested-square {
+    height: 20rem !important;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-footer {
+    display: flex;
+    min-height: 2.2rem;
+    align-items: center;
+    gap: 0.35rem;
+    padding-top: 0.75rem;
+    color: #667085 !important;
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-card .dashboard-chart-empty,
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-card .empty-state,
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-card [class*="empty"] {
+    background: transparent !important;
+    color: #667085 !important;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-requested-card .showcase-chip {
+    border-color: #cbddeb !important;
+    background: #f8fbfd !important;
+    color: #17324a !important;
+}
+
+@media (max-width: 1280px) {
+    body.admin-theme-scope .dealdeck-dashboard .charts-requested-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    body.admin-theme-scope .dealdeck-dashboard .charts-requested-grid {
+        grid-template-columns: 1fr;
+    }
+
+    body.admin-theme-scope .dealdeck-dashboard .charts-requested-card,
+    body.admin-theme-scope .dealdeck-dashboard .charts-requested-card-wide {
+        min-height: 25rem;
+    }
+
+    body.admin-theme-scope .dealdeck-dashboard .charts-requested-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    body.admin-theme-scope .dealdeck-dashboard .charts-requested-select {
+        width: 100%;
+    }
+
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-requested,
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-requested-area,
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-requested-square {
+        height: 20rem !important;
+    }
+}
+
+@media (max-width: 640px) {
+    body.admin-theme-scope .dealdeck-dashboard .charts-requested-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-requested,
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-requested-square {
+        height: 20rem !important;
+    }
+}
+
 /* Hierarchie PAS visible dans la carte "Vue synthetique d'avancement PAS". */
 body.admin-theme-scope .dashboard-synthesis-hierarchy-card {
     --synthesis-pas: #2f75b5;
@@ -124,6 +308,19 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
         --app-table-head: #1c203d;
         --app-on-primary: #ffffff;
         --app-focus-ring: rgba(57, 150, 211, 0.22);
+        --dashboard-bg: #f6f8fb;
+        --dashboard-surface: #ffffff;
+        --dashboard-surface-muted: #eef4f8;
+        --dashboard-border: #d9e4ec;
+        --dashboard-text: #1c2434;
+        --dashboard-muted: #64748b;
+        --dashboard-accent: #2563eb;
+        --dashboard-success: #16845f;
+        --dashboard-warning: #b7791f;
+        --dashboard-danger: #b42318;
+        --dashboard-info: #0f7490;
+        --dashboard-card-radius: 0.5rem;
+        --dashboard-card-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
     }
 
     html.dark,
@@ -149,6 +346,18 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
         --app-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
         --app-shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.26);
         --app-focus-ring: rgba(56, 189, 248, 0.28);
+        --dashboard-bg: #0f172a;
+        --dashboard-surface: #111c2f;
+        --dashboard-surface-muted: #17243a;
+        --dashboard-border: #263955;
+        --dashboard-text: #f8fafc;
+        --dashboard-muted: #cbd5e1;
+        --dashboard-accent: #38bdf8;
+        --dashboard-success: #34d399;
+        --dashboard-warning: #fbbf24;
+        --dashboard-danger: #f87171;
+        --dashboard-info: #67e8f9;
+        --dashboard-card-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
     }
 }
 
@@ -699,24 +908,29 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
     @media (max-width: 639px) {
         /* Hide standard table structure, reflow as cards */
         .data-table-shell table,
-        .showcase-panel table {
+        .showcase-panel table,
+        table.mobile-card-table {
             display: block;
+            min-width: 0 !important;
         }
 
         .data-table-shell thead,
-        .showcase-panel thead {
+        .showcase-panel thead,
+        table.mobile-card-table thead {
             display: none;
         }
 
         .data-table-shell tbody,
-        .showcase-panel tbody {
+        .showcase-panel tbody,
+        table.mobile-card-table tbody {
             display: flex;
             flex-direction: column;
             gap: 0.65rem;
         }
 
         .data-table-shell tbody tr,
-        .showcase-panel tbody tr {
+        .showcase-panel tbody tr,
+        table.mobile-card-table tbody tr {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 0.4rem 0.75rem;
@@ -727,7 +941,8 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
         }
 
         .data-table-shell tbody td,
-        .showcase-panel tbody td {
+        .showcase-panel tbody td,
+        table.mobile-card-table tbody td {
             display: block;
             border: 0 !important;
             padding: 0 !important;
@@ -736,7 +951,8 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
 
         /* First cell spans full width (action name / title) */
         .data-table-shell tbody td:first-child,
-        .showcase-panel tbody td:first-child {
+        .showcase-panel tbody td:first-child,
+        table.mobile-card-table tbody td:first-child {
             grid-column: 1 / -1;
             font-weight: 700;
             font-size: 0.875rem;
@@ -744,7 +960,8 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
 
         /* Add data-label attribute value as label (enhanced with JS) */
         .data-table-shell tbody td[data-label]::before,
-        .showcase-panel tbody td[data-label]::before {
+        .showcase-panel tbody td[data-label]::before,
+        table.mobile-card-table tbody td[data-label]::before {
             content: attr(data-label);
             display: block;
             font-size: 0.68rem;
@@ -2524,6 +2741,11 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
         min-height: 4.25rem;
         padding: 0.65rem 1.25rem !important;
         gap: 0.75rem;
+    }
+
+    .admin-navbar-actions {
+        max-width: min(58vw, 44rem);
+        justify-content: flex-end;
     }
 
     .admin-navbar-title {
@@ -6823,6 +7045,14 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
             padding-inline: 0.75rem !important;
         }
 
+        body.admin-theme-scope .admin-navbar-actions {
+            gap: 0.4rem !important;
+        }
+
+        body.admin-theme-scope .admin-navbar-scope-chip {
+            display: none !important;
+        }
+
         body.admin-theme-scope .admin-exercise-filter {
             display: none !important;
         }
@@ -9032,6 +9262,20 @@ body.admin-theme-scope .dealdeck-dashboard .charts-decision-section {
     grid-column: 1 / -1;
 }
 
+body.admin-theme-scope .dealdeck-dashboard .charts-decision-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .charts-decision-card {
+    min-width: 0;
+}
+
+body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-decision {
+    height: clamp(18rem, 32vh, 24rem);
+}
+
 body.admin-theme-scope .dealdeck-dashboard .charts-long-row > .showcase-panel {
     order: 80;
 }
@@ -9117,8 +9361,13 @@ body.admin-theme-scope .dealdeck-dashboard :is(
         grid-template-columns: 1fr;
     }
 
+    body.admin-theme-scope .dealdeck-dashboard .charts-decision-grid {
+        grid-template-columns: 1fr;
+    }
+
     body.admin-theme-scope .dealdeck-dashboard .charts-status-panel .dashboard-canvas,
-    body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-evolution {
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-evolution,
+    body.admin-theme-scope .dealdeck-dashboard .dashboard-canvas-decision {
         height: 24rem !important;
     }
 }
@@ -9823,6 +10072,51 @@ body.admin-theme-scope .dealdeck-dashboard :is(
         font-weight: 900;
         line-height: 1.1;
         text-decoration: none !important;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-hidden-form {
+        display: none !important;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-stack {
+        display: grid;
+        gap: 5px;
+        align-items: start;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-field {
+        width: 100%;
+        min-height: 28px;
+        border: 1px solid #94a3b8;
+        border-radius: 6px;
+        background: #fff;
+        color: #111827;
+        padding: 5px 6px;
+        font: inherit;
+        font-size: 11px;
+        line-height: 1.25;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-textarea {
+        min-height: 42px;
+        resize: vertical;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-save {
+        min-height: 28px;
+        border: 1px solid #1e5fa8;
+        border-radius: 6px;
+        background: #1e5fa8;
+        color: #fff;
+        padding: 5px 7px;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1.1;
+        cursor: pointer;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-save:hover {
+        background: #17324a;
     }
 
     .auth-password-toggle {

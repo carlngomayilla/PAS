@@ -4,17 +4,6 @@
 
 @php
     $query = collect(request()->query())->filter(fn ($value): bool => trim((string) $value) !== '' && trim((string) $value) !== 'all')->all();
-    $syntheseQuery = collect([
-        'dashboardTab' => 'overview',
-        'direction_id' => request('direction_id'),
-        'service_id' => request('service_id'),
-        'exercice' => request('exercice', request('annee')),
-        'periode' => request('periode'),
-        'trimestre' => request('trimestre'),
-        'statut_suivi' => request('statut_suivi'),
-        'statut_delai' => request('statut_delai'),
-        'alerte_echeance' => request('alerte_echeance'),
-    ])->filter(fn ($value): bool => $value !== null && trim((string) $value) !== '' && trim((string) $value) !== 'all')->all();
 @endphp
 
 @push('head')
@@ -31,8 +20,26 @@
         .pta-suivi-toolbar select { min-width:126px; border:1px solid #b7c7d6; border-radius:6px; padding:6px 8px; font-size:12px; background:#fff; }
         .pta-suivi-actionbar { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; padding:10px 12px; border-bottom:1px solid #d7d7d7; background:#f8fbff; }
         .pta-suivi-table-wrap { width:100%; overflow-x:auto; }
-        .pta-suivi-table { width:100%; min-width:1880px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+        .pta-suivi-table { width:100%; min-width:2485px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+        .pta-col-number { width:46px; }
+        .pta-col-action { width:260px; }
+        .pta-col-sub-action { width:230px; }
+        .pta-col-indicator { width:360px; }
+        .pta-col-responsable { width:170px; }
+        .pta-col-ratio { width:110px; }
+        .pta-col-threshold { width:190px; }
+        .pta-col-realized { width:130px; }
+        .pta-col-rate { width:110px; }
+        .pta-col-performance { width:160px; }
+        .pta-col-gap { width:110px; }
+        .pta-col-deadline { width:150px; }
+        .pta-col-delay { width:90px; }
+        .pta-col-status { width:130px; }
+        .pta-col-proof { width:115px; }
+        .pta-col-observation { width:230px; }
+        .pta-col-row-actions { width:165px; }
         .pta-suivi-table th, .pta-suivi-table td { border:1px solid #111; padding:6px 6px; vertical-align:middle; overflow-wrap:anywhere; }
+        .pta-action-row td { vertical-align:top; }
         .pta-suivi-table th { background:#d9d9d9; color:#000; text-align:center; font-weight:900; }
         .pta-pas-row td { background:#2f75b5; color:#fff; font-weight:900; text-align:center; }
         .pta-pas-code { width:42px; }
@@ -60,8 +67,65 @@
         .pta-preview-link:hover { background:rgba(15,47,87,.045); color:inherit; box-shadow:none; }
         .pta-preview-link:active { background:rgba(57,150,211,.12); }
         .pta-preview-link:focus-visible { outline:2px solid rgba(57,150,211,.55); outline-offset:2px; }
-        .pta-parameter-pill { display:inline-flex; align-items:center; justify-content:center; margin-top:5px; border:1px solid #1e5fa8; border-radius:6px; background:#1e5fa8; color:#fff; padding:4px 7px; font-size:10px; font-weight:900; line-height:1.1; text-decoration:none; }
-        .pta-parameter-pill:hover { background:#17324a; color:#fff; }
+        .pta-inline-hidden-form { display:none; }
+        .pta-inline-stack { display:grid; gap:6px; align-items:start; }
+        .pta-inline-field { width:100%; min-height:30px; border:1px solid #b7c7d6; border-radius:8px; background:#fff; color:#111827; padding:6px 7px; font:inherit; font-size:11px; line-height:1.25; box-shadow:inset 0 1px 0 rgba(15,47,87,.03); transition:border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+        .pta-inline-field:focus { border-color:#1e5fa8; box-shadow:0 0 0 3px rgba(30,95,168,.14); outline:0; }
+        .pta-suivi-table td:has([data-pta-cell-input]) { cursor:text; }
+        .pta-suivi-table td:focus-within { box-shadow:inset 0 0 0 2px rgba(30,95,168,.22); }
+        .pta-inline-textarea { resize:vertical; min-height:42px; }
+        .pta-inline-save { min-height:31px; border:1px solid #1e5fa8; border-radius:999px; background:linear-gradient(180deg,#1e6fb8,#174f84); color:#fff; padding:6px 10px; font-size:10px; font-weight:900; line-height:1.1; cursor:pointer; box-shadow:0 8px 18px rgba(30,95,168,.2); }
+        .pta-inline-save:hover { background:#17324a; }
+        .pta-inline-delete { min-height:31px; border:1px solid #d7a7a7; border-radius:999px; background:linear-gradient(180deg,#fff7f7,#ffecec); color:#b42318; padding:6px 10px; font-size:10px; font-weight:900; line-height:1.1; cursor:pointer; box-shadow:0 8px 18px rgba(180,35,24,.12); }
+        .pta-inline-delete:hover { border-color:#b42318; background:#fff1f1; color:#8a1c14; }
+        .pta-row-actions { position:sticky; right:0; z-index:4; background:#f8fafc !important; text-align:center; box-shadow:-7px 0 14px rgba(15,47,87,.08); }
+        .pta-row-actions-heading { position:sticky; right:0; z-index:6; background:#d9d9d9 !important; box-shadow:-7px 0 14px rgba(15,47,87,.08); }
+        .pta-row-actions-stack { display:grid; gap:6px; align-content:start; justify-items:stretch; }
+        .pta-inline-save-state { min-height:14px; color:#64748b; font-size:9px; font-weight:800; line-height:1.2; }
+        .pta-action-row.is-dirty > td { box-shadow:inset 0 2px 0 #f9b13c, inset 0 -2px 0 #f9b13c; }
+        .pta-action-row.is-submitting > td { opacity:.78; }
+        .pta-inline-field:invalid:not(:focus):not(:placeholder-shown) { border-color:#b42318; background:#fff7f6; }
+        .pta-inline-open { display:inline-flex; min-height:31px; align-items:center; justify-content:center; border:1px solid #b7c7d6; border-radius:999px; background:#fff; color:#17324a; padding:6px 10px; font-size:10px; font-weight:900; line-height:1.1; text-decoration:none; box-shadow:0 8px 18px rgba(15,47,87,.08); }
+        .pta-inline-open:hover { border-color:#1e5fa8; background:#eef6fc; color:#0f2f57; }
+        .pta-inline-report { display:inline-flex; min-height:31px; align-items:center; justify-content:center; border:1px solid #d5932e; border-radius:6px; background:#fff8e8; color:#7b4b0b; padding:6px 9px; font-size:10px; font-weight:900; line-height:1.1; text-decoration:none; }
+        .pta-inline-report:hover { border-color:#b87512; background:#ffefc7; color:#5f3908; }
+        .pta-inline-report.is-disabled { border-color:#cbd5e1; background:#f1f5f9; color:#64748b; cursor:not-allowed; }
+        .pta-param-editor { display:grid; gap:7px; min-width:0; }
+        .pta-param-trigger, .pta-param-panel, .pta-param-readonly, .pta-threshold-card { border:1px solid #c6d8e6; border-radius:6px; background:#ffffff; box-shadow:0 4px 12px rgba(15,47,87,.06); }
+        .pta-param-trigger { display:grid; width:100%; gap:5px; padding:10px; color:#17324a; font:inherit; text-align:left; cursor:pointer; }
+        .pta-param-trigger:hover, .pta-indicator-cell.is-editable .pta-param-trigger:focus-visible { border-color:#2f75b5; background:#f5faff; box-shadow:0 0 0 3px rgba(47,117,181,.14); outline:none; }
+        .pta-indicator-cell.is-editable .pta-param-trigger { border-left:3px solid #2f75b5; }
+        .pta-param-trigger-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .pta-param-edit-affordance { display:inline-flex; align-items:center; color:#1e5fa8; font-size:10px; font-weight:900; line-height:1; }
+        .pta-param-trigger strong, .pta-param-readonly-title { display:block; color:#10233b; font-size:12px; font-weight:900; line-height:1.25; }
+        .pta-param-kicker, .pta-threshold-label, .pta-param-field > span { color:#5d7389; font-size:9px; font-weight:900; letter-spacing:.06em; line-height:1.1; text-transform:uppercase; }
+        .pta-param-trigger-meta { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+        .pta-param-chip { display:inline-flex; min-height:20px; align-items:center; border-radius:999px; padding:3px 7px; font-size:10px; font-weight:900; line-height:1; }
+        .pta-param-chip { border:1px solid #b8d6ec; background:#e8f4fb; color:#174f84; }
+        .pta-param-chip-ready { border-color:#b9d99a; background:#eff8e8; color:#315f16; }
+        .pta-param-chip-missing { border-color:#efc38a; background:#fff7e8; color:#8a5414; }
+        .pta-param-trigger-details { display:grid; gap:3px; color:#334155; font-size:10px; font-weight:800; line-height:1.25; }
+        .pta-param-panel { display:grid; gap:8px; padding:10px; border-left:3px solid #2f75b5; }
+        .pta-param-panel[hidden], .pta-param-trigger[hidden], [data-pta-type-field][hidden] { display:none !important; }
+        .pta-param-type-select { font-weight:900; }
+        .pta-param-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(72px,.55fr); gap:7px; }
+        .pta-param-field { display:grid; gap:4px; min-width:0; }
+        .pta-param-field-full { grid-column:1 / -1; }
+        .pta-param-readonly { display:grid; gap:6px; padding:8px; }
+        .pta-action-header-editor { min-width:0; }
+        .pta-action-config-trigger { min-height:92px; }
+        .pta-action-config-panel { max-height:560px; overflow-y:auto; overscroll-behavior:contain; }
+        .pta-action-config-actions { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px; align-items:center; }
+        .pta-deadline-locked-note { display:grid; gap:4px; border:1px solid #efc38a; border-radius:6px; background:#fff8e8; padding:8px; color:#6f4710; font-size:10px; font-weight:700; }
+        .pta-deadline-locked-note strong { color:#513208; font-size:11px; font-weight:900; }
+        .pta-inline-cancel { min-height:31px; border:1px solid #b7c7d6; border-radius:6px; background:#fff; color:#17324a; padding:6px 9px; font-size:10px; font-weight:900; cursor:pointer; }
+        .pta-inline-cancel:hover { border-color:#1e5fa8; background:#eef6fc; }
+        .pta-threshold-cell { text-align:left; }
+        .pta-threshold-card { display:grid; gap:4px; min-height:48px; align-content:center; padding:8px; text-align:left; }
+        .pta-threshold-card strong { color:#10233b; font-size:12px; font-weight:900; line-height:1.25; }
+        .pta-editable-threshold { cursor:text; }
+        .pta-threshold-input-wrap { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px; align-items:center; color:#7b5c12; font-size:11px; font-weight:900; }
+        .pta-threshold-input-wrap .pta-inline-field { min-height:32px; text-align:right; font-weight:900; }
         .pta-sub-action-cell { font-weight:800; color:#334155; }
         .pta-sub-action-number { font-weight:900; color:#0f2f57; }
         .pta-center, .pta-status-cell { text-align:center; }
@@ -128,12 +192,23 @@
             <h1 class="text-2xl font-black text-[#17324a]">Suivi PTA officiel</h1>
         </div>
         <div class="flex flex-wrap gap-2">
-            <a class="btn btn-secondary rounded-xl px-4 py-2 text-sm" href="{{ route('dashboard', $syntheseQuery) }}">Synthese</a>
-            <button class="btn btn-secondary rounded-xl px-4 py-2 text-sm" type="button" onclick="window.print()">Imprimer</button>
             <a class="btn btn-primary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.excel', $query) }}">Export Excel</a>
             <a class="btn btn-primary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.pdf', $query) }}">Export PDF</a>
         </div>
     </div>
+
+    @if ($errors->any())
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800 no-print">
+            <p>{{ $errors->first('pta_suivi_inline') ?: 'Le paramétrage n’a pas été enregistré. Corrigez les champs signalés.' }}</p>
+            @if (! $errors->has('pta_suivi_inline'))
+                <ul class="mt-2 list-disc pl-5 text-xs font-semibold">
+                    @foreach (collect($errors->all())->unique()->take(5) as $message)
+                        <li>{{ $message }}</li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+    @endif
 
     <section class="pta-suivi-page">
         <div class="pta-suivi-top">
@@ -166,6 +241,22 @@
                         <option value="all">Tous</option>
                         @foreach (($filterOptions['services'] ?? []) as $service)
                             <option value="{{ $service['id'] }}" data-direction="{{ $service['direction_id'] }}" @selected((int) ($filters['service_id'] ?? 0) === (int) $service['id'])>{{ $service['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="objectif_operationnel_id">Objectif operationnel</label>
+                    <select id="objectif_operationnel_id" name="objectif_operationnel_id">
+                        <option value="all">Tous</option>
+                        @foreach (($filterOptions['objectifs_operationnels'] ?? []) as $objective)
+                            <option
+                                value="{{ $objective['id'] }}"
+                                data-direction="{{ $objective['direction_id'] }}"
+                                data-service="{{ $objective['service_id'] }}"
+                                @selected((int) ($filters['objectif_operationnel_id'] ?? 0) === (int) $objective['id'])
+                            >
+                                {{ $objective['label'] }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
@@ -218,54 +309,278 @@
 
         @include('workspace.pta-suivi.partials.table', ['groups' => $groups])
     </section>
-
-    <x-pta.proof-modal />
 @endsection
 
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const modal = document.querySelector('[data-pta-modal]');
-            const modalBody = document.querySelector('[data-pta-modal-body]');
-            const closeButtons = document.querySelectorAll('[data-pta-modal-close]');
             const directionSelect = document.getElementById('direction_id');
             const serviceSelect = document.getElementById('service_id');
+            const objectiveSelect = document.getElementById('objectif_operationnel_id');
+            const tableWrap = document.querySelector('.pta-suivi-table-wrap');
+            const scrollStorageKey = 'pta-suivi:inline-scroll';
 
-            function closeModal() {
-                if (!modal || !modalBody) return;
-                modal.classList.remove('is-open');
-                modal.setAttribute('aria-hidden', 'true');
-                modalBody.innerHTML = '';
+            try {
+                const savedScroll = JSON.parse(window.sessionStorage.getItem(scrollStorageKey) || 'null');
+                if (savedScroll) {
+                    window.requestAnimationFrame(function () {
+                        window.scrollTo({ top: Number(savedScroll.windowY || 0), behavior: 'auto' });
+                        if (tableWrap) tableWrap.scrollLeft = Number(savedScroll.tableX || 0);
+                    });
+                    window.sessionStorage.removeItem(scrollStorageKey);
+                }
+            } catch (error) {
+                window.sessionStorage.removeItem(scrollStorageKey);
             }
 
-            document.addEventListener('click', async function (event) {
-                const button = event.target.closest('[data-pta-action-open]');
-                if (!button || !modal || !modalBody) return;
-                event.preventDefault();
-                modal.classList.add('is-open');
-                modal.setAttribute('aria-hidden', 'false');
-                modalBody.innerHTML = '<div class="p-6 text-center text-sm font-semibold text-slate-600">Chargement...</div>';
+            function optionValue(select) {
+                return select && select.value !== 'all' ? String(select.value) : '';
+            }
 
-                try {
-                    const response = await fetch(button.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-                    if (!response.ok) throw new Error('Erreur de chargement');
-                    modalBody.innerHTML = await response.text();
-                } catch (error) {
-                    modalBody.innerHTML = '<div class="p-6 text-center text-sm font-semibold text-red-700">Impossible de charger le detail de cette action.</div>';
+            function setOptionAvailability(option, isAvailable) {
+                if (!option || option.value === 'all') return;
+
+                option.hidden = !isAvailable;
+                option.disabled = !isAvailable;
+                option.style.display = isAvailable ? '' : 'none';
+            }
+
+            function selectedOptionIsUnavailable(select) {
+                return Boolean(select?.selectedOptions?.[0]?.disabled);
+            }
+
+            function updateServiceOptions() {
+                const directionId = optionValue(directionSelect);
+
+                serviceSelect?.querySelectorAll('option').forEach(function (option) {
+                    const optionDirection = String(option.dataset.direction || '');
+                    setOptionAvailability(option, directionId === '' || optionDirection === directionId);
+                });
+
+                if (selectedOptionIsUnavailable(serviceSelect)) {
+                    serviceSelect.value = 'all';
+                }
+            }
+
+            function updateObjectiveOptions() {
+                const directionId = optionValue(directionSelect);
+                const serviceId = optionValue(serviceSelect);
+
+                objectiveSelect?.querySelectorAll('option').forEach(function (option) {
+                    const optionDirection = String(option.dataset.direction || '');
+                    const optionService = String(option.dataset.service || '');
+                    const matchesDirection = directionId === '' || optionDirection === directionId;
+                    const matchesService = serviceId === '' || optionService === serviceId;
+
+                    setOptionAvailability(option, matchesDirection && matchesService);
+                });
+
+                if (selectedOptionIsUnavailable(objectiveSelect)) {
+                    objectiveSelect.value = 'all';
+                }
+            }
+
+            function syncPtaSuiviFilters() {
+                updateServiceOptions();
+                updateObjectiveOptions();
+            }
+
+            function applyIndicatorType(editor, type, label) {
+                editor.dataset.ptaCurrentType = type;
+                editor.querySelectorAll('[data-pta-current-type-label]').forEach(function (target) {
+                    target.textContent = label || target.textContent;
+                });
+                editor.querySelectorAll('[data-pta-type-field]').forEach(function (field) {
+                    const allowedTypes = String(field.dataset.ptaTypeField || '').split(/\s+/).filter(Boolean);
+                    field.hidden = !allowedTypes.includes(type);
+                    field.querySelectorAll('input, select, textarea').forEach(function (control) {
+                        control.disabled = field.hidden;
+                    });
+                });
+            }
+
+            function showIndicatorStep(editor, step) {
+                const trigger = editor.querySelector('[data-pta-param-open]');
+                const fields = editor.querySelector('[data-pta-param-fields]');
+
+                if (trigger) {
+                    trigger.hidden = step !== 'preview';
+                    trigger.setAttribute('aria-expanded', step === 'fields' ? 'true' : 'false');
+                }
+                if (fields) fields.hidden = step !== 'fields';
+            }
+
+            function saveButtonFor(form) {
+                return Array.from(document.querySelectorAll('[data-pta-save]')).find(function (button) {
+                    return button.form === form;
+                }) || null;
+            }
+
+            function markFormDirty(control) {
+                const form = control?.form;
+                if (!form || !form.matches('[data-pta-inline-form]')) return;
+
+                const row = control.closest('[data-pta-inline-row]');
+                row?.classList.add('is-dirty');
+
+                const saveButton = saveButtonFor(form);
+                if (saveButton) saveButton.classList.add('is-dirty');
+
+                const state = row?.querySelector('[data-pta-save-state]');
+                if (state) state.textContent = 'Modifications non enregistrées';
+            }
+
+            function focusIndicatorEditor(editor) {
+                const indicatorInput = editor.querySelector('[data-pta-param-fields] [name="indicateur"]:not([disabled])');
+                const firstInput = indicatorInput || editor.querySelector('[data-pta-param-fields] [data-pta-cell-input]:not([disabled])');
+
+                if (!firstInput) return;
+
+                firstInput.focus({ preventScroll: true });
+                if (typeof firstInput.select === 'function' && firstInput.tagName !== 'TEXTAREA') {
+                    firstInput.select();
+                }
+            }
+
+            document.querySelectorAll('[data-pta-param-editor]').forEach(function (editor) {
+                const typeInput = editor.querySelector('[data-pta-type-input]');
+                const selectedOption = typeInput?.selectedOptions?.[0];
+                const type = typeInput?.value || editor.dataset.ptaCurrentType || 'non_quantitatif';
+                const label = selectedOption?.dataset.typeLabel || typeInput?.dataset.typeLabel || '';
+                applyIndicatorType(editor, type, label);
+                showIndicatorStep(editor, 'preview');
+            });
+
+            syncPtaSuiviFilters();
+
+            document.addEventListener('click', function (event) {
+                const cancel = event.target.closest('[data-pta-param-cancel]');
+                if (cancel) {
+                    event.preventDefault();
+                    const editor = cancel.closest('[data-pta-param-editor]');
+                    const form = editor?.querySelector('[data-pta-cell-input]')?.form;
+                    form?.reset();
+
+                    const typeInput = editor?.querySelector('[data-pta-type-input]');
+                    if (editor && typeInput) {
+                        const selectedOption = typeInput.selectedOptions?.[0];
+                        applyIndicatorType(editor, typeInput.value, selectedOption?.dataset.typeLabel || typeInput.value);
+                    }
+
+                    if (editor) showIndicatorStep(editor, 'preview');
+                    editor?.closest('[data-pta-inline-row]')?.classList.remove('is-dirty');
+
+                    return;
+                }
+
+                const trigger = event.target.closest('[data-pta-param-open]');
+                if (trigger) {
+                    event.preventDefault();
+                    const editor = trigger.closest('[data-pta-param-editor]');
+                    if (editor) {
+                        showIndicatorStep(editor, 'fields');
+                        focusIndicatorEditor(editor);
+                    }
+
+                    return;
                 }
             });
 
-            closeButtons.forEach((button) => button.addEventListener('click', closeModal));
-            modal?.addEventListener('click', function (event) {
-                if (event.target === modal) closeModal();
+            document.addEventListener('change', function (event) {
+                const typeInput = event.target.closest('[data-pta-type-input]');
+                if (!typeInput) {
+                    if (event.target.matches('[data-pta-cell-input]')) markFormDirty(event.target);
+
+                    return;
+                }
+
+                const editor = typeInput.closest('[data-pta-param-editor]');
+                if (!editor) return;
+
+                const selectedOption = typeInput.selectedOptions?.[0];
+                applyIndicatorType(editor, typeInput.value, selectedOption?.dataset.typeLabel || typeInput.dataset.typeLabel || typeInput.value);
+                showIndicatorStep(editor, 'fields');
+                markFormDirty(typeInput);
             });
+
+            document.addEventListener('input', function (event) {
+                if (event.target.matches('[data-pta-cell-input]')) markFormDirty(event.target);
+            });
+
+            document.querySelectorAll('[data-pta-inline-form]').forEach(function (form) {
+                form.addEventListener('submit', function (event) {
+                    if (!form.reportValidity()) {
+                        event.preventDefault();
+
+                        return;
+                    }
+
+                    try {
+                        window.sessionStorage.setItem(scrollStorageKey, JSON.stringify({
+                            windowY: window.scrollY,
+                            tableX: tableWrap?.scrollLeft || 0,
+                        }));
+                    } catch (error) {
+                        // Scroll restoration is optional.
+                    }
+
+                    const row = saveButtonFor(form)?.closest('[data-pta-inline-row]')
+                        || form.closest('[data-pta-inline-row]');
+                    row?.classList.add('is-submitting');
+
+                    const saveButton = saveButtonFor(form);
+                    if (saveButton) {
+                        saveButton.disabled = true;
+                        saveButton.textContent = 'Enregistrement...';
+                    }
+
+                    const state = row?.querySelector('[data-pta-save-state]');
+                    if (state) state.textContent = 'Enregistrement en cours';
+                });
+            });
+
             document.addEventListener('keydown', function (event) {
-                if (event.key === 'Escape') closeModal();
+                if (!(event.ctrlKey || event.metaKey) || event.key !== 'Enter') return;
+
+                const control = event.target.closest('[data-pta-cell-input]');
+                const form = control?.form;
+                if (!form || !form.matches('[data-pta-inline-form]')) return;
+
+                event.preventDefault();
+                const saveButton = saveButtonFor(form);
+                if (saveButton) form.requestSubmit(saveButton);
+            });
+
+            document.addEventListener('click', function (event) {
+                if (event.target.closest('input, textarea, select, button, a, label')) return;
+
+                const cell = event.target.closest('td');
+                const indicatorEditor = cell?.querySelector('[data-pta-param-editor]');
+                if (indicatorEditor) {
+                    showIndicatorStep(indicatorEditor, 'fields');
+                    focusIndicatorEditor(indicatorEditor);
+
+                    return;
+                }
+
+                const input = cell?.querySelector('[data-pta-cell-input]:not([disabled])');
+                if (!input) return;
+
+                input.focus({ preventScroll: true });
+                if (typeof input.select === 'function' && input.tagName !== 'TEXTAREA') {
+                    input.select();
+                }
             });
 
             directionSelect?.addEventListener('change', function () {
-                if (!serviceSelect) return;
-                serviceSelect.value = 'all';
+                if (serviceSelect) serviceSelect.value = 'all';
+                if (objectiveSelect) objectiveSelect.value = 'all';
+                syncPtaSuiviFilters();
+            });
+
+            serviceSelect?.addEventListener('change', function () {
+                if (objectiveSelect) objectiveSelect.value = 'all';
+                updateObjectiveOptions();
             });
         });
     </script>

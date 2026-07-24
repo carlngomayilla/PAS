@@ -167,6 +167,9 @@
         ['label' => 'Non démarrées', 'value' => collect($statusCards)->firstWhere('label', 'Non demarre')['count'] ?? 0, 'accent' => '#6B7280', 'bg' => '#F1F5F9', 'meta' => null, 'href' => route('workspace.actions.index', ['statut' => 'non_demarre'])],
     ];
     $personalActionsSummary = is_array($analytics['personal_actions_summary'] ?? null) ? $analytics['personal_actions_summary'] : [];
+    $deadlineExtensionSummary = is_array($analytics['deadline_extension_summary'] ?? null)
+        ? $analytics['deadline_extension_summary']
+        : ['actionable_count' => 0, 'mine_count' => 0];
     if ($dashboardRole !== 'agent' && (int) ($personalActionsSummary['total'] ?? 0) > 0) {
         array_splice($summaryStrip, 1, 0, [[
             'label' => 'Mes actions',
@@ -180,21 +183,8 @@
         ]]);
     }
 
-    $summaryCardIsUsed = static function (array $card): bool {
-        if (array_key_exists('used', $card)) {
-            return (bool) $card['used'];
-        }
-
-        $normalized = str_replace(['%', ' ', "\u{00A0}"], '', (string) ($card['value'] ?? ''));
-        $normalized = str_replace(',', '.', $normalized);
-
-        return is_numeric($normalized)
-            ? (float) $normalized > 0
-            : trim((string) ($card['value'] ?? '')) !== '';
-    };
-
     $summaryStrip = collect($summaryStrip)
-        ->filter($summaryCardIsUsed)
+        ->filter(static fn (array $card): bool => ! array_key_exists('used', $card) || (bool) $card['used'])
         ->unique(fn (array $card): string => mb_strtolower(trim((string) ($card['label'] ?? ''))))
         ->sortBy(function (array $card): int {
             $label = \Illuminate\Support\Str::ascii(mb_strtolower((string) ($card['label'] ?? '')));
@@ -448,7 +438,7 @@
             'title' => 'PTA par service',
             'chip' => count($ptaServiceActionRows).' actions',
             'cell_levels' => $ptaServiceActionCellLevels,
-            'headers' => ['Service', 'Objectif opérationnel', 'Action', 'Responsable', 'Début', 'Échéance', 'Cible', 'Réalisé', 'Reste', 'Taux de réalisation', 'Progression technique', 'Statut d\'évolution', 'Statut délai', 'Justificatifs', 'Performance'],
+            'headers' => ['Service', 'Objectif opérationnel', 'Action', 'Responsable', 'Début', 'Échéance', 'Quantité à réaliser', 'Réalisé', 'Reste', 'Taux de réalisation', 'Progression technique', 'Statut d\'évolution', 'Statut délai', 'Justificatifs', 'Performance'],
             'rows' => collect($ptaServiceActionRows)->map(fn (array $row): array => ['url' => (string) ($row['url'] ?? ''), 'cells' => [
                 $shortText($row['service'] ?? '-', 24),
                 $shortText($row['objectif_operationnel'] ?? '-', 34),
@@ -488,7 +478,7 @@
             'title' => 'Actions agents',
             'chip' => count($agentActionRows).' lignes',
             'cell_levels' => $agentActionCellLevels,
-            'headers' => ['Agent', 'Action', 'Objectif opérationnel', 'PTA', 'Direction', 'Service', 'Échéance', 'Cible', 'Réalisé', 'Reste', 'Sous-actions', 'Progression', 'Taux de réalisation', 'Statut', 'Statut délai', 'Performance', 'Justificatifs', 'Commentaires', 'Dernière activité'],
+            'headers' => ['Agent', 'Action', 'Objectif opérationnel', 'PTA', 'Direction', 'Service', 'Échéance', 'Quantité à réaliser', 'Réalisé', 'Reste', 'Sous-actions', 'Progression', 'Taux de réalisation', 'Statut', 'Statut délai', 'Performance', 'Justificatifs', 'Commentaires', 'Dernière activité'],
             'rows' => collect($agentActionRows)->map(fn (array $row): array => ['url' => (string) ($row['url'] ?? ''), 'cells' => [
                 $shortText($row['agent'] ?? '-', 24),
                 $shortText($row['action'] ?? '-', 32),
@@ -516,7 +506,7 @@
             'title' => 'Sous-actions',
             'chip' => count($subActionRows).' sous-actions',
             'cell_levels' => $subActionCellLevels,
-            'headers' => ['Action', 'Sous-action', 'Description', 'Cible prévue', 'Quantité réalisée', 'Unité', 'Taux', 'Résultat obtenu', 'Effectuée', 'Date de réalisation', 'Justificatif', 'Commentaire agent', 'Contrôle supérieur', 'Statut'],
+            'headers' => ['Action', 'Sous-action', 'Description', 'Quantité à réaliser', 'Quantité réalisée', 'Unité', 'Taux', 'Résultat obtenu', 'Effectuée', 'Date de réalisation', 'Justificatif', 'Commentaire agent', 'Contrôle supérieur', 'Statut'],
             'rows' => collect($subActionRows)->map(fn (array $row): array => ['url' => (string) ($row['url'] ?? ''), 'cells' => [
                 $shortText($row['action'] ?? '-', 28),
                 $shortText($row['sous_action'] ?? '-', 28),
@@ -677,13 +667,14 @@
 @endphp
 
 
-<div class="relative z-[90] mb-4 flex flex-wrap items-center gap-2 overflow-visible rounded-[1.35rem] border border-[#3996d3]/18 bg-white/95 p-2 shadow-[0_20px_44px_-36px_rgba(15,23,42,0.45)]" data-dashboard-tabs>
+<div class="relative z-[90] mb-4 flex flex-wrap items-center overflow-visible" data-dashboard-tabs role="tablist" aria-label="Vues du tableau de bord">
     @foreach ($availableDashboardTabs as $tabKey => $tabLabel)
         @if ($showDirectionSynthesisSelector && $tabKey === 'overview')
             <details class="relative z-[100]" data-dashboard-synthesis-selector>
                 <summary
                     class="dashboard-tab {{ $currentDashboardTab === 'overview' ? 'dashboard-tab-active' : 'dashboard-tab-inactive' }} cursor-pointer list-none"
                     aria-current="{{ $currentDashboardTab === 'overview' ? 'page' : 'false' }}"
+                    role="tab"
                 >
                     Synthèse
                 </summary>
@@ -704,6 +695,7 @@
                 class="dashboard-tab {{ $currentDashboardTab === $tabKey ? 'dashboard-tab-active' : 'dashboard-tab-inactive' }}"
                 data-dashboard-tab="{{ $tabKey }}"
                 aria-current="{{ $currentDashboardTab === $tabKey ? 'page' : 'false' }}"
+                role="tab"
             >
                 {{ $tabLabel }}
             </a>
@@ -726,18 +718,6 @@
             inputmode="search"
         >
     </form>
-    <div class="ml-auto flex flex-wrap gap-2 pr-1">
-        <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('workspace.notifications.index', ['tab' => 'alertes']) }}">Alertes</a>
-        @if ($canOpenPtaSuivi)
-            <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('pta.suivi.index', $ptaSuiviQuery) }}">
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4V4zm0 5h16M9 4v16" />
-                </svg>
-                Suivi PTA
-            </a>
-        @endif
-        <a class="btn btn-primary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('workspace.reporting') }}">Rapports</a>
-    </div>
 </div>
 
 @if ($currentDashboardTab === 'overview')

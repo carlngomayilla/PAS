@@ -6,9 +6,9 @@ use App\Http\Controllers\Api\Concerns\AuthorizesPlanningScope;
 use App\Http\Controllers\Api\Concerns\EnsuresPtaIsUnlocked;
 use App\Http\Controllers\Api\Concerns\RecordsAuditTrail;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\ActionResource;
 use App\Http\Requests\StoreActionRequest;
 use App\Http\Requests\UpdateActionRequest;
+use App\Http\Resources\ActionResource;
 use App\Models\Action;
 use App\Models\Pta;
 use App\Models\User;
@@ -201,7 +201,7 @@ class ActionController extends Controller
             // forceFill : statut / statut_dynamique / progression_* ne sont plus
             // mass-assignables (cf. A02). Le payload provient ici de $validated +
             // valeurs internes posees par le controleur, jamais d input direct.
-            $action = new Action();
+            $action = new Action;
             $action->forceFill($payload)->save();
             $this->syncActionRmos($action, $rmoIds);
             $trackingService->initializeActionTracking($action, $user);
@@ -209,7 +209,7 @@ class ActionController extends Controller
 
             if ($request->hasFile('justificatif_financement')) {
                 $file = $request->file('justificatif_financement');
-                $storedFile = $secureStorage->store($file, 'justificatifs/' . date('Y/m'));
+                $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
 
                 $trackingService->addActionJustificatif(
                     $action,
@@ -306,8 +306,12 @@ class ActionController extends Controller
             return $locked;
         }
 
-        $dateChanged = (string) $action->date_debut !== (string) ($validated['date_debut'] ?? null)
-            || (string) $action->date_fin !== (string) ($validated['date_fin'] ?? null);
+        $validated['date_debut'] = optional($action->date_debut)->format('Y-m-d');
+        $validated['date_fin'] = optional($action->date_fin)->format('Y-m-d');
+        $validated['date_echeance'] = optional($action->date_echeance)->format('Y-m-d');
+        $validated['echeance_cible'] = optional($action->echeance_cible)->format('Y-m-d');
+
+        $dateChanged = false;
         $frequencyChanged = false;
         $targetTypeChanged = (string) $action->type_cible !== (string) ($validated['type_cible'] ?? '');
 
@@ -323,13 +327,16 @@ class ActionController extends Controller
 
         DB::transaction(function () use ($action, $validated, $indicatorPayload, $trackingService, $indicatorService, $dateChanged, $frequencyChanged, $targetTypeChanged, $request, $user, $secureStorage, $rmoIds): void {
             $payload = $validated;
+            unset($payload['sous_actions']);
+            if (! Schema::hasColumn('actions', 'ressources_necessaires')) {
+                unset($payload['ressources_necessaires']);
+            }
             $payload['contexte_action'] = $payload['contexte_action'] ?? Action::CONTEXT_PILOTAGE;
             $payload['origine_action'] = $payload['origine_action'] ?? (
                 $payload['contexte_action'] === Action::CONTEXT_OPERATIONNEL
                     ? Action::ORIGIN_INTERNE
                     : Action::ORIGIN_PTA
             );
-            $payload['date_echeance'] = $payload['date_fin'];
             $payload['seuil_alerte_progression'] = $payload['seuil_alerte_progression'] ?? 10;
             unset($payload['frequence_execution']);
             $payload['unite_dg_id'] = $this->primaryRmoUniteId($rmoIds) ?? $action->unite_dg_id;
@@ -349,7 +356,7 @@ class ActionController extends Controller
 
             if ($request->hasFile('justificatif_financement')) {
                 $file = $request->file('justificatif_financement');
-                $storedFile = $secureStorage->store($file, 'justificatifs/' . date('Y/m'));
+                $storedFile = $secureStorage->store($file, 'justificatifs/'.date('Y/m'));
 
                 $trackingService->addActionJustificatif(
                     $action,
@@ -438,7 +445,7 @@ class ActionController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return list<int>
      */
     private function extractRmoIds(array $validated): array
@@ -459,7 +466,7 @@ class ActionController extends Controller
     }
 
     /**
-     * @param list<int> $rmoIds
+     * @param  list<int>  $rmoIds
      */
     private function primaryRmoUniteId(array $rmoIds): ?int
     {
@@ -473,7 +480,7 @@ class ActionController extends Controller
     }
 
     /**
-     * @param list<int> $rmoIds
+     * @param  list<int>  $rmoIds
      */
     private function syncActionRmos(Action $action, array $rmoIds): void
     {

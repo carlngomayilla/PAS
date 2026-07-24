@@ -8,6 +8,7 @@ use App\Models\PlanningUnlockRequest;
 use App\Models\Pta;
 use App\Models\User;
 use App\Notifications\WorkspaceModuleNotification;
+use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
@@ -71,7 +72,7 @@ class PlanningModificationLockService
     public function lockedMessage(Model $target): string
     {
         return sprintf(
-            '%s verrouille apres enregistrement. Toute modification exige une demande de deverrouillage approuvee par le DG.',
+            '%s verrouille apres enregistrement. Toute modification exige une demande de deverrouillage approuvee par la DG, le SCIQ ou la Planification.',
             $this->targetHumanName($target)
         );
     }
@@ -207,13 +208,16 @@ class PlanningModificationLockService
 
     public function isUnlockReviewer(User $user): bool
     {
-        return $user->hasRole(User::ROLE_DG);
+        return $user->hasRole(User::ROLE_DG)
+            || $user->isSuperAdmin()
+            || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL)
+            || $this->canGivePlanifAvis($user);
     }
 
     public function requestUnlock(Model $target, User $requester, string $reason, ?string $justificatifPath = null): PlanningUnlockRequest
     {
         if (! $this->supports($target)) {
-            throw new InvalidArgumentException('Type de cible non pris en charge.');
+            throw new InvalidArgumentException('Type de parametrage non pris en charge.');
         }
 
         $pending = PlanningUnlockRequest::query()
@@ -247,15 +251,13 @@ class PlanningModificationLockService
 
         $this->bumpPersonalTaskCache();
 
-        // Circuit V3 : la demande part d'abord vers les controleurs
-        // SCIQ/Planification, qui la transmettent ensuite a la DG.
-        $this->notifyControllers($unlockRequest, $requester);
+        $this->notifyUnlockReviewers($unlockRequest, $requester);
 
         return $unlockRequest;
     }
 
     /**
-     * Etape controleur : avis SCIQ/Planification puis transmission a la DG.
+     * Etape controleur : avis SCIQ/Planification puis transmission pour decision.
      */
     public function transmitByController(PlanningUnlockRequest $unlockRequest, User $controller, string $avis, ?string $comment = null): void
     {
@@ -299,7 +301,7 @@ class PlanningModificationLockService
     }
 
     /**
-     * Etape controleur : avis SCIQ/Planification puis transmission a la DG.
+     * Etape controleur : avis SCIQ/Planification puis transmission pour decision.
      */
     public function recordPlanifAvis(PlanningUnlockRequest $unlockRequest, User $planif, string $avis, ?string $comment = null): void
     {
@@ -309,11 +311,11 @@ class PlanningModificationLockService
     public function approve(PlanningUnlockRequest $unlockRequest, User $reviewer, ?string $comment = null, ?Carbon $unlockedUntil = null): void
     {
         if (! $this->isUnlockReviewer($reviewer)) {
-            abort(403, 'Seul le DG peut approuver un deverrouillage.');
+            abort(403, 'Seuls la DG, le SCIQ ou la Planification peuvent approuver un deverrouillage.');
         }
 
-        if ((string) $unlockRequest->status !== PlanningUnlockRequest::STATUS_TRANSMISE) {
-            abort(409, 'La demande doit etre transmise par un controleur avant decision du DG.');
+        if (! in_array((string) $unlockRequest->status, [PlanningUnlockRequest::STATUS_SOUMISE, PlanningUnlockRequest::STATUS_TRANSMISE], true)) {
+            abort(409, 'Cette demande a deja ete traitee.');
         }
 
         $target = $unlockRequest->target;
@@ -321,14 +323,19 @@ class PlanningModificationLockService
             abort(404);
         }
 
-        $unlockRequest->forceFill([
+        $unlockRequest->forceFill(array_merge($this->directControlDecisionPayload(
+            $unlockRequest,
+            $reviewer,
+            PlanningUnlockRequest::AVIS_FAVORABLE,
+            $comment
+        ), [
             'status' => PlanningUnlockRequest::STATUS_APPROUVEE,
             'decision' => PlanningUnlockRequest::DECISION_APPROUVER,
             'review_comment' => $comment,
             'reviewed_by' => (int) $reviewer->id,
             'reviewed_at' => now(),
             'unlocked_until' => $unlockedUntil,
-        ])->save();
+        ]))->save();
 
         $target->forceFill([
             'modification_unlocked_at' => now(),
@@ -345,20 +352,25 @@ class PlanningModificationLockService
     public function reject(PlanningUnlockRequest $unlockRequest, User $reviewer, string $comment): void
     {
         if (! $this->isUnlockReviewer($reviewer)) {
-            abort(403, 'Seul le DG peut rejeter un deverrouillage.');
+            abort(403, 'Seuls la DG, le SCIQ ou la Planification peuvent rejeter un deverrouillage.');
         }
 
-        if ((string) $unlockRequest->status !== PlanningUnlockRequest::STATUS_TRANSMISE) {
-            abort(409, 'La demande doit etre transmise par un controleur avant decision du DG.');
+        if (! in_array((string) $unlockRequest->status, [PlanningUnlockRequest::STATUS_SOUMISE, PlanningUnlockRequest::STATUS_TRANSMISE], true)) {
+            abort(409, 'Cette demande a deja ete traitee.');
         }
 
-        $unlockRequest->forceFill([
+        $unlockRequest->forceFill(array_merge($this->directControlDecisionPayload(
+            $unlockRequest,
+            $reviewer,
+            PlanningUnlockRequest::AVIS_DEFAVORABLE,
+            $comment
+        ), [
             'status' => PlanningUnlockRequest::STATUS_REJETEE,
             'decision' => PlanningUnlockRequest::DECISION_REJETER,
             'review_comment' => trim($comment),
             'reviewed_by' => (int) $reviewer->id,
             'reviewed_at' => now(),
-        ])->save();
+        ]))->save();
 
         $this->bumpPersonalTaskCache();
 
@@ -366,7 +378,30 @@ class PlanningModificationLockService
     }
 
     /**
-     * Les controleurs SCIQ/Planification peuvent transmettre la demande a la DG.
+     * @return array<string, mixed>
+     */
+    private function directControlDecisionPayload(PlanningUnlockRequest $unlockRequest, User $reviewer, string $avis, ?string $comment): array
+    {
+        if ((string) $unlockRequest->status !== PlanningUnlockRequest::STATUS_SOUMISE || ! $this->canGivePlanifAvis($reviewer)) {
+            return [];
+        }
+
+        $comment = ($value = trim((string) $comment)) !== '' ? $value : null;
+        $now = now();
+
+        return [
+            'transferred_by' => $unlockRequest->transferred_by ?? (int) $reviewer->id,
+            'transferred_at' => $unlockRequest->transferred_at ?? $now,
+            'transfer_comment' => $unlockRequest->transfer_comment ?? $comment,
+            'planif_avis' => $unlockRequest->planif_avis ?? $avis,
+            'planif_avis_by' => $unlockRequest->planif_avis_by ?? (int) $reviewer->id,
+            'planif_avis_at' => $unlockRequest->planif_avis_at ?? $now,
+            'planif_comment' => $unlockRequest->planif_comment ?? $comment,
+        ];
+    }
+
+    /**
+     * Les controleurs SCIQ/Planification peuvent transmettre un avis.
      */
     public function canTransfer(User $user, PlanningUnlockRequest $unlockRequest): bool
     {
@@ -443,12 +478,13 @@ class PlanningModificationLockService
     }
 
     /**
-     * Circuit V3 - etape 1 : notifier les controleurs SCIQ/Planification.
+     * Notifie les responsables pouvant traiter le deverrouillage.
      */
-    private function notifyControllers(PlanningUnlockRequest $unlockRequest, User $requester): void
+    private function notifyUnlockReviewers(PlanningUnlockRequest $unlockRequest, User $requester): void
     {
         $recipients = User::query()
             ->whereIn('role', [
+                User::ROLE_DG,
                 User::ROLE_PLANIFICATION,
                 User::ROLE_SCIQ,
                 User::ROLE_SCIQ_SUIVI_GLOBAL,
@@ -461,8 +497,8 @@ class PlanningModificationLockService
         $this->notifyUsers(
             $recipients,
             [
-                'title' => 'Demande de modification a controler',
-                'message' => sprintf('%s demande la modification de %s. Controle SCIQ/Planification puis transmission DG attendus.', $requester->name, (string) $unlockRequest->target_label),
+                'title' => 'Demande de modification a traiter',
+                'message' => sprintf('%s demande la modification de %s. Decision possible par la DG, le SCIQ ou la Planification.', $requester->name, (string) $unlockRequest->target_label),
                 'module' => 'gouvernance',
                 'entity_type' => 'planning_unlock_request',
                 'entity_id' => $unlockRequest->id,
@@ -475,7 +511,7 @@ class PlanningModificationLockService
     }
 
     /**
-     * Circuit V3 - etape 2 : le controleur a transmis -> decision DG.
+     * Notification complementaire apres avis SCIQ/Planification.
      */
     private function notifyDgAfterControllerTransmission(PlanningUnlockRequest $unlockRequest, User $controller): void
     {
@@ -487,8 +523,8 @@ class PlanningModificationLockService
         $this->notifyUsers(
             $recipients,
             [
-                'title' => 'Demande de modification transmise a la DG',
-                'message' => sprintf('%s a transmis la demande de modification de %s avec avis "%s". Votre decision est attendue.', $controller->name, (string) $unlockRequest->target_label, (string) $unlockRequest->planif_avis),
+                'title' => 'Avis controleur sur demande de modification',
+                'message' => sprintf('%s a enregistre un avis "%s" pour la demande de modification de %s.', $controller->name, (string) $unlockRequest->planif_avis, (string) $unlockRequest->target_label),
                 'module' => 'gouvernance',
                 'entity_type' => 'planning_unlock_request',
                 'entity_id' => $unlockRequest->id,
@@ -529,8 +565,8 @@ class PlanningModificationLockService
     }
 
     /**
-     * @param EloquentCollection<int, User> $users
-     * @param array<string, mixed> $payload
+     * @param  EloquentCollection<int, User>  $users
+     * @param  array<string, mixed>  $payload
      */
     private function notifyUsers(EloquentCollection $users, array $payload): void
     {
@@ -557,6 +593,6 @@ class PlanningModificationLockService
 
     private function bumpPersonalTaskCache(): void
     {
-        app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->bumpAlerts();
+        app(AnalyticsCacheVersionService::class)->bumpAlerts();
     }
 }

@@ -2,8 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\RetentionRun;
 use App\Models\User;
-use App\Services\Governance\RetentionService;
+use App\Services\Governance\RetentionOperationService;
 use Illuminate\Console\Command;
 
 class RunRetentionPolicyCommand extends Command
@@ -12,7 +13,7 @@ class RunRetentionPolicyCommand extends Command
 
     protected $description = 'Execute un dry-run ou une archive de retention pour les donnees anciennes.';
 
-    public function handle(RetentionService $retentionService): int
+    public function handle(RetentionOperationService $retentionOperationService): int
     {
         $actor = null;
         $actorId = $this->option('actor_id');
@@ -21,9 +22,18 @@ class RunRetentionPolicyCommand extends Command
         }
 
         $execute = (bool) $this->option('execute');
-        $result = $retentionService->archive($execute, $actor);
+        $operation = $retentionOperationService->run(
+            RetentionRun::SCOPE_DATA,
+            $execute,
+            $actor,
+            'console',
+            null,
+            'artisan anbg:retention-run'
+        );
+        $result = $operation['result'];
 
         $this->info('Mode: '.($result['mode'] ?? 'dry-run'));
+        $this->line('Execution: #'.$operation['run']->id);
 
         if (isset($result['created']) && is_array($result['created'])) {
             foreach ($result['created'] as $label => $count) {

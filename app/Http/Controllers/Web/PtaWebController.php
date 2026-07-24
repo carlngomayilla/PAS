@@ -22,6 +22,7 @@ use App\Services\ExerciceContext;
 use App\Services\Notifications\WorkspaceNotificationService;
 use App\Services\PlanningClosureReportService;
 use App\Services\PlanningModificationLockService;
+use App\Services\PtaHierarchyService;
 use App\Services\Security\SecureJustificatifStorage;
 use App\Services\WorkflowSettings;
 use App\Support\SchemaIntrospectionCache;
@@ -40,7 +41,7 @@ use Illuminate\View\View;
  * Contrôleur des PTA — Plan de Travail Annuel.
  *
  * Un PTA est le plan d'un service pour une année donnée. Il est rattaché à un PAO
- * et contient les actions à réaliser. Il suit le cycle : en cours -> cloture -> archive.
+ * et contient les actions à réaliser. Il suit le cycle : en cours -> controle SCIQ -> cloture -> archive.
  */
 class PtaWebController extends Controller
 {
@@ -108,6 +109,7 @@ class PtaWebController extends Controller
         $ptaStats = [
             'total' => (int) $byStatus->sum(),
             'en_cours' => (int) ($byStatus[Pta::STATUS_EN_COURS] ?? 0),
+            'controle_sciq' => (int) ($byStatus[Pta::STATUS_CONTROLE_SCIQ] ?? 0),
             'clotures' => (int) ($byStatus[Pta::STATUS_CLOTURE] ?? 0),
             'archives' => (int) ($byStatus[Pta::STATUS_ARCHIVE] ?? 0),
             'sans_action' => (clone $statsBase)->doesntHave('actions')->count(),
@@ -153,7 +155,29 @@ class PtaWebController extends Controller
         ]);
     }
 
-    /** Affiche le formulaire de création d'un nouveau PTA. */
+    /** Affiche la fiche administrative detaillee d'un PTA. */
+    public function show(Request $request, Pta $pta, PtaHierarchyService $hierarchyService): View
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $this->denyUnlessPlanningReader($user);
+        if ($user->isAgent() || ! $this->canReadService($user, (int) $pta->direction_id, (int) $pta->service_id)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        return view('workspace.pta.show', [
+            'row' => $pta,
+            'hierarchy' => $hierarchyService->build($pta),
+            'canWrite' => $pta->statut !== Pta::STATUS_ARCHIVE
+                && ! app(PlanningModificationLockService::class)->isLocked($pta)
+                && $this->canManagePta($user, (int) $pta->direction_id, (int) $pta->service_id),
+        ]);
+    }
+
+    /** Affiche le formulaire de creation d'un nouveau PTA. */
     public function create(Request $request): View
     {
         $user = $request->user();
@@ -248,7 +272,7 @@ class PtaWebController extends Controller
             $payload['exercice_id'] = $existingPta->exercice_id;
             $payload['titre'] = (string) ($existingPta->titre ?: $payload['titre']);
         }
-        $currentStatus = in_array((string) $existingPta?->statut, [Pta::STATUS_CLOTURE, Pta::STATUS_ARCHIVE], true)
+        $currentStatus = in_array((string) $existingPta?->statut, [Pta::STATUS_CONTROLE_SCIQ, Pta::STATUS_CLOTURE, Pta::STATUS_ARCHIVE], true)
             ? (string) $existingPta->statut
             : $statut;
         $pta->fill($payload);
@@ -413,7 +437,7 @@ class PtaWebController extends Controller
         $targetPao = $objectifOperationnel->pao;
         $targetServiceId = (int) $objectifOperationnel->service_id;
 
-        $statut = in_array((string) $pta->statut, [Pta::STATUS_CLOTURE, Pta::STATUS_ARCHIVE], true)
+        $statut = in_array((string) $pta->statut, [Pta::STATUS_CONTROLE_SCIQ, Pta::STATUS_CLOTURE, Pta::STATUS_ARCHIVE], true)
             ? (string) $pta->statut
             : Pta::STATUS_EN_COURS;
 
@@ -690,8 +714,17 @@ class PtaWebController extends Controller
 
         $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
 
-        if ((string) $pta->statut === Pta::STATUS_ARCHIVE) {
+        $currentStatus = (string) $pta->statut;
+        if ($currentStatus === Pta::STATUS_ARCHIVE) {
             return back()->withErrors(['general' => 'Impossible de cloturer un PTA archivé.']);
+        }
+
+        if ($currentStatus === Pta::STATUS_CLOTURE) {
+            return back()->withErrors(['general' => 'Ce PTA est deja cloture.']);
+        }
+
+        if (! in_array($currentStatus, [Pta::STATUS_EN_COURS, Pta::STATUS_CONTROLE_SCIQ], true)) {
+            return back()->withErrors(['general' => 'Ce PTA ne peut pas etre transmis dans le circuit de controle.']);
         }
 
         $validated = $request->validate([
@@ -709,14 +742,22 @@ class PtaWebController extends Controller
                 ->withErrors(['general' => $this->closureReportErrorMessage($report)]);
         }
 
+        $targetStatus = $currentStatus === Pta::STATUS_EN_COURS
+            ? Pta::STATUS_CONTROLE_SCIQ
+            : Pta::STATUS_CLOTURE;
+        $auditAction = $targetStatus === Pta::STATUS_CONTROLE_SCIQ ? 'submit_control' : 'close';
+        $successMessage = $targetStatus === Pta::STATUS_CONTROLE_SCIQ
+            ? 'PTA transmis au controle SCIQ/Planification avec rapport d\'anomalies trace.'
+            : 'PTA cloture avec rapport d\'anomalies trace.';
+
         $before = $pta->toArray();
         $pta->forceFill([
-            'statut' => Pta::STATUS_CLOTURE,
+            'statut' => $targetStatus,
             'valide_le' => now(),
             'valide_par' => $user->id,
         ])->save();
 
-        $this->recordAudit($request, 'pta', 'close', $pta, $before, [
+        $this->recordAudit($request, 'pta', $auditAction, $pta, $before, [
             ...$pta->toArray(),
             'motif' => (string) $validated['motif'],
             'closure_report' => $report,
@@ -725,7 +766,7 @@ class PtaWebController extends Controller
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', 'PTA clôturé avec rapport d\'anomalies tracé.');
+            ->with('success', $successMessage);
     }
 
     public function archive(Request $request, Pta $pta): RedirectResponse
@@ -986,10 +1027,6 @@ class PtaWebController extends Controller
                     $action->forceFill(['justificatif_financement_path' => $storedFile['path']])->save();
                 }
 
-                if ($action->financement_notifie_le === null) {
-                    $notificationService->notifyActionFinancingRequested($action, $actor);
-                    $action = $trackingService->markFinancingNotificationSent($action);
-                }
             } else {
                 $action->forceFill([
                     'financement_statut' => Action::FINANCEMENT_NON_REQUIS,
@@ -1122,10 +1159,14 @@ class PtaWebController extends Controller
             ?? ''
         ))) !== '' ? $value : null;
         $natureFinancement = ($value = trim((string) ($actionPayload['nature_financement'] ?? ''))) !== '' ? $value : null;
-        $dateFin = $actionPayload['date_fin']
-            ?? optional($existingAction?->date_fin)->format('Y-m-d')
-            ?? optional($objectifOperationnel->echeance)->format('Y-m-d')
-            ?? ($actionPayload['date_debut'] ?? null);
+        $dateFin = $existingAction instanceof Action
+            ? optional($existingAction->date_fin)->format('Y-m-d')
+            : ($actionPayload['date_fin']
+                ?? optional($objectifOperationnel->echeance)->format('Y-m-d')
+                ?? ($actionPayload['date_debut'] ?? null));
+        $dateDebut = $existingAction instanceof Action
+            ? optional($existingAction->date_debut)->format('Y-m-d')
+            : ($actionPayload['date_debut'] ?? null);
         $isQuantitative = $modeEvaluation === Action::MODE_QUANTITATIF;
         $preserveQuantitativeTarget = $isQuantitative
             || ($typeAction === Action::TYPE_COMPOSEE && filled($quantiteCible));
@@ -1183,7 +1224,7 @@ class PtaWebController extends Controller
                 ? $value
                 : ($isNewAction ? null : $existingAction?->resultat_attendu),
             'observations' => $isNewAction ? null : $existingAction?->observations,
-            'date_debut' => $actionPayload['date_debut'] ?? null,
+            'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
             'date_echeance' => $dateFin,
             'responsable_id' => $rmoIds[0] ?? null,
@@ -1220,7 +1261,7 @@ class PtaWebController extends Controller
         } elseif ($isNewAction) {
             $payload['financement_statut'] = Action::FINANCEMENT_PRE_SIGNALE_DAF;
             $payload['financement_soumis_le'] = null;
-            $payload['financement_notifie_le'] = now();
+            $payload['financement_notifie_le'] = null;
         }
 
         if ($isNewAction) {
@@ -1313,8 +1354,12 @@ class PtaWebController extends Controller
                 'cible_prevue' => $saType === SousAction::TYPE_QUANTITATIVE ? $this->nullableFloat($subActionPayload['cible_prevue'] ?? null) : null,
                 'unite' => ($value = trim((string) ($subActionPayload['unite'] ?? ''))) !== '' ? $value : $action->unite_cible,
                 'commentaire' => ($value = trim((string) ($subActionPayload['commentaire'] ?? ''))) !== '' ? $value : null,
-                'date_debut' => $subActionPayload['date_debut'] ?? optional($action->date_debut)->format('Y-m-d') ?? now()->toDateString(),
-                'date_fin' => $subActionPayload['date_fin'] ?? optional($action->date_fin)->format('Y-m-d') ?? optional($action->date_debut)->format('Y-m-d') ?? now()->toDateString(),
+                'date_debut' => $subAction instanceof SousAction
+                    ? optional($subAction->date_debut)->format('Y-m-d')
+                    : ($subActionPayload['date_debut'] ?? optional($action->date_debut)->format('Y-m-d') ?? now()->toDateString()),
+                'date_fin' => $subAction instanceof SousAction
+                    ? optional($subAction->date_fin)->format('Y-m-d')
+                    : ($subActionPayload['date_fin'] ?? optional($action->date_fin)->format('Y-m-d') ?? optional($action->date_debut)->format('Y-m-d') ?? now()->toDateString()),
             ];
 
             if ($subAction instanceof SousAction) {

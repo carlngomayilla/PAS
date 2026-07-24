@@ -121,4 +121,86 @@ class NotificationWebTest extends TestCase
         $this->assertNotNull($notifications->firstWhere('data.module', 'actions')?->read_at);
         $this->assertNull($notifications->firstWhere('data.module', 'alertes')?->read_at);
     }
+
+    public function test_notification_center_filters_searches_and_paginates_the_complete_inbox(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+        ]);
+
+        foreach (range(1, 17) as $index) {
+            $user->notify(new WorkspaceModuleNotification([
+                'title' => 'Action filtrable '.$index,
+                'message' => 'Traitement courant du module actions.',
+                'module' => 'actions',
+                'status' => 'warning',
+                'url' => route('workspace.actions.index'),
+            ]));
+        }
+
+        $user->notify(new WorkspaceModuleNotification([
+            'title' => 'Décision spéciale à retrouver',
+            'message' => 'Validation prioritaire du PTA.',
+            'module' => 'pta',
+            'status' => 'critical',
+            'url' => route('workspace.pta.index'),
+        ]));
+        $user->notify(new WorkspaceModuleNotification([
+            'title' => 'Alerte technique exclue',
+            'message' => 'Cette notification appartient au centre des alertes.',
+            'module' => 'alertes',
+            'status' => 'critical',
+            'url' => route('workspace.notifications.index', ['tab' => 'alertes']),
+        ]));
+
+        $this->actingAs($user)
+            ->get(route('workspace.notifications.index', [
+                'module' => 'actions',
+                'per_page' => 15,
+            ]))
+            ->assertOk()
+            ->assertViewHas('notifications', function ($paginator): bool {
+                return $paginator->total() === 17 && count($paginator->items()) === 15;
+            })
+            ->assertViewHas('notificationFilteredSummary', fn (array $summary): bool => $summary['total'] === 17)
+            ->assertDontSee('Alerte technique exclue');
+
+        $this->actingAs($user)
+            ->get(route('workspace.notifications.index', [
+                'q' => 'decision speciale',
+                'module' => 'pta',
+                'niveau' => 'critical',
+            ]))
+            ->assertOk()
+            ->assertSee('Décision spéciale à retrouver')
+            ->assertViewHas('notifications', fn ($paginator): bool => $paginator->total() === 1);
+    }
+
+    public function test_notification_center_neutralizes_array_query_values(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_SERVICE,
+        ]);
+
+        $user->notify(new WorkspaceModuleNotification([
+            'title' => 'Notification toujours accessible',
+            'message' => 'Les filtres invalides ne cassent pas la page.',
+            'module' => 'actions',
+            'url' => route('workspace.actions.index'),
+        ]));
+
+        $this->actingAs($user)
+            ->get(route('workspace.notifications.index', [
+                'tab' => ['alertes'],
+                'q' => ['invalide'],
+                'etat' => ['unread'],
+                'niveau' => ['critical'],
+                'module' => ['actions'],
+                'per_page' => [50],
+                'page' => [2],
+            ]))
+            ->assertOk()
+            ->assertViewHas('activeTab', 'notifications')
+            ->assertSee('Notification toujours accessible');
+    }
 }

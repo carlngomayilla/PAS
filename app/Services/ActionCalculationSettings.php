@@ -5,23 +5,30 @@ namespace App\Services;
 use App\Models\PlatformSetting;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 
 class ActionCalculationSettings
 {
     public const OFFICIAL_SCOPE_ALL_VISIBLE = 'all_visible';
+
     public const STATISTICAL_SCOPE_ALL_VISIBLE = self::OFFICIAL_SCOPE_ALL_VISIBLE;
+
     public const SCOPE_EXCLUDE_REJECTED = 'exclude_rejected';
 
     public const LEVEL_VALIDATION_AGENT = 'validation_agent';
+
     public const LEVEL_VALIDATION_CHEF = 'validation_chef';
+
     public const LEVEL_VALIDATION_DIRECTION = 'validation_direction';
+
     public const LEVEL_VALIDATION_SCIQ = 'validation_sciq';
+
     public const LEVEL_VALIDATION_DG = 'validation_dg';
 
     public const SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS = 'actions_official_validation_status';
+
     public const SETTING_ACTIONS_STATISTICAL_SCOPE = 'actions_statistical_scope';
 
     /**
@@ -66,8 +73,8 @@ class ActionCalculationSettings
     public function defaults(): array
     {
         return [
-            self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => self::LEVEL_VALIDATION_CHEF,
-            self::SETTING_ACTIONS_STATISTICAL_SCOPE => self::LEVEL_VALIDATION_CHEF,
+            self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS => self::LEVEL_VALIDATION_SCIQ,
+            self::SETTING_ACTIONS_STATISTICAL_SCOPE => self::LEVEL_VALIDATION_SCIQ,
         ];
     }
 
@@ -75,12 +82,12 @@ class ActionCalculationSettings
     {
         $value = $this->normalizeScope((string) ($this->get(
             self::SETTING_ACTIONS_STATISTICAL_SCOPE,
-            self::LEVEL_VALIDATION_CHEF
-        ) ?? self::LEVEL_VALIDATION_CHEF));
+            self::LEVEL_VALIDATION_SCIQ
+        ) ?? self::LEVEL_VALIDATION_SCIQ));
 
         return array_key_exists($value, $this->statisticalScopeOptions())
             ? $value
-            : self::LEVEL_VALIDATION_CHEF;
+            : self::LEVEL_VALIDATION_SCIQ;
     }
 
     /**
@@ -92,7 +99,7 @@ class ActionCalculationSettings
             self::LEVEL_VALIDATION_CHEF => 'Validation chef de service',
             self::LEVEL_VALIDATION_DIRECTION => 'Ancienne validation direction',
             self::LEVEL_VALIDATION_AGENT => 'Soumission agent ou validation chef',
-            self::LEVEL_VALIDATION_SCIQ => 'Validation SCIQ ancienne',
+            self::LEVEL_VALIDATION_SCIQ => 'Validation finale SCIQ / Planification',
             self::LEVEL_VALIDATION_DG => 'Validation DG ancienne',
             self::SCOPE_EXCLUDE_REJECTED => 'Ancienne règle : visibles hors rejetées',
             self::STATISTICAL_SCOPE_ALL_VISIBLE => 'Toutes les actions visibles',
@@ -119,6 +126,9 @@ class ActionCalculationSettings
                 ActionTrackingService::VALIDATION_REJETEE_CHEF,
                 ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
@@ -126,20 +136,28 @@ class ActionCalculationSettings
                 ActionTrackingService::VALIDATION_NON_SOUMISE,
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
             self::LEVEL_VALIDATION_AGENT => [
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
             self::LEVEL_VALIDATION_CHEF => [
-                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
-            self::LEVEL_VALIDATION_DIRECTION,
+            self::LEVEL_VALIDATION_DIRECTION => [
+                ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
+            ],
             self::LEVEL_VALIDATION_SCIQ,
             self::LEVEL_VALIDATION_DG => [
+                ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ],
             default => [
@@ -157,6 +175,7 @@ class ActionCalculationSettings
             self::SCOPE_EXCLUDE_REJECTED => [
                 ActionTrackingService::VALIDATION_REJETEE_CHEF,
                 ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
+                ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
                 ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
             ],
             default => [],
@@ -166,7 +185,7 @@ class ActionCalculationSettings
     public function statisticalScopeLabel(): string
     {
         return $this->statisticalScopeOptions()[$this->statisticalScope()]
-            ?? 'Validation chef de service';
+            ?? 'Validation finale SCIQ / Planification';
     }
 
     public function statisticalScopeSummary(): string
@@ -174,8 +193,8 @@ class ActionCalculationSettings
         return match ($this->statisticalScope()) {
             self::LEVEL_VALIDATION_DIRECTION,
             self::LEVEL_VALIDATION_SCIQ,
-            self::LEVEL_VALIDATION_DG => 'Ancienne règle : seules les actions validées par la direction sont comptées.',
-            self::LEVEL_VALIDATION_CHEF => 'Les statistiques officielles comptent les actions validées par le chef de service.',
+            self::LEVEL_VALIDATION_DG => 'Les statistiques officielles comptent les actions validees par SCIQ ou Planification.',
+            self::LEVEL_VALIDATION_CHEF => 'Les statistiques comptent les actions ayant recu le visa du chef.',
             self::LEVEL_VALIDATION_AGENT => 'Les statistiques officielles comptent les actions soumises par les agents et les actions déjà validées.',
             self::SCOPE_EXCLUDE_REJECTED => 'Ancienne règle : les statistiques excluent les actions rejetées ou en correction.',
             default => 'Les statistiques et les indicateurs sont calculés sur toutes les actions visibles.',
@@ -187,8 +206,8 @@ class ActionCalculationSettings
         return match ($this->statisticalScope()) {
             self::LEVEL_VALIDATION_DIRECTION,
             self::LEVEL_VALIDATION_SCIQ,
-            self::LEVEL_VALIDATION_DG => 'Moyenne calculée sur les anciennes validations direction.',
-            self::LEVEL_VALIDATION_CHEF => 'Moyenne calculée sur les actions validées par le chef de service.',
+            self::LEVEL_VALIDATION_DG => 'Moyenne calculee sur les actions validees par le controle final.',
+            self::LEVEL_VALIDATION_CHEF => 'Moyenne calculee sur les actions ayant recu le visa du chef.',
             self::LEVEL_VALIDATION_AGENT => 'Moyenne calculée sur les actions soumises ou déjà validées.',
             self::SCOPE_EXCLUDE_REJECTED => 'Moyenne calculée sur toutes les actions visibles, hors actions rejetées ou en correction.',
             default => 'Moyenne calculée sur toutes les actions visibles.',
@@ -201,10 +220,10 @@ class ActionCalculationSettings
     public function statisticalRouteFilters(): array
     {
         return match ($this->statisticalScope()) {
-            self::LEVEL_VALIDATION_DIRECTION,
+            self::LEVEL_VALIDATION_DIRECTION => ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION],
             self::LEVEL_VALIDATION_SCIQ,
-            self::LEVEL_VALIDATION_DG => ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_DIRECTION],
-            self::LEVEL_VALIDATION_CHEF => ['statut_validation_min' => ActionTrackingService::VALIDATION_VALIDEE_CHEF],
+            self::LEVEL_VALIDATION_DG => ['statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE],
+            self::LEVEL_VALIDATION_CHEF => ['statut_validation_min' => ActionTrackingService::VALIDATION_SOUMISE_CONTROLE],
             self::LEVEL_VALIDATION_AGENT => ['statut_validation_min' => ActionTrackingService::VALIDATION_SOUMISE_CHEF],
             default => [],
         };
@@ -215,6 +234,7 @@ class ActionCalculationSettings
         $allowed = $this->statisticalValidationStatuses();
         if ($allowed !== []) {
             $query->whereIn($column, $allowed);
+
             return;
         }
 
@@ -255,10 +275,10 @@ class ActionCalculationSettings
     {
         $status = $this->normalizeScope((string) ($payload[self::SETTING_ACTIONS_STATISTICAL_SCOPE]
             ?? $payload[self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS]
-            ?? self::LEVEL_VALIDATION_CHEF));
+            ?? self::LEVEL_VALIDATION_SCIQ));
 
         if (! array_key_exists($status, $this->statisticalScopeOptions())) {
-            $status = self::LEVEL_VALIDATION_CHEF;
+            $status = self::LEVEL_VALIDATION_SCIQ;
         }
 
         foreach ([self::SETTING_ACTIONS_STATISTICAL_SCOPE, self::SETTING_ACTIONS_OFFICIAL_VALIDATION_STATUS] as $key) {
@@ -268,7 +288,8 @@ class ActionCalculationSettings
             );
         }
 
-        $this->flush();
+        $this->resolved = null;
+        $this->tableAvailable = true;
 
         return $this->all();
     }
@@ -353,7 +374,7 @@ class ActionCalculationSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }
@@ -364,6 +385,8 @@ class ActionCalculationSettings
         return match ($scope) {
             ActionTrackingService::VALIDATION_SOUMISE_CHEF => self::LEVEL_VALIDATION_AGENT,
             ActionTrackingService::VALIDATION_VALIDEE_CHEF => self::LEVEL_VALIDATION_CHEF,
+            ActionTrackingService::VALIDATION_SOUMISE_CONTROLE => self::LEVEL_VALIDATION_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE => self::LEVEL_VALIDATION_SCIQ,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION => self::LEVEL_VALIDATION_DIRECTION,
             default => $scope,
         };

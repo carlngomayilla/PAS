@@ -2,9 +2,15 @@
 
 namespace App\Services;
 
+use App\Enums\StatutEcheance;
+use App\Enums\StatutRealisation;
+use App\Enums\StatutRetard;
+use App\Enums\TypeIndicateur;
 use App\Models\Action;
 use App\Models\SousAction;
 use App\Services\Actions\ActionTrackingService;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class PtaOfficialCalculationService
@@ -26,23 +32,26 @@ class PtaOfficialCalculationService
     {
         $subActionResults = $this->subActionResults($action);
         $configuredSubActions = $subActionResults->where('is_configured', true);
-        $target = max(0.0, (float) ($action->quantite_cible ?? 0));
+        $typeIndicateur = $action->resolvedTypeIndicateur();
+        $target = $this->actionQuantityTarget($action);
         $realized = max(0.0, (float) ($action->quantite_realisee ?? 0));
+        $completionThreshold = $this->completionThresholdFor($action);
 
         $actionTargets = collect();
-        if ($target > 0.0) {
-            $actionTargets->push($this->resultFromRawValues($target, $realized, 'action'));
+        if ($typeIndicateur->tracksQuantity() || $target > 0.0) {
+            $actionTargets->push($this->resultFromRawValues($target, $realized, 'action', $completionThreshold));
         }
 
-        if ($this->actionTracksDeliverableTarget($action)) {
+        if ($typeIndicateur->tracksDeliverable() && $this->actionTracksDeliverableTarget($action)) {
             $actionTargets->push($this->resultFromDeliverable(
                 $this->actionDeliverableCompleted($action),
-                'action'
+                'action',
+                $completionThreshold
             ));
         }
 
         if ($actionTargets->isEmpty() && $configuredSubActions->isNotEmpty()) {
-            return $this->targetWeighted($configuredSubActions, 'sous_actions');
+            return $this->targetWeighted($configuredSubActions, 'sous_actions', $completionThreshold);
         }
 
         $configuredTargets = $actionTargets
@@ -54,11 +63,15 @@ class PtaOfficialCalculationService
             return $configuredTargets->first();
         }
 
-        if ($configuredTargets->isNotEmpty()) {
-            return $this->targetWeighted($configuredTargets, 'mixed_targets');
+        if ($typeIndicateur === TypeIndicateur::Mixte && $configuredTargets->isNotEmpty()) {
+            return $this->percentageAverage($configuredTargets, 'mixed_targets', $completionThreshold);
         }
 
-        return $this->resultFromRawValues($target, $realized, 'action');
+        if ($configuredTargets->isNotEmpty()) {
+            return $this->targetWeighted($configuredTargets, 'mixed_targets', $completionThreshold);
+        }
+
+        return $this->resultFromRawValues($target, $realized, 'action', $completionThreshold);
     }
 
     /**
@@ -66,18 +79,21 @@ class PtaOfficialCalculationService
      */
     public function subActionResult(SousAction $sousAction): array
     {
-        $target = max(0.0, (float) ($sousAction->cible_prevue ?? 0));
+        $typeIndicateur = $sousAction->resolvedTypeIndicateur();
+        $target = $this->subActionQuantityTarget($sousAction);
         $realized = max(0.0, (float) ($sousAction->quantite_realisee ?? 0));
+        $completionThreshold = $this->completionThresholdFor($sousAction);
         $targets = collect();
 
-        if ($target > 0.0) {
-            $targets->push($this->resultFromRawValues($target, $realized, 'sous_action'));
+        if ($typeIndicateur->tracksQuantity() || $target > 0.0) {
+            $targets->push($this->resultFromRawValues($target, $realized, 'sous_action', $completionThreshold));
         }
 
-        if ($this->subActionTracksDeliverableTarget($sousAction)) {
+        if ($typeIndicateur->tracksDeliverable() && $this->subActionTracksDeliverableTarget($sousAction)) {
             $targets->push($this->resultFromDeliverable(
                 $this->subActionDeliverableCompleted($sousAction),
-                'sous_action'
+                'sous_action',
+                $completionThreshold
             ));
         }
 
@@ -85,18 +101,22 @@ class PtaOfficialCalculationService
             return $targets->first();
         }
 
-        if ($targets->isNotEmpty()) {
-            return $this->targetWeighted($targets, 'sous_action');
+        if ($typeIndicateur === TypeIndicateur::Mixte && $targets->isNotEmpty()) {
+            return $this->percentageAverage($targets, 'sous_action_mixed_targets', $completionThreshold);
         }
 
-        return $this->resultFromRawValues($target, $realized, 'sous_action');
+        if ($targets->isNotEmpty()) {
+            return $this->targetWeighted($targets, 'sous_action', $completionThreshold);
+        }
+
+        return $this->resultFromRawValues($target, $realized, 'sous_action', $completionThreshold);
     }
 
     /**
      * @param  Collection<int, array<string, mixed>>  $items
      * @return array{target:float,realized:float,rate:?float,display_rate:float,is_configured:bool,excluded:bool,status:string,status_label:string,source:string}
      */
-    public function targetWeighted(Collection $items, string $source = 'target_rollup'): array
+    public function targetWeighted(Collection $items, string $source = 'target_rollup', float $completionThreshold = 100.0): array
     {
         $configured = $items->filter(
             fn (array $item): bool => (bool) ($item['is_configured'] ?? false)
@@ -106,7 +126,44 @@ class PtaOfficialCalculationService
         $target = (float) $configured->sum(fn (array $item): float => max(0.0, (float) ($item['target'] ?? 0)));
         $realized = (float) $configured->sum(fn (array $item): float => max(0.0, (float) ($item['realized'] ?? 0)));
 
-        return $this->resultFromRawValues($target, $realized, $source);
+        return $this->resultFromRawValues($target, $realized, $source, $completionThreshold);
+    }
+
+    /**
+     * Calcule une action mixte selon la formule metier :
+     * taux_final = (taux_quantitatif + taux_livrable) / 2.
+     *
+     * @param  Collection<int, array<string, mixed>>  $items
+     * @return array{target:float,realized:float,rate:?float,display_rate:float,is_configured:bool,excluded:bool,status:string,status_label:string,statut_realisation:string,statut_realisation_label:string,source:string}
+     */
+    public function percentageAverage(Collection $items, string $source = 'percentage_average', float $completionThreshold = 100.0): array
+    {
+        $configured = $items->filter(
+            fn (array $item): bool => (bool) ($item['is_configured'] ?? false)
+                && ($item['rate'] ?? null) !== null
+        );
+
+        if ($configured->isEmpty()) {
+            return $this->resultFromRawValues(0.0, 0.0, $source);
+        }
+
+        $rate = round((float) $configured->avg(fn (array $item): float => (float) ($item['display_rate'] ?? $item['rate'] ?? 0.0)), 2);
+        $statutRealisation = StatutRealisation::fromRate($rate, false, $completionThreshold);
+        $status = $statutRealisation->legacyStatus();
+
+        return [
+            'target' => 100.0,
+            'realized' => $rate,
+            'rate' => $rate,
+            'display_rate' => $this->displayRate($rate),
+            'is_configured' => true,
+            'excluded' => false,
+            'status' => $status,
+            'status_label' => $this->statusLabel($status),
+            'statut_realisation' => $statutRealisation->value,
+            'statut_realisation_label' => $statutRealisation->label(),
+            'source' => $source,
+        ];
     }
 
     /**
@@ -171,34 +228,24 @@ class PtaOfficialCalculationService
         );
     }
 
-    public function statusForRate(?float $rate, bool $isLate = false): string
+    public function statusForRate(?float $rate, bool $isLate = false, float $completionThreshold = 100.0): string
     {
         if ($rate === null) {
-            return self::STATUS_TO_CONFIGURE;
+            return StatutRealisation::AParametrer->legacyStatus();
         }
 
-        if ($rate >= 100.0) {
-            return self::STATUS_DONE;
-        }
-
-        if ($isLate) {
-            return self::STATUS_LATE;
-        }
-
-        if ($rate <= 0.0) {
-            return self::STATUS_PENDING;
-        }
-
-        return self::STATUS_IN_PROGRESS;
+        return $isLate && $rate < $completionThreshold
+            ? self::STATUS_LATE
+            : StatutRealisation::fromRate($rate, false, $completionThreshold)->legacyStatus();
     }
 
     public function statusLabel(string $status): string
     {
         return match ($status) {
             self::STATUS_TO_CONFIGURE => 'A parametrer',
-            self::STATUS_PENDING => 'En attente',
+            self::STATUS_PENDING => 'Non demarree',
             self::STATUS_IN_PROGRESS => 'En cours',
-            self::STATUS_DONE => 'Realise',
+            self::STATUS_DONE => 'Realisee',
             self::STATUS_LATE => 'En retard',
             default => 'En cours',
         };
@@ -207,6 +254,35 @@ class PtaOfficialCalculationService
     public function displayRate(?float $rate): float
     {
         return round(min(100.0, max(0.0, (float) ($rate ?? 0.0))), 2);
+    }
+
+    public function deadlineStatus(Action|SousAction $trackable, CarbonInterface|string|null $reportDate = null): StatutEcheance
+    {
+        $deadline = $this->deadlineFor($trackable);
+
+        if ($deadline === null) {
+            return StatutEcheance::NonEchue;
+        }
+
+        $reportDate = $reportDate instanceof CarbonInterface
+            ? Carbon::instance($reportDate)->startOfDay()
+            : Carbon::parse($reportDate ?? now())->startOfDay();
+
+        return Carbon::parse($deadline)->startOfDay()->lte($reportDate)
+            ? StatutEcheance::Echue
+            : StatutEcheance::NonEchue;
+    }
+
+    public function delayStatus(Action|SousAction $trackable, ?float $rate = null, CarbonInterface|string|null $reportDate = null): StatutRetard
+    {
+        $rate ??= $trackable instanceof Action
+            ? $this->actionResult($trackable)['display_rate']
+            : $this->subActionResult($trackable)['display_rate'];
+
+        $isLate = $this->deadlineStatus($trackable, $reportDate) === StatutEcheance::Echue
+            && $this->displayRate($rate) < $this->completionThresholdFor($trackable);
+
+        return $isLate ? StatutRetard::EnRetard : StatutRetard::DansLesDelais;
     }
 
     /**
@@ -223,40 +299,69 @@ class PtaOfficialCalculationService
             ->values();
     }
 
+    private function actionQuantityTarget(Action $action): float
+    {
+        return max(0.0, (float) ($action->quantite_a_realiser ?? $action->quantite_cible ?? 0));
+    }
+
+    private function subActionQuantityTarget(SousAction $sousAction): float
+    {
+        return max(0.0, (float) ($sousAction->quantite_a_realiser ?? $sousAction->cible_prevue ?? 0));
+    }
+
+    private function deadlineFor(Action|SousAction $trackable): CarbonInterface|string|null
+    {
+        if ($trackable instanceof Action) {
+            return $trackable->date_fin ?? $trackable->date_echeance ?? $trackable->echeance_cible;
+        }
+
+        return $trackable->date_fin;
+    }
+
     /**
      * @return array{target:float,realized:float,rate:?float,display_rate:float,is_configured:bool,excluded:bool,status:string,status_label:string,source:string}
      */
-    private function resultFromRawValues(float $target, float $realized, string $source): array
+    private function resultFromRawValues(float $target, float $realized, string $source, float $completionThreshold = 100.0): array
     {
         $target = round(max(0.0, $target), 4);
         $realized = round(max(0.0, $realized), 4);
 
         if ($target <= 0.0) {
+            $statutRealisation = StatutRealisation::AParametrer;
+
             return [
                 'target' => 0.0,
                 'realized' => $realized,
                 'rate' => null,
+                'raw_rate' => null,
                 'display_rate' => 0.0,
                 'is_configured' => false,
                 'excluded' => true,
-                'status' => self::STATUS_TO_CONFIGURE,
-                'status_label' => $this->statusLabel(self::STATUS_TO_CONFIGURE),
+                'status' => $statutRealisation->legacyStatus(),
+                'status_label' => $this->statusLabel($statutRealisation->legacyStatus()),
+                'statut_realisation' => $statutRealisation->value,
+                'statut_realisation_label' => $statutRealisation->label(),
                 'source' => $source,
             ];
         }
 
-        $rate = round(($realized / $target) * 100, 2);
-        $status = $this->statusForRate($rate);
+        $rawRate = round(($realized / $target) * 100, 2);
+        $rate = $this->displayRate($rawRate);
+        $statutRealisation = StatutRealisation::fromRate($rate, false, $completionThreshold);
+        $status = $statutRealisation->legacyStatus();
 
         return [
             'target' => $target,
             'realized' => $realized,
             'rate' => $rate,
+            'raw_rate' => $rawRate,
             'display_rate' => $this->displayRate($rate),
             'is_configured' => true,
             'excluded' => false,
             'status' => $status,
             'status_label' => $this->statusLabel($status),
+            'statut_realisation' => $statutRealisation->value,
+            'statut_realisation_label' => $statutRealisation->label(),
             'source' => $source,
         ];
     }
@@ -264,25 +369,37 @@ class PtaOfficialCalculationService
     /**
      * @return array{target:float,realized:float,rate:?float,display_rate:float,is_configured:bool,excluded:bool,status:string,status_label:string,source:string}
      */
-    private function resultFromDeliverable(bool $completed, string $source): array
+    private function resultFromDeliverable(bool $completed, string $source, float $completionThreshold = 100.0): array
     {
-        return $this->resultFromRawValues(1.0, $completed ? 1.0 : 0.0, $source);
+        return $this->resultFromRawValues(1.0, $completed ? 1.0 : 0.0, $source, $completionThreshold);
+    }
+
+    private function completionThresholdFor(Action|SousAction $trackable): float
+    {
+        $value = $trackable instanceof Action
+            ? $trackable->seuil_minimum ?? 80
+            : $trackable->seuil_minimum ?? 80;
+
+        return min(100.0, max(0.0, (float) $value));
     }
 
     private function actionTracksDeliverableTarget(Action $action): bool
     {
         $typeAction = trim((string) ($action->type_action ?? ''));
+        $typeIndicateur = $action->resolvedTypeIndicateur();
         $modeEvaluation = trim((string) ($action->mode_evaluation ?? ''));
         $typeCible = trim((string) ($action->type_cible ?? ''));
 
-        $hasExplicitDeliverable = $this->filledText($action->livrable_attendu ?? null)
+        $hasExplicitDeliverable = $this->filledText($action->cible ?? null)
+            || $this->filledText($action->livrable_attendu ?? null)
             || $this->filledText($action->intitule_cible ?? null);
 
-        $isDeliverableMode = in_array($typeAction, [
-            Action::TYPE_NON_QUANTITATIVE,
-            Action::TYPE_MIXTE,
-            Action::TYPE_COMPOSEE,
-        ], true)
+        $isDeliverableMode = $typeIndicateur->tracksDeliverable()
+            || in_array($typeAction, [
+                Action::TYPE_NON_QUANTITATIVE,
+                Action::TYPE_MIXTE,
+                Action::TYPE_COMPOSEE,
+            ], true)
             || in_array($modeEvaluation, [
                 Action::MODE_SANS_QUANTITE,
                 Action::MODE_MIXTE,
@@ -300,13 +417,16 @@ class PtaOfficialCalculationService
     private function subActionTracksDeliverableTarget(SousAction $sousAction): bool
     {
         $type = trim((string) ($sousAction->sub_action_type ?? ''));
-        $isDeliverableType = in_array($type, [
+        $typeIndicateur = $sousAction->resolvedTypeIndicateur();
+        $isDeliverableType = $typeIndicateur->tracksDeliverable() || in_array($type, [
             SousAction::TYPE_NON_QUANTITATIVE,
             SousAction::TYPE_MIXTE,
         ], true) || max(0.0, (float) ($sousAction->cible_prevue ?? 0)) <= 0.0;
 
         return $isDeliverableType && (
-            $this->filledText($sousAction->resultat_attendu ?? null)
+            $this->filledText($sousAction->cible ?? null)
+            || $this->filledText($sousAction->livrable_attendu ?? null)
+            || $this->filledText($sousAction->resultat_attendu ?? null)
             || $this->filledText($sousAction->description ?? null)
         );
     }
@@ -314,7 +434,7 @@ class PtaOfficialCalculationService
     private function actionDeliverableCompleted(Action $action): bool
     {
         if (in_array((string) ($action->statut_validation ?? ''), [
-            ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+            ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
             return true;

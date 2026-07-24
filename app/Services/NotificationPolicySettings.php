@@ -5,8 +5,7 @@ namespace App\Services;
 use App\Models\ActionLog;
 use App\Models\PlatformSetting;
 use App\Models\User;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Support\Str;
 
 class NotificationPolicySettings
@@ -145,9 +144,9 @@ class NotificationPolicySettings
         return [
             'action_assigned' => ['group' => 'Actions', 'label' => 'Attribution d’action', 'description' => 'Notification envoyée à l’agent responsable lors de l’attribution ou du changement de responsable.'],
             'action_submitted_to_chef' => ['group' => 'Actions', 'label' => 'Soumission au chef', 'description' => 'Notification envoyée au service lors d’une demande de validation.'],
-            'action_submitted_to_direction' => ['group' => 'Actions', 'label' => 'Soumission directe à la direction', 'description' => 'Notification envoyée à la direction quand l’étape service est sautée.'],
+            'action_submitted_to_direction' => ['group' => 'Actions', 'label' => 'Soumission au contrôle', 'description' => 'Notification envoyée à SCIQ et Planification après le visa du chef.'],
             'action_reviewed_by_chef' => ['group' => 'Actions', 'label' => 'Décision chef', 'description' => 'Notification après validation ou rejet par le chef de service.'],
-            'action_reviewed_by_direction' => ['group' => 'Actions', 'label' => 'Décision direction', 'description' => 'Notification après validation ou rejet par la direction.'],
+            'action_reviewed_by_direction' => ['group' => 'Actions', 'label' => 'Décision du contrôle', 'description' => 'Notification après validation ou retour par SCIQ ou Planification.'],
             'action_finalized_by_chef' => ['group' => 'Actions', 'label' => 'Finalisation par le chef', 'description' => 'Notification finale lorsque le chef devient la dernière étape du circuit.'],
             'action_finalized_without_workflow' => ['group' => 'Actions', 'label' => 'Clôture sans workflow', 'description' => 'Notification finale quand aucune validation supplémentaire n’est active.'],
             'action_comment_added' => ['group' => 'Actions', 'label' => 'Commentaire action', 'description' => 'Notification envoyée quand un utilisateur ajoute un commentaire sur une action.'],
@@ -187,9 +186,11 @@ class NotificationPolicySettings
     public function alertLevelDefinitions(): array
     {
         return [
-            'warning' => ['label' => 'Attention', 'description' => 'Problème à suivre rapidement.'],
-            'critical' => ['label' => 'Critique', 'description' => 'Problème important à traiter sans attendre.'],
-            'urgence' => ['label' => 'Urgence', 'description' => 'Situation très grave à traiter tout de suite.'],
+            'critical' => ['label' => 'Critique', 'description' => 'Probleme important a traiter sans attendre.'],
+            'warning' => ['label' => 'Vigilance', 'description' => 'Probleme a suivre rapidement.'],
+            'conforme' => ['label' => 'Conforme', 'description' => 'Situation suivie sans anomalie active.'],
+            'info' => ['label' => 'Information', 'description' => 'Information de suivi sans urgence.'],
+            'urgence' => ['label' => 'Urgence', 'description' => 'Situation tres grave a traiter tout de suite.'],
         ];
     }
 
@@ -483,6 +484,9 @@ class NotificationPolicySettings
         return match ($normalized) {
             'urgence' => 'urgence',
             'critical', 'critique' => 'critical',
+            'warning', 'vigilance', 'attention', 'avertissement' => 'warning',
+            'conforme', 'ok', 'success' => 'conforme',
+            'info', 'information' => 'info',
             default => 'warning',
         };
     }
@@ -684,6 +688,7 @@ class NotificationPolicySettings
         /** @var list<array{code:string,offset_days:int,level:string,target_role:string,message_template:string,active:bool}> $items */
         return $items;
     }
+
     private function hasSettingsTable(): bool
     {
         if ($this->tableAvailable !== null) {
@@ -691,7 +696,7 @@ class NotificationPolicySettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }
