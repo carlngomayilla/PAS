@@ -2,9 +2,9 @@
 
 **Application ANBG — Pilotage PAS / PAO / PTA / Actions**
 
-- Version : 1.0
-- Date : 21 mai 2026
-- Périmètre : tous les workflows métier de l'application Laravel courante (branche `local/laravel-13-ai-pta`)
+- Version : 2.0
+- Date : 27 juillet 2026
+- Périmètre : tous les workflows métier de l'application Laravel courante
 - Sources : code (`routes/`, `app/Http/Controllers`, `app/Models`, `app/Services`, `database/migrations`) et documentation (`docs/specifications-fonctionnelles.md`, `docs/analyse-globale-application.md`, `docs/rapport-specifications-fonctionnelles-application-actuelle.md`, `README.md`)
 
 ---
@@ -32,7 +32,7 @@ PAS  (Plan d'Actions Stratégique — pluriannuel, niveau institution)
                                └── Workflow financement DAF ↔ DG
 ```
 
-À chaque niveau s'appliquent : un workflow de validation (`brouillon → soumis → validé → verrouillé` avec réouverture motivée), une journalisation d'audit (`journal_audit`), une gestion d'alertes (`AlertCenterService`), et un périmètre de droits dérivé du rôle de l'utilisateur (RBAC + scope direction/service + délégations).
+À chaque niveau s'appliquent : un cycle opérationnel propre au plan, une journalisation d'audit (`journal_audit`), une gestion d'alertes (`AlertCenterService`) et un périmètre de droits dérivé du rôle de l'utilisateur (RBAC + scope direction/service + délégations). Les anciennes routes génériques `submit`, `approve`, `lock` et `reopen` ont été supprimées ; le cycle Web courant repose sur l'activité, le contrôle éventuel, la clôture, l'archivage et les demandes gouvernées de déverrouillage.
 
 ### 0.2 Rôles applicatifs
 
@@ -51,11 +51,11 @@ L'application gère huit profils (sept rôles métier + un rôle technique). Les
 
 ### 0.3 Conventions transverses
 
-- **Cycle de validation** : tous les plans (PAS, PAO, PTA) suivent le même cycle `brouillon → soumis → valide → verrouille` (enum SQL, cf. migrations `2026_02_21_100200`, `100500`, `100600`). Quatre actions de workflow sont disponibles : `submit`, `approve`, `lock`, `reopen`. Chaque transition appelle `WorkflowSettings` (rôle autorisé, statut cible) puis `WorkspaceNotificationService` et `recordAudit()`.
-- **Verrouillage descendant** : un parent verrouillé bloque la modification des enfants ; toute tentative renvoie un message « plus etre modifié » côté contrôleur.
+- **Cycles des plans** : PAS `actif → cloture → archive` ; PAO `en_cours/valide → cloture → archive` ; PTA `brouillon → en_cours → controle_sciq → cloture → archive`.
+- **Protection des modifications** : un plan archivé est non modifiable. Les modifications exceptionnelles d'un PAS, d'un PTA ou d'une action protégée passent par une demande de déverrouillage lorsqu'une route dédiée existe.
 - **Exercices budgétaires** : `ExerciceContext` injecte l'exercice actif. Les plans et actions sont scopés par `exercice_id`, ce qui empêche les fuites cross-année.
 - **Délégations** : la table `delegations` autorise un utilisateur à agir au nom d'une direction/service pendant une fenêtre temporelle. Les Policies (`PasPolicy`, `PaoPolicy`, etc.) consomment `DelegationService`.
-- **Audit immuable** : le trait `RecordsAuditTrail` + le contrôleur web persistent dans `journal_audit` chaque mutation sensible (`create`, `update`, `delete`, `submit`, `approve`, `lock`, `reopen`).
+- **Audit immuable** : le trait `RecordsAuditTrail` et les contrôleurs Web persistent dans `journal_audit` chaque mutation sensible (`create`, `update`, `delete`, `submit_control`, `close`, `archive`, décisions et corrections).
 - **IA assistée, jamais autonome** : les imports PTA et les rapports IA produisent des propositions traçables ; aucune création d'action ni validation de rapport n'est définitive sans correction/validation humaine.
 
 ---
@@ -71,7 +71,7 @@ Cadrer la stratégie pluriannuelle de l'ANBG. Le PAS est un document institution
 | Acteur | Rôle dans le workflow |
 |---|---|
 | Planification | Crée et alimente le PAS via le wizard (`workspace.pas.create`, `edit`). Soumet pour validation. |
-| DG | Valide (`approve`) et verrouille (`lock`) après recette. |
+| DG | Supervise le cycle stratégique et les décisions institutionnelles selon les habilitations. |
 | Administrateur / Super-Admin | Configure les transitions autorisées par rôle (`WorkflowSettings`). |
 | Direction / Service / Agent | Consultation seule (le PAS est référencé en lecture par les écrans descendants). |
 
@@ -87,27 +87,28 @@ Cadrer la stratégie pluriannuelle de l'ANBG. Le PAS est un document institution
    - Saisie des **axes** (`pas_axes`, contrôleur `PasAxeController` API).
    - Saisie des **objectifs stratégiques** rattachés à chaque axe (`pas_objectifs`, contrôleur `PasObjectifController` API).
    - Métadonnées d'alignement (`align_pas_structure_metadata` ajoute des champs après `statut`).
-3. **Soumission** (`submit`) : Planification déclenche `pas/{pas}/submit`. La transition est conditionnée par `WorkflowSettings::submit_enabled`. Cible `soumis` (ou `valide` si le paramétrage autorise une validation directe).
-4. **Validation** (`approve`) : DG/Cabinet (selon paramétrage) approuve. Le statut passe à `valide`.
-5. **Verrouillage** (`lock`) : passage à `verrouille`. Plus aucune modification de structure n'est possible ; les PAO ne peuvent être créés que sur un PAS validé ou verrouillé (`Pao::scopeValidatedOrLocked`).
-6. **Réouverture** (`reopen`) : Planification ou Admin, sur motif obligatoire, ramène le PAS à un statut antérieur autorisé (`WorkflowSettings::reopen_allowed_statuses`). L'événement est tracé en audit avec l'ancien et le nouveau statut.
+3. **Exploitation active** : le PAS est créé au statut `actif` et peut être complété par les acteurs habilités.
+4. **Contrôle de clôture** (`pas/{pas}/cloturer`) : l'application analyse les PAO, PTA, actions, validations, retards et KPI liés. Une clôture avec anomalies exige une justification explicite.
+5. **Clôture** : le statut passe à `cloture` et la décision est auditée.
+6. **Archivage** (`pas/{pas}/archiver`) : uniquement après clôture ; le PAS passe à `archive` et devient non modifiable.
+7. **Déverrouillage exceptionnel** : une demande motivée utilise le circuit `pas/{pas}/demandes-deverrouillage` lorsqu'une correction postérieure est nécessaire.
 
 ### 1.5 Règles de gestion
 
 - Routes legacy `pas-axes/*` et `pas-objectifs/*` sont redirigées vers le wizard PAS unique : aucun parcours métier séparé pour gérer axes ou objectifs.
-- Suppression d'un PAS verrouillé interdite (`lockedStateMessage('PAS', 'etre supprime')`).
-- La réouverture exige un motif (champ contrôlé par `WorkflowSettings::reopen_motif_required`).
-- Notifications poussées via `WorkspaceNotificationService::notifyPasStatus()` à chaque transition (`submitted`, `approved`, `locked`, `reopened`).
+- La modification et la suppression directe d'un PAS archivé sont interdites.
+- L'archivage exige un PAS clôturé.
+- La clôture contrôle les anomalies descendantes et exige une justification lorsqu'elles subsistent.
+- Les transitions sont auditées avec l'ancien et le nouvel état.
 - Audit : chaque action est journalisée (`recordAudit($request, 'pas', $action, $pas, $before, $after)`).
 
 ### 1.6 États et transitions
 
 | État | Transitions possibles | Acteur typique |
 |---|---|---|
-| `brouillon` | → `soumis` (submit), suppression possible | Planification |
-| `soumis` | → `valide` (approve), retour `brouillon` (reopen) | DG, Cabinet |
-| `valide` | → `verrouille` (lock), retour `soumis`/`brouillon` (reopen) | DG |
-| `verrouille` | → `valide` (reopen exceptionnel) | DG / Admin |
+| `actif` | → `cloture` après contrôle des anomalies | Planification / acteur habilité |
+| `cloture` | → `archive` | Acteur habilité |
+| `archive` | aucune modification directe | Consultation |
 
 ### 1.7 Données clés
 
@@ -117,12 +118,12 @@ Cadrer la stratégie pluriannuelle de l'ANBG. Le PAS est un document institution
 
 - Validation refusée par `WorkflowSettings` → message bloquant côté contrôleur.
 - Création d'un PAO sur un PAS non validé → bloqué via les scopes `validated()` / `validatedOrLocked()`.
-- Réouverture d'un PAS référencé par des PAO verrouillés → impact sur l'aval, à apprécier par l'auditeur (l'application trace mais ne propage pas la réouverture).
+- Une correction postérieure à la protection du plan doit passer par la demande de déverrouillage ; aucune réouverture directe n'est exposée.
 
 ### 1.9 KPI métier
 
 - Taux de couverture du PAS par des PAO (% d'objectifs stratégiques déclinés au moins une fois en PAO par direction).
-- Délai moyen entre `brouillon` et `verrouille` (mesurable via `journal_audit`).
+- Délai moyen entre la création, la clôture et l'archivage (mesurable via `journal_audit`).
 - Nombre de réouvertures par cycle (indicateur de maturité de planification).
 
 ---
@@ -139,7 +140,7 @@ Décliner annuellement le PAS au niveau d'une direction. Chaque PAO traduit les 
 |---|---|
 | Direction | Élabore et soumet le PAO de sa direction. |
 | Planification | Peut piloter, supervise la cohérence avec le PAS. |
-| DG / Cabinet | Valident, verrouillent. |
+| DG / Cabinet | Consultent la consolidation et exercent les arbitrages autorisés. |
 | Service / Agent | Lecture des objectifs opérationnels servant de cadre au PTA. |
 
 ### 2.3 Déclencheurs
@@ -155,10 +156,10 @@ Décliner annuellement le PAS au niveau d'une direction. Chaque PAO traduit les 
    - **Axes PAO** (`pao_axes`).
    - **Objectifs stratégiques rattachés** (`pao_objectifs_strategiques`).
    - **Objectifs opérationnels** (`pao_objectifs_operationnels`, cible de rattachement des PTA).
-4. **Soumission** (`submit`) → statut `soumis`.
-5. **Validation** (`approve`) → `valide`.
-6. **Verrouillage** (`lock`) → `verrouille`.
-7. **Réouverture** (`reopen`) sur motif.
+4. **Validation à l'enregistrement** : le PAO complet est positionné à `valide` par le contrôleur Web courant.
+5. **Exploitation** : les objectifs opérationnels validés alimentent les PTA des services.
+6. **Clôture** (`pao/{pao}/cloturer`) après contrôle des anomalies descendantes.
+7. **Archivage** (`pao/{pao}/archiver`) uniquement depuis l'état clôturé.
 
 ### 2.5 Règles de gestion
 
@@ -170,7 +171,7 @@ Décliner annuellement le PAS au niveau d'une direction. Chaque PAO traduit les 
 
 ### 2.6 États et transitions
 
-Identiques à PAS : `brouillon → soumis → valide → verrouille` avec réouverture motivée.
+Cycle Web courant : `en_cours/valide → cloture → archive`. Les anciennes routes `submit`, `approve`, `lock` et `reopen` ne sont plus exposées.
 
 ### 2.7 Données clés
 
@@ -178,9 +179,9 @@ Identiques à PAS : `brouillon → soumis → valide → verrouille` avec réouv
 
 ### 2.8 Exceptions
 
-- Tentative de soumission par un acteur non habilité → blocage par `WorkflowSettings`.
-- Modification après verrouillage du PAS parent → blocage en cascade.
-- Réouverture interdite si un PTA aval est verrouillé (à apprécier opérationnellement).
+- Modification ou suppression d'un PAO archivé : blocage serveur.
+- Archivage d'un PAO non clôturé : blocage serveur.
+- Clôture avec anomalies descendantes : rapport et justification obligatoires.
 
 ### 2.9 KPI
 
@@ -203,7 +204,7 @@ Planifier les actions d'un service pour l'année, en rattachant chaque action à
 | Chef de service (Services) | Élabore le PTA de son service, crée les actions, soumet et suit. |
 | Planification | Peut piloter et superviser. |
 | Direction | Valide. |
-| DG / Cabinet | Vue consolidée, peuvent verrouiller selon paramétrage. |
+| DG / Cabinet | Vue consolidée et arbitrages institutionnels selon habilitation. |
 | Agent | Lecture seule (sauf saisie hebdo dans les actions). |
 
 ### 3.3 Déclencheurs
@@ -217,22 +218,25 @@ Planifier les actions d'un service pour l'année, en rattachant chaque action à
 2. **Élaboration** :
    - Description et objectifs du PTA.
    - Création des **actions** rattachées (`PtaWebController` orchestre la navigation vers la création d'action depuis le PTA).
-3. **Soumission** (`submit`) → `soumis`.
-4. **Validation** (`approve`) → `valide`. Une fois validé, les actions du PTA sont opposables et entrent en exécution.
-5. **Verrouillage** (`lock`) → `verrouille`. Les actions associées passent en mode suivi/contrôle uniquement.
-6. **Réouverture** motivée (`reopen`).
+3. **Paramétrage des actions** : tant qu'une action reste à paramétrer, le PTA ne peut pas entrer normalement en exécution.
+4. **Mise en cours** : lorsque toutes les actions sont paramétrées, le PTA passe de `brouillon` à `en_cours`.
+5. **Soumission au contrôle SCIQ** (`pta/{pta}/cloturer` depuis `en_cours`) : statut `controle_sciq`.
+6. **Clôture** (`pta/{pta}/cloturer` depuis `controle_sciq`) : statut `cloture`, avec rapport d'anomalies tracé si nécessaire.
+7. **Archivage** (`pta/{pta}/archiver`) uniquement après clôture.
+8. **Déverrouillage exceptionnel** : demande motivée via `pta/{pta}/demandes-deverrouillage`.
 
 ### 3.5 Règles de gestion
 
 - Unicité PTA par PAO (`normalize_ptas_unique_per_pao` — un seul PTA actif par PAO et par service).
 - Les actions sont obligatoirement créées dans un PTA (les routes `/actions/create` et `POST /actions` redirigent ou retournent `403` avec message explicite).
-- Verrouillage descendant : un PTA verrouillé empêche la modification des actions structurantes.
+- Un PTA archivé ne peut plus être modifié ni recevoir d'action.
+- Une modification exceptionnelle d'un PTA ou d'une action protégée passe par le circuit de déverrouillage prévu.
 - Audit complet via `recordAudit($request, 'pta', $action, $pta, $before, $after)`.
 - Notifications de statut via `WorkspaceNotificationService::notifyPtaStatus()`.
 
 ### 3.6 États et transitions
 
-Identiques à PAS/PAO : `brouillon → soumis → valide → verrouille` + `reopen`.
+Cycle courant : `brouillon → en_cours → controle_sciq → cloture → archive`.
 
 ### 3.7 Données clés
 
@@ -264,8 +268,8 @@ Piloter la réalisation concrète des décisions de planification : assigner une
 | Acteur | Rôle |
 |---|---|
 | Chef de service | Crée l'action (depuis le PTA), affecte un responsable, soumet pour validation. |
-| Direction | Valide en seconde ligne après le chef de service. |
-| Agent | Saisit la progression hebdomadaire, gère les sous-actions, dépose les justificatifs, demande la clôture. |
+| Planification / SCIQ | Contrôle en seconde ligne après le visa du chef de service. |
+| Agent | Saisit la progression, gère ses sous-actions, dépose les justificatifs et soumet son suivi. |
 | DAF | Examine les demandes de financement, statue. |
 | DG | Approuve ou refuse le financement final. |
 | Planification / Cabinet / DG | Vue consolidée, supervision. |
@@ -279,7 +283,7 @@ Piloter la réalisation concrète des décisions de planification : assigner une
 `non_demarre`, `en_cours`, `en_avance`, `en_retard`, `acheve_dans_delai`, `acheve_hors_delai`, `cloturee`.
 
 **Statut de validation hiérarchique** (`statut_validation`, ajouté par `add_action_validation_workflow_fields`) :
-`non_soumise` → `soumise_chef` → (`validee_chef` | `rejetee_chef`) → (`validee_direction` | `rejetee_direction`).
+`non_soumise` → `soumise_chef` → (`soumise_controle` | `rejetee_chef`/`correction_demandee`) → (`validee_controle` | `correction_controle`).
 
 **Statut de financement** (constantes `Action::FINANCEMENT_*`) :
 `non_requis` · `en_attente_daf` (alias `a_traiter_daf`) · `en_cours_analyse` · `approuve` (alias `valide_daf`) · `rejete` (alias `rejete_daf`) · `finance` (alias `accorde_dg`) · `non_finance` (alias `refuse_dg`).
@@ -294,13 +298,14 @@ Piloter la réalisation concrète des décisions de planification : assigner une
    - Import IA PTA : `PtaActionParameterizationService` propose `type_action`, seuils, sous-actions, risque et alertes ; Laravel valide et l'utilisateur peut corriger avant import.
 3. **Indicateurs (KPI d'action)** : configurés directement dans l'écran action (les routes legacy `kpi/create` redirigent désormais ; seuls `kpi.store/update/destroy` sont conservés pour les opérations atomiques).
 4. **Financement** : si `financement_requis = true`, saisie description, source, justificatif initial.
-5. **Génération automatique des semaines** (`ActionWeek`) sur l'intervalle `[date_debut, date_fin_prevue]` (unicité `(action_id, numero_semaine)`).
+5. **Initialisation du suivi** : l'action est prête pour une saisie cumulative ou par sous-actions. L'ancienne route de soumission hebdomadaire est neutralisée par une réponse `410`.
 
 ### 4.5 Étapes — sous-workflow 2 : validation hiérarchique
 
 1. **Soumission au chef de service** : `statut_validation` passe à `soumise_chef`, horodaté (`soumise_le`, `soumise_par`).
-2. **Évaluation chef de service** (`actions/{action}/review`, `ActionTrackingWebController::reviewClosure`) : note (`evaluation_note`), commentaire, transition `validee_chef` ou `rejetee_chef`.
-3. **Validation direction** (`actions/{action}/review-direction`, `reviewClosureByDirection`) : note, commentaire, transition `validee_direction` ou `rejetee_direction`. C'est la validation terminale métier.
+2. **Visa chef de service** (`actions/{action}/review`) : validation vers `soumise_controle` ou retour motivé vers `correction_demandee`.
+3. **Contrôle Planification/SCIQ** (`actions/{action}/controle`) : validation terminale vers `validee_controle` et clôture, ou retour motivé vers `correction_controle`.
+4. **Correction** : le RMO corrige les données ou pièces sans effacer l'historique puis soumet à nouveau.
 
 ### 4.6 Étapes — sous-workflow 3 : financement (RMO → DAF → DG)
 
@@ -316,32 +321,29 @@ Routes dédiées sous `/actions/{action}/financement/...` :
 
 ### 4.7 Étapes — sous-workflow 4 : suivi opérationnel
 
-1. **Semaines générées** automatiquement à la création (`ActionWeek`).
-2. **Saisie hebdomadaire** (`actions/{action}/semaines/{actionWeek}/soumettre`, `ActionTrackingWebController::submitWeek`) :
-   - Champs communs : difficultés, mesures correctives, justificatif hebdo.
-   - Quantitatif : `quantite_realisee` cumulée.
-   - Qualitatif / sous-actions : avancement estimé 0-100 %, tâches réalisées.
-3. **Sous-actions** (`SousAction`, `actions.sub-actions.store`/`update`) : décomposition fine de l'action pour les modes `sous_actions` et `mixte`.
-4. **Mise à jour rapide de statut** (`PATCH actions/{action}/quick-statut`) pour basculer `en_cours`/`suspendu`/`termine`.
-5. **Mise à jour de l'exécution quantitative** (`actions.execution.update`).
-6. **Recalcul automatique** : `ActionObserver` déclenche `recalculateRealization()` et `ActionPerformanceService` à chaque sauvegarde ; les seuils de retard et de KPI sont paramétrables (`ActionCalculationSettings`).
-7. **Commentaires** (`actions.comment`) : discussion sur l'action, persistée et tracée.
-8. **Justificatifs** (`Justificatif`, polymorphe `MorphMany`) : dépôt, prévisualisation, téléchargement contrôlés (`actions.justificatifs.preview`/`download`) — stockage sécurisé via `SecureJustificatifStorage` (scan antivirus avant persistance).
+1. **Saisie de l'action** (`actions.execution.update`) : quantité réalisée, difficulté, commentaire et justificatif selon les règles du PTA.
+2. **Saisie des sous-actions** (`actions.sub-actions.update`) : progression ou preuve de chaque élément affecté.
+3. **Sauvegarde** : conservation d'un brouillon opérationnel sans déclencher le circuit complet.
+4. **Soumission** : contrôles de complétude puis transmission au chef de service.
+5. **Recalcul automatique** : `ActionObserver`, `ActionTrackingService` et `ActionPerformanceService` recalculent la progression, le statut dynamique, le délai et les KPI.
+6. **Commentaires** (`actions.comment`) : discussion persistée et tracée.
+7. **Justificatifs** : dépôt, prévisualisation et téléchargement contrôlés (`actions.justificatifs.preview`/`download`).
+8. **Ancien suivi hebdomadaire** : la route de soumission par semaine est supprimée du circuit métier et retourne `410`.
 
 ### 4.8 Étapes — sous-workflow 5 : clôture
 
-1. **Demande de clôture** par l'agent : saisie `date_fin_reelle`, `rapport_final`, dépôt `justificatif_final` obligatoire.
-2. **Revue chef de service** (`actions.review`) : note finale, commentaire, validation ou rejet.
-3. **Revue direction** (`actions.review-direction`) : décision terminale.
-4. Le statut dynamique bascule à `cloturee` ; l'action devient lecture-seule pour l'exécution (les KPI restent calculés pour le reporting).
+1. **Soumission du résultat** par l'agent ou le RMO avec les preuves exigées.
+2. **Visa chef de service** (`actions.review`) : transmission au contrôle ou retour en correction.
+3. **Contrôle final Planification/SCIQ** (`actions.control.review`) : validation ou correction motivée.
+4. Après `validee_controle`, le statut bascule à `cloturee` et la performance devient officielle.
 
 ### 4.9 Règles de gestion majeures
 
-- Toute action est créée depuis un PTA validé/verrouillé ; sinon redirection ou 403.
-- L'agent ne peut **pas** créer ou supprimer une action ; il ne saisit que les semaines, sous-actions, justificatifs et la demande de clôture (politique RBAC + `ActionPolicy`).
-- Unicité : `(action_id, numero_semaine)` pour `action_weeks` ; un seul `ActionKpi` primaire par action (`primaryKpi`).
+- Toute action est créée ou paramétrée depuis le PTA ; la création directe depuis le portefeuille Actions est bloquée ou redirigée.
+- L'agent ne peut **pas** créer ou supprimer une action ; il ne saisit que son suivi, ses sous-actions, justificatifs et commentaires.
+- Un seul `ActionKpi` primaire est retenu par action (`primaryKpi`).
 - Justificatifs : un système polymorphe unique remplace l'ancienne table `action_justificatifs` (cf. migration `migrate_action_justificatifs_to_justificatifs`).
-- Verrouillage descendant : si le PTA parent est `verrouille`, les champs structurants de l'action sont figés ; seuls les champs de suivi restent ouverts.
+- Un PTA archivé bloque les modifications. Les corrections exceptionnelles passent par le circuit de déverrouillage.
 - Recalcul auto : à chaque save d'action, l'`ActionObserver` invalide les caches agrégés (`PlanningCacheObserver`).
 
 ### 4.10 Données clés
@@ -638,22 +640,21 @@ Maintenir le socle organisationnel et de sécurité : structures (directions, se
 ## 9. Vue end-to-end : enchaînement nominal
 
 ```
-1. Structuration PAS                 (Planification → DG)
-2. Déclinaison PAO par direction     (Direction)
-3. Validation PAO                    (DG / Direction)
-4. Déclinaison PTA par service       (Service)
-5. Validation PTA                    (Direction)
-6. Création des actions dans le PTA  (Service)
-7. Génération automatique des semaines
-8. Soumission de l'action            (Agent → Chef de service → Contrôleur)
-9. Demande de financement (optionnel)(Service → DAF → DG)
-10. Exécution + saisie hebdomadaire  (Agent)
-11. Calcul automatique statuts/KPI   (ActionObserver + jobs)
-12. Alertes et escalade              (AlertCenterService + SendAlertDigestJob)
-13. Demande de clôture               (Agent)
-14. Visa chef de service + validation finale SCIQ / Planification
-15. Reporting consolidé              (Planification / DG)
-16. Audit immuable                   (transverse à chaque étape)
+1. Structuration du PAS actif        (Planification)
+2. Déclinaison du PAO par direction  (Direction)
+3. Déclinaison du PTA par service    (Service)
+4. Paramétrage des actions dans PTA  (Service)
+5. Passage du PTA en cours
+6. Exécution et saisie cumulative    (Agent / RMO)
+7. Soumission de l'action            (Agent → Chef de service)
+8. Visa chef puis contrôle final     (Chef → Planification/SCIQ)
+9. Financement optionnel             (RMO → DAF → DG)
+10. Report d'échéance optionnel      (RMO → Chef → Contrôle → Décideur → Application)
+11. Calcul automatique statuts/KPI   (services et observers)
+12. Alertes et notifications         (acteurs du périmètre)
+13. Clôture et archivage des plans   (acteurs habilités)
+14. Reporting consolidé              (Planification / DG)
+15. Audit immuable                   (transverse à chaque étape)
 ```
 
 ---
@@ -662,11 +663,11 @@ Maintenir le socle organisationnel et de sécurité : structures (directions, se
 
 | Workflow | Acteurs principaux | États clés | Verrou | Audit | Alertes |
 |---|---|---|---|---|---|
-| PAS | Planification, DG | brouillon→soumis→valide→verrouille | descendant sur PAO | ✓ | `missing_pao_coverage` |
-| PAO | Direction, DG | idem PAS | descendant sur PTA | ✓ | `missing_pao_coverage` |
-| PTA | Service, Direction | idem PAS | descendant sur actions structurantes | ✓ | dérive des actions |
-| Action — exécution | Service, Agent | non_demarre→en_cours→termine/suspendu/annule (+ statut_dynamique) | sur PTA verrouillé | ✓ | `action_overdue`, `action_non_demarre` |
-| Action — validation hiérarchique | Agent, Chef de service, SCIQ / Planification | non_soumise→soumise_chef→validee_chef→soumise_controle→validee_controle (+ corrections/rejets) | — | ✓ | via `action_log` |
+| PAS | Planification, DG | actif→cloture→archive | archive non modifiable, déverrouillage gouverné | ✓ | `missing_pao_coverage` |
+| PAO | Direction, Planification | en_cours/valide→cloture→archive | archive non modifiable | ✓ | `missing_pao_coverage` |
+| PTA | Service, Planification/SCIQ | brouillon→en_cours→controle_sciq→cloture→archive | archive non modifiable, déverrouillage gouverné | ✓ | dérive des actions |
+| Action — exécution | Service, Agent | non_demarre→en_cours→a_corriger/cloturee/suspendu/annule (+ statut dynamique) | protection du PTA et des états terminaux | ✓ | `action_overdue`, `action_non_demarre` |
+| Action — validation hiérarchique | Agent, Chef de service, SCIQ / Planification | non_soumise→soumise_chef→soumise_controle→validee_controle (+ corrections/rejets) | — | ✓ | via `action_log` |
 | Action — financement | DAF, DG | non_requis · en_attente_daf · en_cours_analyse · approuve · rejete · finance · non_finance | — | ✓ | via `action_log` |
 | Alertes | Tous (par scope) | non lu / lu | — | lecture journalisée | — |
 | Pilotage / Reporting | DG, Cabinet, Planif. | — | — | — | — |
@@ -685,16 +686,96 @@ Maintenir le socle organisationnel et de sécurité : structures (directions, se
 
 Identifiés au croisement de l'analyse de code et de l'audit existant (`docs/analyse-globale-application.md`) :
 
-1. **Propagation de la réouverture** : la réouverture d'un plan parent (PAS ou PAO) ne déclenche pas mécaniquement de re-validation des plans enfants ; à clarifier en termes de processus (gel manuel ? alerte ?).
-2. **Pas d'idempotence explicite sur la génération des semaines** lors d'un changement de `date_fin_prevue` après création : à vérifier que `ActionWeek` est recalculé correctement sans casser l'historique de saisies.
-3. **Couverture PAO** : l'alerte `missing_pao_coverage` est utile mais ne propose pas d'action « créer le PAO manquant » en un clic ; opportunité UX.
-4. **Financement vs exécution** : une action `approuve` (DAF) mais non encore `finance` (DG) peut-elle démarrer son exécution ? À tracer dans une règle de gestion explicite.
-5. **Rétention vs audit** : la politique de purge doit explicitement exclure `journal_audit` ; à confirmer dans le code de rétention.
-6. **Alertes calculées à la volée** : performances à surveiller en volume (>5 000 actions ouvertes) — l'audit a déjà recommandé d'introduire la pagination cursor sur les endpoints reporting et probablement sur la collecte des alertes.
+1. **Déverrouillage descendant** : une correction d'un plan parent ne revalide pas automatiquement tous les objets enfants ; l'analyse d'impact reste indispensable.
+2. **Couverture PAO** : l'alerte `missing_pao_coverage` identifie les manques, mais la création corrective reste une action utilisateur.
+3. **Financement vs exécution** : la règle autorisant ou non le démarrage avant la décision DG doit rester explicite dans le paramétrage métier.
+4. **Alertes calculées à la volée** : les performances doivent être surveillées au-delà de 5 000 actions ouvertes.
+5. **Parcours unifiés** : Imports et Reporting sont unifiés dans la navigation mais leurs espaces classique et IA restent techniquement distincts.
 
 ---
 
-## 12. Glossaire
+## 12. Workflows consolidés au 27 juillet 2026
+
+### 12.1 Suivi d'une action par onglets
+
+La page `actions/{action}/suivi` conserve la synthèse et les étapes en partie haute, puis répartit les opérations détaillées entre sept onglets :
+
+1. **Validation** : saisie, soumission, visa du chef et contrôle Planification/SCIQ.
+2. **Fiche** : rattachements PAS-PAO-PTA, responsables, dates, cible, seuils et risques.
+3. **Échéances** : création, instruction et application des reports.
+4. **Financement** : dossier RMO, instruction DAF, corrections et décision DG.
+5. **Discussion** : commentaires et retours de validation.
+6. **Justificatifs** : pièces d'exécution et de correction.
+7. **Journal** : événements, décisions et alertes.
+
+Un seul panneau détaillé est visible. Les liens directs sont conservés, l'onglet contenant une erreur est prioritaire après une validation refusée et la navigation clavier reste disponible.
+
+### 12.2 Report d'échéance
+
+```text
+RMO + pièce
+  → Chef de service
+  → Planification/SCIQ
+  → DG ou Chef Planification
+  → Contrôleur habilité applique la date
+```
+
+- La demande contient la nouvelle date souhaitée, le motif, la justification et une pièce obligatoire.
+- Un acteur peut demander un complément ; le demandeur fournit alors une nouvelle version de la pièce et la demande revient à l'étape concernée.
+- L'index distingue la file **À traiter**, les demandes du périmètre et **Mes demandes**.
+- Les versions successives des pièces restent téléchargeables selon les droits.
+- Aucune date n'est modifiée avant l'action finale `appliquer`.
+- L'application finale est réservée au contrôleur après décision favorable complète.
+
+### 12.3 Navigation Imports et Reporting
+
+- La barre latérale affiche une seule entrée **Imports**, mais les parcours classique et IA/OCR restent techniquement distincts.
+- L'import classique applique le modèle, l'aperçu, le mapping, la validation et la confirmation.
+- L'import IA/OCR applique le chargement, l'extraction, la correction ligne par ligne, la validation humaine et l'import final audité.
+- La barre latérale affiche une seule entrée **Reporting**, mais le centre d'exports institutionnels et l'espace de rapports IA conservent leurs pages propres.
+- Le centre d'exports produit des fichiers Excel/PDF immédiatement ou en file, avec téléchargement signé.
+- Le rapport IA reste un brouillon jusqu'à sa correction et sa validation humaine, puis peut être exporté en Word, PDF ou Excel.
+
+### 12.4 Notifications, audit et rétention
+
+- Notifications et alertes sont regroupées dans un centre unique avec compteurs, lecture individuelle et lecture globale.
+- Les validations, corrections, financements et reports alimentent la boîte des acteurs concernés selon leur rôle et leur périmètre.
+- Le journal d'audit est append-only, filtrable et exportable ; il conserve l'ancien et le nouvel état lorsqu'ils sont disponibles.
+- La rétention propose une simulation sans écriture, un verrou contre les exécutions concurrentes, un registre d'exécution et des exports contrôlés.
+- Le journal d'audit est exclu de toute purge opérationnelle.
+
+### 12.5 Import IA avec OpenAI uniquement
+
+```text
+Depot du fichier
+  -> extraction technique du contenu
+  -> analyse structuree OpenAI
+  -> controles referentiels Laravel
+  -> revue humaine
+  -> validation
+  -> import final audite
+```
+
+- L'extraction locale lit le document mais ne constitue pas une analyse IA.
+- Si OpenAI ne repond pas, la session passe en echec et aucune ligne de secours n'est importee.
+- Les erreurs de rattachement, date, doublon ou cible restent bloquantes.
+
+### 12.6 Rapport IA conforme au template
+
+```text
+Snapshot Laravel
+  -> redaction structuree OpenAI
+  -> composition selon le template ANBG
+  -> controle code/version/empreinte/sections
+  -> relecture et validation humaines
+  -> export officiel
+```
+
+- Toute modification relance le controle et peut remettre le rapport en brouillon.
+- Un export exige une conformite de 100 % et une validation humaine.
+- Les rapports historiques sans preuve de template restent bloques jusqu'a revalidation.
+
+## 13. Glossaire
 
 - **PAS** — Plan d'Actions Stratégique (pluriannuel, institutionnel).
 - **PAO** — Plan d'Actions Opérationnel (annuel, niveau direction).

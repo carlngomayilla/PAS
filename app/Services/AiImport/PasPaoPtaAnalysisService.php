@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\OpenAi\OpenAiClientService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 class PasPaoPtaAnalysisService
@@ -46,30 +47,32 @@ class PasPaoPtaAnalysisService
      */
     public function analyze(AiImportSession $session, array $extraction, ?User $user = null): array
     {
-        if ($this->openAi->available()) {
-            try {
-                $response = $this->openAi->createStructuredResponse(
-                    'pas_pao_pta_import',
-                    $this->prompt($session, $extraction),
-                    $this->schema(),
-                    $user,
-                    'ai_import'
-                );
-
-                $session->forceFill([
-                    'model_used' => $response['model'],
-                    'input_tokens' => $response['input_tokens'],
-                    'output_tokens' => $response['output_tokens'],
-                    'total_cost_usd' => $response['total_cost_usd'],
-                ])->save();
-
-                return $this->normalizeAiResult($response['data'], $session, $extraction);
-            } catch (Throwable $exception) {
-                report($exception);
-            }
+        if (! $this->openAi->available()) {
+            throw new RuntimeException('L import IA requiert OpenAI. Configurez OPENAI_API_KEY; aucun autre fournisseur ni resultat de secours ne sera utilise.');
         }
 
-        return $this->fallbackResult($session, $extraction);
+        try {
+            $response = $this->openAi->createStructuredResponse(
+                'pas_pao_pta_import',
+                $this->prompt($session, $extraction),
+                $this->schema(),
+                $user,
+                'ai_import'
+            );
+
+            $session->forceFill([
+                'model_used' => $response['model'],
+                'input_tokens' => $response['input_tokens'],
+                'output_tokens' => $response['output_tokens'],
+                'total_cost_usd' => $response['total_cost_usd'],
+            ])->save();
+
+            return $this->normalizeAiResult($response['data'], $session, $extraction);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            throw new RuntimeException('OpenAI n a pas pu analyser le document. L import IA est interrompu pour eviter un resultat non verifie.', previous: $exception);
+        }
     }
 
     /**

@@ -71,8 +71,9 @@ return [
     'openai_responses' => [
         'key' => env('OPENAI_API_KEY'),
         'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
-        'model' => env('OPENAI_MODEL', 'gpt-5.4-mini'),
-        'model_high' => env('OPENAI_MODEL_HIGH', 'gpt-5.5'),
+        'model' => env('OPENAI_MODEL', 'gpt-5.6-luna'),
+        'model_high' => env('OPENAI_MODEL_HIGH', 'gpt-5.6-terra'),
+        'reasoning_effort' => env('OPENAI_REASONING_EFFORT', 'medium'),
         'enabled' => filter_var(env('AI_PTA_LLM_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         'log_usage' => filter_var(env('AI_LOG_USAGE', true), FILTER_VALIDATE_BOOLEAN),
         'monthly_budget_usd' => (float) env('AI_MONTHLY_BUDGET_USD', 20),

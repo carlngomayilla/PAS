@@ -2,7 +2,7 @@
 
 **Guide détaillé et illustré pour la planification, le suivi, la validation et le reporting**
 
-**Version 1.0 - 14 juin 2026**
+**Version 2.0 - 27 juillet 2026**
 
 ![Logo e-Pilotage PAS](manuel-utilisation-e-pilotage-pas-assets/logo-e-pilotage-pas.png)
 
@@ -26,7 +26,7 @@ e-Pilotage PAS est l'application de pilotage stratégique et opérationnel de l'
 - Consulter les tableaux de bord, les alertes, les rapports et les exports PDF/Excel.
 - Administrer les rôles, les modules, les référentiels, les exercices, les règles de calcul et les modèles d'export.
 
-> **Principe métier :** Le PTA définit les règles de l'action. Le suivi applique ces règles. La validation du chef officialise la performance. Le reporting utilise la performance officielle.
+> **Principe métier :** Le PTA définit les règles de l'action. Le suivi applique ces règles. Le chef donne son visa, puis le contrôle Planification/SCIQ officialise la performance utilisée dans le reporting.
 
 ## 2. Concepts clés à connaître
 
@@ -92,15 +92,13 @@ e-Pilotage PAS est l'application de pilotage stratégique et opérationnel de l'
 
 L'espace de travail regroupe les modules par famille : Menu, Planification, Exécution, Pilotage, Administration et Plateforme. Les libellés peuvent être personnalisés par le Super Admin, mais la logique reste identique.
 
-Sur ordinateur, le menu latéral reste compact puis affiche ses libellés au survol ou lorsqu'il reçoit le focus clavier. Les onglets changent de vue ; les commandes lancent une action et conservent un style distinct.
-
 ![Illustration 3 - Carte des menus principaux](manuel-utilisation-e-pilotage-pas-assets/schema-navigation-modules.png)
 *Illustration 3 - Carte des menus principaux*
 
 | Famille | Modules | Utilisation |
 | --- | --- | --- |
 | Menu | Pilotage, Mes tâches, Notifications | Accès rapide aux synthèses, tâches ouvertes et messages système. |
-| Planification | PAS, PAO, PTA, Imports Excel | Création et structuration de la planification. |
+| Planification | PAS, PAO, PTA, Imports | Création, structuration et imports classiques ou assistés. |
 | Exécution | Actions, Financement des actions | Suivi, contrôle, validation, financement et justificatifs. |
 | Pilotage | Reporting, Alertes | Analyse consolidée, exports et surveillance des écarts. |
 | Administration | Référentiels, Délégations, Rétention, API Docs, Audit | Gestion de la donnée de base, traçabilité et gouvernance. |
@@ -115,7 +113,7 @@ Sur ordinateur, le menu latéral reste compact puis affiche ses libellés au sur
 
 ## 6. Tableau de bord et Mes tâches
 
-Le tableau de bord affiche une synthèse adaptée au rôle connecté : indicateurs de performance, alertes importantes, tâches ouvertes, score personnel, graphiques et tableaux de suivi. Les graphiques précisent leur variable, leur unité et leur période ; leurs légendes et infobulles donnent les volumes et pourcentages associés. Les profils Contrôle et suivi-évaluation disposent d'une carte Avancement global calculée sur les actions de leur périmètre visible.
+Le tableau de bord affiche une synthèse adaptée au rôle connecté : indicateurs de performance, alertes importantes, tâches ouvertes, score personnel, graphiques et tableaux de suivi.
 
 ### Mes tâches
 
@@ -130,6 +128,16 @@ Le tableau de bord affiche une synthèse adaptée au rôle connecté : indicateu
 - Progression théorique : progression attendue selon le calendrier.
 - Performance officielle : valeur validée et utilisée dans les rapports.
 - Alertes : écarts, retards, criticités ou anomalies détectés dans le périmètre.
+
+### Tableaux de bord par profil
+
+- DG : synthèse institutionnelle, arbitrages, alertes critiques et consolidation globale.
+- Direction : résultats de la direction, comparaison des services et dossiers à traiter.
+- Chef de service : PTA du service, actions, validations en attente et retards.
+- Agent / RMO : actions assignées, progression personnelle, corrections et échéances.
+- Planification / SCIQ : couverture PAS-PAO-PTA, avancement global, contrôle et qualité des données.
+- Le Super Admin peut activer, ordonner et dimensionner les cartes et graphiques par profil.
+- Un clic sur une carte conserve les filtres utiles et ouvre la vue détaillée autorisée.
 
 ## 7. Module PAS
 
@@ -160,6 +168,8 @@ Le tableau de bord affiche une synthèse adaptée au rôle connecté : indicateu
 - Le rapport d'anomalies peut signaler des PAO ouverts, PTA ouverts, actions en cours, validations en attente, retards ou KPI incomplets.
 - L'archivage intervient après clôture et conserve la traçabilité.
 
+> **Cycle actuel :** Le PAS suit le cycle actif, clôturé, puis archivé. Les anciennes commandes génériques Soumettre, Approuver, Verrouiller et Réouvrir ne font plus partie du parcours Web.
+
 ## 8. Module PAO
 
 ### Créer un PAO
@@ -182,6 +192,8 @@ Le tableau de bord affiche une synthèse adaptée au rôle connecté : indicateu
 - Une direction dispose en principe d'un PAO par exercice.
 - Lorsque les champs obligatoires sont complets, la validation peut être automatique selon les règles configurées.
 - Les objectifs opérationnels validés sont transmis aux chefs de service concernés.
+
+> **Cycle actuel :** Le PAO complet est validé dans le parcours de création, puis peut être clôturé et archivé. Un PAO archivé ne peut plus être modifié directement.
 
 | Champ PAO | Usage |
 | --- | --- |
@@ -209,6 +221,15 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 5. Créer les actions liées à l'objectif opérationnel.
 6. Enregistrer le PTA.
 
+### Cycle du PTA
+
+1. Le PTA débute en brouillon tant que des actions restent à paramétrer.
+2. Lorsque les actions sont complètes, le PTA passe en cours.
+3. La première commande de clôture transmet le PTA au contrôle SCIQ.
+4. Après contrôle, la clôture finale place le PTA à l'état clôturé.
+5. L'archivage n'est possible qu'après clôture.
+6. Une correction exceptionnelle d'un PTA protégé exige une demande de déverrouillage motivée.
+
 ### Créer une action dans le PTA
 
 1. Déplier le bloc Nouvelle action.
@@ -229,12 +250,6 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 
 > **Point de vigilance :** Pour une action composée, la somme des poids des sous-actions doit être égale à 100 %. Cette règle garantit un calcul cohérent de la performance.
 
-### Paramétrer l'indicateur dans le suivi PTA
-
-- Dans la colonne Indicateurs de mesure, les profils de planification et de contrôle habilités voient une commande Paramétrer ou Modifier directement dans la cellule.
-- Le type d'indicateur détermine les champs disponibles : quantité et unité pour le quantitatif, livrable pour le non quantitatif, les deux pour le mixte.
-- Les profils de suivi conservent les commandes Faire le suivi et Demander un report ; ils ne modifient pas les paramètres de l'action depuis ce tableau.
-
 ## 10. Suivi d'une action
 
 ![Illustration 5 - Workflow de suivi et validation d'une action](manuel-utilisation-e-pilotage-pas-assets/schema-workflow-action.png)
@@ -245,7 +260,19 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 1. Ouvrir Exécution > Actions.
 2. Filtrer si nécessaire par statut, direction, service, responsable ou recherche.
 3. Cliquer sur Suivi ou ouvrir le détail de l'action.
-4. Consulter la fiche, la progression, les justificatifs, la discussion et le journal.
+4. Utiliser les onglets Validation, Fiche, Échéances, Financement, Discussion, Justificatifs et Journal.
+
+### Comprendre les onglets du suivi
+
+| Onglet | Contenu | Utilisateur principalement concerné |
+| --- | --- | --- |
+| Validation | Saisie d'avancement, soumission, visa du chef et contrôle final. | Agent/RMO, chef de service, Planification/SCIQ |
+| Fiche | Rattachement PAS-PAO-PTA, responsables, dates, cible, risques et paramètres. | Tous les profils autorisés |
+| Échéances | Demande de report, pièce justificative, avis et application de la date approuvée. | RMO, chef, contrôleurs, décideur final |
+| Financement | Dossier RMO, instruction DAF, compléments et décision DG. | RMO, DAF, DG |
+| Discussion | Commentaires et retours de validation horodatés. | Acteurs du dossier |
+| Justificatifs | Pièces d'exécution, de correction et de clôture. | RMO et validateurs |
+| Journal | Historique des événements, décisions et alertes de l'action. | Contrôleurs et profils habilités |
 
 ### Enregistrer l'avancement
 
@@ -256,25 +283,27 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 - Décrire les difficultés rencontrées si le champ est activé.
 - Cliquer sur Enregistrer pour garder un brouillon sans déclencher la validation complète.
 
-### Soumettre au chef
+### Soumettre l'avancement
 
 1. Vérifier que les champs requis par le PTA sont remplis.
 2. Déposer la pièce justificative si elle est obligatoire ou attendue.
 3. Compléter le commentaire si le commentaire est obligatoire.
 4. Renseigner les difficultés ou écrire Aucune difficulté rencontrée si demandé par la procédure interne.
 5. Cliquer sur Soumettre au chef.
-6. Attendre la validation ou la demande de correction.
+6. Attendre le visa du chef de service puis le contrôle Planification/SCIQ.
 
-> **Différence essentielle :** Enregistrer calcule une performance provisoire. Soumettre déclenche le contrôle. Valider par le chef fige la performance officielle.
+> **Différence essentielle :** Enregistrer conserve un brouillon. Soumettre déclenche le visa hiérarchique. La performance devient officielle seulement après le contrôle final requis.
 
 ## 11. Validation, corrections et demandes de modification
 
-### Validation chef
+### Visa du chef et contrôle final
 
 - Le chef examine les éléments soumis par l'agent ou le RMO.
 - Il vérifie la cohérence de la quantité, des justificatifs, des commentaires et des difficultés.
-- S'il valide, l'action ou la sous-action devient officiellement prise en compte.
-- S'il rejette, il doit renseigner un motif. L'élément revient en correction.
+- S'il valide, le dossier est transmis au contrôleur Planification/SCIQ.
+- Le contrôleur vérifie la conformité, la preuve et la cohérence du résultat.
+- Tout rejet ou retour doit être motivé ; l'élément revient alors au RMO pour correction.
+- La clôture n'est acquise qu'après la dernière validation prévue par le workflow.
 
 ### Corrections demandées
 
@@ -284,19 +313,27 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 4. Corriger la saisie, le justificatif, le commentaire ou la quantité.
 5. Enregistrer puis soumettre à nouveau.
 
-### Demande de modification
+### Demander un report d'échéance
 
-- Après enregistrement définitif, certaines actions peuvent être figées en lecture seule.
-- Le bouton Demande de modification permet de demander la réouverture.
-- La demande suit le circuit contrôleur SCIQ/Planification puis décision DG selon la configuration.
-- Le motif doit être clair : erreur de saisie, changement d'échéance, réaffectation, ajustement de cible ou correction de financement.
+1. Ouvrir l'action puis l'onglet Échéances, ou cliquer sur Report de l'action.
+2. Sélectionner l'action ou la sous-action concernée.
+3. Saisir la nouvelle date souhaitée, le motif et la justification détaillée.
+4. Joindre obligatoirement une pièce justificative lisible.
+5. Soumettre la demande au chef de service.
+6. Après l'avis du chef, attendre le contrôle Planification/SCIQ.
+7. La DG ou le Chef Planification rend la décision finale selon le circuit applicable.
+8. Après approbation finale, seul un contrôleur habilité applique la nouvelle date.
+
+> **Règle impérative :** Aucune date d'action ou de sous-action ne peut être changée directement, même par un contrôleur. Le changement n'est appliqué qu'après l'approbation complète de la demande de report.
 
 ### Financement
 
-- Si l'action nécessite un financement, le PTA doit indiquer le besoin, le montant, la nature et la pièce justificative.
-- Le DAF peut valider et transmettre à la DG, demander un complément ou rejeter.
-- La DG peut accorder ou refuser le financement.
-- Les décisions, dates, pièces et commentaires restent visibles dans le détail de l'action.
+1. Le RMO prépare le dossier dans l'onglet Financement : source, montant, commentaire et pièce justificative.
+2. Le RMO soumet le dossier à la DAF.
+3. La DAF donne un avis favorable, demande un complément ou rejette avec un motif.
+4. En cas de complément ou de rejet corrigeable, le RMO ajoute une nouvelle pièce et soumet à nouveau.
+5. Après avis favorable de la DAF, la DG accorde ou refuse le financement.
+6. Consulter l'historique des décisions, pièces et dates dans l'action.
 
 ## 12. Reporting, alertes et exports
 
@@ -306,7 +343,7 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 ### Consulter un rapport
 
 1. Ouvrir Pilotage > Reporting.
-2. Choisir le type de rapport métier.
+2. Choisir le parcours de reporting ou de rapport assisté proposé depuis l'entrée Reporting.
 3. Appliquer les filtres : exercice, trimestre, direction, service, statut, type d'action, responsable ou criticité.
 4. Analyser les résultats affichés.
 5. Exporter en Excel pour analyse détaillée ou en PDF pour diffusion.
@@ -318,12 +355,30 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 - Les filtres modifient les tableaux et les exports.
 - Les exports doivent être relus avant diffusion institutionnelle.
 
+### Produire un rapport assisté par IA
+
+1. Ouvrir Pilotage > Reporting puis l'onglet Rapport assisté par IA.
+2. Choisir le niveau PAS, PAO ou PTA et le périmètre autorisé.
+3. Lancer la génération du brouillon à partir des indicateurs calculés par l'application.
+4. Relire les chiffres, les analyses, les risques et les recommandations proposés.
+5. Corriger le texte lorsque cela est nécessaire.
+6. Faire valider humainement le rapport avant tout export officiel.
+7. Exporter le contenu validé en Word, PDF ou Excel selon les formats disponibles.
+
 ### Gérer les alertes
 
 - Les alertes signalent les retards, criticités, anomalies et éléments à traiter.
 - Une alerte peut être lue depuis Notifications > Alertes ou depuis le menu Alertes.
 - Le bouton Ouvrir mène généralement vers l'action ou l'élément concerné.
 - Les alertes non lues peuvent être marquées comme lues individuellement ou en masse selon les droits.
+
+### Utiliser le centre Notifications
+
+- La page Notifications regroupe les messages applicatifs et un accès aux alertes actives.
+- Les compteurs de la barre latérale et de l'en-tête reflètent les éléments non lus du périmètre.
+- Les notifications de validation, correction, financement et report ouvrent directement le dossier concerné.
+- Utiliser Marquer comme lu après traitement ou Tout marquer comme lu pour nettoyer la file.
+- Les canaux, seuils, délais d'escalade et digests sont configurés par les administrateurs habilités.
 
 ## 13. Référentiels, délégations, audit et gouvernance
 
@@ -338,31 +393,24 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 
 - Une délégation donne temporairement à un autre utilisateur la capacité d'intervenir dans un circuit.
 - Elle doit préciser le délégant, le délégué, la période, le périmètre et le motif.
-- Le registre distingue les délégations actives, planifiées, proches de leur fin, échues et annulées.
-- Deux délégations du même bénéficiaire ne peuvent pas se chevaucher sur le même périmètre.
 - Une délégation doit être annulée dès qu'elle n'est plus nécessaire.
-
-### Demandes de suppression
-
-- Chaque demandeur consulte uniquement ses propres demandes et leur décision dans la file de gouvernance.
-- Le super-admin consulte la file globale, l'analyse d'impact et les mouvements d'affectation récents avant de décider.
-- Une demande de complément revient au demandeur ; sa réponse replace la demande dans la file d'instruction.
-- Les suppressions, désactivations, archivages, refus et corrections restent tracés dans le journal d'audit.
 
 ### Audit
 
 - Le journal d'audit conserve les actions sensibles : création, modification, suppression, validation, décisions et changements de configuration.
 - Les filtres permettent de rechercher par module, action, utilisateur, entité, date ou texte.
 - L'audit sert à contrôler la traçabilité et à comprendre l'historique d'un dossier.
+- L'export CSV reprend les filtres autorisés sans exposer de secret.
+- Le journal est en ajout uniquement : une entrée existante n'est pas modifiée pour réécrire l'histoire.
 
 ### Rétention et documentation API
 
-- La rétention concerne l'archivage et les règles de conservation des données.
-- L'écran distingue les snapshots de données historiques et l'archivage de statut des PAO/PTA.
-- Le bouton **Simuler** calcule les éléments éligibles sans modifier les données ; **Exécuter** applique l'opération après confirmation.
-- Chaque opération apparaît dans l'historique avec son opérateur, ses volumes, sa durée et son statut.
-- Le registre des archives se filtre par source, lot, opérateur ou période et peut être exporté en CSV.
-- Le téléchargement JSON restitue une archive individuelle en masquant les secrets éventuels.
+- La rétention concerne l'archivage et les règles de conservation des données opérationnelles.
+- Commencer par une simulation : elle affiche les candidats sans modifier les données.
+- Une seule exécution peut travailler sur un même périmètre à la fois.
+- Le registre conserve les simulations et exécutions Web, console ou planifiées.
+- Les candidats peuvent être exportés et les archives téléchargées en JSON masqué selon les droits.
+- Le journal d'audit n'est jamais supprimé par la rétention.
 - La documentation API expose les contrats techniques pour les intégrations autorisées.
 - Ces modules sont réservés aux profils habilités.
 
@@ -370,15 +418,6 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 
 ![Illustration 7 - Zones de paramétrage de la Super Administration](manuel-utilisation-e-pilotage-pas-assets/schema-super-admin.png)
 *Illustration 7 - Zones de paramétrage de la Super Administration*
-
-### Centre de commandement
-
-La page d'accueil Super Administration présente l'état global de la plateforme avant les réglages détaillés : utilisateurs et sessions actifs, modules ouverts, contrôles en anomalie, décisions de gouvernance et brouillons à publier.
-
-- La file **À traiter** classe les interventions prioritaires et ouvre directement l'écran concerné.
-- L'**État des brouillons** distingue les paramètres généraux, les modules et l'apparence avant publication.
-- Les **Domaines d'administration** regroupent tous les réglages en quatre ensembles cliquables : Plateforme, Gouvernance, Pilotage métier, Continuité et sorties.
-- L'activité sur sept jours et les dernières modifications sensibles facilitent le contrôle administratif et l'accès au journal d'audit.
 
 ### Plateforme
 
@@ -391,8 +430,7 @@ La page d'accueil Super Administration présente l'état global de la plateforme
 
 - Rôles : matrice de permissions, registre des rôles et restauration de versions.
 - Organisation : directions, services, comptes utilisateurs et import en masse.
-- Unités DG : SCIQ, DGA, Cabinet, UCAS, chefs d'unité et membres. Un chef doit avoir un compte actif et être déjà membre de l'unité ou porter le rôle de chef correspondant. Une même personne ne peut diriger qu'une unité à la fois.
-- Simulations d'organisation : choisir une source et une destination pour lire les volumes d'utilisateurs, PTA, actions et justificatifs concernés, sans modifier les données.
+- Unités DG : SCIQ, DGA, Cabinet, UCAS, chefs d'unité et membres.
 - Dashboards : cartes et visibilité selon les profils.
 - Diagnostic et audit : contrôle plateforme et actions sensibles.
 
@@ -410,24 +448,18 @@ La page d'accueil Super Administration présente l'état global de la plateforme
 ### Avancé
 
 - Snapshots : sauvegarder, comparer et restaurer une configuration.
-- Simulation : comparer les paramètres publiés au scénario cible sans modifier les données. Le circuit Actions reste verrouillé sur **Agent → Chef de service → Contrôleur** ; seuls le seuil de clôture et l'auto-clôture sont simulés.
-- Templates d'export : créer et prévisualiser un brouillon, puis le publier pour activer ses affectations. Un brouillon ne peut être ni actif ni modèle par défaut. Modifier un modèle publié ouvre une nouvelle phase de brouillon ; l'archivage ou la restauration désactive ses anciennes affectations jusqu'à une nouvelle publication.
-- Affectations d'export : le module, le type de rapport et le format viennent du modèle. Le profil, le niveau et le périmètre direction/service peuvent être précisés. Une seule affectation active peut être définie par défaut pour un même périmètre.
-
-### Règles de sécurité
-
-- Seul un compte dont le rôle principal est **Super Admin** dispose des privilèges Super Admin. Un rôle personnalisé ne peut ni hériter de ce rôle ni le dupliquer.
-- L'activation et la désactivation du mode maintenance exigent le mot de passe courant. Le lien temporaire généré lors de l'activation doit être utilisé immédiatement et n'est pas conservé dans l'audit.
-- Une restauration partielle ne propose que les groupes contenus dans le snapshot sélectionné. Aucun groupe externe ne peut être injecté dans la demande.
-- Les dates métier restent soumises à leurs circuits de validation ; les réglages techniques Super Admin ne contournent pas ces workflows.
+- Simulation : vérifier l'impact d'un changement avant application.
+- Templates d'export : créer, prévisualiser, publier, archiver et affecter des modèles de rapports.
 
 > **Prudence :** Toute modification dans Super Administration peut changer l'expérience de plusieurs profils. Documentez le motif et utilisez les brouillons, snapshots ou simulations lorsqu'ils sont disponibles.
 
-## 15. Imports Excel
+## 15. Imports classiques et assistés par IA
 
-### Importer un fichier
+La barre latérale présente une seule entrée Imports afin d'éviter les doublons. Cette entrée donne accès à deux parcours techniques distincts : l'import classique de fichiers structurés et l'import assisté par IA/OCR.
 
-1. Ouvrir Planification > Imports Excel.
+### Importer un fichier structuré
+
+1. Ouvrir Planification > Imports puis choisir le parcours d'import classique.
 2. Télécharger le modèle Excel si nécessaire.
 3. Préparer une feuille avec une ligne par action planifiée.
 4. Cliquer sur Nouvel import.
@@ -443,6 +475,35 @@ La page d'accueil Super Administration présente l'état global de la plateforme
 - Vérifier les codes directions, services, objectifs et utilisateurs avant import.
 - Contrôler les dates et les montants.
 - Lire le rapport d'erreurs si l'import échoue.
+
+### Utiliser l'import assisté par IA
+
+1. Ouvrir Planification > Imports puis accéder au parcours d'import assisté par IA.
+2. Déposer le document PTA autorisé : Excel, CSV, PDF, Word ou image selon la configuration.
+3. Attendre l'extraction et consulter les lignes reconnues, les avertissements et le score de confiance.
+4. Corriger les informations proposées et ignorer les lignes qui ne doivent pas être importées.
+5. Lancer la validation métier ; aucune donnée définitive n'est créée tant que les erreurs bloquantes subsistent.
+6. Générer le fichier canonique ou confirmer l'import final.
+7. Contrôler le rapport d'import et l'historique des corrections.
+
+> **Validation humaine obligatoire :** L'IA facilite l'extraction et la rédaction, mais elle ne valide jamais seule un PTA, une action ou un rapport institutionnel.
+
+### Fournisseur IA et controle des rapports
+
+- OpenAI est l'unique fournisseur autorise pour les imports assistes par IA et les rapports IA.
+- Une cle `OPENAI_API_KEY` valide doit etre configuree. En son absence, le traitement s'arrete sans resultat IA de secours.
+- Laravel calcule les donnees et indicateurs depuis la base. OpenAI organise et redige uniquement le snapshot transmis.
+- Chaque rapport affiche le fournisseur, le modele, le code et la version du template, la date du controle et le score de conformite.
+- Une modification relance automatiquement le controle. Une section absente ou deplacee bloque validation et exports.
+- Le circuit reste : brouillon OpenAI conforme, relecture humaine, validation habilitee, puis export Word, PDF ou Excel.
+
+### Traiter une erreur OpenAI
+
+1. Lire le message affiche dans la page Import ou Rapport IA.
+2. Verifier la cle API, le budget mensuel et la disponibilite du worker `ai-imports`.
+3. Relancer l'analyse apres correction.
+4. Le systeme ne remplace jamais silencieusement OpenAI par Ollama ou un autre fournisseur.
+5. Pour un rapport non conforme, restaurer les rubriques indiquees, enregistrer, puis valider.
 
 ## 16. Bonnes pratiques par profil
 
@@ -462,8 +523,9 @@ La page d'accueil Super Administration présente l'état global de la plateforme
 | Je ne vois pas un module | Votre rôle ou la configuration de navigation ne l'autorise pas. | Demander à l'administrateur de vérifier vos droits et modules visibles. |
 | Je ne peux pas créer une action depuis Actions | Les actions se créent depuis le PTA. | Aller dans Planification > PTA puis ajouter l'action dans le PTA. |
 | Je ne peux pas soumettre | Un champ obligatoire manque : preuve, commentaire, difficulté ou quantité. | Lire les messages d'erreur, compléter les champs, puis soumettre à nouveau. |
-| Mon action affiche 100 % mais n'est pas dans le reporting | La performance est encore provisoire. | Vérifier le visa du chef puis la validation finale SCIQ / Planification. |
-| Je dois modifier une action figée | L'action est enregistrée et verrouillée. | Utiliser Demande de modification et saisir un motif clair. |
+| Mon action affiche 100 % mais n'est pas dans le reporting | La performance est encore provisoire ou en contrôle. | Vérifier le visa du chef et la validation finale Planification/SCIQ. |
+| Je dois modifier une date | Les dates sont protégées par le circuit de report. | Ouvrir l'onglet Échéances, joindre une preuve et soumettre une demande de report. |
+| Le mauvais formulaire s'affiche | Un autre onglet de suivi est actif. | Choisir l'onglet Validation, Échéances, Financement ou Justificatifs correspondant à l'opération. |
 | Un export ne correspond pas à mon attendu | Les filtres ou le périmètre changent le résultat. | Vérifier les filtres, l'exercice, le trimestre, la direction et le service. |
 | Un justificatif est refusé | Format non autorisé ou pièce incomplète. | Utiliser un format accepté et déposer une pièce lisible. |
 
@@ -479,7 +541,8 @@ La page d'accueil Super Administration présente l'état global de la plateforme
 | KPI | Indicateur de performance. |
 | Justificatif | Document ou preuve déposée pour appuyer une réalisation. |
 | Soumission | Transmission d'une réalisation au chef pour validation. |
-| Validation chef | Décision qui officialise la performance. |
+| Visa du chef | Décision hiérarchique qui transmet le suivi au contrôle final ou le retourne en correction. |
+| Validation du contrôle | Décision Planification/SCIQ qui officialise la performance et clôture le circuit. |
 | Alerte | Signal automatique ou manuel indiquant un risque, un retard ou une anomalie. |
 | Snapshot | Copie d'une configuration permettant comparaison ou restauration. |
 | Périmètre | Champ de visibilité et d'action autorisé pour un utilisateur. |

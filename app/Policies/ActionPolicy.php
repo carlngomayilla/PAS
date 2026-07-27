@@ -127,9 +127,7 @@ class ActionPolicy
         );
     }
 
-    /**
-     * Peut saisir le suivi hebdomadaire (l'agent responsable uniquement).
-     */
+    /** Compatibilité API historique : seul le responsable peut soumettre son exécution. */
     public function submitWeek(User $user, Action $action): bool
     {
         return $action->isResponsible($user);

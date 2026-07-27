@@ -2,7 +2,7 @@
 
 Application ANBG e-Pilotage PAS / PAO / PTA
 
-Date de reference : 2026-07-08
+Date de reference : 2026-07-27
 
 Source d'analyse : code Laravel local, routes web et API, modeles, migrations, services applicatifs, tests fonctionnels et documentation existante.
 
@@ -984,20 +984,23 @@ Les ressources API identifiees comprennent :
 6. Creation du PTA.
 7. Creation des actions et sous-actions.
 8. Parametrage des indicateurs.
-9. Validation ou verrouillage selon workflow.
-10. Execution et suivi.
-11. Reporting et audit.
+9. Mise en activite puis controle selon le type de plan.
+10. Cloture apres controle des anomalies.
+11. Archivage du plan cloture.
+12. Execution, suivi, reporting et audit.
 
 ### 28.2 Cycle d'execution d'une action
 
 1. L'action est creee ou importee.
 2. Les responsables et echeances sont definis.
 3. Les indicateurs sont rattaches.
-4. L'utilisateur renseigne l'avancement.
+4. L'utilisateur renseigne l'avancement dans l'onglet Validation.
 5. Les justificatifs sont ajoutes.
-6. Les KPI sont mesures.
-7. Les alertes sont declenchees si necessaire.
-8. L'action est cloturee ou revisee.
+6. Le suivi est soumis au chef de service.
+7. Le chef valide ou retourne le suivi en correction.
+8. Planification ou le SCIQ effectue le controle final.
+9. Les KPI et alertes sont recalcules.
+10. L'action est cloturee apres validation finale ou retournee en correction.
 
 ### 28.3 Controle PTA
 
@@ -1038,11 +1041,13 @@ Les ressources API identifiees comprennent :
 
 ### 28.7 Demande de report d'echeance
 
-1. L'utilisateur demande une nouvelle echeance.
-2. Il precise le motif.
-3. Le validateur statue.
-4. La date est mise a jour si la demande est acceptee.
-5. L'historique est conserve.
+1. L'utilisateur demande une nouvelle echeance depuis l'onglet Echeances.
+2. Il precise la date souhaitee, le motif et la justification, puis joint une piece obligatoire.
+3. Le chef de service rend son avis.
+4. Planification ou le SCIQ controle la demande.
+5. La DG ou le Chef Planification rend la decision finale.
+6. Un controleur habilite applique la date seulement apres approbation complete.
+7. Les revisions de pieces, avis, decisions, ancienne date et nouvelle date sont conservees.
 
 ## 29. Regles de gestion transverses
 
@@ -1969,3 +1974,78 @@ La page d'accueil ne doit pas se limiter a une vue essentielle composee de quelq
 - Les exports ne contiennent ni hash, ni jeton, ni mot de passe, ni secret de session.
 - Les cellules commencant par un caractere de formule tableur sont neutralisees avant ecriture.
 - Les lignes sont parcourues par lots afin de limiter la consommation memoire.
+
+## 59. Consolidation fonctionnelle au 27 juillet 2026
+
+### 59.1 Navigation unifiee
+
+- La barre laterale presente une seule entree **Imports**. Cette entree regroupe la navigation vers deux parcours techniques encore distincts : import classique et import assiste par IA/OCR.
+- La barre laterale presente une seule entree **Reporting**. Cette entree regroupe le centre d'exports institutionnels et l'espace de rapports assistes par IA, qui conservent leurs propres pages.
+- Une information, une commande ou un onglet ne doit pas etre duplique sur une meme page.
+- Les onglets servent a changer de vue ou de formulaire ; les boutons restent reserves aux commandes qui produisent une action.
+
+### 59.2 Poste de suivi d'une action
+
+- Le suivi d'une action utilise sept onglets : **Validation**, **Fiche**, **Echeances**, **Financement**, **Discussion**, **Justificatifs** et **Journal**.
+- Un seul panneau detaille est visible a la fois. Les informations synthetiques, les etapes du workflow et les indicateurs essentiels restent accessibles au-dessus des onglets.
+- Un lien direct vers un onglet ouvre automatiquement le bon panneau.
+- En cas d'erreur de validation, le panneau contenant le formulaire en erreur est prioritaire.
+- La navigation par clavier utilise les fleches, Debut et Fin, avec des relations accessibles entre chaque onglet et son panneau.
+
+### 59.3 Circuit officiel de l'avancement
+
+1. Le RMO ou l'agent enregistre une progression, une difficulte, un commentaire et les pieces requises.
+2. La soumission transmet le suivi au chef de service.
+3. Le chef valide ou retourne le suivi avec un motif.
+4. Apres le visa du chef, Planification ou le SCIQ effectue le controle final prevu.
+5. Un rejet replace le dossier en correction sans effacer l'historique.
+6. Seule la progression ayant termine le circuit requis alimente la performance officielle et le reporting institutionnel.
+
+### 59.4 Gouvernance des dates
+
+- Aucune date d'action ou de sous-action ne peut etre modifiee directement apres la planification.
+- Le demandeur saisit une nouvelle date, un motif, une justification et joint une piece justificative.
+- Le chef de service rend un avis, puis Planification ou le SCIQ controle la demande.
+- La DG ou le Chef Planification rend la decision finale selon le circuit applicable.
+- Apres approbation finale, seul un controleur habilite applique la nouvelle date.
+- Les anciennes et nouvelles dates, les avis, la decision et l'identite de l'operateur sont conserves dans l'audit.
+
+### 59.5 Gouvernance du financement
+
+1. Le RMO soumet la source de financement, le montant, le commentaire et la piece du dossier.
+2. La DAF instruit le dossier et peut emettre un avis favorable, demander un complement ou rejeter avec un motif.
+3. Le RMO peut corriger et resoumettre le dossier lorsque le statut le permet.
+4. La DG rend la decision terminale d'accord ou de refus.
+5. Les transitions incompatibles, doublons de decision et acces hors perimetre sont refuses par le serveur.
+
+### 59.6 Principes d'interface
+
+- Les en-tetes des pages utilisent un style institutionnel commun et un motif geometrique sans marque externe.
+- Le motif reste limite a la barre laterale, a l'en-tete et aux zones decoratives ; les tableaux, formulaires, champs et cartes KPI restent neutres.
+- Le mode sombre doit conserver des textes, icones, bordures, graphiques et etats de focus lisibles.
+- La barre laterale se retracte automatiquement hors survol sur les ecrans compatibles, tout en conservant le logo ANBG et les icones identifiables.
+- Les tableaux de bord sont adaptes au profil connecte et affichent des graphiques avec titres, unites, pourcentages, legendes et etats vides explicites.
+
+## 60. Gouvernance OpenAI et conformite des rapports IA
+
+### 60.1 Fournisseur unique
+
+- Import IA et Rapports IA utilisent exclusivement l'API Responses d'OpenAI.
+- L'absence de cle, une erreur reseau ou une reponse invalide provoque un echec explicite.
+- Aucun fallback Ollama, multi-fournisseur ou brouillon local n'est presente comme resultat IA.
+
+### 60.2 Controle du template
+
+- Laravel calcule les metriques; OpenAI retourne une redaction conforme a un schema JSON strict.
+- Le template est identifie par un code, une version et une empreinte SHA-256.
+- Rubriques et ordre sont controles apres generation et apres chaque modification.
+- Statut, score, anomalies et horodatage sont conserves avec le rapport.
+- Validation humaine et exports Word, PDF ou Excel exigent une conformite de 100 %.
+- Le rapport trimestriel PTA reprend les sept rubriques du modele `rapport_pta_trimestriel_2026.docx`.
+
+### 60.3 Configuration et exploitation
+
+- `gpt-5.6-luna` traite les operations courantes et `gpt-5.6-terra` la redaction institutionnelle.
+- La cle reste dans l'environnement serveur et n'est jamais affichee ni journalisee.
+- Tokens, cout estime, modele et identifiant de requete sont traces.
+- Budget mensuel, limites de tokens, delais et tentatives sont configurables.

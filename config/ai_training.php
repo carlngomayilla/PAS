@@ -17,7 +17,7 @@ return [
         'pdf_parser_enabled' => (bool) env('AI_PTA_PDF_PARSER_ENABLED', true),
         'pdf_parser_max_bytes' => (int) env('AI_PTA_PDF_PARSER_MAX_BYTES', 5 * 1024 * 1024),
         'llm_enabled' => (bool) env('AI_PTA_LLM_ENABLED', true),
-        'llm_provider' => env('AI_PTA_LLM_PROVIDER', 'openai'),
+        'llm_provider' => 'openai',
         'llm_model' => env('AI_PTA_LLM_MODEL'),
         'llm_text_model' => env('AI_PTA_TEXT_MODEL'),
         'llm_vision_model' => env('AI_PTA_VISION_MODEL'),
@@ -54,6 +54,8 @@ return [
     ],
 
     'reports' => [
+        'provider' => 'openai',
+        'template_version' => env('AI_REPORT_TEMPLATE_VERSION', '2026.1'),
         'pta_quarterly_template_path' => env(
             'AI_PTA_QUARTERLY_REPORT_TEMPLATE_PATH',
             env('AI_PTA_REPORT_TEMPLATE_PATH', base_path('docs/templates/rapport_pta_trimestriel_2026.docx'))

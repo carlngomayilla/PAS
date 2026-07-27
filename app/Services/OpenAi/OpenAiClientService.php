@@ -68,6 +68,9 @@ class OpenAiClientService
                 'input' => $input,
                 'store' => false,
                 'max_output_tokens' => $maxOutputTokens,
+                'reasoning' => [
+                    'effort' => (string) config('services.openai_responses.reasoning_effort', 'medium'),
+                ],
                 'text' => [
                     'format' => [
                         'type' => 'json_schema',

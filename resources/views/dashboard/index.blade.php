@@ -26,7 +26,7 @@
         @include('dashboard.partials.role-default', ['essentialDashboard' => $essentialDashboard])
     @endif
 
-    @if (request('dashboardTab') === 'advanced')
+    @if (in_array((string) request('dashboardTab'), ['advanced', 'charts', 'tables'], true))
         <div class="pt-2">
             @include('partials.dashboard-analytics')
         </div>

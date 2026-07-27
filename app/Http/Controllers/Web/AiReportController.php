@@ -7,6 +7,7 @@ use App\Models\AiGeneratedReport;
 use App\Models\Direction;
 use App\Models\Service;
 use App\Services\Ai\PtaQuarterlyReportPreviewService;
+use App\Services\Ai\ReportTemplateConformityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,8 @@ use Illuminate\View\View;
 class AiReportController extends Controller
 {
     public function __construct(
-        private readonly PtaQuarterlyReportPreviewService $ptaQuarterlyPreview
+        private readonly PtaQuarterlyReportPreviewService $ptaQuarterlyPreview,
+        private readonly ReportTemplateConformityService $conformity
     ) {}
 
     public function index(Request $request): View
@@ -68,6 +70,11 @@ class AiReportController extends Controller
             $contentColumn => $validated['content'],
             'status' => $validated['status'] ?? $report->status,
         ])->save();
+        $this->conformity->apply($report->refresh(), $validated['content']);
+
+        if ($report->status === AiGeneratedReport::STATUS_VALIDATED && ! $report->refresh()->isTemplateConforming()) {
+            $report->forceFill(['status' => AiGeneratedReport::STATUS_DRAFT])->save();
+        }
 
         return redirect()
             ->route('workspace.ai-reports.show', $report)

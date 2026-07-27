@@ -16,118 +16,118 @@ class UserProfileService
         $items = match ($user->role) {
             User::ROLE_SUPER_ADMIN => [
                 [
-                    'module'     => 'Super Administration',
+                    'module' => 'Super Administration',
                     'operations' => ['Piloter plateforme', 'Configurer exports', 'Publier regles globales', 'Auditer'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
                 [
-                    'module'     => 'Gouvernance systeme',
+                    'module' => 'Gouvernance systeme',
                     'operations' => ['Gérer modules', 'Ajuster navigation', 'Maintenir coherence des parametres'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
             ],
             User::ROLE_ADMIN_FONCTIONNEL => [
                 [
-                    'module'     => 'Gouvernance PAS/PAO/PTA',
+                    'module' => 'Gouvernance PAS/PAO/PTA',
                     'operations' => ['Creer', 'Modifier', 'Supprimer', 'Cloturer', 'Archiver', 'Consulter'],
-                    'portee'     => 'Toutes les directions et services',
+                    'portee' => 'Toutes les directions et services',
                 ],
                 [
-                    'module'     => 'Execution et performance',
+                    'module' => 'Execution et performance',
                     'operations' => ['Piloter actions', 'Suivre progression globale', 'Consulter alertes'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
                 [
-                    'module'     => 'Administration',
+                    'module' => 'Administration',
                     'operations' => ['Gérer utilisateurs', 'Consulter journal audit'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
             ],
             User::ROLE_DG => [
                 [
-                    'module'     => 'PAS',
+                    'module' => 'PAS',
                     'operations' => ['Consulter', 'Arbitrer exceptions'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
                 [
-                    'module'     => 'PAO / PTA',
+                    'module' => 'PAO / PTA',
                     'operations' => ['Superviser', 'Valider', 'Consulter'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
                 [
-                    'module'     => 'Reporting',
+                    'module' => 'Reporting',
                     'operations' => ['Consulter tableaux de bord consolides'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
             ],
             User::ROLE_PLANIFICATION => [
                 [
-                    'module'     => 'Structuration PAS/PAO/PTA',
+                    'module' => 'Structuration PAS/PAO/PTA',
                     'operations' => ['Creer', 'Modifier', 'Cloturer', 'Consulter'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
                 [
-                    'module'     => 'Objectifs stratégiques',
+                    'module' => 'Objectifs stratégiques',
                     'operations' => ['Definir axes/objectifs', 'Configurer indicateurs de suivi'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
                 [
-                    'module'     => 'Suivi et reporting',
+                    'module' => 'Suivi et reporting',
                     'operations' => ['Consolider avancement', 'Produire rapports'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
             ],
             User::ROLE_DIRECTION => [
                 [
-                    'module'     => 'PAO de la direction',
+                    'module' => 'PAO de la direction',
                     'operations' => ['Creer', 'Modifier', 'Suivre'],
-                    'portee'     => 'Direction rattachee',
+                    'portee' => 'Direction rattachee',
                 ],
                 [
-                    'module'     => 'PTA et execution',
+                    'module' => 'PTA et execution',
                     'operations' => ['Superviser services', 'Suivre actions'],
-                    'portee'     => 'Direction rattachee',
+                    'portee' => 'Direction rattachee',
                 ],
             ],
             User::ROLE_SERVICE => [
                 [
-                    'module'     => 'PTA du service',
+                    'module' => 'PTA du service',
                     'operations' => ['Exécuter taches', 'Mettre à jour statuts'],
-                    'portee'     => 'Direction et service rattaches',
+                    'portee' => 'Direction et service rattaches',
                 ],
                 [
-                    'module'     => 'Actions',
-                    'operations' => ['Renseigner execution', 'Saisir suivi hebdomadaire', 'Téléverser justificatifs', 'Signaler alertes'],
-                    'portee'     => 'Direction et service rattaches',
+                    'module' => 'Actions',
+                    'operations' => ['Renseigner execution', 'Mettre à jour progression', 'Téléverser justificatifs', 'Signaler alertes'],
+                    'portee' => 'Direction et service rattaches',
                 ],
             ],
             User::ROLE_AGENT => [
                 [
-                    'module'     => 'Suivi hebdomadaire des actions',
-                    'operations' => ['Renseigner suivi hebdomadaire', 'Mettre à jour progression', 'Signaler difficultés', 'Téléverser justificatifs hebdomadaires'],
-                    'portee'     => 'Direction et service rattaches',
+                    'module' => 'Execution des actions',
+                    'operations' => ['Mettre à jour progression', 'Signaler difficultés', 'Téléverser justificatifs'],
+                    'portee' => 'Direction et service rattaches',
                 ],
             ],
             User::ROLE_AUDITEUR => [
                 [
-                    'module'     => 'Pilotage',
+                    'module' => 'Pilotage',
                     'operations' => ['Consulter PAS/PAO/PTA', 'Consulter reporting'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
                 [
-                    'module'     => 'Audit',
+                    'module' => 'Audit',
                     'operations' => ['Lecture seule des informations'],
-                    'portee'     => 'Globale',
+                    'portee' => 'Globale',
                 ],
             ],
             default => [],
         };
 
         return [
-            'role'       => $user->role,
+            'role' => $user->role,
             'role_label' => $user->roleLabel(),
-            'scope'      => $user->profileScopeLabel(),
-            'items'      => $items,
+            'scope' => $user->profileScopeLabel(),
+            'items' => $items,
         ];
     }
 }

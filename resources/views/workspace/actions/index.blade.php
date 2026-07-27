@@ -192,7 +192,6 @@
     <x-ui.page-title
         eyebrow="Pilotage opérationnel"
         title="Suivi des actions"
-        subtitle="Pilotage opérationnel des actions, validations, justificatifs et performances d'exécution."
     />
 
     <section class="showcase-toolbar mb-4 app-screen-block">

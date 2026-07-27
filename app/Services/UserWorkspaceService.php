@@ -24,24 +24,6 @@ class UserWorkspaceService
     {
         $specRole = $this->specSidebarRole($user);
         $modules = $this->modulesForSpecRole($specRole, $user);
-        if (! collect($modules)->contains(fn (array $module): bool => ($module['code'] ?? null) === 'pta_suivi')) {
-            array_splice($modules, 1, 0, [[
-                'code' => 'pta_suivi',
-                'label' => 'Suivi PTA',
-                'endpoint' => '/pta/suivi',
-                'can_write' => false,
-                'actions' => ['Consulter', 'Faire le suivi', 'Demander un report'],
-            ]]);
-        }
-        if (! collect($modules)->contains(fn (array $module): bool => ($module['code'] ?? null) === 'reports_echeance')) {
-            array_splice($modules, 2, 0, [[
-                'code' => 'reports_echeance',
-                'label' => 'Reports echeance',
-                'endpoint' => '/workspace/reports-echeance',
-                'can_write' => false,
-                'actions' => ['A traiter', 'Mes demandes', 'Consulter'],
-            ]]);
-        }
         $modules = array_values(array_filter(
             $modules,
             fn (array $module): bool => $this->moduleAllowedByPermissions($module, $user)
@@ -166,9 +148,9 @@ class UserWorkspaceService
                 'endpoint' => '/api/v1/actions',
                 'can_write' => $canWriteOperational || $hasOwnExecutionSpace || $hasDelegatedActionReview,
                 'actions' => ($isAgent || ($hasOwnExecutionSpace && ! $canManageActions))
-                    ? ['Consulter', 'Renseigner suivi hebdomadaire', 'Téléverser justificatifs hebdomadaires']
+                    ? ['Consulter', 'Mettre à jour la progression', 'Téléverser des justificatifs']
                     : ($canManageActions
-                        ? ['Consulter', 'Créer', 'Modifier', 'Paramétrer indicateur', 'Supprimer', 'Clôturer', 'Suivi hebdomadaire']
+                        ? ['Consulter', 'Créer', 'Modifier', 'Paramétrer indicateur', 'Supprimer', 'Clôturer']
                         : ($hasDelegatedActionReview
                             ? ['Consulter', 'Évaluer', 'Valider ou rejeter']
                             : ['Consulter'])),
@@ -335,8 +317,11 @@ class UserWorkspaceService
             return 'chef';
         }
 
-        // Defaut : agent / RMO
-        return 'agent';
+        if (in_array($base, [User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE], true)) {
+            return 'readonly';
+        }
+
+        return $user->isAgent() ? 'agent' : 'readonly';
     }
 
     /**
@@ -356,6 +341,14 @@ class UserWorkspaceService
         ], $extra);
 
         return match ($specRole) {
+            'readonly' => [
+                $m('pilotage', 'Dashboard', '/workspace/pilotage'),
+                ...($user->hasPermission('reporting.read')
+                    ? [$m('reporting', 'Reporting', '/workspace/reporting')]
+                    : []),
+                $m('notifications', 'Notifications', '/workspace/notifications'),
+            ],
+
             // Note (2026-05-29) : les modules historiques sans page dediee
             // (controle, corrections, agents, synthese_agence, arbitrages,
             // financements_critiques, rapports_consolides, supervision) ont ete
@@ -531,7 +524,11 @@ class UserWorkspaceService
                 'users.manage',
                 'users.manage_roles'
             ),
-            'super_admin', 'workflows' => $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL),
+            'super_admin', 'workflows' => $user->hasRole(
+                User::ROLE_SUPER_ADMIN,
+                User::ROLE_ADMIN,
+                User::ROLE_ADMIN_FONCTIONNEL
+            ),
             'retention' => $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN_FONCTIONNEL)
                 || $user->hasAnyPermission('retention.read', 'retention.manage'),
             default => true,

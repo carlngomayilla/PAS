@@ -1045,6 +1045,7 @@ class SuperAdminWebController extends Controller
         $this->denyUnlessSuperAdmin($user);
 
         $validated = $this->validateOrganizationUserPayload($request);
+        $this->denyAdminPrivilegeEscalation($user, null, (string) ($validated['role'] ?? ''));
         $temporaryPlaceholder = 'temp-password-placeholder';
         $passwordWasGenerated = trim((string) ($validated['password'] ?? '')) === '';
         $initialPassword = $passwordWasGenerated
@@ -1089,6 +1090,7 @@ class SuperAdminWebController extends Controller
         $this->denyUnlessSuperAdmin($user);
 
         $validated = $this->validateOrganizationUserPayload($request, $managedUser);
+        $this->denyAdminPrivilegeEscalation($user, $managedUser, (string) ($validated['role'] ?? $managedUser->role));
 
         $targetBaseRole = isset($validated['role'])
             ? $this->roleRegistry->baseRole((string) $validated['role'])
@@ -1200,6 +1202,7 @@ class SuperAdminWebController extends Controller
     {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
+        $this->denyAdminPrivilegeEscalation($user, $managedUser);
 
         $validated = $request->validate([
             'transfer_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -1246,6 +1249,7 @@ class SuperAdminWebController extends Controller
     {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
+        $this->denyAdminPrivilegeEscalation($user, $managedUser);
 
         $temporaryPassword = $this->passwordPolicy->generateInitialPassword();
         $before = Arr::except($managedUser->toArray(), ['password']);
@@ -1273,6 +1277,7 @@ class SuperAdminWebController extends Controller
     {
         $user = $this->authUser($request);
         $this->denyUnlessSuperAdmin($user);
+        $this->denyAdminPrivilegeEscalation($user, $managedUser);
 
         $revoked = $this->revokeSessionsForUser($managedUser);
 
@@ -2870,7 +2875,59 @@ class SuperAdminWebController extends Controller
             return;
         }
 
+        if (
+            $user->hasRole(User::ROLE_ADMIN, User::ROLE_ADMIN_FONCTIONNEL)
+            && ! in_array((string) request()->route()?->getName(), $this->technicalPlatformRouteNames(), true)
+        ) {
+            return;
+        }
+
         abort(403, 'Acces non autorise.');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function technicalPlatformRouteNames(): array
+    {
+        return [
+            'workspace.super-admin.settings.edit',
+            'workspace.super-admin.settings.draft',
+            'workspace.super-admin.settings.publish-draft',
+            'workspace.super-admin.settings.discard-draft',
+            'workspace.super-admin.settings.update',
+            'workspace.super-admin.modules.edit',
+            'workspace.super-admin.modules.draft',
+            'workspace.super-admin.modules.publish-draft',
+            'workspace.super-admin.modules.discard-draft',
+            'workspace.super-admin.modules.update',
+            'workspace.super-admin.roles.edit',
+            'workspace.super-admin.roles.update',
+            'workspace.super-admin.roles.registry.update',
+            'workspace.super-admin.roles.registry.duplicate',
+            'workspace.super-admin.roles.registry.restore',
+            'workspace.super-admin.snapshots.index',
+            'workspace.super-admin.snapshots.store',
+            'workspace.super-admin.snapshots.restore',
+            'workspace.super-admin.simulation.index',
+            'workspace.super-admin.simulation.run',
+            'workspace.super-admin.audit-diagnostic.index',
+            'workspace.super-admin.maintenance.index',
+            'workspace.super-admin.maintenance.run',
+        ];
+    }
+
+    private function denyAdminPrivilegeEscalation(User $actor, ?User $managedUser = null, ?string $targetRole = null): void
+    {
+        if ($actor->isSuperAdmin()) {
+            return;
+        }
+
+        $targetsSuperAdmin = $managedUser?->isSuperAdmin() ?? false;
+        $assignsSuperAdmin = $targetRole !== null
+            && $this->roleRegistry->baseRole($targetRole) === User::ROLE_SUPER_ADMIN;
+
+        abort_if($targetsSuperAdmin || $assignsSuperAdmin, 403, 'Seul le Super Admin technique peut gerer ce compte.');
     }
 
     /**

@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\Action;
 use App\Models\Direction;
+use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
@@ -65,6 +66,33 @@ class ReportingAnalyticsServiceTest extends TestCase
         $this->assertSame(80.0, (float) $payload['pasConsolidation'][0]['progression_moyenne']);
         $this->assertCount(1, $payload['interannualComparison']);
         $this->assertSame(80.0, (float) $payload['interannualComparison'][0]['progression_moyenne']);
+    }
+
+    public function test_reporting_counts_operational_objectives_from_the_active_planning_hierarchy(): void
+    {
+        [$admin, $pta] = $this->createPlanningFixture();
+        $pao = $pta->pao()->firstOrFail();
+        $pasObjectif = $pao->pasObjectif()->firstOrFail();
+
+        $objectifOperationnel = ObjectifOperationnel::query()->create([
+            'pao_id' => $pao->id,
+            'pas_id' => $pao->pas_id,
+            'pas_axe_id' => $pasObjectif->pas_axe_id,
+            'pas_objectif_id' => $pasObjectif->id,
+            'direction_id' => $pao->direction_id,
+            'service_id' => $pao->service_id,
+            'code' => 'OO-RA',
+            'libelle' => 'Objectif operationnel actif',
+            'echeance' => '2026-12-31',
+            'statut' => 'en_cours',
+        ]);
+
+        $pta->update(['objectif_operationnel_id' => $objectifOperationnel->id]);
+
+        $payload = app(ReportingAnalyticsService::class)->buildPayload($admin, false, false);
+
+        $this->assertSame(1, $payload['global']['objectifs_operationnels_total']);
+        $this->assertSame(1, $payload['statuts']['objectifs_operationnels']['en_cours']);
     }
 
     /**

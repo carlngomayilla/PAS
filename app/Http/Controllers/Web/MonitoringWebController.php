@@ -14,11 +14,11 @@ use App\Models\Direction;
 use App\Models\ExportTemplate;
 use App\Models\Kpi;
 use App\Models\KpiMesure;
+use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
-use App\Models\PaoObjectifOperationnel;
-use App\Models\PaoObjectifStrategique;
 use App\Models\Pas;
 use App\Models\PasAxe;
+use App\Models\PasObjectif;
 use App\Models\PlatformSetting;
 use App\Models\Pta;
 use App\Models\Service;
@@ -87,8 +87,8 @@ class MonitoringWebController extends Controller
         $actions = Action::query();
         $kpis = Kpi::query();
         $mesures = KpiMesure::query();
-        $objectifsOperationnels = PaoObjectifOperationnel::query();
-        $objectifsStrategiques = PaoObjectifStrategique::query();
+        $objectifsOperationnels = ObjectifOperationnel::query();
+        $objectifsStrategiques = PasObjectif::query();
 
         $this->scopePao($paos, $user);
         $this->scopePta($ptas, $user);
@@ -133,7 +133,7 @@ class MonitoringWebController extends Controller
         $actionsTerminees = (clone $actions)
             ->whereIn('statut_dynamique', ['acheve_dans_delai', 'acheve_hors_delai'])
             ->count();
-        $objectifsOperationnelsTermines = (clone $objectifsOperationnels)->where('statut_realisation', 'termine')->count();
+        $objectifsOperationnelsTermines = (clone $objectifsOperationnels)->whereIn('statut', ['termine', 'cloture'])->count();
         $kpisAvecMesures = (clone $kpis)->has('mesures')->count();
 
         $actionsRetard = (clone $actions)
@@ -371,7 +371,7 @@ class MonitoringWebController extends Controller
                 'ptas' => $this->countByStatus($ptas, 'statut'),
                 'actions' => $this->countByStatus($actions, 'statut_dynamique'),
                 'actions_validation' => $this->countByStatus($actions, 'statut_validation'),
-                'objectifs_operationnels' => $this->countByStatus($objectifsOperationnels, 'statut_realisation'),
+                'objectifs_operationnels' => $this->countByStatus($objectifsOperationnels, 'statut'),
             ],
             'pipelineGaps' => [
                 'pas_sans_pao' => $pasSansPao,
@@ -1314,17 +1314,13 @@ class MonitoringWebController extends Controller
         }
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('objectifStrategique.paoAxe.pao', function (Builder $subQuery) use ($user): void {
-                $subQuery->where('direction_id', (int) $user->direction_id);
-            });
+            $query->where('direction_id', (int) $user->direction_id);
 
             return;
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('objectifStrategique.paoAxe.pao.ptas', function (Builder $subQuery) use ($user): void {
-                $subQuery->where('service_id', (int) $user->service_id);
-            });
+            $query->where('service_id', (int) $user->service_id);
 
             return;
         }
@@ -1411,7 +1407,7 @@ class MonitoringWebController extends Controller
         }
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('paoAxe.pao', function (Builder $subQuery) use ($user): void {
+            $query->whereHas('paos', function (Builder $subQuery) use ($user): void {
                 $subQuery->where('direction_id', (int) $user->direction_id);
             });
 
@@ -1419,7 +1415,7 @@ class MonitoringWebController extends Controller
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('paoAxe.pao.ptas', function (Builder $subQuery) use ($user): void {
+            $query->whereHas('objectifsOperationnels', function (Builder $subQuery) use ($user): void {
                 $subQuery->where('service_id', (int) $user->service_id);
             });
 
@@ -2266,7 +2262,7 @@ class MonitoringWebController extends Controller
         $ptas = Pta::query();
         $actions = Action::query();
         $mesures = KpiMesure::query();
-        $objectifsOperationnels = PaoObjectifOperationnel::query();
+        $objectifsOperationnels = ObjectifOperationnel::query();
 
         $this->scopePao($paos, $user);
         $this->scopePta($ptas, $user);
@@ -2410,7 +2406,7 @@ class MonitoringWebController extends Controller
                 'ptas' => $this->countByStatus($ptas, 'statut'),
                 'actions' => $this->countByStatus($actions, 'statut_dynamique'),
                 'actions_validation' => $this->countByStatus($actions, 'statut_validation'),
-                'objectifs_operationnels' => $this->countByStatus($objectifsOperationnels, 'statut_realisation'),
+                'objectifs_operationnels' => $this->countByStatus($objectifsOperationnels, 'statut'),
             ],
             'alertes' => [
                 'actions_en_retard' => $retardsActions,

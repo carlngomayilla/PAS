@@ -17,7 +17,6 @@
     <x-ui.page-title
         eyebrow="Déclinaison opérationnelle"
         title="Plan d'actions opérationnel"
-        subtitle="Organisation annuelle des objectifs stratégiques par direction."
     >
         <x-slot:actions>
             @if ($canWrite)

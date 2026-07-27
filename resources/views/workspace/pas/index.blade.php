@@ -18,7 +18,6 @@
     <x-ui.page-title
         eyebrow="Pilotage institutionnel"
         title="Pilotage stratégique"
-        subtitle="Suivi des plans stratégiques, des axes et des objectifs institutionnels."
     >
         <x-slot:actions>
             @if ($canWrite)

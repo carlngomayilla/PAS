@@ -72,17 +72,22 @@
 
     $sections = [];
 
-    $menuItems = [[
-        'code' => 'pilotage',
-        'label' => $moduleLabel('pilotage', 'Pilotage'),
-        'route' => 'dashboard',
-        'icon' => 'dashboard',
-        'patterns' => ['dashboard', 'admin.dashboard'],
-        'badge' => (int) ($moduleBadges['pilotage'] ?? 0),
-        'display_order' => -100 + $moduleOrder('pilotage', 20),
-    ]];
+    $menuItems = [];
+    if ($canSeeModule('pilotage')) {
+        $menuItems[] = [
+            'code' => 'pilotage',
+            'label' => $moduleLabel('pilotage', 'Pilotage'),
+            'route' => 'dashboard',
+            'icon' => 'dashboard',
+            'patterns' => ['dashboard', 'admin.dashboard'],
+            'badge' => (int) ($moduleBadges['pilotage'] ?? 0),
+            'display_order' => -100 + $moduleOrder('pilotage', 20),
+        ];
+    }
 
-    $sections[] = ['title' => 'Menu', 'items' => $sortItems($menuItems)];
+    if ($menuItems !== []) {
+        $sections[] = ['title' => 'Menu', 'items' => $sortItems($menuItems)];
+    }
 
     $planningItems = [];
     if ($canSeeModule('pas')) {
@@ -130,6 +135,7 @@
             'route' => $hasManualImports ? 'workspace.imports.index' : 'workspace.ai-imports.pta.index',
             'icon' => 'docs',
             'patterns' => ['workspace.imports.*', 'workspace.ai-imports.*'],
+            'badge' => collect($visibleImportModuleCodes)->sum(fn (string $code): int => (int) ($moduleBadges[$code] ?? 0)),
             'display_order' => min(
                 $hasManualImports ? $moduleOrder('imports_excel', 55) : PHP_INT_MAX,
                 in_array('ai_imports', $visibleImportModuleCodes, true) ? $moduleOrder('ai_imports', 56) : PHP_INT_MAX,
@@ -182,6 +188,7 @@
             'route' => $hasInstitutionalReporting ? 'workspace.reporting' : 'workspace.ai-reports.index',
             'icon' => 'reporting',
             'patterns' => ['workspace.reporting', 'workspace.reporting.*', 'workspace.ai-reports.*'],
+            'badge' => collect($visibleReportingModuleCodes)->sum(fn (string $code): int => (int) ($moduleBadges[$code] ?? 0)),
             'display_order' => min(
                 $hasInstitutionalReporting ? $moduleOrder('reporting', 70) : PHP_INT_MAX,
                 in_array('ai_reports', $visibleReportingModuleCodes, true) ? $moduleOrder('ai_reports', 72) : PHP_INT_MAX,
@@ -275,6 +282,22 @@
         ])))
         ->map(fn (mixed $code): string => (string) $code)
         ->filter()
+        ->unique()
+        ->values();
+
+    // Ces entrées sont des onglets ou des raccourcis d'un module déjà affiché.
+    // Elles restent disponibles dans le workspace, mais ne créent plus de
+    // doublons dans la navigation principale.
+    $renderedModuleCodes = $renderedModuleCodes
+        ->merge([
+            'synthese_agence',
+            'rapports_consolides',
+            'supervision',
+            'roles_permissions',
+            'organisation',
+            'exercices',
+            'workflows',
+        ])
         ->unique()
         ->values();
 

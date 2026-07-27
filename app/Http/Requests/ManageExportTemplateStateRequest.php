@@ -11,7 +11,8 @@ class ManageExportTemplateStateRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user instanceof User && $user->isSuperAdmin();
+        return $user instanceof User
+            && $user->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_ADMIN_FONCTIONNEL);
     }
 
     /**

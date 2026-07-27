@@ -34,3 +34,5 @@ Thumbs.db
 database/backups/
 /output/
 /tmp/
+__pycache__/
+*.pyc

@@ -6,6 +6,7 @@ use App\Models\AiReportRequest;
 use App\Models\User;
 use App\Services\OpenAi\OpenAiClientService;
 use Illuminate\Support\Arr;
+use RuntimeException;
 use Throwable;
 
 class AiReportNarrativeService
@@ -20,31 +21,33 @@ class AiReportNarrativeService
      */
     public function generate(AiReportRequest $request, array $metrics, ?User $user = null): array
     {
-        if ($this->openAi->available()) {
-            try {
-                $response = $this->openAi->createStructuredResponse(
-                    'institutional_report',
-                    $this->prompt($request, $metrics),
-                    $this->schema(),
-                    $user,
-                    'ai_reporting',
-                    highCapability: true
-                );
-
-                $request->forceFill([
-                    'model_used' => $response['model'],
-                    'input_tokens' => $response['input_tokens'],
-                    'output_tokens' => $response['output_tokens'],
-                    'total_cost_usd' => $response['total_cost_usd'],
-                ])->save();
-
-                return $this->normalize($response['data'], $request, $metrics);
-            } catch (Throwable $exception) {
-                report($exception);
-            }
+        if (! $this->openAi->available()) {
+            throw new RuntimeException('La generation de rapport IA requiert OpenAI. Aucun fournisseur de secours n est autorise.');
         }
 
-        return $this->fallback($request, $metrics);
+        try {
+            $response = $this->openAi->createStructuredResponse(
+                'institutional_report',
+                $this->prompt($request, $metrics),
+                $this->schema(),
+                $user,
+                'ai_reporting',
+                highCapability: true
+            );
+
+            $request->forceFill([
+                'model_used' => $response['model'],
+                'input_tokens' => $response['input_tokens'],
+                'output_tokens' => $response['output_tokens'],
+                'total_cost_usd' => $response['total_cost_usd'],
+            ])->save();
+
+            return $this->normalize($response['data'], $request, $metrics);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            throw new RuntimeException('OpenAI n a pas pu produire le rapport institutionnel. Aucun brouillon de secours ne sera publie.', previous: $exception);
+        }
     }
 
     /**
@@ -68,22 +71,20 @@ class AiReportNarrativeService
     {
         return [
             'type' => 'object',
-            'required' => ['title', 'summary', 'html', 'sections'],
+            'required' => ['title', 'summary', 'sections'],
             'additionalProperties' => false,
             'properties' => [
                 'title' => ['type' => 'string'],
                 'summary' => ['type' => 'string'],
-                'html' => ['type' => 'string'],
                 'sections' => [
                     'type' => 'array',
                     'items' => [
                         'type' => 'object',
-                        'required' => ['title', 'content', 'indicators'],
+                        'required' => ['title', 'content'],
                         'additionalProperties' => false,
                         'properties' => [
                             'title' => ['type' => 'string'],
                             'content' => ['type' => 'string'],
-                            'indicators' => ['type' => 'object'],
                         ],
                     ],
                 ],
@@ -103,7 +104,7 @@ class AiReportNarrativeService
             ->map(fn (array $section): array => [
                 'title' => (string) ($section['title'] ?? 'Section'),
                 'content' => (string) ($section['content'] ?? ''),
-                'indicators' => is_array($section['indicators'] ?? null) ? $section['indicators'] : [],
+                'indicators' => [],
             ])
             ->values()
             ->all();

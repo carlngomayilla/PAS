@@ -629,20 +629,10 @@ function bootDashboardRender(force = false) {
     }
 
     try {
-      const [dataLabelsMod, annotationMod] = await Promise.all([
-        import('chartjs-plugin-datalabels'),
-        import('chartjs-plugin-annotation'),
-      ]);
-
-      const dataLabels = dataLabelsMod?.default || dataLabelsMod;
+      const annotationMod = await import('chartjs-plugin-annotation');
       const annotation = annotationMod?.default || annotationMod;
 
-      if (dataLabels && !Chart.registry.plugins.get('datalabels')) {
-        Chart.register(dataLabels);
         // Désactivé globalement : activé au cas par cas via barDataLabels().
-        Chart.defaults.set('plugins.datalabels', { display: false });
-      }
-
       if (annotation && !Chart.registry.plugins.get('annotation')) {
         Chart.register(annotation);
       }
@@ -3060,15 +3050,7 @@ function bootDashboardRender(force = false) {
   }
 
   function mountRequestedBarCustomLabel() {
-    let rows = requestedRowsFromChart(decisionCharts.operational_objectives || {}, 6);
-
-    if (rows.length === 0) {
-      rows = requestedRowsFromChart(decisionCharts.strategic_objectives || {}, 6);
-    }
-
-    if (rows.length === 0) {
-      rows = requestedRowsFromChart(decisionCharts.axis_progress || {}, 6);
-    }
+    const rows = requestedRowsFromChart(decisionCharts.operational_objectives || {}, 6);
 
     mountChart('dashboard-requested-bar-custom-label-chart', requestedBaseConfig('bar', {
       data: {
@@ -3581,6 +3563,14 @@ function bootDashboardRender(force = false) {
           console.error('Impossible de redimensionner un graphique Plotly du tableau de bord.', error);
         }
       });
+    }
+
+    const hasRenderableDeferredChart = Array.from(
+      document.querySelectorAll('[data-chart-state="deferred"]')
+    ).some((host) => chartHostIsRenderable(host));
+
+    if (hasRenderableDeferredChart && !renderInFlight) {
+      void render();
     }
 
     scheduleChartsMasonryLayout();

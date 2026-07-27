@@ -6,7 +6,7 @@
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="showcase-panel-title">Rapports IA</h1>
-                <p class="text-sm text-slate-500">Rapports PAS, PAO et PTA generes depuis les metriques Laravel.</p>
+                <p class="text-sm text-slate-500 dark:text-slate-300">Métriques Laravel, rédaction OpenAI et contrôle automatique du modèle institutionnel.</p>
             </div>
             <a class="btn btn-primary" href="{{ route('workspace.ai-reports.create') }}">Nouveau rapport</a>
         </div>
@@ -23,6 +23,7 @@
                         <th class="px-3 py-2">Titre</th>
                         <th class="px-3 py-2">Type</th>
                         <th class="px-3 py-2">Statut</th>
+                        <th class="px-3 py-2">Conformité</th>
                         <th class="px-3 py-2">Auteur</th>
                         <th class="px-3 py-2">Actions</th>
                     </tr>
@@ -34,12 +35,17 @@
                             <td class="px-3 py-2 font-semibold">{{ $report->title }}</td>
                             <td class="px-3 py-2">{{ \App\Models\AiGeneratedReport::reportTypes()[$report->report_type] ?? $report->report_type }}</td>
                             <td class="px-3 py-2">{{ $report->status }}</td>
+                            <td class="px-3 py-2">
+                                <span class="inline-flex rounded-full px-2 py-1 text-xs font-bold {{ $report->isTemplateConforming() ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200' }}">
+                                    {{ $report->conformity_score }} %
+                                </span>
+                            </td>
                             <td class="px-3 py-2">{{ $report->user?->name ?? '-' }}</td>
                             <td class="px-3 py-2"><a class="btn btn-outline" href="{{ route('workspace.ai-reports.show', $report) }}">Ouvrir</a></td>
                         </tr>
                     @empty
                         <tr>
-                            <td class="px-3 py-8 text-center text-slate-500" colspan="6">Aucun rapport IA.</td>
+                            <td class="px-3 py-8 text-center text-slate-500" colspan="7">Aucun rapport IA.</td>
                         </tr>
                     @endforelse
                 </tbody>

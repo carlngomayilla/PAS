@@ -243,7 +243,7 @@
                         </div>
                         <div>
                             <label for="agent_fonction">Fonction</label>
-                            <input id="agent_fonction" name="agent_fonction" type="text" value="{{ old('agent_fonction', $row->agent_fonction) }}" placeholder="Ex: Charge du suivi hebdomadaire">
+                            <input id="agent_fonction" name="agent_fonction" type="text" value="{{ old('agent_fonction', $row->agent_fonction) }}" placeholder="Ex : Chargé du suivi des actions">
                         </div>
                         <div>
                             <label for="agent_telephone">Téléphone</label>

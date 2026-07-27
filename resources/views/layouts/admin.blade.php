@@ -508,6 +508,7 @@
     </div>
 
     <x-preview-modal />
+    <x-ui.process-bubble />
 
     <div id="anbg-dialog" class="anbg-dialog hidden" aria-hidden="true">
         <div class="anbg-dialog-backdrop" data-dialog-dismiss></div>

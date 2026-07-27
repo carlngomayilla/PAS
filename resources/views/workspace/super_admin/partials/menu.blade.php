@@ -1,25 +1,26 @@
 @php
     $buttonLabel = $buttonLabel ?? 'Accès';
+    $isTechnicalAdministrator = auth()->user()?->isSuperAdmin() ?? false;
     $sections = [
         [
             'title' => 'Plateforme',
             'description' => 'Identité, navigation, maintenance.',
             'links' => [
-                ['label' => 'Généraux', 'description' => 'Textes, logos, formats.', 'route' => route('workspace.super-admin.settings.edit'), 'active' => request()->routeIs('workspace.super-admin.settings.*')],
+                ['label' => 'Généraux', 'description' => 'Textes, logos, formats.', 'route' => route('workspace.super-admin.settings.edit'), 'active' => request()->routeIs('workspace.super-admin.settings.*'), 'technical' => true],
                 ['label' => 'Apparence', 'description' => 'Palette, densité, lecture.', 'route' => route('workspace.super-admin.appearance.edit'), 'active' => request()->routeIs('workspace.super-admin.appearance.*')],
-                ['label' => 'Modules', 'description' => 'Ordre et visibilité.', 'route' => route('workspace.super-admin.modules.edit'), 'active' => request()->routeIs('workspace.super-admin.modules.*')],
-                ['label' => 'Maintenance', 'description' => 'Caches et actions techniques.', 'route' => route('workspace.super-admin.maintenance.index'), 'active' => request()->routeIs('workspace.super-admin.maintenance.*')],
+                ['label' => 'Modules', 'description' => 'Ordre et visibilité.', 'route' => route('workspace.super-admin.modules.edit'), 'active' => request()->routeIs('workspace.super-admin.modules.*'), 'technical' => true],
+                ['label' => 'Maintenance', 'description' => 'Caches et actions techniques.', 'route' => route('workspace.super-admin.maintenance.index'), 'active' => request()->routeIs('workspace.super-admin.maintenance.*'), 'technical' => true],
             ],
         ],
         [
             'title' => 'Gouvernance',
             'description' => 'Accès, organisation, audit.',
             'links' => [
-                ['label' => 'Rôles', 'description' => 'Matrice, registre, comparaison.', 'route' => route('workspace.super-admin.roles.edit'), 'active' => request()->routeIs('workspace.super-admin.roles.*')],
+                ['label' => 'Rôles', 'description' => 'Matrice, registre, comparaison.', 'route' => route('workspace.super-admin.roles.edit'), 'active' => request()->routeIs('workspace.super-admin.roles.*'), 'technical' => true],
                 ['label' => 'Organisation', 'description' => 'Directions, services, comptes.', 'route' => route('workspace.super-admin.organization.index'), 'active' => request()->routeIs('workspace.super-admin.organization.*')],
                 ['label' => 'Unités DG', 'description' => 'SCIQ, DGA, Cabinet, UCAS — chef et membres.', 'route' => route('workspace.super-admin.unites-dg.index'), 'active' => request()->routeIs('workspace.super-admin.unites-dg.*')],
                 ['label' => 'Dashboards', 'description' => 'Cartes et visibilité.', 'route' => route('workspace.super-admin.dashboard-profiles.edit'), 'active' => request()->routeIs('workspace.super-admin.dashboard-profiles.*')],
-                ['label' => 'Diagnostic', 'description' => 'Contrôle plateforme et incidents.', 'route' => route('workspace.super-admin.audit-diagnostic.index'), 'active' => request()->routeIs('workspace.super-admin.audit-diagnostic.*')],
+                ['label' => 'Diagnostic', 'description' => 'Contrôle plateforme et incidents.', 'route' => route('workspace.super-admin.audit-diagnostic.index'), 'active' => request()->routeIs('workspace.super-admin.audit-diagnostic.*'), 'technical' => true],
                 ['label' => 'Audit', 'description' => 'Journal des actions sensibles.', 'route' => route('workspace.audit.index'), 'active' => request()->routeIs('workspace.audit.*')],
             ],
         ],
@@ -41,19 +42,31 @@
             'title' => 'Avancé',
             'description' => 'Snapshots, simulation, exports.',
             'links' => [
-                ['label' => 'Snapshots', 'description' => 'Comparaison et restauration.', 'route' => route('workspace.super-admin.snapshots.index'), 'active' => request()->routeIs('workspace.super-admin.snapshots.*')],
-                ['label' => 'Simulation', 'description' => 'Impact avant application.', 'route' => route('workspace.super-admin.simulation.index'), 'active' => request()->routeIs('workspace.super-admin.simulation.*')],
+                ['label' => 'Snapshots', 'description' => 'Comparaison et restauration.', 'route' => route('workspace.super-admin.snapshots.index'), 'active' => request()->routeIs('workspace.super-admin.snapshots.*'), 'technical' => true],
+                ['label' => 'Simulation', 'description' => 'Impact avant application.', 'route' => route('workspace.super-admin.simulation.index'), 'active' => request()->routeIs('workspace.super-admin.simulation.*'), 'technical' => true],
                 ['label' => 'Templates', 'description' => 'Designer, versions, affectations.', 'route' => route('workspace.super-admin.templates.index'), 'active' => request()->routeIs('workspace.super-admin.templates.*')],
             ],
         ],
     ];
+    $sections = collect($sections)
+        ->map(function (array $section) use ($isTechnicalAdministrator): array {
+            $section['links'] = collect($section['links'])
+                ->filter(fn (array $link): bool => $isTechnicalAdministrator || ! ($link['technical'] ?? false))
+                ->values()
+                ->all();
+
+            return $section;
+        })
+        ->filter(fn (array $section): bool => $section['links'] !== [])
+        ->values()
+        ->all();
     $totalLinks = collect($sections)->sum(fn (array $section): int => count($section['links']));
 @endphp
 
 <details class="super-admin-menu">
     <summary class="super-admin-menu-trigger" aria-label="{{ $buttonLabel }}">
         <span class="super-admin-menu-trigger-copy">
-            <span class="super-admin-menu-trigger-eyebrow">Super Admin</span>
+            <span class="super-admin-menu-trigger-eyebrow">{{ $isTechnicalAdministrator ? 'Super Admin' : 'Administration' }}</span>
             <span class="super-admin-menu-trigger-label">{{ $buttonLabel }}</span>
         </span>
         <span class="super-admin-menu-trigger-meta">

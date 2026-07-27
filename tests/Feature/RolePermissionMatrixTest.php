@@ -255,7 +255,8 @@ class RolePermissionMatrixTest extends TestCase
             User::ROLE_DIRECTION => ['pilotage', 'mes_taches', 'pao', 'pta', 'ai_imports', 'execution', 'services_agents', 'reporting', 'ai_reports', 'notifications'],
             User::ROLE_SERVICE => ['pilotage', 'mes_taches', 'pta', 'ai_imports', 'execution', 'agents', 'reporting', 'ai_reports', 'notifications'],
             User::ROLE_AGENT => ['pilotage', 'mes_taches', 'execution', 'corrections', 'notifications'],
-            User::ROLE_AUDITEUR => ['pilotage', 'mes_taches', 'execution', 'corrections', 'notifications'],
+            User::ROLE_AUDITEUR => ['pilotage', 'reporting', 'notifications'],
+            User::ROLE_INVITE_LECTURE => ['pilotage', 'reporting', 'notifications'],
         ];
 
         foreach ($expected as $role => $modules) {

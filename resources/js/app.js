@@ -9,4 +9,5 @@ import './super-admin-menu';
 import './super-admin-preview';
 import './preview-modal';
 import './ui-enhancements';
+import './premium-process-bubble';
 import './action-detail-tabs';

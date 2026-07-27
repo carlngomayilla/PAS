@@ -31,7 +31,6 @@
     <x-ui.page-title
         eyebrow="Exécution annuelle"
         title="Plan de travail annuel"
-        subtitle="Suivi des plans de travail par service, avec rattachement aux objectifs opérationnels."
     >
         <x-slot:actions>
             @if ($canWrite)
@@ -43,11 +42,6 @@
     <section class="showcase-panel mb-4 app-screen-block">
         <div class="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
             <div>
-                <p class="text-xs font-black uppercase tracking-[0.16em] text-[#3996d3]">Poste de travail PTA</p>
-                <h2 class="mt-2 text-2xl font-black text-[#17324a]">Objectifs transmis, actions et controle dans un seul flux</h2>
-                <p class="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-                    Le chef de service travaille par objectif operationnel, la direction suit l'execution, et SCIQ/Planification controle avant cloture.
-                </p>
                 <div class="mt-4 grid gap-3 sm:grid-cols-3">
                     <div class="rounded-xl border border-slate-200/80 bg-white/80 p-3">
                         <p class="text-xs font-bold uppercase text-slate-500">Services couverts</p>

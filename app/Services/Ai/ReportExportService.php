@@ -85,6 +85,7 @@ class ReportExportService
     private function ensureValidated(AiGeneratedReport $report): void
     {
         abort_unless(trim($report->contentForExport()) !== '', 422, 'Rapport vide.');
+        abort_unless($report->isTemplateConforming(), 422, 'Export bloque : le rapport ne respecte pas le modele institutionnel valide.');
         abort_unless(
             in_array($report->status, [AiGeneratedReport::STATUS_VALIDATED, AiGeneratedReport::STATUS_EXPORTED], true),
             422,

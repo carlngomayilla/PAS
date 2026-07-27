@@ -8,8 +8,8 @@ use App\Models\ActionLog;
 use App\Models\ActionWeek;
 use App\Models\Direction;
 use App\Models\KpiMesure;
+use App\Models\ObjectifOperationnel;
 use App\Models\Pao;
-use App\Models\PaoObjectifOperationnel;
 use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\Service;
@@ -102,7 +102,7 @@ class ReportingAnalyticsService
         $ptas = Pta::query();
         $actions = Action::query();
         $mesures = KpiMesure::query();
-        $objectifsOperationnels = PaoObjectifOperationnel::query();
+        $objectifsOperationnels = ObjectifOperationnel::query();
 
         $this->scopePao($paos, $user);
         $this->scopePta($ptas, $user);
@@ -351,7 +351,7 @@ class ReportingAnalyticsService
                 'ptas' => $this->countByStatus($ptas, 'statut'),
                 'actions' => $this->countByStatus($actions, 'statut_dynamique'),
                 'actions_validation' => $this->countByStatus($actions, 'statut_validation'),
-                'objectifs_operationnels' => $this->countByStatus($objectifsOperationnels, 'statut_realisation'),
+                'objectifs_operationnels' => $this->countByStatus($objectifsOperationnels, 'statut'),
             ],
             'alertes' => [
                 'actions_en_retard' => $retardsActions,
@@ -588,7 +588,7 @@ class ReportingAnalyticsService
             $ptas->where('direction_id', $directionId);
             $actions->whereHas('pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', $directionId));
             $mesures->whereHas('kpi.action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', $directionId));
-            $objectifsOperationnels->whereHas('objectifStrategique.paoAxe.pao', fn (Builder $paoQuery) => $paoQuery->where('direction_id', $directionId));
+            $objectifsOperationnels->where('direction_id', $directionId);
         }
 
         if ($serviceId > 0) {
@@ -1493,17 +1493,13 @@ class ReportingAnalyticsService
         }
 
         if ($user->hasRole(User::ROLE_DIRECTION) && $user->direction_id !== null) {
-            $query->whereHas('objectifStrategique.paoAxe.pao', function (Builder $subQuery) use ($user): void {
-                $subQuery->where('direction_id', (int) $user->direction_id);
-            });
+            $query->where('direction_id', (int) $user->direction_id);
 
             return;
         }
 
         if ($user->hasRole(User::ROLE_SERVICE) && $user->service_id !== null) {
-            $query->whereHas('objectifStrategique.paoAxe.pao.ptas', function (Builder $subQuery) use ($user): void {
-                $subQuery->where('service_id', (int) $user->service_id);
-            });
+            $query->where('service_id', (int) $user->service_id);
 
             return;
         }
@@ -1712,7 +1708,7 @@ class ReportingAnalyticsService
         $ptaQuery = Pta::query();
         $actionQuery = Action::query();
         $mesureQuery = KpiMesure::query();
-        $objectifQuery = PaoObjectifOperationnel::query();
+        $objectifQuery = ObjectifOperationnel::query();
         $this->scopePao($paoQuery, $user);
         $this->scopePta($ptaQuery, $user);
         $this->scopeAction($actionQuery, $user);

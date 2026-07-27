@@ -37,6 +37,12 @@ class AiGeneratedReport extends Model
 
     public const STATUS_ARCHIVED = 'archived';
 
+    public const CONFORMITY_PENDING = 'pending';
+
+    public const CONFORMITY_CONFORMING = 'conforming';
+
+    public const CONFORMITY_NON_CONFORMING = 'non_conforming';
+
     /**
      * @var list<string>
      */
@@ -48,6 +54,18 @@ class AiGeneratedReport extends Model
         'period_end',
         'filters',
         'metrics_snapshot',
+        'ai_provider',
+        'ai_model',
+        'template_code',
+        'template_version',
+        'template_fingerprint',
+        'conformity_status',
+        'conformity_score',
+        'conformity_issues',
+        'conformity_checked_at',
+        'input_tokens',
+        'output_tokens',
+        'total_cost_usd',
         'ai_draft',
         'validated_content',
         'status',
@@ -66,6 +84,11 @@ class AiGeneratedReport extends Model
             'period_end' => 'date',
             'filters' => 'array',
             'metrics_snapshot' => 'array',
+            'conformity_issues' => 'array',
+            'conformity_checked_at' => 'datetime',
+            'input_tokens' => 'integer',
+            'output_tokens' => 'integer',
+            'total_cost_usd' => 'decimal:6',
         ];
     }
 
@@ -97,5 +120,12 @@ class AiGeneratedReport extends Model
     public function contentForExport(): string
     {
         return trim((string) ($this->validated_content ?: $this->ai_draft));
+    }
+
+    public function isTemplateConforming(): bool
+    {
+        return $this->conformity_status === self::CONFORMITY_CONFORMING
+            && $this->conformity_score === 100
+            && $this->template_fingerprint !== null;
     }
 }

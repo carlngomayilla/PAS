@@ -6,7 +6,7 @@
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="showcase-panel-title">Nouveau rapport IA</h1>
-                <p class="text-sm text-slate-500">Generation basee sur un snapshot metier calcule par Laravel.</p>
+                <p class="text-sm text-slate-500 dark:text-slate-300">Données calculées par Laravel, rédaction structurée exclusivement par OpenAI, puis contrôle du modèle ANBG.</p>
             </div>
             <a class="btn btn-outline" href="{{ route('workspace.ai-reports.index') }}">Retour</a>
         </div>
@@ -15,7 +15,11 @@
             <div class="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{{ $errors->first() }}</div>
         @endif
 
-        <form method="POST" action="{{ route('workspace.ai-reports.generate') }}" class="rounded-lg border border-[#d8ecf8] bg-white p-4">
+        <div class="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
+            OpenAI est l’unique fournisseur autorisé. Le rapport restera à l’état de brouillon jusqu’à sa conformité automatique et sa validation humaine.
+        </div>
+
+        <form method="POST" action="{{ route('workspace.ai-reports.generate') }}" class="rounded-lg border border-[#d8ecf8] bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
             @csrf
             <div class="grid gap-4 md:grid-cols-2">
                 <div>

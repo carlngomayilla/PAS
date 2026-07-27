@@ -34,18 +34,10 @@ async function bootDashboardCharts() {
 
   Chart.register(...registerables);
 
-  // Plugins optionnels : value-labels (datalabels) + lignes de seuil (annotation).
+  // Le plugin d'annotation reste actif pour les lignes de seuil.
   try {
-    const [dataLabelsMod, annotationMod] = await Promise.all([
-      import('chartjs-plugin-datalabels'),
-      import('chartjs-plugin-annotation'),
-    ]);
-    const dataLabels = dataLabelsMod?.default || dataLabelsMod;
+    const annotationMod = await import('chartjs-plugin-annotation');
     const annotation = annotationMod?.default || annotationMod;
-    if (dataLabels && !Chart.registry.plugins.get('datalabels')) {
-      Chart.register(dataLabels);
-      Chart.defaults.set('plugins.datalabels', { display: false });
-    }
     if (annotation && !Chart.registry.plugins.get('annotation')) {
       Chart.register(annotation);
     }

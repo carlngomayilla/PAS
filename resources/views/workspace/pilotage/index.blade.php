@@ -29,7 +29,7 @@
             <x-dashboard.kpi-card label="Execution moyenne" :value="number_format((float) $summary['average_progress'], 1).'%' " tone="success" />
         </div>
 
-        <x-dashboard.section-card title="Arborescence" subtitle="Lecture descendante du cadre strategique vers les PTA et actions">
+        <x-dashboard.section-card title="Arborescence">
             <div class="space-y-3">
                 @forelse ($tree as $pasNode)
                     @php
@@ -109,11 +109,6 @@
                                                             </div>
                                                         @endforeach
 
-                                                        @if ($pta->actions_count > 3)
-                                                            <p class="text-xs font-medium text-[var(--dashboard-muted)]">
-                                                                {{ $pta->actions_count - 3 }} autre(s) action(s) accessible(s) depuis la fiche PTA ou la liste des actions.
-                                                            </p>
-                                                        @endif
                                                     </div>
                                                 @endif
                                             </div>

@@ -24,7 +24,7 @@ class SuperAdminWebTest extends TestCase
         $this->seed();
     }
 
-    public function test_super_admin_can_access_super_admin_workspace_and_admin_cannot(): void
+    public function test_super_admin_and_admin_can_access_business_administration_workspace(): void
     {
         $superAdmin = $this->createSuperAdminUser();
         $admin = $this->createAdminUser();
@@ -42,7 +42,51 @@ class SuperAdminWebTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('workspace.super-admin.index'))
+            ->assertOk()
+            ->assertSee('Centre de commandement')
+            ->assertDontSee(route('workspace.super-admin.maintenance.index'), false)
+            ->assertDontSee(route('workspace.super-admin.roles.edit'), false);
+    }
+
+    public function test_admin_can_manage_business_configuration_but_not_technical_platform_operations(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.super-admin.workflow.edit'))
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.super-admin.organization.index'))
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.super-admin.settings.edit'))
             ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.super-admin.snapshots.index'))
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->get(route('workspace.super-admin.maintenance.index'))
+            ->assertForbidden();
+    }
+
+    public function test_admin_cannot_manage_a_super_admin_account(): void
+    {
+        $admin = $this->createAdminUser();
+        $superAdmin = $this->createSuperAdminUser();
+
+        $this->actingAs($admin)
+            ->post(route('workspace.super-admin.organization.users.toggle', $superAdmin))
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->post(route('workspace.super-admin.organization.users.reset-password', $superAdmin))
+            ->assertForbidden();
+
+        $this->assertTrue((bool) $superAdmin->fresh()->is_active);
     }
 
     public function test_super_admin_can_create_publish_and_override_default_export_template(): void

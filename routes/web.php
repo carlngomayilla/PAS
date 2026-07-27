@@ -423,16 +423,13 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 abort(410, 'Validation par route dédiée supprimée : utilisez actions.review avec sous_action_id.');
             })->name('actions.sub-actions.review');
             Route::any('actions/{action}/review-direction', static function () {
-                abort(410, 'Workflow de validation direction supprime (refonte en cours).');
-            })->name('actions.review-direction');
-            Route::any('actions/{action}/review-direction', static function () {
-                abort(410, 'Workflow de validation direction supprime (refonte en cours).');
+                abort(410, 'Cette ancienne etape a ete retiree. Utilisez le controle SCIQ/Planification.');
             })->name('actions.review-direction');
             Route::any('actions/{action}/anomalies', static function () {
-                abort(410, 'Workflow de gestion d\'anomalies supprime (refonte en cours).');
+                abort(410, 'La saisie manuelle d anomalies a été retirée. Utilisez les alertes et commentaires de suivi.');
             })->name('actions.anomalies.signal');
             Route::any('actions/{action}/anomalies/{log}/resolve', static function () {
-                abort(410, 'Workflow de gestion d\'anomalies supprime (refonte en cours).');
+                abort(410, 'La résolution manuelle d anomalies a été retirée. Utilisez les alertes et commentaires de suivi.');
             })->name('actions.anomalies.resolve');
             Route::post('actions/{action}/reports-echeance', [DeadlineExtensionWebController::class, 'store'])
                 ->name('actions.deadline-extension.store');

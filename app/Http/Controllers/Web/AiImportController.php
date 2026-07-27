@@ -14,6 +14,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use RuntimeException;
 
 class AiImportController extends Controller
 {
@@ -49,8 +50,18 @@ class AiImportController extends Controller
                 ->with('status', 'Analyse IA lancee en arriere-plan.');
         }
 
-        $extraction = $this->documents->extract($session);
-        $this->analysis->analyzeAndPersist($session->refresh(), $extraction, $request->user());
+        try {
+            $extraction = $this->documents->extract($session);
+            $this->analysis->analyzeAndPersist($session->refresh(), $extraction, $request->user());
+        } catch (RuntimeException $exception) {
+            $session->forceFill([
+                'status' => AiImportSession::STATUS_FAILED,
+                'completed_at' => now(),
+            ])->save();
+            report($exception);
+
+            return back()->withInput()->withErrors(['openai' => $exception->getMessage()]);
+        }
         $this->validation->validateSession($session->refresh());
         $this->excel->generate($session->refresh());
 
@@ -69,8 +80,18 @@ class AiImportController extends Controller
             return back()->with('status', 'Analyse relancee en arriere-plan.');
         }
 
-        $extraction = $this->documents->extract($session);
-        $this->analysis->analyzeAndPersist($session->refresh(), $extraction, $request->user());
+        try {
+            $extraction = $this->documents->extract($session);
+            $this->analysis->analyzeAndPersist($session->refresh(), $extraction, $request->user());
+        } catch (RuntimeException $exception) {
+            $session->forceFill([
+                'status' => AiImportSession::STATUS_FAILED,
+                'completed_at' => now(),
+            ])->save();
+            report($exception);
+
+            return back()->withErrors(['openai' => $exception->getMessage()]);
+        }
         $this->validation->validateSession($session->refresh());
         $this->excel->generate($session->refresh());
 

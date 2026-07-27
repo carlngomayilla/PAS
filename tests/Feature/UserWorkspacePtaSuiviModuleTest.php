@@ -11,7 +11,7 @@ class UserWorkspacePtaSuiviModuleTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_every_profile_receives_the_pta_tracking_module(): void
+    public function test_tracking_and_deadline_features_do_not_create_duplicate_sidebar_modules(): void
     {
         $roles = [
             User::ROLE_SUPER_ADMIN,
@@ -29,7 +29,6 @@ class UserWorkspacePtaSuiviModuleTest extends TestCase
             User::ROLE_DGA_SUPERVISION,
             User::ROLE_CABINET_SUPERVISION,
             User::ROLE_UCAS,
-            User::ROLE_INVITE_LECTURE,
         ];
 
         foreach ($roles as $role) {
@@ -39,18 +38,25 @@ class UserWorkspacePtaSuiviModuleTest extends TestCase
                 'is_active' => true,
             ])->save();
 
-            $module = collect(app(UserWorkspaceService::class)->modulesFor($user))
-                ->firstWhere('code', 'pta_suivi');
+            $modules = collect(app(UserWorkspaceService::class)->modulesFor($user));
 
-            $this->assertNotNull($module, "Le module Suivi PTA manque pour le profil {$role}.");
-            $this->assertSame('/pta/suivi', $module['endpoint']);
-            $this->assertSame(['Consulter', 'Faire le suivi', 'Demander un report'], $module['actions']);
+            $this->assertNull($modules->firstWhere('code', 'pta_suivi'));
+            $this->assertNull($modules->firstWhere('code', 'reports_echeance'));
+        }
+    }
 
-            $deadlineModule = collect(app(UserWorkspaceService::class)->modulesFor($user))
-                ->firstWhere('code', 'reports_echeance');
-            $this->assertNotNull($deadlineModule, "Le module Reports echeance manque pour le profil {$role}.");
-            $this->assertSame('/workspace/reports-echeance', $deadlineModule['endpoint']);
-            $this->assertSame(['A traiter', 'Mes demandes', 'Consulter'], $deadlineModule['actions']);
+    public function test_read_only_profiles_do_not_receive_operational_modules(): void
+    {
+        foreach ([User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE] as $role) {
+            $user = User::factory()->create([
+                'role' => $role,
+                'is_active' => true,
+            ]);
+            $modules = collect(app(UserWorkspaceService::class)->modulesFor($user));
+
+            $this->assertNull($modules->firstWhere('code', 'pta_suivi'));
+            $this->assertNull($modules->firstWhere('code', 'reports_echeance'));
+            $this->assertNull($modules->firstWhere('code', 'execution'));
         }
     }
 }

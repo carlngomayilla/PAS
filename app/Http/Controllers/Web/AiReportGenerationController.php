@@ -12,6 +12,7 @@ use App\Services\Ai\PtaReportDataBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 
 class AiReportGenerationController extends Controller
 {
@@ -44,7 +45,15 @@ class AiReportGenerationController extends Controller
         $title = trim((string) ($validated['title'] ?? ''))
             ?: (AiGeneratedReport::reportTypes()[$type] ?? 'Rapport IA').' - '.now()->format('d/m/Y');
         $metrics = $this->metricsFor($type, $filters);
-        $draft = $this->writer->draft($title, $type, $metrics);
+        try {
+            $generation = $this->writer->generate($title, $type, $metrics, $request->user());
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            return back()->withInput()->withErrors(['openai' => $exception->getMessage()]);
+        }
+        $conformity = $generation['conformity'];
+        $template = $conformity['template'];
 
         $report = AiGeneratedReport::query()->create([
             'user_id' => $request->user()?->id,
@@ -54,13 +63,25 @@ class AiReportGenerationController extends Controller
             'period_end' => $filters['period_end'] ?? null,
             'filters' => $filters,
             'metrics_snapshot' => $metrics,
-            'ai_draft' => $draft,
+            'ai_provider' => 'openai',
+            'ai_model' => $generation['model'],
+            'template_code' => $template['code'],
+            'template_version' => $template['version'],
+            'template_fingerprint' => $template['fingerprint'],
+            'conformity_status' => $conformity['status'],
+            'conformity_score' => $conformity['score'],
+            'conformity_issues' => $conformity['issues'],
+            'conformity_checked_at' => now(),
+            'input_tokens' => $generation['input_tokens'],
+            'output_tokens' => $generation['output_tokens'],
+            'total_cost_usd' => $generation['total_cost_usd'],
+            'ai_draft' => $generation['content'],
             'status' => AiGeneratedReport::STATUS_DRAFT,
         ]);
 
         return redirect()
             ->route('workspace.ai-reports.show', $report)
-            ->with('status', 'Rapport IA genere a partir des metriques Laravel.');
+            ->with('status', 'Rapport structure par OpenAI et controle conforme au modele ANBG. Validation humaine requise.');
     }
 
     /**

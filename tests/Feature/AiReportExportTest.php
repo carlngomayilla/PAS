@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AiGeneratedReport;
 use App\Services\Ai\ActionReportMetricsBuilder;
+use App\Services\Ai\ReportTemplateConformityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\CreatesAiPtaFixtures;
@@ -24,10 +25,13 @@ class AiReportExportTest extends TestCase
             'report_type' => AiGeneratedReport::TYPE_PAS_GLOBAL,
             'title' => 'Rapport export',
             'metrics_snapshot' => ['totaux' => ['actions' => 1]],
-            'ai_draft' => 'Brouillon',
-            'validated_content' => 'Rapport valide exportable',
+            'ai_provider' => 'openai',
+            'ai_model' => 'gpt-test',
+            'ai_draft' => $this->conformingContent(AiGeneratedReport::TYPE_PAS_GLOBAL),
+            'validated_content' => $this->conformingContent(AiGeneratedReport::TYPE_PAS_GLOBAL),
             'status' => AiGeneratedReport::STATUS_VALIDATED,
         ]);
+        app(ReportTemplateConformityService::class)->apply($report);
 
         $this->actingAs($user)->get(route('workspace.ai-reports.export.pdf', $report))->assertOk();
         $this->actingAs($user)->get(route('workspace.ai-reports.export.word', $report))->assertOk();
@@ -51,10 +55,13 @@ class AiReportExportTest extends TestCase
             'report_type' => AiGeneratedReport::TYPE_PTA_QUARTERLY,
             'title' => 'Rapport PTA trimestriel modele',
             'metrics_snapshot' => $metrics,
-            'ai_draft' => 'Brouillon PTA',
-            'validated_content' => 'Rapport valide PTA',
+            'ai_provider' => 'openai',
+            'ai_model' => 'gpt-test',
+            'ai_draft' => $this->conformingContent(AiGeneratedReport::TYPE_PTA_QUARTERLY),
+            'validated_content' => $this->conformingContent(AiGeneratedReport::TYPE_PTA_QUARTERLY),
             'status' => AiGeneratedReport::STATUS_VALIDATED,
         ]);
+        app(ReportTemplateConformityService::class)->apply($report);
 
         $this->actingAs($user)->get(route('workspace.ai-reports.export.word', $report))->assertOk();
 
@@ -111,6 +118,18 @@ class AiReportExportTest extends TestCase
         $this->assertIsString($xml);
 
         return html_entity_decode(strip_tags((string) $xml), ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    private function conformingContent(string $reportType): string
+    {
+        $service = app(ReportTemplateConformityService::class);
+        $sections = collect($service->template($reportType)['sections'])->map(fn (array $section): array => [
+            'key' => $section['key'],
+            'title' => $section['title'],
+            'content' => str_repeat('Analyse institutionnelle detaillee et verifiee sur le snapshot Laravel. ', 3),
+        ])->all();
+
+        return $service->compose('Rapport conforme', $sections);
     }
 
     private function docxChartCount(string $path): int

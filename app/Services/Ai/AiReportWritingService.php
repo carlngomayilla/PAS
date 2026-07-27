@@ -3,13 +3,61 @@
 namespace App\Services\Ai;
 
 use App\Models\AiGeneratedReport;
+use App\Models\User;
+use App\Services\OpenAi\OpenAiClientService;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 class AiReportWritingService
 {
     public function __construct(
-        private readonly PtaQuarterlyNarrativeBuilder $ptaNarratives
+        private readonly PtaQuarterlyNarrativeBuilder $ptaNarratives,
+        private readonly OpenAiClientService $openAi,
+        private readonly ReportTemplateConformityService $conformity
     ) {}
+
+    /**
+     * @param  array<string,mixed>  $metrics
+     * @return array{content:string,model:string,input_tokens:int,output_tokens:int,total_cost_usd:float,conformity:array<string,mixed>}
+     */
+    public function generate(string $title, string $reportType, array $metrics, ?User $user = null): array
+    {
+        if (! $this->openAi->available()) {
+            throw new RuntimeException('La generation IA requiert une cle OPENAI_API_KEY valide. Aucun autre fournisseur ni brouillon automatique ne sera utilise.');
+        }
+
+        $template = $this->conformity->template($reportType);
+        $response = $this->openAi->createStructuredResponse(
+            'anbg_report_'.$reportType,
+            $this->openAiPrompt($title, $reportType, $metrics, $template),
+            $this->openAiSchema($template),
+            $user,
+            'ai_reporting',
+            highCapability: true
+        );
+        $sections = collect($response['data']['sections'] ?? [])
+            ->map(fn (mixed $section): array => is_array($section) ? [
+                'key' => (string) ($section['key'] ?? ''),
+                'title' => (string) ($section['title'] ?? ''),
+                'content' => (string) ($section['content'] ?? ''),
+            ] : ['key' => '', 'title' => '', 'content' => ''])
+            ->all();
+        $content = $this->conformity->compose($title, $sections);
+        $inspection = $this->conformity->inspect($reportType, $content);
+
+        if ($inspection['status'] !== AiGeneratedReport::CONFORMITY_CONFORMING) {
+            throw new RuntimeException('OpenAI a produit un rapport non conforme au modele : '.implode(' ', $inspection['issues']));
+        }
+
+        return [
+            'content' => $content,
+            'model' => $response['model'],
+            'input_tokens' => $response['input_tokens'],
+            'output_tokens' => $response['output_tokens'],
+            'total_cost_usd' => $response['total_cost_usd'],
+            'conformity' => $inspection,
+        ];
+    }
 
     /**
      * @param  array<string, mixed>  $metrics
@@ -43,6 +91,53 @@ class AiReportWritingService
             'Conclusion : ce brouillon doit etre relu, ajuste puis valide par un utilisateur habilite avant export officiel.',
             'Annexe chiffree : '.json_encode($metrics['totaux'] ?? [], JSON_UNESCAPED_SLASHES),
         ]);
+    }
+
+    /**
+     * @param  array<string,mixed>  $metrics
+     * @param  array<string,mixed>  $template
+     */
+    private function openAiPrompt(string $title, string $reportType, array $metrics, array $template): string
+    {
+        return implode("\n\n", [
+            'Tu rediges un rapport institutionnel professionnel pour l ANBG.',
+            'Utilise exclusivement les donnees du snapshot Laravel. N invente aucun chiffre, nom, date, resultat ou causalite. Signale explicitement toute donnee absente.',
+            'Respecte exactement les sections, leurs cles et leur ordre. Chaque section doit etre detaillee, humaine, factuelle et orientee decision.',
+            'Titre='.$title,
+            'Type='.$reportType,
+            'Modele='.json_encode($template, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'SNAPSHOT_LARAVEL='.json_encode($metrics, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ]);
+    }
+
+    /**
+     * @param  array<string,mixed>  $template
+     * @return array<string,mixed>
+     */
+    private function openAiSchema(array $template): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => ['sections'],
+            'properties' => [
+                'sections' => [
+                    'type' => 'array',
+                    'minItems' => count($template['sections']),
+                    'maxItems' => count($template['sections']),
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['key', 'title', 'content'],
+                        'properties' => [
+                            'key' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                            'content' => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
     }
 
     /**

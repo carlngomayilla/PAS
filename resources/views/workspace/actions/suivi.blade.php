@@ -11,10 +11,6 @@
         $pao = $action->pao ?: $pta?->pao;
         $pas = $pao?->pas;
         $objectifOperationnel = $action->objectifOperationnel;
-        // Suivi hebdomadaire supprime : labels de frequence/periode retires.
-        $frequenceLabel = '-';
-        $periodeLabelSingulier = 'Periode';
-        $periodeLabelPluriel = 'periodes';
         $validationStatus = (string) ($action->statut_validation ?: 'non_soumise');
         $validationStatusLabels = is_array($validationStatusLabels ?? null) ? $validationStatusLabels : [];
         $justificatifCategoryLabels = is_array($justificatifCategoryLabels ?? null) ? $justificatifCategoryLabels : [];
@@ -877,7 +873,6 @@
                     <dt>Fin prévue</dt><dd>{{ optional($action->date_fin)->format('d/m/Y') ?: '-' }}</dd>
                     <dt>Échéance</dt><dd>{{ optional($action->date_echeance)->format('d/m/Y') ?: '-' }}</dd>
                     <dt>Fin réelle</dt><dd>{{ optional($action->date_fin_reelle)->format('d/m/Y') ?: '-' }}</dd>
-                    <dt>Fréquence</dt><dd>{{ $frequenceLabel }}</dd>
                 </dl>
             </article>
 
@@ -1382,14 +1377,6 @@
             <p class="text-slate-600">Cette action ne nécessite pas de financement spécifique.</p>
         @endif
     </section>
-
-    {{-- Sections workflow opérationnel SUPPRIMÉES le 2026-05-31 (refonte en cours) :
-         - action-status (État d'avancement)
-         - action-weeks (Sous-actions / suivi périodique)
-         - action-review-chef (Vérification chef de service)
-         - action-controle (Contrôle et anomalies)
-         À reconstruire from scratch quand le nouveau workflow sera spécifié. --}}
-
 
     <section
         id="action-discussion"

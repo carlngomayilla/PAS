@@ -24,7 +24,7 @@ LOGO_PATH = ROOT / "public" / "images" / "logo-full.png"
 
 TITLE = "Manuel d'utilisation de l'application e-Pilotage PAS"
 SUBTITLE = "Guide détaillé et illustré pour la planification, le suivi, la validation et le reporting"
-VERSION = "Version 1.0 - 14 juin 2026"
+VERSION = "Version 2.0 - 27 juillet 2026"
 
 BLUE = RGBColor(46, 116, 181)
 DARK_BLUE = RGBColor(31, 77, 120)
@@ -182,7 +182,7 @@ def save_navigation_diagram(path: Path) -> None:
     draw.text((60, 42), "Carte de navigation de l'espace de travail", font=title_font, fill="#0B2545")
     sections = [
         ("Menu", ["Pilotage", "Mes tâches", "Notifications"]),
-        ("Planification", ["PAS", "PAO", "PTA", "Imports Excel"]),
+        ("Planification", ["PAS", "PAO", "PTA", "Imports"]),
         ("Exécution", ["Actions", "Financement des actions"]),
         ("Pilotage", ["Reporting", "Alertes"]),
         ("Administration", ["Référentiels", "Délégations", "Rétention", "API Docs", "Audit"]),
@@ -252,7 +252,7 @@ def save_action_workflow(path: Path) -> None:
     lanes = [
         ("PTA / Chef", 70, "#FFF4D6"),
         ("Agent / RMO", 470, "#E8F3FB"),
-        ("Chef validateur", 870, "#EAF6E1"),
+        ("Chef / Contrôleur", 870, "#EAF6E1"),
         ("Reporting", 1270, "#F4F6F9"),
     ]
     for label, x, fill in lanes:
@@ -262,8 +262,8 @@ def save_action_workflow(path: Path) -> None:
         ((100, 220, 380, 310), "Définir l'action\nType, cible, seuils,\nresponsable, preuves"),
         ((500, 220, 780, 310), "Enregistrer\nBrouillon libre,\nperformance provisoire"),
         ((500, 410, 780, 500), "Soumettre\nContrôles complets :\npreuve, commentaire, difficulté"),
-        ((900, 410, 1180, 500), "Valider ou rejeter\nMotif obligatoire\nen cas de rejet"),
-        ((900, 610, 1180, 700), "Officialiser\nProgression figée\npar le chef"),
+        ((900, 410, 1180, 500), "Visa du chef\nValidation ou retour\nmotivé"),
+        ((900, 610, 1180, 700), "Contrôle final\nPlanification / SCIQ\nou retour en correction"),
         ((1300, 610, 1580, 700), "Consolider\nKPI, tableaux,\nexports PDF/Excel"),
     ]
     for box, label in steps:
@@ -276,7 +276,7 @@ def save_action_workflow(path: Path) -> None:
     draw_arrow(draw, (1180, 655), (1300, 655), "#3996D3")
     draw_arrow(draw, (900, 500), (780, 500), "#F9B13C")
     draw.text((650, 520), "Rejet : retour à correction", font=note_font, fill="#7A5A00")
-    draw.text((70, 930), "Règle clé : les chiffres du reporting s'appuient sur la performance officielle, pas sur le brouillon de suivi.", font=get_font(20, True), fill="#17324A")
+    draw.text((70, 930), "Règle clé : le reporting utilise la performance officielle après le visa et le contrôle requis.", font=get_font(20, True), fill="#17324A")
     image.save(path)
 
 
@@ -446,6 +446,23 @@ def set_table_width(table, widths: list[int]) -> None:
                 tc_pr.append(tc_w)
             tc_w.set(qn("w:w"), str(widths[idx]))
             tc_w.set(qn("w:type"), "dxa")
+
+
+def finalize_accessibility(doc: Document) -> None:
+    for table in doc.tables:
+        row_properties = table.rows[0]._tr.get_or_add_trPr()
+        header = row_properties.find(qn("w:tblHeader"))
+        if header is None:
+            header = OxmlElement("w:tblHeader")
+            row_properties.append(header)
+        header.set(qn("w:val"), "true")
+
+    for index, shape in enumerate(doc.inline_shapes, start=1):
+        properties = shape._inline.docPr
+        if not properties.get("descr"):
+            properties.set("descr", f"Illustration fonctionnelle e-Pilotage {index}")
+        if not properties.get("title"):
+            properties.set("title", f"Illustration {index}")
 
 
 def set_run_font(run, name: str = "Calibri", size: int | None = None, color: RGBColor | None = None, bold: bool | None = None) -> None:
@@ -694,7 +711,7 @@ def build_manual(writer: ManualWriter) -> None:
     ])
     writer.callout(
         "Principe métier",
-        "Le PTA définit les règles de l'action. Le suivi applique ces règles. La validation du chef officialise la performance. Le reporting utilise la performance officielle.",
+        "Le PTA définit les règles de l'action. Le suivi applique ces règles. Le chef donne son visa, puis le contrôle Planification/SCIQ officialise la performance utilisée dans le reporting.",
     )
 
     writer.h1("2. Concepts clés à connaître")
@@ -775,7 +792,7 @@ def build_manual(writer: ManualWriter) -> None:
         ["Famille", "Modules", "Utilisation"],
         [
             ["Menu", "Pilotage, Mes tâches, Notifications", "Accès rapide aux synthèses, tâches ouvertes et messages système."],
-            ["Planification", "PAS, PAO, PTA, Imports Excel", "Création et structuration de la planification."],
+            ["Planification", "PAS, PAO, PTA, Imports", "Création, structuration et imports classiques ou assistés."],
             ["Exécution", "Actions, Financement des actions", "Suivi, contrôle, validation, financement et justificatifs."],
             ["Pilotage", "Reporting, Alertes", "Analyse consolidée, exports et surveillance des écarts."],
             ["Administration", "Référentiels, Délégations, Rétention, API Docs, Audit", "Gestion de la donnée de base, traçabilité et gouvernance."],
@@ -809,6 +826,16 @@ def build_manual(writer: ManualWriter) -> None:
         "Performance officielle : valeur validée et utilisée dans les rapports.",
         "Alertes : écarts, retards, criticités ou anomalies détectés dans le périmètre.",
     ])
+    writer.h2("Tableaux de bord par profil")
+    writer.bullets([
+        "DG : synthèse institutionnelle, arbitrages, alertes critiques et consolidation globale.",
+        "Direction : résultats de la direction, comparaison des services et dossiers à traiter.",
+        "Chef de service : PTA du service, actions, validations en attente et retards.",
+        "Agent / RMO : actions assignées, progression personnelle, corrections et échéances.",
+        "Planification / SCIQ : couverture PAS-PAO-PTA, avancement global, contrôle et qualité des données.",
+        "Le Super Admin peut activer, ordonner et dimensionner les cartes et graphiques par profil.",
+        "Un clic sur une carte conserve les filtres utiles et ouvre la vue détaillée autorisée.",
+    ])
 
     writer.h1("7. Module PAS")
     writer.h2("Créer un PAS")
@@ -840,6 +867,10 @@ def build_manual(writer: ManualWriter) -> None:
         "Le rapport d'anomalies peut signaler des PAO ouverts, PTA ouverts, actions en cours, validations en attente, retards ou KPI incomplets.",
         "L'archivage intervient après clôture et conserve la traçabilité.",
     ])
+    writer.callout(
+        "Cycle actuel",
+        "Le PAS suit le cycle actif, clôturé, puis archivé. Les anciennes commandes génériques Soumettre, Approuver, Verrouiller et Réouvrir ne font plus partie du parcours Web.",
+    )
 
     writer.h1("8. Module PAO")
     writer.h2("Créer un PAO")
@@ -863,6 +894,10 @@ def build_manual(writer: ManualWriter) -> None:
         "Lorsque les champs obligatoires sont complets, la validation peut être automatique selon les règles configurées.",
         "Les objectifs opérationnels validés sont transmis aux chefs de service concernés.",
     ])
+    writer.callout(
+        "Cycle actuel",
+        "Le PAO complet est validé dans le parcours de création, puis peut être clôturé et archivé. Un PAO archivé ne peut plus être modifié directement.",
+    )
     writer.table(
         ["Champ PAO", "Usage"],
         [
@@ -890,6 +925,15 @@ def build_manual(writer: ManualWriter) -> None:
         "Vérifier les informations affichées automatiquement : PAO d'origine, PAS lié, axe stratégique, objectif stratégique, direction, service et échéance.",
         "Créer les actions liées à l'objectif opérationnel.",
         "Enregistrer le PTA.",
+    ])
+    writer.h2("Cycle du PTA")
+    writer.steps([
+        "Le PTA débute en brouillon tant que des actions restent à paramétrer.",
+        "Lorsque les actions sont complètes, le PTA passe en cours.",
+        "La première commande de clôture transmet le PTA au contrôle SCIQ.",
+        "Après contrôle, la clôture finale place le PTA à l'état clôturé.",
+        "L'archivage n'est possible qu'après clôture.",
+        "Une correction exceptionnelle d'un PTA protégé exige une demande de déverrouillage motivée.",
     ])
     writer.h2("Créer une action dans le PTA")
     writer.steps([
@@ -925,8 +969,22 @@ def build_manual(writer: ManualWriter) -> None:
         "Ouvrir Exécution > Actions.",
         "Filtrer si nécessaire par statut, direction, service, responsable ou recherche.",
         "Cliquer sur Suivi ou ouvrir le détail de l'action.",
-        "Consulter la fiche, la progression, les justificatifs, la discussion et le journal.",
+        "Utiliser les onglets Validation, Fiche, Échéances, Financement, Discussion, Justificatifs et Journal.",
     ])
+    writer.h2("Comprendre les onglets du suivi")
+    writer.table(
+        ["Onglet", "Contenu", "Utilisateur principalement concerné"],
+        [
+            ["Validation", "Saisie d'avancement, soumission, visa du chef et contrôle final.", "Agent/RMO, chef de service, Planification/SCIQ"],
+            ["Fiche", "Rattachement PAS-PAO-PTA, responsables, dates, cible, risques et paramètres.", "Tous les profils autorisés"],
+            ["Échéances", "Demande de report, pièce justificative, avis et application de la date approuvée.", "RMO, chef, contrôleurs, décideur final"],
+            ["Financement", "Dossier RMO, instruction DAF, compléments et décision DG.", "RMO, DAF, DG"],
+            ["Discussion", "Commentaires et retours de validation horodatés.", "Acteurs du dossier"],
+            ["Justificatifs", "Pièces d'exécution, de correction et de clôture.", "RMO et validateurs"],
+            ["Journal", "Historique des événements, décisions et alertes de l'action.", "Contrôleurs et profils habilités"],
+        ],
+        widths=[1700, 4750, 2910],
+    )
     writer.h2("Enregistrer l'avancement")
     writer.bullets([
         "Pour une action quantitative, renseigner la quantité réalisée totale à ce jour.",
@@ -936,27 +994,29 @@ def build_manual(writer: ManualWriter) -> None:
         "Décrire les difficultés rencontrées si le champ est activé.",
         "Cliquer sur Enregistrer pour garder un brouillon sans déclencher la validation complète.",
     ])
-    writer.h2("Soumettre au chef")
+    writer.h2("Soumettre l'avancement")
     writer.steps([
         "Vérifier que les champs requis par le PTA sont remplis.",
         "Déposer la pièce justificative si elle est obligatoire ou attendue.",
         "Compléter le commentaire si le commentaire est obligatoire.",
         "Renseigner les difficultés ou écrire Aucune difficulté rencontrée si demandé par la procédure interne.",
         "Cliquer sur Soumettre au chef.",
-        "Attendre la validation ou la demande de correction.",
+        "Attendre le visa du chef de service puis le contrôle Planification/SCIQ.",
     ])
     writer.callout(
         "Différence essentielle",
-        "Enregistrer calcule une performance provisoire. Soumettre déclenche le contrôle. Valider par le chef fige la performance officielle.",
+        "Enregistrer conserve un brouillon. Soumettre déclenche le visa hiérarchique. La performance devient officielle seulement après le contrôle final requis.",
     )
 
     writer.h1("11. Validation, corrections et demandes de modification")
-    writer.h2("Validation chef")
+    writer.h2("Visa du chef et contrôle final")
     writer.bullets([
         "Le chef examine les éléments soumis par l'agent ou le RMO.",
         "Il vérifie la cohérence de la quantité, des justificatifs, des commentaires et des difficultés.",
-        "S'il valide, l'action ou la sous-action devient officiellement prise en compte.",
-        "S'il rejette, il doit renseigner un motif. L'élément revient en correction.",
+        "S'il valide, le dossier est transmis au contrôleur Planification/SCIQ.",
+        "Le contrôleur vérifie la conformité, la preuve et la cohérence du résultat.",
+        "Tout rejet ou retour doit être motivé ; l'élément revient alors au RMO pour correction.",
+        "La clôture n'est acquise qu'après la dernière validation prévue par le workflow.",
     ])
     writer.h2("Corrections demandées")
     writer.steps([
@@ -966,19 +1026,30 @@ def build_manual(writer: ManualWriter) -> None:
         "Corriger la saisie, le justificatif, le commentaire ou la quantité.",
         "Enregistrer puis soumettre à nouveau.",
     ])
-    writer.h2("Demande de modification")
-    writer.bullets([
-        "Après enregistrement définitif, certaines actions peuvent être figées en lecture seule.",
-        "Le bouton Demande de modification permet de demander la réouverture.",
-        "La demande suit le circuit contrôleur SCIQ/Planification puis décision DG selon la configuration.",
-        "Le motif doit être clair : erreur de saisie, changement d'échéance, réaffectation, ajustement de cible ou correction de financement.",
+    writer.h2("Demander un report d'échéance")
+    writer.steps([
+        "Ouvrir l'action puis l'onglet Échéances, ou cliquer sur Report de l'action.",
+        "Sélectionner l'action ou la sous-action concernée.",
+        "Saisir la nouvelle date souhaitée, le motif et la justification détaillée.",
+        "Joindre obligatoirement une pièce justificative lisible.",
+        "Soumettre la demande au chef de service.",
+        "Après l'avis du chef, attendre le contrôle Planification/SCIQ.",
+        "La DG ou le Chef Planification rend la décision finale selon le circuit applicable.",
+        "Après approbation finale, seul un contrôleur habilité applique la nouvelle date.",
     ])
+    writer.callout(
+        "Règle impérative",
+        "Aucune date d'action ou de sous-action ne peut être changée directement, même par un contrôleur. Le changement n'est appliqué qu'après l'approbation complète de la demande de report.",
+        fill=WARNING_HEX,
+    )
     writer.h2("Financement")
-    writer.bullets([
-        "Si l'action nécessite un financement, le PTA doit indiquer le besoin, le montant, la nature et la pièce justificative.",
-        "Le DAF peut valider et transmettre à la DG, demander un complément ou rejeter.",
-        "La DG peut accorder ou refuser le financement.",
-        "Les décisions, dates, pièces et commentaires restent visibles dans le détail de l'action.",
+    writer.steps([
+        "Le RMO prépare le dossier dans l'onglet Financement : source, montant, commentaire et pièce justificative.",
+        "Le RMO soumet le dossier à la DAF.",
+        "La DAF donne un avis favorable, demande un complément ou rejette avec un motif.",
+        "En cas de complément ou de rejet corrigeable, le RMO ajoute une nouvelle pièce et soumet à nouveau.",
+        "Après avis favorable de la DAF, la DG accorde ou refuse le financement.",
+        "Consulter l'historique des décisions, pièces et dates dans l'action.",
     ])
 
     writer.h1("12. Reporting, alertes et exports")
@@ -986,7 +1057,7 @@ def build_manual(writer: ManualWriter) -> None:
     writer.h2("Consulter un rapport")
     writer.steps([
         "Ouvrir Pilotage > Reporting.",
-        "Choisir le type de rapport métier.",
+        "Choisir le parcours de reporting ou de rapport assisté proposé depuis l'entrée Reporting.",
         "Appliquer les filtres : exercice, trimestre, direction, service, statut, type d'action, responsable ou criticité.",
         "Analyser les résultats affichés.",
         "Exporter en Excel pour analyse détaillée ou en PDF pour diffusion.",
@@ -998,12 +1069,30 @@ def build_manual(writer: ManualWriter) -> None:
         "Les filtres modifient les tableaux et les exports.",
         "Les exports doivent être relus avant diffusion institutionnelle.",
     ])
+    writer.h2("Produire un rapport assisté par IA")
+    writer.steps([
+        "Ouvrir Pilotage > Reporting puis l'onglet Rapport assisté par IA.",
+        "Choisir le niveau PAS, PAO ou PTA et le périmètre autorisé.",
+        "Lancer la génération du brouillon à partir des indicateurs calculés par l'application.",
+        "Relire les chiffres, les analyses, les risques et les recommandations proposés.",
+        "Corriger le texte lorsque cela est nécessaire.",
+        "Faire valider humainement le rapport avant tout export officiel.",
+        "Exporter le contenu validé en Word, PDF ou Excel selon les formats disponibles.",
+    ])
     writer.h2("Gérer les alertes")
     writer.bullets([
         "Les alertes signalent les retards, criticités, anomalies et éléments à traiter.",
         "Une alerte peut être lue depuis Notifications > Alertes ou depuis le menu Alertes.",
         "Le bouton Ouvrir mène généralement vers l'action ou l'élément concerné.",
         "Les alertes non lues peuvent être marquées comme lues individuellement ou en masse selon les droits.",
+    ])
+    writer.h2("Utiliser le centre Notifications")
+    writer.bullets([
+        "La page Notifications regroupe les messages applicatifs et un accès aux alertes actives.",
+        "Les compteurs de la barre latérale et de l'en-tête reflètent les éléments non lus du périmètre.",
+        "Les notifications de validation, correction, financement et report ouvrent directement le dossier concerné.",
+        "Utiliser Marquer comme lu après traitement ou Tout marquer comme lu pour nettoyer la file.",
+        "Les canaux, seuils, délais d'escalade et digests sont configurés par les administrateurs habilités.",
     ])
 
     writer.h1("13. Référentiels, délégations, audit et gouvernance")
@@ -1025,10 +1114,17 @@ def build_manual(writer: ManualWriter) -> None:
         "Le journal d'audit conserve les actions sensibles : création, modification, suppression, validation, décisions et changements de configuration.",
         "Les filtres permettent de rechercher par module, action, utilisateur, entité, date ou texte.",
         "L'audit sert à contrôler la traçabilité et à comprendre l'historique d'un dossier.",
+        "L'export CSV reprend les filtres autorisés sans exposer de secret.",
+        "Le journal est en ajout uniquement : une entrée existante n'est pas modifiée pour réécrire l'histoire.",
     ])
     writer.h2("Rétention et documentation API")
     writer.bullets([
-        "La rétention concerne l'archivage et les règles de conservation des données.",
+        "La rétention concerne l'archivage et les règles de conservation des données opérationnelles.",
+        "Commencer par une simulation : elle affiche les candidats sans modifier les données.",
+        "Une seule exécution peut travailler sur un même périmètre à la fois.",
+        "Le registre conserve les simulations et exécutions Web, console ou planifiées.",
+        "Les candidats peuvent être exportés et les archives téléchargées en JSON masqué selon les droits.",
+        "Le journal d'audit n'est jamais supprimé par la rétention.",
         "La documentation API expose les contrats techniques pour les intégrations autorisées.",
         "Ces modules sont réservés aux profils habilités.",
     ])
@@ -1073,10 +1169,13 @@ def build_manual(writer: ManualWriter) -> None:
         fill=WARNING_HEX,
     )
 
-    writer.h1("15. Imports Excel")
-    writer.h2("Importer un fichier")
+    writer.h1("15. Imports classiques et assistés par IA")
+    writer.p(
+        "La barre latérale présente une seule entrée Imports afin d'éviter les doublons. Cette entrée donne accès à deux parcours techniques distincts : l'import classique de fichiers structurés et l'import assisté par IA/OCR."
+    )
+    writer.h2("Importer un fichier structuré")
     writer.steps([
-        "Ouvrir Planification > Imports Excel.",
+        "Ouvrir Planification > Imports puis choisir le parcours d'import classique.",
         "Télécharger le modèle Excel si nécessaire.",
         "Préparer une feuille avec une ligne par action planifiée.",
         "Cliquer sur Nouvel import.",
@@ -1093,6 +1192,20 @@ def build_manual(writer: ManualWriter) -> None:
         "Contrôler les dates et les montants.",
         "Lire le rapport d'erreurs si l'import échoue.",
     ])
+    writer.h2("Utiliser l'import assisté par IA")
+    writer.steps([
+        "Ouvrir Planification > Imports puis accéder au parcours d'import assisté par IA.",
+        "Déposer le document PTA autorisé : Excel, CSV, PDF, Word ou image selon la configuration.",
+        "Attendre l'extraction et consulter les lignes reconnues, les avertissements et le score de confiance.",
+        "Corriger les informations proposées et ignorer les lignes qui ne doivent pas être importées.",
+        "Lancer la validation métier ; aucune donnée définitive n'est créée tant que les erreurs bloquantes subsistent.",
+        "Générer le fichier canonique ou confirmer l'import final.",
+        "Contrôler le rapport d'import et l'historique des corrections.",
+    ])
+    writer.callout(
+        "Validation humaine obligatoire",
+        "L'IA facilite l'extraction et la rédaction, mais elle ne valide jamais seule un PTA, une action ou un rapport institutionnel.",
+    )
 
     writer.h1("16. Bonnes pratiques par profil")
     writer.table(
@@ -1115,8 +1228,9 @@ def build_manual(writer: ManualWriter) -> None:
             ["Je ne vois pas un module", "Votre rôle ou la configuration de navigation ne l'autorise pas.", "Demander à l'administrateur de vérifier vos droits et modules visibles."],
             ["Je ne peux pas créer une action depuis Actions", "Les actions se créent depuis le PTA.", "Aller dans Planification > PTA puis ajouter l'action dans le PTA."],
             ["Je ne peux pas soumettre", "Un champ obligatoire manque : preuve, commentaire, difficulté ou quantité.", "Lire les messages d'erreur, compléter les champs, puis soumettre à nouveau."],
-            ["Mon action affiche 100 % mais n'est pas dans le reporting", "La performance est encore provisoire.", "Attendre ou demander la validation du chef."],
-            ["Je dois modifier une action figée", "L'action est enregistrée et verrouillée.", "Utiliser Demande de modification et saisir un motif clair."],
+            ["Mon action affiche 100 % mais n'est pas dans le reporting", "La performance est encore provisoire ou en contrôle.", "Vérifier le visa du chef et la validation finale Planification/SCIQ."],
+            ["Je dois modifier une date", "Les dates sont protégées par le circuit de report.", "Ouvrir l'onglet Échéances, joindre une preuve et soumettre une demande de report."],
+            ["Le mauvais formulaire s'affiche", "Un autre onglet de suivi est actif.", "Choisir l'onglet Validation, Échéances, Financement ou Justificatifs correspondant à l'opération."],
             ["Un export ne correspond pas à mon attendu", "Les filtres ou le périmètre changent le résultat.", "Vérifier les filtres, l'exercice, le trimestre, la direction et le service."],
             ["Un justificatif est refusé", "Format non autorisé ou pièce incomplète.", "Utiliser un format accepté et déposer une pièce lisible."],
         ],
@@ -1135,7 +1249,8 @@ def build_manual(writer: ManualWriter) -> None:
             ["KPI", "Indicateur de performance."],
             ["Justificatif", "Document ou preuve déposée pour appuyer une réalisation."],
             ["Soumission", "Transmission d'une réalisation au chef pour validation."],
-            ["Validation chef", "Décision qui officialise la performance."],
+            ["Visa du chef", "Décision hiérarchique qui transmet le suivi au contrôle final ou le retourne en correction."],
+            ["Validation du contrôle", "Décision Planification/SCIQ qui officialise la performance et clôture le circuit."],
             ["Alerte", "Signal automatique ou manuel indiquant un risque, un retard ou une anomalie."],
             ["Snapshot", "Copie d'une configuration permettant comparaison ou restauration."],
             ["Périmètre", "Champ de visibilité et d'action autorisé pour un utilisateur."],
@@ -1164,6 +1279,7 @@ def main() -> None:
     writer = ManualWriter(doc, assets)
     add_cover(writer)
     build_manual(writer)
+    finalize_accessibility(doc)
     doc.save(DOCX_PATH)
     save_markdown(writer)
     print(f"Created {DOCX_PATH}")
