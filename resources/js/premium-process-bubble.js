@@ -1,107 +1,86 @@
-const SELECTOR = '[data-process-bubble]';
+const root = document.querySelector('[data-process-bubble]');
 
-const escapeHtml = (value) => String(value)
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#039;');
+function createProcessBubble(element) {
+  if (!element) return null;
 
-const stateCopy = {
-  pending: ['Initialisation', 'Préparation sécurisée du traitement.'],
-  running: ['Traitement en cours', 'Les données sont analysées et contrôlées.'],
-  almost_done: ['Presque terminé', 'Dernières vérifications avant validation.'],
-  success: ['Traitement terminé', 'Votre demande a été traitée avec succès.'],
-  error: ['Traitement interrompu', 'Vérifiez les informations puis réessayez.'],
-};
-
-function controller() {
-  const root = document.querySelector(SELECTOR);
-  if (!root) return null;
-
-  const title = root.querySelector('[data-process-title]');
-  const message = root.querySelector('[data-process-message]');
-  const eyebrow = root.querySelector('[data-process-eyebrow]');
-  const bar = root.querySelector('[data-process-progress-bar]');
-  const label = root.querySelector('[data-process-progress-label]');
-  const steps = root.querySelector('[data-process-steps]');
-  let timeoutHandle = null;
-  let latencyHandle = null;
-  let activeChannel = null;
+  const title = element.querySelector('[data-process-title]');
+  const message = element.querySelector('[data-process-message]');
+  const eyebrow = element.querySelector('[data-process-eyebrow]');
+  const bar = element.querySelector('[data-process-progress-bar]');
+  const label = element.querySelector('[data-process-progress-label]');
+  const steps = element.querySelector('[data-process-steps]');
+  let closeTimer = null;
+  let latencyTimer = null;
 
   const update = (payload = {}) => {
-    const progress = Math.min(100, Math.max(0, Number(payload.progress ?? 0)));
+    const progress = Math.min(100, Math.max(0, Number(payload.progress ?? 12)));
     const status = payload.status || (progress >= 90 ? 'almost_done' : 'running');
-    const copy = stateCopy[status] || stateCopy.running;
+    const defaultCopy = {
+      pending: ['Préparation', 'Votre demande démarre.'],
+      running: ['Traitement en cours', 'Analyse et vérification des données.'],
+      almost_done: ['Presque terminé', 'Dernières vérifications.'],
+      success: ['Terminé', 'Le traitement est terminé.'],
+      error: ['Traitement interrompu', 'Vérifiez les données puis réessayez.'],
+    }[status] || ['Traitement en cours', 'Analyse et vérification des données.'];
 
-    root.dataset.status = status;
-    title.textContent = payload.title || copy[0];
-    message.textContent = payload.message || copy[1];
-    eyebrow.textContent = payload.eyebrow || (status === 'running' ? 'IA en analyse' : 'Traitement sécurisé');
+    element.dataset.status = status;
+    eyebrow.textContent = payload.eyebrow || 'Traitement sécurisé';
+    title.textContent = payload.title || defaultCopy[0];
+    message.textContent = payload.message || defaultCopy[1];
     bar.style.width = `${progress}%`;
     label.textContent = `${Math.round(progress)} %`;
 
-    if (Array.isArray(payload.logs)) {
-      steps.innerHTML = payload.logs.slice(-5).map((entry) => (
-        `<div class="premium-process-step is-${escapeHtml(entry.type || 'info')}">`
-        + `<span class="premium-process-step-dot" aria-hidden="true"></span>`
-        + `<span>${escapeHtml(entry.message || '')}</span></div>`
-      )).join('');
-    }
+    const logs = Array.isArray(payload.logs) ? payload.logs.slice(-3) : [];
+    steps.replaceChildren(...logs.map((entry) => {
+      const row = document.createElement('div');
+      row.className = `premium-process-step is-${entry.type || 'info'}`;
+      const dot = document.createElement('span');
+      dot.className = 'premium-process-step-dot';
+      dot.setAttribute('aria-hidden', 'true');
+      const copy = document.createElement('span');
+      copy.textContent = entry.message || '';
+      row.append(dot, copy);
+      return row;
+    }));
+    steps.hidden = logs.length === 0;
 
     if (status === 'success' || status === 'error') {
-      window.clearTimeout(timeoutHandle);
-      timeoutHandle = window.setTimeout(() => hide(), status === 'success' ? 1800 : 5000);
+      window.clearTimeout(closeTimer);
+      closeTimer = window.setTimeout(hide, status === 'success' ? 1600 : 4500);
     }
   };
 
   const show = (payload = {}) => {
-    root.classList.remove('hidden');
-    root.setAttribute('aria-hidden', 'false');
-    requestAnimationFrame(() => root.classList.add('is-visible'));
+    window.clearTimeout(closeTimer);
+    window.clearTimeout(latencyTimer);
+    element.classList.remove('hidden');
+    element.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(() => element.classList.add('is-visible'));
     update(payload);
-    window.clearTimeout(latencyHandle);
-    latencyHandle = window.setTimeout(() => {
-      if (!['success', 'error'].includes(root.dataset.status)) {
-        update({
-          status: 'running',
-          progress: Number(label.textContent.replace(/\D/g, '')) || 18,
-          title: 'Analyse approfondie',
-          message: 'Le traitement prend un peu plus de temps. Vous pouvez laisser cette fenêtre ouverte.',
-        });
-      }
-    }, 8000);
+    latencyTimer = window.setTimeout(() => update({
+      status: 'running',
+      progress: 35,
+      title: 'Analyse en cours',
+      message: 'Le traitement continue en arrière-plan.',
+    }), 8000);
   };
 
-  const hide = () => {
-    window.clearTimeout(latencyHandle);
-    root.classList.remove('is-visible');
+  function hide() {
+    window.clearTimeout(latencyTimer);
+    element.classList.remove('is-visible');
     window.setTimeout(() => {
-      root.classList.add('hidden');
-      root.setAttribute('aria-hidden', 'true');
-    }, 360);
-  };
+      element.classList.add('hidden');
+      element.setAttribute('aria-hidden', 'true');
+    }, 240);
+  }
 
-  root.querySelector('[data-process-close]')?.addEventListener('click', hide);
+  element.querySelector('[data-process-close]')?.addEventListener('click', hide);
 
-  const subscribe = ({ trackingId, userId }) => {
-    if (!window.Echo || !Number.isInteger(Number(trackingId)) || !Number.isInteger(Number(userId))) {
-      return false;
-    }
-
-    const channelName = `user.${Number(userId)}.process.${Number(trackingId)}`;
-    if (activeChannel) window.Echo.leave(activeChannel);
-    activeChannel = channelName;
-    window.Echo.private(channelName).listen('.process.updated', (payload) => update(payload));
-
-    return true;
-  };
-
-  return { show, update, hide, subscribe };
+  return { show, update, hide };
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const processBubble = controller();
+function boot() {
+  const processBubble = createProcessBubble(root || document.querySelector('[data-process-bubble]'));
   if (!processBubble) return;
 
   window.AnBGProcess = processBubble;
@@ -114,12 +93,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       processBubble.show({
         status: 'pending',
-        progress: 8,
-        title: form.dataset.loadingTitle || 'Envoi en cours',
-        message: form.dataset.loadingMessage || 'Votre demande est sécurisée avant traitement.',
+        progress: 10,
+        title: form.dataset.loadingTitle || 'Traitement en cours',
+        message: form.dataset.loadingMessage || 'Veuillez patienter quelques instants.',
       });
     });
   });
 
   document.addEventListener('anbg:process-updated', (event) => processBubble.update(event.detail || {}));
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot, { once: true });
+} else {
+  boot();
+}

@@ -515,31 +515,12 @@ class PtaWebController extends Controller
             'motif' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
         $deletionRequests = app(DeletionRequestService::class);
-        // Super Admin et DG peuvent supprimer directement avec cascade (Actions et
-        // sous-actions). Les autres roles passent par le workflow de demande validee.
-        $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
-        if (! $canDeleteDirectly) {
-            $deletionRequest = $deletionRequests->requestBusinessDeletion($pta, $user, (string) $validated['motif'], 'pta');
-            $this->recordAudit($request, 'pta', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
-
-            return redirect()
-                ->route('workspace.pta.index')
-                ->with('success', 'Demande de suppression du PTA transmise au Super Admin.');
-        }
-
-        $before = $pta->toArray();
-        $impact = $deletionRequests->impactForEntity($pta);
-        $deletionRequests->deleteBusinessTarget($pta);
-
-        $this->recordAudit($request, 'pta', 'delete', $pta, [
-            ...$before,
-            'deletion_reason' => (string) $validated['motif'],
-            'impact' => $impact,
-        ], null);
+        $deletionRequest = $deletionRequests->requestBusinessDeletion($pta, $user, (string) $validated['motif'], 'pta');
+        $this->recordAudit($request, 'pta', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
 
         return redirect()
             ->route('workspace.pta.index')
-            ->with('success', $this->entityDeletedMessage(UiLabel::object('pta')));
+            ->with('success', 'Demande transmise au Chef Planification. La suppression sera exécutable uniquement par un administrateur après accord.');
     }
 
     /**

@@ -28,6 +28,15 @@ class PremiumUiComponentsTest extends TestCase
         $this->assertStringContainsString("import './premium-process-bubble';", $javascript);
         $this->assertStringContainsString('.premium-loading-orb', $styles);
         $this->assertStringContainsString('prefers-reduced-motion', $styles);
+
+        $processJavascript = file_get_contents(resource_path('js/premium-process-bubble.js'));
+        $notificationJavascript = file_get_contents(resource_path('js/ui-enhancements.js'));
+
+        $this->assertIsString($processJavascript);
+        $this->assertIsString($notificationJavascript);
+        $this->assertStringContainsString("document.readyState === 'loading'", $processJavascript);
+        $this->assertStringContainsString('form[enctype="multipart/form-data"]', $processJavascript);
+        $this->assertStringContainsString('.flash-warning', $notificationJavascript);
     }
 
     public function test_shared_data_table_is_responsive_without_forced_desktop_width(): void

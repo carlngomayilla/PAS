@@ -408,31 +408,12 @@ class PaoWebController extends Controller
             'motif' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
         $deletionRequests = app(DeletionRequestService::class);
-        // Super Admin et DG peuvent supprimer directement avec cascade (PTAs, OOs,
-        // Actions). Les autres roles passent par le workflow de demande validee.
-        $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
-        if (! $canDeleteDirectly) {
-            $deletionRequest = $deletionRequests->requestBusinessDeletion($pao, $user, (string) $validated['motif'], 'pao');
-            $this->recordAudit($request, 'pao', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
-
-            return redirect()
-                ->route('workspace.pao.index')
-                ->with('success', 'Demande de suppression du PAO transmise au Super Admin.');
-        }
-
-        $before = $pao->toArray();
-        $impact = $deletionRequests->impactForEntity($pao);
-        $deletionRequests->deleteBusinessTarget($pao);
-
-        $this->recordAudit($request, 'pao', 'delete', $pao, [
-            ...$before,
-            'deletion_reason' => (string) $validated['motif'],
-            'impact' => $impact,
-        ], null);
+        $deletionRequest = $deletionRequests->requestBusinessDeletion($pao, $user, (string) $validated['motif'], 'pao');
+        $this->recordAudit($request, 'pao', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
 
         return redirect()
             ->route('workspace.pao.index')
-            ->with('success', $this->entityDeletedMessage(UiLabel::object('pao')));
+            ->with('success', 'Demande transmise au Chef Planification. La suppression sera exécutable uniquement par un administrateur après accord.');
     }
 
     public function close(Request $request, Pao $pao, PlanningClosureReportService $closureReportService): RedirectResponse

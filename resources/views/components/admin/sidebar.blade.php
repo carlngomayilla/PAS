@@ -146,8 +146,9 @@
         $sections[] = ['title' => 'Planification', 'items' => $sortItems($planningItems)];
     }
 
+    $executionItems = [];
     if ($canSeeModule('execution')) {
-        $executionItems = [[
+        $executionItems[] = [
             'code' => 'actions',
             'module_code' => 'execution',
             'label' => $moduleLabel('execution', 'Actions'),
@@ -157,7 +158,7 @@
             'active_when' => static fn (): bool => request()->routeIs('workspace.actions.*'),
             'badge' => (int) ($moduleBadges['actions'] ?? 0),
             'display_order' => $moduleOrder('execution', 70),
-        ]];
+        ];
 
         if ($canSeeModule('financement')) {
             $executionItems[] = [
@@ -170,7 +171,22 @@
                 'display_order' => $moduleOrder('financement', 71),
             ];
         }
+    }
 
+    if ($canSeeModule('reports_echeance') || (int) ($moduleBadges['reports_echeance'] ?? 0) > 0) {
+        $executionItems[] = [
+            'code' => 'reports_echeance',
+            'module_code' => 'reports_echeance',
+            'label' => $moduleLabel('reports_echeance', "Reports d'échéance"),
+            'route' => 'workspace.deadline-extension.index',
+            'icon' => 'workflow',
+            'patterns' => ['workspace.deadline-extension.*'],
+            'badge' => (int) ($moduleBadges['reports_echeance'] ?? 0),
+            'display_order' => $moduleOrder('reports_echeance', 72),
+        ];
+    }
+
+    if ($executionItems !== []) {
         $sections[] = ['title' => 'Exécution', 'items' => $sortItems($executionItems)];
     }
 

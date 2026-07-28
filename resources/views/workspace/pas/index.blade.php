@@ -60,7 +60,7 @@
             @if ($filters['without_pao'])
                 <input type="hidden" name="without_pao" value="1">
             @endif
-            <div class="mt-4 flex flex-wrap gap-2">
+            <div class="showcase-filter-actions mt-4">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.pas.index') }}">Réinitialiser</a>
             </div>

@@ -13,14 +13,15 @@ use App\Models\Pta;
 use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\DeletionRequestService;
 use App\Services\Exports\PtaSuiviWorkbookExporter;
 use App\Services\PlanningModificationLockService;
 use App\Services\PtaSuiviService;
 use App\Support\SchemaIntrospectionCache;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -61,7 +62,7 @@ class PtaSuiviWebController extends Controller
         Action $action,
         PlanningModificationLockService $lockService,
         ActionTrackingService $trackingService
-    ): RedirectResponse {
+    ): RedirectResponse|JsonResponse {
         $user = $this->user($request);
         $this->ptaSuiviService->denyUnlessAuthorized($user);
 
@@ -109,6 +110,15 @@ class PtaSuiviWebController extends Controller
             $this->recordAudit($request, 'pta_suivi', 'inline_update_action', $action, $before, $action->toArray());
         }
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Paramétrage enregistré sans rechargement de la page.',
+                'action_id' => (int) $action->id,
+                'row_type' => (string) $validated['row_type'],
+                'sous_action_id' => isset($validated['sous_action_id']) ? (int) $validated['sous_action_id'] : null,
+            ]);
+        }
+
         return redirect()
             ->route('pta.suivi.index', $request->query())
             ->with('success', 'Ligne du Suivi PTA mise a jour.');
@@ -150,14 +160,17 @@ class PtaSuiviWebController extends Controller
             $lockService->lockAfterSave($action->refresh(), $user);
             $this->recordAudit($request, 'pta_suivi', 'inline_delete_sous_action', $subAction, $before, null);
         } else {
-            $before = $action->toArray();
-            DB::transaction(function () use ($action): void {
-                $action->sousActions()->delete();
-                $action->delete();
-            });
+            $deletionRequest = app(DeletionRequestService::class)->requestBusinessDeletion(
+                $action,
+                $user,
+                'Suppression demandée depuis le tableau de suivi du PTA.',
+                'action'
+            );
+            $this->recordAudit($request, 'pta_suivi', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
 
-            $lockService->lockAfterSave($pta, $user);
-            $this->recordAudit($request, 'pta_suivi', 'inline_delete_action', $action, $before, null);
+            return redirect()
+                ->route('pta.suivi.index', $request->query())
+                ->with('success', 'Demande transmise au Chef Planification. La ligne reste visible jusqu’à l’exécution administrative.');
         }
 
         return redirect()

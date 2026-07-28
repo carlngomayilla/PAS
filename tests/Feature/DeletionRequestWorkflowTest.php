@@ -11,6 +11,7 @@ use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\PersonalTaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\CreatesAdminUser;
@@ -18,8 +19,8 @@ use Tests\TestCase;
 
 class DeletionRequestWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -27,9 +28,14 @@ class DeletionRequestWorkflowTest extends TestCase
         $this->seed();
     }
 
-    public function test_authorized_manager_can_request_user_deletion_and_super_admin_can_delete_when_impact_is_empty(): void
+    public function test_authorized_manager_can_request_user_deletion_then_planning_chief_approves_before_execution(): void
     {
         $superAdmin = $this->createSuperAdminUser();
+        $planningChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'is_active' => true,
+            'password_changed_at' => now(),
+        ]);
         [$direction, $service] = $this->makeScope('DEL0');
 
         $requester = User::factory()->create([
@@ -58,13 +64,23 @@ class DeletionRequestWorkflowTest extends TestCase
         $this->assertSame(DeletionRequest::STATUS_PENDING, $request->status);
         $this->assertSame(0, $request->impact_summary['total'] ?? null);
         $this->assertTrue(DB::table('notifications')
-            ->where('notifiable_id', $superAdmin->id)
+            ->where('notifiable_id', $planningChief->id)
             ->where('data', 'like', '%Demande de suppression a traiter%')
             ->exists());
-        $tasks = app(\App\Services\PersonalTaskService::class)->forUser($superAdmin, 10);
+        $tasks = app(PersonalTaskService::class)->forUser($planningChief, 10);
         $this->assertTrue(collect($tasks['items'])->contains(
             fn (array $task): bool => ($task['key'] ?? '') === 'deletion-request-review:'.$request->id
         ));
+
+        $this->actingAs($planningChief)
+            ->post(route('workspace.super-admin.organization.deletion-requests.decision', $request), [
+                'decision' => DeletionRequest::DECISION_APPROVE,
+                'reviewer_note' => 'Demande contrôlée et autorisée pour exécution.',
+                'return_to' => 'governance',
+            ])
+            ->assertRedirect(route('workspace.deletion-requests.index'));
+
+        $this->assertSame(DeletionRequest::STATUS_APPROVED, $request->fresh()->status);
 
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.deletion-requests.decision', $request), [
@@ -89,6 +105,11 @@ class DeletionRequestWorkflowTest extends TestCase
     public function test_delete_decision_is_blocked_with_impact_and_disable_transfers_open_tasks(): void
     {
         $superAdmin = $this->createSuperAdminUser();
+        $planningChief = User::factory()->create([
+            'role' => User::ROLE_CHEF_PLANIFICATION,
+            'is_active' => true,
+            'password_changed_at' => now(),
+        ]);
         [$direction, $service] = $this->makeScope('DEL1');
 
         $requester = User::factory()->create([
@@ -137,6 +158,14 @@ class DeletionRequestWorkflowTest extends TestCase
         $request = DeletionRequest::query()->where('entity_id', $target->id)->firstOrFail();
         $this->assertGreaterThan(0, (int) ($request->impact_summary['total'] ?? 0));
 
+        $this->actingAs($planningChief)
+            ->post(route('workspace.super-admin.organization.deletion-requests.decision', $request), [
+                'decision' => DeletionRequest::DECISION_APPROVE,
+                'reviewer_note' => 'Accord pour désactivation après contrôle de l impact.',
+                'return_to' => 'governance',
+            ])
+            ->assertRedirect(route('workspace.deletion-requests.index'));
+
         $this->actingAs($superAdmin)
             ->post(route('workspace.super-admin.organization.deletion-requests.decision', $request), [
                 'decision' => DeletionRequest::DECISION_DELETE,
@@ -170,7 +199,7 @@ class DeletionRequestWorkflowTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame(DeletionRequest::DECISION_DISABLE, $audit->nouvelle_valeur['decision'] ?? null);
-        $this->assertSame($replacement->id, $audit->nouvelle_valeur['execution']['lifecycle']['replacement_user_id'] ?? null);
+        $this->assertSame($replacement->id, $audit->nouvelle_valeur['result']['lifecycle']['replacement_user_id'] ?? null);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Action;
+use App\Models\DeletionRequest;
 use App\Models\Direction;
 use App\Models\Justificatif;
 use App\Models\ObjectifOperationnel;
@@ -311,8 +312,19 @@ class PtaSuiviWebTest extends TestCase
                 ->assertSee('name="rmo_id"', false)
                 ->assertSee('Faire le suivi', false)
                 ->assertSee('Demander un report', false)
-                ->assertSee(route('pta.suivi.actions.update', $action), false)
-                ->assertDontSee(route('workspace.pta.edit', $action->pta_id).'?focus=action#action-'.$action->id, false);
+                ->assertSee(route('pta.suivi.actions.update', $action), false);
+
+            $parameterUrl = route('workspace.pta.edit', $action->pta_id).'?focus=action#action-'.$action->id;
+            $response = $this->actingAs($user)->get(route('pta.suivi.index', ['annee' => 'all']));
+            if (in_array($role, [User::ROLE_PLANIFICATION, User::ROLE_CHEF_PLANIFICATION], true)) {
+                $response
+                    ->assertSee('Modifier le paramétrage', false)
+                    ->assertSee($parameterUrl, false);
+            } else {
+                $response
+                    ->assertDontSee('Modifier le paramétrage', false)
+                    ->assertDontSee($parameterUrl, false);
+            }
 
             $this->actingAs($user)
                 ->patch(route('pta.suivi.actions.update', $action), [
@@ -448,8 +460,39 @@ class PtaSuiviWebTest extends TestCase
             ])
             ->assertRedirect(route('pta.suivi.index'));
 
-        $this->assertSoftDeleted($action);
-        $this->assertSoftDeleted($subAction);
+        $this->assertNotSoftDeleted($action);
+        $this->assertNotSoftDeleted($subAction);
+        $this->assertDatabaseHas('deletion_requests', [
+            'entity_type' => Action::class,
+            'entity_id' => $action->id,
+            'status' => DeletionRequest::STATUS_PENDING,
+        ]);
+    }
+
+    public function test_inline_action_update_can_return_json_without_page_reload(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_PLANIFICATION,
+            'is_active' => true,
+        ]);
+        $action = $this->makePtaAction('Action AJAX', '2026-12-15');
+
+        $this->actingAs($user)
+            ->patchJson(route('pta.suivi.actions.update', $action), [
+                'row_type' => 'action',
+                'libelle' => 'Action AJAX modifiée',
+                'type_indicateur' => 'quantitatif',
+                'indicateur' => 'Dossiers traités',
+                'quantite_a_realiser' => 25,
+                'seuil_minimum' => 80,
+                'unite' => 'dossiers',
+                'observations' => 'Sauvegarde asynchrone.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('action_id', $action->id)
+            ->assertJsonPath('row_type', 'action');
+
+        $this->assertSame('Action AJAX modifiée', $action->fresh()->libelle);
     }
 
     public function test_pta_suivi_control_table_uses_hierarchy_colors_without_legend_or_progression_column(): void
@@ -490,7 +533,8 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('pta-inline-field', false)
             ->assertSee('name="rmo_id"', false)
             ->assertSee(route('pta.suivi.actions.update', $action), false)
-            ->assertDontSee(route('workspace.pta.edit', $action->pta_id).'?focus=action#action-'.$action->id, false)
+            ->assertSee(route('workspace.pta.edit', $action->pta_id).'?focus=action#action-'.$action->id, false)
+            ->assertSee('Modifier le paramétrage', false)
             ->assertSee('Faire le suivi', false)
             ->assertSee('Demander un report', false)
             ->assertDontSee('focus=target#action-', false)

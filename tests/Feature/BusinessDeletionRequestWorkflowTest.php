@@ -2,24 +2,21 @@
 
 namespace Tests\Feature;
 
-use App\Models\Action;
 use App\Models\DeletionRequest;
-use App\Models\Direction;
-use App\Models\Pao;
 use App\Models\Pas;
-use App\Models\Pta;
-use App\Models\Service;
-use App\Models\SousAction;
 use App\Models\User;
-use App\Services\PasStructureService;
+use App\Services\DeletionRequestService;
+use App\Services\RolePermissionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Concerns\CreatesAdminUser;
 use Tests\TestCase;
 
 class BusinessDeletionRequestWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -27,305 +24,202 @@ class BusinessDeletionRequestWorkflowTest extends TestCase
         $this->seed();
     }
 
-    public function test_super_admin_pao_delete_with_existing_pta_cascades_immediately(): void
+    public function test_super_admin_delete_creates_request_without_deleting_data(): void
     {
-        // Regle metier ANBG : le Super Admin (et le DG) suppriment DIRECTEMENT en
-        // cascade les PAO + PTA + Actions enfants, sans passer par le workflow de
-        // demande. Seuls les roles a perimetre limite (service, direction...) creent
-        // une DeletionRequest validee ensuite par le Super Admin.
         $superAdmin = $this->createSuperAdminUser();
-        [$direction, $service] = $this->makeScope('BDR1');
-        [$pas, $pao, $pta] = $this->makePlanningTree($direction, $service, 'PAO impacte');
+        $pas = $this->makePas('PAS soumis');
 
         $this->actingAs($superAdmin)
-            ->delete(route('workspace.pao.destroy', $pao), [
-                'motif' => 'Suppression directe par Super Admin (cascade PTA).',
+            ->delete(route('workspace.pas.destroy', $pas), [
+                'motif' => 'Document créé en double par erreur.',
             ])
-            ->assertRedirect(route('workspace.pao.index'));
+            ->assertRedirect(route('workspace.pas.index'));
 
-        // PAO et son PTA enfant doivent etre supprimes definitivement pour
-        // liberer les contraintes uniques metier (codes PAO/PTA).
-        $this->assertDatabaseMissing('paos', ['id' => $pao->id]);
-        $this->assertDatabaseMissing('ptas', ['id' => $pta->id]);
-
-        // Aucune DeletionRequest ne doit avoir ete creee : suppression directe.
-        $this->assertSame(0, DeletionRequest::query()
-            ->where('entity_type', Pao::class)
-            ->where('entity_id', $pao->id)
-            ->count());
-
-        // Le PAS parent n'est PAS supprime (cascade descend, pas remonte).
-        $this->assertNotNull($pas->fresh());
-        $this->assertFalse((bool) $pas->fresh()->trashed());
+        $this->assertDatabaseHas('pas', ['id' => $pas->id]);
+        $this->assertDatabaseHas('deletion_requests', [
+            'entity_type' => Pas::class,
+            'entity_id' => $pas->id,
+            'status' => DeletionRequest::STATUS_PENDING,
+        ]);
     }
 
-    public function test_dg_pao_delete_with_existing_pta_cascades_immediately(): void
+    public function test_deletion_requires_planning_chief_approval_then_admin_execution(): void
     {
-        // Le DG dispose des memes droits de suppression directe que le Super Admin
-        // (regle metier ANBG : pilotage complet de l'agence).
-        $dg = User::factory()->create([
-            'role' => User::ROLE_DG,
-            'is_active' => true,
-            'password_changed_at' => now(),
-        ]);
-        [$direction, $service] = $this->makeScope('BDRDG');
-        [$pas, $pao, $pta] = $this->makePlanningTree($direction, $service, 'PAO supprime par DG');
+        $requester = $this->createSuperAdminUser();
+        $planningChief = $this->makeUser(User::ROLE_CHEF_PLANIFICATION);
+        $admin = $this->makeUser(User::ROLE_ADMIN_FONCTIONNEL);
+        $pas = $this->makePas('PAS gouverné');
+        $service = app(DeletionRequestService::class);
 
-        $this->actingAs($dg)
-            ->delete(route('workspace.pao.destroy', $pao), [
-                'motif' => 'Suppression directe par DG (cascade PTA).',
-            ])
-            ->assertRedirect(route('workspace.pao.index'));
+        $deletionRequest = $service->requestBusinessDeletion(
+            $pas,
+            $requester,
+            'Suppression contrôlée du document.',
+            'pas'
+        );
 
-        $this->assertDatabaseMissing('paos', ['id' => $pao->id]);
-        $this->assertDatabaseMissing('ptas', ['id' => $pta->id]);
-        $this->assertSame(0, DeletionRequest::query()
-            ->where('entity_type', Pao::class)
-            ->where('entity_id', $pao->id)
-            ->count());
-        $this->assertNotNull($pas->fresh());
+        try {
+            $service->execute(
+                $deletionRequest,
+                $admin,
+                DeletionRequest::DECISION_DELETE,
+                'Tentative avant validation.'
+            );
+            $this->fail('Une suppression non approuvée ne doit jamais être exécutée.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('decision', $exception->errors());
+        }
+
+        $approved = $service->approve(
+            $deletionRequest,
+            $planningChief,
+            DeletionRequest::DECISION_APPROVE,
+            'Accord après vérification du motif.'
+        );
+
+        $this->assertSame(DeletionRequest::STATUS_APPROVED, $approved->status);
+        $this->assertDatabaseHas('pas', ['id' => $pas->id]);
+
+        $service->execute(
+            $approved,
+            $admin,
+            DeletionRequest::DECISION_DELETE,
+            'Exécution administrative après accord.'
+        );
+
+        $this->assertDatabaseMissing('pas', ['id' => $pas->id]);
+        $this->assertSame(DeletionRequest::STATUS_DELETED, $approved->fresh()->status);
+        $this->assertSame($planningChief->id, $approved->fresh()->approved_by);
+        $this->assertSame($admin->id, $approved->fresh()->reviewed_by);
     }
 
-    public function test_service_action_delete_with_sub_actions_creates_request_instead_of_deleting(): void
+    public function test_dg_cannot_approve_or_execute_a_deletion(): void
     {
-        $superAdmin = $this->createSuperAdminUser();
-        [$direction, $service] = $this->makeScope('BDR2');
-        [, , $pta] = $this->makePlanningTree($direction, $service, 'Action impactee');
+        $requester = $this->createSuperAdminUser();
+        $dg = $this->makeUser(User::ROLE_DG);
+        $pas = $this->makePas('PAS protégé');
+        $deletionRequest = app(DeletionRequestService::class)->requestBusinessDeletion(
+            $pas,
+            $requester,
+            'Vérification de la séparation des responsabilités.',
+            'pas'
+        );
 
-        $serviceUser = User::factory()->create([
-            'role' => User::ROLE_SERVICE,
-            'is_active' => true,
-            'direction_id' => $direction->id,
-            'service_id' => $service->id,
-            'password_changed_at' => now(),
-        ]);
-        $agent = User::factory()->create([
-            'role' => User::ROLE_AGENT,
-            'is_agent' => true,
-            'is_active' => true,
-            'direction_id' => $direction->id,
-            'service_id' => $service->id,
-            'password_changed_at' => now(),
-        ]);
-        $action = Action::query()->create([
-            'pta_id' => $pta->id,
-            'pao_id' => $pta->pao_id,
-            'libelle' => 'Action avec sous-action',
-            'date_debut' => now()->subWeek()->toDateString(),
-            'date_fin' => now()->addWeek()->toDateString(),
-            'responsable_id' => $agent->id,
-            'statut' => 'en_cours',
-            'statut_dynamique' => 'en_cours',
-            'financement_requis' => false,
-        ]);
-        SousAction::query()->create([
-            'action_id' => $action->id,
-            'agent_id' => $agent->id,
-            'libelle' => 'Sous-action liee',
-            'date_debut' => now()->subDay()->toDateString(),
-            'date_fin' => now()->addDay()->toDateString(),
-            'statut' => 'en_cours',
-        ]);
+        foreach (['approve', 'execute'] as $operation) {
+            try {
+                if ($operation === 'approve') {
+                    app(DeletionRequestService::class)->approve(
+                        $deletionRequest,
+                        $dg,
+                        DeletionRequest::DECISION_APPROVE,
+                        'Validation non autorisée.'
+                    );
+                } else {
+                    app(DeletionRequestService::class)->execute(
+                        $deletionRequest,
+                        $dg,
+                        DeletionRequest::DECISION_DELETE,
+                        'Exécution non autorisée.'
+                    );
+                }
+                $this->fail('Le DG ne doit pas pouvoir '.$operation.' cette demande.');
+            } catch (HttpException $exception) {
+                $this->assertSame(403, $exception->getStatusCode());
+            }
+        }
 
-        $this->actingAs($serviceUser)
-            ->delete(route('workspace.actions.destroy', $action), [
-                'motif' => 'Suppression demandee car action creee en doublon.',
-            ])
-            ->assertRedirect(route('workspace.actions.index'));
-
-        $this->assertFalse((bool) $action->fresh()->trashed());
-        $request = DeletionRequest::query()
-            ->where('entity_type', Action::class)
-            ->where('entity_id', $action->id)
-            ->firstOrFail();
-
-        $this->assertSame(DeletionRequest::STATUS_PENDING, $request->status);
-        $this->assertSame(1, $request->impact_summary['linked_records']['sous_actions'] ?? null);
-
-        $this->actingAs($superAdmin)
-            ->post(route('workspace.super-admin.organization.deletion-requests.decision', $request), [
-                'decision' => DeletionRequest::DECISION_DELETE,
-                'reviewer_note' => 'Tentative refusee par impact encore present.',
-            ])
-            ->assertSessionHasErrors('decision');
-
-        $this->assertFalse((bool) $action->fresh()->trashed());
+        $this->assertDatabaseHas('pas', ['id' => $pas->id]);
     }
 
-    public function test_super_admin_can_delete_unused_pas_with_required_reason(): void
+    public function test_role_permissions_are_applied_only_after_two_step_governance(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $pas = Pas::query()->create([
-            'titre' => 'PAS sans rattachement',
+        $planningChief = $this->makeUser(User::ROLE_CHEF_PLANIFICATION);
+        $settings = app(RolePermissionSettings::class);
+        $before = $settings->all();
+        $submitted = $before;
+        $submitted[User::ROLE_AGENT] = array_values(array_unique([
+            ...($submitted[User::ROLE_AGENT] ?? []),
+            'reporting.read',
+        ]));
+
+        $governanceRequest = app(DeletionRequestService::class)->requestRolePermissionChange(
+            $submitted,
+            $superAdmin,
+            'Ajout contrôlé d une permission de reporting.'
+        );
+
+        $this->assertSame($before, $settings->all());
+
+        $approved = app(DeletionRequestService::class)->approve(
+            $governanceRequest,
+            $planningChief,
+            DeletionRequest::DECISION_APPROVE,
+            'Modification cohérente avec les responsabilités.'
+        );
+        $this->assertSame($before, $settings->all());
+
+        app(DeletionRequestService::class)->execute(
+            $approved,
+            $superAdmin,
+            DeletionRequest::DECISION_APPLY,
+            'Application de la matrice approuvée.'
+        );
+
+        $this->assertContains('reporting.read', $settings->forRole(User::ROLE_AGENT));
+        $this->assertSame(DeletionRequest::STATUS_CORRECTED, $approved->fresh()->status);
+    }
+
+    public function test_user_role_assignment_waits_for_planning_approval_and_admin_execution(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $planningChief = $this->makeUser(User::ROLE_CHEF_PLANIFICATION);
+        $target = $this->makeUser(User::ROLE_AGENT);
+        $service = app(DeletionRequestService::class);
+
+        $roleRequest = $service->requestUserRoleChange(
+            $target,
+            User::ROLE_SERVICE,
+            $superAdmin,
+            'Évolution de responsabilité validée par la hiérarchie.'
+        );
+
+        $this->assertSame(User::ROLE_AGENT, $target->fresh()->role);
+
+        $approved = $service->approve(
+            $roleRequest,
+            $planningChief,
+            DeletionRequest::DECISION_APPROVE,
+            'Le changement de rôle est justifié.'
+        );
+        $this->assertSame(User::ROLE_AGENT, $target->fresh()->role);
+
+        $service->execute(
+            $approved,
+            $superAdmin,
+            DeletionRequest::DECISION_APPLY,
+            'Application administrative du rôle approuvé.'
+        );
+
+        $this->assertSame(User::ROLE_SERVICE, $target->fresh()->role);
+    }
+
+    private function makeUser(string $role): User
+    {
+        return User::factory()->create([
+            'role' => $role,
+            'is_active' => true,
+            'password_changed_at' => now(),
+        ]);
+    }
+
+    private function makePas(string $title): Pas
+    {
+        return Pas::query()->create([
+            'titre' => $title,
             'periode_debut' => 2026,
             'periode_fin' => 2028,
             'statut' => Pas::STATUS_ACTIF,
-        ]);
-
-        $this->actingAs($superAdmin)
-            ->delete(route('workspace.pas.destroy', $pas), [
-                'motif' => 'Suppression technique apres creation par erreur.',
-            ])
-            ->assertRedirect(route('workspace.pas.index'));
-
-        $this->assertDatabaseMissing('pas', ['id' => $pas->id]);
-        $this->assertDatabaseMissing('deletion_requests', [
-            'entity_type' => Pas::class,
-            'entity_id' => $pas->id,
-        ]);
-    }
-
-    public function test_super_admin_can_delete_pas_with_only_axes_and_objectifs(): void
-    {
-        $superAdmin = $this->createSuperAdminUser();
-        $pas = Pas::query()->create([
-            'titre' => 'PAS structure seul',
-            'periode_debut' => 2026,
-            'periode_fin' => 2026,
-            'statut' => Pas::STATUS_ACTIF,
-        ]);
-
-        app(PasStructureService::class)->sync($pas, [[
-            'libelle' => 'Axe structurel',
-            'objectifs' => [[
-                'libelle' => 'Objectif structurel',
-            ]],
-        ]], $superAdmin->id);
-
-        $this->actingAs($superAdmin)
-            ->delete(route('workspace.pas.destroy', $pas), [
-                'motif' => 'Suppression technique du PAS cree par erreur.',
-            ])
-            ->assertRedirect(route('workspace.pas.index'));
-
-        $this->assertDatabaseMissing('pas', ['id' => $pas->id]);
-        $this->assertDatabaseMissing('pas_axes', ['pas_id' => $pas->id]);
-        $this->assertDatabaseMissing('deletion_requests', [
-            'entity_type' => Pas::class,
-            'entity_id' => $pas->id,
-        ]);
-    }
-
-    public function test_super_admin_can_delete_pas_with_full_tree_cascades_immediately(): void
-    {
-        $superAdmin = $this->createSuperAdminUser();
-        [$direction, $service] = $this->makeScope('BDRPAS-SA');
-        [$pas, $pao, $pta] = $this->makePlanningTree($direction, $service, 'PAS supprime par SA');
-        $action = $this->makeAction($pta, 'Action cascade SA');
-
-        $this->actingAs($superAdmin)
-            ->delete(route('workspace.pas.destroy', $pas), [
-                'motif' => 'Suppression directe du PAS complet par Super Admin.',
-            ])
-            ->assertRedirect(route('workspace.pas.index'));
-
-        $this->assertDatabaseMissing('pas', ['id' => $pas->id]);
-        $this->assertDatabaseMissing('paos', ['id' => $pao->id]);
-        $this->assertDatabaseMissing('ptas', ['id' => $pta->id]);
-        $this->assertDatabaseMissing('actions', ['id' => $action->id]);
-        $this->assertDatabaseMissing('deletion_requests', [
-            'entity_type' => Pas::class,
-            'entity_id' => $pas->id,
-        ]);
-    }
-
-    public function test_dg_can_delete_pas_with_full_tree_cascades_immediately(): void
-    {
-        $dg = User::factory()->create([
-            'role' => User::ROLE_DG,
-            'is_active' => true,
-            'password_changed_at' => now(),
-        ]);
-        [$direction, $service] = $this->makeScope('BDRPAS-DG');
-        [$pas, $pao, $pta] = $this->makePlanningTree($direction, $service, 'PAS supprime par DG');
-        $action = $this->makeAction($pta, 'Action cascade DG');
-
-        $this->actingAs($dg)
-            ->delete(route('workspace.pas.destroy', $pas), [
-                'motif' => 'Suppression directe du PAS complet par DG.',
-            ])
-            ->assertRedirect(route('workspace.pas.index'));
-
-        $this->assertDatabaseMissing('pas', ['id' => $pas->id]);
-        $this->assertDatabaseMissing('paos', ['id' => $pao->id]);
-        $this->assertDatabaseMissing('ptas', ['id' => $pta->id]);
-        $this->assertDatabaseMissing('actions', ['id' => $action->id]);
-        $this->assertDatabaseMissing('deletion_requests', [
-            'entity_type' => Pas::class,
-            'entity_id' => $pas->id,
-        ]);
-    }
-
-    /**
-     * @return array{0:Direction,1:Service}
-     */
-    private function makeScope(string $suffix): array
-    {
-        $direction = Direction::query()->create([
-            'code' => 'B-'.$suffix,
-            'libelle' => 'Direction '.$suffix,
-            'actif' => true,
-        ]);
-        $service = Service::query()->create([
-            'direction_id' => $direction->id,
-            'code' => 'S-'.$suffix,
-            'libelle' => 'Service '.$suffix,
-            'actif' => true,
-        ]);
-
-        return [$direction, $service];
-    }
-
-    /**
-     * @return array{0:Pas,1:Pao,2:Pta}
-     */
-    private function makePlanningTree(Direction $direction, Service $service, string $title): array
-    {
-        $pas = Pas::query()->create([
-            'titre' => 'PAS '.$title,
-            'periode_debut' => 2026,
-            'periode_fin' => 2028,
-            'statut' => Pas::STATUS_ACTIF,
-        ]);
-        $pao = Pao::query()->create([
-            'pas_id' => $pas->id,
-            'direction_id' => $direction->id,
-            'annee' => 2026,
-            'titre' => 'PAO '.$title,
-            'statut' => Pao::STATUS_VALIDE,
-        ]);
-        $pta = Pta::query()->create([
-            'pao_id' => $pao->id,
-            'direction_id' => $direction->id,
-            'service_id' => $service->id,
-            'titre' => 'PTA '.$title,
-            'statut' => Pta::STATUS_EN_COURS,
-        ]);
-
-        return [$pas, $pao, $pta];
-    }
-
-    private function makeAction(Pta $pta, string $label): Action
-    {
-        $agent = User::factory()->create([
-            'role' => User::ROLE_AGENT,
-            'is_agent' => true,
-            'is_active' => true,
-            'direction_id' => $pta->direction_id,
-            'service_id' => $pta->service_id,
-            'password_changed_at' => now(),
-        ]);
-
-        return Action::query()->create([
-            'pta_id' => $pta->id,
-            'pao_id' => $pta->pao_id,
-            'libelle' => $label,
-            'date_debut' => now()->subWeek()->toDateString(),
-            'date_fin' => now()->addWeek()->toDateString(),
-            'responsable_id' => $agent->id,
-            'statut' => 'en_cours',
-            'statut_dynamique' => 'en_cours',
-            'financement_requis' => false,
         ]);
     }
 }

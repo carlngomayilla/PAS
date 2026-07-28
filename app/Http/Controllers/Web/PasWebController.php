@@ -293,32 +293,12 @@ class PasWebController extends Controller
             'motif' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
         $deletionRequests = app(DeletionRequestService::class);
-        // Super Admin et DG peuvent supprimer directement avec cascade (PAOs, PTAs,
-        // OOs, Actions, Axes, Objectifs strategiques). Pour les autres roles, la
-        // suppression passe par le workflow de demande validee par le Super Admin.
-        $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
-        if (! $canDeleteDirectly) {
-            $deletionRequest = $deletionRequests->requestBusinessDeletion($pas, $user, (string) $validated['motif'], 'pas');
-            $this->recordAudit($request, 'pas', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
-
-            return redirect()
-                ->route('workspace.pas.index')
-                ->with('success', 'Demande de suppression du PAS transmise au Super Admin.');
-        }
-
-        $before = $pas->toArray();
-        $impact = $deletionRequests->impactForEntity($pas);
-        $deletionRequests->deleteBusinessTarget($pas);
-
-        $this->recordAudit($request, 'pas', 'delete', $pas, [
-            ...$before,
-            'deletion_reason' => (string) $validated['motif'],
-            'impact' => $impact,
-        ], null);
+        $deletionRequest = $deletionRequests->requestBusinessDeletion($pas, $user, (string) $validated['motif'], 'pas');
+        $this->recordAudit($request, 'pas', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
 
         return redirect()
             ->route('workspace.pas.index')
-            ->with('success', $this->entityDeletedMessage(UiLabel::object('pas')));
+            ->with('success', 'Demande transmise au Chef Planification. Aucune donnée ne sera supprimée avant son accord et l’exécution par un administrateur.');
     }
 
     public function close(Request $request, Pas $pas, PlanningClosureReportService $closureReportService): RedirectResponse

@@ -13,11 +13,14 @@
         .pta-suivi-logo { padding:10px 12px; min-height:78px; }
         .pta-suivi-logo img { width:128px; height:auto; display:block; }
         .pta-suivi-title { min-height:78px; display:flex; align-items:center; justify-content:center; background:#bdd7ee; border-left:1px solid #d7d7d7; border-right:1px solid #d7d7d7; font-size:18px; font-weight:900; letter-spacing:.02em; text-align:center; }
-        .pta-suivi-meta { display:grid; grid-template-columns:1fr auto; gap:10px; padding:12px; border-bottom:1px solid #d7d7d7; }
+        .pta-suivi-meta { display:grid; gap:14px; padding:14px; border-bottom:1px solid #d7d7d7; }
         .pta-suivi-meta p { margin:0 0 5px; color:#ff6600; font-size:12px; font-weight:700; }
-        .pta-suivi-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; justify-content:flex-end; }
+        .pta-suivi-toolbar { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:10px; align-items:end; width:100%; }
+        .pta-suivi-filter-field { min-width:0; }
+        .pta-suivi-toolbar > div { min-width:0; }
         .pta-suivi-toolbar label { display:block; margin-bottom:3px; font-size:11px; font-weight:800; color:#17324a; }
-        .pta-suivi-toolbar select { min-width:126px; border:1px solid #b7c7d6; border-radius:6px; padding:6px 8px; font-size:12px; background:#fff; }
+        .pta-suivi-toolbar select { width:100%; min-width:0; height:40px; border:1px solid #b7c7d6; border-radius:6px; padding:6px 8px; font-size:12px; background:#fff; }
+        .pta-suivi-filter-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; grid-column:1/-1; }
         .pta-suivi-actionbar { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; padding:10px 12px; border-bottom:1px solid #d7d7d7; background:#f8fbff; }
         .pta-suivi-table-wrap { width:100%; overflow-x:auto; }
         .pta-suivi-table { width:100%; min-width:2485px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
@@ -170,7 +173,12 @@
             .pta-suivi-top { grid-template-columns:1fr; }
             .pta-suivi-title { border-left:0; border-right:0; }
             .pta-suivi-meta { grid-template-columns:1fr; }
-            .pta-suivi-toolbar { justify-content:flex-start; }
+            .pta-suivi-toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        }
+        @media (max-width:560px) {
+            .pta-suivi-toolbar { grid-template-columns:1fr; }
+            .pta-suivi-filter-actions { justify-content:stretch; }
+            .pta-suivi-filter-actions > * { flex:1; }
         }
         @media print {
             body { background:#fff !important; }
@@ -303,7 +311,10 @@
                         @endforeach
                     </select>
                 </div>
-                <button class="btn btn-primary rounded-xl px-4 py-2 text-sm" type="submit">Filtrer</button>
+                <div class="pta-suivi-filter-actions">
+                    <a class="btn btn-secondary rounded-lg px-4 py-2 text-sm" href="{{ route('pta.suivi.index') }}">Réinitialiser</a>
+                    <button class="btn btn-primary rounded-lg px-4 py-2 text-sm" type="submit">Appliquer les filtres</button>
+                </div>
             </form>
         </div>
 
@@ -508,21 +519,14 @@
             });
 
             document.querySelectorAll('[data-pta-inline-form]').forEach(function (form) {
-                form.addEventListener('submit', function (event) {
+                form.addEventListener('submit', async function (event) {
                     if (!form.reportValidity()) {
                         event.preventDefault();
 
                         return;
                     }
 
-                    try {
-                        window.sessionStorage.setItem(scrollStorageKey, JSON.stringify({
-                            windowY: window.scrollY,
-                            tableX: tableWrap?.scrollLeft || 0,
-                        }));
-                    } catch (error) {
-                        // Scroll restoration is optional.
-                    }
+                    event.preventDefault();
 
                     const row = saveButtonFor(form)?.closest('[data-pta-inline-row]')
                         || form.closest('[data-pta-inline-row]');
@@ -536,6 +540,45 @@
 
                     const state = row?.querySelector('[data-pta-save-state]');
                     if (state) state.textContent = 'Enregistrement en cours';
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            body: new FormData(form),
+                            credentials: 'same-origin',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        });
+                        const payload = await response.json().catch(function () {
+                            return {};
+                        });
+
+                        if (!response.ok) {
+                            const firstError = Object.values(payload.errors || {}).flat()[0];
+                            throw new Error(firstError || payload.message || 'Enregistrement impossible.');
+                        }
+
+                        row?.classList.remove('is-dirty', 'is-submitting');
+                        if (state) state.textContent = payload.message || 'Paramétrage enregistré';
+                        if (saveButton) {
+                            saveButton.disabled = false;
+                            saveButton.textContent = 'Enregistré';
+                            saveButton.classList.remove('is-dirty');
+                        }
+                        window.setTimeout(function () {
+                            if (saveButton) saveButton.textContent = 'Enregistrer';
+                            if (state) state.textContent = 'Aucune modification';
+                        }, 2200);
+                    } catch (error) {
+                        row?.classList.remove('is-submitting');
+                        if (state) state.textContent = error.message || 'Enregistrement impossible';
+                        if (saveButton) {
+                            saveButton.disabled = false;
+                            saveButton.textContent = 'Réessayer';
+                        }
+                    }
                 });
             });
 

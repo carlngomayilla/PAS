@@ -512,15 +512,22 @@ import { gsap } from 'gsap';
 
     // Convert existing flash-success / flash-error into toasts on load
     function flashToToast() {
-        document.querySelectorAll('.flash-success, .flash-error').forEach(function (flash) {
+        document.querySelectorAll('.flash-success, .flash-warning, .flash-error').forEach(function (flash) {
             if (flash.dataset.toastMigrated) return;
             flash.dataset.toastMigrated = '1';
 
-            var tone = flash.classList.contains('flash-success') ? 'success' : 'error';
+            var tone = flash.classList.contains('flash-success')
+                ? 'success'
+                : (flash.classList.contains('flash-warning') ? 'warning' : 'error');
             var text = flash.textContent.trim().replace(/\s+/g, ' ');
             if (!text) return;
 
-            showToast({ tone: tone, message: text, duration: tone === 'success' ? 5000 : 8000 });
+            showToast({
+                tone: tone,
+                title: tone === 'success' ? 'Terminé' : (tone === 'warning' ? 'À vérifier' : 'Action impossible'),
+                message: text,
+                duration: tone === 'success' ? 3600 : 6500,
+            });
             // Hide original flash so both don't show
             flash.style.display = 'none';
         });

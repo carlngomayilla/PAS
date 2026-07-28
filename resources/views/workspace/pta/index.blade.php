@@ -138,7 +138,7 @@
             @if ($filters['without_action'])
                 <input type="hidden" name="without_action" value="1">
             @endif
-            <div class="mt-4 flex flex-wrap gap-2">
+            <div class="showcase-filter-actions mt-4">
                 <button class="btn btn-primary" type="submit">Appliquer</button>
                 <a class="btn btn-secondary" href="{{ route('workspace.pta.index') }}">Réinitialiser</a>
             </div>

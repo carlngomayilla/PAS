@@ -755,44 +755,12 @@ class ActionWebController extends Controller
             'motif' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
         $deletionRequests = app(DeletionRequestService::class);
-        // Super Admin et DG peuvent supprimer directement avec cascade (sous-actions
-        // et semaines associees). Les autres roles passent par le workflow de demande.
-        $canDeleteDirectly = $user->isSuperAdmin() || $user->hasRole(User::ROLE_DG);
-        if (! $canDeleteDirectly) {
-            $deletionRequest = $deletionRequests->requestBusinessDeletion($action, $user, (string) $validated['motif'], 'action');
-            $this->recordAudit($request, 'action', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
-
-            return redirect()
-                ->route('workspace.actions.index')
-                ->with('success', 'Demande de suppression de l\'action transmise au Super Admin.');
-        }
-
-        $before = $action->toArray();
-        $impact = $deletionRequests->impactForEntity($action);
-
-        DB::transaction(function () use ($action, $secureStorage, $deletionRequests): void {
-            $documents = $action->justificatifs()->get(['id', 'chemin_stockage']);
-            $paths = $documents->pluck('chemin_stockage')->filter()->all();
-
-            $action->justificatifs()->delete();
-            // Cascade complete : sous-actions, semaines, responsables associes
-            // (via deleteBusinessTarget) avant la suppression de l'action elle-meme.
-            $deletionRequests->deleteBusinessTarget($action);
-
-            foreach ($paths as $path) {
-                $secureStorage->deleteByPath((string) $path);
-            }
-        });
-
-        $this->recordAudit($request, 'action', 'delete', $action, [
-            ...$before,
-            'deletion_reason' => (string) $validated['motif'],
-            'impact' => $impact,
-        ], null);
+        $deletionRequest = $deletionRequests->requestBusinessDeletion($action, $user, (string) $validated['motif'], 'action');
+        $this->recordAudit($request, 'action', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
 
         return redirect()
             ->route('workspace.actions.index')
-            ->with('success', $this->entityDeletedMessage(UiLabel::object('action'), true));
+            ->with('success', 'Demande transmise au Chef Planification. La suppression sera exécutable uniquement par un administrateur après accord.');
     }
 
     /**

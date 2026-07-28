@@ -14,9 +14,9 @@ use App\Services\DeletionRequestService;
 use App\Services\PasStructureService;
 use App\Services\PlanningModificationLockService;
 use App\Support\UiLabel;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PasController extends Controller
 {
@@ -26,8 +26,7 @@ class PasController extends Controller
 
     public function __construct(
         private readonly PasStructureService $pasStructureService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -97,7 +96,7 @@ class PasController extends Controller
         ];
 
         $pas = DB::transaction(function () use ($validated, $payload, $user): Pas {
-            $pas = new Pas();
+            $pas = new Pas;
             $pas->fill($payload);
             $pas->forceFill([
                 'statut' => Pas::STATUS_ACTIF,
@@ -234,11 +233,22 @@ class PasController extends Controller
             ], 409);
         }
 
-        $before = $pas->toArray();
-        app(DeletionRequestService::class)->deleteBusinessTarget($pas);
+        $validated = $request->validate([
+            'motif' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+        $deletionRequest = app(DeletionRequestService::class)->requestBusinessDeletion(
+            $pas,
+            $user,
+            (string) $validated['motif'],
+            'pas'
+        );
 
-        $this->recordAudit($request, 'pas', 'delete', $pas, $before, null);
+        $this->recordAudit($request, 'pas', 'deletion_request_create', $deletionRequest, null, $deletionRequest->toArray());
 
-        return response()->json([], 204);
+        return response()->json([
+            'message' => 'Demande transmise au Chef Planification.',
+            'deletion_request_id' => $deletionRequest->id,
+            'status' => $deletionRequest->status,
+        ], 202);
     }
 }

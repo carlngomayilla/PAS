@@ -8,6 +8,7 @@
         $filters = is_array($filters ?? null) ? $filters : [];
         $statusLabels = [
             'pending' => 'En attente',
+            'approved' => 'Approuvée, à exécuter',
             'complement_requested' => 'Complément requis',
             'deleted' => 'Supprimée',
             'disabled' => 'Désactivée',
@@ -17,6 +18,7 @@
         ];
         $statusClasses = [
             'pending' => 'anbg-badge anbg-badge-warning',
+            'approved' => 'anbg-badge anbg-badge-success',
             'complement_requested' => 'anbg-badge anbg-badge-info',
             'deleted' => 'anbg-badge anbg-badge-success',
             'disabled' => 'anbg-badge anbg-badge-neutral',
@@ -26,6 +28,7 @@
         ];
         $moduleLabels = [
             'referentiel_utilisateur' => 'Utilisateur',
+            'access_control' => 'Rôles et permissions',
             'pas' => 'PAS',
             'pao' => 'PAO',
             'pta' => 'PTA',
@@ -34,6 +37,7 @@
         $summaryCards = [
             ['label' => 'Total', 'value' => $summary['total'] ?? 0, 'status' => 'all'],
             ['label' => 'À instruire', 'value' => $summary['pending'] ?? 0, 'status' => 'pending'],
+            ['label' => 'À exécuter', 'value' => $summary['awaiting_execution'] ?? 0, 'status' => 'approved'],
             ['label' => 'Exécutées', 'value' => $summary['approved'] ?? 0, 'status' => 'all'],
             ['label' => 'Compléments', 'value' => $summary['complement'] ?? 0, 'status' => 'complement_requested'],
             ['label' => 'Refusées', 'value' => $summary['rejected'] ?? 0, 'status' => 'rejected'],
@@ -148,6 +152,7 @@
                                 $linkedRecords = is_array($impact['linked_records'] ?? null) ? $impact['linked_records'] : [];
                                 $isUserRequest = $row->entity_type === \App\Models\User::class;
                                 $canArchive = in_array($row->module, ['pas', 'pao', 'pta'], true);
+                                $isAccessChange = $row->module === 'access_control';
                             @endphp
                             <tr id="request-{{ $row->id }}">
                                 <td>
@@ -202,7 +207,7 @@
                                     @endif
                                 </td>
                                 <td class="text-right">
-                                    @if ($canReview && $row->status === \App\Models\DeletionRequest::STATUS_PENDING)
+                                    @if ($canApprove && $row->status === \App\Models\DeletionRequest::STATUS_PENDING)
                                         <details class="relative inline-block text-left">
                                             <summary class="btn btn-primary btn-sm cursor-pointer list-none">Décider</summary>
                                             <form method="POST" action="{{ route('workspace.super-admin.organization.deletion-requests.decision', $row) }}" class="absolute right-0 z-30 mt-2 grid w-[24rem] max-w-[88vw] gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
@@ -212,11 +217,8 @@
                                                     Décision
                                                     <select name="decision" required>
                                                         <option value="">Sélectionner</option>
-                                                        <option value="delete">Supprimer</option>
-                                                        @if ($isUserRequest)<option value="disable">Désactiver et transférer</option>@endif
-                                                        @if ($canArchive)<option value="archive">Archiver</option>@endif
+                                                        <option value="approve">Approuver pour exécution</option>
                                                         <option value="request_complement">Demander un complément</option>
-                                                        <option value="correct">Marquer corrigée</option>
                                                         <option value="reject">Refuser</option>
                                                     </select>
                                                 </label>
@@ -239,7 +241,43 @@
                                                     Note de décision
                                                     <textarea name="reviewer_note" rows="4" minlength="5" maxlength="1000" required></textarea>
                                                 </label>
-                                                <button class="btn btn-primary btn-sm" type="submit">Enregistrer la décision</button>
+                                                <button class="btn btn-primary btn-sm" type="submit">Enregistrer l’accord</button>
+                                            </form>
+                                        </details>
+                                    @elseif ($canExecute && $row->status === \App\Models\DeletionRequest::STATUS_APPROVED)
+                                        <details class="relative inline-block text-left">
+                                            <summary class="btn btn-primary btn-sm cursor-pointer list-none">Exécuter</summary>
+                                            <form method="POST" action="{{ route('workspace.super-admin.organization.deletion-requests.decision', $row) }}" class="absolute right-0 z-30 mt-2 grid w-[24rem] max-w-[88vw] gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                                                @csrf
+                                                <input type="hidden" name="return_to" value="governance">
+                                                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500">
+                                                    Action administrative
+                                                    <select name="decision" required>
+                                                        @if ($isAccessChange)
+                                                            <option value="apply">Appliquer les rôles et permissions</option>
+                                                        @else
+                                                            <option value="delete">Supprimer définitivement</option>
+                                                        @endif
+                                                        @if ($isUserRequest)<option value="disable">Désactiver et transférer</option>@endif
+                                                        @if ($canArchive)<option value="archive">Archiver</option>@endif
+                                                    </select>
+                                                </label>
+                                                @if ($isUserRequest)
+                                                    <label class="grid gap-1 text-xs font-bold uppercase text-slate-500">
+                                                        Repreneur
+                                                        <select name="transfer_to_user_id">
+                                                            <option value="">Aucun</option>
+                                                            @foreach ($transferUserOptions as $option)
+                                                                <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </label>
+                                                @endif
+                                                <label class="grid gap-1 text-xs font-bold uppercase text-slate-500">
+                                                    Note d’exécution
+                                                    <textarea name="reviewer_note" rows="4" minlength="5" maxlength="1000" required></textarea>
+                                                </label>
+                                                <button class="btn btn-primary btn-sm" type="submit">Confirmer l’exécution</button>
                                             </form>
                                         </details>
                                     @elseif (! $canReview && $row->status === \App\Models\DeletionRequest::STATUS_COMPLEMENT_REQUESTED)

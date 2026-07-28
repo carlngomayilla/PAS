@@ -18,6 +18,8 @@ class GovernanceQueueService
      *     summary:array<string, int>,
      *     filters:array<string, mixed>,
      *     canReview:bool,
+     *     canApprove:bool,
+     *     canExecute:bool,
      *     assignmentHistory:Collection<int, UserAssignmentHistory>,
      *     transferUserOptions:Collection<int, User>
      * }
@@ -25,7 +27,9 @@ class GovernanceQueueService
     public function deletionRequests(User $actor, array $input): array
     {
         $filters = $this->normalizeFilters($input);
-        $canReview = $actor->isSuperAdmin();
+        $canReview = $actor->isPlanningControlChief()
+            || $actor->isSuperAdmin()
+            || $actor->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
         $scope = DeletionRequest::query();
         if (! $canReview) {
             $scope->where('requested_by', $actor->id);
@@ -34,12 +38,14 @@ class GovernanceQueueService
         $query = (clone $scope)->with([
             'requester:id,name,email',
             'reviewer:id,name,email',
+            'approver:id,name,email',
         ]);
         $this->applyFilters($query, $filters);
         $this->applySort($query, (string) $filters['sort']);
 
         $openStatuses = [
             DeletionRequest::STATUS_PENDING,
+            DeletionRequest::STATUS_APPROVED,
             DeletionRequest::STATUS_COMPLEMENT_REQUESTED,
         ];
         $approvedStatuses = [
@@ -55,12 +61,15 @@ class GovernanceQueueService
                 'total' => (clone $scope)->count(),
                 'open' => (clone $scope)->whereIn('status', $openStatuses)->count(),
                 'pending' => (clone $scope)->where('status', DeletionRequest::STATUS_PENDING)->count(),
+                'awaiting_execution' => (clone $scope)->where('status', DeletionRequest::STATUS_APPROVED)->count(),
                 'approved' => (clone $scope)->whereIn('status', $approvedStatuses)->count(),
                 'rejected' => (clone $scope)->where('status', DeletionRequest::STATUS_REJECTED)->count(),
                 'complement' => (clone $scope)->where('status', DeletionRequest::STATUS_COMPLEMENT_REQUESTED)->count(),
             ],
             'filters' => $filters,
             'canReview' => $canReview,
+            'canApprove' => $actor->isPlanningControlChief(),
+            'canExecute' => $actor->isSuperAdmin() || $actor->hasRole(User::ROLE_ADMIN_FONCTIONNEL),
             'assignmentHistory' => $canReview ? $this->assignmentHistory() : collect(),
             'transferUserOptions' => $canReview
                 ? User::query()
@@ -104,6 +113,7 @@ class GovernanceQueueService
         $statuses = [
             'all',
             DeletionRequest::STATUS_PENDING,
+            DeletionRequest::STATUS_APPROVED,
             DeletionRequest::STATUS_COMPLEMENT_REQUESTED,
             DeletionRequest::STATUS_DELETED,
             DeletionRequest::STATUS_DISABLED,
@@ -111,7 +121,7 @@ class GovernanceQueueService
             DeletionRequest::STATUS_REJECTED,
             DeletionRequest::STATUS_CORRECTED,
         ];
-        $modules = ['all', 'referentiel_utilisateur', 'pas', 'pao', 'pta', 'action'];
+        $modules = ['all', 'referentiel_utilisateur', 'access_control', 'pas', 'pao', 'pta', 'action'];
         $sorts = ['newest', 'oldest', 'pending_first'];
         $perPage = is_scalar($input['per_page'] ?? null) ? (int) $input['per_page'] : 20;
 

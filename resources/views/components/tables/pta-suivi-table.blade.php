@@ -11,6 +11,10 @@
     $tableColumnCount = $isInteractive ? 19 : 18;
     $pasLabelColspan = $isInteractive ? 15 : 14;
     $hierarchyValueColspan = $isInteractive ? 8 : 7;
+    $canOpenActionParameters = $isInteractive && auth()->user()?->hasRole(
+        \App\Models\User::ROLE_PLANIFICATION,
+        \App\Models\User::ROLE_CHEF_PLANIFICATION
+    );
     $actionCellStyle = 'background:#f8fafc;color:#111827;';
     $subActionCellStyle = 'background:#f1f5f9;color:#334155;';
     $previewUrl = static function (array $metricRow, array $row): string {
@@ -448,6 +452,9 @@
                                                     @if ($canEditMetric && $inlineUpdateUrl !== '')
                                                         <button form="{{ $formId }}" class="pta-inline-save" type="submit" data-pta-save>Enregistrer</button>
                                                         <span class="pta-inline-save-state" data-pta-save-state aria-live="polite">Aucune modification</span>
+                                                    @endif
+                                                    @if ($canOpenActionParameters && (! $hasSubAction || $loop->first) && $parameterUrl !== '')
+                                                        <a class="pta-inline-open" href="{{ $parameterUrl }}">Modifier le paramétrage</a>
                                                     @endif
                                                     <a class="pta-inline-open" href="{{ $trackingUrl }}">Faire le suivi</a>
                                                     @if ($canRequestReport)

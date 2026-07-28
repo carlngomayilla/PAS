@@ -596,30 +596,25 @@ class SuperAdminWebController extends Controller
             $submittedPermissions[$role] = $submittedPermissions[$role] ?? [];
         }
 
-        $before = $this->rolePermissionSettings->all();
-        $after = $this->rolePermissionSettings->update($submittedPermissions, $user);
-        $ignoredPermissions = $this->ignoredSubmittedPermissions($submittedPermissions, $after, $roleCodes);
-        $this->roleRegistry->recordVersionSnapshot(
-            $this->customRolePermissionSnapshot($after),
+        $deletionRequest = $this->deletionRequestService->requestRolePermissionChange(
+            $submittedPermissions,
             $user,
-            'permissions',
-            'Matrice de permissions'
+            (string) $request->input('motif', 'Mise à jour de la matrice des rôles et permissions.')
         );
-        $auditTarget = $this->auditAnchor('role_permissions', 'role_permissions_matrix', 'permissions-update');
+        $this->recordAudit(
+            $request,
+            'access_control',
+            'role_permission_change_requested',
+            $deletionRequest,
+            null,
+            $deletionRequest->toArray()
+        );
 
-        $this->recordAudit($request, 'super_admin', 'role_permission_settings_update', $auditTarget, $before, $after);
-
-        $redirect = redirect()
+        return redirect()
             ->route('workspace.super-admin.roles.edit', [
                 'simulate_role' => (string) $request->string('simulate_role', User::ROLE_ADMIN_FONCTIONNEL),
             ])
-            ->with('success', 'Rôles et permissions mis à jour.');
-
-        if ($ignoredPermissions !== []) {
-            $redirect->with('warning', $this->ignoredPermissionsMessage($ignoredPermissions));
-        }
-
-        return $redirect;
+            ->with('success', 'Demande transmise au Chef Planification. La matrice reste inchangée jusqu’à son accord et son application par un administrateur.');
     }
 
     /**
@@ -1091,6 +1086,19 @@ class SuperAdminWebController extends Controller
 
         $validated = $this->validateOrganizationUserPayload($request, $managedUser);
         $this->denyAdminPrivilegeEscalation($user, $managedUser, (string) ($validated['role'] ?? $managedUser->role));
+        $currentRoleCode = trim((string) ($managedUser->custom_role_code ?: $managedUser->role));
+        $requestedRoleCode = trim((string) ($validated['role'] ?? $currentRoleCode));
+        $roleChangeRequested = $requestedRoleCode !== $currentRoleCode;
+        if ($roleChangeRequested) {
+            $roleRequest = $this->deletionRequestService->requestUserRoleChange(
+                $managedUser,
+                $requestedRoleCode,
+                $user,
+                (string) ($validated['motif'] ?? 'Modification du rôle utilisateur.')
+            );
+            $this->recordAudit($request, 'access_control', 'user_role_change_requested', $roleRequest, null, $roleRequest->toArray());
+            $validated['role'] = $currentRoleCode;
+        }
 
         $targetBaseRole = isset($validated['role'])
             ? $this->roleRegistry->baseRole((string) $validated['role'])
@@ -1165,7 +1173,9 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route('workspace.super-admin.organization.index')
-            ->with('success', 'Utilisateur mis à jour.');
+            ->with('success', $roleChangeRequested
+                ? 'Utilisateur mis à jour. Le changement de rôle attend l’accord du Chef Planification puis son application administrative.'
+                : 'Utilisateur mis à jour.');
     }
 
     public function organizationDirectionToggle(Request $request, Direction $direction): RedirectResponse
@@ -1442,6 +1452,27 @@ class SuperAdminWebController extends Controller
             ->whereIn('id', $validated['user_ids'])
             ->get();
 
+        if ((string) $validated['bulk_action'] === 'assign_role') {
+            $requestedRole = (string) ($validated['bulk_role'] ?? '');
+            if ($requestedRole === '') {
+                return back()->withErrors(['bulk_role' => 'Le rôle à attribuer est obligatoire.']);
+            }
+
+            foreach ($users as $managedUser) {
+                $roleRequest = $this->deletionRequestService->requestUserRoleChange(
+                    $managedUser,
+                    $requestedRole,
+                    $user,
+                    (string) ($validated['bulk_motif'] ?? 'Attribution groupée de rôle.')
+                );
+                $this->recordAudit($request, 'access_control', 'user_role_change_requested', $roleRequest, null, $roleRequest->toArray());
+            }
+
+            return redirect()
+                ->route('workspace.super-admin.organization.index')
+                ->with('success', 'Les attributions de rôle ont été transmises au Chef Planification. Aucun rôle n’a encore été modifié.');
+        }
+
         $processed = 0;
         $skipped = 0;
         $temporaryCredentials = [];
@@ -1597,10 +1628,11 @@ class SuperAdminWebController extends Controller
     public function organizationDeletionRequestDecision(Request $request, DeletionRequest $deletionRequest): RedirectResponse
     {
         $user = $this->authUser($request);
-        $this->denyUnlessSuperAdmin($user);
 
         $validated = $request->validate([
             'decision' => ['required', Rule::in([
+                DeletionRequest::DECISION_APPROVE,
+                DeletionRequest::DECISION_APPLY,
                 DeletionRequest::DECISION_DELETE,
                 DeletionRequest::DECISION_DISABLE,
                 DeletionRequest::DECISION_ARCHIVE,
@@ -1614,18 +1646,32 @@ class SuperAdminWebController extends Controller
         ]);
 
         $before = $deletionRequest->toArray();
-        $execution = $this->deletionRequestService->decide(
-            $deletionRequest,
-            $user,
-            (string) $validated['decision'],
-            (string) $validated['reviewer_note'],
-            isset($validated['transfer_to_user_id']) ? (int) $validated['transfer_to_user_id'] : null
-        );
+        $decision = (string) $validated['decision'];
+        if (in_array($decision, [
+            DeletionRequest::DECISION_APPROVE,
+            DeletionRequest::DECISION_REJECT,
+            DeletionRequest::DECISION_REQUEST_COMPLEMENT,
+        ], true)) {
+            $result = $this->deletionRequestService->approve(
+                $deletionRequest,
+                $user,
+                $decision,
+                (string) $validated['reviewer_note']
+            )->toArray();
+        } else {
+            $result = $this->deletionRequestService->execute(
+                $deletionRequest,
+                $user,
+                $decision,
+                (string) $validated['reviewer_note'],
+                isset($validated['transfer_to_user_id']) ? (int) $validated['transfer_to_user_id'] : null
+            );
+        }
 
         $deletionRequest->refresh();
         $this->recordAudit($request, 'super_admin', 'deletion_request_decision', $deletionRequest, $before, [
             ...$deletionRequest->toArray(),
-            'execution' => $execution,
+            'result' => $result,
         ]);
 
         $returnRoute = ($validated['return_to'] ?? 'organization') === 'governance'
@@ -1634,7 +1680,9 @@ class SuperAdminWebController extends Controller
 
         return redirect()
             ->route($returnRoute)
-            ->with('success', 'Décision de suppression enregistrée.');
+            ->with('success', $deletionRequest->isApproved()
+                ? 'Accord du Chef Planification enregistré. La suppression attend son exécution administrative.'
+                : 'Décision de gouvernance enregistrée.');
     }
 
     public function dashboardProfilesEdit(Request $request): View

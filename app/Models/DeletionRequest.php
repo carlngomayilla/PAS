@@ -12,19 +12,36 @@ class DeletionRequest extends Model
     use HasFactory;
 
     public const STATUS_PENDING = 'pending';
+
+    public const STATUS_APPROVED = 'approved';
+
     public const STATUS_DELETED = 'deleted';
+
     public const STATUS_DISABLED = 'disabled';
+
     public const STATUS_ARCHIVED = 'archived';
+
     public const STATUS_REJECTED = 'rejected';
+
     public const STATUS_COMPLEMENT_REQUESTED = 'complement_requested';
+
     public const STATUS_CORRECTED = 'corrected';
 
     public const DECISION_DELETE = 'delete';
+
     public const DECISION_DISABLE = 'disable';
+
     public const DECISION_ARCHIVE = 'archive';
+
     public const DECISION_REJECT = 'reject';
+
     public const DECISION_REQUEST_COMPLEMENT = 'request_complement';
+
     public const DECISION_CORRECT = 'correct';
+
+    public const DECISION_APPROVE = 'approve';
+
+    public const DECISION_APPLY = 'apply';
 
     /**
      * @var list<string>
@@ -32,6 +49,7 @@ class DeletionRequest extends Model
     protected $fillable = [
         'requested_by',
         'reviewed_by',
+        'approved_by',
         'module',
         'entity_type',
         'entity_id',
@@ -40,9 +58,11 @@ class DeletionRequest extends Model
         'status',
         'reason',
         'reviewer_note',
+        'approval_note',
         'impact_summary',
         'decision',
         'decided_at',
+        'approved_at',
         'executed_at',
     ];
 
@@ -54,6 +74,7 @@ class DeletionRequest extends Model
         return [
             'impact_summary' => 'array',
             'decided_at' => 'datetime',
+            'approved_at' => 'datetime',
             'executed_at' => 'datetime',
         ];
     }
@@ -66,6 +87,11 @@ class DeletionRequest extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     public function entity(): MorphTo
@@ -81,5 +107,10 @@ class DeletionRequest extends Model
     public function isPending(): bool
     {
         return in_array((string) $this->status, [self::STATUS_PENDING, self::STATUS_COMPLEMENT_REQUESTED], true);
+    }
+
+    public function isApproved(): bool
+    {
+        return (string) $this->status === self::STATUS_APPROVED;
     }
 }

@@ -346,7 +346,7 @@
             @if ($filters['without_kpi'])
                 <input type="hidden" name="without_kpi" value="1">
             @endif
-            <div class="mt-4 flex flex-wrap gap-2">
+            <div class="showcase-filter-actions mt-4">
                 <button class="btn btn-primary rounded-2xl px-4 py-2.5" type="submit">
                     Appliquer les filtres
                 </button>

@@ -11,6 +11,7 @@ use App\Models\PaoObjectifOperationnel;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
+use App\Models\PlatformSetting;
 use App\Models\Pta;
 use App\Models\User;
 use App\Notifications\WorkspaceModuleNotification;
@@ -26,8 +27,111 @@ use Throwable;
 class DeletionRequestService
 {
     public function __construct(
-        private readonly UserLifecycleService $userLifecycleService
+        private readonly UserLifecycleService $userLifecycleService,
+        private readonly RolePermissionSettings $rolePermissionSettings,
+        private readonly RoleRegistryService $roleRegistry
     ) {}
+
+    public function requestUserRoleChange(User $target, string $role, User $actor, string $reason): DeletionRequest
+    {
+        if (! $actor->isSuperAdmin() && ! $actor->hasRole(User::ROLE_ADMIN_FONCTIONNEL)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $baseRole = $this->roleRegistry->baseRole($role);
+        $customRoleCode = $this->roleRegistry->isCustomRole($role) ? $role : null;
+        $existing = DeletionRequest::query()
+            ->where('entity_type', User::class)
+            ->where('entity_id', (int) $target->id)
+            ->where('requested_action', 'assign_role')
+            ->whereIn('status', [
+                DeletionRequest::STATUS_PENDING,
+                DeletionRequest::STATUS_APPROVED,
+                DeletionRequest::STATUS_COMPLEMENT_REQUESTED,
+            ])
+            ->first();
+
+        if ($existing instanceof DeletionRequest) {
+            throw ValidationException::withMessages([
+                'role' => 'Une attribution de rôle est déjà en cours de validation pour cet utilisateur.',
+            ]);
+        }
+
+        $request = DeletionRequest::query()->create([
+            'requested_by' => (int) $actor->id,
+            'module' => 'access_control',
+            'entity_type' => User::class,
+            'entity_id' => (int) $target->id,
+            'entity_label' => $this->userLabel($target),
+            'requested_action' => 'assign_role',
+            'status' => DeletionRequest::STATUS_PENDING,
+            'reason' => trim($reason) ?: 'Attribution ou modification d un rôle utilisateur.',
+            'impact_summary' => [
+                'governance_payload' => [
+                    'role' => $baseRole,
+                    'custom_role_code' => $customRoleCode,
+                ],
+                'current_role' => $target->role,
+                'current_custom_role_code' => $target->custom_role_code,
+                'requested_role' => $role,
+            ],
+        ]);
+
+        $this->notifyPlanningChiefs($request, $actor);
+
+        return $request;
+    }
+
+    /**
+     * @param  array<string, array<int, string>>  $permissions
+     */
+    public function requestRolePermissionChange(array $permissions, User $actor, string $reason): DeletionRequest
+    {
+        if (! $actor->isSuperAdmin() && ! $actor->hasRole(User::ROLE_ADMIN_FONCTIONNEL)) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $anchor = PlatformSetting::query()->updateOrCreate(
+            ['group' => 'role_permissions', 'key' => 'governance_anchor'],
+            ['value' => 'approval_required']
+        );
+
+        $existing = DeletionRequest::query()
+            ->where('module', 'access_control')
+            ->where('requested_action', 'role_permissions_update')
+            ->whereIn('status', [
+                DeletionRequest::STATUS_PENDING,
+                DeletionRequest::STATUS_APPROVED,
+                DeletionRequest::STATUS_COMPLEMENT_REQUESTED,
+            ])
+            ->first();
+
+        if ($existing instanceof DeletionRequest) {
+            throw ValidationException::withMessages([
+                'general' => 'Une modification des rôles et permissions est déjà en cours de validation.',
+            ]);
+        }
+
+        $request = DeletionRequest::query()->create([
+            'requested_by' => (int) $actor->id,
+            'module' => 'access_control',
+            'entity_type' => PlatformSetting::class,
+            'entity_id' => (int) $anchor->id,
+            'entity_label' => 'Matrice des rôles et permissions',
+            'requested_action' => 'role_permissions_update',
+            'status' => DeletionRequest::STATUS_PENDING,
+            'reason' => trim($reason) ?: 'Mise à jour de la matrice des rôles et permissions.',
+            'impact_summary' => [
+                'governance_payload' => ['permissions' => $permissions],
+                'current_permissions' => $this->rolePermissionSettings->all(),
+                'roles_affected' => count($permissions),
+            ],
+        ]);
+
+        $this->notifyPlanningChiefs($request, $actor);
+
+        return $request;
+    }
 
     public function canRequestUserDeletion(User $actor, User $target): bool
     {
@@ -88,7 +192,11 @@ class DeletionRequestService
         $existing = DeletionRequest::query()
             ->where('entity_type', User::class)
             ->where('entity_id', (int) $target->id)
-            ->whereIn('status', [DeletionRequest::STATUS_PENDING, DeletionRequest::STATUS_COMPLEMENT_REQUESTED])
+            ->whereIn('status', [
+                DeletionRequest::STATUS_PENDING,
+                DeletionRequest::STATUS_APPROVED,
+                DeletionRequest::STATUS_COMPLEMENT_REQUESTED,
+            ])
             ->first();
 
         if ($existing instanceof DeletionRequest) {
@@ -109,7 +217,7 @@ class DeletionRequestService
             'impact_summary' => $this->impactForUser($target),
         ]);
 
-        $this->notifySuperAdmins($request, $actor);
+        $this->notifyPlanningChiefs($request, $actor);
 
         return $request;
     }
@@ -132,7 +240,11 @@ class DeletionRequestService
         $existing = DeletionRequest::query()
             ->where('entity_type', $target::class)
             ->where('entity_id', (int) $target->getKey())
-            ->whereIn('status', [DeletionRequest::STATUS_PENDING, DeletionRequest::STATUS_COMPLEMENT_REQUESTED])
+            ->whereIn('status', [
+                DeletionRequest::STATUS_PENDING,
+                DeletionRequest::STATUS_APPROVED,
+                DeletionRequest::STATUS_COMPLEMENT_REQUESTED,
+            ])
             ->first();
 
         if ($existing instanceof DeletionRequest) {
@@ -153,7 +265,7 @@ class DeletionRequestService
             'impact_summary' => $this->impactForEntity($target),
         ]);
 
-        $this->notifySuperAdmins($request, $actor);
+        $this->notifyPlanningChiefs($request, $actor);
 
         return $request;
     }
@@ -192,19 +304,79 @@ class DeletionRequestService
             $lockedRequest->forceFill([
                 'status' => DeletionRequest::STATUS_PENDING,
                 'reason' => $reason."\n\nComplément du demandeur : ".$complement,
-                'impact_summary' => $target instanceof Model
+                'impact_summary' => $target instanceof Model && $lockedRequest->requested_action === 'delete'
                     ? $this->impactForEntity($target)
                     : (array) ($lockedRequest->impact_summary ?? []),
                 'reviewed_by' => null,
+                'approved_by' => null,
                 'decision' => null,
+                'approval_note' => null,
                 'decided_at' => null,
+                'approved_at' => null,
                 'executed_at' => null,
             ])->save();
 
             return $lockedRequest->refresh();
         });
 
-        $this->notifySuperAdmins($request, $actor);
+        $this->notifyPlanningChiefs($request, $actor);
+
+        return $request;
+    }
+
+    public function approve(
+        DeletionRequest $request,
+        User $actor,
+        string $decision,
+        string $note
+    ): DeletionRequest {
+        if (! $actor->isPlanningControlChief()) {
+            abort(403, 'Acces non autorise.');
+        }
+
+        $note = trim($note);
+        if ($note === '') {
+            throw ValidationException::withMessages([
+                'approval_note' => 'Le motif de la decision est obligatoire.',
+            ]);
+        }
+
+        $request = DB::transaction(function () use ($request, $actor, $decision, $note): DeletionRequest {
+            $lockedRequest = DeletionRequest::query()
+                ->whereKey($request->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $lockedRequest->isPending()) {
+                throw ValidationException::withMessages([
+                    'decision' => 'Cette demande a déjà été traitée.',
+                ]);
+            }
+
+            $status = match ($decision) {
+                DeletionRequest::DECISION_APPROVE => DeletionRequest::STATUS_APPROVED,
+                DeletionRequest::DECISION_REJECT => DeletionRequest::STATUS_REJECTED,
+                DeletionRequest::DECISION_REQUEST_COMPLEMENT => DeletionRequest::STATUS_COMPLEMENT_REQUESTED,
+                default => throw ValidationException::withMessages(['decision' => 'Decision inconnue.']),
+            };
+
+            $target = $this->resolveTarget($lockedRequest);
+            $lockedRequest->forceFill([
+                'approved_by' => (int) $actor->id,
+                'status' => $status,
+                'decision' => $decision,
+                'approval_note' => $note,
+                'impact_summary' => $target instanceof Model && $lockedRequest->requested_action === 'delete'
+                    ? $this->impactForEntity($target)
+                    : (array) ($lockedRequest->impact_summary ?? []),
+                'approved_at' => $decision === DeletionRequest::DECISION_APPROVE ? now() : null,
+                'decided_at' => $decision !== DeletionRequest::DECISION_APPROVE ? now() : null,
+            ])->save();
+
+            return $lockedRequest->refresh();
+        });
+
+        $this->notifyApprovalOutcome($request, $actor);
 
         return $request;
     }
@@ -212,16 +384,21 @@ class DeletionRequestService
     /**
      * @return array<string, mixed>
      */
-    public function decide(DeletionRequest $request, User $actor, string $decision, string $note, ?int $replacementId = null): array
-    {
-        if (! $actor->isSuperAdmin()) {
+    public function execute(
+        DeletionRequest $request,
+        User $actor,
+        string $decision,
+        string $note,
+        ?int $replacementId = null
+    ): array {
+        if (! $actor->isSuperAdmin() && ! $actor->hasRole(User::ROLE_ADMIN_FONCTIONNEL)) {
             abort(403, 'Acces non autorise.');
         }
 
         $note = trim($note);
         if ($note === '') {
             throw ValidationException::withMessages([
-                'reviewer_note' => 'Le motif de decision est obligatoire.',
+                'reviewer_note' => 'Le motif d execution est obligatoire.',
             ]);
         }
 
@@ -231,14 +408,20 @@ class DeletionRequestService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (! $request->isPending()) {
+            if (! $request->isApproved() || $request->approved_by === null || $request->approved_at === null) {
                 throw ValidationException::withMessages([
-                    'decision' => 'Cette demande a déjà été traitée.',
+                    'decision' => 'L accord préalable du Chef Planification est obligatoire.',
                 ]);
             }
 
             $target = $this->resolveTarget($request);
-            $impact = $target instanceof Model ? $this->impactForEntity($target) : (array) ($request->impact_summary ?? []);
+            $isAccessChange = in_array((string) $request->requested_action, [
+                'role_permissions_update',
+                'assign_role',
+            ], true);
+            $impact = $target instanceof Model && ! $isAccessChange
+                ? $this->impactForEntity($target)
+                : (array) ($request->impact_summary ?? []);
             $execution = [
                 'decision' => $decision,
                 'target_entity_type' => (string) $request->entity_type,
@@ -251,13 +434,32 @@ class DeletionRequestService
                 DeletionRequest::DECISION_DELETE => DeletionRequest::STATUS_DELETED,
                 DeletionRequest::DECISION_DISABLE => DeletionRequest::STATUS_DISABLED,
                 DeletionRequest::DECISION_ARCHIVE => DeletionRequest::STATUS_ARCHIVED,
-                DeletionRequest::DECISION_REJECT => DeletionRequest::STATUS_REJECTED,
-                DeletionRequest::DECISION_REQUEST_COMPLEMENT => DeletionRequest::STATUS_COMPLEMENT_REQUESTED,
                 DeletionRequest::DECISION_CORRECT => DeletionRequest::STATUS_CORRECTED,
-                default => throw ValidationException::withMessages(['decision' => 'Decision inconnue.']),
+                DeletionRequest::DECISION_APPLY => DeletionRequest::STATUS_CORRECTED,
+                default => throw ValidationException::withMessages(['decision' => 'Decision d execution inconnue.']),
             };
 
-            if ($decision === DeletionRequest::DECISION_DELETE) {
+            if ($decision === DeletionRequest::DECISION_APPLY) {
+                $payload = (array) data_get($request->impact_summary, 'governance_payload', []);
+                if ((string) $request->requested_action === 'role_permissions_update') {
+                    $execution['permissions'] = $this->rolePermissionSettings->update(
+                        (array) ($payload['permissions'] ?? []),
+                        $actor
+                    );
+                } elseif ((string) $request->requested_action === 'assign_role' && $target instanceof User) {
+                    $target->forceFill([
+                        'role' => (string) ($payload['role'] ?? $target->role),
+                        'custom_role_code' => $payload['custom_role_code'] ?? null,
+                    ])->save();
+                    $execution['user_role'] = [
+                        'user_id' => (int) $target->id,
+                        'role' => (string) $target->role,
+                        'custom_role_code' => $target->custom_role_code,
+                    ];
+                } else {
+                    throw ValidationException::withMessages(['decision' => 'Cette demande ne contient aucun changement d accès applicable.']);
+                }
+            } elseif ($decision === DeletionRequest::DECISION_DELETE) {
                 if (! $target instanceof Model) {
                     throw ValidationException::withMessages(['decision' => 'L element concerne est introuvable.']);
                 }
@@ -297,12 +499,7 @@ class DeletionRequestService
                 'reviewer_note' => $note,
                 'impact_summary' => $impact,
                 'decided_at' => now(),
-                'executed_at' => in_array($decision, [
-                    DeletionRequest::DECISION_DELETE,
-                    DeletionRequest::DECISION_DISABLE,
-                    DeletionRequest::DECISION_ARCHIVE,
-                    DeletionRequest::DECISION_CORRECT,
-                ], true) ? now() : null,
+                'executed_at' => now(),
             ])->save();
 
             $this->notifyRequester($request, $actor);
@@ -698,17 +895,17 @@ class DeletionRequestService
         return class_basename($target).' #'.(string) $target->getKey();
     }
 
-    private function notifySuperAdmins(DeletionRequest $request, User $actor): void
+    private function notifyPlanningChiefs(DeletionRequest $request, User $actor): void
     {
         $recipients = User::query()
-            ->where('role', User::ROLE_SUPER_ADMIN)
             ->where('is_active', true)
-            ->get(['id', 'name', 'email']);
+            ->get(['id', 'name', 'email', 'role', 'custom_role_code'])
+            ->filter(fn (User $user): bool => $user->isPlanningControlChief());
 
         $this->sendNotification($recipients, [
             'title' => 'Demande de suppression a traiter',
             'message' => sprintf('%s demande la suppression de %s.', $actor->name, (string) $request->entity_label),
-            'module' => 'super_admin',
+            'module' => 'gouvernance',
             'entity_type' => 'deletion_request',
             'entity_id' => $request->id,
             'url' => route('workspace.deletion-requests.index', ['status' => DeletionRequest::STATUS_PENDING]).'#request-'.$request->id,
@@ -723,6 +920,43 @@ class DeletionRequestService
                 'event' => 'deletion_request_created',
                 'request_id' => (int) $request->id,
                 'target' => (string) $request->entity_label,
+            ],
+        ]);
+    }
+
+    private function notifyApprovalOutcome(DeletionRequest $request, User $actor): void
+    {
+        $recipients = User::query()
+            ->where('is_active', true)
+            ->get(['id', 'name', 'email', 'role'])
+            ->filter(fn (User $user): bool => $request->isApproved()
+                ? $user->isSuperAdmin() || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL)
+                : (int) $user->id === (int) $request->requested_by);
+
+        $this->sendNotification($recipients, [
+            'title' => $request->isApproved()
+                ? 'Suppression approuvee, execution requise'
+                : 'Decision du Chef Planification',
+            'message' => sprintf(
+                'La demande concernant %s est maintenant au statut %s.',
+                (string) $request->entity_label,
+                (string) $request->status
+            ),
+            'module' => 'gouvernance',
+            'entity_type' => 'deletion_request',
+            'entity_id' => $request->id,
+            'url' => route('workspace.deletion-requests.index', ['status' => $request->status]).'#request-'.$request->id,
+            'icon' => 'shield-check',
+            'status' => $request->isApproved() ? 'success' : 'info',
+            'priority' => 'high',
+            'notification_type' => 'validation',
+            'categorie' => 'gouvernance',
+            'niveau' => (string) $request->status,
+            'user_id_declencheur' => (int) $actor->id,
+            'meta' => [
+                'event' => 'deletion_request_planning_reviewed',
+                'request_id' => (int) $request->id,
+                'status' => (string) $request->status,
             ],
         ]);
     }

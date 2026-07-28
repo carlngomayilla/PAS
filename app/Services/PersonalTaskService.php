@@ -536,7 +536,7 @@ class PersonalTaskService
     {
         $tasks = collect();
 
-        if ($role === 'super_admin') {
+        if ($user->isPlanningControlChief()) {
             $tasks = $tasks->merge(
                 DeletionRequest::query()
                     ->with('requester:id,name')
@@ -550,7 +550,7 @@ class PersonalTaskService
                         return $this->task(
                             key: 'deletion-request-review:'.$request->id,
                             type: 'decision_suppression',
-                            title: 'Decision suppression',
+                            title: 'Accord suppression',
                             subject: (string) ($request->entity_label ?? 'Demande de suppression'),
                             context: (string) $request->module,
                             responsible: $request->requester?->name,
@@ -558,7 +558,35 @@ class PersonalTaskService
                             deadlineAt: $deadline,
                             url: route('workspace.deletion-requests.index', ['status' => DeletionRequest::STATUS_PENDING]).'#request-'.$request->id,
                             criticality: $this->criticalityFromDeadline($deadline, 'importante'),
-                            scoreImpact: 'Retard de decision impute au Super Admin.'
+                            scoreImpact: 'Retard d approbation impute au Chef Planification.'
+                        );
+                    })
+            );
+        }
+
+        if ($user->isSuperAdmin() || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL)) {
+            $tasks = $tasks->merge(
+                DeletionRequest::query()
+                    ->with(['requester:id,name', 'approver:id,name'])
+                    ->where('status', DeletionRequest::STATUS_APPROVED)
+                    ->latest('approved_at')
+                    ->get()
+                    ->map(function (DeletionRequest $request): array {
+                        $received = $this->carbon($request->approved_at);
+                        $deadline = $received?->copy()->addHours(48);
+
+                        return $this->task(
+                            key: 'deletion-request-execution:'.$request->id,
+                            type: 'decision_suppression',
+                            title: 'Exécution suppression',
+                            subject: (string) ($request->entity_label ?? 'Demande de suppression'),
+                            context: (string) $request->module,
+                            responsible: $request->approver?->name,
+                            receivedAt: $received,
+                            deadlineAt: $deadline,
+                            url: route('workspace.deletion-requests.index', ['status' => DeletionRequest::STATUS_APPROVED]).'#request-'.$request->id,
+                            criticality: $this->criticalityFromDeadline($deadline, 'importante'),
+                            scoreImpact: 'Retard d exécution impute à l administration fonctionnelle.'
                         );
                     })
             );
