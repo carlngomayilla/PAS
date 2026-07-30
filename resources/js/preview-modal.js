@@ -149,7 +149,7 @@ function svgToPngDataUrl(svgElement) {
 (function () {
     'use strict';
 
-    var interactiveSelector = 'a, button, input, select, textarea, label, summary, details, form, [role="button"]';
+    var interactiveSelector = 'a, button, input, select, textarea, label, summary, details, form, [role="button"], [data-preview-ignore="1"], [data-dropdown-toggle], .btn, .dropdown-toggle, .dropdown-item, .table-action, .table-action-button, [data-action], details[open], details > summary, .relative > summary';
     var modal = null;
     var titleEl = null;
     var eyebrowEl = null;
@@ -711,6 +711,10 @@ function svgToPngDataUrl(svgElement) {
         window.print();
     }
 
+    function isInteractivePreviewTarget(target) {
+        return Boolean(target && target.closest && target.closest(interactiveSelector));
+    }
+
     document.addEventListener('click', function (event) {
         var closeTrigger = event.target.closest('[data-preview-close]');
         if (closeTrigger) {
@@ -751,14 +755,14 @@ function svgToPngDataUrl(svgElement) {
         }
 
         var clickedTable = event.target.closest('table.app-table.preview-table-clickable');
-        if (clickedTable && !clickedTable.closest('#preview-modal') && !event.target.closest(interactiveSelector)) {
+        if (clickedTable && !clickedTable.closest('#preview-modal') && !isInteractivePreviewTarget(event.target)) {
             event.preventDefault();
             openTablePreview(clickedTable);
             return;
         }
 
         var clickedChart = event.target.closest('.dashboard-chart-host.preview-chart-clickable, .dashboard-canvas.preview-chart-clickable, .dashboard-gauge-card.preview-chart-clickable');
-        if (clickedChart && !clickedChart.closest('#preview-modal') && !event.target.closest(interactiveSelector)) {
+        if (clickedChart && !clickedChart.closest('#preview-modal') && !isInteractivePreviewTarget(event.target)) {
             event.preventDefault();
             openChartPreview(clickedChart);
         }
