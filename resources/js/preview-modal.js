@@ -711,8 +711,21 @@ function svgToPngDataUrl(svgElement) {
         window.print();
     }
 
+    function hasInteractiveControlInScope(target) {
+        if (!target) return false;
+
+        var scope = target.closest('td, th, tr, .relative, details, form, .table-actions, .data-table-actions');
+        if (!scope) return false;
+
+        if (scope.matches && scope.matches(interactiveSelector)) {
+            return true;
+        }
+
+        return Boolean(scope.querySelector && scope.querySelector(interactiveSelector));
+    }
+
     function isInteractivePreviewTarget(target) {
-        return Boolean(target && target.closest && target.closest(interactiveSelector));
+        return Boolean(target && target.closest && (target.closest(interactiveSelector) || hasInteractiveControlInScope(target)));
     }
 
     document.addEventListener('click', function (event) {
