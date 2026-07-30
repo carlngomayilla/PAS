@@ -169,6 +169,7 @@ function svgToPngDataUrl(svgElement) {
     var previewId = 0;
     var refreshTimer = null;
     var previewInitialized = false;
+    var suppressPreviewForNextClick = false;
 
     function ensureElements() {
         modal = modal || document.getElementById('preview-modal');
@@ -728,6 +729,23 @@ function svgToPngDataUrl(svgElement) {
         return Boolean(target && target.closest && (target.closest(interactiveSelector) || hasInteractiveControlInScope(target)));
     }
 
+    function shouldSuppressPreviewClick(target) {
+        if (!target) return false;
+
+        if (target.closest && target.closest('[data-preview-ignore="1"], .preview-table-toolbar, [data-preview-table-trigger], [data-preview-chart-trigger], .preview-chart-inline-btn')) {
+            return true;
+        }
+
+        if (target.closest && target.closest('td, th, tr')) {
+            var rowScope = target.closest('td, th, tr');
+            if (rowScope && rowScope.querySelector && rowScope.querySelector('button, a, input, select, textarea, summary, details, form, [role="button"], [data-action]')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     document.addEventListener('click', function (event) {
         var closeTrigger = event.target.closest('[data-preview-close]');
         if (closeTrigger) {
@@ -764,6 +782,10 @@ function svgToPngDataUrl(svgElement) {
                 ? findChartByPreviewId(chartTrigger.dataset.previewChartId)
                 : chartTrigger.closest('.dashboard-chart-host, .dashboard-canvas, .dashboard-gauge-card');
             if (chart) openChartPreview(chart);
+            return;
+        }
+
+        if (shouldSuppressPreviewClick(event.target)) {
             return;
         }
 
