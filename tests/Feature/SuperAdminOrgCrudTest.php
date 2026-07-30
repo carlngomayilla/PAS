@@ -210,6 +210,31 @@ class SuperAdminOrgCrudTest extends TestCase
         $this->assertFalse((bool) $managed->fresh()->is_active);
     }
 
+    public function test_super_admin_cannot_create_user_without_matricule(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $direction = Direction::query()->whereIn('code', ['DAF', 'DSIC', 'DS'])->firstOrFail();
+        $service = Service::query()->where('direction_id', $direction->id)->firstOrFail();
+
+        $this->actingAs($superAdmin)
+            ->post(route('workspace.super-admin.organization.users.store'), [
+                'name' => 'Utilisateur sans matricule',
+                'email' => 'user-sans-matricule@anbg.test',
+                'role' => User::ROLE_AGENT,
+                'direction_id' => $direction->id,
+                'service_id' => $service->id,
+                'is_active' => '1',
+                'is_agent' => '1',
+                'agent_matricule' => '',
+                'agent_fonction' => 'Agent test',
+                'password' => 'Password-Crud@123',
+                'password_confirmation' => 'Password-Crud@123',
+            ])
+            ->assertSessionHasErrors('agent_matricule');
+
+        $this->assertDatabaseMissing('users', ['email' => 'user-sans-matricule@anbg.test']);
+    }
+
     public function test_super_admin_cannot_deactivate_own_account(): void
     {
         $superAdmin = $this->createSuperAdminUser();

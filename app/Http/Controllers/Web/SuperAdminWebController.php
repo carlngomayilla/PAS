@@ -3085,6 +3085,22 @@ class SuperAdminWebController extends Controller
 
         $creating = ! ($managedUser instanceof User);
 
+        $selectedRole = (string) ($request->input('role') ?? '');
+        $baseRole = $this->roleRegistry->baseRole($selectedRole);
+        $requiresUserMatricule = in_array($baseRole, [
+            User::ROLE_AGENT,
+            User::ROLE_DIRECTION,
+            User::ROLE_SERVICE,
+            User::ROLE_DG,
+            User::ROLE_SUPER_ADMIN,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_PLANIFICATION,
+            User::ROLE_AUDITEUR,
+        ], true);
+        $agentMatriculeRules = $requiresUserMatricule
+            ? ['required', 'string', 'max:80', 'filled', $matriculeRule]
+            : ['nullable', 'string', 'max:80', $matriculeRule];
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email:rfc', 'max:255', $emailRule],
@@ -3093,7 +3109,7 @@ class SuperAdminWebController extends Controller
             'service_id' => ['nullable', 'integer', 'exists:services,id'],
             'is_active' => ['nullable', 'boolean'],
             'is_agent' => ['nullable', 'boolean'],
-            'agent_matricule' => ['nullable', 'string', 'max:80', $matriculeRule],
+            'agent_matricule' => $agentMatriculeRules,
             'agent_fonction' => ['nullable', 'string', 'max:255'],
             'agent_telephone' => ['nullable', 'string', 'max:80'],
             'suspended_until' => ['nullable', 'date'],
