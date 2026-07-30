@@ -640,10 +640,20 @@ function svgToPngDataUrl(svgElement) {
         });
     }
 
+    function tableSupportsPreview(table) {
+        if (!table) return false;
+        if (table.closest('#preview-modal')) return false;
+        if (table.closest('[data-preview-disabled="1"]')) return false;
+        if (table.querySelector('button, a, input, select, textarea, summary, details, form, [role="button"], [data-action], [data-preview-ignore="1"]')) {
+            return false;
+        }
+
+        return true;
+    }
+
     function injectTablePreviewButtons() {
         document.querySelectorAll('table.app-table').forEach(function (table) {
-            if (table.closest('#preview-modal')) return;
-            if (table.closest('[data-preview-disabled="1"]')) return;
+            if (!tableSupportsPreview(table)) return;
             if (table.dataset.previewReady === '1') return;
             table.dataset.previewReady = '1';
             table.dataset.previewTableId = table.dataset.previewTableId || nextPreviewId('preview-table');
