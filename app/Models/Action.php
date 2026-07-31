@@ -320,6 +320,11 @@ class Action extends Model
         return $this->morphMany(Justificatif::class, 'justifiable');
     }
 
+    public function financialTransactions(): HasMany
+    {
+        return $this->hasMany(FinancialTransaction::class);
+    }
+
     // Relation weeks() supprimee : le suivi hebdomadaire n'existe plus.
     // Stub retournant une collection vide via Builder pour compatibilite.
     public function weeks(): HasMany

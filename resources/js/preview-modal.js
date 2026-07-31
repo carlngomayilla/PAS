@@ -653,12 +653,15 @@ function svgToPngDataUrl(svgElement) {
 
     function injectTablePreviewButtons() {
         document.querySelectorAll('table.app-table').forEach(function (table) {
+            table.classList.remove('preview-table-clickable');
+            if (table.getAttribute('title') === 'Agrandir le tableau') {
+                table.removeAttribute('title');
+            }
+
             if (!tableSupportsPreview(table)) return;
             if (table.dataset.previewReady === '1') return;
             table.dataset.previewReady = '1';
             table.dataset.previewTableId = table.dataset.previewTableId || nextPreviewId('preview-table');
-            table.classList.add('preview-table-clickable');
-            table.setAttribute('title', 'Agrandir le tableau');
 
             var wrapper = table.closest('.app-table-wrapper') || table.parentElement;
             if (!wrapper || wrapper.querySelector('[data-preview-table-trigger]')) return;
@@ -796,13 +799,6 @@ function svgToPngDataUrl(svgElement) {
         }
 
         if (shouldSuppressPreviewClick(event.target)) {
-            return;
-        }
-
-        var clickedTable = event.target.closest('table.app-table.preview-table-clickable');
-        if (clickedTable && !clickedTable.closest('#preview-modal') && !isInteractivePreviewTarget(event.target)) {
-            event.preventDefault();
-            openTablePreview(clickedTable);
             return;
         }
 

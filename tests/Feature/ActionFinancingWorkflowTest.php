@@ -112,9 +112,8 @@ class ActionFinancingWorkflowTest extends TestCase
         $this->actingAs($fixture['daf_director'])
             ->get(route('workspace.daf.financements.index'))
             ->assertOk()
-            ->assertSee('Pilotage des financements')
+            ->assertSee('Suivi des financements')
             ->assertSee('Action avec besoin de financement')
-            ->assertSee('Budget interne')
             ->assertDontSee('Action sans financement DAF');
     }
 

@@ -364,6 +364,12 @@ class UserWorkspaceService
             ],
 
             'chef' => [
+                $m('financement', 'Suivi financier', '/workspace/daf/financements-actions', [
+                    'can_write' => (string) ($user->direction?->code ?? '') === 'DAF',
+                    'actions' => (string) ($user->direction?->code ?? '') === 'DAF'
+                        ? ['Consulter', 'Enregistrer un engagement', 'Enregistrer un decaissement', 'Demander un depassement']
+                        : ['Consulter'],
+                ]),
                 $m('pilotage', 'Dashboard', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
@@ -378,6 +384,7 @@ class UserWorkspaceService
             ],
 
             'sciq_planif' => [
+                $m('financement', 'Suivi financier', '/workspace/daf/financements-actions'),
                 $m('pilotage', 'Dashboard global', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pas', 'PAS', '/workspace/pas', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
@@ -397,6 +404,7 @@ class UserWorkspaceService
             ],
 
             'directeur' => [
+                $m('financement', 'Suivi financier', '/workspace/daf/financements-actions'),
                 $m('pilotage', 'Dashboard direction', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('pao', 'PAO', '/workspace/pao', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),

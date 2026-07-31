@@ -19,6 +19,7 @@ use App\Http\Controllers\Web\AiUsageController;
 use App\Http\Controllers\Web\AuditWebController;
 use App\Http\Controllers\Web\DeadlineExtensionWebController;
 use App\Http\Controllers\Web\DependentSelectController;
+use App\Http\Controllers\Web\FinancialMonitoringWebController;
 use App\Http\Controllers\Web\GlobalSearchWebController;
 use App\Http\Controllers\Web\GovernanceWebController;
 use App\Http\Controllers\Web\KpiMesureWebController;
@@ -315,8 +316,18 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
 
             // ── ACTIONS ────────────────────────────────────────────────────────────
             // Tâches concrètes rattachées à un PTA : suivi, validation, clôture, KPI.
-            Route::get('daf/financements-actions', [ActionWebController::class, 'financingRequests'])
+            Route::get('daf/financements-actions', [FinancialMonitoringWebController::class, 'index'])
                 ->name('daf.financements.index');
+            Route::post('finances/actions/{action}/operations', [FinancialMonitoringWebController::class, 'storeTransaction'])
+                ->name('finances.transactions.store');
+            Route::post('finances/depassements', [FinancialMonitoringWebController::class, 'storeOverrun'])
+                ->name('finances.overruns.store');
+            Route::post('finances/depassements/{budgetOverrunRequest}/decision', [FinancialMonitoringWebController::class, 'reviewOverrun'])
+                ->name('finances.overruns.review');
+            Route::get('finances/operations/{financialTransaction}/pieces/{justificatif}/telecharger', [FinancialMonitoringWebController::class, 'downloadTransactionProof'])
+                ->name('finances.transactions.proof.download');
+            Route::get('finances/depassements/{budgetOverrunRequest}/pieces/{justificatif}/telecharger', [FinancialMonitoringWebController::class, 'downloadOverrunProof'])
+                ->name('finances.overruns.proof.download');
 
             Route::patch('actions/{action}/quick-statut', [ActionWebController::class, 'quickStatus'])
                 ->name('actions.quick-status');

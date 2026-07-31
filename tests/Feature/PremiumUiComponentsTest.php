@@ -46,4 +46,16 @@ class PremiumUiComponentsTest extends TestCase
         $this->assertStringContainsString('min-w-full', $html);
         $this->assertStringNotContainsString('min-w-[1200px]', $html);
     }
+
+    public function test_table_preview_only_opens_from_its_dedicated_trigger(): void
+    {
+        $javascript = file_get_contents(resource_path('js/preview-modal.js'));
+
+        $this->assertIsString($javascript);
+        $this->assertStringContainsString('[data-preview-table-trigger]', $javascript);
+        $this->assertStringNotContainsString(
+            "event.target.closest('table.app-table.preview-table-clickable')",
+            $javascript
+        );
+    }
 }
