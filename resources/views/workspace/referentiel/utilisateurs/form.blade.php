@@ -238,8 +238,8 @@
                 <div id="agent-fields" class="conditional-block mt-4">
                     <div class="form-grid-compact mt-2">
                         <div>
-                            <label for="agent_matricule">Matricule agent</label>
-                            <input id="agent_matricule" name="agent_matricule" type="text" value="{{ old('agent_matricule', $row->agent_matricule) }}">
+                            <label for="agent_matricule">Matricule agent <span aria-hidden="true">*</span></label>
+                            <input id="agent_matricule" name="agent_matricule" type="text" maxlength="80" value="{{ old('agent_matricule', $row->agent_matricule) }}" required>
                         </div>
                         <div>
                             <label for="agent_fonction">Fonction</label>

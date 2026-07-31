@@ -2,12 +2,13 @@
 
 namespace Database\Factories;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
@@ -15,6 +16,15 @@ class UserFactory extends Factory
      * The current password being used by the factory.
      */
     protected static ?string $password;
+
+    public function configure(): static
+    {
+        return $this->afterMaking(function (User $user): void {
+            if ($user->role === User::ROLE_AGENT && $user->agent_matricule === null) {
+                $user->agent_matricule = 'AGT-'.Str::upper(Str::random(12));
+            }
+        });
+    }
 
     /**
      * Define the model's default state.

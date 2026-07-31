@@ -547,16 +547,32 @@ class ReferentielWebController extends Controller
     private function validateUtilisateur(Request $request, bool $creating, User $actor, ?User $utilisateur = null): array
     {
         $emailRule = Rule::unique('users', 'email');
+        $matriculeRule = Rule::unique('users', 'agent_matricule');
         if (! $creating && $utilisateur !== null) {
             $emailRule = $emailRule->ignore($utilisateur->id);
+            $matriculeRule = $matriculeRule->ignore($utilisateur->id);
         }
+
+        $matricule = ! $creating && ! $request->exists('agent_matricule')
+            ? $utilisateur?->agent_matricule
+            : $request->input('agent_matricule');
+
+        $request->merge([
+            'agent_matricule' => User::normalizeAgentMatricule($matricule),
+        ]);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', $emailRule],
             'role' => ['required', Rule::in($this->acceptedRoleOptions($actor, $utilisateur))],
             'is_active' => ['nullable', 'boolean'],
-            'agent_matricule' => ['nullable', 'string', 'max:80'],
+            'agent_matricule' => [
+                Rule::requiredIf(fn (): bool => $this->roleRegistry->baseRole((string) $request->input('role')) === User::ROLE_AGENT),
+                'nullable',
+                'string',
+                'max:80',
+                $matriculeRule,
+            ],
             'agent_fonction' => ['nullable', 'string', 'max:120'],
             'agent_telephone' => ['nullable', 'string', 'max:40'],
             'direction_id' => ['nullable', 'integer', 'exists:directions,id'],
@@ -571,9 +587,7 @@ class ReferentielWebController extends Controller
                 : ['nullable', 'string', $this->passwordPolicy->rule(false), 'confirmed'],
         ]);
 
-        $validated['agent_matricule'] = isset($validated['agent_matricule'])
-            ? trim((string) $validated['agent_matricule'])
-            : null;
+        $validated['agent_matricule'] = User::normalizeAgentMatricule($validated['agent_matricule'] ?? null);
         $validated['agent_fonction'] = isset($validated['agent_fonction'])
             ? trim((string) $validated['agent_fonction'])
             : null;

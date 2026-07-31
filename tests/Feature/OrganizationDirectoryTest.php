@@ -197,6 +197,58 @@ class OrganizationDirectoryTest extends TestCase
             ->assertSee($temporaryPassword);
     }
 
+    public function test_agent_creation_requires_a_unique_normalized_matricule(): void
+    {
+        $admin = $this->createAdminUser();
+        [$direction, $service] = $this->operationalScope();
+        User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'agent_matricule' => 'AGT-001',
+        ]);
+
+        $basePayload = [
+            'name' => 'Agent tracé',
+            'email' => 'agent.trace@anbg.test',
+            'role' => User::ROLE_AGENT,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'agent_fonction' => 'Chargé de suivi',
+            'is_active' => '1',
+        ];
+
+        $this->actingAs($admin)
+            ->post(route('workspace.referentiel.utilisateurs.store'), [
+                ...$basePayload,
+                'agent_matricule' => '   ',
+            ])
+            ->assertSessionHasErrors('agent_matricule');
+
+        $this->actingAs($admin)
+            ->post(route('workspace.referentiel.utilisateurs.store'), [
+                ...$basePayload,
+                'agent_matricule' => ' agt-001 ',
+            ])
+            ->assertSessionHasErrors('agent_matricule');
+
+        $this->assertDatabaseMissing('users', ['email' => 'agent.trace@anbg.test']);
+    }
+
+    public function test_user_model_refuses_to_persist_an_agent_without_matricule(): void
+    {
+        [$direction, $service] = $this->operationalScope();
+        $agent = User::factory()->make([
+            'role' => User::ROLE_AGENT,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+        ])->forceFill(['agent_matricule' => null]);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $agent->save();
+    }
+
     public function test_bulk_password_reset_generates_a_distinct_password_for_each_user(): void
     {
         $superAdmin = $this->createSuperAdminUser();

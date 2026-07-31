@@ -25,6 +25,21 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if ($user->role !== self::ROLE_AGENT) {
+                return;
+            }
+
+            $user->agent_matricule = self::normalizeAgentMatricule($user->agent_matricule);
+
+            if ($user->agent_matricule === null) {
+                throw new \InvalidArgumentException('Le matricule est obligatoire pour tout agent.');
+            }
+        });
+    }
+
     public const ROLE_SUPER_ADMIN = 'super_admin';
 
     public const ROLE_ADMIN = 'admin';
@@ -71,6 +86,13 @@ class User extends Authenticatable
     public const ROLE_AUDITEUR = 'auditeur';
 
     public const ROLE_INVITE_LECTURE = 'invite_lecture';
+
+    public static function normalizeAgentMatricule(mixed $matricule): ?string
+    {
+        $normalized = Str::upper((string) Str::of((string) $matricule)->trim()->replaceMatches('/\s+/', ''));
+
+        return $normalized !== '' ? $normalized : null;
+    }
 
     /**
      * @return array<int, string>

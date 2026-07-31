@@ -1349,6 +1349,7 @@ class SuperAdminWebController extends Controller
                 $serviceId = $this->resolveServiceIdFromCodes($row['service_code'] ?? null, $row['direction_code'] ?? null);
                 $baseRole = $this->roleRegistry->baseRole($selectedRole);
                 $customRoleCode = $this->roleRegistry->isCustomRole($selectedRole) ? $selectedRole : null;
+                $agentMatricule = User::normalizeAgentMatricule($row['agent_matricule'] ?? null);
                 $isActive = $this->normalizeBooleanValue($row['is_active'] ?? '1');
                 $isAgent = $this->normalizeBooleanValue($row['is_agent'] ?? ($baseRole === User::ROLE_AGENT ? '1' : '0'));
                 $suspendedUntil = trim((string) ($row['suspended_until'] ?? '')) !== ''
@@ -1356,6 +1357,24 @@ class SuperAdminWebController extends Controller
                     : null;
                 $password = trim((string) ($row['password'] ?? ''));
                 if (! ($existing instanceof User) && $password === '') {
+                    $skipped++;
+
+                    continue;
+                }
+
+                if ($baseRole === User::ROLE_AGENT && $agentMatricule === null) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $matriculeAlreadyUsed = $agentMatricule !== null
+                    && User::query()
+                        ->where('agent_matricule', $agentMatricule)
+                        ->when($existing instanceof User, fn ($query) => $query->whereKeyNot($existing->getKey()))
+                        ->exists();
+
+                if ($matriculeAlreadyUsed) {
                     $skipped++;
 
                     continue;
@@ -1377,7 +1396,7 @@ class SuperAdminWebController extends Controller
                     'custom_role_code' => $customRoleCode,
                     'direction_id' => $directionId,
                     'service_id' => $serviceId,
-                    'agent_matricule' => trim((string) ($row['agent_matricule'] ?? '')) ?: null,
+                    'agent_matricule' => $agentMatricule,
                     'agent_fonction' => trim((string) ($row['agent_fonction'] ?? '')) ?: null,
                     'agent_telephone' => trim((string) ($row['agent_telephone'] ?? '')) ?: null,
                     'is_active' => $isActive,
@@ -3075,6 +3094,14 @@ class SuperAdminWebController extends Controller
      */
     private function validateOrganizationUserPayload(Request $request, ?User $managedUser = null): array
     {
+        $matricule = $managedUser instanceof User && ! $request->exists('agent_matricule')
+            ? $managedUser->agent_matricule
+            : $request->input('agent_matricule');
+
+        $request->merge([
+            'agent_matricule' => User::normalizeAgentMatricule($matricule),
+        ]);
+
         $emailRule = Rule::unique('users', 'email');
         $matriculeRule = Rule::unique('users', 'agent_matricule');
 

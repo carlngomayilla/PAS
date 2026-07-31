@@ -125,6 +125,34 @@ class SuperAdminOrgUsersTest extends TestCase
         ]);
     }
 
+    public function test_super_admin_import_skips_agents_without_matricule_or_with_a_duplicate(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $direction = Direction::query()->whereIn('code', ['DAF', 'DSIC', 'DS'])->firstOrFail();
+        $service = Service::query()->where('direction_id', $direction->id)->firstOrFail();
+        User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'direction_id' => $direction->id,
+            'service_id' => $service->id,
+            'agent_matricule' => 'IMP-EXISTANT',
+        ]);
+
+        $csv = implode(PHP_EOL, [
+            'name;email;role;direction_code;service_code;agent_matricule;agent_fonction;agent_telephone;is_active;is_agent;suspended_until;suspension_reason;password',
+            'Sans matricule;sans.matricule@anbg.test;agent;'.$direction->code.';'.$service->code.';;Agent;;1;1;;;Password-Import@123',
+            'Matricule duplique;matricule.duplique@anbg.test;agent;'.$direction->code.';'.$service->code.'; imp-existant ;Agent;;1;1;;;Password-Import@123',
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->post(route('workspace.super-admin.organization.users.import'), [
+                'users_file' => UploadedFile::fake()->createWithContent('agents-invalides.csv', $csv),
+            ])
+            ->assertRedirect(route('workspace.super-admin.organization.index'));
+
+        $this->assertDatabaseMissing('users', ['email' => 'sans.matricule@anbg.test']);
+        $this->assertDatabaseMissing('users', ['email' => 'matricule.duplique@anbg.test']);
+    }
+
     public function test_super_admin_can_create_chef_planification_with_operational_scope(): void
     {
         $superAdmin = $this->createSuperAdminUser();
