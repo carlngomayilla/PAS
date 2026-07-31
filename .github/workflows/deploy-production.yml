@@ -20,14 +20,10 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, pas-production]
     timeout-minutes: 20
     environment: production
     env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
 
     steps:
@@ -35,26 +31,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          : "${DEPLOY_HOST:?Le secret DEPLOY_HOST est requis.}"
-          : "${DEPLOY_USER:?Le secret DEPLOY_USER est requis.}"
-          : "${DEPLOY_SSH_PRIVATE_KEY:?Le secret DEPLOY_SSH_PRIVATE_KEY est requis.}"
-          : "${DEPLOY_KNOWN_HOSTS:?Le secret DEPLOY_KNOWN_HOSTS est requis.}"
-
-      - name: Configure SSH
-        shell: bash
-        run: |
-          set -euo pipefail
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
-          chmod 600 "$HOME/.ssh/id_ed25519"
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/known_hosts"
+          DEPLOY_PATH="${DEPLOY_PATH:-/var/www/pas-anbg/PAS}"
+          test -d "$DEPLOY_PATH"
+          test -x "$DEPLOY_PATH/scripts/deploy.sh"
 
       - name: Deploy verified main branch
         shell: bash
         run: |
           set -euo pipefail
           DEPLOY_PATH="${DEPLOY_PATH:-/var/www/pas-anbg/PAS}"
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            "$DEPLOY_USER@$DEPLOY_HOST" \
-            "cd '$DEPLOY_PATH' && GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh"
+          cd "$DEPLOY_PATH"
+          GIT_TERMINAL_PROMPT=0 bash scripts/deploy.sh
