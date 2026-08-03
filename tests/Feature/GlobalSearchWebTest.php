@@ -11,8 +11,8 @@ use Tests\TestCase;
 
 class GlobalSearchWebTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     public function test_global_search_returns_detailed_user_profiles_by_name(): void
     {

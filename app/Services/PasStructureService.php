@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 class PasStructureService
 {
     /**
-     * @param array<int, array<string, mixed>> $axes
+     * @param  array<int, array<string, mixed>>  $axes
      */
     public function sync(Pas $pas, array $axes, ?int $createdBy = null): void
     {
@@ -26,7 +26,7 @@ class PasStructureService
                 $axeIndex + 1
             );
 
-            $axe = $this->findReusableAxe($pas, $axeData, $axeCode) ?? new PasAxe();
+            $axe = $this->findReusableAxe($pas, $axeData, $axeCode) ?? new PasAxe;
             if ($axe->trashed()) {
                 $axe->restore();
             }
@@ -59,7 +59,7 @@ class PasStructureService
 
                 $targetValues = $this->resolveTargetValues($objectifData);
 
-                $objectif = $this->findReusableObjectif($axe, $objectifData, $objectifCode) ?? new PasObjectif();
+                $objectif = $this->findReusableObjectif($axe, $objectifData, $objectifCode) ?? new PasObjectif;
                 if ($objectif->trashed()) {
                     $objectif->restore();
                 }
@@ -95,7 +95,7 @@ class PasStructureService
     }
 
     /**
-     * @param array<string, mixed> $axeData
+     * @param  array<string, mixed>  $axeData
      */
     private function findReusableAxe(Pas $pas, array $axeData, string $code): ?PasAxe
     {
@@ -118,7 +118,7 @@ class PasStructureService
     }
 
     /**
-     * @param array<string, mixed> $objectifData
+     * @param  array<string, mixed>  $objectifData
      */
     private function findReusableObjectif(PasAxe $axe, array $objectifData, string $code): ?PasObjectif
     {
@@ -141,7 +141,7 @@ class PasStructureService
     }
 
     /**
-     * @param list<int> $keptObjectifIds
+     * @param  list<int>  $keptObjectifIds
      */
     private function deleteMissingObjectifs(PasAxe $axe, array $keptObjectifIds): void
     {
@@ -160,7 +160,7 @@ class PasStructureService
     }
 
     /**
-     * @param list<int> $keptAxeIds
+     * @param  list<int>  $keptAxeIds
      */
     private function deleteMissingAxes(Pas $pas, array $keptAxeIds): void
     {
@@ -179,7 +179,7 @@ class PasStructureService
     }
 
     /**
-     * @param array<string, bool> $usedCodes
+     * @param  array<string, bool>  $usedCodes
      */
     private function resolveUniqueCode(array &$usedCodes, mixed $rawCode, string $prefix, int $position): string
     {
@@ -246,7 +246,7 @@ class PasStructureService
     }
 
     /**
-     * @param array<string, mixed> $axeData
+     * @param  array<string, mixed>  $axeData
      */
     private function resolveAxisStartDate(array $axeData, int $defaultYear): string
     {
@@ -256,7 +256,7 @@ class PasStructureService
     }
 
     /**
-     * @param array<string, mixed> $axeData
+     * @param  array<string, mixed>  $axeData
      */
     private function resolveAxisEndDate(array $axeData, int $defaultYear): string
     {
@@ -266,7 +266,7 @@ class PasStructureService
     }
 
     /**
-     * @param array<string, mixed> $objectifData
+     * @param  array<string, mixed>  $objectifData
      * @return array<string, scalar>|null
      */
     private function resolveTargetValues(array $objectifData): ?array

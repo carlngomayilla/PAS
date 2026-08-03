@@ -9,8 +9,8 @@ use Tests\TestCase;
 
 class SuperAdminWorkflowSettingsTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {

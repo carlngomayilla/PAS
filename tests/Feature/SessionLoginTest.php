@@ -62,7 +62,7 @@ class SessionLoginTest extends TestCase
         app()->detectEnvironment(fn () => 'production');
 
         try {
-            (new SyncOrgUsersPreservingPasswordsSeeder())->setContainer(app())->run();
+            (new SyncOrgUsersPreservingPasswordsSeeder)->setContainer(app())->run();
         } finally {
             app()->detectEnvironment(fn () => $previousEnv);
         }

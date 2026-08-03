@@ -2,13 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\Action;
 use App\Models\Exercice;
-use App\Models\Kpi;
-use App\Models\KpiMesure;
 use App\Models\Pao;
 use App\Models\Pas;
-use App\Models\Pta;
 use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -17,6 +13,7 @@ use Illuminate\Support\Carbon;
 class ExerciceContext
 {
     public const SESSION_KEY = 'pas_exercice_filter';
+
     public const QUARTER_SESSION_KEY = 'pas_trimestre_filter';
 
     public function selectedYear(): ?int
@@ -396,7 +393,7 @@ class ExerciceContext
     }
 
     /**
-     * @param list<string> $columns
+     * @param  list<string>  $columns
      */
     private function applyQuarterToColumns(Builder|Relation $query, array $columns, int $year): void
     {
@@ -410,14 +407,15 @@ class ExerciceContext
     }
 
     /**
-     * @param list<string> $columns
-     * @param array{0: string, 1: string} $range
+     * @param  list<string>  $columns
+     * @param  array{0: string, 1: string}  $range
      */
     private function applyDateRangeToColumns(Builder|Relation $query, array $columns, array $range): void
     {
         foreach ($columns as $index => $column) {
             if ($index === 0) {
                 $query->whereBetween($column, $range);
+
                 continue;
             }
 

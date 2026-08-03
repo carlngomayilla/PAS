@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\PlatformSetting;
 use App\Services\ActionCalculationSettings;
 use Illuminate\Database\Seeder;
 
@@ -12,7 +13,7 @@ class ActionCalculationSettingsSeeder extends Seeder
         $settings = app(ActionCalculationSettings::class);
 
         foreach ($settings->defaults() as $key => $value) {
-            \App\Models\PlatformSetting::query()->updateOrCreate(
+            PlatformSetting::query()->updateOrCreate(
                 ['group' => 'action_calculation', 'key' => $key],
                 ['value' => $value]
             );

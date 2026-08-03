@@ -17,7 +17,7 @@ class ActionWorkspacePresenter
      *     review_controller: bool,
      *     request_deadline: bool,
      *     review_deadline_chef: bool,
-     *     review_deadline_controller: bool,
+     *     review_deadline_director: bool,
      *     review_deadline_final: bool,
      *     apply_deadline: bool,
      *     submit_financing: bool,
@@ -73,40 +73,37 @@ class ActionWorkspacePresenter
             && $activeDeadlineRequest?->status === DeadlineExtensionRequest::STATUS_APPROUVEE
         ) {
             return $this->step(
-                'Date approuvee',
-                "Appliquer l'echeance validee",
-                'La decision finale est acquise. Seul un controleur peut maintenant modifier la date planifiee.',
+                'Modification approuvee',
+                'Appliquer la décision historique',
+                'Ce dossier provient de l’ancien circuit. La DG peut appliquer les paramètres déjà approuvés.',
                 '#action-echeances',
-                'Appliquer la date',
+                'Appliquer la modification',
                 'success'
             );
         }
 
         if (($permissions['review_deadline_final'] ?? false)
-            && in_array($activeDeadlineRequest?->status, [
-                DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
-                DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
-            ], true)
+            && $activeDeadlineRequest?->status === DeadlineExtensionRequest::STATUS_TRANSMISE_DG
         ) {
             return $this->step(
-                'Report echeance',
-                'Rendre la decision finale',
-                "Le dossier a recu les avis hierarchique et de controle. La date ne changera qu'apres cette decision puis son application par un controleur.",
+                'Modification d’action',
+                'Rendre l’accord final',
+                'Le chef de service et le directeur ont donné leur accord. Une validation DG applique automatiquement et atomiquement les seuls paramètres demandés par le RMO.',
                 '#action-echeances',
-                'Traiter le report',
+                'Décider et appliquer',
                 'warning'
             );
         }
 
-        if (($permissions['review_deadline_controller'] ?? false)
-            && $activeDeadlineRequest?->status === DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE
+        if (($permissions['review_deadline_director'] ?? false)
+            && $activeDeadlineRequest?->status === DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION
         ) {
             return $this->step(
-                'Report echeance',
-                'Controler la demande de report',
-                'Verifier la justification et la piece avant transmission au DG ou au Chef Planification.',
+                'Modification d’action',
+                'Donner l’accord du directeur',
+                'Vérifier les paramètres demandés, la justification et la pièce avant transmission à la DG.',
                 '#action-echeances',
-                'Controler le report',
+                'Examiner la demande',
                 'warning'
             );
         }
@@ -118,11 +115,11 @@ class ActionWorkspacePresenter
             ], true)
         ) {
             return $this->step(
-                'Report echeance',
-                'Donner un avis hierarchique',
-                'Le chef de service doit viser, refuser ou demander un complement avant le controle.',
+                'Modification d’action',
+                'Valider au niveau du service',
+                'Le chef de service doit valider, refuser ou demander un complément avant l’accord du directeur.',
                 '#action-echeances',
-                'Examiner le report',
+                'Examiner la demande',
                 'warning'
             );
         }
@@ -324,6 +321,7 @@ class ActionWorkspacePresenter
                 DeadlineExtensionRequest::STATUS_SOUMISE,
                 DeadlineExtensionRequest::STATUS_EN_ANALYSE,
                 DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE,
+                DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION,
                 DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE,
                 DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
                 DeadlineExtensionRequest::STATUS_TRANSMISE_DG,

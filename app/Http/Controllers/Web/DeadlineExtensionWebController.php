@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ApplyDeadlineExtensionRequest;
 use App\Http\Requests\ResubmitDeadlineExtensionRequest;
 use App\Http\Requests\ReviewDeadlineExtensionByChefRequest;
-use App\Http\Requests\ReviewDeadlineExtensionByControllerRequest;
+use App\Http\Requests\ReviewDeadlineExtensionByDirectorRequest;
 use App\Http\Requests\ReviewDeadlineExtensionFinalRequest;
 use App\Http\Requests\StoreDeadlineExtensionRequest;
 use App\Models\Action;
@@ -17,12 +17,15 @@ use App\Models\User;
 use App\Services\DeadlineExtensionQueueService;
 use App\Services\DocumentPolicySettings;
 use App\Services\Security\SecureJustificatifStorage;
+use App\Services\Workflow\DeadlineExtensionChangeSet;
 use App\Services\Workflow\DeadlineExtensionWorkflowService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class DeadlineExtensionWebController extends Controller
 {
@@ -46,14 +49,18 @@ class DeadlineExtensionWebController extends Controller
         ]);
     }
 
-    public function show(Request $request, DeadlineExtensionRequest $deadlineExtensionRequest): View
-    {
+    public function show(
+        Request $request,
+        DeadlineExtensionRequest $deadlineExtensionRequest,
+        DeadlineExtensionChangeSet $changeSet
+    ): View {
         $this->authorizeRequestAccess($request, $deadlineExtensionRequest);
         $deadlineExtensionRequest->loadMissing([
             'action.pta:id,direction_id,service_id,titre',
             'sousAction:id,action_id,libelle',
             'requestedBy:id,name,role',
             'chefReviewedBy:id,name',
+            'directorReviewedBy:id,name',
             'sciqReviewedBy:id,name',
             'finalDecidedBy:id,name',
             'appliedBy:id,name',
@@ -73,15 +80,15 @@ class DeadlineExtensionWebController extends Controller
                 DeadlineExtensionRequest::STATUS_SOUMISE,
                 DeadlineExtensionRequest::STATUS_EN_ANALYSE,
             ], true) && $user->can('reviewDeadlineExtensionByChef', $action),
-            'canReviewByController' => $deadlineExtensionRequest->status === DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE
-                && $user->can('reviewDeadlineExtensionByController', $action),
-            'canReviewFinal' => in_array((string) $deadlineExtensionRequest->status, [
-                DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
-                DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
-            ], true) && $user->can('reviewDeadlineExtensionFinal', $action),
+            'canReviewByDirector' => $deadlineExtensionRequest->status === DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION
+                && $user->can('reviewDeadlineExtensionByDirector', $action),
+            'canReviewFinal' => $deadlineExtensionRequest->status === DeadlineExtensionRequest::STATUS_TRANSMISE_DG
+                && $user->can('reviewDeadlineExtensionFinal', $action),
             'canApply' => $deadlineExtensionRequest->status === DeadlineExtensionRequest::STATUS_APPROUVEE
                 && $user->can('applyDeadlineExtension', $action),
             'documentAccept' => app(DocumentPolicySettings::class)->acceptAttribute(),
+            'changeFieldLabels' => $changeSet::labels(),
+            'responsableOptions' => $this->responsableOptions($action),
         ]);
     }
 
@@ -147,18 +154,24 @@ class DeadlineExtensionWebController extends Controller
         }
 
         $storedFile = $secureStorage->store($file, 'reports-echeance/'.date('Y/m'));
-        $deadlineExtensionRequest = $workflow->submit(
-            $action,
-            $request->safe()->except(['piece_justificative']),
-            $user,
-            $storedFile
-        );
+        try {
+            $deadlineExtensionRequest = $workflow->submit(
+                $action,
+                $request->safe()->except(['piece_justificative']),
+                $user,
+                $storedFile
+            );
+        } catch (Throwable $exception) {
+            $secureStorage->deleteByPath($storedFile['path']);
+
+            throw $exception;
+        }
 
         $this->recordAudit($request, 'reports_echeance', 'submit', $deadlineExtensionRequest, null, $deadlineExtensionRequest->toArray());
 
         return redirect()
             ->route('workspace.actions.suivi', $action)
-            ->with('success', 'Demande de report d echeance soumise.');
+            ->with('success', 'Demande de modification soumise au chef de service.');
     }
 
     public function reviewByChef(
@@ -175,7 +188,7 @@ class DeadlineExtensionWebController extends Controller
         $reviewed = $workflow->reviewByChef($deadlineExtensionRequest, $request->validated(), $user);
         $this->recordAudit($request, 'reports_echeance', 'chef_review', $reviewed, $before, $reviewed->toArray());
 
-        return $this->redirectAfterWorkflow($request, $reviewed, 'Avis du chef de service enregistré.');
+        return $this->redirectAfterWorkflow($request, $reviewed, 'Décision du chef de service enregistrée.');
     }
 
     public function resubmit(
@@ -196,19 +209,25 @@ class DeadlineExtensionWebController extends Controller
 
         $storedFile = $secureStorage->store($file, 'reports-echeance/'.date('Y/m'));
         $before = $deadlineExtensionRequest->toArray();
-        $resubmitted = $workflow->resubmit(
-            $deadlineExtensionRequest,
-            $request->safe()->except(['piece_justificative']),
-            $user,
-            $storedFile
-        );
+        try {
+            $resubmitted = $workflow->resubmit(
+                $deadlineExtensionRequest,
+                $request->safe()->except(['piece_justificative']),
+                $user,
+                $storedFile
+            );
+        } catch (Throwable $exception) {
+            $secureStorage->deleteByPath($storedFile['path']);
+
+            throw $exception;
+        }
         $this->recordAudit($request, 'reports_echeance', 'resubmit', $resubmitted, $before, $resubmitted->toArray());
 
-        return $this->redirectAfterWorkflow($request, $resubmitted, 'Complement ajoute et demande de report retransmise.');
+        return $this->redirectAfterWorkflow($request, $resubmitted, 'Complément ajouté et demande retransmise.');
     }
 
-    public function reviewByController(
-        ReviewDeadlineExtensionByControllerRequest $request,
+    public function reviewByDirector(
+        ReviewDeadlineExtensionByDirectorRequest $request,
         DeadlineExtensionRequest $deadlineExtensionRequest,
         DeadlineExtensionWorkflowService $workflow
     ): RedirectResponse {
@@ -218,10 +237,10 @@ class DeadlineExtensionWebController extends Controller
         }
 
         $before = $deadlineExtensionRequest->toArray();
-        $reviewed = $workflow->reviewByController($deadlineExtensionRequest, $request->validated(), $user);
-        $this->recordAudit($request, 'reports_echeance', 'controller_review', $reviewed, $before, $reviewed->toArray());
+        $reviewed = $workflow->reviewByDirector($deadlineExtensionRequest, $request->validated(), $user);
+        $this->recordAudit($request, 'reports_echeance', 'director_review', $reviewed, $before, $reviewed->toArray());
 
-        return $this->redirectAfterWorkflow($request, $reviewed, 'Avis du contrôleur enregistré.');
+        return $this->redirectAfterWorkflow($request, $reviewed, 'Décision du directeur enregistrée.');
     }
 
     public function reviewFinal(
@@ -241,7 +260,7 @@ class DeadlineExtensionWebController extends Controller
         return $this->redirectAfterWorkflow(
             $request,
             $reviewed,
-            'Décision finale enregistrée. La date reste inchangée jusqu’à son application par un contrôleur.'
+            'Accord final DG enregistré. Les paramètres demandés ont été appliqués automatiquement.'
         );
     }
 
@@ -277,7 +296,7 @@ class DeadlineExtensionWebController extends Controller
             (int) $deadlineExtensionRequest->requested_by === (int) $user->id
             || $user->can('view', $action)
             || $user->can('reviewDeadlineExtensionByChef', $action)
-            || $user->can('reviewDeadlineExtensionByController', $action)
+            || $user->can('reviewDeadlineExtensionByDirector', $action)
             || $user->can('reviewDeadlineExtensionFinal', $action)
             || $user->can('applyDeadlineExtension', $action)
         );
@@ -311,5 +330,21 @@ class DeadlineExtensionWebController extends Controller
         $justificatif->forceFill($attributes);
 
         return $justificatif;
+    }
+
+    /** @return Collection<int, User> */
+    private function responsableOptions(Action $action)
+    {
+        $action->loadMissing('pta:id,direction_id,service_id');
+
+        return User::query()
+            ->where('is_active', true)
+            ->where('direction_id', (int) $action->pta?->direction_id)
+            ->when(
+                $action->pta?->service_id !== null,
+                fn ($query) => $query->where('service_id', (int) $action->pta?->service_id)
+            )
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'role']);
     }
 }

@@ -40,7 +40,7 @@ return new class extends Migration
             if (Schema::hasColumn('actions', 'direction_valide_par')) {
                 try {
                     $table->dropConstrainedForeignId('direction_valide_par');
-                } catch (\Throwable) {
+                } catch (Throwable) {
                     $table->dropColumn('direction_valide_par');
                 }
             }

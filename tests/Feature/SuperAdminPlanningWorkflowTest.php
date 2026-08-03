@@ -2,14 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Services\WorkflowSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesAdminUser;
 use Tests\TestCase;
 
 class SuperAdminPlanningWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -33,7 +34,7 @@ class SuperAdminPlanningWorkflowTest extends TestCase
     {
         $superAdmin = $this->createSuperAdminUser();
 
-        $modes = app(\App\Services\WorkflowSettings::class)->planningWorkflowModes();
+        $modes = app(WorkflowSettings::class)->planningWorkflowModes();
 
         $this->assertArrayHasKey('canonical', $modes);
         $this->assertCount(1, $modes, 'Un seul mode workflow doit être disponible : canonical.');
@@ -49,8 +50,8 @@ class SuperAdminPlanningWorkflowTest extends TestCase
             ])
             ->assertRedirect(route('workspace.super-admin.workflow.edit'));
 
-        $this->assertSame('canonical', app(\App\Services\WorkflowSettings::class)->planningWorkflowMode('pas'));
-        $this->assertSame('canonical', app(\App\Services\WorkflowSettings::class)->planningWorkflowMode('pao'));
-        $this->assertSame('canonical', app(\App\Services\WorkflowSettings::class)->planningWorkflowMode('pta'));
+        $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pas'));
+        $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pao'));
+        $this->assertSame('canonical', app(WorkflowSettings::class)->planningWorkflowMode('pta'));
     }
 }

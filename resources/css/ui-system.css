@@ -1,0 +1,707 @@
+/* Canonical application UI foundations. Loaded after the legacy theme. */
+
+:root {
+    --ui-institutional: #0f5f99;
+    --ui-institutional-hover: #0b4d7c;
+    --ui-border: #d7e2ea;
+    --ui-muted: #64748b;
+    --ui-surface: #ffffff;
+    --ui-surface-subtle: #f7f9fb;
+    --ui-focus: rgb(57 150 211 / 18%);
+}
+
+/* Global blocking loader -------------------------------------------------- */
+.global-loader-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 110000;
+    display: grid;
+    place-items: center;
+    padding: 1.5rem;
+    background: rgb(248 250 252 / 78%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: auto;
+    backdrop-filter: blur(6px);
+    transition: opacity 160ms ease, visibility 160ms ease;
+}
+
+.global-loader-overlay.hidden {
+    display: none !important;
+}
+
+.global-loader-overlay.is-visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.global-loader-status {
+    display: grid;
+    max-width: min(28rem, calc(100vw - 3rem));
+    place-items: center;
+    gap: 0.9rem;
+    color: #17324a;
+    text-align: center;
+    outline: none;
+}
+
+.global-loader-spinner {
+    display: block;
+    width: 3.25rem;
+    height: 3.25rem;
+    border: 0.32rem solid #cbd5e1;
+    border-top-color: var(--ui-institutional);
+    border-radius: 999px;
+    animation: global-loader-spin 760ms linear infinite;
+}
+
+.global-loader-message {
+    margin: 0;
+    color: inherit;
+    font-size: 0.95rem;
+    font-weight: 750;
+    line-height: 1.45;
+}
+
+body[aria-busy="true"] {
+    cursor: wait;
+}
+
+body.dashboard-detail-open {
+    overflow: hidden;
+}
+
+[data-global-loader-locked="true"],
+a[aria-busy="true"] {
+    cursor: wait !important;
+    opacity: 0.72;
+}
+
+html.dark .global-loader-overlay {
+    background: rgb(8 19 31 / 82%);
+}
+
+html.dark .global-loader-status {
+    color: #f8fafc;
+}
+
+html.dark .global-loader-spinner {
+    border-color: #475569;
+    border-top-color: #72c8f2;
+}
+
+@keyframes global-loader-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Page hierarchy --------------------------------------------------------- */
+body.admin-theme-scope.anbg-glass-theme .app-page-header {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    padding: clamp(1rem, 2vw, 1.35rem) !important;
+    border: 1px solid var(--ui-border) !important;
+    border-radius: 0.9rem !important;
+    background: var(--ui-surface) !important;
+    box-shadow: 0 8px 22px -22px rgb(15 48 74 / 55%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-page-header .app-title {
+    color: #17324a !important;
+    font-size: clamp(1.5rem, 2.5vw, 1.875rem) !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.025em !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .admin-navbar-period-chip {
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+/* Forms ------------------------------------------------------------------ */
+body.admin-theme-scope.anbg-glass-theme form.app-form-surface {
+    width: 100% !important;
+    max-width: 56rem;
+    margin-inline: auto;
+    padding: clamp(1rem, 2.2vw, 1.5rem) !important;
+    border: 1px solid var(--ui-border) !important;
+    border-radius: 0.9rem !important;
+    background: var(--ui-surface) !important;
+    box-shadow: 0 10px 28px -26px rgb(15 48 74 / 50%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme form.app-form-surface[data-form-layout="wide"],
+body.admin-theme-scope.anbg-glass-theme form.app-form-surface:has(.pta-registration-screen) {
+    max-width: none;
+}
+
+body.admin-theme-scope.anbg-glass-theme form.app-form-surface .form-section {
+    margin: 0 !important;
+    padding: 1.25rem 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-top: 1px solid var(--ui-border) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme form.app-form-surface .form-section:first-of-type {
+    padding-top: 0 !important;
+    border-top: 0 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme form.app-form-surface .form-section::before,
+body.admin-theme-scope.anbg-glass-theme form.app-form-surface .form-section::after {
+    content: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme form.app-form-surface .app-form-section-header,
+body.admin-theme-scope.anbg-glass-theme form.app-form-surface .form-section > .form-section-title {
+    margin: 0 0 1rem !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-form-label {
+    display: block !important;
+    margin: 0 !important;
+    color: #243b53 !important;
+    font-size: 0.875rem !important;
+    font-weight: 700 !important;
+    line-height: 1.4 !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-form-control:not([type="checkbox"]):not([type="radio"]):not([type="color"]) {
+    width: 100% !important;
+    min-height: 2.875rem !important;
+    padding: 0.68rem 0.82rem !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 0.65rem !important;
+    background: #ffffff !important;
+    color: #172b3a !important;
+    font-size: 0.9rem !important;
+    line-height: 1.4 !important;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 4%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme textarea.app-form-control {
+    min-height: 7rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-form-control:focus-visible {
+    border-color: #3996d3 !important;
+    outline: 0 !important;
+    box-shadow: 0 0 0 4px var(--ui-focus) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-form-control[aria-invalid="true"] {
+    border-color: #dc2626 !important;
+    background: #fffafa !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-form-control[aria-invalid="true"]:focus-visible {
+    box-shadow: 0 0 0 4px rgb(220 38 38 / 12%) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-form-control:required:user-valid {
+    border-color: #65a30d !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-form-hint, .field-hint) {
+    color: var(--ui-muted) !important;
+    font-size: 0.78rem !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-form-error {
+    color: #b42318 !important;
+    font-size: 0.78rem !important;
+    font-weight: 650 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-file-dropzone .app-file-input {
+    min-height: 4.75rem !important;
+    border-style: dashed !important;
+    background: #f8fbfd !important;
+    cursor: pointer;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-file-dropzone.is-dragging .app-file-input {
+    border-color: #3996d3 !important;
+    background: #eef8fd !important;
+    box-shadow: 0 0 0 4px var(--ui-focus) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme .app-file-dropzone.has-file .app-file-input {
+    border-color: #65a30d !important;
+    background: #f7fee7 !important;
+}
+
+.app-file-meta {
+    margin: 0;
+    color: var(--ui-muted);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(.app-form-actions, .form-actions) {
+    padding-top: 1rem !important;
+    border-top: 1px solid var(--ui-border) !important;
+}
+
+/* Tables ----------------------------------------------------------------- */
+body.admin-theme-scope.anbg-glass-theme :where(.app-table-wrapper, .data-table-shell, .table-wrap) {
+    border: 1px solid var(--ui-border) !important;
+    border-radius: 0.75rem !important;
+    background: var(--ui-surface) !important;
+    box-shadow: none !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) {
+    width: 100% !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    background: var(--ui-surface) !important;
+    color: #243b53 !important;
+    font-size: 0.875rem !important;
+    line-height: 1.45 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) thead th {
+    position: sticky !important;
+    z-index: 2 !important;
+    top: 0 !important;
+    padding: 0.75rem 0.9rem !important;
+    border-right: 1px solid rgb(255 255 255 / 18%) !important;
+    border-bottom: 1px solid var(--ui-institutional) !important;
+    background: var(--ui-institutional) !important;
+    color: #ffffff !important;
+    font-size: 0.875rem !important;
+    font-weight: 750 !important;
+    line-height: 1.35 !important;
+    text-align: left !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    white-space: nowrap;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) tbody td {
+    padding: 0.75rem 0.9rem !important;
+    border-right: 1px solid #edf2f6 !important;
+    border-bottom: 1px solid #e5ebf0 !important;
+    background: #ffffff !important;
+    color: #334e68 !important;
+    vertical-align: middle !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) tbody tr:nth-child(even) td {
+    background: var(--ui-surface-subtle) !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) tbody tr:hover td {
+    background: #eef7fc !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) :is(th, td):last-child {
+    border-right: 0 !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) :is(th, td)[data-num],
+body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) :is(th, td).num {
+    font-variant-numeric: tabular-nums;
+    text-align: right !important;
+}
+
+body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) tfoot td {
+    padding: 0.8rem 0.9rem !important;
+    border-top: 2px solid #3996d3 !important;
+    background: #e8f3fb !important;
+    color: #17324a !important;
+    font-weight: 800 !important;
+}
+
+.table-text-truncate {
+    display: -webkit-box;
+    max-width: 30rem;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+/* Opt-in interactive table controls. */
+.enhanced-table-toolbar,
+.data-table-controls {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.8rem;
+    border: 1px solid var(--ui-border);
+    border-bottom: 0;
+    border-radius: 0.75rem 0.75rem 0 0;
+    background: #ffffff;
+}
+
+.enhanced-table-search,
+.enhanced-table-page-size,
+.data-table-search-input,
+.data-table-page-size-select {
+    min-height: 2.6rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.6rem;
+    background: #ffffff;
+    color: #243b53;
+    font-size: 0.875rem;
+}
+
+.enhanced-table-search,
+.data-table-search-input {
+    width: min(24rem, 100%);
+    padding: 0.55rem 0.75rem;
+}
+
+.enhanced-table-page-size,
+.data-table-page-size-select {
+    padding: 0.45rem 2rem 0.45rem 0.65rem;
+}
+
+.data-table-controls__search,
+.data-table-controls__page-size {
+    display: grid;
+    gap: 0.3rem;
+}
+
+.data-table-controls__search {
+    min-width: min(100%, 18rem);
+    flex: 1 1 18rem;
+}
+
+.data-table-controls__label {
+    color: #334e68;
+    font-size: 0.78rem;
+    font-weight: 750;
+}
+
+.data-table-results-count {
+    margin: 0 0 0.55rem;
+    color: var(--ui-muted);
+    font-size: 0.8rem;
+    font-weight: 650;
+}
+
+.data-table-column-menu {
+    position: relative;
+}
+
+.data-table-column-menu-panel {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    display: grid;
+    width: min(19rem, calc(100vw - 2rem));
+    max-height: 20rem;
+    gap: 0.25rem;
+    padding: 0.65rem;
+    overflow-y: auto;
+    border: 1px solid var(--ui-border);
+    border-radius: 0.7rem;
+    background: #ffffff;
+    box-shadow: 0 18px 45px -24px rgb(15 48 74 / 55%);
+}
+
+.data-table-column-menu-panel[hidden] {
+    display: none;
+}
+
+.data-table-column-menu-title {
+    margin: 0 0 0.25rem;
+    color: #17324a;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.data-table-column-option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.5rem;
+    color: #334e68;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.data-table-column-option:hover {
+    background: #eef7fc;
+}
+
+.data-table-column-checkbox {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--ui-institutional);
+}
+
+.data-table-column-option-note {
+    grid-column: 2;
+    color: var(--ui-muted);
+    font-size: 0.7rem;
+}
+
+th.data-table-column-resizable {
+    position: sticky !important;
+    padding-right: 1.65rem !important;
+}
+
+.data-table-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: grid;
+    width: 1.25rem;
+    place-items: center;
+    color: rgb(255 255 255 / 72%);
+    cursor: col-resize;
+    touch-action: none;
+    user-select: none;
+}
+
+.data-table-resize-handle:hover,
+.data-table-resize-handle:focus-visible {
+    background: rgb(255 255 255 / 14%);
+    color: #ffffff;
+    outline: 2px solid #ffffff;
+    outline-offset: -3px;
+}
+
+table.is-resizing-columns,
+table.is-resizing-columns * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
+.data-table-column-hidden {
+    display: none !important;
+}
+
+.enhanced-table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 0.85rem;
+    border-top: 1px solid var(--ui-border);
+    color: var(--ui-muted);
+    font-size: 0.8rem;
+}
+
+.enhanced-table-pagination,
+.data-table-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.75rem 0;
+}
+
+.enhanced-table-pagination button,
+.data-table-pagination button {
+    min-width: 2.35rem;
+    min-height: 2.35rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.55rem;
+    background: #ffffff;
+    color: #17324a;
+    font-weight: 700;
+}
+
+.enhanced-table-pagination button:disabled,
+.data-table-pagination button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+th[data-enhanced-sort] button,
+th.data-table-sortable .data-table-sort-button {
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+}
+
+th[data-enhanced-sort] button::after {
+    content: '↕';
+    opacity: 0.7;
+}
+
+th[data-enhanced-sort][aria-sort="ascending"] button::after { content: '↑'; }
+th[data-enhanced-sort][aria-sort="descending"] button::after { content: '↓'; }
+
+.data-table-sort-indicator {
+    margin-left: auto;
+    opacity: 0.72;
+}
+
+.data-table-page-button.is-current {
+    border-color: var(--ui-institutional) !important;
+    background: var(--ui-institutional) !important;
+    color: #ffffff !important;
+}
+
+.data-table-page-ellipsis {
+    padding-inline: 0.25rem;
+    color: var(--ui-muted);
+}
+
+.data-table-no-results-cell {
+    padding: 2rem 1rem !important;
+    color: var(--ui-muted) !important;
+    text-align: center !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme form.app-form-surface,
+html.dark body.admin-theme-scope.anbg-glass-theme .app-page-header,
+html.dark body.admin-theme-scope.anbg-glass-theme :where(.app-table-wrapper, .data-table-shell, .table-wrap) {
+    border-color: #334155 !important;
+    background: #111d2a !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .app-form-label,
+html.dark body.admin-theme-scope.anbg-glass-theme .app-page-header .app-title {
+    color: #e5edf5 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme .app-form-control:not([type="checkbox"]):not([type="radio"]):not([type="color"]) {
+    border-color: #475569 !important;
+    background: #162534 !important;
+    color: #f8fafc !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) tbody td {
+    border-color: #2a3b4c !important;
+    background: #111d2a !important;
+    color: #dbe7f1 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) tbody tr:nth-child(even) td {
+    background: #162534 !important;
+}
+
+html.dark body.admin-theme-scope.anbg-glass-theme :where(table.app-table, table.data-table, table.dashboard-table) tbody tr:hover td {
+    background: #19344a !important;
+}
+
+@media (max-width: 47.99rem) {
+    body.admin-theme-scope.anbg-glass-theme .app-page-header {
+        align-items: stretch !important;
+        flex-direction: column !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme form.app-form-surface {
+        max-width: none;
+        padding: 1rem !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme :where(.app-form-actions, .form-actions) {
+        align-items: stretch !important;
+        flex-direction: column-reverse !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme :where(.app-form-actions, .form-actions) > :where(button, a[role="button"], .btn, .app-btn) {
+        width: 100%;
+    }
+
+    .enhanced-table-toolbar,
+    .data-table-controls,
+    .enhanced-table-footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .enhanced-table-search,
+    .data-table-search-input {
+        width: 100%;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme table[data-mobile-cards] {
+        display: block !important;
+        background: transparent !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme table[data-mobile-cards] thead {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme table[data-mobile-cards] tbody {
+        display: grid !important;
+        gap: 0.75rem !important;
+        padding: 0.75rem !important;
+        background: #eef3f7 !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme table[data-mobile-cards] tbody tr {
+        display: grid !important;
+        gap: 0 !important;
+        border: 1px solid var(--ui-border) !important;
+        border-radius: 0.75rem !important;
+        background: #ffffff !important;
+        box-shadow: 0 8px 18px -18px rgb(15 48 74 / 55%) !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme table[data-mobile-cards] tbody td {
+        display: grid !important;
+        grid-template-columns: minmax(7rem, 38%) minmax(0, 1fr) !important;
+        gap: 0.7rem !important;
+        padding: 0.65rem 0.75rem !important;
+        border: 0 !important;
+        border-bottom: 1px solid #e8edf2 !important;
+        background: transparent !important;
+        text-align: left !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme table[data-mobile-cards] tbody td:last-child {
+        border-bottom: 0 !important;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme table[data-mobile-cards] tbody td::before {
+        color: var(--ui-muted);
+        content: attr(data-label);
+        font-size: 0.75rem;
+        font-weight: 750;
+    }
+
+    body.admin-theme-scope.anbg-glass-theme table[data-mobile-cards] :is(th, td)[data-mobile-hidden] {
+        display: none !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .global-loader-overlay {
+        transition: none;
+    }
+
+    .global-loader-spinner {
+        animation: none;
+    }
+}

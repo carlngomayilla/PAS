@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Services\Analytics\AnalyticsCacheVersionService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -40,11 +41,11 @@ class ActionLog extends Model
     protected static function booted(): void
     {
         static::saved(static function (): void {
-            app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->bumpAlerts();
+            app(AnalyticsCacheVersionService::class)->bumpAlerts();
         });
 
         static::deleted(static function (): void {
-            app(\App\Services\Analytics\AnalyticsCacheVersionService::class)->bumpAlerts();
+            app(AnalyticsCacheVersionService::class)->bumpAlerts();
         });
     }
 
@@ -64,7 +65,7 @@ class ActionLog extends Model
     }
 
     /**
-     * @param Builder<ActionLog> $query
+     * @param  Builder<ActionLog>  $query
      * @return Builder<ActionLog>
      */
     public function scopeActiveAlert(Builder $query): Builder

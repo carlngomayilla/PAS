@@ -6,6 +6,11 @@
 
 <header {{ $attributes->merge(['class' => 'app-page-header mb-6']) }}>
     <div class="min-w-0">
+        @isset($breadcrumbs)
+            <nav class="mb-2 text-xs font-semibold text-[var(--app-muted)]" aria-label="Fil d’Ariane">
+                {{ $breadcrumbs }}
+            </nav>
+        @endisset
         @if ($eyebrow)
             <span class="app-eyebrow">{{ $eyebrow }}</span>
         @endif

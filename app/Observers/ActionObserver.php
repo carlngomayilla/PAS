@@ -10,8 +10,7 @@ class ActionObserver
 {
     public function __construct(
         private readonly AnalyticsCacheVersionService $cacheVersion
-    ) {
-    }
+    ) {}
 
     // Fields whose change affects long-term reports (history, exports).
     // Other changes (comments, resources, risks) only invalidate the dashboard.

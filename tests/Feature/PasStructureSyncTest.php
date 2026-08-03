@@ -12,8 +12,8 @@ use Tests\TestCase;
 
 class PasStructureSyncTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     public function test_sync_reuses_soft_deleted_generated_axis_codes_instead_of_inserting_duplicates(): void
     {

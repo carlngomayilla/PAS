@@ -4,6 +4,8 @@ namespace App\Services\Imports;
 
 use Illuminate\Http\UploadedFile;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
 
 class SimpleSpreadsheet
@@ -28,10 +30,10 @@ class SimpleSpreadsheet
     }
 
     /**
-     * @param list<string> $headers
-     * @param list<array<string,mixed>> $rows
+     * @param  list<string>  $headers
+     * @param  list<array<string,mixed>>  $rows
      */
-    public function downloadCsv(string $filename, array $headers, array $rows): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function downloadCsv(string $filename, array $headers, array $rows): StreamedResponse
     {
         return response()->streamDownload(function () use ($headers, $rows): void {
             $out = fopen('php://output', 'w');
@@ -44,10 +46,10 @@ class SimpleSpreadsheet
     }
 
     /**
-     * @param list<string> $headers
-     * @param list<array<string,mixed>> $rows
+     * @param  list<string>  $headers
+     * @param  list<array<string,mixed>>  $rows
      */
-    public function downloadXlsx(string $filename, array $headers, array $rows, string $sheetName = 'IMPORT_GLOBAL'): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse
+    public function downloadXlsx(string $filename, array $headers, array $rows, string $sheetName = 'IMPORT_GLOBAL'): BinaryFileResponse|StreamedResponse
     {
         return $this->downloadXlsxWorkbook($filename, [[
             'name' => $sheetName,
@@ -57,9 +59,9 @@ class SimpleSpreadsheet
     }
 
     /**
-     * @param list<array{name:string,headers:list<string>,rows:list<array<string,mixed>>}> $sheets
+     * @param  list<array{name:string,headers:list<string>,rows:list<array<string,mixed>>}>  $sheets
      */
-    public function downloadXlsxWorkbook(string $filename, array $sheets): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse
+    public function downloadXlsxWorkbook(string $filename, array $sheets): BinaryFileResponse|StreamedResponse
     {
         if (! class_exists(ZipArchive::class)) {
             $firstSheet = $sheets[0] ?? ['headers' => [], 'rows' => []];
@@ -72,7 +74,7 @@ class SimpleSpreadsheet
             throw new RuntimeException('Impossible de preparer le fichier Excel.');
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($path, ZipArchive::OVERWRITE);
         $zip->addFromString('[Content_Types].xml', $this->contentTypesXml(count($sheets)));
         $zip->addFromString('_rels/.rels', $this->relsXml());
@@ -111,6 +113,7 @@ class SimpleSpreadsheet
             $line++;
             if ($line === 1) {
                 $headers = array_map([$this, 'normalizeHeader'], $data);
+
                 continue;
             }
             if ($this->isEmptyRow($data)) {
@@ -139,7 +142,7 @@ class SimpleSpreadsheet
             throw new RuntimeException("L'extension PHP Zip est requise pour lire les fichiers .xlsx.");
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($path) !== true) {
             throw new RuntimeException('Fichier Excel invalide.');
         }
@@ -305,7 +308,7 @@ class SimpleSpreadsheet
     }
 
     /**
-     * @param list<string> $sheetNames
+     * @param  list<string>  $sheetNames
      */
     private function workbookXml(array $sheetNames): string
     {

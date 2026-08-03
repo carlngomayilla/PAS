@@ -2,7 +2,7 @@
 
 **Guide détaillé et illustré pour la planification, le suivi, la validation et le reporting**
 
-**Version 2.0 - 27 juillet 2026**
+**Version 2.1 - 31 juillet 2026**
 
 ![Logo e-Pilotage PAS](manuel-utilisation-e-pilotage-pas-assets/logo-e-pilotage-pas.png)
 
@@ -20,11 +20,12 @@ e-Pilotage PAS est l'application de pilotage stratégique et opérationnel de l'
 - Structurer un PAS avec ses axes stratégiques et ses objectifs stratégiques.
 - Décliner le PAS en PAO annuels par direction et par objectif stratégique.
 - Construire les PTA des services à partir des objectifs opérationnels transmis.
-- Créer les actions dans le PTA, affecter les RMO ou agents, définir les cibles, les seuils, les justificatifs, les risques et les financements.
+- Créer les actions dans le PTA, affecter les RMO ou agents, définir les cibles, les seuils, les justificatifs, les risques et le budget prévisionnel.
 - Suivre les actions avec quantités réalisées, justificatifs, commentaires et difficultés.
 - Valider ou rejeter les réalisations pour officialiser la performance.
 - Consulter les tableaux de bord, les alertes, les rapports et les exports PDF/Excel.
 - Administrer les rôles, les modules, les référentiels, les exercices, les règles de calcul et les modèles d'export.
+- Suivre les engagements et décaissements réels, avec pièces justificatives, reste à payer et contrôle des dépassements budgétaires.
 
 > **Principe métier :** Le PTA définit les règles de l'action. Le suivi applique ces règles. Le chef donne son visa, puis le contrôle Planification/SCIQ officialise la performance utilisée dans le reporting.
 
@@ -38,6 +39,10 @@ e-Pilotage PAS est l'application de pilotage stratégique et opérationnel de l'
 | Action | Unité opérationnelle suivie dans l'application. | Organiser une mission, produire un rapport, réaliser une activité, livrer un indicateur. |
 | Sous-action | Découpage d'une action composée entre plusieurs RMO. | Répartir une action en tâches pondérées par responsable. |
 | Justificatif | Pièce qui prouve l'exécution ou le financement. | PDF, image, document Word, Excel, photo ou autre preuve autorisée. |
+| Budget prévisionnel | Montant estimé lors du paramétrage de l'action. | Enveloppe de référence validée avant son suivi dans l'application. |
+| Engagement | Montant engagé pour préparer ou commander une dépense. | Bon de commande, décision ou engagement contractuel. |
+| Décaissement | Montant réellement payé. | Virement, chèque, ordre de paiement ou autre paiement tracé. |
+| Budget effectif | Budget prévisionnel augmenté des dépassements approuvés. | Base utilisée pour autoriser les engagements et décaissements. |
 | Performance provisoire | Progression calculée lors du suivi, avant validation. | Un agent enregistre 80 %, mais le chef n'a pas encore validé. |
 | Performance officielle | Progression figée après validation du chef. | Seule cette valeur entre dans les statistiques et le reporting. |
 
@@ -64,6 +69,7 @@ e-Pilotage PAS est l'application de pilotage stratégique et opérationnel de l'
 | Direction | Direction | Création et suivi du PAO, supervision des PTA et actions de sa direction. |
 | Service / Chef unité | Service | Création du PTA, création des actions, affectation des RMO, validation chef. |
 | Agent / RMO | Actions assignées | Saisie de l'avancement, justificatifs, difficultés, commentaires et soumission. |
+| Directrice et chefs de service DAF habilités | DAF et périmètre financier autorisé | Saisie des engagements et décaissements réels, dépôt des preuves, demandes de dépassement. |
 | Cabinet / collaborateur | Lecture globale selon habilitation | Consultation du pilotage, du reporting, des alertes et de l'audit. |
 
 > **Attention :** Les menus visibles dépendent du rôle, du périmètre et de la configuration des modules. Deux utilisateurs peuvent donc voir des menus différents.
@@ -88,6 +94,9 @@ e-Pilotage PAS est l'application de pilotage stratégique et opérationnel de l'
 
 > **Bonne pratique :** Ne partagez jamais votre compte. Les actions de validation, les commentaires, les exports et les changements sensibles sont journalisés dans l'audit.
 
+![Capture 1 - Profil, portée et alerte de sécurité](manuel-utilisation-e-pilotage-pas-assets/capture-profil-securite.png)
+*Capture 1 - L'écran Profil rappelle le rôle, la portée organisationnelle et les règles de sécurité applicables. Une alerte de mot de passe expiré bloque volontairement l'accès aux modules tant que le renouvellement n'est pas terminé.*
+
 ## 5. Interface et navigation
 
 L'espace de travail regroupe les modules par famille : Menu, Planification, Exécution, Pilotage, Administration et Plateforme. Les libellés peuvent être personnalisés par le Super Admin, mais la logique reste identique.
@@ -99,7 +108,7 @@ L'espace de travail regroupe les modules par famille : Menu, Planification, Exé
 | --- | --- | --- |
 | Menu | Pilotage, Mes tâches, Notifications | Accès rapide aux synthèses, tâches ouvertes et messages système. |
 | Planification | PAS, PAO, PTA, Imports | Création, structuration et imports classiques ou assistés. |
-| Exécution | Actions, Financement des actions | Suivi, contrôle, validation, financement et justificatifs. |
+| Exécution | Actions, Financement des actions | Suivi, contrôle, validation, financement prévisionnel, engagements, décaissements et justificatifs. |
 | Pilotage | Reporting, Alertes | Analyse consolidée, exports et surveillance des écarts. |
 | Administration | Référentiels, Délégations, Rétention, API Docs, Audit | Gestion de la donnée de base, traçabilité et gouvernance. |
 | Plateforme | Super Administration | Paramétrage avancé de l'application. |
@@ -114,6 +123,9 @@ L'espace de travail regroupe les modules par famille : Menu, Planification, Exé
 ## 6. Tableau de bord et Mes tâches
 
 Le tableau de bord affiche une synthèse adaptée au rôle connecté : indicateurs de performance, alertes importantes, tâches ouvertes, score personnel, graphiques et tableaux de suivi.
+
+![Capture 2 - Tableau de bord, filtres et consolidation](manuel-utilisation-e-pilotage-pas-assets/capture-tableau-de-bord.png)
+*Capture 2 - Le tableau de bord associe les filtres d'analyse, la consolidation institutionnelle, les alertes et les raccourcis vers le suivi PTA et les rapports. Les chiffres visibles sont des données de démonstration.*
 
 ### Mes tâches
 
@@ -207,6 +219,9 @@ Le tableau de bord affiche une synthèse adaptée au rôle connecté : indicateu
 
 ## 9. Module PTA et création des actions
 
+![Capture 3 - Accueil du module PTA](manuel-utilisation-e-pilotage-pas-assets/capture-pta.png)
+*Capture 3 - La page PTA centralise les services couverts, les actions rattachées et les états du workflow. Le bouton Nouveau PTA n'est visible et actif que pour les profils autorisés.*
+
 Le PTA est le point central de création des actions. Le module Actions sert ensuite au suivi, au contrôle, à la validation et à la consultation. Si un utilisateur cherche à créer une action directement depuis Actions, l'application le redirige vers le PTA.
 
 ![Illustration 4 - Les étapes de création d'une action dans le PTA](manuel-utilisation-e-pilotage-pas-assets/schema-creation-action.png)
@@ -251,6 +266,9 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 > **Point de vigilance :** Pour une action composée, la somme des poids des sous-actions doit être égale à 100 %. Cette règle garantit un calcul cohérent de la performance.
 
 ## 10. Suivi d'une action
+
+![Capture 4 - Liste de suivi des actions](manuel-utilisation-e-pilotage-pas-assets/capture-actions.png)
+*Capture 4 - La liste des actions propose les vues Liste, Kanban, Calendrier et Gantt. Les filtres permettent notamment d'isoler le PTA, le statut dynamique, la validation et le financement. Les données affichées sont des données de démonstration.*
 
 ![Illustration 5 - Workflow de suivi et validation d'une action](manuel-utilisation-e-pilotage-pas-assets/schema-workflow-action.png)
 *Illustration 5 - Workflow de suivi et validation d'une action*
@@ -326,14 +344,54 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 
 > **Règle impérative :** Aucune date d'action ou de sous-action ne peut être changée directement, même par un contrôleur. Le changement n'est appliqué qu'après l'approbation complète de la demande de report.
 
-### Financement
+### Distinguer le financement prévisionnel du suivi financier
 
-1. Le RMO prépare le dossier dans l'onglet Financement : source, montant, commentaire et pièce justificative.
-2. Le RMO soumet le dossier à la DAF.
-3. La DAF donne un avis favorable, demande un complément ou rejette avec un motif.
-4. En cas de complément ou de rejet corrigeable, le RMO ajoute une nouvelle pièce et soumet à nouveau.
-5. Après avis favorable de la DAF, la DG accorde ou refuse le financement.
-6. Consulter l'historique des décisions, pièces et dates dans l'action.
+Deux informations ne doivent pas être confondues :
+
+- **Financement prévisionnel de l'action** : il correspond au besoin et au montant estimé renseignés lors du paramétrage de l'action. Cette enveloppe est déjà issue des arbitrages DAF et DG réalisés avant la saisie dans l'application.
+- **Suivi financier** : il enregistre ensuite les montants réellement engagés ou décaissés. Il ne modifie pas directement le budget prévisionnel.
+
+Le dossier de financement disponible dans l'action reste utile lorsqu'un besoin doit suivre son circuit RMO, DAF puis DG. Le module **Financement des actions** sert, lui, à suivre l'exécution budgétaire réelle une fois l'enveloppe connue.
+
+### Consulter l'exécution financière d'une action
+
+Tous les profils habilités peuvent ouvrir **Exécution > Financement des actions**. La page présente une synthèse des budgets visibles et un tableau filtrable par direction, service, action ou mot-clé.
+
+Pour chaque action, lire les valeurs suivantes :
+
+- **Budget** : montant prévisionnel, augmenté des dépassements approuvés lorsqu'ils existent.
+- **Engagé** : total des engagements enregistrés par la DAF.
+- **Décaissé** : total effectivement payé.
+- **Reste disponible** : budget moins décaissements.
+- **Taux d'engagement** et **taux de décaissement** : pourcentages calculés sur le budget effectif.
+
+Les directeurs et chefs de service voient les données de leur périmètre pour préparer leurs actions. Planification, SCIQ, Chef Planification et DG disposent des vues de contrôle prévues. La saisie reste réservée à la DAF.
+
+### Enregistrer un engagement ou un décaissement - DAF uniquement
+
+1. Ouvrir **Exécution > Financement des actions**.
+2. Filtrer puis sélectionner l'action concernée.
+3. Dans la zone d'opération, choisir **Engagement** ou **Décaissement**.
+4. Saisir le montant, la date, le moyen de paiement, la référence, le bénéficiaire et le commentaire utile.
+5. Pour un décaissement, joindre obligatoirement la preuve de paiement : chèque, ordre de paiement, virement, reçu ou pièce admise par la politique documentaire.
+6. Vérifier le budget, le reste disponible et les totaux affichés avant d'enregistrer.
+7. Enregistrer l'opération. Elle est historisée avec son auteur, sa date, ses informations de paiement et ses justificatifs.
+
+> **Contrôle automatique :** L'application refuse un engagement ou un décaissement qui dépasse le budget effectif de l'action, du service ou de la direction. Cette règle s'applique même si le bouton est accessible dans l'écran.
+
+### Demander un dépassement budgétaire
+
+Une demande peut concerner une action, un service ou une direction lorsque l'évolution des prix ou un besoin justifié dépasse l'enveloppe existante.
+
+1. Depuis le module financier, choisir le périmètre concerné : action, service ou direction.
+2. Saisir le montant supplémentaire demandé et un motif précis d'au moins une phrase complète.
+3. Ajouter une preuve lorsque celle-ci est disponible : devis, note de justification, document de marché ou toute pièce autorisée.
+4. Envoyer la demande.
+5. Si elle a été créée par un chef de service DAF, la Directrice DAF la transmet à la DG ou la rejette avec une note motivée.
+6. La DG approuve ou rejette avec une note motivée.
+7. Seule une décision DG favorable augmente le budget effectif. Les opérations qui dépassaient l'ancien plafond peuvent alors être enregistrées dans les limites du nouveau budget.
+
+> **Important :** une demande de dépassement n'autorise aucun paiement tant qu'elle n'est pas approuvée par la DG. Une demande rejetée reste consultable dans l'historique avec son motif.
 
 ## 12. Reporting, alertes et exports
 
@@ -354,6 +412,18 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 - Les chiffres officiels reposent sur les actions dont le circuit de validation requis est terminé.
 - Les filtres modifient les tableaux et les exports.
 - Les exports doivent être relus avant diffusion institutionnelle.
+
+### Lire les données financières dans le pilotage
+
+Les responsables qui disposent du module financier peuvent rapprocher l'avancement opérationnel et les dépenses réelles.
+
+1. Filtrer d'abord l'exercice, la direction et le service concernés.
+2. Comparer le budget estimé, les engagements et les décaissements dans la vue financière.
+3. Identifier une action dont l'avancement est faible mais dont le taux de décaissement est élevé, ou l'inverse.
+4. Ouvrir l'action ou la ligne financière pour consulter les références, bénéficiaires, dates et pièces justificatives autorisées.
+5. Utiliser ces éléments pour formuler un avis de contrôle; Planification, SCIQ et la DG n'enregistrent pas les paiements à la place de la DAF.
+
+> **Lecture correcte :** le taux de décaissement mesure la consommation du budget effectif, pas le niveau d'avancement opérationnel. Les deux indicateurs doivent être analysés ensemble, mais ils ne se remplacent pas.
 
 ### Produire un rapport assisté par IA
 
@@ -387,7 +457,19 @@ Le PTA est le point central de création des actions. Le module Actions sert ens
 - Directions : créer, modifier ou désactiver les directions selon les droits.
 - Services : rattacher chaque service à une direction.
 - Utilisateurs : gérer le nom, l'e-mail, le rôle, le périmètre direction/service, le statut actif et la photo.
-- Les suppressions sensibles peuvent suivre une demande de suppression plutôt qu'une suppression directe.
+- Les suppressions sensibles suivent une demande de suppression plutôt qu'une suppression directe.
+
+### Demandes de suppression et droits sensibles
+
+Les PAS, PAO, PTA, actions, comptes et autres données protégées ne doivent pas être supprimés comme une simple correction de formulaire.
+
+1. L'administrateur ou le Super Admin habilité ouvre la fiche de l'élément et choisit la demande de suppression lorsque cette option est disponible.
+2. Il décrit le motif, vérifie les dépendances et transmet la demande.
+3. Le Chef Planification analyse l'impact puis approuve, refuse ou demande un complément selon le circuit applicable.
+4. Après approbation, l'Admin ou le Super Admin autorisé applique la décision depuis la file de gouvernance.
+5. L'application inscrit la demande, les décisions et l'exécution dans le journal d'audit.
+
+> **Règle de gouvernance :** attribuer un rôle ou une permission ne donne pas le droit de contourner un circuit de suppression. Les droits d'écran, les contrôles serveur et l'audit restent appliqués.
 
 ### Délégations
 
@@ -526,6 +608,9 @@ La barre latérale présente une seule entrée Imports afin d'éviter les doublo
 | Mon action affiche 100 % mais n'est pas dans le reporting | La performance est encore provisoire ou en contrôle. | Vérifier le visa du chef et la validation finale Planification/SCIQ. |
 | Je dois modifier une date | Les dates sont protégées par le circuit de report. | Ouvrir l'onglet Échéances, joindre une preuve et soumettre une demande de report. |
 | Le mauvais formulaire s'affiche | Un autre onglet de suivi est actif. | Choisir l'onglet Validation, Échéances, Financement ou Justificatifs correspondant à l'opération. |
+| Je ne peux pas enregistrer un décaissement | La saisie financière est réservée à la Directrice DAF et aux chefs de service DAF habilités. | Vérifier le rattachement DAF et le rôle, puis demander l'habilitation à l'administrateur si nécessaire. |
+| Mon montant financier est refusé | Il dépasse le budget effectif de l'action, du service ou de la direction. | Vérifier les opérations déjà enregistrées et créer une demande de dépassement DAF-DG si elle est justifiée. |
+| Je ne vois pas une dépense d'une autre direction | Votre périmètre de consultation ne couvre pas cette direction. | Demander un avis à la DAF, à Planification/SCIQ ou au profil global habilité; ne pas partager de pièce par un canal non autorisé. |
 | Un export ne correspond pas à mon attendu | Les filtres ou le périmètre changent le résultat. | Vérifier les filtres, l'exercice, le trimestre, la direction et le service. |
 | Un justificatif est refusé | Format non autorisé ou pièce incomplète. | Utiliser un format accepté et déposer une pièce lisible. |
 
@@ -543,6 +628,9 @@ La barre latérale présente une seule entrée Imports afin d'éviter les doublo
 | Soumission | Transmission d'une réalisation au chef pour validation. |
 | Visa du chef | Décision hiérarchique qui transmet le suivi au contrôle final ou le retourne en correction. |
 | Validation du contrôle | Décision Planification/SCIQ qui officialise la performance et clôture le circuit. |
+| Engagement | Montant réservé ou contractualisé avant le paiement effectif. |
+| Décaissement | Montant effectivement payé, obligatoirement appuyé par une preuve. |
+| Dépassement budgétaire | Montant supplémentaire demandé lorsque le budget d'une action, d'un service ou d'une direction ne suffit plus. |
 | Alerte | Signal automatique ou manuel indiquant un risque, un retard ou une anomalie. |
 | Snapshot | Copie d'une configuration permettant comparaison ou restauration. |
 | Périmètre | Champ de visibilité et d'action autorisé pour un utilisateur. |
@@ -553,4 +641,6 @@ La barre latérale présente une seule entrée Imports afin d'éviter les doublo
 - GUIDE.md : organisation fonctionnelle et technique de l'application.
 - docs/spec-workflow-canonique-pas-anbg.md : règles métier PAS, PAO, PTA, actions et validation.
 - docs/WORKFLOW-SUIVI-V2.md : principes de suivi, performance provisoire/officielle et validation chef.
+- docs/dossier-projet-v1/03-specifications-techniques.md : architecture, sécurité, suivi financier et exploitation.
+- .github/workflows/deploy-production.yml et scripts/deploy.sh : mécanisme de déploiement automatisé de production.
 - Routes et vues Laravel : menus, formulaires, champs et écrans disponibles dans l'application.

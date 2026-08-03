@@ -87,8 +87,8 @@
         </div>
     </section>
 
-    <div id="dashboard-row-detail-modal" class="fixed inset-0 z-[1000] hidden items-center justify-center bg-slate-950/55 p-4" aria-hidden="true">
-        <div class="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div id="dashboard-row-detail-modal" class="fixed inset-0 z-[1000] hidden items-stretch justify-end bg-slate-950/55" aria-hidden="true">
+        <aside class="h-full w-full max-w-[42rem] overflow-hidden bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="dashboard-row-detail-title">
             <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
                 <div>
                     <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3996d3]">Detail de ligne</p>
@@ -96,10 +96,10 @@
                 </div>
                 <button type="button" class="btn btn-primary btn-sm rounded-xl" data-dashboard-row-detail-close>Fermer</button>
             </div>
-            <div class="max-h-[62vh] overflow-y-auto p-5">
+            <div class="h-[calc(100vh-5rem)] overflow-y-auto p-5">
                 <dl id="dashboard-row-detail-body" class="grid gap-3 md:grid-cols-2"></dl>
                 <a id="dashboard-row-detail-link" href="#" class="btn btn-primary mt-5 hidden rounded-xl">Ouvrir la page</a>
             </div>
-        </div>
+        </aside>
     </div>
 @endif

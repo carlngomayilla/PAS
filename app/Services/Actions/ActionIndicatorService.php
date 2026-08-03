@@ -19,7 +19,7 @@ class ActionIndicatorService
     ];
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     public function pullPrimaryIndicatorPayload(array &$validated): array
@@ -50,13 +50,13 @@ class ActionIndicatorService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function syncPrimaryIndicator(Action $action, array $payload): Kpi
     {
         $indicator = $action->primaryKpi()->first();
         if (! $indicator instanceof Kpi) {
-            $indicator = new Kpi();
+            $indicator = new Kpi;
             $indicator->action()->associate($action);
         }
 

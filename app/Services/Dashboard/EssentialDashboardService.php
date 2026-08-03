@@ -154,8 +154,12 @@ class EssentialDashboardService
             ->whereIn('status', [
                 DeadlineExtensionRequest::STATUS_SOUMISE,
                 DeadlineExtensionRequest::STATUS_EN_ANALYSE,
-                DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
                 DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE,
+                DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION,
+                DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE,
+                DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
+                DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
+                DeadlineExtensionRequest::STATUS_APPROUVEE,
             ])
             ->whereIn('action_id', (clone $actions)->select('actions.id'))
             ->count();

@@ -22,7 +22,7 @@ class SimpleZipReader
 
         while ($offset + 4 <= $length) {
             $signature = unpack('Vsignature', substr($binary, $offset, 4))['signature'] ?? 0;
-            if ($signature !== 0x04034b50) {
+            if ($signature !== 0x04034B50) {
                 break;
             }
 

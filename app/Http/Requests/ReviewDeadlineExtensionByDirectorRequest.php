@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
-class ReviewDeadlineExtensionByControllerRequest extends FormRequest
+class ReviewDeadlineExtensionByDirectorRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -18,12 +18,10 @@ class ReviewDeadlineExtensionByControllerRequest extends FormRequest
         return $user instanceof User
             && $deadlineExtensionRequest instanceof DeadlineExtensionRequest
             && $deadlineExtensionRequest->action !== null
-            && $user->can('reviewDeadlineExtensionByController', $deadlineExtensionRequest->action);
+            && $user->can('reviewDeadlineExtensionByDirector', $deadlineExtensionRequest->action);
     }
 
-    /**
-     * @return array<string, array<int, mixed>>
-     */
+    /** @return array<string, array<int, mixed>> */
     public function rules(): array
     {
         return [
@@ -40,21 +38,16 @@ class ReviewDeadlineExtensionByControllerRequest extends FormRequest
         ];
     }
 
-    /**
-     * @return array<int, callable(Validator): void>
-     */
+    /** @return array<int, callable(Validator): void> */
     public function after(): array
     {
         return [
             function (Validator $validator): void {
-                $decision = (string) $this->input('decision');
-                $comment = trim((string) $this->input('comment', ''));
-
-                if (
-                    in_array($decision, [DeadlineExtensionRequest::AVIS_DEFAVORABLE, DeadlineExtensionRequest::AVIS_COMPLEMENT], true)
-                    && $comment === ''
-                ) {
-                    $validator->errors()->add('comment', 'Un commentaire est requis pour un avis défavorable ou une demande de complément.');
+                if (in_array((string) $this->input('decision'), [
+                    DeadlineExtensionRequest::AVIS_DEFAVORABLE,
+                    DeadlineExtensionRequest::AVIS_COMPLEMENT,
+                ], true) && trim((string) $this->input('comment', '')) === '') {
+                    $validator->errors()->add('comment', 'Un commentaire est requis pour un refus ou une demande de complément.');
                 }
             },
         ];

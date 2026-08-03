@@ -15,8 +15,7 @@ class AlertRoutingService
     public function __construct(
         private readonly DelegationService $delegationService,
         private readonly NotificationPolicySettings $notificationPolicySettings
-    ) {
-    }
+    ) {}
 
     /**
      * @return Collection<int, User>
@@ -113,7 +112,7 @@ class AlertRoutingService
     }
 
     /**
-     * @param array<int, string> $roles
+     * @param  array<int, string>  $roles
      * @return EloquentCollection<int, User>
      */
     private function globalUsers(array $roles): EloquentCollection
@@ -125,13 +124,13 @@ class AlertRoutingService
     }
 
     /**
-     * @param array<int, string> $roles
+     * @param  array<int, string>  $roles
      * @return EloquentCollection<int, User>
      */
     private function serviceUsers(int $directionId, int $serviceId, array $roles): EloquentCollection
     {
         if ($directionId <= 0 || $serviceId <= 0) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         return User::query()
@@ -158,8 +157,8 @@ class AlertRoutingService
     }
 
     /**
-     * @param int|array<int, int> $directionIds
-     * @param array<int, string> $roles
+     * @param  int|array<int, int>  $directionIds
+     * @param  array<int, string>  $roles
      * @return EloquentCollection<int, User>
      */
     private function directionUsers(int|array $directionIds, array $roles): EloquentCollection
@@ -168,7 +167,7 @@ class AlertRoutingService
         $ids = array_values(array_filter($ids, static fn (int $value): bool => $value > 0));
 
         if ($ids === []) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         return User::query()
@@ -183,7 +182,7 @@ class AlertRoutingService
     private function agentRecipient(Action $action): EloquentCollection
     {
         if ($action->responsable_id === null) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         return User::query()
@@ -199,7 +198,7 @@ class AlertRoutingService
         $roles = $this->notificationPolicySettings->alertOversightRoles($level);
 
         if ($roles === []) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         return $this->globalUsers($roles);
@@ -236,7 +235,7 @@ class AlertRoutingService
                 User::ROLE_ADMIN => $this->globalUsers([User::ROLE_ADMIN]),
                 User::ROLE_SUPER_ADMIN => $this->globalUsers([User::ROLE_SUPER_ADMIN]),
                 User::ROLE_CABINET => $this->globalUsers([User::ROLE_CABINET, User::ROLE_COLLABORATEUR]),
-                default => new EloquentCollection(),
+                default => new EloquentCollection,
             };
 
             $recipients = $this->mergeRecipients($recipients, $extra);
@@ -246,8 +245,8 @@ class AlertRoutingService
     }
 
     /**
-     * @param Collection<int, User>|EloquentCollection<int, User> $first
-     * @param Collection<int, User>|EloquentCollection<int, User> $second
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $first
+     * @param  Collection<int, User>|EloquentCollection<int, User>  $second
      * @return Collection<int, User>
      */
     private function mergeRecipients(Collection|EloquentCollection $first, Collection|EloquentCollection $second): Collection

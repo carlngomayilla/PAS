@@ -2,30 +2,24 @@
 
 namespace Tests\Feature;
 
-use App\Models\Action;
-use App\Models\Delegation;
 use App\Models\Direction;
-use App\Models\Justificatif;
-use App\Models\Kpi;
-use App\Models\KpiMesure;
 use App\Models\ObjectifOperationnel;
+use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
-use App\Models\Pao;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\ExerciceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\CreatesAdminUser;
 use Tests\TestCase;
 
 class PlanningApiTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -88,7 +82,7 @@ class PlanningApiTest extends TestCase
     public function test_service_user_sees_pao_transmitted_through_operational_objective(): void
     {
         $serviceUser = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
-        $year = app(\App\Services\ExerciceContext::class)->selectedYear();
+        $year = app(ExerciceContext::class)->selectedYear();
         $pas = Pas::query()->create([
             'titre' => 'PAS test transmission service',
             'periode_debut' => $year,
@@ -200,7 +194,7 @@ class PlanningApiTest extends TestCase
         ]);
 
         $token = (string) $loginResponse->json('access_token');
-        $serviceUser = \App\Models\User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
+        $serviceUser = User::query()->where('email', 'r.ekomi.anbg@gmail.com')->firstOrFail();
         $objectifId = (int) PasObjectif::query()->value('id');
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
@@ -470,7 +464,7 @@ class PlanningApiTest extends TestCase
             'periode_fin' => '2028-12-31 00:00:00',
         ]);
 
-        $axeId = (int) \App\Models\PasAxe::query()
+        $axeId = (int) PasAxe::query()
             ->where('pas_id', $pasId)
             ->where('code', 'AXE-TEST-1')
             ->value('id');
@@ -602,7 +596,7 @@ class PlanningApiTest extends TestCase
     }
 
     /**
-     * @return array{0: \App\Models\Pta, 1: \App\Models\User}
+     * @return array{0: Pta, 1: User}
      */
     private function firstUnlockedPtaAndAgent(): array
     {

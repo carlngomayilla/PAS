@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Action;
+use App\Models\ActionKpi;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
@@ -143,7 +145,7 @@ return new class extends Migration
         $payload = $rows->map(fn ($row): array => [
             'user_id' => null,
             'module' => 'archive_kpi_conformite',
-            'entite_type' => \App\Models\ActionKpi::class,
+            'entite_type' => ActionKpi::class,
             'entite_id' => (int) $row->id,
             'action' => 'archive_before_drop',
             'ancienne_valeur' => json_encode([
@@ -205,7 +207,7 @@ return new class extends Migration
             return [
                 'user_id' => null,
                 'module' => 'archive_chef_quality_note',
-                'entite_type' => \App\Models\Action::class,
+                'entite_type' => Action::class,
                 'entite_id' => (int) $row->id,
                 'action' => 'archive_before_drop',
                 'ancienne_valeur' => json_encode($snapshot, JSON_THROW_ON_ERROR),

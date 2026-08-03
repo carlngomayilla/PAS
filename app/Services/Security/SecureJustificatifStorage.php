@@ -15,8 +15,7 @@ class SecureJustificatifStorage
 {
     public function __construct(
         private readonly AntivirusScanner $scanner
-    ) {
-    }
+    ) {}
 
     /**
      * @return array{path:string,mime_type:?string,taille_octets:int,nom_original:string,est_chiffre:bool}

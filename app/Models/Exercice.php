@@ -11,7 +11,9 @@ class Exercice extends Model
     use HasFactory;
 
     public const STATUT_OUVERT = 'ouvert';
+
     public const STATUT_CLOS = 'clos';
+
     public const STATUT_ARCHIVE = 'archive';
 
     /**

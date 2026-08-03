@@ -3,8 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Mail\AlertDigestMail;
-use App\Notifications\WorkspaceModuleNotification;
+use App\Models\Action;
 use App\Models\User;
+use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Actions\ActionTrackingService;
 use App\Services\Alerting\AlertDigestBuilder;
 use Illuminate\Console\Command;
@@ -24,8 +25,7 @@ class SendAlertDigestCommand extends Command
     public function __construct(
         private readonly AlertDigestBuilder $digestBuilder,
         private readonly ActionTrackingService $trackingService
-    )
-    {
+    ) {
         parent::__construct();
     }
 
@@ -62,6 +62,7 @@ class SendAlertDigestCommand extends Command
 
             if ($totalAlerts <= 0) {
                 $skipped++;
+
                 continue;
             }
 
@@ -69,6 +70,7 @@ class SendAlertDigestCommand extends Command
 
             if ($dryRun) {
                 $this->line("DRY-RUN {$user->email} : {$totalAlerts} alertes");
+
                 continue;
             }
 
@@ -130,7 +132,7 @@ class SendAlertDigestCommand extends Command
 
     private function refreshMetricsForOpenActions(): void
     {
-        $actions = \App\Models\Action::query()
+        $actions = Action::query()
             ->whereNotIn('statut_dynamique', [
                 ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
                 ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
@@ -138,7 +140,7 @@ class SendAlertDigestCommand extends Command
             ->get(['id']);
 
         foreach ($actions as $actionRef) {
-            $action = \App\Models\Action::query()->find($actionRef->id);
+            $action = Action::query()->find($actionRef->id);
             if ($action === null) {
                 continue;
             }

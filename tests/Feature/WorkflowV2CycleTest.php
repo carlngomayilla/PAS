@@ -171,6 +171,12 @@ class WorkflowV2CycleTest extends TestCase
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
         $this->assertSame('85.00', (string) $action->fresh()->progression_reelle);
+        $this->assertDatabaseHas('journal_audit', [
+            'user_id' => $fixture['agent']->id,
+            'module' => 'action',
+            'action' => 'save_execution_draft',
+            'entite_id' => $action->id,
+        ]);
     }
 
     public function test_controller_endpoint_closes_action_after_chef_visa(): void
@@ -538,6 +544,54 @@ class WorkflowV2CycleTest extends TestCase
             ->assertSee('Action WF '.Action::TYPE_COMPOSEE)
             ->assertDontSee('Action hors validation')
             ->assertDontSee('Action personnelle du chef');
+    }
+
+    public function test_sciq_validation_queue_only_lists_executions_transmitted_to_final_control(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+        $sciq = User::factory()->create(['role' => User::ROLE_SCIQ]);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 75], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $workflow->reviewAction($action, true, null, $fixture['chef']);
+
+        Action::query()->create([
+            'pta_id' => $fixture['action']->pta_id,
+            'responsable_id' => $fixture['agent']->id,
+            'libelle' => 'Action encore chez le chef',
+            'type_action' => Action::TYPE_QUANTITATIVE,
+            'statut_parametrage' => 'parametre',
+            'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_CHEF,
+            'contexte_action' => Action::CONTEXT_PILOTAGE,
+            'quantite_cible' => 100,
+            'justificatif_obligatoire' => false,
+        ]);
+
+        $this->actingAs($sciq)
+            ->get(route('workspace.actions.index', ['vue' => 'validations']))
+            ->assertOk()
+            ->assertSee('Contrôle des exécutions')
+            ->assertSee('Exécutions à contrôler')
+            ->assertSee('Traçabilité')
+            ->assertSee($fixture['action']->libelle)
+            ->assertDontSee('Action encore chez le chef');
+    }
+
+    public function test_controller_cannot_validate_an_execution_in_which_they_intervened(): void
+    {
+        $fixture = $this->createFixture(Action::TYPE_QUANTITATIVE, ['quantite_cible' => 100]);
+        $workflow = app(ActionWorkflowService::class);
+
+        $action = $workflow->recordActionProgress($fixture['action'], ['quantite_realisee' => 80], $fixture['agent']);
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $action->forceFill(['responsable_id' => $fixture['controller']->id])->save();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Le controle final doit etre realise par un autre intervenant.');
+
+        $workflow->reviewActionByController($action, true, null, $fixture['controller']);
     }
 
     /**

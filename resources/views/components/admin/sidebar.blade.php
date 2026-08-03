@@ -36,13 +36,14 @@
         'imports_excel' => 'docs',
         'ai_imports' => 'docs',
         'ai_reports' => 'reporting',
+        'reports' => 'reporting',
         default => $code,
     };
     $moduleSection = static fn (string $code): string => match ($code) {
         'mes_taches', 'notifications' => 'Menu',
         'pas', 'pao', 'pta', 'imports_excel', 'ai_imports' => 'Planification',
         'execution', 'mes_actions', 'corrections', 'validations', 'agents', 'services_agents', 'controle', 'financement' => 'Exécution',
-        'reporting', 'ai_reports', 'alertes', 'synthese_agence', 'arbitrages', 'financements_critiques', 'rapports_consolides', 'supervision' => 'Pilotage',
+        'reporting', 'reports', 'ai_reports', 'alertes', 'synthese_agence', 'arbitrages', 'financements_critiques', 'rapports_consolides', 'supervision' => 'Pilotage',
         'super_admin' => 'Plateforme',
         default => 'Administration',
     };
@@ -191,6 +192,17 @@
     }
 
     $pilotageItems = [];
+    if ($canSeeModule('reports')) {
+        $pilotageItems[] = [
+            'code' => 'reports',
+            'label' => $moduleLabel('reports', 'Rapports'),
+            'route' => 'workspace.reports.index',
+            'icon' => 'reporting',
+            'patterns' => ['workspace.reports.*'],
+            'badge' => (int) ($moduleBadges['reports'] ?? 0),
+            'display_order' => $moduleOrder('reports', 71),
+        ];
+    }
     $visibleReportingModuleCodes = collect(['reporting', 'ai_reports'])
         ->filter(fn (string $code): bool => $canSeeModule($code))
         ->values()
@@ -411,8 +423,8 @@
                             class="app-sidebar-logo-image app-sidebar-logo-full"
                         >
                         <img
-                            src="{{ asset('images/logo-anbg-flamme.png') }}"
-                            alt="Logo ANBG"
+                            src="{{ asset('favicon.png') }}"
+                            alt="Icône ANBG"
                             class="app-sidebar-logo-image app-sidebar-logo-flame"
                         >
                     </a>

@@ -221,6 +221,36 @@ class AuditWorkspaceTest extends TestCase
         $this->getJson('/api/v1/journal-audit')->assertForbidden();
     }
 
+    public function test_sciq_can_review_global_execution_and_procedure_history(): void
+    {
+        $sciq = User::factory()->create([
+            'role' => User::ROLE_SCIQ,
+            'password_changed_at' => now(),
+        ]);
+        $this->createAudit($sciq, [
+            'module' => 'action',
+            'action' => 'review_control_validate',
+            'entite_type' => 'action',
+            'entite_id' => 701,
+        ]);
+        $this->createAudit($sciq, [
+            'module' => 'profil_utilisateur',
+            'action' => 'profile_update',
+            'entite_type' => 'user',
+            'entite_id' => 702,
+        ]);
+
+        $this->actingAs($sciq)
+            ->get(route('workspace.audit.index', ['operation_scope' => 'execution']))
+            ->assertOk()
+            ->assertSee('Exécution &amp; procédures', false)
+            ->assertViewHas('logs', fn ($paginator): bool => $paginator->total() === 1)
+            ->assertSee('Review Control Validate');
+
+        Sanctum::actingAs($sciq);
+        $this->getJson('/api/v1/journal-audit')->assertOk();
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */

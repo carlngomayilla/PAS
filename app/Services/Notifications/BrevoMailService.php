@@ -5,6 +5,7 @@ namespace App\Services\Notifications;
 use App\Jobs\SendBrevoNotificationEmailsJob;
 use App\Mail\BrevoNotificationMail;
 use App\Models\User;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -36,8 +37,7 @@ class BrevoMailService
 {
     public function __construct(
         private readonly BrevoEmailTemplateFactory $templateFactory
-    ) {
-    }
+    ) {}
 
     /**
      * @param  Collection<int, User>|EloquentCollection<int, User>  $targets
@@ -54,7 +54,7 @@ class BrevoMailService
 
     /**
      * @param  Collection<int, User>|EloquentCollection<int, User>  $recipients
-     * @param  array<string, mixed>  $payload Notification rendue (title, message, url, module, entity_*).
+     * @param  array<string, mixed>  $payload  Notification rendue (title, message, url, module, entity_*).
      */
     public function dispatch(
         string $event,
@@ -86,7 +86,7 @@ class BrevoMailService
         }
 
         try {
-            app(\Illuminate\Contracts\Bus\Dispatcher::class)->dispatch(new SendBrevoNotificationEmailsJob(
+            app(Dispatcher::class)->dispatch(new SendBrevoNotificationEmailsJob(
                 $event,
                 $targets->pluck('id')->map(fn ($id): int => (int) $id)->all(),
                 $payload

@@ -35,8 +35,8 @@
 
     <section class="pta-suivi-detail-section">
         <h3 class="text-base font-black text-[#17324a]">Parcours de l'action</h3>
-        <div class="mt-2 overflow-x-auto rounded-md border border-slate-200 bg-white">
-            <table class="pta-suivi-detail-table min-w-full">
+        <div class="mt-2 app-table-wrapper overflow-x-auto rounded-md border border-slate-200 bg-white">
+            <table class="app-table data-table min-w-full">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -65,8 +65,8 @@
 
     <section class="pta-suivi-detail-section">
         <h3 class="text-base font-black text-[#17324a]">Validations</h3>
-        <div class="mt-2 overflow-x-auto rounded-md border border-slate-200 bg-white">
-            <table class="pta-suivi-detail-table min-w-full">
+        <div class="mt-2 app-table-wrapper overflow-x-auto rounded-md border border-slate-200 bg-white">
+            <table class="app-table data-table min-w-full">
                 <thead>
                     <tr>
                         <th>Niveau</th>
@@ -93,8 +93,8 @@
 
     <section class="pta-suivi-detail-section">
         <h3 class="text-base font-black text-[#17324a]">Pieces jointes / preuves</h3>
-        <div class="mt-2 overflow-x-auto rounded-md border border-slate-200 bg-white">
-            <table class="pta-suivi-detail-table min-w-full">
+        <div class="mt-2 app-table-wrapper overflow-x-auto rounded-md border border-slate-200 bg-white">
+            <table class="app-table data-table min-w-full">
                 <thead>
                     <tr>
                         <th>Piece</th>

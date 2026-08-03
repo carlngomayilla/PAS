@@ -17,16 +17,15 @@ class AlertDigestBuilder
 
     public function __construct(
         private readonly AlertRoutingService $alertRoutingService
-    ) {
-    }
+    ) {}
 
     /**
      * @return array{
-     *     generated_at: \Illuminate\Support\Carbon,
+     *     generated_at: Carbon,
      *     scope: array{role: string, direction_id: int|null, service_id: int|null},
-     *     actions_retard: Collection<int, \App\Models\Action>,
-     *     kpi_sous_seuil: Collection<int, \App\Models\KpiMesure>,
-     *     action_logs: Collection<int, \App\Models\ActionLog>,
+     *     actions_retard: Collection<int, Action>,
+     *     kpi_sous_seuil: Collection<int, KpiMesure>,
+     *     action_logs: Collection<int, ActionLog>,
      *     totals: array{actions_retard: int, kpi_sous_seuil: int, action_logs: int, total_alertes: int}
      * }
      */
@@ -109,11 +108,11 @@ class AlertDigestBuilder
 
     /**
      * @return array{
-     *     generated_at: \Illuminate\Support\Carbon,
+     *     generated_at: Carbon,
      *     scope: array{role: string, direction_id: int|null, service_id: int|null},
-     *     actions_retard: Collection<int, \App\Models\Action>,
-     *     kpi_sous_seuil: Collection<int, \App\Models\KpiMesure>,
-     *     action_logs: Collection<int, \App\Models\ActionLog>,
+     *     actions_retard: Collection<int, Action>,
+     *     kpi_sous_seuil: Collection<int, KpiMesure>,
+     *     action_logs: Collection<int, ActionLog>,
      *     totals: array{actions_retard: int, kpi_sous_seuil: int, action_logs: int, total_alertes: int}
      * }
      */

@@ -6,17 +6,19 @@
             \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE => 'Avis chef attendu',
             \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE => 'Analyse chef',
             \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE => 'Complement demande',
-            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'Controle attendu',
-            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'Validation finale attendue',
-            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'Validation finale attendue',
-            \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE => 'Application controleur attendue',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => 'Accord directeur attendu',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'Migration vers la direction',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'Migration vers la direction',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'Accord final DG attendu',
+            \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE => 'Ancienne décision à appliquer',
             \App\Models\DeadlineExtensionRequest::STATUS_REJETEE => 'Rejetee',
-            \App\Models\DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE => 'Date appliquee',
+            \App\Models\DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE => 'Modifications appliquées',
         ];
         $statusClasses = [
             \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE => 'anbg-badge-warning',
             \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE => 'anbg-badge-warning',
             \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE => 'anbg-badge-warning',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => 'anbg-badge-info',
             \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'anbg-badge-info',
             \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'anbg-badge-info',
             \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'anbg-badge-info',
@@ -28,10 +30,11 @@
             \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE => 'Chef de service',
             \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE => 'Chef de service',
             \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE => 'Demandeur',
-            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'SCIQ / Planification',
-            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'DG / Chef Planification',
-            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'DG / Chef Planification',
-            \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE => 'Controleur',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => 'Directeur',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'Directeur',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'Directeur',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'DG',
+            \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE => 'DG',
             \App\Models\DeadlineExtensionRequest::STATUS_REJETEE => 'Terminee',
             \App\Models\DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE => 'Terminee',
         ];
@@ -40,8 +43,8 @@
     <div class="app-screen-flow">
         <x-ui.page-title
             eyebrow="PTA / Actions"
-            title="Reports d'echeance"
-            subtitle="File de traitement gouvernee : Chef de service, controle SCIQ ou Planification, validation finale, puis application par un controleur."
+            title="Demandes de modification"
+            subtitle="Circuit : RMO, Chef de service, Directeur, puis accord final DG."
         />
 
         <section class="showcase-panel mb-4 app-screen-block">

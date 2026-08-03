@@ -186,8 +186,11 @@
                                 'archive' => 'anbg-badge anbg-badge-neutral',
                                 default => 'anbg-badge anbg-badge-neutral',
                             };
-                            // Le meme endpoint fait avancer le PTA dans le circuit canonique.
-                            $canClose = in_array((string) $row->statut, ['en_cours', 'controle_sciq'], true);
+                            $canSubmitForControl = $canWrite && $row->statut === 'en_cours';
+                            $canFinalizeControl = ($canControlPta ?? false)
+                                && $row->statut === 'controle_sciq'
+                                && (int) ($row->valide_par ?? 0) !== (int) ($currentUser?->id ?? 0);
+                            $canClose = $canSubmitForControl || $canFinalizeControl;
                             $canArchive = $row->statut === 'cloture';
                             $closeButtonLabel = $row->statut === 'controle_sciq' ? 'Cloturer' : 'Envoyer au controle';
                             $closeConfirmMessage = $row->statut === 'controle_sciq'

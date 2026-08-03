@@ -207,7 +207,7 @@ class ActionPolicy
             return false;
         }
 
-        return $this->view($user, $action);
+        return $action->isResponsible($user);
     }
 
     public function reviewDeadlineExtensionByChef(User $user, Action $action): bool
@@ -231,18 +231,14 @@ class ActionPolicy
         );
     }
 
-    public function reviewDeadlineExtensionByController(User $user, Action $action): bool
+    public function reviewDeadlineExtensionByDirector(User $user, Action $action): bool
     {
-        if ($action->isResponsible($user) || $user->hasRole(User::ROLE_CHEF_PLANIFICATION)) {
+        if ($action->isResponsible($user) || ! $user->hasRole(User::ROLE_DIRECTION)) {
             return false;
         }
 
-        return $user->hasRole(
-            User::ROLE_PLANIFICATION,
-            User::ROLE_SCIQ,
-            User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_UNITE_SCIQ
-        );
+        return (int) $user->direction_id > 0
+            && (int) $user->direction_id === (int) $action->pta?->direction_id;
     }
 
     public function reviewDeadlineExtensionFinal(User $user, Action $action): bool
@@ -251,12 +247,12 @@ class ActionPolicy
             return false;
         }
 
-        return $user->hasRole(User::ROLE_DG, User::ROLE_CHEF_PLANIFICATION);
+        return $user->hasRole(User::ROLE_DG);
     }
 
     public function applyDeadlineExtension(User $user, Action $action): bool
     {
-        return $this->reviewDeadlineExtensionByController($user, $action);
+        return $this->reviewDeadlineExtensionFinal($user, $action);
     }
 
     public function reviewDeadlineExtensionByDg(User $user, Action $action): bool

@@ -12,11 +12,15 @@ class ExportTemplate extends Model
     use HasFactory;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_PUBLISHED = 'published';
+
     public const STATUS_ARCHIVED = 'archived';
 
     public const FORMAT_PDF = 'pdf';
+
     public const FORMAT_EXCEL = 'excel';
+
     public const FORMAT_WORD = 'word';
 
     /**

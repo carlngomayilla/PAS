@@ -4,21 +4,17 @@ namespace App\Http\Requests;
 
 use App\Models\Action;
 use App\Models\DeadlineExtensionRequest;
+use App\Models\SousAction;
 use App\Models\User;
-use App\Services\DocumentPolicySettings;
-use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Carbon;
 use Illuminate\Validation\Validator;
 
-class ResubmitDeadlineExtensionRequest extends FormRequest
+class ResubmitDeadlineExtensionRequest extends StoreDeadlineExtensionRequest
 {
     public function authorize(): bool
     {
         $user = $this->user();
-        $deadlineExtensionRequest = $this->route('deadlineExtensionRequest');
-        $action = $deadlineExtensionRequest instanceof DeadlineExtensionRequest
-            ? $deadlineExtensionRequest->action
-            : null;
+        $deadlineExtensionRequest = $this->deadlineExtensionRequest();
+        $action = $deadlineExtensionRequest?->action;
 
         return $user instanceof User
             && $action instanceof Action
@@ -27,50 +23,34 @@ class ResubmitDeadlineExtensionRequest extends FormRequest
             && $user->can('requestDeadlineExtension', $action);
     }
 
-    /**
-     * @return array<string, array<int, mixed>>
-     */
-    public function rules(): array
+    protected function prepareForValidation(): void
     {
-        $documentPolicy = app(DocumentPolicySettings::class);
+        $deadlineExtensionRequest = $this->deadlineExtensionRequest();
+        if (! $deadlineExtensionRequest instanceof DeadlineExtensionRequest) {
+            return;
+        }
 
-        return [
-            'requested_deadline' => ['required', 'date_format:Y-m-d', 'after:today'],
-            'motif' => ['required', 'string', 'min:5', 'max:255'],
-            'justification' => ['required', 'string', 'min:10', 'max:5000'],
-            'piece_justificative' => [
-                'required',
-                'file',
-                'max:'.$documentPolicy->maxUploadKilobytes(),
-                $documentPolicy->mimesRule(),
-            ],
-        ];
+        $this->merge([
+            'sous_action_id' => $deadlineExtensionRequest->sous_action_id,
+        ]);
     }
 
-    /**
-     * @return array<int, callable(Validator): void>
-     */
-    public function after(): array
+    protected function actionForValidation(): ?Action
     {
-        return [
-            function (Validator $validator): void {
-                $deadlineExtensionRequest = $this->route('deadlineExtensionRequest');
-                $requestedDeadline = $this->input('requested_deadline');
-                if (! $deadlineExtensionRequest instanceof DeadlineExtensionRequest
-                    || ! is_string($requestedDeadline)
-                    || trim($requestedDeadline) === '') {
-                    return;
-                }
+        return $this->deadlineExtensionRequest()?->action;
+    }
 
-                if (Carbon::parse($requestedDeadline)->startOfDay()->lessThanOrEqualTo(
-                    Carbon::parse($deadlineExtensionRequest->old_deadline)->startOfDay()
-                )) {
-                    $validator->errors()->add(
-                        'requested_deadline',
-                        'La nouvelle echeance doit etre posterieure a l echeance actuelle.'
-                    );
-                }
-            },
-        ];
+    protected function selectedSousAction(Action $action, Validator $validator): ?SousAction
+    {
+        $deadlineExtensionRequest = $this->deadlineExtensionRequest();
+
+        return $deadlineExtensionRequest?->sousAction;
+    }
+
+    private function deadlineExtensionRequest(): ?DeadlineExtensionRequest
+    {
+        $request = $this->route('deadlineExtensionRequest');
+
+        return $request instanceof DeadlineExtensionRequest ? $request : null;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\PlatformSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -10,8 +11,8 @@ use Tests\TestCase;
 
 class SuperAdminGeneralSettingsTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -75,8 +76,8 @@ class SuperAdminGeneralSettingsTest extends TestCase
             'module' => 'super_admin',
             'action' => 'general_settings_update',
         ]);
-        $logoMarkPath = \App\Models\PlatformSetting::query()->where('key', 'logo_mark_path')->value('value');
-        $faviconPath = \App\Models\PlatformSetting::query()->where('key', 'favicon_path')->value('value');
+        $logoMarkPath = PlatformSetting::query()->where('key', 'logo_mark_path')->value('value');
+        $faviconPath = PlatformSetting::query()->where('key', 'favicon_path')->value('value');
         $this->assertIsString($logoMarkPath);
         $this->assertIsString($faviconPath);
         $this->assertStringStartsWith('branding/', $logoMarkPath);

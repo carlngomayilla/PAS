@@ -7,6 +7,7 @@
     $currentDashboardUser = auth()->user();
     $dashboardNotifications = $currentDashboardUser?->notifications()->latest()->limit(6)->get() ?? collect();
     $analytics = $dashboardData ?? [];
+    $financialSummary = is_array($analytics['financial_summary'] ?? null) ? $analytics['financial_summary'] : null;
     $dashboardRole = $analytics['dashboard_role'] ?? 'global';
     $roleDashboard = $analytics['role_dashboard'] ?? [];
     $roleHero = $roleDashboard['hero'] ?? [];
@@ -720,15 +721,16 @@
     </form>
 </div>
 
-@if ($currentDashboardTab === 'overview')
-    <form
+<form
         method="GET"
         action="{{ route('synthese.index') }}"
         class="mb-4 rounded-2xl border border-[#3996d3]/20 bg-white/95 p-3 shadow-sm"
+        data-filter-form
+        data-form-layout="wide"
         data-dashboard-synthesis-filter-form
         data-services-url-template="{{ route('synthese.services-by-direction', ['direction' => '__DIRECTION__']) }}"
     >
-        <input type="hidden" name="dashboardTab" value="overview">
+        <input type="hidden" name="dashboardTab" value="{{ $currentDashboardTab }}">
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
             <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
                 Annee
@@ -796,12 +798,11 @@
                 {{ $directionSelector['selected_label'] ?? 'Synthese globale' }} | {{ $directionSelector['service_selected_label'] ?? 'Tous les services' }} | {{ $exerciseFilter['label'] ?? 'Exercice courant' }}
             </div>
             <div class="flex flex-wrap gap-2">
-                <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('synthese.index', ['dashboardTab' => 'overview', 'direction_id' => 'all', 'service_id' => 'all', 'exercice' => 'all', 'periode' => 'all', 'trimestre' => 'all', 'statut_suivi' => 'all', 'statut_delai' => 'all', 'alerte_echeance' => 'all']) }}">Reinitialiser</a>
+                <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('synthese.index', ['dashboardTab' => $currentDashboardTab, 'direction_id' => 'all', 'service_id' => 'all', 'exercice' => 'all', 'periode' => 'all', 'trimestre' => 'all', 'statut_suivi' => 'all', 'statut_delai' => 'all', 'alerte_echeance' => 'all']) }}">Reinitialiser</a>
                 <button type="submit" class="btn btn-primary btn-sm rounded-xl px-3 py-1.5 text-xs">Appliquer</button>
             </div>
         </div>
     </form>
-@endif
 
 {{-- Badge redondant supprimé : les informations rôle/périmètre/direction/service/exercice
      sont désormais accessibles via le chip de périmètre dans la navbar (et le filtre exercice). --}}

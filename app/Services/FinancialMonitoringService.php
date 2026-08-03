@@ -186,6 +186,37 @@ class FinancialMonitoringService
         ];
     }
 
+    /**
+     * @return array{budget:float,engaged:float,disbursed:float,remaining:float,engagement_rate:float,disbursement_rate:float,actions_total:int}
+     */
+    public function dashboardSummary(User $user): ?array
+    {
+        if (! $this->canView($user)) {
+            return null;
+        }
+
+        $actions = $this->scopedActions($user);
+        $actionIds = (clone $actions)->select('id');
+        $budget = (float) (clone $actions)->sum('montant_estime');
+        $totals = FinancialTransaction::query()
+            ->whereIn('action_id', $actionIds)
+            ->selectRaw("COALESCE(SUM(CASE WHEN operation_type = 'engagement' THEN amount ELSE 0 END), 0) as engaged")
+            ->selectRaw("COALESCE(SUM(CASE WHEN operation_type = 'decaissement' THEN amount ELSE 0 END), 0) as disbursed")
+            ->first();
+        $engaged = (float) ($totals?->engaged ?? 0);
+        $disbursed = (float) ($totals?->disbursed ?? 0);
+
+        return [
+            'budget' => $budget,
+            'engaged' => $engaged,
+            'disbursed' => $disbursed,
+            'remaining' => $budget - $disbursed,
+            'engagement_rate' => $budget > 0 ? round($engaged / $budget * 100, 2) : 0.0,
+            'disbursement_rate' => $budget > 0 ? round($disbursed / $budget * 100, 2) : 0.0,
+            'actions_total' => (clone $actions)->count(),
+        ];
+    }
+
     private function assertOperationWithinApprovedBudget(Action $action, string $operationType, float $amount): void
     {
         $summary = $this->actionSummary($action);

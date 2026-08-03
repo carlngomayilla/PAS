@@ -7,12 +7,11 @@ use Illuminate\Notifications\Notification;
 class WorkspaceModuleNotification extends Notification
 {
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function __construct(
         private readonly array $payload
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<int, string>

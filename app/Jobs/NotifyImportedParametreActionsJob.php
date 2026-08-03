@@ -16,10 +16,11 @@ class NotifyImportedParametreActionsJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
+
     public int $timeout = 600;
 
     /**
-     * @param list<int> $actionIds
+     * @param  list<int>  $actionIds
      */
     public function __construct(
         public readonly array $actionIds,

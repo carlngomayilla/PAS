@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -77,7 +77,7 @@ class DatabaseConstraintsCoverageTest extends TestCase
         }
 
         // Tentative d insertion incoherente : role_scope=service mais service_id NULL.
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
 
         DB::table('delegations')->insert([
             'delegant_id' => 1,

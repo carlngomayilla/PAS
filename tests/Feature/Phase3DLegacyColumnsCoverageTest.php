@@ -17,7 +17,7 @@ class Phase3DLegacyColumnsCoverageTest extends TestCase
 
     public function test_a23_canonical_resources_falls_back_to_legacy_booleans(): void
     {
-        $action = new Action();
+        $action = new Action;
         $action->forceFill([
             'ressources_necessaires' => null,
             'ressource_main_oeuvre' => true,
@@ -32,7 +32,7 @@ class Phase3DLegacyColumnsCoverageTest extends TestCase
 
     public function test_a23_canonical_resources_prefers_array_over_booleans(): void
     {
-        $action = new Action();
+        $action = new Action;
         $action->forceFill([
             'ressources_necessaires' => ['ressources_humaines', 'ressources_informatiques'],
             // Booleen legacy contradictoire : doit etre IGNORE au profit du JSON.
@@ -50,7 +50,7 @@ class Phase3DLegacyColumnsCoverageTest extends TestCase
 
     public function test_a23_resource_labels_match_options(): void
     {
-        $action = new Action();
+        $action = new Action;
         $action->forceFill([
             'ressources_necessaires' => ['ressources_humaines'],
         ]);

@@ -19,8 +19,8 @@ class SendBrevoNotificationEmailsJob implements ShouldQueue
     public int $timeout = 180;
 
     /**
-     * @param list<int> $recipientIds
-     * @param array<string, mixed> $payload
+     * @param  list<int>  $recipientIds
+     * @param  array<string, mixed>  $payload
      */
     public function __construct(
         public readonly string $event,

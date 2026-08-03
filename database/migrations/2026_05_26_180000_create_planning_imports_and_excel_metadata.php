@@ -70,7 +70,7 @@ return new class extends Migration
 
         if (DB::connection()->getDriverName() === 'pgsql' && Schema::hasTable('actions') && Schema::hasColumn('actions', 'statut_parametrage')) {
             try {
-                DB::statement("ALTER TABLE actions DROP CONSTRAINT IF EXISTS actions_statut_parametrage_check");
+                DB::statement('ALTER TABLE actions DROP CONSTRAINT IF EXISTS actions_statut_parametrage_check');
                 DB::statement("ALTER TABLE actions ADD CONSTRAINT actions_statut_parametrage_check CHECK (statut_parametrage IN ('a_parametrer','parametre'))");
             } catch (Throwable) {
                 // Idempotent best-effort constraint for PostgreSQL.

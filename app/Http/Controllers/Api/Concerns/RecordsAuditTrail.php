@@ -9,8 +9,8 @@ use Illuminate\Http\Request;
 trait RecordsAuditTrail
 {
     /**
-     * @param array<string, mixed>|null $before
-     * @param array<string, mixed>|null $after
+     * @param  array<string, mixed>|null  $before
+     * @param  array<string, mixed>|null  $after
      */
     protected function recordAudit(
         Request $request,
@@ -33,4 +33,3 @@ trait RecordsAuditTrail
         ]);
     }
 }
-

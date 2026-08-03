@@ -134,7 +134,7 @@ return new class extends Migration
                     $foreign->nullOnDelete();
                 }
             });
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // FK probablement deja presente (rerun de la migration). On ignore.
         }
     }
@@ -149,7 +149,7 @@ return new class extends Migration
             Schema::table($table, function (Blueprint $blueprint) use ($column): void {
                 $blueprint->dropForeign([$column]);
             });
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // FK absente : non bloquant.
         }
     }
@@ -179,7 +179,7 @@ return new class extends Migration
     {
         try {
             DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS {$constraintName}");
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Non bloquant.
         }
     }

@@ -220,6 +220,7 @@ class WorkspaceModuleSettings
             'ai_imports' => ['code' => 'ai_imports', 'label' => 'IA & Imports', 'description' => 'Extraction IA, previsualisation et import PTA valide', 'enabled' => true, 'order' => 56, 'section' => 'planification'],
             'execution' => ['code' => 'execution', 'label' => 'Actions', 'description' => 'Exécution des tâches et suivi de progression', 'enabled' => true, 'order' => 60, 'section' => 'execution'],
             'reporting' => ['code' => 'reporting', 'label' => 'Reporting', 'description' => 'Reporting consolidé, exports et diffusion', 'enabled' => true, 'order' => 70, 'section' => 'pilotage'],
+            'reports' => ['code' => 'reports', 'label' => 'Rapports', 'description' => 'Réunions programmées, comptes rendus, incidents et vérification', 'enabled' => true, 'order' => 71, 'section' => 'pilotage'],
             'ai_reports' => ['code' => 'ai_reports', 'label' => 'Rapports IA', 'description' => 'Rapports PAS, PAO et PTA rediges depuis les metriques', 'enabled' => true, 'order' => 72, 'section' => 'pilotage'],
             'referentiel' => ['code' => 'referentiel', 'label' => 'Référentiels', 'description' => 'Directions, services, utilisateurs', 'enabled' => true, 'order' => 80, 'section' => 'gouvernance'],
             'delegations' => ['code' => 'delegations', 'label' => 'Délégations', 'description' => 'Suppléance temporaire de validation', 'enabled' => true, 'order' => 90, 'section' => 'gouvernance'],

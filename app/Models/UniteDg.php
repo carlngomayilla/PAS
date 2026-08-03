@@ -20,8 +20,11 @@ class UniteDg extends Model
     protected $table = 'unites_dg';
 
     public const CODE_SCIQ = 'SCIQ';
+
     public const CODE_DGA = 'DGA';
+
     public const CODE_CABINET = 'CABINET';
+
     public const CODE_UCAS = 'UCAS';
 
     /** @var list<string> */

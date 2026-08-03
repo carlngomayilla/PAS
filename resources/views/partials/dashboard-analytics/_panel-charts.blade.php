@@ -8,13 +8,51 @@
         $decisionOperationalObjectives = is_array($decisionChartPayload['operational_objectives'] ?? null) ? $decisionChartPayload['operational_objectives'] : [];
         $decisionPtaEvolution = is_array($decisionChartPayload['pta_evolution'] ?? null) ? $decisionChartPayload['pta_evolution'] : [];
         $decisionActionStatus = is_array($decisionChartPayload['action_status'] ?? null) ? $decisionChartPayload['action_status'] : [];
-
         $statusTotal = collect($decisionActionStatus['values'] ?? [])->sum();
         $axisTotal = count((array) ($decisionAxisProgress['labels'] ?? []));
         $strategicTotal = count((array) ($decisionStrategicObjectives['labels'] ?? []));
         $operationalTotal = count((array) ($decisionOperationalObjectives['labels'] ?? []));
         $ptaPoints = count((array) ($decisionPtaEvolution['labels'] ?? []));
     @endphp
+
+    <section class="charts-requested-section" aria-labelledby="pta-quarterly-charts-title">
+        <header class="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+                <h2 id="pta-quarterly-charts-title" class="showcase-panel-title">Graphiques du PTA trimestriel</h2>
+                <p class="mt-1 text-sm font-semibold text-[#667085]">{{ $ptaQuarterlyAnalysis['period']['label'] ?? 'Période courante' }}</p>
+            </div>
+            <span class="showcase-chip">4 graphiques prioritaires</span>
+        </header>
+
+        <div class="charts-requested-grid">
+            @foreach ([
+                ['axis-progression', 'Progression des axes du PTA sur les trois mois', 'Comparaison mensuelle par axe stratégique.'],
+                ['monthly-rate', 'Évolution du taux global du PTA', 'Réalisation cumulative des actions arrivées à échéance.'],
+                ['axis-rate', 'Taux globaux des axes stratégiques', 'Taux pondérés à partir des volumes d’actions échues.'],
+                ['service-rate', 'Taux de réalisation par direction ou service', 'Services conservés dans leur ordre de présentation.'],
+            ] as [$chartKey, $chartTitle, $chartDescription])
+                <article class="showcase-panel charts-requested-card">
+                    <header class="charts-requested-header">
+                        <div>
+                            <h3 class="charts-requested-title">{{ $chartTitle }}</h3>
+                            <p class="charts-requested-description">{{ $chartDescription }}</p>
+                            <dl class="charts-requested-meta">
+                                <div><dt>Unité</dt><dd>%</dd></div>
+                                <div><dt>Source</dt><dd>PTA filtré</dd></div>
+                            </dl>
+                        </div>
+                    </header>
+                    <div class="dashboard-canvas dashboard-canvas-requested">
+                        <div id="dashboard-pta-{{ $chartKey }}-chart-charts" class="dashboard-chart-host" data-empty-message="Aucune donnée PTA disponible pour ce graphique.">
+                            <div class="dashboard-chart-fallback" aria-hidden="true">
+                                <x-ui.empty-state title="Aucune donnée PTA" message="Le graphique sera alimenté selon les filtres sélectionnés." icon="chart" tone="info" />
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            @endforeach
+        </div>
+    </section>
 
     <section class="charts-requested-section">
         <article class="showcase-panel charts-requested-card charts-requested-card-wide">

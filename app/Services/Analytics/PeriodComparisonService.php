@@ -5,7 +5,7 @@ namespace App\Services\Analytics;
 class PeriodComparisonService
 {
     /**
-     * @param array<int, array<string, mixed>> $rows
+     * @param  array<int, array<string, mixed>>  $rows
      * @return array<int, array<string, mixed>>
      */
     public function normalizeRows(array $rows): array

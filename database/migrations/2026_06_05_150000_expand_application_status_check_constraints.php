@@ -224,7 +224,7 @@ return new class extends Migration
     }
 
     /**
-     * @param list<string> $allowed
+     * @param  list<string>  $allowed
      */
     private function replaceCheck(string $table, string $column, string $constraint, array $allowed, ?string $fallback = null, ?string $default = null): void
     {
@@ -278,7 +278,7 @@ return new class extends Migration
     }
 
     /**
-     * @param list<string> $values
+     * @param  list<string>  $values
      */
     private function literalList(array $values): string
     {

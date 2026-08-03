@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Services\Security\PasswordPolicyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -28,8 +27,7 @@ class PasswordResetController extends Controller
 {
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy
-    ) {
-    }
+    ) {}
 
     public function showRequestForm(): View
     {

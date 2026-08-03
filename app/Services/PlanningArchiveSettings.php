@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaIntrospectionCache;
 
 class PlanningArchiveSettings
 {
@@ -81,7 +81,7 @@ class PlanningArchiveSettings
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, string>
      */
     public function update(array $payload, ?User $actor = null): array
@@ -117,7 +117,7 @@ class PlanningArchiveSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }

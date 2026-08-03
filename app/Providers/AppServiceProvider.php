@@ -4,13 +4,19 @@ namespace App\Providers;
 
 use App\Database\Connectors\PostgresConnector;
 use App\Models\Action;
+use App\Models\DeadlineExtensionRequest;
 use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\Pta;
 use App\Models\User;
-use App\Services\AppearanceSettings;
+use App\Observers\ActionObserver;
+use App\Observers\PlanningCacheObserver;
+use App\Policies\ActionPolicy;
+use App\Policies\PaoPolicy;
+use App\Policies\PasPolicy;
 use App\Services\ActionCalculationSettings;
 use App\Services\ActionManagementSettings;
+use App\Services\AppearanceSettings;
 use App\Services\DashboardProfileSettings;
 use App\Services\DocumentPolicySettings;
 use App\Services\DynamicReferentialSettings;
@@ -18,28 +24,23 @@ use App\Services\ManagedKpiSettings;
 use App\Services\NotificationPolicySettings;
 use App\Services\OrganizationGovernanceService;
 use App\Services\PlatformDiagnosticService;
+use App\Services\PlatformMaintenanceService;
+use App\Services\PlatformSettings;
 use App\Services\PlatformSimulationService;
 use App\Services\PlatformSnapshotService;
-use App\Services\PlatformSettings;
-use App\Services\PlatformMaintenanceService;
-use App\Services\RoleRegistryService;
 use App\Services\RolePermissionSettings;
+use App\Services\RoleRegistryService;
 use App\Services\WorkflowSettings;
 use App\Services\WorkspaceModuleSettings;
-use App\Policies\ActionPolicy;
-use App\Policies\PaoPolicy;
-use App\Policies\PasPolicy;
-use App\Observers\ActionObserver;
-use App\Observers\PlanningCacheObserver;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -48,7 +49,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind('db.connector.pgsql', fn (): PostgresConnector => new PostgresConnector());
+        $this->app->bind('db.connector.pgsql', fn (): PostgresConnector => new PostgresConnector);
 
         $this->app->singleton(AppearanceSettings::class);
         $this->app->singleton(ActionCalculationSettings::class);
@@ -92,6 +93,7 @@ class AppServiceProvider extends ServiceProvider
 
         Blade::directive('cspNonce', static fn (): string => '<?php echo "nonce=\"".e(\Illuminate\Support\Facades\Vite::cspNonce())."\""; ?>');
         Action::observe(ActionObserver::class);
+        DeadlineExtensionRequest::observe(PlanningCacheObserver::class);
         Pao::observe(PlanningCacheObserver::class);
         Pta::observe(PlanningCacheObserver::class);
         User::observe(PlanningCacheObserver::class);

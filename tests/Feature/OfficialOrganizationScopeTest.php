@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
 use App\Models\UniteDg;
+use App\Models\User;
 use App\Services\AccessScopeService;
 use Database\Seeders\ProductionSafeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

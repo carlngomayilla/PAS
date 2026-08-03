@@ -68,7 +68,7 @@ return new class extends Migration
             Schema::table($table, function (Blueprint $blueprint) use ($columnList, $indexName): void {
                 $blueprint->index($columnList, $indexName);
             });
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Index probablement deja present : on ignore silencieusement.
         }
     }
@@ -83,7 +83,7 @@ return new class extends Migration
             Schema::table($table, function (Blueprint $blueprint) use ($indexName): void {
                 $blueprint->dropIndex($indexName);
             });
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Index inexistant ou deja supprime : non bloquant.
         }
     }

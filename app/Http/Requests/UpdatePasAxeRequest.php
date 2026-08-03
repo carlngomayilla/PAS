@@ -57,4 +57,3 @@ class UpdatePasAxeRequest extends FormRequest
         return null;
     }
 }
-

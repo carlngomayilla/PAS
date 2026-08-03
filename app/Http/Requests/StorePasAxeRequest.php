@@ -37,4 +37,3 @@ class StorePasAxeRequest extends FormRequest
         ];
     }
 }
-

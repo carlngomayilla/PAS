@@ -1241,15 +1241,16 @@
                         var fd = new FormData(modifForm);
                         fd.append('_token', csrfToken);
                         submitBtn.disabled = true;
-                        submitBtn.textContent = 'Envoi…';
+                        var requestLoaderToken = window.AnBGLoader?.start({
+                            operation: 'save',
+                            message: 'Envoi de la demande de modification…',
+                        });
                         fetch('/workspace/actions/' + actionId + '/demandes-deverrouillage', {
                             method: 'POST',
                             body: fd,
                             credentials: 'same-origin',
                             headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
                         }).then(function (resp) {
-                            submitBtn.disabled = false;
-                            submitBtn.textContent = 'Envoyer la demande';
                             var blockReq = document.querySelector('[data-action-block][data-action-id="' + actionId + '"]');
                             if (resp.ok || resp.redirected) {
                                 closeModifModal();
@@ -1259,9 +1260,10 @@
                                 errEl.hidden = false;
                             }
                         }).catch(function (err) {
-                            submitBtn.disabled = false;
-                            submitBtn.textContent = 'Envoyer la demande';
                             if (errEl) { errEl.textContent = 'Erreur réseau : ' + (err && err.message ? err.message : 'inconnue'); errEl.hidden = false; }
+                        }).finally(function () {
+                            submitBtn.disabled = false;
+                            window.AnBGLoader?.finish(requestLoaderToken);
                         });
                     });
                 }
@@ -1321,7 +1323,10 @@
                         }
                         var payload = collectActionPayload(blockSave);
                         target.disabled = true;
-                        target.textContent = 'Sauvegarde…';
+                        var saveLoaderToken = window.AnBGLoader?.start({
+                            operation: 'save',
+                            message: 'Enregistrement de l\'action PTA…',
+                        });
                         fetch(inlineUpsertUrl, {
                             method: 'POST',
                             headers: {
@@ -1337,8 +1342,6 @@
                                 return { ok: response.ok, data: data };
                             });
                         }).then(function (result) {
-                            target.disabled = false;
-                            target.textContent = 'Enregistrer';
                             if (result.ok && result.data && result.data.ok) {
                                 flashActionMessage(blockSave, false, result.data.message || 'Action enregistree.');
                                 // Mettre a jour l'id de l'action (selecteur strict pour ne pas
@@ -1378,9 +1381,10 @@
                                 flashActionMessage(blockSave, true, msg);
                             }
                         }).catch(function (err) {
-                            target.disabled = false;
-                            target.textContent = 'Enregistrer';
                             flashActionMessage(blockSave, true, 'Erreur reseau : ' + (err && err.message ? err.message : 'inconnue'));
+                        }).finally(function () {
+                            target.disabled = false;
+                            window.AnBGLoader?.finish(saveLoaderToken);
                         });
                         return;
                     }
@@ -1400,6 +1404,10 @@
                                 return;
                             }
                             target.disabled = true;
+                            var deleteLoaderToken = window.AnBGLoader?.start({
+                                operation: 'delete',
+                                message: 'Suppression de l\'action PTA…',
+                            });
                             var fd = new FormData();
                             fd.append('_method', 'DELETE');
                             fd.append('_token', csrfToken);
@@ -1410,7 +1418,6 @@
                                 credentials: 'same-origin',
                                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                             }).then(function (resp) {
-                                target.disabled = false;
                                 if (resp.ok || resp.redirected) {
                                     block.remove();
                                     refreshActionIndexes();
@@ -1418,8 +1425,10 @@
                                     flashActionMessage(block, true, 'Echec suppression (HTTP ' + resp.status + ').');
                                 }
                             }).catch(function (err) {
-                                target.disabled = false;
                                 flashActionMessage(block, true, 'Erreur reseau : ' + (err && err.message ? err.message : 'inconnue'));
+                            }).finally(function () {
+                                target.disabled = false;
+                                window.AnBGLoader?.finish(deleteLoaderToken);
                             });
                             return;
                         }

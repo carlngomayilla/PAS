@@ -8,7 +8,7 @@ use ZipArchive;
 class SimpleZipWriter
 {
     /**
-     * @param array<string, string> $entries
+     * @param  array<string, string>  $entries
      */
     public function write(string $path, array $entries): void
     {
@@ -22,11 +22,11 @@ class SimpleZipWriter
     }
 
     /**
-     * @param array<string, string> $entries
+     * @param  array<string, string>  $entries
      */
     private function writeWithZipArchive(string $path, array $entries): void
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Unable to open XLSX archive for writing.');
         }
@@ -39,7 +39,7 @@ class SimpleZipWriter
     }
 
     /**
-     * @param array<string, string> $entries
+     * @param  array<string, string>  $entries
      */
     private function writeStoreOnlyArchive(string $path, array $entries): void
     {
@@ -56,7 +56,7 @@ class SimpleZipWriter
 
             $localHeader = pack(
                 'VvvvvvVVVvv',
-                0x04034b50,
+                0x04034B50,
                 20,
                 0,
                 0,
@@ -73,7 +73,7 @@ class SimpleZipWriter
 
             $centralDirectory .= pack(
                 'VvvvvvvVVVvvvvvVV',
-                0x02014b50,
+                0x02014B50,
                 20,
                 20,
                 0,
@@ -98,7 +98,7 @@ class SimpleZipWriter
         $centralSize = strlen($centralDirectory);
         $endOfCentralDirectory = pack(
             'VvvvvVVv',
-            0x06054b50,
+            0x06054B50,
             0,
             0,
             count($entries),

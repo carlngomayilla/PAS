@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\PlatformSetting;
 use App\Models\User;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaIntrospectionCache;
 
 class ActionManagementSettings
 {
@@ -138,6 +138,7 @@ class ActionManagementSettings
         $this->resolved = null;
         $this->tableAvailable = null;
     }
+
     private function hasSettingsTable(): bool
     {
         if ($this->tableAvailable !== null) {
@@ -145,11 +146,9 @@ class ActionManagementSettings
         }
 
         try {
-            return $this->tableAvailable = \App\Support\SchemaIntrospectionCache::hasTable('platform_settings');
+            return $this->tableAvailable = SchemaIntrospectionCache::hasTable('platform_settings');
         } catch (\Throwable) {
             return $this->tableAvailable = false;
         }
     }
 }
-
-

@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Schema;
  * planning.read, reporting.read, alerts.read, referentiel.read, audit.read,
  * messagerie.read), ce qui empechait toute action d'ecriture.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         if (! Schema::hasTable('platform_settings')) {

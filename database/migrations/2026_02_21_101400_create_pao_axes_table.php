@@ -26,4 +26,3 @@ return new class extends Migration
         Schema::dropIfExists('pao_axes');
     }
 };
-

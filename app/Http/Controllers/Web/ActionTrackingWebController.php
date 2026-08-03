@@ -24,6 +24,7 @@ use App\Services\PlanningModificationLockService;
 use App\Services\Security\SecureJustificatifStorage;
 use App\Services\Workflow\ActionPerformanceCalculator;
 use App\Services\Workflow\ActionWorkflowService;
+use App\Services\Workflow\DeadlineExtensionChangeSet;
 use App\Services\WorkflowSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -99,6 +100,7 @@ class ActionTrackingWebController extends Controller
             'deadlineExtensionRequests' => fn ($q) => $q->with([
                 'requestedBy:id,name,email',
                 'chefReviewedBy:id,name,email',
+                'directorReviewedBy:id,name,email',
                 'sciqReviewedBy:id,name,email',
                 'finalDecidedBy:id,name,email',
                 'dgDecidedBy:id,name,email',
@@ -125,7 +127,7 @@ class ActionTrackingWebController extends Controller
         $canReviewByController = $this->canReviewByController($user);
         $canRequestDeadlineExtension = $user->can('requestDeadlineExtension', $action);
         $canReviewDeadlineExtensionByChef = $user->can('reviewDeadlineExtensionByChef', $action);
-        $canReviewDeadlineExtensionByController = $user->can('reviewDeadlineExtensionByController', $action);
+        $canReviewDeadlineExtensionByDirector = $user->can('reviewDeadlineExtensionByDirector', $action);
         $canReviewDeadlineExtensionFinal = $user->can('reviewDeadlineExtensionFinal', $action);
         $canApplyDeadlineExtension = $user->can('applyDeadlineExtension', $action);
         $canSubmitFinancing = $user->can('submitFinancing', $action)
@@ -141,7 +143,7 @@ class ActionTrackingWebController extends Controller
             'review_controller' => $canReviewByController,
             'request_deadline' => $canRequestDeadlineExtension,
             'review_deadline_chef' => $canReviewDeadlineExtensionByChef,
-            'review_deadline_controller' => $canReviewDeadlineExtensionByController,
+            'review_deadline_director' => $canReviewDeadlineExtensionByDirector,
             'review_deadline_final' => $canReviewDeadlineExtensionFinal,
             'apply_deadline' => $canApplyDeadlineExtension,
             'submit_financing' => $canSubmitFinancing,
@@ -177,12 +179,9 @@ class ActionTrackingWebController extends Controller
             'canReviewClosure' => false,
             'canRequestDeadlineExtension' => $canRequestDeadlineExtension,
             'canReviewDeadlineExtensionByChef' => $canReviewDeadlineExtensionByChef,
-            'canReviewDeadlineExtensionByController' => $canReviewDeadlineExtensionByController,
+            'canReviewDeadlineExtensionByDirector' => $canReviewDeadlineExtensionByDirector,
             'canReviewDeadlineExtensionFinal' => $canReviewDeadlineExtensionFinal,
             'canApplyDeadlineExtension' => $canApplyDeadlineExtension,
-            // Compatibilité temporaire avec les anciennes clés de la vue.
-            'canReviewDeadlineExtensionBySciq' => $canReviewDeadlineExtensionByController,
-            'canReviewDeadlineExtensionByDg' => $canReviewDeadlineExtensionFinal,
             'canSubmitFinancing' => $canSubmitFinancing,
             'canReviewFinancingByDaf' => $canReviewFinancingByDaf,
             'canReviewFinancingByDg' => $canReviewFinancingByDg,
@@ -193,6 +192,16 @@ class ActionTrackingWebController extends Controller
             'alertLevelLabels' => app(DynamicReferentialSettings::class)->alertLevelLabels(),
             'validationStatusLabels' => app(DynamicReferentialSettings::class)->validationStatusLabels(),
             'documentAccept' => app(DocumentPolicySettings::class)->acceptAttribute(),
+            'deadlineChangeFieldLabels' => DeadlineExtensionChangeSet::labels(),
+            'deadlineResponsableOptions' => User::query()
+                ->where('is_active', true)
+                ->where('direction_id', (int) $action->pta?->direction_id)
+                ->when(
+                    $action->pta?->service_id !== null,
+                    fn ($query) => $query->where('service_id', (int) $action->pta?->service_id)
+                )
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'role']),
         ]);
     }
 
@@ -319,6 +328,15 @@ class ActionTrackingWebController extends Controller
                 ],
             ]);
             $notificationService->notifyActionSubmittedToChef($submittedAction, $user);
+        } else {
+            $savedAction = $action->fresh();
+            $this->recordAudit($request, 'action', 'save_execution_draft', $savedAction, $before, [
+                ...$savedAction->toArray(),
+                'audit_context' => [
+                    'execution_draft' => true,
+                    'proof_added' => $hasNewProof,
+                ],
+            ]);
         }
 
         return redirect()
@@ -422,6 +440,16 @@ class ActionTrackingWebController extends Controller
                 $submittedSubAction,
                 $user
             );
+        } else {
+            $savedSubAction = $sousAction->fresh();
+            $this->recordAudit($request, 'action', 'save_sub_action_execution_draft', $savedSubAction, $beforeSubAction, [
+                ...$savedSubAction->toArray(),
+                'audit_context' => [
+                    'execution_draft' => true,
+                    'parent_action_id' => (int) $action->id,
+                    'proof_added' => $hasNewProof,
+                ],
+            ]);
         }
 
         return redirect()

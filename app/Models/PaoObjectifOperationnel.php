@@ -68,4 +68,3 @@ class PaoObjectifOperationnel extends Model
         return $this->belongsTo(User::class, 'responsable_id');
     }
 }
-

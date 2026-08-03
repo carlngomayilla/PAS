@@ -5,16 +5,15 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use App\Services\Security\PasswordPolicyService;
 use Closure;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsurePasswordIsFresh
 {
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy
-    ) {
-    }
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {

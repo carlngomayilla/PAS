@@ -4,16 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\Action;
 use App\Models\Direction;
-use App\Models\JournalAudit;
+use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
-use App\Models\Pao;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
-use App\Services\NotificationPolicySettings;
 use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -22,8 +20,8 @@ use Tests\TestCase;
 
 class SuperAdminNotifPoliciesTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {

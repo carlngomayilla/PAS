@@ -3,12 +3,12 @@
     'description' => null,
 ])
 
-<section {{ $attributes->merge(['class' => 'form-section app-card p-5']) }}>
+<section {{ $attributes->merge(['class' => 'form-section app-form-section app-card']) }}>
     @if ($title)
-        <div class="mb-4">
-            <h3 class="text-base font-extrabold text-[#1c203d]">{{ $title }}</h3>
+        <div class="form-section-header app-form-section-header">
+            <h3 class="form-section-title">{{ $title }}</h3>
             @if ($description)
-                <p class="mt-1 text-sm text-[#667085]">{{ $description }}</p>
+                <p class="form-section-subtitle">{{ $description }}</p>
             @endif
         </div>
     @endif

@@ -64,7 +64,7 @@ class DeadlineExtensionQueueService
     /**
      * @return Collection<int, DeadlineExtensionRequest>
      */
-    private function actionableRequests(User $user): Collection
+    public function actionableRequests(User $user): Collection
     {
         $requests = $this->actionableCandidateQuery($user)->get();
 
@@ -89,16 +89,11 @@ class DeadlineExtensionQueueService
             ->unique(fn (array $scope): string => $scope['direction_id'].'-'.$scope['service_id'])
             ->values();
 
-        $isController = $user->hasRole(
-            User::ROLE_PLANIFICATION,
-            User::ROLE_SCIQ,
-            User::ROLE_SCIQ_SUIVI_GLOBAL,
-            User::ROLE_CHEF_UNITE_SCIQ
-        ) && ! $user->hasRole(User::ROLE_CHEF_PLANIFICATION);
-        $isFinalApprover = $user->hasRole(User::ROLE_DG, User::ROLE_CHEF_PLANIFICATION);
+        $isDirector = $user->hasRole(User::ROLE_DIRECTION) && (int) $user->direction_id > 0;
+        $isFinalApprover = $user->hasRole(User::ROLE_DG);
 
         return $this->baseQuery()
-            ->where(function (Builder $candidateQuery) use ($user, $chefScopes, $isController, $isFinalApprover): void {
+            ->where(function (Builder $candidateQuery) use ($user, $chefScopes, $isDirector, $isFinalApprover): void {
                 $candidateQuery->where(function (Builder $ownComplementQuery) use ($user): void {
                     $ownComplementQuery
                         ->where('status', DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE)
@@ -126,17 +121,18 @@ class DeadlineExtensionQueueService
                     });
                 }
 
-                if ($isController) {
-                    $candidateQuery->orWhereIn('status', [
-                        DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE,
-                        DeadlineExtensionRequest::STATUS_APPROUVEE,
-                    ]);
+                if ($isDirector) {
+                    $candidateQuery->orWhere(function (Builder $directorQuery) use ($user): void {
+                        $directorQuery
+                            ->where('status', DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION)
+                            ->whereHas('action.pta', fn (Builder $ptaQuery) => $ptaQuery->where('direction_id', (int) $user->direction_id));
+                    });
                 }
 
                 if ($isFinalApprover) {
                     $candidateQuery->orWhereIn('status', [
-                        DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
                         DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
+                        DeadlineExtensionRequest::STATUS_APPROUVEE,
                     ]);
                 }
             });
@@ -153,8 +149,7 @@ class DeadlineExtensionQueueService
             DeadlineExtensionRequest::STATUS_SOUMISE,
             DeadlineExtensionRequest::STATUS_EN_ANALYSE => $user->can('reviewDeadlineExtensionByChef', $action),
             DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE => (int) $request->requested_by === (int) $user->id,
-            DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => $user->can('reviewDeadlineExtensionByController', $action),
-            DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
+            DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => $user->can('reviewDeadlineExtensionByDirector', $action),
             DeadlineExtensionRequest::STATUS_TRANSMISE_DG => $user->can('reviewDeadlineExtensionFinal', $action),
             DeadlineExtensionRequest::STATUS_APPROUVEE => $user->can('applyDeadlineExtension', $action),
             default => false,
@@ -170,6 +165,7 @@ class DeadlineExtensionQueueService
                 'sousAction:id,action_id,libelle',
                 'requestedBy:id,name,role',
                 'chefReviewedBy:id,name',
+                'directorReviewedBy:id,name',
                 'sciqReviewedBy:id,name',
                 'finalDecidedBy:id,name',
                 'appliedBy:id,name',

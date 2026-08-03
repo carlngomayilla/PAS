@@ -17,12 +17,7 @@
         $alertLevelLabels = is_array($alertLevelLabels ?? null) ? $alertLevelLabels : [];
         $validationLabel = $validationStatusLabels[$validationStatus] ?? $validationStatusLabel($validationStatus);
         $currentUser = auth()->user();
-        $isSubActionOnlyDeadlineRequester = $currentUser instanceof \App\Models\User
-            && $currentUser->isAgent()
-            && ! $action->isResponsible($currentUser);
-        $deadlineRequestTargets = $isSubActionOnlyDeadlineRequester
-            ? $action->sousActions->filter(fn ($subAction): bool => (int) $subAction->agent_id === (int) $currentUser->id)
-            : $action->sousActions;
+        $deadlineRequestTargets = $action->sousActions;
         $isExecutorAgent = $currentUser instanceof \App\Models\User
             && $currentUser->isAgent()
             && (
@@ -118,6 +113,7 @@
             \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE,
             \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE,
             \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE,
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION,
             \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE,
             \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
             \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
@@ -129,17 +125,19 @@
             \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE => 'Soumise',
             \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE => 'En analyse',
             \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE => 'Complement demande',
-            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'Transmise au controleur',
-            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'Validation finale attendue',
-            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'Transmise DG',
-            \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE => 'Approuvee - application controleur attendue',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => 'Accord directeur attendu',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'Migration vers la direction',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'Migration vers la direction',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'Accord final DG attendu',
+            \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE => 'Ancienne décision à appliquer par la DG',
             \App\Models\DeadlineExtensionRequest::STATUS_REJETEE => 'Rejetee',
-            \App\Models\DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE => 'Mise a jour appliquee',
+            \App\Models\DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE => 'Modifications appliquées',
         ];
         $deadlineExtensionStatusStyles = [
             \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE => 'anbg-badge anbg-badge-info',
             \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE => 'anbg-badge anbg-badge-info',
             \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE => 'anbg-badge anbg-badge-warning',
+            \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => 'anbg-badge anbg-badge-warning',
             \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => 'anbg-badge anbg-badge-warning',
             \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => 'anbg-badge anbg-badge-warning',
             \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG => 'anbg-badge anbg-badge-warning',
@@ -958,13 +956,13 @@
         aria-labelledby="action-echeances-tab"
         tabindex="0"
         data-action-tab-panel
-        data-has-errors="{{ $errors->hasAny(['sous_action_id', 'requested_deadline', 'motif', 'justification', 'piece_justificative', 'approved_deadline']) ? 'true' : 'false' }}"
+        data-has-errors="{{ $errors->hasAny(['sous_action_id', 'change_fields', 'requested_deadline', 'requested_libelle', 'requested_responsable_ids', 'requested_date_debut', 'motif', 'justification', 'piece_justificative']) ? 'true' : 'false' }}"
         hidden
     >
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="showcase-panel-title">Reports d'echeance</h2>
-                <p class="text-sm text-slate-500">Demande avec pièce justificative, avis du chef, contrôle SCIQ / Planification, décision DG ou Chef Planification, puis application par un contrôleur.</p>
+                <h2 class="showcase-panel-title">Demandes de modification</h2>
+                <p class="text-sm text-slate-500">Le RMO choisit les paramètres. Circuit obligatoire : Chef de service, Directeur, puis accord final DG et application automatique.</p>
             </div>
             @if ($activeDeadlineExtensionRequest)
                 <span class="{{ $deadlineExtensionStatusStyles[$activeDeadlineExtensionRequest->status] ?? 'anbg-badge anbg-badge-neutral' }}">
@@ -979,23 +977,14 @@
                 @if (($canRequestDeadlineExtension ?? false) && ! $activeDeadlineExtensionRequest)
                     <form class="mt-3 space-y-3" method="POST" action="{{ route('workspace.actions.deadline-extension.store', $action) }}" enctype="multipart/form-data">
                         @csrf
-                        @if ($deadlineRequestTargets->isNotEmpty())
-                            <div>
-                                <label for="deadline_sous_action_id">Élément concerné</label>
-                                <select id="deadline_sous_action_id" name="sous_action_id" @required($isSubActionOnlyDeadlineRequester)>
-                                    @unless ($isSubActionOnlyDeadlineRequester)
-                                        <option value="">Action principale</option>
-                                    @endunless
-                                    @foreach ($deadlineRequestTargets as $sousAction)
-                                        <option value="{{ $sousAction->id }}" @selected((string) old('sous_action_id', request('report_sous_action_id')) === (string) $sousAction->id)>{{ $sousAction->libelle }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @endif
-                        <div>
-                            <label for="requested_deadline">Nouvelle echeance demandee</label>
-                            <input id="requested_deadline" name="requested_deadline" type="date" value="{{ old('requested_deadline') }}" required>
-                        </div>
+                        <x-deadline-change-fields
+                            prefix="new_deadline_change"
+                            :action="$action"
+                            :sub-actions="$deadlineRequestTargets"
+                            :selected-sub-action-id="request('report_sous_action_id')"
+                            :responsable-options="$deadlineResponsableOptions"
+                            :show-target="true"
+                        />
                         <div>
                             <label for="deadline_motif">Motif</label>
                             <input id="deadline_motif" name="motif" type="text" value="{{ old('motif') }}" maxlength="255" required>
@@ -1008,7 +997,7 @@
                             <label for="piece_justificative">Piece justificative</label>
                             <input id="piece_justificative" name="piece_justificative" type="file" accept="{{ $documentAccept ?? '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg' }}" required>
                         </div>
-                        <button class="btn btn-primary" type="submit">Soumettre le report</button>
+                        <button class="btn btn-primary" type="submit">Soumettre la demande</button>
                     </form>
                 @elseif ($activeDeadlineExtensionRequest)
                     <p class="mt-3 text-sm text-slate-600">Une demande est deja en cours pour cette action ou l'une de ses sous-actions.</p>
@@ -1029,27 +1018,25 @@
                                     \App\Models\DeadlineExtensionRequest::STATUS_SOUMISE,
                                     \App\Models\DeadlineExtensionRequest::STATUS_EN_ANALYSE,
                                 ], true);
-                            $canControllerReviewThisRequest = ($canReviewDeadlineExtensionByController ?? false)
-                                && (string) $deadlineRequest->status === \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE;
+                            $canDirectorReviewThisRequest = ($canReviewDeadlineExtensionByDirector ?? false)
+                                && (string) $deadlineRequest->status === \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION;
                             $canFinalReviewThisRequest = ($canReviewDeadlineExtensionFinal ?? false)
-                                && in_array((string) $deadlineRequest->status, [
-                                    \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
-                                    \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
-                                ], true);
+                                && (string) $deadlineRequest->status === \App\Models\DeadlineExtensionRequest::STATUS_TRANSMISE_DG;
                             $canApplyThisRequest = ($canApplyDeadlineExtension ?? false)
                                 && (string) $deadlineRequest->status === \App\Models\DeadlineExtensionRequest::STATUS_APPROUVEE;
                             $canResubmitThisRequest = $currentUser instanceof \App\Models\User
                                 && (int) $deadlineRequest->requested_by === (int) $currentUser->id
                                 && (string) $deadlineRequest->status === \App\Models\DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE;
                             $deadlineMetadata = is_array($deadlineRequest->metadata) ? $deadlineRequest->metadata : [];
+                            $deadlineRequestedChanges = is_array($deadlineRequest->requested_changes) ? $deadlineRequest->requested_changes : [];
                             $revisionCount = (int) ($deadlineMetadata['revision_count'] ?? 0);
                             $revisionHistory = is_array($deadlineMetadata['revision_history'] ?? null)
                                 ? $deadlineMetadata['revision_history']
                                 : [];
                             $complementComment = $deadlineRequest->final_decision === \App\Models\DeadlineExtensionRequest::DECISION_COMPLEMENT
                                 ? $deadlineRequest->final_comment
-                                : ($deadlineRequest->sciq_avis === \App\Models\DeadlineExtensionRequest::AVIS_COMPLEMENT
-                                    ? $deadlineRequest->sciq_comment
+                                : ($deadlineRequest->director_decision === \App\Models\DeadlineExtensionRequest::AVIS_COMPLEMENT
+                                    ? $deadlineRequest->director_comment
                                     : $deadlineRequest->chef_comment);
                         @endphp
                         <div class="rounded border border-slate-200 p-3">
@@ -1065,6 +1052,14 @@
                                 <span class="{{ $statusStyle }}">{{ $statusLabel }}</span>
                             </div>
                             <p class="mt-2 text-sm text-slate-600">{{ $deadlineRequest->motif }}</p>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                @forelse (array_keys($deadlineRequestedChanges) as $changeField)
+                                    <span class="anbg-badge anbg-badge-neutral">{{ $deadlineChangeFieldLabels[$changeField] ?? $changeField }}</span>
+                                @empty
+                                    <span class="anbg-badge anbg-badge-neutral">Échéance · ancien dossier</span>
+                                @endforelse
+                            </div>
+                            <a class="btn btn-secondary btn-sm mt-3" href="{{ route('workspace.deadline-extension.show', $deadlineRequest) }}">Ouvrir le dossier</a>
                             <dl class="action-fiche-dl mt-2">
                                 <dt>Demandeur</dt><dd>{{ $deadlineRequest->requestedBy?->name ?? '-' }}</dd>
                                 <dt>Pièce justificative</dt><dd><a class="font-semibold text-[#1e5fa8]" href="{{ route('workspace.deadline-extension.attachment', $deadlineRequest) }}">{{ $deadlineRequest->attachment_name ?: 'Télécharger' }}</a></dd>
@@ -1080,10 +1075,10 @@
                                 @endif
                                 <dt>Révisions</dt><dd>{{ $revisionCount }}</dd>
                                 <dt>Avis chef</dt><dd>{{ $deadlineRequest->chef_avis ?: '-' }}{{ $deadlineRequest->chefReviewedBy ? ' · '.$deadlineRequest->chefReviewedBy->name : '' }}</dd>
-                                <dt>Avis contrôle</dt><dd>{{ $deadlineRequest->sciq_avis ?: '-' }}{{ $deadlineRequest->sciqReviewedBy ? ' · '.$deadlineRequest->sciqReviewedBy->name : '' }}</dd>
-                                <dt>Décision finale</dt><dd>{{ $deadlineRequest->final_decision ?: $deadlineRequest->dg_decision ?: '-' }}{{ $deadlineRequest->finalDecidedBy ? ' · '.$deadlineRequest->finalDecidedBy->name : '' }}</dd>
+                                <dt>Accord directeur</dt><dd>{{ $deadlineRequest->director_decision ?: '-' }}{{ $deadlineRequest->directorReviewedBy ? ' · '.$deadlineRequest->directorReviewedBy->name : '' }}</dd>
+                                <dt>Accord final DG</dt><dd>{{ $deadlineRequest->final_decision ?: $deadlineRequest->dg_decision ?: '-' }}{{ $deadlineRequest->finalDecidedBy ? ' · '.$deadlineRequest->finalDecidedBy->name : '' }}</dd>
                                 <dt>Echeance approuvee</dt><dd>{{ optional($deadlineRequest->approved_deadline)->format('d/m/Y') ?: '-' }}</dd>
-                                <dt>Appliquée par</dt><dd>{{ $deadlineRequest->appliedBy?->name ?? '-' }}</dd>
+                                <dt>Application</dt><dd>{{ $deadlineRequest->appliedBy?->name ?? '-' }}{{ $deadlineRequest->applied_at ? ' · '.$deadlineRequest->applied_at->format('d/m/Y H:i') : '' }}</dd>
                             </dl>
 
                             @if ($canResubmitThisRequest)
@@ -1093,10 +1088,13 @@
                                         <p class="text-sm font-semibold text-amber-950">Complément demandé</p>
                                         <p class="mt-1 text-sm text-amber-900">{{ $complementComment ?: 'Veuillez compléter le dossier et joindre une nouvelle pièce justificative.' }}</p>
                                     </div>
-                                    <div>
-                                        <label for="resubmit_deadline_{{ $deadlineRequest->id }}">Nouvelle échéance demandée</label>
-                                        <input id="resubmit_deadline_{{ $deadlineRequest->id }}" name="requested_deadline" type="date" value="{{ old('requested_deadline', optional($deadlineRequest->requested_deadline)->format('Y-m-d')) }}" required>
-                                    </div>
+                                    <x-deadline-change-fields
+                                        prefix="resubmit_{{ $deadlineRequest->id }}"
+                                        :action="$action"
+                                        :selected-sub-action-id="$deadlineRequest->sous_action_id"
+                                        :changes="$deadlineRequestedChanges"
+                                        :responsable-options="$deadlineResponsableOptions"
+                                    />
                                     <div>
                                         <label for="resubmit_motif_{{ $deadlineRequest->id }}">Motif actualisé</label>
                                         <input id="resubmit_motif_{{ $deadlineRequest->id }}" name="motif" type="text" value="{{ old('motif', $deadlineRequest->motif) }}" maxlength="255" required>
@@ -1127,41 +1125,39 @@
                                 </form>
                             @endif
 
-                            @if ($canControllerReviewThisRequest)
-                                <form class="mt-3 space-y-2 rounded-md border border-blue-200 bg-blue-50/50 p-3" method="POST" action="{{ route('workspace.deadline-extension.controller', $deadlineRequest) }}">
+                            @if ($canDirectorReviewThisRequest)
+                                <form class="mt-3 space-y-2 rounded-md border border-blue-200 bg-blue-50/50 p-3" method="POST" action="{{ route('workspace.deadline-extension.direction', $deadlineRequest) }}">
                                     @csrf
-                                    <label for="deadline_controller_decision_{{ $deadlineRequest->id }}">Avis du contrôleur</label>
+                                    <label for="deadline_controller_decision_{{ $deadlineRequest->id }}">Décision du directeur</label>
                                     <select id="deadline_controller_decision_{{ $deadlineRequest->id }}" name="decision" required>
                                         <option value="{{ \App\Models\DeadlineExtensionRequest::AVIS_FAVORABLE }}">Avis favorable</option>
                                         <option value="{{ \App\Models\DeadlineExtensionRequest::AVIS_DEFAVORABLE }}">Avis défavorable</option>
                                         <option value="{{ \App\Models\DeadlineExtensionRequest::AVIS_COMPLEMENT }}">Demander un complément</option>
                                     </select>
                                     <textarea name="comment" rows="2" placeholder="Commentaire"></textarea>
-                                    <button class="btn btn-secondary" type="submit">Transmettre à la validation finale</button>
+                                    <button class="btn btn-secondary" type="submit">Transmettre à la DG</button>
                                 </form>
                             @endif
 
                             @if ($canFinalReviewThisRequest)
                                 <form class="mt-3 space-y-2 rounded-md border border-amber-200 bg-amber-50/50 p-3" method="POST" action="{{ route('workspace.deadline-extension.final', $deadlineRequest) }}">
                                     @csrf
-                                    <label for="deadline_final_decision_{{ $deadlineRequest->id }}">Décision finale DG / Chef Planification</label>
+                                    <label for="deadline_final_decision_{{ $deadlineRequest->id }}">Décision finale DG</label>
                                     <select id="deadline_final_decision_{{ $deadlineRequest->id }}" name="decision" required>
                                         <option value="{{ \App\Models\DeadlineExtensionRequest::DECISION_APPROUVER }}">Approuver</option>
                                         <option value="{{ \App\Models\DeadlineExtensionRequest::DECISION_REJETER }}">Rejeter</option>
                                         <option value="{{ \App\Models\DeadlineExtensionRequest::DECISION_COMPLEMENT }}">Demander complement</option>
                                     </select>
-                                    <label for="approved_deadline_{{ $deadlineRequest->id }}">Echeance approuvee</label>
-                                    <input id="approved_deadline_{{ $deadlineRequest->id }}" name="approved_deadline" type="date" value="{{ optional($deadlineRequest->requested_deadline)->format('Y-m-d') }}">
                                     <textarea name="comment" rows="2" placeholder="Commentaire"></textarea>
-                                    <button class="btn btn-primary" type="submit">Enregistrer la décision finale</button>
+                                    <button class="btn btn-primary" type="submit">Décider et appliquer</button>
                                 </form>
                             @endif
 
                             @if ($canApplyThisRequest)
                                 <form class="mt-3 space-y-2 rounded-md border border-emerald-200 bg-emerald-50/50 p-3" method="POST" action="{{ route('workspace.deadline-extension.apply', $deadlineRequest) }}">
                                     @csrf
-                                    <p class="text-sm font-semibold text-emerald-900">La date {{ optional($deadlineRequest->approved_deadline)->format('d/m/Y') }} a été approuvée. Elle n’est pas encore appliquée.</p>
-                                    <button class="btn btn-primary" type="submit">Appliquer la date approuvée</button>
+                                    <p class="text-sm font-semibold text-emerald-900">Ancienne décision approuvée en attente d’application par la DG.</p>
+                                    <button class="btn btn-primary" type="submit">Appliquer la modification</button>
                                 </form>
                             @endif
                         </div>

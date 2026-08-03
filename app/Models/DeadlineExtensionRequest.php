@@ -18,6 +18,8 @@ class DeadlineExtensionRequest extends Model
 
     public const STATUS_TRANSMISE_CONTROLE = 'transmise_controle';
 
+    public const STATUS_TRANSMISE_DIRECTION = 'transmise_direction';
+
     public const STATUS_TRANSMISE_VALIDATION_FINALE = 'transmise_validation_finale';
 
     public const STATUS_TRANSMISE_DG = 'transmise_dg';
@@ -49,6 +51,9 @@ class DeadlineExtensionRequest extends Model
         'target_type',
         'old_deadline',
         'requested_deadline',
+        'requested_changes',
+        'original_values',
+        'applied_values',
         'approved_deadline',
         'requested_by',
         'motif',
@@ -63,6 +68,10 @@ class DeadlineExtensionRequest extends Model
         'chef_comment',
         'chef_reviewed_by',
         'chef_reviewed_at',
+        'director_decision',
+        'director_comment',
+        'director_reviewed_by',
+        'director_reviewed_at',
         'sciq_avis',
         'sciq_comment',
         'sciq_reviewed_by',
@@ -90,8 +99,12 @@ class DeadlineExtensionRequest extends Model
             'old_deadline' => 'date',
             'requested_deadline' => 'date',
             'approved_deadline' => 'date',
+            'requested_changes' => 'array',
+            'original_values' => 'array',
+            'applied_values' => 'array',
             'is_critical' => 'boolean',
             'chef_reviewed_at' => 'datetime',
+            'director_reviewed_at' => 'datetime',
             'sciq_reviewed_at' => 'datetime',
             'final_decided_at' => 'datetime',
             'dg_decided_at' => 'datetime',
@@ -123,6 +136,11 @@ class DeadlineExtensionRequest extends Model
     public function chefReviewedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'chef_reviewed_by');
+    }
+
+    public function directorReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'director_reviewed_by');
     }
 
     public function finalDecidedBy(): BelongsTo

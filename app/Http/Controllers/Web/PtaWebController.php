@@ -143,6 +143,7 @@ class PtaWebController extends Controller
             'serviceOptions' => $this->serviceOptions($user),
             'statusOptions' => $this->statusOptions($user),
             'canWrite' => $this->canWrite($user),
+            'canControlPta' => $this->canControlPta($user),
             'filters' => [
                 'q' => (string) $request->string('q'),
                 'pao_id' => $request->filled('pao_id') ? (int) $request->integer('pao_id') : null,
@@ -686,14 +687,16 @@ class PtaWebController extends Controller
         return 'Donnees invalides.';
     }
 
-    public function close(Request $request, Pta $pta, PlanningClosureReportService $closureReportService): RedirectResponse
-    {
+    public function close(
+        Request $request,
+        Pta $pta,
+        PlanningClosureReportService $closureReportService,
+        WorkspaceNotificationService $notificationService
+    ): RedirectResponse {
         $user = $request->user();
         if (! $user instanceof User) {
             abort(401);
         }
-
-        $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
 
         $currentStatus = (string) $pta->statut;
         if ($currentStatus === Pta::STATUS_ARCHIVE) {
@@ -706,6 +709,18 @@ class PtaWebController extends Controller
 
         if (! in_array($currentStatus, [Pta::STATUS_EN_COURS, Pta::STATUS_CONTROLE_SCIQ], true)) {
             return back()->withErrors(['general' => 'Ce PTA ne peut pas etre transmis dans le circuit de controle.']);
+        }
+
+        if ($currentStatus === Pta::STATUS_CONTROLE_SCIQ) {
+            if (! $this->canControlPta($user)) {
+                abort(403, 'La cloture finale est reservee au controle SCIQ/Planification.');
+            }
+
+            if ((int) ($pta->valide_par ?? 0) === (int) $user->id) {
+                abort(409, 'Le meme utilisateur ne peut pas transmettre puis cloturer ce PTA.');
+            }
+        } else {
+            $this->denyUnlessManagePta($user, (int) $pta->direction_id, (int) $pta->service_id);
         }
 
         $validated = $request->validate([
@@ -744,10 +759,22 @@ class PtaWebController extends Controller
             'closure_report' => $report,
             'forced_with_anomalies' => $forceClose,
         ]);
+        $notificationService->notifyPtaStatus(
+            $pta,
+            $targetStatus === Pta::STATUS_CONTROLE_SCIQ ? 'submitted' : 'approved',
+            $user
+        );
 
         return redirect()
             ->route('workspace.pta.index')
             ->with('success', $successMessage);
+    }
+
+    private function canControlPta(User $user): bool
+    {
+        return app(PlanningModificationLockService::class)->canGivePlanifAvis($user)
+            || $user->isSuperAdmin()
+            || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
     }
 
     public function archive(Request $request, Pta $pta): RedirectResponse

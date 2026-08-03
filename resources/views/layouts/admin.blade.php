@@ -61,6 +61,7 @@
 @php
     $routeName = request()->route()?->getName() ?? '';
     $layoutUser = auth()->user();
+    $headerActivePeriodLabel = app(\App\Services\ExerciceContext::class)->activeLabel();
     $headerNotifications = collect();
     $headerUnreadCount = 0;
     $headerNotificationUnreadCount = 0;
@@ -121,13 +122,21 @@
                 'header-validation-badge:'.$dashboardVersion.':'.(int) $layoutUser->id,
                 now()->addSeconds(120),
                 function () use ($layoutUser): int {
+                    $isFinalControlUser = app(\App\Services\PlanningModificationLockService::class)->canGivePlanifAvis($layoutUser)
+                        || $layoutUser->isSuperAdmin()
+                        || $layoutUser->hasRole(\App\Models\User::ROLE_ADMIN_FONCTIONNEL);
                     $isGlobalReader = $layoutUser->hasGlobalReadAccess()
                         || $layoutUser->hasRole(\App\Models\User::ROLE_SUPER_ADMIN)
                         || $layoutUser->hasRole(\App\Models\User::ROLE_DG)
                         || $layoutUser->hasRole(\App\Models\User::ROLE_PLANIFICATION)
                         || $layoutUser->hasRole(\App\Models\User::ROLE_CABINET);
                     $pendingQ = \App\Models\Action::query()
-                        ->where('statut_validation', \App\Services\Actions\ActionTrackingService::VALIDATION_SOUMISE_CHEF);
+                        ->whereIn('statut_validation', $isFinalControlUser
+                            ? [
+                                \App\Services\Actions\ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                                \App\Services\Actions\ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                            ]
+                            : [\App\Services\Actions\ActionTrackingService::VALIDATION_SOUMISE_CHEF]);
                     if (! $isGlobalReader) {
                         if ($layoutUser->hasRole(\App\Models\User::ROLE_DIRECTION) && $layoutUser->direction_id) {
                             $pendingQ->whereHas('pta', fn ($q) => $q->where('direction_id', $layoutUser->direction_id));
@@ -163,6 +172,10 @@
         $openTasksCount = (int) app(\App\Services\PersonalTaskService::class)->openTaskCount($layoutUser);
         if ($openTasksCount > 0) {
             $headerSidebarBadges['mes_taches'] = $openTasksCount;
+        }
+        $controlTasksCount = (int) app(\App\Services\PersonalTaskService::class)->controlTaskCount($layoutUser);
+        if ($controlTasksCount > 0) {
+            $headerSidebarBadges['controle'] = $controlTasksCount;
         }
 
         if (\App\Support\SchemaIntrospectionCache::hasTable('deadline_extension_requests')) {
@@ -298,6 +311,14 @@
                                     <span class="max-w-[180px] truncate">{{ $navbarScopeLabel }}</span>
                                 </span>
                             @endif
+
+                            <span
+                                class="admin-navbar-period-chip hidden lg:inline-flex shrink-0 items-center gap-1.5 border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-800"
+                                title="Période active : {{ $headerActivePeriodLabel }}"
+                            >
+                                <span aria-hidden="true">◷</span>
+                                {{ $headerActivePeriodLabel }}
+                            </span>
 
                             <div class="admin-local-clock" id="admin-local-clock" aria-label="Heure locale">
                                 --:--:--

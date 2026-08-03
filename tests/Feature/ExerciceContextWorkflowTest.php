@@ -11,8 +11,8 @@ use Tests\TestCase;
 
 class ExerciceContextWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     public function test_super_admin_manages_exercises_and_active_year_controls_default_context(): void
     {

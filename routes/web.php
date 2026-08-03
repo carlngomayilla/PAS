@@ -22,6 +22,7 @@ use App\Http\Controllers\Web\DependentSelectController;
 use App\Http\Controllers\Web\FinancialMonitoringWebController;
 use App\Http\Controllers\Web\GlobalSearchWebController;
 use App\Http\Controllers\Web\GovernanceWebController;
+use App\Http\Controllers\Web\InstitutionalReportWebController;
 use App\Http\Controllers\Web\KpiMesureWebController;
 use App\Http\Controllers\Web\KpiWebController;
 use App\Http\Controllers\Web\MonitoringWebController;
@@ -136,6 +137,31 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.notifications.read_all');
         Route::get('/workspace/mes-taches', [PersonalTaskWebController::class, 'index'])
             ->name('workspace.tasks.index');
+
+        Route::get('/workspace/rapports', [InstitutionalReportWebController::class, 'index'])
+            ->name('workspace.reports.index');
+        Route::post('/workspace/rapports', [InstitutionalReportWebController::class, 'store'])
+            ->name('workspace.reports.store');
+        Route::get('/workspace/rapports/export/{format}', [InstitutionalReportWebController::class, 'export'])
+            ->name('workspace.reports.export');
+        Route::get('/workspace/rapports/{institutionalReport}', [InstitutionalReportWebController::class, 'show'])
+            ->name('workspace.reports.show');
+        Route::post('/workspace/rapports/{institutionalReport}/soumettre', [InstitutionalReportWebController::class, 'submit'])
+            ->name('workspace.reports.submit');
+        Route::post('/workspace/rapports/{institutionalReport}/corriger', [InstitutionalReportWebController::class, 'resubmit'])
+            ->name('workspace.reports.resubmit');
+        Route::post('/workspace/rapports/{institutionalReport}/reporter', [InstitutionalReportWebController::class, 'postpone'])
+            ->name('workspace.reports.postpone');
+        Route::post('/workspace/rapports/{institutionalReport}/annuler', [InstitutionalReportWebController::class, 'cancel'])
+            ->name('workspace.reports.cancel');
+        Route::post('/workspace/rapports/{institutionalReport}/decisions', [InstitutionalReportWebController::class, 'storeDecision'])
+            ->name('workspace.reports.decisions.store');
+        Route::patch('/workspace/rapports/{institutionalReport}/decisions/{decision}', [InstitutionalReportWebController::class, 'updateDecision'])
+            ->name('workspace.reports.decisions.update');
+        Route::post('/workspace/rapports/{institutionalReport}/verification', [InstitutionalReportWebController::class, 'review'])
+            ->name('workspace.reports.review');
+        Route::get('/workspace/rapports/{institutionalReport}/pieces/{justificatif}/telecharger', [InstitutionalReportWebController::class, 'download'])
+            ->name('workspace.reports.attachments.download');
 
         // ── RÉFÉRENTIEL (Directions, Services, Utilisateurs) ──────────────────────
         // Gestion des structures organisationnelles accessibles aux administrateurs.
@@ -457,16 +483,12 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('deadline-extension.resubmit');
             Route::post('reports-echeance/{deadlineExtensionRequest}/chef', [DeadlineExtensionWebController::class, 'reviewByChef'])
                 ->name('deadline-extension.chef');
-            Route::post('reports-echeance/{deadlineExtensionRequest}/controle', [DeadlineExtensionWebController::class, 'reviewByController'])
-                ->name('deadline-extension.controller');
+            Route::post('reports-echeance/{deadlineExtensionRequest}/direction', [DeadlineExtensionWebController::class, 'reviewByDirector'])
+                ->name('deadline-extension.direction');
             Route::post('reports-echeance/{deadlineExtensionRequest}/final', [DeadlineExtensionWebController::class, 'reviewFinal'])
                 ->name('deadline-extension.final');
             Route::post('reports-echeance/{deadlineExtensionRequest}/appliquer', [DeadlineExtensionWebController::class, 'apply'])
                 ->name('deadline-extension.apply');
-            Route::post('reports-echeance/{deadlineExtensionRequest}/sciq', [DeadlineExtensionWebController::class, 'reviewByController'])
-                ->name('deadline-extension.sciq');
-            Route::post('reports-echeance/{deadlineExtensionRequest}/dg', [DeadlineExtensionWebController::class, 'reviewFinal'])
-                ->name('deadline-extension.dg');
             Route::any('actions/{action}/semaines/{week}/soumettre', static function () {
                 abort(410, 'Le suivi hebdomadaire a ete supprime du circuit metier.');
             })->name('actions.weeks.submit');

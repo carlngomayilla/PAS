@@ -293,6 +293,7 @@ class RolePermissionSettings
                 'referentiel.read',
                 'referentiel.write',
                 'delegations.manage',
+                'audit.read',
             ],
             User::ROLE_DIRECTION => [
                 'planning.read',
@@ -407,6 +408,7 @@ class RolePermissionSettings
                 'referentiel.read',
                 'referentiel.write',
                 'delegations.manage',
+                'audit.read',
             ],
 
             // Chef planification : meme niveau de droits que Chef d'unite SCIQ.
@@ -427,6 +429,7 @@ class RolePermissionSettings
                 'referentiel.read',
                 'users.manage',
                 'users.manage_roles',
+                'audit.read',
             ],
 
             // Chef d'unite SCIQ : controle principal global + suivi strategique
@@ -445,6 +448,7 @@ class RolePermissionSettings
                 'referentiel.read',
                 'users.manage',
                 'users.manage_roles',
+                'audit.read',
             ],
 
             // DGA — supervision vue globale (lecture). A06 : retire le pilotage
@@ -619,6 +623,7 @@ class RolePermissionSettings
             'referentiel.read',
             'users.manage',
             'users.manage_roles',
+            'audit.read',
         ];
     }
 
@@ -683,6 +688,21 @@ class RolePermissionSettings
      */
     private function enforceServiceOrUnitChiefBoundary(string $role, array $permissions): array
     {
+        $baseRole = $this->roleRegistry->baseRole($role);
+        if (in_array($role, [
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_CHEF_PLANIFICATION,
+        ], true) || in_array($baseRole, [
+            User::ROLE_SCIQ,
+            User::ROLE_SCIQ_SUIVI_GLOBAL,
+            User::ROLE_CHEF_UNITE_SCIQ,
+            User::ROLE_CHEF_PLANIFICATION,
+        ], true)) {
+            $permissions = array_values(array_unique([...$permissions, 'audit.read']));
+        }
+
         $blocked = $this->lockedPermissionsForRole($role);
 
         if ($blocked === []) {

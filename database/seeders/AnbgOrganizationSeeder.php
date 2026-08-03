@@ -241,7 +241,7 @@ class AnbgOrganizationSeeder extends Seeder
     private function loadUsersFromWorkbook(): array
     {
         $path = $this->workbookPath();
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
 
         if ($zip->open($path) !== true) {
             throw new RuntimeException(sprintf('Impossible d ouvrir le classeur utilisateurs: %s', $path));
@@ -269,7 +269,7 @@ class AnbgOrganizationSeeder extends Seeder
     }
 
     /**
-     * @param array<int, string> $sharedStrings
+     * @param  array<int, string>  $sharedStrings
      * @return array<int, array<string, mixed>>
      */
     private function loadUsersFromBaseImportSheet(ZipArchive $zip, string $sheetPath, array $sharedStrings, string $path): array
@@ -324,7 +324,7 @@ class AnbgOrganizationSeeder extends Seeder
     }
 
     /**
-     * @param array<int, string> $sharedStrings
+     * @param  array<int, string>  $sharedStrings
      * @return array<int, array<string, mixed>>
      */
     private function loadUsersFromNewUsersSheet(ZipArchive $zip, string $sheetPath, array $sharedStrings, string $path): array
@@ -475,7 +475,7 @@ class AnbgOrganizationSeeder extends Seeder
     }
 
     /**
-     * @param array<int, string> $sharedStrings
+     * @param  array<int, string>  $sharedStrings
      * @return array<int, string>
      */
     private function readRowCells(SimpleXMLElement $row, array $sharedStrings): array
@@ -497,6 +497,7 @@ class AnbgOrganizationSeeder extends Seeder
                     $inlineText .= (string) $textPart;
                 }
                 $cells[$column] = trim($inlineText);
+
                 continue;
             }
 
@@ -520,7 +521,7 @@ class AnbgOrganizationSeeder extends Seeder
     }
 
     /**
-     * @param array<int, string> $cells
+     * @param  array<int, string>  $cells
      */
     private function cell(array $cells, int $column): string
     {
@@ -560,8 +561,7 @@ class AnbgOrganizationSeeder extends Seeder
         ?string $directionCode = null,
         ?string $fonction = null,
         ?string $directionLabel = null
-    ): string
-    {
+    ): string {
         $role = $this->normalizeWorkbookToken($roleSlug);
         $function = $this->normalizeWorkbookToken((string) $fonction);
         $direction = $this->normalizeWorkbookToken((string) $directionLabel);
@@ -622,7 +622,7 @@ class AnbgOrganizationSeeder extends Seeder
     }
 
     /**
-     * @param array<string, mixed> $service
+     * @param  array<string, mixed>  $service
      * @return array<string, mixed>
      */
     protected function servicePayload(array $service, mixed $now): array
@@ -651,7 +651,7 @@ class AnbgOrganizationSeeder extends Seeder
     }
 
     /**
-     * @param array<string, mixed> $user
+     * @param  array<string, mixed>  $user
      * @return array<string, mixed>
      */
     protected function normalizeUserOrganization(array $user): array
@@ -705,7 +705,6 @@ class AnbgOrganizationSeeder extends Seeder
     {
         $this->deactivateLegacyOrganizationEntries($now);
 
-        return;
     }
 
     protected function deactivateLegacyOrganizationEntries(mixed $now): void
@@ -747,7 +746,7 @@ class AnbgOrganizationSeeder extends Seeder
     }
 
     /**
-     * @param array<string, mixed> $user
+     * @param  array<string, mixed>  $user
      */
     protected function resolveMatricule(array $user, int $sequence): string
     {

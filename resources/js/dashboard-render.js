@@ -1,6 +1,7 @@
 import { loadPlotly } from './plotly-loader';
 
 let dashboardBooted = false;
+let dashboardDetailTrigger = null;
 
 function decodeDashboardPayload(encoded) {
   try {
@@ -22,6 +23,9 @@ function closeDashboardRowModal(modal) {
   modal.classList.add('hidden');
   modal.classList.remove('flex');
   modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('dashboard-detail-open');
+  dashboardDetailTrigger?.focus({ preventScroll: true });
+  dashboardDetailTrigger = null;
 }
 
 function bindDashboardRowDetails() {
@@ -74,6 +78,9 @@ function bindDashboardRowDetails() {
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       modal.setAttribute('aria-hidden', 'false');
+      dashboardDetailTrigger = button;
+      document.body.classList.add('dashboard-detail-open');
+      modal.querySelector('[data-dashboard-row-detail-close]')?.focus({ preventScroll: true });
     });
   });
 
@@ -90,6 +97,12 @@ function bindDashboardRowDetails() {
     modal.dataset.dashboardRowDetailBackdropBound = '1';
     modal.addEventListener('click', (event) => {
       if (event.target === modal) {
+        closeDashboardRowModal(modal);
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
         closeDashboardRowModal(modal);
       }
     });
@@ -110,25 +123,47 @@ function bindDashboardTableExports() {
         return;
       }
 
-      const table = sourceTable.cloneNode(true);
-      table.querySelectorAll('.dashboard-no-export').forEach((node) => node.remove());
+      const loaderToken = window.AnBGLoader?.start({
+        operation: 'export',
+        message: 'Génération du fichier Excel…',
+      });
+      try {
+        const table = sourceTable.cloneNode(true);
+        table.querySelectorAll('.dashboard-no-export').forEach((node) => node.remove());
+        table.querySelectorAll('tbody tr[data-table-filter-match="false"], tbody tr[data-table-generated-row]').forEach((node) => node.remove());
+        table.querySelectorAll('tbody tr[data-table-filter-match="true"]').forEach((row) => {
+          row.hidden = false;
+          row.removeAttribute('hidden');
+        });
 
-      const html = [
-        '<html>',
-        '<head><meta charset="utf-8"></head>',
-        `<body>${table.outerHTML}</body>`,
-        '</html>',
-      ].join('');
-      const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${button.dataset.dashboardExportName || 'tableau'}.xls`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+        const html = [
+          '<html>',
+          '<head><meta charset="utf-8"></head>',
+          `<body>${table.outerHTML}</body>`,
+          '</html>',
+        ].join('');
+        const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${button.dataset.dashboardExportName || 'tableau'}.xls`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } finally {
+        window.setTimeout(() => window.AnBGLoader?.finish(loaderToken), 120);
+      }
     });
+  });
+
+  document.querySelectorAll('[data-dashboard-print]').forEach((button) => {
+    if (button.dataset.dashboardPrintBound === '1') {
+      return;
+    }
+
+    button.dataset.dashboardPrintBound = '1';
+    button.addEventListener('click', () => window.print());
   });
 }
 
@@ -3424,7 +3459,9 @@ function bootDashboardRender(force = false) {
 
     const ptaQuarterly = reportingCharts.pta_quarterly || {};
     const ptaAxisRates = ptaQuarterly.axis_rates || { labels: [], values: [], urls: [] };
+    const ptaServiceRates = ptaQuarterly.service_rates || { labels: [], values: [], urls: [] };
     const ptaMonthlyRates = ptaQuarterly.monthly_rates || { labels: [], values: [], urls: [] };
+    const ptaAxisProgression = ptaQuarterly.axis_progression || { labels: [], series: [] };
 
     function ptaRateBarConfig(data, label, color) {
       return baseConfig('bar', {
@@ -3454,35 +3491,80 @@ function bootDashboardRender(force = false) {
       });
     }
 
-    mountChart('dashboard-pta-axis-rate-chart', ptaRateBarConfig(ptaAxisRates, 'Taux PTA', ANBG.primary),
-      ({ element }) => (ptaAxisRates.urls || [])[element?.index] || '');
+    const monthColors = ['#4472C4', '#ED7D31', '#A9D18E'];
+    ['charts', 'details'].forEach((location) => {
+      mountChart(`dashboard-pta-axis-rate-chart-${location}`, ptaRateBarConfig(ptaAxisRates, 'Taux PTA', ANBG.primary),
+        ({ element }) => (ptaAxisRates.urls || [])[element?.index] || '');
 
-    mountChart('dashboard-pta-monthly-rate-chart', baseConfig('bar', {
-      data: {
-        labels: ptaMonthlyRates.labels || [],
-        datasets: [{
-          label: 'Taux PTA',
-          data: ptaMonthlyRates.values || [],
-          backgroundColor: (context) => barGradient(context.chart, ANBG.primary),
-          borderColor: ANBG.primary,
-          borderWidth: 1,
-          borderRadius: 12,
-          maxBarThickness: 42,
-        }],
-      },
-      options: {
-        scales: percentScales(),
-        plugins: {
-          anbgBarShadow: { enabled: true },
-          datalabels: barDataLabels((value) => (value > 0 ? `${Math.round(value)}%` : '')),
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` Taux PTA : ${formatNumber(ctx.parsed?.y ?? 0)} %`,
+      mountChart(`dashboard-pta-service-rate-chart-${location}`, baseConfig('bar', {
+        data: {
+          labels: ptaServiceRates.labels || [],
+          datasets: [{
+            label: 'Taux de réalisation',
+            data: ptaServiceRates.values || [],
+            backgroundColor: '#70AD47',
+            borderColor: '#548235',
+            borderWidth: 1,
+            maxBarThickness: 34,
+          }],
+        },
+        options: {
+          scales: percentScales(),
+          plugins: {
+            datalabels: barDataLabels((value) => `${Math.round(value)}%`),
+            legend: { display: false },
+          },
+        },
+      }), ({ element }) => (ptaServiceRates.urls || [])[element?.index] || '');
+
+      mountChart(`dashboard-pta-axis-progression-chart-${location}`, baseConfig('bar', {
+        data: {
+          labels: ptaAxisProgression.labels || [],
+          datasets: (ptaAxisProgression.series || []).map((series, index) => ({
+            label: series.label,
+            data: series.values || [],
+            backgroundColor: monthColors[index % monthColors.length],
+            borderColor: monthColors[index % monthColors.length],
+            borderWidth: 1,
+            maxBarThickness: 42,
+          })),
+        },
+        options: {
+          scales: percentScales(),
+          plugins: {
+            datalabels: barDataLabels((value) => `${Math.round(value)}%`),
+            legend: { position: 'bottom' },
+          },
+        },
+      }));
+
+      mountChart(`dashboard-pta-monthly-rate-chart-${location}`, baseConfig('bar', {
+        data: {
+          labels: ptaMonthlyRates.labels || [],
+          datasets: [{
+            label: 'Taux PTA',
+            data: ptaMonthlyRates.values || [],
+            backgroundColor: (context) => barGradient(context.chart, ANBG.primary),
+            borderColor: ANBG.primary,
+            borderWidth: 1,
+            borderRadius: 12,
+            maxBarThickness: 42,
+          }],
+        },
+        options: {
+          scales: percentScales(),
+          plugins: {
+            anbgBarShadow: { enabled: true },
+            datalabels: barDataLabels((value) => (value > 0 ? `${Math.round(value)}%` : '')),
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` Taux PTA : ${formatNumber(ctx.parsed?.y ?? 0)} %`,
+              },
             },
           },
         },
-      },
-    }), ({ element }) => (ptaMonthlyRates.urls || [])[element?.index] || '');
+      }), ({ element }) => (ptaMonthlyRates.urls || [])[element?.index] || '');
+    });
   }
 
   function chartsMasonryItems(panel) {

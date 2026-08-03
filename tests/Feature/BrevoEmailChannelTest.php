@@ -13,6 +13,7 @@ use App\Models\PasObjectif;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
+use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -116,7 +117,7 @@ class BrevoEmailChannelTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'notifiable_type' => User::class,
             'notifiable_id' => $fixture['agent']->id,
-            'type' => \App\Notifications\WorkspaceModuleNotification::class,
+            'type' => WorkspaceModuleNotification::class,
         ]);
 
         /*
@@ -175,7 +176,7 @@ class BrevoEmailChannelTest extends TestCase
 
         Notification::assertSentTo(
             $fixture['agent'],
-            \App\Notifications\WorkspaceModuleNotification::class
+            WorkspaceModuleNotification::class
         );
 
         $this->assertDatabaseMissing('brevo_email_log', [

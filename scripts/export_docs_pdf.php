@@ -32,7 +32,7 @@ $docs = [
     '06-maquettes-ui-ux.md' => '06-maquettes-ui-ux.pdf',
 ];
 
-$style = <<<CSS
+$style = <<<'CSS'
 <style>
     @page { margin: 18mm 15mm; }
     body {
@@ -85,12 +85,6 @@ $style = <<<CSS
 </style>
 CSS;
 
-/**
- * @param string $title
- * @param string $markdown
- * @param string $style
- * @return string
- */
 function buildHtmlDocument(string $title, string $markdown, string $style): string
 {
     $safeTitle = htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -120,6 +114,7 @@ foreach ($docs as $mdFile => $pdfFile) {
     $mdPath = $docsDir.DIRECTORY_SEPARATOR.$mdFile;
     if (! is_file($mdPath)) {
         fwrite(STDERR, "Fichier markdown manquant: {$mdPath}\n");
+
         continue;
     }
 

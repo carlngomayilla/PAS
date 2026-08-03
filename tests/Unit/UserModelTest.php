@@ -11,12 +11,12 @@ class UserModelTest extends TestCase
     {
         // role et is_agent ne sont plus mass-assignables (cf. A02) : on les pose
         // via forceFill pour reproduire l etat persiste qui interesse le test.
-        $agent = (new User())->forceFill([
+        $agent = (new User)->forceFill([
             'role' => User::ROLE_AGENT,
             'is_agent' => false,
         ]);
 
-        $serviceWithLegacyFlag = (new User())->forceFill([
+        $serviceWithLegacyFlag = (new User)->forceFill([
             'role' => User::ROLE_SERVICE,
             'is_agent' => true,
         ]);

@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
@@ -28,7 +29,7 @@ abstract class TestCase extends BaseTestCase
         // A31 — Flush le cache d introspection schema entre tests : sinon les
         // tests qui rejouent les migrations via RefreshDatabase verraient un
         // schema "fige" cote cache et leur scope/has_column serait incorrect.
-        \App\Support\SchemaIntrospectionCache::flush();
+        SchemaIntrospectionCache::flush();
 
         parent::tearDown();
     }

@@ -33,9 +33,10 @@ class AiReportWordPreviewTest extends TestCase
 
         $this->assertIsArray($preview);
         $this->assertSame('Apercu du modele Word trimestriel', $preview['title']);
-        $this->assertCount(4, $preview['tables']);
-        $this->assertSame('TAUX DE REALISATION DES AXES GLOBAUX', $preview['tables'][1]['title']);
-        $this->assertSame('Service Applications', $preview['tables'][2]['rows'][0][0]);
+        $this->assertCount(6, $preview['tables']);
+        $this->assertSame('Comparaison entre avancement global et realisation des actions echues', $preview['tables'][1]['title']);
+        $this->assertSame('TAUX DE REALISATION DES AXES GLOBAUX', $preview['tables'][2]['title']);
+        $this->assertSame('Service Applications', $preview['tables'][3]['rows'][0][0]);
         $this->assertSame('Progression des axes du PTA sur la periode', $preview['charts'][0]['title']);
         $this->assertNotEmpty($preview['charts'][0]['points']);
     }

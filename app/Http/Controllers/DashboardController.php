@@ -19,12 +19,14 @@ use App\Models\User;
 use App\Services\ActionCalculationSettings;
 use App\Services\Actions\ActionStatusService;
 use App\Services\Actions\ActionTrackingService;
+use App\Services\Ai\ActionReportMetricsBuilder;
 use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\Dashboard\DashboardPythonChartService;
 use App\Services\DashboardProfileSettings;
 use App\Services\DeadlineExtensionQueueService;
 use App\Services\ExerciceContext;
+use App\Services\FinancialMonitoringService;
 use App\Services\PersonalTaskService;
 use App\Services\PtaSuiviService;
 use App\Services\WorkflowSettings;
@@ -68,7 +70,8 @@ class DashboardController extends Controller
         private readonly ActionStatusService $actionStatusService,
         private readonly PersonalTaskService $personalTaskService,
         private readonly PtaSuiviService $ptaSuiviService,
-        private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService
+        private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService,
+        private readonly FinancialMonitoringService $financialMonitoringService
     ) {}
 
     public function index(Request $request): View
@@ -242,6 +245,7 @@ class DashboardController extends Controller
         ];
 
         $dashboardData = $this->buildDashboardData($user, $scopedActions);
+        $dashboardData['financial_summary'] = $this->financialMonitoringService->dashboardSummary($user);
         $reportingAnalytics = $this->buildDashboardReportingPayload($user, $totals, $alerts, $statusBreakdown, $dashboardData);
         $dashboardClientData = $this->buildDashboardClientPayload($dashboardData);
         $reportingClientAnalytics = $this->buildReportingClientPayload($reportingAnalytics);
@@ -473,6 +477,15 @@ class DashboardController extends Controller
         $periodStart = $periodRange[0] ?? $this->dashboardPtaPeriodStart($actions);
         $periodEnd = $periodRange[1] ?? $this->dashboardPtaPeriodEnd($actions);
 
+        $canonical = app(ActionReportMetricsBuilder::class)->buildPtaAnalysis($actions, [
+            'period_start' => $periodStart->toDateString(),
+            'period_end' => $periodEnd->toDateString(),
+        ]);
+
+        return $this->dashboardPtaCanonicalPayload($canonical, $filters);
+
+        /* Legacy implementation retained below temporarily for a safe rollback. */
+
         $axes = $this->dashboardPtaAxisRows($user, $actions, $periodEnd);
 
         $services = $actions
@@ -535,6 +548,72 @@ class DashboardController extends Controller
                     'values' => collect($monthly)->pluck('realization_rate')->values()->all(),
                     'urls' => collect($monthly)->map(fn (): string => $this->actionIndexRoute())->values()->all(),
                 ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $analysis
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function dashboardPtaCanonicalPayload(array $analysis, array $filters): array
+    {
+        $summary = (array) ($analysis['synthese'] ?? []);
+        $mapRow = function (array $row): array {
+            return $row + [
+                'planned_actions' => (int) ($row['actions_prevues'] ?? 0),
+                'completed_actions' => (int) ($row['actions_realisees'] ?? 0),
+                'due_completed_actions' => (int) ($row['actions_echues_realisees'] ?? 0),
+                'late_or_unrealized_actions' => (int) ($row['actions_en_retard_non_realisees'] ?? 0),
+                'not_started_actions' => (int) ($row['actions_non_demarrees'] ?? 0),
+                'in_progress_actions' => (int) ($row['actions_en_cours'] ?? 0),
+                'due_actions' => (int) ($row['actions_echues'] ?? 0),
+                'progress_rate' => (float) ($row['taux_global_avancement'] ?? 0),
+                'realization_rate' => (float) ($row['taux_realisation'] ?? 0),
+                'performance_level' => (string) ($row['niveau_performance'] ?? 'Critique'),
+            ];
+        };
+
+        $axes = collect($analysis['axes'] ?? [])->map(fn (array $row): array => $mapRow($row))->values();
+        $services = collect($analysis['services'] ?? [])->map(fn (array $row): array => $mapRow($row) + [
+            'url' => $this->actionIndexRoute(),
+        ])->values();
+        $monthly = collect($analysis['evolution_mensuelle'] ?? [])->map(fn (array $row): array => [
+            'label' => (string) ($row['mois'] ?? ''),
+            'due_actions' => (int) ($row['actions_echues'] ?? 0),
+            'completed_actions' => (int) ($row['actions_realisees'] ?? 0),
+            'realization_rate' => (float) ($row['taux_realisation'] ?? 0),
+            'variation' => (float) ($row['variation'] ?? 0),
+            'trend' => (string) ($row['tendance'] ?? 'Stagnation'),
+        ])->values();
+        $gaps = (array) ($analysis['ecarts'] ?? []);
+
+        return [
+            'period' => [
+                'start' => (string) ($analysis['periode']['debut'] ?? ''),
+                'end' => (string) ($analysis['periode']['fin'] ?? ''),
+                'label' => (string) ($filters['periode_label'] ?? $analysis['periode']['libelle'] ?? 'Periode courante'),
+            ],
+            'summary' => $mapRow($summary),
+            'indicator_comparison' => $analysis['comparaison_indicateurs'] ?? [],
+            'axes' => $axes->all(),
+            'services' => $services->all(),
+            'service_axis_matrix' => $analysis['matrice_services_axes'] ?? [],
+            'monthly' => $monthly->all(),
+            'axis_monthly' => $analysis['evolution_mensuelle_axes'] ?? [],
+            'gaps' => [
+                'unrealized' => $gaps['actions_non_realisees'] ?? [],
+                'partial' => $gaps['actions_partielles'] ?? [],
+                'postponed' => $gaps['actions_reportees'] ?? [],
+            ],
+            'corrective_measures' => $analysis['mesures_correctives'] ?? [],
+            'findings' => $analysis['constats'] ?? [],
+            'charts' => [
+                'axis_rates' => $analysis['graphiques']['taux_axes'] ?? [],
+                'service_rates' => $analysis['graphiques']['taux_services'] ?? [],
+                'monthly_rates' => $analysis['graphiques']['evolution_trimestre'] ?? [],
+                'axis_progression' => $analysis['graphiques']['progression_axes'] ?? [],
             ],
         ];
     }
@@ -3019,27 +3098,6 @@ class DashboardController extends Controller
                 'subtitle' => 'Lecture globale des alertes, des retards, des preuves attendues et des directions sous vigilance.',
             ],
             'summary_cards' => $summaryCards,
-            'trend_chart' => [
-                'title' => 'Evolution du suivi',
-                'subtitle' => 'Actions, achevements et retards sur l annee en cours.',
-                ...$this->buildRoleTrendChart($actions),
-            ],
-            'support_chart' => [
-                'title' => 'Directions sous vigilance',
-                'subtitle' => 'Comparaison des directions sur execution, validation et retards.',
-                ...[
-                    'type' => 'bar',
-                    'index_axis' => 'y',
-                    'stacked' => false,
-                    'labels' => array_column($directionRows, 'direction'),
-                    'urls' => array_column($directionRows, 'url'),
-                    'datasets' => [
-                        ['label' => 'Execution', 'color' => '#F26522', 'data' => array_column($directionRows, 'taux_execution')],
-                        ['label' => 'Validation', 'color' => '#0F5B66', 'data' => array_column($directionRows, 'taux_validation')],
-                        ['label' => 'Retards', 'color' => '#B42318', 'data' => array_column($directionRows, 'retards')],
-                    ],
-                ],
-            ],
             'primary_rows' => $directionRows,
             'secondary_rows' => $this->buildDirectionCriticalRows($actions, 8),
         ];

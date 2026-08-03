@@ -27,7 +27,7 @@ return new class extends Migration
             Schema::table('pas_directions', function (Blueprint $blueprint): void {
                 $blueprint->unique(['pas_id', 'direction_id'], 'pas_directions_pas_id_direction_id_unique');
             });
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Index probablement deja present : non bloquant.
         }
     }
@@ -42,7 +42,7 @@ return new class extends Migration
             Schema::table('pas_directions', function (Blueprint $blueprint): void {
                 $blueprint->dropUnique('pas_directions_pas_id_direction_id_unique');
             });
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Index inexistant : non bloquant.
         }
     }

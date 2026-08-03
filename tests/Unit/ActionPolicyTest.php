@@ -4,10 +4,10 @@ namespace Tests\Unit;
 
 use App\Models\Action;
 use App\Models\Direction;
+use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
-use App\Models\Pao;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
@@ -25,7 +25,7 @@ class ActionPolicyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->policy = new ActionPolicy();
+        $this->policy = new ActionPolicy;
     }
 
     public function test_agent_can_only_handle_his_own_action_execution(): void

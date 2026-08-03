@@ -13,8 +13,7 @@ class PlanningAutoArchiveService
 {
     public function __construct(
         private readonly PlanningArchiveSettings $settings
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<string, mixed>

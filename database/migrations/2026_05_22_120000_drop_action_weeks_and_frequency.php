@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -27,7 +26,7 @@ return new class extends Migration
             Schema::table('justificatifs', function (Blueprint $table): void {
                 try {
                     $table->dropConstrainedForeignId('action_week_id');
-                } catch (\Throwable) {
+                } catch (Throwable) {
                     $table->dropColumn('action_week_id');
                 }
             });
@@ -38,7 +37,7 @@ return new class extends Migration
             Schema::table('action_logs', function (Blueprint $table): void {
                 try {
                     $table->dropConstrainedForeignId('action_week_id');
-                } catch (\Throwable) {
+                } catch (Throwable) {
                     $table->dropColumn('action_week_id');
                 }
             });

@@ -138,6 +138,8 @@ class ActionWebController extends Controller
             'canWrite' => $this->canWrite($user),
             'showDualActionTabs' => $this->shouldUseDualActionTabs($user),
             'showActionValidationTab' => $this->canUseActionValidationTab($user),
+            'isFinalControlQueue' => $this->isFinalControlUser($user),
+            'canReadAudit' => $user->hasPermission('audit.read'),
             'filters' => [
                 'vue' => $viewMode,
                 'contexte_action' => trim((string) $request->string('contexte_action')),
@@ -152,7 +154,7 @@ class ActionWebController extends Controller
                 'week_start' => $request->filled('week_start') ? trim((string) $request->string('week_start')) : '',
                 'statut' => trim((string) $request->string('statut')),
                 'statut_validation' => $viewMode === 'validations'
-                    ? ActionTrackingService::VALIDATION_SOUMISE_CHEF
+                    ? $this->validationQueueStatus($user)
                     : ($request->filled('statut_validation') ? trim((string) $request->string('statut_validation')) : ''),
                 'statut_validation_min' => $viewMode === 'validations'
                     ? ''
@@ -1206,7 +1208,7 @@ class ActionWebController extends Controller
         }
 
         if ($viewMode === 'validations') {
-            $this->wherePendingChefValidation($query);
+            $this->wherePendingValidation($query, $user);
             $this->whereUserIsNotResponsible($query, $user);
         }
 
@@ -1551,6 +1553,20 @@ class ActionWebController extends Controller
         return ! $user->isAgent();
     }
 
+    private function isFinalControlUser(User $user): bool
+    {
+        return app(PlanningModificationLockService::class)->canGivePlanifAvis($user)
+            || $user->isSuperAdmin()
+            || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
+    }
+
+    private function validationQueueStatus(User $user): string
+    {
+        return $this->isFinalControlUser($user)
+            ? ActionTrackingService::VALIDATION_SOUMISE_CONTROLE
+            : ActionTrackingService::VALIDATION_SOUMISE_CHEF;
+    }
+
     private function scopeAction(Builder $query, User $user): void
     {
         if ($user->hasGlobalReadAccess()) {
@@ -1634,6 +1650,18 @@ class ActionWebController extends Controller
                 ->orWhereHas('sousActions', fn (Builder $subActionQuery) => $subActionQuery
                     ->where('validation_status', SousAction::VALIDATION_SOUMISE));
         });
+    }
+
+    private function wherePendingValidation(Builder $query, User $user): Builder
+    {
+        if ($this->isFinalControlUser($user)) {
+            return $query->whereIn('statut_validation', [
+                ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+            ]);
+        }
+
+        return $this->wherePendingChefValidation($query);
     }
 
     private function whereUserIsNotResponsible(Builder $query, User $user): Builder

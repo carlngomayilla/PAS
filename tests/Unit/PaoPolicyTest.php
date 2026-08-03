@@ -22,7 +22,7 @@ class PaoPolicyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->policy = new PaoPolicy();
+        $this->policy = new PaoPolicy;
     }
 
     public function test_policy_matches_pao_scope_rules_for_global_direction_and_service_profiles(): void

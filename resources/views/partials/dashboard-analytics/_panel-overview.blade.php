@@ -272,6 +272,36 @@
         'canOpenPtaSuivi' => $canOpenPtaSuivi,
     ])
 
+    @if (is_array($financialSummary ?? null))
+        @php
+            $currency = static fn (float $value): string => number_format($value, 0, ',', ' ').' FCFA';
+            $financialKpis = [
+                ['Budget des actions', $currency((float) ($financialSummary['budget'] ?? 0)), 'Montants inscrits dans les actions visibles', 'text-[#17324a]'],
+                ['Engagements enregistrés', $currency((float) ($financialSummary['engaged'] ?? 0)), number_format((float) ($financialSummary['engagement_rate'] ?? 0), 1, ',', ' ').'% du budget', 'text-[#176a9d]'],
+                ['Décaissements réalisés', $currency((float) ($financialSummary['disbursed'] ?? 0)), number_format((float) ($financialSummary['disbursement_rate'] ?? 0), 1, ',', ' ').'% du budget', 'text-emerald-700'],
+                ['Solde budgétaire à décaisser', $currency((float) ($financialSummary['remaining'] ?? 0)), (int) ($financialSummary['actions_total'] ?? 0).' action(s) dans le périmètre', 'text-amber-700'],
+            ];
+        @endphp
+        <section class="mb-4 border border-[#cfe3ef] bg-white dark:border-slate-700 dark:bg-slate-900" aria-label="Suivi budgétaire">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#dcecf5] px-4 py-3 dark:border-slate-700 sm:px-5">
+                <div>
+                    <h2 class="text-base font-bold text-[#17324a] dark:text-slate-100">Suivi budgétaire</h2>
+                    <p class="mt-0.5 text-xs text-[#667085] dark:text-slate-400">Lecture du budget des actions, des engagements et des décaissements de votre périmètre.</p>
+                </div>
+                <a class="btn btn-secondary btn-sm rounded-lg" href="{{ route('workspace.daf.financements.index') }}">Voir le suivi financier</a>
+            </div>
+            <div class="grid gap-px bg-[#dcecf5] sm:grid-cols-2 xl:grid-cols-4 dark:bg-slate-700">
+                @foreach ($financialKpis as [$label, $value, $meta, $tone])
+                    <a href="{{ route('workspace.daf.financements.index') }}" class="min-h-32 bg-white px-4 py-4 transition hover:bg-[#f7fbfd] dark:bg-slate-900 dark:hover:bg-slate-800">
+                        <p class="text-xs font-bold uppercase tracking-wide text-[#667085] dark:text-slate-400">{{ $label }}</p>
+                        <p class="mt-3 text-2xl font-black {{ $tone }} dark:text-sky-200">{{ $value }}</p>
+                        <p class="mt-2 text-xs leading-5 text-[#667085] dark:text-slate-400">{{ $meta }}</p>
+                    </a>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     @if (($showLegacySynthesisProgressCards ?? false) && !in_array($dashboardRole, ['agent'], true))
     <div class="mb-4 w-full space-y-3">
         @php
@@ -520,8 +550,8 @@
             </div>
         </section>
 
-        <div id="dashboard-row-detail-modal" class="fixed inset-0 z-[1000] hidden items-center justify-center bg-slate-950/55 p-4" aria-hidden="true">
-            <div class="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div id="dashboard-row-detail-modal" class="fixed inset-0 z-[1000] hidden items-stretch justify-end bg-slate-950/55" aria-hidden="true">
+            <aside class="h-full w-full max-w-[42rem] overflow-hidden bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="dashboard-row-detail-title">
                 <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
                     <div>
                         <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3996d3]">Détail de ligne</p>
@@ -529,11 +559,11 @@
                     </div>
                     <button type="button" class="btn btn-primary btn-sm rounded-xl" data-dashboard-row-detail-close>Fermer</button>
                 </div>
-                <div class="max-h-[62vh] overflow-y-auto p-5">
+                <div class="h-[calc(100vh-5rem)] overflow-y-auto p-5">
                     <dl id="dashboard-row-detail-body" class="grid gap-3 md:grid-cols-2"></dl>
                     <a id="dashboard-row-detail-link" href="#" class="btn btn-primary mt-5 hidden rounded-xl">Ouvrir la page</a>
                 </div>
-            </div>
+            </aside>
         </div>
     @endif
 

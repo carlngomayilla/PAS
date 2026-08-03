@@ -13,6 +13,8 @@
         $scopeViews = [
             ['code' => '', 'label' => 'Tous les événements', 'count' => (int) ($scopeCounts['all'] ?? 0)],
             ['code' => 'recent', 'label' => 'Dernières 24 h', 'count' => (int) ($scopeCounts['recent'] ?? 0)],
+            ['code' => 'execution', 'label' => 'Exécution & procédures', 'count' => (int) ($scopeCounts['execution'] ?? 0)],
+            ['code' => 'reports', 'label' => 'Rapports institutionnels', 'count' => (int) ($scopeCounts['reports'] ?? 0)],
             ['code' => 'interventions', 'label' => 'Interventions', 'count' => (int) ($scopeCounts['interventions'] ?? 0)],
             ['code' => 'sensitive', 'label' => 'Sensibles', 'count' => (int) ($scopeCounts['sensitive'] ?? 0)],
             ['code' => 'organization', 'label' => 'Organisation', 'count' => (int) ($scopeCounts['organization'] ?? 0)],

@@ -156,6 +156,7 @@ class CleanupInactiveUsersCommand extends Command
                         $service->code
                     ));
                     $stats['services_sans_pta']++;
+
                     continue;
                 }
 
@@ -168,6 +169,7 @@ class CleanupInactiveUsersCommand extends Command
 
                 if ($activeUsers->isEmpty()) {
                     $this->warn(sprintf('  ! Service %s : aucun utilisateur actif.', $service->code));
+
                     continue;
                 }
 
@@ -223,6 +225,7 @@ class CleanupInactiveUsersCommand extends Command
             DB::rollBack();
             $this->error('Echec : '.$e->getMessage());
             $this->error('Trace : '.$e->getTraceAsString());
+
             return self::FAILURE;
         }
 

@@ -34,6 +34,7 @@ class AntivirusScanner
         } catch (ProcessTimedOutException $exception) {
             if ($failOpen) {
                 report($exception);
+
                 return;
             }
 
@@ -41,6 +42,7 @@ class AntivirusScanner
         } catch (ProcessFailedException $exception) {
             if ($failOpen) {
                 report($exception);
+
                 return;
             }
 
@@ -60,6 +62,7 @@ class AntivirusScanner
 
         if ($failOpen) {
             report(new MalwareScanException('Scanner antivirus indisponible: '.$output));
+
             return;
         }
 

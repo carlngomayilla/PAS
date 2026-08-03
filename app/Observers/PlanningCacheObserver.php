@@ -9,8 +9,7 @@ class PlanningCacheObserver
 {
     public function __construct(
         private readonly AnalyticsCacheVersionService $cacheVersion
-    ) {
-    }
+    ) {}
 
     public function saved(Model $model): void
     {

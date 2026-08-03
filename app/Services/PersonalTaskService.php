@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\Action;
 use App\Models\ActionLog;
+use App\Models\DeadlineExtensionRequest;
 use App\Models\DeletionRequest;
 use App\Models\PlanningUnlockRequest;
+use App\Models\Pta;
 use App\Models\SousAction;
 use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
@@ -23,7 +25,8 @@ class PersonalTaskService
     public function __construct(
         private readonly UserWorkspaceService $workspaceService,
         private readonly AlertRoutingService $alertRoutingService,
-        private readonly PersonalScoreService $personalScoreService
+        private readonly PersonalScoreService $personalScoreService,
+        private readonly DeadlineExtensionQueueService $deadlineExtensionQueueService
     ) {}
 
     /**
@@ -92,6 +95,17 @@ class PersonalTaskService
         return $this->collectCached($user)->count();
     }
 
+    public function controlTaskCount(User $user): int
+    {
+        return $this->collectCached($user)
+            ->whereIn('type', [
+                'validation_controleur',
+                'controle_pta',
+                'controle_modification',
+            ])
+            ->count();
+    }
+
     /**
      * Collecte des taches mise en cache 60s par utilisateur (comme le centre
      * d'alertes) pour ne pas rejouer les 8 requetes sources a chaque chargement
@@ -128,6 +142,8 @@ class PersonalTaskService
             ->merge($this->chefValidationTasks($user, $role))
             ->merge($this->chefSubActionValidationTasks($user, $role))
             ->merge($this->controllerValidationTasks($user, $role))
+            ->merge($this->ptaControlTasks($user, $role))
+            ->merge($this->deadlineExtensionControlTasks($user))
             ->merge($this->dafFinancingTasks($user, $role))
             ->merge($this->dgFinancingTasks($user, $role))
             ->merge($this->actionAlertTasks($user, $role))
@@ -401,6 +417,98 @@ class PersonalTaskService
                     url: route('workspace.actions.suivi', $action).'#action-validation',
                     criticality: $this->criticalityFromDeadline($deadline, 'importante'),
                     scoreImpact: 'Retard impute au controleur, pas au RMO.'
+                );
+            });
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function ptaControlTasks(User $user, string $role): Collection
+    {
+        if (! in_array($role, ['sciq_planif', 'super_admin'], true)) {
+            return collect();
+        }
+
+        return Pta::query()
+            ->with(['service:id,libelle', 'validateur:id,name'])
+            ->where('statut', Pta::STATUS_CONTROLE_SCIQ)
+            ->where(function (Builder $query) use ($user): void {
+                $query->whereNull('valide_par')->orWhere('valide_par', '!=', (int) $user->id);
+            })
+            ->latest('valide_le')
+            ->get()
+            ->map(function (Pta $pta): array {
+                $received = $this->carbon($pta->valide_le) ?? $this->carbon($pta->updated_at);
+                $deadline = $received?->copy()->addHours(48);
+
+                return $this->task(
+                    key: 'pta-control:'.$pta->id,
+                    type: 'controle_pta',
+                    title: 'Controle PTA',
+                    subject: (string) $pta->titre,
+                    context: $pta->service?->libelle,
+                    responsible: $pta->validateur?->name,
+                    receivedAt: $received,
+                    deadlineAt: $deadline,
+                    url: route('workspace.pta.show', $pta),
+                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
+                    scoreImpact: 'Retard de controle impute au profil SCIQ/Planification.'
+                );
+            });
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function deadlineExtensionControlTasks(User $user): Collection
+    {
+        return $this->deadlineExtensionQueueService
+            ->actionableRequests($user)
+            ->map(function (DeadlineExtensionRequest $request): array {
+                $received = $this->carbon($request->updated_at);
+                $deadline = $received?->copy()->addHours(48);
+                [$type, $title, $scoreImpact] = match ((string) $request->status) {
+                    DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE => [
+                        'complement_report_echeance',
+                        'Compléter la demande',
+                        'Retard de complément imputé au RMO.',
+                    ],
+                    DeadlineExtensionRequest::STATUS_SOUMISE,
+                    DeadlineExtensionRequest::STATUS_EN_ANALYSE => [
+                        'validation_chef_report_echeance',
+                        'Valider la modification',
+                        'Retard de validation imputé au chef de service.',
+                    ],
+                    DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => [
+                        'accord_direction_report_echeance',
+                        'Donner l’accord direction',
+                        'Retard de décision imputé au directeur.',
+                    ],
+                    DeadlineExtensionRequest::STATUS_APPROUVEE => [
+                        'application_report_echeance_legacy',
+                        'Appliquer une ancienne décision',
+                        'Retard d’application imputé à la DG.',
+                    ],
+                    default => [
+                        'accord_dg_report_echeance',
+                        'Donner l’accord final DG',
+                        'Retard de décision finale imputé à la DG.',
+                    ],
+                };
+
+                return $this->task(
+                    key: 'deadline-extension-control:'.$request->id,
+                    type: $type,
+                    title: $title,
+                    subject: (string) ($request->action?->libelle ?? 'Demande de report'),
+                    context: (string) $request->motif,
+                    responsible: $request->requestedBy?->name,
+                    receivedAt: $received,
+                    deadlineAt: $deadline,
+                    url: route('workspace.deadline-extension.show', $request),
+                    criticality: $this->criticalityFromDeadline($deadline, $request->is_critical ? 'critique' : 'importante'),
+                    scoreImpact: $scoreImpact
                 );
             });
     }

@@ -16,8 +16,7 @@ class ReportingController extends Controller
 
     public function __construct(
         private readonly ReportingAnalyticsService $reportingAnalyticsService
-    ) {
-    }
+    ) {}
 
     public function overview(Request $request): JsonResponse
     {

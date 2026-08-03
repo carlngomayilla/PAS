@@ -3,6 +3,7 @@
 namespace App\Services\Scope;
 
 use App\Models\User;
+use App\Support\SchemaIntrospectionCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Schema;
 
@@ -99,7 +100,7 @@ class UserScopeService
         foreach ($candidates as $candidate) {
             // A31 — Cache memoise pour eviter l interrogation du schema info
             // a chaque scope query (appelee sur quasiment chaque requete metier).
-            if (\App\Support\SchemaIntrospectionCache::hasColumn($table, $candidate)) {
+            if (SchemaIntrospectionCache::hasColumn($table, $candidate)) {
                 return $candidate;
             }
         }

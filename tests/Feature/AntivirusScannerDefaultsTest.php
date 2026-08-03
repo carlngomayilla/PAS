@@ -54,7 +54,7 @@ class AntivirusScannerDefaultsTest extends TestCase
             Config::set('security.uploads.antivirus.binary', '/usr/bin/clamscan-introuvable-xyz');
             Config::set('security.uploads.antivirus.fail_open', false);
 
-            $scanner = new AntivirusScanner();
+            $scanner = new AntivirusScanner;
             $file = UploadedFile::fake()->create('document.pdf', 16, 'application/pdf');
 
             $this->expectException(MalwareScanException::class);
@@ -71,7 +71,7 @@ class AntivirusScannerDefaultsTest extends TestCase
         Config::set('security.uploads.antivirus.enabled', false);
         Config::set('security.uploads.antivirus.binary', '/usr/bin/clamscan-introuvable-xyz');
 
-        $scanner = new AntivirusScanner();
+        $scanner = new AntivirusScanner;
         $file = UploadedFile::fake()->create('document.pdf', 16, 'application/pdf');
 
         // Aucune exception attendue : enabled=false → early return.

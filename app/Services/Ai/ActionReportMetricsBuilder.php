@@ -74,6 +74,18 @@ class ActionReportMetricsBuilder
     }
 
     /**
+     * Build the canonical quarterly PTA analysis from an already authorized action collection.
+     *
+     * @param  Collection<int, Action>  $actions
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function buildPtaAnalysis(Collection $actions, array $filters = []): array
+    {
+        return $this->buildPtaQuarterlyAnalysis($actions->values(), $filters);
+    }
+
+    /**
      * @param  array<string, mixed>  $filters
      */
     private function applyFilters(Builder $query, array $filters): void
@@ -96,6 +108,26 @@ class ActionReportMetricsBuilder
 
         if (! empty($filters['service_id'])) {
             $query->whereHas('pta', fn (Builder $pta): Builder => $pta->where('service_id', (int) $filters['service_id']));
+        }
+
+        if (! empty($filters['responsable_id'])) {
+            $query->where('responsable_id', (int) $filters['responsable_id']);
+        }
+
+        if (! empty($filters['statut'])) {
+            $status = (string) $filters['statut'];
+            $query->where(function (Builder $builder) use ($status): void {
+                $builder->where('statut', $status)->orWhere('statut_dynamique', $status);
+            });
+        }
+
+        if (! empty($filters['pas_axe_id'])) {
+            $axisId = (int) $filters['pas_axe_id'];
+            $query->where(function (Builder $builder) use ($axisId): void {
+                $builder->whereHas('objectifOperationnel', fn (Builder $objective): Builder => $objective->where('pas_axe_id', $axisId))
+                    ->orWhereHas('pta.objectifOperationnel', fn (Builder $objective): Builder => $objective->where('pas_axe_id', $axisId))
+                    ->orWhereHas('pta.pao.pasObjectif', fn (Builder $objective): Builder => $objective->where('pas_axe_id', $axisId));
+            });
         }
     }
 
@@ -195,6 +227,7 @@ class ActionReportMetricsBuilder
             ->all();
 
         $monthly = $this->monthlyEvolution($actions, $periodStart, $periodEnd);
+        $axisMonthly = $this->axisMonthlyEvolution($actions, $periodStart, $periodEnd);
         $serviceAxisMatrix = $this->serviceAxisMatrix($actions, $axes, $periodEnd);
         $lateOrUnrealized = $this->dueActions($actions, $periodEnd)
             ->reject(fn (Action $action): bool => $this->isCompleted($action))
@@ -217,12 +250,15 @@ class ActionReportMetricsBuilder
             'services' => $services,
             'matrice_services_axes' => $serviceAxisMatrix,
             'evolution_mensuelle' => $monthly,
+            'evolution_mensuelle_axes' => $axisMonthly,
+            'comparaison_indicateurs' => $this->indicatorComparison($actions, $periodEnd),
             'ecarts' => [
                 'actions_non_realisees' => $lateOrUnrealized->take(15)->map(fn (Action $action): array => $this->actionLine($action))->all(),
                 'actions_partielles' => $partial->take(15)->map(fn (Action $action): array => $this->actionLine($action))->all(),
                 'actions_reportees' => $postponed->take(15)->map(fn (Action $action): array => $this->actionLine($action))->all(),
             ],
             'mesures_correctives' => $this->correctiveMeasures($lateOrUnrealized, $partial, $postponed),
+            'constats' => $this->analysisFindings($axes, $services, $lateOrUnrealized),
             'graphiques' => [
                 'taux_axes' => [
                     'labels' => collect($axes)->pluck('libelle')->values()->all(),
@@ -235,6 +271,10 @@ class ActionReportMetricsBuilder
                 'evolution_trimestre' => [
                     'labels' => collect($monthly)->pluck('mois')->values()->all(),
                     'values' => collect($monthly)->pluck('taux_realisation')->values()->all(),
+                ],
+                'progression_axes' => [
+                    'labels' => collect($axisMonthly)->pluck('axe')->values()->all(),
+                    'series' => $this->axisMonthlySeries($axisMonthly, $monthly),
                 ],
             ],
         ];
@@ -301,15 +341,21 @@ class ActionReportMetricsBuilder
         $dueCompleted = $due->filter(fn (Action $action): bool => $this->isCompleted($action));
         $dueUnrealized = $due->reject(fn (Action $action): bool => $this->isCompleted($action));
         $notStarted = $actions->filter(fn (Action $action): bool => $this->dashboardStatus($action) === 'non_demarre');
+        $inProgress = $actions->filter(fn (Action $action): bool => $this->dashboardStatus($action) === 'en_cours');
+        $progressRate = $this->rate($completed->count(), $actions->count());
+        $realizationRate = $this->rate($dueCompleted->count(), $due->count());
 
         return [
             'actions_prevues' => $actions->count(),
             'actions_realisees' => $completed->count(),
+            'actions_echues_realisees' => $dueCompleted->count(),
             'actions_en_retard_non_realisees' => $dueUnrealized->count(),
             'actions_non_demarrees' => $notStarted->count(),
+            'actions_en_cours' => $inProgress->count(),
             'actions_echues' => $due->count(),
-            'taux_global_avancement' => $this->rate($completed->count(), $actions->count()),
-            'taux_realisation' => $this->rate($dueCompleted->count(), $due->count()),
+            'taux_global_avancement' => $progressRate,
+            'taux_realisation' => $realizationRate,
+            'niveau_performance' => $this->performanceLevel($realizationRate),
         ];
     }
 
@@ -333,30 +379,167 @@ class ActionReportMetricsBuilder
         $months = [];
         $cursor = $periodStart->copy()->startOfMonth();
         $last = $periodEnd->copy()->startOfMonth();
+        $previousRate = null;
 
         while ($cursor->lte($last)) {
-            $monthStart = $cursor->copy()->startOfMonth();
             $monthEnd = $cursor->copy()->endOfMonth();
             if ($monthEnd->gt($periodEnd)) {
                 $monthEnd = $periodEnd->copy();
             }
-            $monthActions = $actions->filter(
-                fn (Action $action): bool => $action->date_fin !== null
-                    && $action->date_fin->betweenIncluded($monthStart, $monthEnd)
-            );
-            $completed = $monthActions->filter(fn (Action $action): bool => $this->isCompleted($action))->count();
+            $monthActions = $this->dueActions($actions, $monthEnd);
+            $completed = $monthActions->filter(fn (Action $action): bool => $this->wasCompletedAt($action, $monthEnd))->count();
+            $rate = $this->rate($completed, $monthActions->count());
+            $variation = $previousRate === null ? 0.0 : round($rate - $previousRate, 2);
 
             $months[] = [
                 'mois' => $cursor->translatedFormat('M Y'),
                 'actions_echues' => $monthActions->count(),
                 'actions_realisees' => $completed,
-                'taux_realisation' => $this->rate($completed, $monthActions->count()),
+                'taux_realisation' => $rate,
+                'variation' => $variation,
+                'tendance' => $variation > 0 ? 'Hausse' : ($variation < 0 ? 'Baisse' : 'Stagnation'),
             ];
 
+            $previousRate = $rate;
             $cursor->addMonth();
         }
 
         return $months;
+    }
+
+    /**
+     * @param  Collection<int, Action>  $actions
+     * @return list<array<string, mixed>>
+     */
+    private function axisMonthlyEvolution(Collection $actions, Carbon $periodStart, Carbon $periodEnd): array
+    {
+        $months = [];
+        $cursor = $periodStart->copy()->startOfMonth();
+
+        while ($cursor->lte($periodEnd->copy()->startOfMonth())) {
+            $months[] = [
+                'label' => $cursor->translatedFormat('M Y'),
+                'end' => $cursor->copy()->endOfMonth()->min($periodEnd),
+            ];
+            $cursor->addMonth();
+        }
+
+        return $actions
+            ->groupBy(fn (Action $action): string => $this->axisKey($action))
+            ->map(function (Collection $rows) use ($months): array {
+                $rates = collect($months)->map(function (array $month) use ($rows): array {
+                    /** @var Carbon $monthEnd */
+                    $monthEnd = $month['end'];
+                    $due = $this->dueActions($rows, $monthEnd);
+                    $completed = $due->filter(fn (Action $action): bool => $this->wasCompletedAt($action, $monthEnd))->count();
+
+                    return [
+                        'mois' => (string) $month['label'],
+                        'taux' => $this->rate($completed, $due->count()),
+                    ];
+                })->all();
+
+                return [
+                    'code' => (string) ($rows->first()?->pta?->pao?->pasObjectif?->pasAxe?->code ?? ''),
+                    'axe' => $this->axisLabel($rows->first()),
+                    'mois' => $rates,
+                    'evolution' => round((float) (collect($rates)->last()['taux'] ?? 0) - (float) (collect($rates)->first()['taux'] ?? 0), 2),
+                ];
+            })
+            ->sortBy('axe')
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function indicatorComparison(Collection $actions, Carbon $periodEnd): array
+    {
+        $row = $this->analysisRow($actions, $periodEnd);
+
+        return [
+            [
+                'indicateur' => 'Avancement global du PTA',
+                'realisees' => $row['actions_realisees'],
+                'base' => $row['actions_prevues'],
+                'taux' => $row['taux_global_avancement'],
+                'formule' => 'Actions realisees / actions prevues x 100',
+                'interpretation' => 'Niveau global d execution du PTA',
+            ],
+            [
+                'indicateur' => 'Realisation des actions echues',
+                'realisees' => $row['actions_echues_realisees'],
+                'base' => $row['actions_echues'],
+                'taux' => $row['taux_realisation'],
+                'formule' => 'Actions echues realisees / actions echues x 100',
+                'interpretation' => 'Respect des echeances arrivees a terme',
+            ],
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $axisMonthly
+     * @param  list<array<string, mixed>>  $monthly
+     * @return list<array<string, mixed>>
+     */
+    private function axisMonthlySeries(array $axisMonthly, array $monthly): array
+    {
+        return collect($monthly)->map(function (array $month, int $monthIndex) use ($axisMonthly): array {
+            return [
+                'label' => (string) ($month['mois'] ?? ''),
+                'values' => collect($axisMonthly)->map(
+                    fn (array $axis): float => round((float) ($axis['mois'][$monthIndex]['taux'] ?? 0), 2)
+                )->values()->all(),
+            ];
+        })->values()->all();
+    }
+
+    /** @return array<string, list<string>> */
+    private function analysisFindings(array $axes, array $services, Collection $unrealized): array
+    {
+        $axisRows = collect($axes)->sortByDesc('taux_realisation')->values();
+        $serviceRows = collect($services)->sortByDesc('taux_realisation')->values();
+        $strongestAxis = $axisRows->first();
+        $weakestAxis = $axisRows->last();
+        $strongestService = $serviceRows->first();
+        $weakestService = $serviceRows->last();
+
+        return [
+            'points_forts' => array_values(array_filter([
+                $strongestAxis ? 'Axe le plus avance : '.($strongestAxis['libelle'] ?? 'Non renseigne').' ('.$strongestAxis['taux_realisation'].' %).' : null,
+                $strongestService ? 'Service le plus avance : '.($strongestService['libelle'] ?? 'Non renseigne').' ('.$strongestService['taux_realisation'].' %).' : null,
+            ])),
+            'points_faibles' => array_values(array_filter([
+                $weakestAxis ? 'Axe necessitant le plus d attention : '.($weakestAxis['libelle'] ?? 'Non renseigne').' ('.$weakestAxis['taux_realisation'].' %).' : null,
+                $weakestService ? 'Service necessitant un accompagnement : '.($weakestService['libelle'] ?? 'Non renseigne').' ('.$weakestService['taux_realisation'].' %).' : null,
+                $unrealized->isNotEmpty() ? $unrealized->count().' action(s) echue(s) restent non realisee(s).' : null,
+            ])),
+            'priorites' => array_values(array_filter([
+                $unrealized->isNotEmpty() ? 'Traiter en priorite les actions echues non realisees.' : null,
+                collect($axes)->contains(fn (array $axis): bool => (float) ($axis['taux_realisation'] ?? 0) < 60) ? 'Renforcer le suivi des axes dont le taux est inferieur a 60 %.' : null,
+            ])),
+        ];
+    }
+
+    private function wasCompletedAt(Action $action, Carbon $observationEnd): bool
+    {
+        if (! $this->isCompleted($action)) {
+            return false;
+        }
+
+        $completedAt = $action->date_fin_reelle ?? $action->cloture_le;
+
+        return $completedAt === null || $completedAt->lte($observationEnd);
+    }
+
+    private function performanceLevel(float $rate): string
+    {
+        return match (true) {
+            $rate >= 80 => 'Tres satisfaisant',
+            $rate >= 60 => 'Satisfaisant',
+            $rate >= 40 => 'Moyen',
+            $rate >= 20 => 'Faible',
+            default => 'Critique',
+        };
     }
 
     /**
@@ -393,13 +576,7 @@ class ActionReportMetricsBuilder
             return Carbon::parse((string) $filters['period_end'])->endOfDay();
         }
 
-        $latest = $actions
-            ->pluck('date_fin')
-            ->filter()
-            ->sort()
-            ->last();
-
-        return $latest instanceof Carbon ? $latest->copy()->endOfDay() : now()->endOfDay();
+        return now()->endOfDay();
     }
 
     private function resolvePeriodStart(Collection $actions, array $filters, Carbon $periodEnd): Carbon

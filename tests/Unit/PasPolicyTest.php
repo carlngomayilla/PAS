@@ -22,7 +22,7 @@ class PasPolicyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->policy = new PasPolicy();
+        $this->policy = new PasPolicy;
     }
 
     public function test_policy_matches_pas_scope_rules_for_global_direction_and_service_profiles(): void

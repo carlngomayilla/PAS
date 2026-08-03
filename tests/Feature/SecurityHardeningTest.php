@@ -11,8 +11,8 @@ use Tests\TestCase;
 
 class SecurityHardeningTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     public function test_web_and_api_responses_include_security_headers(): void
     {

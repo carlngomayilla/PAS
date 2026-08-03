@@ -1,58 +1,10 @@
 import { gsap } from 'gsap';
 
 /**
- * UI Enhancements — spinner, flash dismiss, search icons, pagination summary
+ * UI Enhancements — flash dismiss, search icons, pagination summary
  */
 (function () {
     'use strict';
-
-    // ── FORM SUBMIT SPINNER ──────────────────────────────────────────────
-    // Finds the submit button, marks it as loading, disables form resubmit,
-    // and shows a visible inline spinner with aria-busy for accessibility.
-    var SPINNER_HTML = '<span class="ui-spinner" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg></span>';
-
-    document.addEventListener('submit', function (event) {
-        var form = event.target;
-        if (!(form instanceof HTMLFormElement)) return;
-        if (form.dataset.confirmMessage || form.dataset.promptMessage) return;
-        if ((form.method || 'get').toLowerCase() === 'get') return;
-
-        var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
-        if (!submitBtn || submitBtn.dataset.loading) return;
-
-        submitBtn.dataset.loading = '1';
-        submitBtn.dataset.originalContent = submitBtn.innerHTML;
-        submitBtn.setAttribute('aria-busy', 'true');
-        submitBtn.disabled = true;
-        submitBtn.classList.add('is-loading');
-
-        // Replace button content with spinner + "Envoi…" while preserving width
-        var labelText = (submitBtn.textContent || '').trim() || 'Envoi…';
-        if (submitBtn.tagName === 'BUTTON') {
-            submitBtn.innerHTML = SPINNER_HTML + '<span class="ui-spinner-label">Envoi en cours…</span>';
-        } else {
-            submitBtn.value = 'Envoi en cours…';
-        }
-
-        form.setAttribute('aria-busy', 'true');
-        form.classList.add('is-submitting');
-
-        // Safety: restore after 15s in case of network error / redirect cancel
-        setTimeout(function () {
-            if (submitBtn.dataset.loading) {
-                delete submitBtn.dataset.loading;
-                submitBtn.disabled = false;
-                submitBtn.removeAttribute('aria-busy');
-                submitBtn.classList.remove('is-loading');
-                if (submitBtn.dataset.originalContent !== undefined) {
-                    submitBtn.innerHTML = submitBtn.dataset.originalContent;
-                    delete submitBtn.dataset.originalContent;
-                }
-                form.removeAttribute('aria-busy');
-                form.classList.remove('is-submitting');
-            }
-        }, 15000);
-    });
 
     // ── TOP PROGRESS BAR FOR FETCH CALLS ─────────────────────────────────
     // Lightweight nprogress-style bar for AJAX fetch() calls.
@@ -872,7 +824,269 @@ import { gsap } from 'gsap';
     }
 
     // ── INIT ─────────────────────────────────────────────────────────────
+    var FORM_CONTROL_SELECTOR = [
+        'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])',
+        'select',
+        'textarea',
+    ].join(', ');
+    var formObserverStarted = false;
+
+    function markFormField(control, form) {
+        control.classList.add('app-form-control');
+
+        var labels = control.labels ? Array.prototype.slice.call(control.labels) : [];
+        labels.forEach(function (label) {
+            label.classList.add('app-form-label');
+            if (control.required) label.classList.add('is-required');
+        });
+
+        if (control.matches('input[type="checkbox"], input[type="radio"]')) {
+            var choiceLabel = control.closest('label');
+            if (choiceLabel) choiceLabel.classList.add('app-form-choice');
+            return;
+        }
+
+        var parent = control.parentElement;
+        var depth = 0;
+        while (parent && parent !== form && depth < 3) {
+            if (parent.matches('.form-section, fieldset, .form-grid, .form-grid-compact, .app-form-grid')) break;
+
+            var ownsLabel = labels.some(function (label) { return parent.contains(label); });
+            if (ownsLabel) {
+                parent.classList.add('app-form-field');
+                break;
+            }
+
+            parent = parent.parentElement;
+            depth++;
+        }
+    }
+
+    function markFormActions(form) {
+        form.querySelectorAll('.form-actions').forEach(function (actions) {
+            actions.classList.add('app-form-actions');
+        });
+
+        form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function (submit) {
+            var parent = submit.parentElement;
+            if (!parent || parent === form || parent.matches('td, th')) return;
+            if (parent.closest('table, .row-actions, .data-table-actions')) return;
+
+            var fields = parent.querySelectorAll(FORM_CONTROL_SELECTOR);
+            if (fields.length === 0) parent.classList.add('app-form-actions');
+        });
+    }
+
+    function formatFileSize(size) {
+        if (!Number.isFinite(size) || size <= 0) return '0 octet';
+        if (size < 1024) return size + ' octets';
+        if (size < 1024 * 1024) return (size / 1024).toFixed(1).replace('.', ',') + ' Ko';
+
+        return (size / (1024 * 1024)).toFixed(1).replace('.', ',') + ' Mo';
+    }
+
+    function enhanceFileInput(input) {
+        if (!(input instanceof HTMLInputElement) || input.type !== 'file') return;
+        if (input.dataset.fileEnhanced || input.dataset.fileEnhance === 'off') return;
+
+        var field = input.closest('.app-form-field') || input.parentElement;
+        if (!field) return;
+
+        input.dataset.fileEnhanced = '1';
+        input.classList.add('app-file-input');
+        field.classList.add('app-file-dropzone');
+
+        var meta = document.createElement('p');
+        var metaId = (input.id || input.name || 'file').replace(/[^a-zA-Z0-9_-]/g, '-') + '-file-meta';
+        meta.id = metaId;
+        meta.className = 'app-file-meta';
+        meta.setAttribute('aria-live', 'polite');
+        meta.textContent = input.accept
+            ? 'Formats acceptés : ' + input.accept.split(',').join(', ')
+            : 'Déposez un fichier ici ou utilisez le bouton de sélection.';
+        input.insertAdjacentElement('afterend', meta);
+
+        var describedBy = new Set((input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
+        describedBy.add(metaId);
+        input.setAttribute('aria-describedby', Array.from(describedBy).join(' '));
+
+        var refreshMeta = function () {
+            var files = Array.prototype.slice.call(input.files || []);
+            if (files.length === 0) {
+                meta.textContent = input.accept
+                    ? 'Formats acceptés : ' + input.accept.split(',').join(', ')
+                    : 'Aucun fichier sélectionné.';
+                field.classList.remove('has-file');
+                return;
+            }
+
+            var first = files[0];
+            var suffix = files.length > 1 ? ' et ' + (files.length - 1) + ' autre(s)' : '';
+            meta.textContent = first.name + ' · ' + formatFileSize(first.size) + suffix;
+            field.classList.add('has-file');
+        };
+
+        input.addEventListener('change', refreshMeta);
+        ['dragenter', 'dragover'].forEach(function (eventName) {
+            field.addEventListener(eventName, function (event) {
+                if (input.disabled) return;
+                event.preventDefault();
+                field.classList.add('is-dragging');
+            });
+        });
+        ['dragleave', 'drop'].forEach(function (eventName) {
+            field.addEventListener(eventName, function (event) {
+                field.classList.remove('is-dragging');
+                if (eventName !== 'drop' || input.disabled || !event.dataTransfer?.files?.length) return;
+                event.preventDefault();
+
+                try {
+                    input.files = event.dataTransfer.files;
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                } catch (error) {
+                    input.click();
+                }
+            });
+        });
+
+        refreshMeta();
+    }
+
+    function enhanceForm(form) {
+        if (!(form instanceof HTMLFormElement)) return;
+        if (!form.closest('#admin-main-content, .app-content')) return;
+        if (form.dataset.formEnhance === 'off') return;
+
+        var controls = Array.prototype.slice.call(form.querySelectorAll(FORM_CONTROL_SELECTOR));
+        controls.forEach(function (control) {
+            markFormField(control, form);
+            enhanceFileInput(control);
+        });
+        markFormActions(form);
+
+        var compactContext = form.closest([
+            'table',
+            '.app-table-wrapper',
+            '.data-table-shell',
+            '.row-actions',
+            '.data-table-actions',
+            'details',
+            '.admin-navbar',
+            '.app-sidebar',
+        ].join(', '));
+        var requestedLayout = form.dataset.formLayout || '';
+        var isCompact = requestedLayout === 'compact' || Boolean(compactContext)
+            || form.matches('[data-compact-form], [data-preview-ignore]')
+            || controls.length === 0;
+        var isFilter = requestedLayout === 'filter' || form.method.toLowerCase() === 'get'
+            || form.matches('[role="search"], [data-filter-form]')
+            || Boolean(form.closest('.filter-bar, .filters-bar, .showcase-toolbar'));
+
+        form.classList.toggle('app-form-compact', isCompact);
+        form.classList.toggle('app-form-filter', !isCompact && isFilter);
+
+        var isSubstantive = !isCompact && !isFilter && (
+            controls.length >= 2
+            || form.matches('.form-shell, .form-grid, .app-form')
+            || Boolean(form.querySelector('textarea, input[type="file"]'))
+        );
+        form.classList.toggle('app-form-surface', isSubstantive);
+
+        if (isSubstantive) {
+            var hasExistingSurface = Boolean(form.closest([
+                '.showcase-panel',
+                '.app-card',
+                '.ui-card',
+                '.form-section',
+                '.dashboard-card',
+                '.data-table-shell',
+            ].join(', '))) || form.matches('[class*="border"], [class*="rounded"], .form-shell');
+            form.classList.toggle('app-form-standalone', !hasExistingSurface);
+        } else {
+            form.classList.remove('app-form-standalone');
+        }
+
+        form.dataset.formEnhanced = '1';
+    }
+
+    function enhanceForms(root) {
+        if (!(root instanceof Element) && root !== document) return;
+
+        if (root instanceof HTMLFormElement) enhanceForm(root);
+        if (root instanceof Element) {
+            var parentForm = root.closest('form');
+            if (parentForm) enhanceForm(parentForm);
+        }
+        root.querySelectorAll('#admin-main-content form, .app-content form').forEach(enhanceForm);
+    }
+
+    function initFormObserver() {
+        if (formObserverStarted || typeof MutationObserver === 'undefined') return;
+
+        var content = document.getElementById('admin-main-content');
+        if (!content) return;
+
+        formObserverStarted = true;
+        var pendingForms = new Set();
+        var scheduled = false;
+        var flush = function () {
+            pendingForms.forEach(enhanceForm);
+            pendingForms.clear();
+            scheduled = false;
+        };
+        var observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
+                mutation.addedNodes.forEach(function (node) {
+                    if (!(node instanceof Element)) return;
+                    var parentForm = node.closest('form');
+                    if (parentForm) pendingForms.add(parentForm);
+                    node.querySelectorAll('form').forEach(function (form) { pendingForms.add(form); });
+                });
+            });
+
+            if (pendingForms.size > 0 && !scheduled) {
+                scheduled = true;
+                window.requestAnimationFrame(flush);
+            }
+        });
+        observer.observe(content, { childList: true, subtree: true });
+    }
+
+    function initDeadlineChangeFields() {
+        document.querySelectorAll('[data-deadline-change-fields]').forEach(function (root) {
+            if (root.dataset.changeFieldsBound) return;
+
+            var targetSelect = root.querySelector('select[name="sous_action_id"]');
+            var refreshScopes = function () {
+                var targetKind = targetSelect
+                    ? (targetSelect.value ? 'subaction' : 'action')
+                    : (root.dataset.targetKind || 'action');
+
+                root.dataset.targetKind = targetKind;
+                root.querySelectorAll('[data-change-scope]').forEach(function (field) {
+                    var scope = field.dataset.changeScope || 'all';
+                    var isCompatible = scope === 'all' || scope === targetKind;
+
+                    field.hidden = !isCompatible;
+                    field.setAttribute('aria-hidden', isCompatible ? 'false' : 'true');
+                    field.querySelectorAll('input, select, textarea').forEach(function (control) {
+                        control.disabled = !isCompatible;
+                        if (!isCompatible && control instanceof HTMLInputElement && control.type === 'checkbox') {
+                            control.checked = false;
+                        }
+                    });
+                });
+            };
+
+            if (targetSelect) targetSelect.addEventListener('change', refreshScopes);
+            refreshScopes();
+            root.dataset.changeFieldsBound = '1';
+        });
+    }
+
     function initDynamicDom() {
+        enhanceForms(document);
+        initDeadlineChangeFields();
         initFlash();
         flashToToast();
         initClientValidation();
@@ -888,6 +1102,7 @@ import { gsap } from 'gsap';
 
     function init() {
         initDynamicDom();
+        initFormObserver();
         initBrowserNotifications();
         initSpotlight();
         initKeyboardShortcuts();

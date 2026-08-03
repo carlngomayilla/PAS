@@ -2,8 +2,6 @@
 
 namespace App\Services\Workflow;
 
-use App\Enums\StatutEcheance;
-use App\Enums\StatutRetard;
 use App\Events\DeadlineExtensionApproved;
 use App\Models\Action;
 use App\Models\DeadlineExtensionRequest;
@@ -17,7 +15,8 @@ use Illuminate\Validation\ValidationException;
 class DeadlineExtensionWorkflowService
 {
     public function __construct(
-        private readonly WorkspaceNotificationService $notificationService
+        private readonly WorkspaceNotificationService $notificationService,
+        private readonly DeadlineExtensionChangeSet $changeSet
     ) {}
 
     /**
@@ -29,23 +28,24 @@ class DeadlineExtensionWorkflowService
         $action->loadMissing('pta:id,direction_id,service_id');
         $sousAction = $this->targetSousAction($action, $payload['sous_action_id'] ?? null);
         $oldDeadline = $this->targetDeadline($action, $sousAction);
-        $requestedDeadline = Carbon::parse((string) $payload['requested_deadline'])->startOfDay();
+        $requestedChanges = $this->changeSet->requestedChanges($payload, $sousAction instanceof SousAction);
+        $originalValues = $this->changeSet->snapshot($action, $sousAction, array_keys($requestedChanges));
+        $requestedDeadline = array_key_exists(DeadlineExtensionChangeSet::FIELD_DEADLINE, $requestedChanges)
+            ? Carbon::parse((string) $requestedChanges[DeadlineExtensionChangeSet::FIELD_DEADLINE])->startOfDay()
+            : $oldDeadline;
 
-        if ($requestedDeadline->lessThanOrEqualTo($oldDeadline)) {
-            throw ValidationException::withMessages([
-                'requested_deadline' => 'La nouvelle echeance doit etre posterieure a l echeance actuelle.',
-            ]);
-        }
+        $request = DB::transaction(function () use ($action, $actor, $payload, $storedFile, $sousAction, $oldDeadline, $requestedDeadline, $requestedChanges, $originalValues): DeadlineExtensionRequest {
+            Action::query()->whereKey($action->id)->lockForUpdate()->firstOrFail();
+            $this->ensureNoActiveRequest($action, $sousAction);
 
-        $this->ensureNoActiveRequest($action, $sousAction);
-
-        $request = DB::transaction(function () use ($action, $actor, $payload, $storedFile, $sousAction, $oldDeadline, $requestedDeadline): DeadlineExtensionRequest {
             $deadlineExtensionRequest = DeadlineExtensionRequest::query()->create([
                 'action_id' => $action->id,
                 'sous_action_id' => $sousAction?->id,
                 'target_type' => $sousAction instanceof SousAction ? 'sous_action' : 'action',
                 'old_deadline' => $oldDeadline->toDateString(),
                 'requested_deadline' => $requestedDeadline->toDateString(),
+                'requested_changes' => $requestedChanges,
+                'original_values' => $originalValues,
                 'requested_by' => $actor->id,
                 'motif' => (string) ($payload['motif'] ?? ''),
                 'justification' => (string) ($payload['justification'] ?? ''),
@@ -72,8 +72,9 @@ class DeadlineExtensionWorkflowService
                     'target_type' => $deadlineExtensionRequest->target_type,
                     'old_deadline' => $oldDeadline->toDateString(),
                     'requested_deadline' => $requestedDeadline->toDateString(),
+                    'change_fields' => array_keys($requestedChanges),
                 ],
-                User::ROLE_PLANIFICATION
+                User::ROLE_SERVICE
             );
 
             return $deadlineExtensionRequest;
@@ -108,21 +109,38 @@ class DeadlineExtensionWorkflowService
                 ]);
             }
 
-            $requestedDeadline = Carbon::parse((string) $payload['requested_deadline'])->startOfDay();
-            $oldDeadline = Carbon::parse($lockedRequest->old_deadline)->startOfDay();
-            if ($requestedDeadline->lessThanOrEqualTo($oldDeadline)) {
+            if ($lockedRequest->target_type === 'sous_action' && ! $lockedRequest->sousAction instanceof SousAction) {
                 throw ValidationException::withMessages([
-                    'requested_deadline' => 'La nouvelle echeance doit etre posterieure a l echeance actuelle.',
+                    'decision' => 'La sous-action ciblée est supprimée ou indisponible.',
                 ]);
             }
 
-            $nextStatus = $this->resubmissionStatus($lockedRequest);
+            $oldDeadline = $this->targetDeadline($lockedRequest->action, $lockedRequest->sousAction);
+            $requestedChanges = $this->changeSet->requestedChanges(
+                $payload,
+                $lockedRequest->sousAction instanceof SousAction
+            );
+            $originalValues = $this->changeSet->snapshot(
+                $lockedRequest->action,
+                $lockedRequest->sousAction,
+                array_keys($requestedChanges)
+            );
+            $requestedDeadline = array_key_exists(DeadlineExtensionChangeSet::FIELD_DEADLINE, $requestedChanges)
+                ? Carbon::parse((string) $requestedChanges[DeadlineExtensionChangeSet::FIELD_DEADLINE])->startOfDay()
+                : $oldDeadline;
+
+            $changeSetChanged = $this->normalizedChangeSet($lockedRequest->requested_changes) !== $this->normalizedChangeSet($requestedChanges);
+            $nextStatus = $changeSetChanged
+                ? DeadlineExtensionRequest::STATUS_SOUMISE
+                : $this->resubmissionStatus($lockedRequest);
             $metadata = is_array($lockedRequest->metadata) ? $lockedRequest->metadata : [];
             $history = is_array($metadata['revision_history'] ?? null) ? $metadata['revision_history'] : [];
             $history[] = [
                 'resubmitted_at' => now()->toIso8601String(),
                 'resubmitted_by' => $actor->id,
                 'previous_requested_deadline' => optional($lockedRequest->requested_deadline)->format('Y-m-d'),
+                'previous_requested_changes' => $lockedRequest->requested_changes,
+                'previous_original_values' => $lockedRequest->original_values,
                 'previous_motif' => $lockedRequest->motif,
                 'previous_justification' => $lockedRequest->justification,
                 'previous_attachment_path' => $lockedRequest->attachment_path,
@@ -144,12 +162,25 @@ class DeadlineExtensionWorkflowService
                     'chef_comment' => null,
                     'chef_reviewed_by' => null,
                     'chef_reviewed_at' => null,
+                    'director_decision' => null,
+                    'director_comment' => null,
+                    'director_reviewed_by' => null,
+                    'director_reviewed_at' => null,
+                    'final_decision' => null,
+                    'final_comment' => null,
+                    'final_decided_by' => null,
+                    'final_decided_at' => null,
+                    'final_approver_role' => null,
+                    'dg_decision' => null,
+                    'dg_comment' => null,
+                    'dg_decided_by' => null,
+                    'dg_decided_at' => null,
                 ],
-                DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => [
-                    'sciq_avis' => null,
-                    'sciq_comment' => null,
-                    'sciq_reviewed_by' => null,
-                    'sciq_reviewed_at' => null,
+                DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => [
+                    'director_decision' => null,
+                    'director_comment' => null,
+                    'director_reviewed_by' => null,
+                    'director_reviewed_at' => null,
                 ],
                 default => [
                     'final_decision' => null,
@@ -166,7 +197,11 @@ class DeadlineExtensionWorkflowService
 
             $lockedRequest->forceFill(array_merge([
                 'status' => $nextStatus,
+                'old_deadline' => $oldDeadline->toDateString(),
                 'requested_deadline' => $requestedDeadline->toDateString(),
+                'requested_changes' => $requestedChanges,
+                'original_values' => $originalValues,
+                'applied_values' => null,
                 'approved_deadline' => null,
                 'motif' => (string) $payload['motif'],
                 'justification' => (string) $payload['justification'],
@@ -188,10 +223,12 @@ class DeadlineExtensionWorkflowService
                     'next_status' => $nextStatus,
                     'revision_count' => count($history),
                     'requested_deadline' => $requestedDeadline->toDateString(),
+                    'change_fields' => array_keys($requestedChanges),
+                    'change_set_changed' => $changeSetChanged,
                 ],
                 match ($nextStatus) {
                     DeadlineExtensionRequest::STATUS_SOUMISE => User::ROLE_SERVICE,
-                    DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => User::ROLE_SCIQ,
+                    DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => User::ROLE_DIRECTION,
                     default => User::ROLE_DG,
                 }
             );
@@ -211,7 +248,7 @@ class DeadlineExtensionWorkflowService
     {
         $decision = (string) $payload['decision'];
         $status = match ($decision) {
-            DeadlineExtensionRequest::AVIS_FAVORABLE => DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE,
+            DeadlineExtensionRequest::AVIS_FAVORABLE => DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION,
             DeadlineExtensionRequest::AVIS_COMPLEMENT => DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE,
             default => DeadlineExtensionRequest::STATUS_REJETEE,
         };
@@ -226,6 +263,7 @@ class DeadlineExtensionWorkflowService
                 DeadlineExtensionRequest::STATUS_SOUMISE,
                 DeadlineExtensionRequest::STATUS_EN_ANALYSE,
             ]);
+            $this->ensureDistinctReviewer($lockedRequest, $actor);
 
             $lockedRequest->forceFill([
                 'status' => $status,
@@ -246,7 +284,7 @@ class DeadlineExtensionWorkflowService
                     'decision' => $decision,
                     'status' => $status,
                 ],
-                $decision === DeadlineExtensionRequest::AVIS_FAVORABLE ? User::ROLE_SCIQ : null
+                $decision === DeadlineExtensionRequest::AVIS_FAVORABLE ? User::ROLE_DIRECTION : null
             );
 
             return $lockedRequest;
@@ -260,11 +298,11 @@ class DeadlineExtensionWorkflowService
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function reviewByController(DeadlineExtensionRequest $request, array $payload, User $actor): DeadlineExtensionRequest
+    public function reviewByDirector(DeadlineExtensionRequest $request, array $payload, User $actor): DeadlineExtensionRequest
     {
         $decision = (string) $payload['decision'];
         $status = match ($decision) {
-            DeadlineExtensionRequest::AVIS_FAVORABLE => DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
+            DeadlineExtensionRequest::AVIS_FAVORABLE => DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
             DeadlineExtensionRequest::AVIS_COMPLEMENT => DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE,
             default => DeadlineExtensionRequest::STATUS_REJETEE,
         };
@@ -275,21 +313,22 @@ class DeadlineExtensionWorkflowService
                 ->whereKey($request->id)
                 ->lockForUpdate()
                 ->firstOrFail();
-            $this->ensureStatus($lockedRequest, [DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE]);
+            $this->ensureStatus($lockedRequest, [DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION]);
+            $this->ensureDistinctReviewer($lockedRequest, $actor, [$lockedRequest->chef_reviewed_by]);
 
             $lockedRequest->forceFill([
                 'status' => $status,
-                'sciq_avis' => $decision,
-                'sciq_comment' => (string) ($payload['comment'] ?? ''),
-                'sciq_reviewed_by' => $actor->id,
-                'sciq_reviewed_at' => now(),
+                'director_decision' => $decision,
+                'director_comment' => (string) ($payload['comment'] ?? ''),
+                'director_reviewed_by' => $actor->id,
+                'director_reviewed_at' => now(),
             ])->save();
 
             $this->logAction(
                 $lockedRequest->action,
-                'deadline_extension_controller_reviewed',
+                'deadline_extension_director_reviewed',
                 $decision === DeadlineExtensionRequest::AVIS_FAVORABLE ? 'info' : 'warning',
-                'Avis du contrôleur enregistré sur une demande de report.',
+                'Accord du directeur enregistré sur une demande de modification.',
                 $actor,
                 [
                     'deadline_extension_request_id' => $lockedRequest->id,
@@ -302,9 +341,9 @@ class DeadlineExtensionWorkflowService
             return $lockedRequest;
         });
 
-        $this->notificationService->notifyDeadlineExtensionControllerReviewed($reviewed->fresh(['action']), $actor);
+        $this->notificationService->notifyDeadlineExtensionDirectorReviewed($reviewed->fresh(['action']), $actor);
 
-        return $reviewed->fresh(['action', 'sousAction', 'sciqReviewedBy']);
+        return $reviewed->fresh(['action', 'sousAction', 'directorReviewedBy']);
     }
 
     /**
@@ -314,7 +353,7 @@ class DeadlineExtensionWorkflowService
     {
         $decision = (string) $payload['decision'];
         $status = match ($decision) {
-            DeadlineExtensionRequest::DECISION_APPROUVER => DeadlineExtensionRequest::STATUS_APPROUVEE,
+            DeadlineExtensionRequest::DECISION_APPROUVER => DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE,
             DeadlineExtensionRequest::DECISION_COMPLEMENT => DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE,
             default => DeadlineExtensionRequest::STATUS_REJETEE,
         };
@@ -326,29 +365,46 @@ class DeadlineExtensionWorkflowService
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->ensureStatus($lockedRequest, [
-                DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
                 DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
             ]);
+            $this->ensureDistinctReviewer($lockedRequest, $actor, [
+                $lockedRequest->chef_reviewed_by,
+                $lockedRequest->director_reviewed_by,
+            ]);
+            $this->lockChangeTargets($lockedRequest);
 
-            $approvedDeadline = $this->approvedDeadline($lockedRequest, $payload['approved_deadline'] ?? null);
-            $lockedRequest->forceFill([
+            $requestedChanges = is_array($lockedRequest->requested_changes) ? $lockedRequest->requested_changes : [];
+            $approvedDeadline = array_key_exists(DeadlineExtensionChangeSet::FIELD_DEADLINE, $requestedChanges)
+                ? (string) $requestedChanges[DeadlineExtensionChangeSet::FIELD_DEADLINE]
+                : null;
+            $finalValues = [
                 'status' => $status,
                 'final_decision' => $decision,
                 'final_comment' => (string) ($payload['comment'] ?? ''),
                 'final_decided_by' => $actor->id,
                 'final_decided_at' => now(),
                 'final_approver_role' => $actor->role,
-                'approved_deadline' => $decision === DeadlineExtensionRequest::DECISION_APPROUVER ? $approvedDeadline->toDateString() : null,
+                'approved_deadline' => $decision === DeadlineExtensionRequest::DECISION_APPROUVER ? $approvedDeadline : null,
                 // Compatibilité des exports et historiques déjà fondés sur les colonnes DG.
                 'dg_decision' => $decision,
                 'dg_comment' => (string) ($payload['comment'] ?? ''),
                 'dg_decided_by' => $actor->id,
                 'dg_decided_at' => now(),
-            ])->save();
+            ];
+
+            if ($decision === DeadlineExtensionRequest::DECISION_APPROUVER) {
+                $finalValues['applied_values'] = $this->changeSet->apply($lockedRequest);
+                $finalValues['applied_by'] = $actor->id;
+                $finalValues['applied_at'] = now();
+            }
+
+            $lockedRequest->forceFill($finalValues)->save();
 
             $this->logAction(
                 $lockedRequest->action,
-                'deadline_extension_final_decided',
+                $decision === DeadlineExtensionRequest::DECISION_APPROUVER
+                    ? 'deadline_extension_dg_approved_and_applied'
+                    : 'deadline_extension_final_decided',
                 $decision === DeadlineExtensionRequest::DECISION_APPROUVER ? 'info' : 'warning',
                 'Décision finale enregistrée sur une demande de report.',
                 $actor,
@@ -357,13 +413,18 @@ class DeadlineExtensionWorkflowService
                     'decision' => $decision,
                     'status' => $status,
                     'approver_role' => $actor->role,
-                    'approved_deadline' => $decision === DeadlineExtensionRequest::DECISION_APPROUVER ? $approvedDeadline->toDateString() : null,
+                    'approved_deadline' => $decision === DeadlineExtensionRequest::DECISION_APPROUVER ? $approvedDeadline : null,
+                    'change_fields' => array_keys($requestedChanges),
                 ],
                 $decision === DeadlineExtensionRequest::DECISION_APPROUVER ? User::ROLE_SCIQ : null
             );
 
             return $lockedRequest;
         });
+
+        if ($decision === DeadlineExtensionRequest::DECISION_APPROUVER) {
+            DeadlineExtensionApproved::dispatch($reviewed, $actor);
+        }
 
         $this->notificationService->notifyDeadlineExtensionFinalDecided($reviewed->fresh(['action']), $actor);
 
@@ -379,50 +440,37 @@ class DeadlineExtensionWorkflowService
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->ensureStatus($lockedRequest, [DeadlineExtensionRequest::STATUS_APPROUVEE]);
+            $this->lockChangeTargets($lockedRequest);
 
-            if ($lockedRequest->approved_deadline === null) {
-                throw ValidationException::withMessages([
-                    'approved_deadline' => 'Aucune échéance finale approuvée ne peut être appliquée.',
-                ]);
-            }
-
-            $approvedDeadline = Carbon::parse($lockedRequest->approved_deadline)->startOfDay();
-            $this->applyDeadline($lockedRequest, $approvedDeadline);
+            $appliedValues = $this->changeSet->apply($lockedRequest);
 
             $lockedRequest->forceFill([
                 'status' => DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE,
+                'applied_values' => $appliedValues,
                 'applied_by' => $actor->id,
                 'applied_at' => now(),
             ])->save();
 
             $this->logAction(
                 $lockedRequest->action,
-                'deadline_extension_applied_by_controller',
+                'deadline_extension_legacy_applied_by_dg',
                 'info',
-                'La nouvelle échéance approuvée a été appliquée par un contrôleur.',
+                'La modification approuvée a été appliquée par la DG.',
                 $actor,
                 [
                     'deadline_extension_request_id' => $lockedRequest->id,
-                    'approved_deadline' => $approvedDeadline->toDateString(),
+                    'change_fields' => array_keys($appliedValues),
                 ]
             );
-
-            DeadlineExtensionApproved::dispatch($lockedRequest, $actor);
 
             return $lockedRequest;
         });
 
+        DeadlineExtensionApproved::dispatch($applied, $actor);
+
         $this->notificationService->notifyDeadlineExtensionApplied($applied->fresh(['action']), $actor);
 
         return $applied->fresh(['action', 'sousAction']);
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    public function reviewByDg(DeadlineExtensionRequest $request, array $payload, User $actor): DeadlineExtensionRequest
-    {
-        return $this->reviewFinal($request, $payload, $actor);
     }
 
     private function targetSousAction(Action $action, mixed $sousActionId): ?SousAction
@@ -458,54 +506,18 @@ class DeadlineExtensionWorkflowService
         return Carbon::parse($deadline)->startOfDay();
     }
 
-    private function approvedDeadline(DeadlineExtensionRequest $request, mixed $approvedDeadline): Carbon
-    {
-        $deadline = $approvedDeadline !== null && trim((string) $approvedDeadline) !== ''
-            ? Carbon::parse((string) $approvedDeadline)->startOfDay()
-            : Carbon::parse($request->requested_deadline)->startOfDay();
-
-        if ($deadline->lessThanOrEqualTo(Carbon::parse($request->old_deadline)->startOfDay())) {
-            throw ValidationException::withMessages([
-                'approved_deadline' => 'L echeance approuvee doit etre posterieure a l echeance actuelle.',
-            ]);
-        }
-
-        return $deadline;
-    }
-
     private function resubmissionStatus(DeadlineExtensionRequest $request): string
     {
         if ($request->final_decision === DeadlineExtensionRequest::DECISION_COMPLEMENT
             || $request->dg_decision === DeadlineExtensionRequest::DECISION_COMPLEMENT) {
-            return DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE;
+            return DeadlineExtensionRequest::STATUS_TRANSMISE_DG;
         }
 
-        if ($request->sciq_avis === DeadlineExtensionRequest::AVIS_COMPLEMENT) {
-            return DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE;
+        if ($request->director_decision === DeadlineExtensionRequest::AVIS_COMPLEMENT) {
+            return DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION;
         }
 
         return DeadlineExtensionRequest::STATUS_SOUMISE;
-    }
-
-    private function applyDeadline(DeadlineExtensionRequest $request, Carbon $approvedDeadline): void
-    {
-        if ($request->sousAction instanceof SousAction) {
-            $request->sousAction->forceFill([
-                'date_fin' => $approvedDeadline->toDateString(),
-                'statut_echeance' => $approvedDeadline->isPast() ? StatutEcheance::Echue->value : StatutEcheance::NonEchue->value,
-                'statut_retard' => StatutRetard::DansLesDelais->value,
-            ])->save();
-
-            return;
-        }
-
-        $request->action->forceFill([
-            'date_fin' => $approvedDeadline->toDateString(),
-            'date_echeance' => $approvedDeadline->toDateString(),
-            'echeance_cible' => $approvedDeadline->toDateString(),
-            'statut_echeance' => $approvedDeadline->isPast() ? StatutEcheance::Echue->value : StatutEcheance::NonEchue->value,
-            'statut_retard' => StatutRetard::DansLesDelais->value,
-        ])->save();
     }
 
     /**
@@ -529,6 +541,7 @@ class DeadlineExtensionWorkflowService
                 DeadlineExtensionRequest::STATUS_SOUMISE,
                 DeadlineExtensionRequest::STATUS_EN_ANALYSE,
                 DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE,
+                DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION,
                 DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE,
                 DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE,
                 DeadlineExtensionRequest::STATUS_TRANSMISE_DG,
@@ -548,6 +561,65 @@ class DeadlineExtensionWorkflowService
         throw ValidationException::withMessages([
             'requested_deadline' => 'Une demande de report est deja en cours pour cet element.',
         ]);
+    }
+
+    /** @param array<int, mixed> $previousReviewerIds */
+    private function ensureDistinctReviewer(
+        DeadlineExtensionRequest $request,
+        User $actor,
+        array $previousReviewerIds = []
+    ): void {
+        $forbiddenIds = collect($previousReviewerIds)
+            ->push($request->requested_by)
+            ->filter(fn (mixed $id): bool => (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+
+        if (! $forbiddenIds->contains((int) $actor->id)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'decision' => 'Chaque étape du circuit doit être traitée par un intervenant distinct du RMO et des valideurs précédents.',
+        ]);
+    }
+
+    private function normalizedChangeSet(mixed $changes): string
+    {
+        $values = is_array($changes) ? $changes : [];
+        foreach ($values as &$value) {
+            if (is_array($value)) {
+                sort($value);
+            }
+        }
+        ksort($values);
+
+        return json_encode($values, JSON_THROW_ON_ERROR);
+    }
+
+    private function lockChangeTargets(DeadlineExtensionRequest $request): void
+    {
+        $action = Action::query()->whereKey($request->action_id)->lockForUpdate()->firstOrFail();
+        $request->setRelation('action', $action);
+
+        if ($request->target_type !== 'sous_action') {
+            $request->setRelation('sousAction', null);
+
+            return;
+        }
+
+        $sousAction = SousAction::withTrashed()
+            ->whereKey($request->sous_action_id)
+            ->where('action_id', $request->action_id)
+            ->lockForUpdate()
+            ->first();
+        if (! $sousAction instanceof SousAction || $sousAction->trashed()) {
+            throw ValidationException::withMessages([
+                'decision' => 'La sous-action ciblée est supprimée ou indisponible. Aucune modification n’a été appliquée.',
+            ]);
+        }
+
+        $request->setRelation('sousAction', $sousAction);
     }
 
     /**

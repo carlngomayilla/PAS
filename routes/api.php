@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\Api\ActionController;
 use App\Http\Controllers\Api\ActionCommentController;
+use App\Http\Controllers\Api\ActionController;
 use App\Http\Controllers\Api\ActionValidationController;
 use App\Http\Controllers\Api\AlerteController;
 use App\Http\Controllers\Api\AuthController;

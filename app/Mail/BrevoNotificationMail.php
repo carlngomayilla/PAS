@@ -27,8 +27,7 @@ class BrevoNotificationMail extends Mailable
         public readonly string $ctaUrl = '',
         public readonly string $recipientName = '',
         public readonly array $template = []
-    ) {
-    }
+    ) {}
 
     public function envelope(): Envelope
     {

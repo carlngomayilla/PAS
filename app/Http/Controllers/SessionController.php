@@ -18,8 +18,7 @@ class SessionController extends Controller
 {
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy
-    ) {
-    }
+    ) {}
 
     public function create(): View
     {

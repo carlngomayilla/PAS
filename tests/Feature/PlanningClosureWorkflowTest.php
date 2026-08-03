@@ -12,6 +12,7 @@ use App\Models\PasAxe;
 use App\Models\PasObjectif;
 use App\Models\Pta;
 use App\Models\Service;
+use App\Models\User;
 use App\Services\Actions\ActionTrackingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesAdminUser;
@@ -86,6 +87,10 @@ class PlanningClosureWorkflowTest extends TestCase
     public function test_pta_closure_report_detects_open_and_late_actions(): void
     {
         $superAdmin = $this->createSuperAdminUser();
+        $sciq = User::factory()->create([
+            'role' => User::ROLE_SCIQ,
+            'password_changed_at' => now(),
+        ]);
         $fixture = $this->planningFixture();
 
         $this->actingAs($superAdmin)
@@ -114,9 +119,23 @@ class PlanningClosureWorkflowTest extends TestCase
                 'motif' => 'Cloture PTA apres controle SCIQ',
                 'force_close' => '1',
             ])
+            ->assertStatus(409);
+
+        $this->assertSame(Pta::STATUS_CONTROLE_SCIQ, $fixture['pta']->fresh()->statut);
+
+        $this->actingAs($sciq)
+            ->post(route('workspace.pta.close', $fixture['pta']), [
+                'motif' => 'Cloture PTA apres controle SCIQ',
+                'force_close' => '1',
+            ])
             ->assertRedirect(route('workspace.pta.index'));
 
         $this->assertSame(Pta::STATUS_CLOTURE, $fixture['pta']->fresh()->statut);
+        $this->assertDatabaseHas('journal_audit', [
+            'user_id' => $sciq->id,
+            'module' => 'pta',
+            'action' => 'close',
+        ]);
     }
 
     /**

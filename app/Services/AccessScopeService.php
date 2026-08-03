@@ -19,10 +19,15 @@ use App\Models\User;
 class AccessScopeService
 {
     public const TYPE_GLOBAL = 'global';
+
     public const TYPE_DIRECTION = 'direction';
+
     public const TYPE_SERVICE = 'service';
+
     public const TYPE_UNITE = 'unite';
+
     public const TYPE_AGENT = 'agent';
+
     public const TYPE_LIMITED = 'limited';
 
     /**
@@ -209,7 +214,7 @@ class AccessScopeService
     }
 
     /**
-     * @param array<string, mixed> $scope
+     * @param  array<string, mixed>  $scope
      * @return array<string, mixed>
      */
     private function finalize(array $scope, User $user): array

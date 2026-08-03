@@ -26,7 +26,7 @@ return new class extends Migration
 
         foreach (['pas', 'paos', 'ptas', 'actions', 'kpis'] as $tableName) {
             if (Schema::hasTable($tableName) && ! Schema::hasColumn($tableName, 'exercice_id')) {
-                Schema::table($tableName, function (Blueprint $table) use ($tableName): void {
+                Schema::table($tableName, function (Blueprint $table): void {
                     $table->foreignId('exercice_id')->nullable()->after('id')->constrained('exercices')->nullOnDelete();
                 });
             }
@@ -75,7 +75,7 @@ return new class extends Migration
     {
         foreach (array_reverse(['pas', 'paos', 'ptas', 'actions', 'kpis']) as $tableName) {
             if (Schema::hasTable($tableName) && Schema::hasColumn($tableName, 'exercice_id')) {
-                Schema::table($tableName, function (Blueprint $table) use ($tableName): void {
+                Schema::table($tableName, function (Blueprint $table): void {
                     $table->dropConstrainedForeignId('exercice_id');
                 });
             }

@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -16,7 +14,7 @@ final class ActionWeek
 {
     public static function query(): self
     {
-        return new self();
+        return new self;
     }
 
     public function __call(string $name, array $arguments): self
@@ -28,12 +26,12 @@ final class ActionWeek
 
     public static function __callStatic(string $name, array $arguments): self
     {
-        return new self();
+        return new self;
     }
 
     public function get(): Collection
     {
-        return new Collection();
+        return new Collection;
     }
 
     public function count(): int
@@ -53,6 +51,6 @@ final class ActionWeek
 
     public function pluck($column)
     {
-        return new Collection();
+        return new Collection;
     }
 }

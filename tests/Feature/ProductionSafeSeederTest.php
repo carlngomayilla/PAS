@@ -103,7 +103,7 @@ class ProductionSafeSeederTest extends TestCase
             ->where('is_active', true)
             ->whereNull('deleted_at')
             ->orderByRaw(
-                "CASE WHEN role = ? THEN 0 WHEN role = ? THEN 1 ELSE 2 END",
+                'CASE WHEN role = ? THEN 0 WHEN role = ? THEN 1 ELSE 2 END',
                 [User::ROLE_AGENT, User::ROLE_SERVICE]
             )
             ->orderBy('id')

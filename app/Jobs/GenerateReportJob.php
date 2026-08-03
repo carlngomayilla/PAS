@@ -16,6 +16,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -25,6 +26,7 @@ class GenerateReportJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
+
     public int $timeout = 900;
 
     public function __construct(
@@ -47,7 +49,7 @@ class GenerateReportJob implements ShouldQueue
         // generer un export potentiellement sensible. En cas d echec, on logge
         // et on sort silencieusement (le job ne doit pas etre retry).
         if (! $this->stillAuthorizedToExport($user)) {
-            \Illuminate\Support\Facades\Log::warning('Reporting export refused at job-time (A16).', [
+            Log::warning('Reporting export refused at job-time (A16).', [
                 'user_id' => $user->id,
                 'format' => $format,
                 'reason' => $this->disqualificationReason($user),

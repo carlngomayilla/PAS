@@ -49,7 +49,7 @@ class ReportingExportPermissionTest extends TestCase
     }
 
     /**
-     * @param list<string> $permissions
+     * @param  list<string>  $permissions
      */
     private function setRolePermissions(string $role, array $permissions): void
     {

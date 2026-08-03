@@ -6,7 +6,7 @@
 
     $viteEntries = $assetProfile === 'guest'
         ? ['resources/css/guest.css', 'resources/js/guest.js']
-        : ['resources/css/app.css', 'resources/css/anbg-glass.css', 'resources/js/app.js'];
+        : ['resources/css/app.css', 'resources/css/anbg-glass.css', 'resources/css/ui-system.css', 'resources/js/app.js'];
 @endphp
 
 <link rel="preconnect" href="https://fonts.googleapis.com">

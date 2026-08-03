@@ -24,7 +24,7 @@ class TestSeederProductionGuardTest extends TestCase
             $this->expectException(RuntimeException::class);
             $this->expectExceptionMessage('TestSeeder est interdit en production.');
 
-            (new TestSeeder())->setContainer(app())->run();
+            (new TestSeeder)->setContainer(app())->run();
         } finally {
             app()->detectEnvironment(fn () => $previousEnv);
         }
@@ -41,7 +41,7 @@ class TestSeederProductionGuardTest extends TestCase
 
         try {
             $this->expectException(RuntimeException::class);
-            (new TestSeeder())->setContainer(app())->run();
+            (new TestSeeder)->setContainer(app())->run();
         } finally {
             if ($previousOverride === false) {
                 putenv('ANBG_ALLOW_TEST_SEEDER');

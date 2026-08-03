@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Notifications\WorkspaceModuleNotification;
 use App\Services\Notifications\WorkspaceNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;

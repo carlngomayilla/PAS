@@ -29,6 +29,16 @@ class AuditWorkspaceService
         'review_action_reject',
         'review_sub_action_validate',
         'review_sub_action_reject',
+        'review_control_validate',
+        'review_control_reject',
+        'submit_control',
+        'controller_review',
+        'director_review',
+        'deadline_applied',
+        'deadline_extension_director_reviewed',
+        'deadline_extension_dg_approved_and_applied',
+        'deadline_extension_final_decided',
+        'deadline_extension_legacy_applied_by_dg',
         'submit_financing_daf',
         'review_financing_daf',
         'review_financing_dg',
@@ -72,7 +82,7 @@ class AuditWorkspaceService
             'entite_id' => $this->positiveInteger($input['entite_id'] ?? null),
             'date_from' => $this->date($input['date_from'] ?? null),
             'date_to' => $this->date($input['date_to'] ?? null),
-            'operation_scope' => in_array($operationScope, ['recent', 'interventions', 'sensitive', 'organization'], true)
+            'operation_scope' => in_array($operationScope, ['recent', 'execution', 'reports', 'interventions', 'sensitive', 'organization'], true)
                 ? $operationScope
                 : '',
             'sort' => $sort === 'oldest' ? 'oldest' : 'recent',
@@ -316,6 +326,8 @@ class AuditWorkspaceService
             'scope_counts' => [
                 'all' => (clone $contextQuery)->count(),
                 'recent' => $this->countForScope($contextQuery, 'recent'),
+                'execution' => $this->countForScope($contextQuery, 'execution'),
+                'reports' => $this->countForScope($contextQuery, 'reports'),
                 'interventions' => $this->countForScope($contextQuery, 'interventions'),
                 'sensitive' => $this->countForScope($contextQuery, 'sensitive'),
                 'organization' => $this->countForScope($contextQuery, 'organization'),
@@ -383,11 +395,46 @@ class AuditWorkspaceService
     {
         match ($scope) {
             'recent' => $query->where('created_at', '>=', now()->subDay()),
+            'execution' => $this->applyExecutionScope($query),
+            'reports' => $query->where('module', 'institutional_reports'),
             'interventions' => $this->applyInterventionScope($query),
             'sensitive' => $this->applySensitiveScope($query),
             'organization' => $query->where('action', 'like', 'organization_%'),
             default => null,
         };
+    }
+
+    private function applyExecutionScope(Builder $query): Builder
+    {
+        return $query->where(function (Builder $executionQuery): void {
+            $executionQuery
+                ->whereIn('module', [
+                    'action',
+                    'actions',
+                    'pta',
+                    'pao',
+                    'pas',
+                    'planning',
+                    'planning_unlock',
+                    'deadline_extension',
+                    'reports_echeance',
+                ])
+                ->orWhereIn('entite_type', [
+                    'action',
+                    'sous_action',
+                    'pta',
+                    'pao',
+                    'pas',
+                    'deadline_extension_request',
+                    'planning_unlock_request',
+                ])
+                ->orWhere('action', 'like', '%controle%')
+                ->orWhere('action', 'like', '%review%')
+                ->orWhere('action', 'like', '%validation%')
+                ->orWhere('action', 'like', '%progress%')
+                ->orWhere('action', 'like', '%execution%')
+                ->orWhere('action', 'like', '%justificatif%');
+        });
     }
 
     private function applyInterventionScope(Builder $query): Builder

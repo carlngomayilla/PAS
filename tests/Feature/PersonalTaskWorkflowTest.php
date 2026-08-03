@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Action;
+use App\Models\DeadlineExtensionRequest;
 use App\Models\Direction;
 use App\Models\JournalAudit;
 use App\Models\Pao;
@@ -147,6 +148,59 @@ class PersonalTaskWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Controle final')
             ->assertSee('Action a controler');
+    }
+
+    public function test_sciq_keeps_pta_control_while_deadline_decision_is_routed_to_the_director(): void
+    {
+        $fixture = $this->planningFixture();
+        $sciq = User::factory()->create(['role' => User::ROLE_SCIQ, 'password_changed_at' => now()]);
+        $otherSciq = User::factory()->create(['role' => User::ROLE_SCIQ, 'password_changed_at' => now()]);
+        $director = User::factory()->create([
+            'role' => User::ROLE_DIRECTION,
+            'direction_id' => $fixture['direction']->id,
+            'password_changed_at' => now(),
+        ]);
+        $action = $this->makeAction($fixture['pta'], $fixture['agent'], 'Action avec report');
+
+        $fixture['pta']->forceFill([
+            'statut' => Pta::STATUS_CONTROLE_SCIQ,
+            'valide_par' => $otherSciq->id,
+            'valide_le' => now(),
+        ])->save();
+        $deadlineRequest = DeadlineExtensionRequest::query()->create([
+            'action_id' => $action->id,
+            'target_type' => 'action',
+            'old_deadline' => now()->addWeek()->toDateString(),
+            'requested_deadline' => now()->addWeeks(2)->toDateString(),
+            'requested_changes' => ['deadline' => now()->addWeeks(2)->toDateString()],
+            'original_values' => ['deadline' => now()->addWeek()->toDateString()],
+            'requested_by' => $fixture['agent']->id,
+            'motif' => 'Contrainte externe documentee',
+            'justification' => 'Report necessaire pour finaliser le livrable.',
+            'attachment_path' => 'reports-echeance/test.pdf',
+            'attachment_name' => 'justificatif.pdf',
+            'attachment_mime' => 'application/pdf',
+            'attachment_size' => 1024,
+            'is_critical' => false,
+            'status' => DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION,
+        ]);
+
+        $items = collect(app(PersonalTaskService::class)->forUser($sciq, 20)['items']);
+        $directorItems = collect(app(PersonalTaskService::class)->forUser($director, 20)['items']);
+
+        $this->assertNotNull($items->firstWhere('key', 'pta-control:'.$fixture['pta']->id));
+        $this->assertNull($items->firstWhere('key', 'deadline-extension-control:'.$deadlineRequest->id));
+        $this->assertNotNull($directorItems->firstWhere('key', 'deadline-extension-control:'.$deadlineRequest->id));
+        $this->assertSame(1, app(PersonalTaskService::class)->controlTaskCount($sciq));
+
+        $fixture['pta']->forceFill(['valide_par' => $sciq->id])->save();
+        $deadlineRequest->forceFill(['status' => DeadlineExtensionRequest::STATUS_REJETEE])->save();
+
+        $refreshedItems = collect(app(PersonalTaskService::class)->forUser($sciq, 20)['items']);
+        $refreshedDirectorItems = collect(app(PersonalTaskService::class)->forUser($director, 20)['items']);
+        $this->assertNull($refreshedItems->firstWhere('key', 'pta-control:'.$fixture['pta']->id));
+        $this->assertNull($refreshedDirectorItems->firstWhere('key', 'deadline-extension-control:'.$deadlineRequest->id));
+        $this->assertSame(0, app(PersonalTaskService::class)->controlTaskCount($sciq));
     }
 
     public function test_personal_task_workspace_filters_and_paginates_the_full_authorized_queue(): void

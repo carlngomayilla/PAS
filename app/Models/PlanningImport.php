@@ -11,7 +11,9 @@ class PlanningImport extends Model
     use HasFactory;
 
     public const MODE_CREATE_ONLY = 'create_only';
+
     public const MODE_SKIP_DUPLICATES = 'skip_duplicates';
+
     public const MODE_UPDATE_EXISTING = 'update_existing';
 
     protected $fillable = [

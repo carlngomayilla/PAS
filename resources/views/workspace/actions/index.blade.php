@@ -9,6 +9,8 @@
         $currentViewMode = (string) ($filters['vue'] ?? '');
         $showDualActionTabs = (bool) ($showDualActionTabs ?? false);
         $showActionValidationTab = (bool) ($showActionValidationTab ?? false);
+        $isFinalControlQueue = (bool) ($isFinalControlQueue ?? false);
+        $canReadAudit = (bool) ($canReadAudit ?? false);
         $isValidationTab = $currentViewMode === 'validations';
         $viewModeLabel = match ($currentViewMode) {
             'pilotage' => 'Actions pilotées',
@@ -190,8 +192,8 @@
 
     <div class="app-screen-flow">
     <x-ui.page-title
-        eyebrow="Pilotage opérationnel"
-        title="Suivi des actions"
+        :eyebrow="$isValidationTab && $isFinalControlQueue ? 'Conformité SCIQ' : 'Pilotage opérationnel'"
+        :title="$isValidationTab && $isFinalControlQueue ? 'Contrôle des exécutions' : 'Suivi des actions'"
     />
 
     <section class="showcase-toolbar mb-4 app-screen-block">
@@ -204,11 +206,17 @@
                 @endif
                 @if ($showActionValidationTab)
                     <a class="btn btn-sm {{ $isValidationTab ? 'btn-primary' : 'btn-secondary' }} rounded-xl px-3 py-1.5" href="{{ route('workspace.actions.index', ['vue' => 'validations']) }}">
-                        Validations
+                        {{ $isFinalControlQueue ? 'Exécutions à contrôler' : 'Validations' }}
                         @if ($pendingValidationCount > 0)
                             <span class="ml-1 rounded-full bg-white/25 px-2 py-0.5 text-[11px] font-bold">{{ $pendingValidationCount }}</span>
                         @endif
                     </a>
+                @endif
+                @if ($isValidationTab && $isFinalControlQueue)
+                    <a class="btn btn-sm btn-secondary rounded-xl px-3 py-1.5" href="{{ route('workspace.notifications.index', ['tab' => 'alertes']) }}">Alertes & anomalies</a>
+                    @if ($canReadAudit)
+                        <a class="btn btn-sm btn-secondary rounded-xl px-3 py-1.5" href="{{ route('workspace.audit.index', ['operation_scope' => 'execution']) }}">Traçabilité</a>
+                    @endif
                 @endif
             </div>
             <div class="flex items-center gap-2">
@@ -293,8 +301,8 @@
                 <div>
                     <label for="statut_validation">Validation</label>
                     @if ($isValidationTab)
-                        <input type="hidden" name="statut_validation" value="soumise_chef">
-                        <input id="statut_validation" type="text" value="En attente chef" readonly>
+                        <input type="hidden" name="statut_validation" value="{{ $filters['statut_validation'] }}">
+                        <input id="statut_validation" type="text" value="{{ $isFinalControlQueue ? 'Transmise au contrôle final' : 'En attente chef' }}" readonly>
                     @else
                         <select id="statut_validation" name="statut_validation">
                             <option value="">Toutes</option>

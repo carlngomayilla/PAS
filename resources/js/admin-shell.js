@@ -690,6 +690,14 @@
         });
     }
 
+    function submitConfirmedForm(form, submitter) {
+        if (window.AnBGLoader) {
+            window.AnBGLoader.beginFormSubmission(form, submitter);
+        }
+
+        HTMLFormElement.prototype.submit.call(form);
+    }
+
     document.addEventListener('submit', function (event) {
         var form = event.target;
 
@@ -699,6 +707,7 @@
 
         var confirmMessage = form.dataset.confirmMessage;
         var promptMessage = form.dataset.promptMessage;
+        var submitter = event.submitter;
 
         if (!confirmMessage && !promptMessage) {
             return;
@@ -729,7 +738,7 @@
                     targetInput.value = result.value || '';
                 }
 
-                HTMLFormElement.prototype.submit.call(form);
+                submitConfirmedForm(form, submitter);
             });
 
             return;
@@ -748,7 +757,7 @@
                 return;
             }
 
-            HTMLFormElement.prototype.submit.call(form);
+            submitConfirmedForm(form, submitter);
         });
     }, true);
 

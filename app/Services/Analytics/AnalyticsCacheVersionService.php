@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Cache;
 class AnalyticsCacheVersionService
 {
     private const REPORTING_VERSION_KEY = 'analytics-cache:reporting-version';
+
     private const DASHBOARD_VERSION_KEY = 'analytics-cache:dashboard-version';
 
     // A39 — Versionnement dedie pour le centre d alertes : permet d invalider

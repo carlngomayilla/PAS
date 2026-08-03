@@ -24,76 +24,293 @@
     --color-textMuted: #667085;
 }
 
-/* Compact feedback bubbles — intentionally non-blocking. */
-@layer components {
-    .premium-process-overlay {
-        inset: auto 1rem 1rem auto;
-        display: block;
-        width: min(24rem, calc(100vw - 2rem));
-        padding: 0;
-        background: transparent;
-        pointer-events: none;
-        backdrop-filter: none;
-    }
-
-    .premium-process-overlay.hidden {
-        display: none;
-    }
-
-    .premium-process-card {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        gap: 0.8rem 0.9rem;
+/* Unified form presentation ------------------------------------------------ */
+@layer utilities {
+    body.admin-theme-scope .app-form-surface {
+        position: relative;
         width: 100%;
-        padding: 0.9rem;
-        border-radius: 1.15rem;
-        pointer-events: auto;
-        transform: translateY(0.65rem) scale(0.98);
-    }
-
-    .premium-process-overlay.is-visible .premium-process-card {
-        transform: translateY(0) scale(1);
-    }
-
-    .premium-loading-orb {
-        grid-row: 1 / span 2;
-        width: 2.75rem;
-        height: 2.75rem;
-        margin: 0;
-    }
-
-    .premium-process-copy {
         min-width: 0;
-        padding-right: 1.8rem;
+        gap: 1.15rem;
     }
 
-    .premium-process-eyebrow {
-        font-size: 0.6rem;
-        letter-spacing: 0.09em;
+    body.admin-theme-scope .app-form-standalone {
+        padding: clamp(1rem, 2.2vw, 1.5rem);
+        border: 1px solid color-mix(in srgb, var(--app-border) 88%, #3996d3 12%);
+        border-radius: 1.25rem;
+        background:
+            linear-gradient(145deg, color-mix(in srgb, var(--app-surface) 97%, #3996d3 3%), var(--app-surface));
+        box-shadow: 0 18px 48px -36px rgba(23, 50, 74, 0.42);
     }
 
-    .premium-process-title {
-        margin-top: 0.1rem;
-        font-size: 0.98rem;
+    body.admin-theme-scope .app-form-surface .form-section {
+        position: relative;
+        isolation: isolate;
+        padding: 1.25rem !important;
+        overflow: hidden;
+        border-color: color-mix(in srgb, var(--app-border) 82%, #3996d3 18%) !important;
+        border-radius: 1.1rem !important;
+        background:
+            linear-gradient(180deg, color-mix(in srgb, var(--app-surface-muted) 46%, transparent), transparent 5rem),
+            var(--app-surface) !important;
+        box-shadow: 0 14px 36px -34px rgba(23, 50, 74, 0.55) !important;
     }
 
-    .premium-process-message {
-        margin-top: 0.18rem;
-        font-size: 0.75rem;
+    body.admin-theme-scope .app-form-surface .form-section::before {
+        position: absolute;
+        z-index: -1;
+        top: 0;
+        right: 0;
+        left: 0;
+        height: 0.2rem;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #3996d3, #76b9df 58%, #8fc043);
+        content: '';
+    }
+
+    body.admin-theme-scope .app-form-surface .form-section-title {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        color: var(--app-primary) !important;
+        font-size: 1rem !important;
+        font-weight: 800 !important;
+        line-height: 1.35;
+    }
+
+    body.admin-theme-scope .app-form-surface .form-section > .form-section-title,
+    body.admin-theme-scope .app-form-section > .app-form-section-header {
+        margin: -1.25rem -1.25rem 1.15rem;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid color-mix(in srgb, var(--app-border) 84%, transparent);
+        background: color-mix(in srgb, var(--app-surface-muted) 62%, transparent);
+    }
+
+    body.admin-theme-scope .app-form-section > .app-form-section-header .form-section-subtitle {
+        margin-top: 0.28rem;
+    }
+
+    body.admin-theme-scope .app-form-surface :where(.form-grid, .form-grid-compact, .app-form-grid) {
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)) !important;
+        gap: 1rem 1.1rem !important;
+        align-items: start !important;
+    }
+
+    body.admin-theme-scope .app-form-field {
+        display: grid;
+        min-width: 0;
+        align-content: start;
+        gap: 0.42rem;
+    }
+
+    body.admin-theme-scope .app-form-field > .app-form-label,
+    body.admin-theme-scope .app-form-label {
+        width: fit-content;
+        max-width: 100%;
+        margin: 0 !important;
+        color: var(--app-text) !important;
+        font-size: 0.79rem !important;
+        font-weight: 780 !important;
+        line-height: 1.35;
+        letter-spacing: 0.01em;
+    }
+
+    body.admin-theme-scope .app-form-label.is-required::after {
+        margin-left: 0.18rem;
+        color: var(--app-danger);
+        content: '*';
+    }
+
+    body.admin-theme-scope .app-form-control:not([type="checkbox"]):not([type="radio"]):not([type="color"]) {
+        width: 100%;
+        min-height: 2.9rem;
+        max-width: none;
+        border: 1px solid color-mix(in srgb, var(--app-border) 88%, #7faecb 12%) !important;
+        border-radius: 0.82rem !important;
+        background: var(--app-surface) !important;
+        color: var(--app-text) !important;
+        padding: 0.72rem 0.88rem !important;
+        font-size: 0.9rem;
+        line-height: 1.35;
+        box-shadow: 0 1px 2px rgba(23, 50, 74, 0.035) !important;
+        transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+    }
+
+    body.admin-theme-scope textarea.app-form-control {
+        min-height: 7rem;
+        resize: vertical;
+    }
+
+    body.admin-theme-scope .app-form-control:not([type="checkbox"]):not([type="radio"]):not([type="color"]):hover:not(:disabled) {
+        border-color: color-mix(in srgb, #3996d3 48%, var(--app-border)) !important;
+    }
+
+    body.admin-theme-scope .app-form-control:focus-visible {
+        border-color: #3996d3 !important;
+        outline: 0 !important;
+        box-shadow: 0 0 0 4px color-mix(in srgb, #3996d3 15%, transparent) !important;
+    }
+
+    body.admin-theme-scope .app-form-control[aria-invalid="true"] {
+        border-color: color-mix(in srgb, var(--app-danger) 72%, var(--app-border)) !important;
+        background: color-mix(in srgb, var(--app-danger) 3%, var(--app-surface)) !important;
+    }
+
+    body.admin-theme-scope .app-form-control[aria-invalid="true"]:focus-visible {
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-danger) 14%, transparent) !important;
+    }
+
+    body.admin-theme-scope .app-form-control:disabled,
+    body.admin-theme-scope .app-form-control[readonly] {
+        border-color: color-mix(in srgb, var(--app-border) 82%, transparent) !important;
+        background: var(--app-surface-muted) !important;
+        color: var(--app-muted) !important;
+        cursor: not-allowed;
+        opacity: 0.82;
+    }
+
+    body.admin-theme-scope input[type="file"].app-form-control {
+        padding: 0.35rem !important;
+        color: var(--app-muted) !important;
+    }
+
+    body.admin-theme-scope input[type="file"].app-form-control::file-selector-button {
+        min-height: 2.15rem;
+        margin-right: 0.75rem;
+        padding: 0.48rem 0.78rem;
+        border: 0;
+        border-radius: 0.62rem;
+        background: color-mix(in srgb, #3996d3 11%, var(--app-surface));
+        color: var(--app-primary);
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    body.admin-theme-scope .app-form-choice {
+        display: inline-flex !important;
+        width: fit-content !important;
+        min-height: 2.45rem;
+        align-items: center;
+        gap: 0.58rem;
+        margin: 0 !important;
+        padding: 0.5rem 0.72rem;
+        border: 1px solid color-mix(in srgb, var(--app-border) 88%, #3996d3 12%);
+        border-radius: 0.72rem;
+        background: color-mix(in srgb, var(--app-surface-muted) 48%, transparent);
+        cursor: pointer;
+    }
+
+    body.admin-theme-scope .app-form-choice :where(input[type="checkbox"], input[type="radio"]) {
+        width: 1rem;
+        height: 1rem;
+        flex: 0 0 auto;
+        margin: 0;
+        accent-color: #3996d3;
+    }
+
+    body.admin-theme-scope :where(.app-form-hint, .field-hint) {
+        margin: 0;
+        color: var(--app-muted) !important;
+        font-size: 0.76rem;
+        line-height: 1.45;
+    }
+
+    body.admin-theme-scope .app-form-error {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.35rem;
+        margin: 0;
+        font-size: 0.76rem;
         line-height: 1.4;
     }
 
-    .premium-process-progress {
-        grid-column: 1 / -1;
-        margin-top: 0;
+    body.admin-theme-scope .app-form-error::before {
+        content: '\2022';
     }
 
-    .premium-process-steps {
-        grid-column: 1 / -1;
-        max-height: 5rem;
-        margin-top: 0;
+    body.admin-theme-scope :where(.app-form-actions, .form-actions) {
+        display: flex;
+        width: 100%;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.65rem;
     }
 
+    body.admin-theme-scope .app-form-surface > :where(.app-form-actions, .form-actions) {
+        margin-top: 0.15rem;
+        padding-top: 1rem;
+        border-top: 1px solid color-mix(in srgb, var(--app-border) 86%, transparent);
+    }
+
+    body.admin-theme-scope .app-form-filter {
+        align-items: end;
+    }
+
+    body.admin-theme-scope .app-form-filter .app-form-control:not(textarea) {
+        min-height: 2.65rem;
+    }
+
+    body.admin-theme-scope .app-form-compact {
+        min-width: 0;
+    }
+
+    html.dark body.admin-theme-scope .app-form-standalone,
+    html.dark body.admin-theme-scope .app-form-surface .form-section {
+        border-color: rgba(125, 173, 205, 0.24) !important;
+        background:
+            linear-gradient(180deg, rgba(57, 150, 211, 0.055), transparent 5rem),
+            var(--app-surface) !important;
+        box-shadow: 0 18px 48px -38px rgba(0, 0, 0, 0.72) !important;
+    }
+
+    html.dark body.admin-theme-scope .app-form-control:not([type="checkbox"]):not([type="radio"]):not([type="color"]) {
+        border-color: rgba(125, 173, 205, 0.26) !important;
+        background: color-mix(in srgb, var(--app-surface) 94%, #0c1d2b 6%) !important;
+    }
+
+    html.dark body.admin-theme-scope .app-form-choice {
+        border-color: rgba(125, 173, 205, 0.24);
+        background: rgba(57, 150, 211, 0.055);
+    }
+
+    @media (max-width: 47.99rem) {
+        body.admin-theme-scope .app-form-standalone,
+        body.admin-theme-scope .app-form-surface .form-section {
+            padding: 1rem !important;
+            border-radius: 0.95rem !important;
+        }
+
+        body.admin-theme-scope .app-form-surface .form-section > .form-section-title,
+        body.admin-theme-scope .app-form-section > .app-form-section-header {
+            margin: -1rem -1rem 1rem;
+            padding: 0.9rem 1rem;
+        }
+
+        body.admin-theme-scope .app-form-surface :where(.form-grid, .form-grid-compact, .app-form-grid) {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        body.admin-theme-scope :where(.app-form-actions, .form-actions) {
+            align-items: stretch;
+            flex-direction: column-reverse;
+        }
+
+        body.admin-theme-scope :where(.app-form-actions, .form-actions) > :where(.btn, button, a[role="button"], a.btn) {
+            width: 100%;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        body.admin-theme-scope .app-form-control {
+            transition-duration: 1ms !important;
+        }
+    }
+}
+
+/* Compact feedback bubbles — intentionally non-blocking. */
+@layer components {
     #anbg-toast-region {
         width: min(22rem, calc(100vw - 2rem));
         gap: 0.55rem;
@@ -128,11 +345,6 @@
     }
 
     @media (max-width: 39.99rem) {
-        .premium-process-overlay {
-            inset: auto 0.75rem 0.75rem;
-            width: auto;
-        }
-
         #anbg-toast-region {
             inset: 0.75rem 0.75rem auto;
             width: auto;
@@ -8876,32 +9088,6 @@ a[aria-label]:not([title]):focus-visible::after {
 .dark .ui-typo-caption { color: #94a3b8; }
 
 /* â”€â”€â”€ UI SPINNER & TOP PROGRESS BAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.ui-spinner {
-    display: inline-flex;
-    align-items: center;
-    margin-right: 0.5rem;
-    vertical-align: middle;
-}
-.ui-spinner svg {
-    animation: ui-spin 0.7s linear infinite;
-}
-.ui-spinner-label {
-    vertical-align: middle;
-}
-@keyframes ui-spin {
-    to { transform: rotate(360deg); }
-}
-
-button.is-loading,
-input[type="submit"].is-loading {
-    cursor: progress !important;
-    opacity: 0.85;
-}
-
-form.is-submitting {
-    cursor: progress;
-}
-
 /* Top-bar progress for fetch() AJAX calls â€” nprogress-style */
 .ui-topbar-progress {
     position: fixed;
@@ -8932,7 +9118,6 @@ form.is-submitting {
     100% { background-position: -200% 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .ui-spinner svg,
     .ui-topbar-progress.is-active { animation: none; }
 }
 
@@ -10272,13 +10457,19 @@ body.admin-theme-scope .dealdeck-dashboard :is(
 
     .auth-password-toggle {
         position: absolute;
-        right: 0.55rem;
+        right: 0.625rem;
         top: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 2.1rem;
-        height: 2.1rem;
+        box-sizing: border-box;
+        width: 2.25rem;
+        height: 2.25rem;
+        margin: 0;
+        padding: 0;
+        line-height: 1;
+        appearance: none;
+        z-index: 1;
         border: 1px solid color-mix(in srgb, var(--app-blue, #3996d3) 28%, transparent);
         border-radius: 999px;
         background: color-mix(in srgb, var(--app-blue, #3996d3) 8%, var(--app-surface, #ffffff));

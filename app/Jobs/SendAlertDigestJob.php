@@ -14,6 +14,7 @@ class SendAlertDigestJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
+
     public int $timeout = 600;
 
     public function __construct(

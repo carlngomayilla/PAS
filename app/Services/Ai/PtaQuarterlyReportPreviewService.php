@@ -25,6 +25,8 @@ class PtaQuarterlyReportPreviewService
         $services = $this->rows($analysis, 'services');
         $matrix = $this->rows($analysis, 'matrice_services_axes');
         $monthly = $this->rows($analysis, 'evolution_mensuelle');
+        $axisMonthly = $this->rows($analysis, 'evolution_mensuelle_axes');
+        $comparison = $this->rows($analysis, 'comparaison_indicateurs');
         $gaps = is_array($analysis['ecarts'] ?? null) ? $analysis['ecarts'] : [];
 
         return [
@@ -42,13 +44,32 @@ class PtaQuarterlyReportPreviewService
             ],
             'tables' => [
                 $this->summaryTable($summary, $axes),
+                $this->indicatorComparisonTable($comparison),
                 $this->serviceAxisMatrixTable($axes, $matrix),
                 $this->serviceRatesTable($services),
                 $this->monthlyEvolutionTable($monthly),
+                $this->axisMonthlyEvolutionTable($axisMonthly),
             ],
             'charts' => $this->charts($analysis, $axes, $services, $monthly),
             'gap_sections' => $this->gapSections($gaps),
         ];
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    private function indicatorComparisonTable(array $rows): array
+    {
+        return $this->table(
+            'Comparaison entre avancement global et realisation des actions echues',
+            ['Indicateur', 'Nombre realise', 'Base de calcul', 'Taux', 'Formule', 'Interpretation'],
+            collect($rows)->map(fn (array $row): array => [
+                (string) ($row['indicateur'] ?? '-'),
+                $this->asNumber($row['realisees'] ?? 0),
+                $this->asNumber($row['base'] ?? 0),
+                $this->asPercent($row['taux'] ?? 0),
+                (string) ($row['formule'] ?? '-'),
+                (string) ($row['interpretation'] ?? '-'),
+            ])->values()->all()
+        );
     }
 
     /**
@@ -189,16 +210,36 @@ class PtaQuarterlyReportPreviewService
     {
         return $this->table(
             'Evolution du taux de realisation du PTA sur la periode',
-            ['Mois', 'Actions echues', 'Actions realisees', 'Taux de realisation'],
+            ['Mois', 'Actions echues', 'Actions realisees', 'Taux de realisation', 'Variation', 'Tendance'],
             collect($monthly)
                 ->map(fn (array $row): array => [
                     (string) ($row['mois'] ?? 'Non renseigne'),
                     $this->asNumber($row['actions_echues'] ?? 0),
                     $this->asNumber($row['actions_realisees'] ?? 0),
                     $this->asPercent($row['taux_realisation'] ?? 0),
+                    (($row['variation'] ?? 0) > 0 ? '+' : '').(string) ($row['variation'] ?? 0).' point(s)',
+                    (string) ($row['tendance'] ?? 'Stagnation'),
                 ])
                 ->values()
                 ->all()
+        );
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    private function axisMonthlyEvolutionTable(array $rows): array
+    {
+        $months = collect($rows)->first()['mois'] ?? [];
+
+        return $this->table(
+            'Evolution mensuelle des axes strategiques',
+            array_merge(['Axe'], collect($months)->pluck('mois')->map(fn ($month): string => (string) $month)->all(), ['Evolution']),
+            collect($rows)->map(function (array $row): array {
+                return array_merge(
+                    [(string) ($row['axe'] ?? 'Non renseigne')],
+                    collect($row['mois'] ?? [])->map(fn (array $month): string => $this->asPercent($month['taux'] ?? 0))->all(),
+                    [(string) ($row['evolution'] ?? 0).' point(s)']
+                );
+            })->values()->all()
         );
     }
 
@@ -358,10 +399,11 @@ class PtaQuarterlyReportPreviewService
         $rate = (float) $rate;
 
         return match (true) {
-            $rate >= 100 => 'Realise',
-            $rate >= 50 => 'En cours',
-            $rate > 0 => 'Faible',
-            default => 'Non demarre',
+            $rate >= 80 => 'Tres satisfaisant',
+            $rate >= 60 => 'Satisfaisant',
+            $rate >= 40 => 'Moyen',
+            $rate >= 20 => 'Faible',
+            default => 'Critique',
         };
     }
 

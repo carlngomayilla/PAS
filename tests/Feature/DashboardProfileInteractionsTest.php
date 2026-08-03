@@ -115,11 +115,20 @@ class DashboardProfileInteractionsTest extends TestCase
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
         $tables->assertSee('Directions');
-        $tables->assertSee('Directions sous vigilance');
+        $tables->assertDontSee('Directions sous vigilance');
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
         $charts->assertSee('avancement du PAS');
+        $charts->assertSee('Graphiques du PTA trimestriel');
+        $charts->assertSee('dashboard-pta-axis-progression-chart-charts', false);
+        $charts->assertSee('dashboard-pta-monthly-rate-chart-charts', false);
+        $charts->assertSee('dashboard-pta-axis-rate-chart-charts', false);
+        $charts->assertSee('dashboard-pta-service-rate-chart-charts', false);
+        $charts->assertDontSee('Evolution du suivi');
+        $charts->assertDontSee('Directions sous vigilance');
+        $charts->assertDontSee('dashboard-role-trend-chart', false);
+        $charts->assertDontSee('dashboard-role-support-chart', false);
     }
 
     public function test_seeded_planification_user_sees_suivi_evaluation_dashboard_sections(): void
@@ -137,11 +146,20 @@ class DashboardProfileInteractionsTest extends TestCase
         $tables = $this->actingAs($user)->get('/dashboard?dashboardTab=tables');
         $tables->assertOk();
         $tables->assertSee('Directions');
-        $tables->assertSee('Directions sous vigilance');
+        $tables->assertDontSee('Directions sous vigilance');
 
         $charts = $this->actingAs($user)->get('/dashboard?dashboardTab=charts');
         $charts->assertOk();
         $charts->assertSee('avancement du PAS');
+        $charts->assertSee('Graphiques du PTA trimestriel');
+        $charts->assertSee('dashboard-pta-axis-progression-chart-charts', false);
+        $charts->assertSee('dashboard-pta-monthly-rate-chart-charts', false);
+        $charts->assertSee('dashboard-pta-axis-rate-chart-charts', false);
+        $charts->assertSee('dashboard-pta-service-rate-chart-charts', false);
+        $charts->assertDontSee('Evolution du suivi');
+        $charts->assertDontSee('Directions sous vigilance');
+        $charts->assertDontSee('dashboard-role-trend-chart', false);
+        $charts->assertDontSee('dashboard-role-support-chart', false);
     }
 
     public function test_dashboard_overview_limits_primary_kpis_for_progressive_density(): void

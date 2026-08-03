@@ -15,8 +15,8 @@ use Tests\TestCase;
 
 class PlanningAutoArchiveWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     public function test_super_admin_configures_and_runs_automatic_pao_pta_archiving(): void
     {

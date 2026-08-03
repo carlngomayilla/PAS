@@ -13,8 +13,7 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy
-    ) {
-    }
+    ) {}
 
     public function login(Request $request): JsonResponse
     {
@@ -74,7 +73,7 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $profil = $user->profileInteractions();
 

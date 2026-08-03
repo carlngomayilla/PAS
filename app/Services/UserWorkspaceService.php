@@ -24,6 +24,18 @@ class UserWorkspaceService
     {
         $specRole = $this->specSidebarRole($user);
         $modules = $this->modulesForSpecRole($specRole, $user);
+        if ($user->hasPermission('reporting.read')) {
+            $modules[] = [
+                'code' => 'reports',
+                'label' => 'Rapports',
+                'description' => 'Réunions programmées, comptes rendus, incidents et circuit de vérification',
+                'endpoint' => '/workspace/rapports',
+                'can_write' => ! $user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE),
+                'actions' => $user->hasRole(User::ROLE_AUDITEUR, User::ROLE_INVITE_LECTURE)
+                    ? ['Consulter']
+                    : ['Consulter', 'Programmer une réunion', 'Déposer un rapport'],
+            ];
+        }
         $modules = array_values(array_filter(
             $modules,
             fn (array $module): bool => $this->moduleAllowedByPermissions($module, $user)
@@ -358,6 +370,7 @@ class UserWorkspaceService
                 $m('pilotage', 'Dashboard', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
                 $m('execution', 'Action', '/workspace/actions?vue=mes_actions', ['can_write' => true, 'actions' => ['Consulter', 'Saisir suivi']]),
+                $m('reports_echeance', 'Mes modifications', '/workspace/reports-echeance?vue=mes_demandes', ['can_write' => true, 'actions' => ['Demander', 'Compléter', 'Suivre']]),
                 // 'corrections' → vue "Mes actions" filtree sur les corrections demandees.
                 $m('corrections', 'Corrections demandées', '/workspace/actions?vue=mes_actions&statut=a_corriger'),
                 $m('notifications', 'Notifications', '/workspace/notifications'),
@@ -375,6 +388,7 @@ class UserWorkspaceService
                 $m('pta', 'PTA', '/workspace/pta', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
                 $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Charger', 'Corriger', 'Valider']]),
                 $m('execution', 'Action', '/workspace/actions', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Valider', 'Renvoyer']]),
+                $m('reports_echeance', 'Modifications', '/workspace/reports-echeance', ['can_write' => true, 'actions' => ['Valider', 'Demander complément', 'Rejeter']]),
                 // La validation est désormais traitée dans l'onglet Actions > Validations.
                 // 'agents' → liste des utilisateurs du referentiel (deja filtree par scope).
                 $m('agents', 'Agents / RMO', '/workspace/referentiel/utilisateurs'),
@@ -393,8 +407,8 @@ class UserWorkspaceService
                 $m('imports_excel', 'Imports Excel', '/workspace/imports-excel', ['can_write' => true, 'actions' => ['Verifier', 'Mapper colonnes', 'Importer']]),
                 $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Analyser', 'Valider', 'Importer']]),
                 $m('execution', 'Action', '/workspace/actions'),
-                // 'controle' → onglet "Validations" des actions.
-                $m('controle', 'Contrôle', '/workspace/actions?vue=validations', ['can_write' => true, 'actions' => ['Signaler', 'Bloquer', 'Lever blocage']]),
+                // Un seul espace regroupe la file de contrôle, les anomalies et la traçabilité.
+                $m('controle', 'Contrôle & conformité', '/workspace/actions?vue=validations', ['can_write' => true, 'actions' => ['Vérifier', 'Demander correction', 'Valider', 'Consulter la traçabilité']]),
                 ...($user->isPlanningControlChief()
                     ? [$m('referentiel', 'Utilisateurs', '/workspace/referentiel/utilisateurs', ['can_write' => true, 'actions' => ['Consulter', 'Administrer utilisateurs']])]
                     : []),
@@ -411,6 +425,7 @@ class UserWorkspaceService
                 $m('pta', 'PTA des services', '/workspace/pta'),
                 $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Charger', 'Corriger', 'Valider']]),
                 $m('execution', 'Action', '/workspace/actions'),
+                $m('reports_echeance', 'Modifications', '/workspace/reports-echeance', ['can_write' => true, 'actions' => ['Donner accord', 'Demander complément', 'Rejeter']]),
                 // 'services_agents' → referentiel utilisateurs (filtree par direction).
                 $m('services_agents', 'Services / Agents', '/workspace/referentiel/utilisateurs'),
                 $m('reporting', 'Reporting direction', '/workspace/reporting'),
@@ -421,6 +436,7 @@ class UserWorkspaceService
             'directeur_daf' => [
                 $m('pilotage', 'Dashboard direction', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
+                $m('reports_echeance', 'Modifications', '/workspace/reports-echeance', ['can_write' => true, 'actions' => ['Donner accord', 'Demander complément', 'Rejeter']]),
                 $m('pao', 'PAO', '/workspace/pao', ['can_write' => true, 'actions' => ['Consulter', 'Créer', 'Modifier', 'Clôturer']]),
                 $m('pta', 'PTA des services', '/workspace/pta'),
                 $m('ai_imports', 'IA & Imports', '/workspace/ai-imports/pta', ['can_write' => true, 'actions' => ['Charger', 'Corriger', 'Valider']]),
@@ -435,6 +451,7 @@ class UserWorkspaceService
             'dg' => [
                 $m('pilotage', 'Dashboard global', '/workspace/pilotage'),
                 $m('mes_taches', 'Mes tâches', '/workspace/mes-taches'),
+                $m('reports_echeance', 'Modifications', '/workspace/reports-echeance', ['can_write' => true, 'actions' => ['Décider', 'Appliquer']]),
                 // 'synthese_agence' → reporting global (memes donnees consolidees).
                 $m('synthese_agence', 'Synthèse agence', '/workspace/reporting'),
                 // 'arbitrages' → demandes de deverrouillage (le DG y prend ses decisions).
@@ -523,7 +540,7 @@ class UserWorkspaceService
                 'ai_pta_import.history'
             ),
             'ai_reports' => $user->hasPermission('ai_reports.view'),
-            'reporting', 'rapports_consolides' => $user->hasPermission('reporting.read'),
+            'reports', 'reporting', 'rapports_consolides' => $user->hasPermission('reporting.read'),
             'financements_critiques' => $user->hasPermission('alerts.read'),
             'audit' => $user->hasPermission('audit.read'),
             'referentiel', 'roles_permissions', 'organisation' => $user->hasAnyPermission(

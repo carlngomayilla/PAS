@@ -7,10 +7,10 @@ use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\Delegation;
 use App\Models\Direction;
+use App\Models\Pao;
 use App\Models\Pas;
 use App\Models\PasAxe;
 use App\Models\PasObjectif;
-use App\Models\Pao;
 use App\Models\Pta;
 use App\Models\Service;
 use App\Models\User;
@@ -21,8 +21,8 @@ use Tests\TestCase;
 
 class AlertDigestCommandTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesAdminUser;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {

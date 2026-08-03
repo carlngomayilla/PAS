@@ -26,8 +26,8 @@ return new class extends Migration
         if (DB::connection()->getDriverName() === 'pgsql') {
             DB::statement('ALTER TABLE actions DROP CONSTRAINT IF EXISTS actions_statut_validation_check');
             DB::statement(
-                "ALTER TABLE actions ADD CONSTRAINT actions_statut_validation_check "
-                ."CHECK (statut_validation IS NULL OR statut_validation IN "
+                'ALTER TABLE actions ADD CONSTRAINT actions_statut_validation_check '
+                .'CHECK (statut_validation IS NULL OR statut_validation IN '
                 ."('non_soumise','soumise_chef','rejetee_chef','correction_demandee','validee_chef','rejetee_direction','validee_direction'))"
             );
         }
@@ -38,8 +38,8 @@ return new class extends Migration
         if (DB::connection()->getDriverName() === 'pgsql') {
             DB::statement('ALTER TABLE actions DROP CONSTRAINT IF EXISTS actions_statut_validation_check');
             DB::statement(
-                "ALTER TABLE actions ADD CONSTRAINT actions_statut_validation_check "
-                ."CHECK (statut_validation IS NULL OR statut_validation IN "
+                'ALTER TABLE actions ADD CONSTRAINT actions_statut_validation_check '
+                .'CHECK (statut_validation IS NULL OR statut_validation IN '
                 ."('non_soumise','soumise_chef','rejetee_chef','validee_chef','rejetee_direction','validee_direction'))"
             );
         }

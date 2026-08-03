@@ -14,6 +14,7 @@ use App\Models\FinancialTransaction;
 use App\Models\Justificatif;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\Analytics\AnalyticsCacheVersionService;
 use App\Services\FinancialMonitoringService;
 use App\Services\Security\SecureJustificatifStorage;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +26,8 @@ use Throwable;
 class FinancialMonitoringWebController extends Controller
 {
     use RecordsAuditTrail;
+
+    public function __construct(private readonly AnalyticsCacheVersionService $cacheVersionService) {}
 
     public function index(Request $request, FinancialMonitoringService $finance): View
     {
@@ -156,6 +159,7 @@ class FinancialMonitoringWebController extends Controller
         }
 
         $this->recordAudit($request, 'finance', 'financial_transaction_create', $transaction, null, $transaction->toArray());
+        $this->cacheVersionService->bumpAll();
 
         return redirect()->route('workspace.daf.financements.index', ['action_id' => $action->id])->with('success', 'Operation financiere enregistree.');
     }
@@ -189,6 +193,7 @@ class FinancialMonitoringWebController extends Controller
         }
 
         $this->recordAudit($request, 'finance', 'budget_overrun_request_create', $overrun, null, $overrun->toArray());
+        $this->cacheVersionService->bumpAll();
 
         return redirect()->route('workspace.daf.financements.index')->with('success', 'Demande de depassement enregistree.');
     }
@@ -204,6 +209,7 @@ class FinancialMonitoringWebController extends Controller
         $validated = $request->validated();
         $overrun = $finance->reviewOverrun($budgetOverrunRequest, (string) $validated['decision'], (string) $validated['note'], $user);
         $this->recordAudit($request, 'finance', 'budget_overrun_request_review', $overrun, $before, $overrun->toArray());
+        $this->cacheVersionService->bumpAll();
 
         return redirect()->route('workspace.daf.financements.index')->with('success', 'Decision de depassement enregistree.');
     }

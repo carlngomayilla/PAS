@@ -15,7 +15,9 @@ class Pas extends Model
     use SoftDeletes;
 
     public const STATUS_ACTIF = 'actif';
+
     public const STATUS_CLOTURE = 'cloture';
+
     public const STATUS_ARCHIVE = 'archive';
 
     protected $table = 'pas';

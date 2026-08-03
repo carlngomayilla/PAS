@@ -5,18 +5,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Pao extends Model
 {
     use HasFactory, SoftDeletes;
 
     public const STATUS_VALIDE = 'valide';
+
     public const STATUS_EN_COURS = 'en_cours';
+
     public const STATUS_CLOTURE = 'cloture';
+
     public const STATUS_ARCHIVE = 'archive';
+
     public const STATUS_VERROUILLE = 'verrouille';
 
     protected $table = 'paos';

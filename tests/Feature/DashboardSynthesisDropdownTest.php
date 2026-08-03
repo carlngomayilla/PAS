@@ -80,8 +80,12 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringNotContainsString('Services PTA', $charts);
         $this->assertStringNotContainsString('Meilleures actions', $charts);
         $this->assertStringNotContainsString('dashboard-status-mix-chart', $charts);
-        $this->assertStringNotContainsString('dashboard-pta-axis-rate-chart', $charts);
-        $this->assertStringNotContainsString('dashboard-pta-monthly-rate-chart', $charts);
+        $this->assertStringContainsString('Graphiques du PTA trimestriel', $charts);
+        $this->assertStringContainsString('dashboard-pta-{{ $chartKey }}-chart-charts', $charts);
+        $this->assertStringContainsString('Progression des axes du PTA sur les trois mois', $charts);
+        $this->assertStringContainsString('Évolution du taux global du PTA', $charts);
+        $this->assertStringContainsString('Taux globaux des axes stratégiques', $charts);
+        $this->assertStringContainsString('Taux de réalisation par direction ou service', $charts);
         $this->assertStringNotContainsString('dashboard-kpi-gauge-', $charts);
         $this->assertStringContainsString("Évolution de l'avancement du PAS", $charts);
         $this->assertStringContainsString('Avancement des axes stratégiques', $charts);

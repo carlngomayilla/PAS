@@ -6,6 +6,8 @@ use App\Models\Action;
 use App\Models\ActionLog;
 use App\Models\DeadlineExtensionRequest;
 use App\Models\Delegation;
+use App\Models\InstitutionalMeetingDecision;
+use App\Models\InstitutionalReport;
 use App\Models\JournalAudit;
 use App\Models\Pao;
 use App\Models\Pas;
@@ -64,7 +66,7 @@ class WorkspaceNotificationService
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
-                'url' => route('workspace.actions.suivi', $action),
+                'url' => route('workspace.deadline-extension.show', $request),
                 'icon' => 'bolt',
                 'status' => 'info',
                 'priority' => 'normal',
@@ -1101,8 +1103,8 @@ class WorkspaceNotificationService
             'deadline_extension_requested',
             $this->actionSupervisorRecipients($action),
             [
-                'title' => 'Demande de report d\'échéance',
-                'message' => sprintf('Une demande de report d\'échéance vient d\'être soumise pour l\'action « %s ».', (string) $action->libelle),
+                'title' => 'Demande de modification',
+                'message' => sprintf('Une demande de modification vient d\'être soumise pour l\'action « %s ».', (string) $action->libelle),
                 'module' => 'reports_echeance',
                 'entity_type' => 'deadline_extension_request',
                 'entity_id' => $request->id,
@@ -1128,11 +1130,8 @@ class WorkspaceNotificationService
         $request->loadMissing('action');
         $action = $request->action;
         $recipients = match ((string) $request->status) {
-            DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE => $this->controlRecipients(),
-            DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE => $this->globalUsers([
-                User::ROLE_DG,
-                User::ROLE_CHEF_PLANIFICATION,
-            ]),
+            DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION => $this->actionDirectionRecipients($action),
+            DeadlineExtensionRequest::STATUS_TRANSMISE_DG => $this->globalUsers([User::ROLE_DG]),
             default => $this->actionSupervisorRecipients($action),
         };
 
@@ -1140,12 +1139,12 @@ class WorkspaceNotificationService
             'deadline_extension_requested',
             $recipients,
             [
-                'title' => 'Complement de report recu',
-                'message' => sprintf('Le complement demande pour le report de l action « %s » a ete ajoute.', (string) $action->libelle),
+                'title' => 'Complément reçu',
+                'message' => sprintf('Le complément demandé pour l\'action « %s » a été ajouté.', (string) $action->libelle),
                 'module' => 'reports_echeance',
                 'entity_type' => 'deadline_extension_request',
                 'entity_id' => $request->id,
-                'url' => route('workspace.actions.suivi', $action),
+                'url' => route('workspace.deadline-extension.show', $request),
                 'icon' => 'file-check',
                 'status' => 'info',
                 'priority' => 'high',
@@ -1168,19 +1167,19 @@ class WorkspaceNotificationService
         $request->loadMissing('action');
         $action = $request->action;
         $recipients = $request->chef_avis === DeadlineExtensionRequest::AVIS_FAVORABLE
-            ? $this->controlRecipients()
+            ? $this->actionDirectionRecipients($action)
             : User::query()->whereKey($request->requested_by)->get();
 
         $this->dispatchEvent(
             'deadline_extension_sciq_reviewed',
             $recipients,
             [
-                'title' => 'Avis du chef sur le report',
-                'message' => sprintf('Le chef de service a rendu son avis sur le report de l’action « %s ».', (string) $action->libelle),
+                'title' => 'Décision du chef de service',
+                'message' => sprintf('Le chef de service a rendu sa décision sur la modification de l’action « %s ».', (string) $action->libelle),
                 'module' => 'reports_echeance',
                 'entity_type' => 'deadline_extension_request',
                 'entity_id' => $request->id,
-                'url' => route('workspace.actions.suivi', $action),
+                'url' => route('workspace.deadline-extension.show', $request),
                 'icon' => 'send',
                 'status' => $request->chef_avis === DeadlineExtensionRequest::AVIS_FAVORABLE ? 'info' : 'warning',
                 'priority' => 'high',
@@ -1194,7 +1193,7 @@ class WorkspaceNotificationService
         );
     }
 
-    public function notifyDeadlineExtensionControllerReviewed(DeadlineExtensionRequest $request, ?User $actor = null): void
+    public function notifyDeadlineExtensionDirectorReviewed(DeadlineExtensionRequest $request, ?User $actor = null): void
     {
         if (! $this->notificationPolicySettings->eventEnabled('deadline_extension_sciq_reviewed')) {
             return;
@@ -1202,28 +1201,28 @@ class WorkspaceNotificationService
 
         $request->loadMissing('action');
         $action = $request->action;
-        $recipients = $request->sciq_avis === DeadlineExtensionRequest::AVIS_FAVORABLE
-            ? $this->globalUsers([User::ROLE_DG, User::ROLE_CHEF_PLANIFICATION])
+        $recipients = $request->director_decision === DeadlineExtensionRequest::AVIS_FAVORABLE
+            ? $this->globalUsers([User::ROLE_DG])
             : User::query()->whereKey($request->requested_by)->get();
 
         $this->dispatchEvent(
             'deadline_extension_sciq_reviewed',
             $recipients,
             [
-                'title' => 'Avis du contrôleur sur le report',
-                'message' => sprintf('Le contrôle SCIQ / Planification a rendu son avis sur le report de l’action « %s ».', (string) $action->libelle),
+                'title' => 'Décision du directeur',
+                'message' => sprintf('Le directeur a rendu sa décision sur la modification de l’action « %s ».', (string) $action->libelle),
                 'module' => 'reports_echeance',
                 'entity_type' => 'deadline_extension_request',
                 'entity_id' => $request->id,
-                'url' => route('workspace.actions.suivi', $action),
+                'url' => route('workspace.deadline-extension.show', $request),
                 'icon' => 'send',
-                'status' => $request->sciq_avis === DeadlineExtensionRequest::AVIS_FAVORABLE ? 'info' : 'warning',
+                'status' => $request->director_decision === DeadlineExtensionRequest::AVIS_FAVORABLE ? 'info' : 'warning',
                 'priority' => 'high',
             ],
             [
                 'action_label' => (string) $action->libelle,
                 'actor_name' => (string) ($actor?->name ?? ''),
-                'avis' => (string) $request->sciq_avis,
+                'avis' => (string) $request->director_decision,
             ],
             $actor?->id
         );
@@ -1237,23 +1236,24 @@ class WorkspaceNotificationService
 
         $request->loadMissing('action');
         $action = $request->action;
-        $recipients = $request->final_decision === DeadlineExtensionRequest::DECISION_APPROUVER
-            ? $this->controlRecipients()
-            : $this->mergeRecipients(
+        $recipients = $this->mergeRecipients(
+            $this->mergeRecipients(
                 User::query()->whereKey($request->requested_by)->get(),
                 $this->actionSupervisorRecipients($action)
-            );
+            ),
+            $this->controlRecipients()
+        );
 
         $this->dispatchEvent(
             'deadline_extension_dg_decided',
             $recipients,
             [
-                'title' => 'Décision finale sur le report',
-                'message' => sprintf('Décision finale « %s » sur le report de l’action « %s ».', (string) $request->final_decision, (string) $action->libelle),
+                'title' => 'Décision finale DG',
+                'message' => sprintf('Décision DG « %s » sur la modification de l’action « %s ».', (string) $request->final_decision, (string) $action->libelle),
                 'module' => 'reports_echeance',
                 'entity_type' => 'deadline_extension_request',
                 'entity_id' => $request->id,
-                'url' => route('workspace.actions.suivi', $action),
+                'url' => route('workspace.deadline-extension.show', $request),
                 'icon' => 'calendar-check',
                 'status' => $request->final_decision === DeadlineExtensionRequest::DECISION_APPROUVER ? 'success' : 'warning',
                 'priority' => 'high',
@@ -1284,8 +1284,8 @@ class WorkspaceNotificationService
             'deadline_extension_dg_decided',
             $recipients,
             [
-                'title' => 'Nouvelle échéance appliquée',
-                'message' => sprintf('La nouvelle échéance approuvée de l’action « %s » a été appliquée par le contrôleur.', (string) $action->libelle),
+                'title' => 'Modification appliquée',
+                'message' => sprintf('Les paramètres approuvés de l’action « %s » ont été appliqués par la DG.', (string) $action->libelle),
                 'module' => 'reports_echeance',
                 'entity_type' => 'deadline_extension_request',
                 'entity_id' => $request->id,
@@ -1389,7 +1389,17 @@ class WorkspaceNotificationService
             ->all();
 
         $targets = $this->mergeRecipients(
-            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET]),
+            $this->globalUsers([
+                User::ROLE_SUPER_ADMIN,
+                User::ROLE_ADMIN,
+                User::ROLE_DG,
+                User::ROLE_PLANIFICATION,
+                User::ROLE_SCIQ,
+                User::ROLE_SCIQ_SUIVI_GLOBAL,
+                User::ROLE_CHEF_PLANIFICATION,
+                User::ROLE_CHEF_UNITE_SCIQ,
+                User::ROLE_CABINET,
+            ]),
             $this->directionUsers($directionIds, [User::ROLE_DIRECTION, User::ROLE_SERVICE])
         );
 
@@ -1426,7 +1436,17 @@ class WorkspaceNotificationService
 
         $directionId = (int) $pao->direction_id;
         $targets = $this->mergeRecipients(
-            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET]),
+            $this->globalUsers([
+                User::ROLE_SUPER_ADMIN,
+                User::ROLE_ADMIN,
+                User::ROLE_DG,
+                User::ROLE_PLANIFICATION,
+                User::ROLE_SCIQ,
+                User::ROLE_SCIQ_SUIVI_GLOBAL,
+                User::ROLE_CHEF_PLANIFICATION,
+                User::ROLE_CHEF_UNITE_SCIQ,
+                User::ROLE_CABINET,
+            ]),
             $this->directionUsers($directionId, [User::ROLE_DIRECTION, User::ROLE_SERVICE])
         );
 
@@ -1465,7 +1485,17 @@ class WorkspaceNotificationService
         $serviceId = (int) $pta->service_id;
 
         $targets = $this->mergeRecipients(
-            $this->globalUsers([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_DG, User::ROLE_PLANIFICATION, User::ROLE_CABINET]),
+            $this->globalUsers([
+                User::ROLE_SUPER_ADMIN,
+                User::ROLE_ADMIN,
+                User::ROLE_DG,
+                User::ROLE_PLANIFICATION,
+                User::ROLE_SCIQ,
+                User::ROLE_SCIQ_SUIVI_GLOBAL,
+                User::ROLE_CHEF_PLANIFICATION,
+                User::ROLE_CHEF_UNITE_SCIQ,
+                User::ROLE_CABINET,
+            ]),
             $this->directionUsers($directionId, [User::ROLE_DIRECTION])
         );
         $targets = $this->mergeRecipients(
@@ -1494,6 +1524,141 @@ class WorkspaceNotificationService
                 'entity_title' => (string) $pta->titre,
                 'actor_name' => (string) ($actor?->name ?? ''),
             ],
+            $actor?->id
+        );
+    }
+
+    public function notifyMeetingScheduled(InstitutionalReport $meeting, ?User $actor = null): void
+    {
+        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $meeting->scheduled_at === null) {
+            return;
+        }
+
+        $this->dispatchEvent(
+            'meeting_scheduled',
+            $this->meetingParticipantRecipients($meeting),
+            $this->meetingPayload(
+                $meeting,
+                'Réunion programmée',
+                sprintf('La réunion « %s » est programmée le %s.', (string) $meeting->title, $meeting->scheduled_at->format('d/m/Y à H:i')),
+                'calendar-plus',
+                'info',
+                'normal'
+            ),
+            $this->meetingReplacements($meeting, $actor),
+            $actor?->id
+        );
+    }
+
+    public function notifyMeetingPostponed(InstitutionalReport $meeting, ?User $actor = null): void
+    {
+        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $meeting->scheduled_at === null) {
+            return;
+        }
+
+        $this->dispatchEvent(
+            'meeting_postponed',
+            $this->meetingParticipantRecipients($meeting),
+            $this->meetingPayload(
+                $meeting,
+                'Réunion reportée',
+                sprintf('La réunion « %s » est reportée au %s. Motif : %s', (string) $meeting->title, $meeting->scheduled_at->format('d/m/Y à H:i'), (string) $meeting->postponement_reason),
+                'calendar-clock',
+                'warning',
+                'high'
+            ),
+            $this->meetingReplacements($meeting, $actor),
+            $actor?->id
+        );
+    }
+
+    public function notifyMeetingReminder(InstitutionalReport $meeting, int $daysBefore): void
+    {
+        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $meeting->scheduled_at === null || $meeting->held_at !== null) {
+            return;
+        }
+
+        $this->dispatchEvent(
+            'meeting_reminder',
+            $this->meetingParticipantRecipients($meeting),
+            $this->meetingPayload(
+                $meeting,
+                'Rappel de réunion',
+                sprintf('La réunion « %s » se tiendra dans %d jour(s), le %s.', (string) $meeting->title, $daysBefore, $meeting->scheduled_at->format('d/m/Y à H:i')),
+                'bell-ring',
+                $daysBefore <= 1 ? 'warning' : 'info',
+                $daysBefore <= 1 ? 'high' : 'normal'
+            ),
+            $this->meetingReplacements($meeting, null)
+        );
+    }
+
+    public function notifyMeetingMinutesPublished(InstitutionalReport $meeting, ?User $actor = null): void
+    {
+        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $meeting->held_at === null) {
+            return;
+        }
+
+        $this->dispatchEvent(
+            'meeting_minutes_published',
+            $this->meetingRecipientsWithControls($meeting),
+            $this->meetingPayload(
+                $meeting,
+                'PV de réunion disponible',
+                sprintf('Le procès-verbal de la réunion « %s » est disponible. Consultez le dossier pour télécharger la copie.', (string) $meeting->title),
+                'file-check',
+                'success',
+                'normal'
+            ),
+            $this->meetingReplacements($meeting, $actor)
+        );
+    }
+
+    public function notifyMeetingCancelled(InstitutionalReport $meeting, ?User $actor = null): void
+    {
+        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING) {
+            return;
+        }
+
+        $this->dispatchEvent(
+            'meeting_cancelled',
+            $this->meetingParticipantRecipients($meeting),
+            $this->meetingPayload(
+                $meeting,
+                'Réunion annulée',
+                sprintf('La réunion « %s » est annulée. Motif : %s', (string) $meeting->title, (string) $meeting->cancellation_reason),
+                'calendar-x',
+                'warning',
+                'high'
+            ),
+            $this->meetingReplacements($meeting, $actor),
+            $actor?->id
+        );
+    }
+
+    public function notifyMeetingDecisionAssigned(InstitutionalReport $meeting, InstitutionalMeetingDecision $decision, ?User $actor = null): void
+    {
+        if ($meeting->report_type !== InstitutionalReport::TYPE_MEETING || $decision->responsible_id === null) {
+            return;
+        }
+
+        $recipient = User::query()->find($decision->responsible_id);
+        if (! $recipient instanceof User) {
+            return;
+        }
+
+        $this->dispatchEvent(
+            'meeting_decision_assigned',
+            collect([$recipient]),
+            $this->meetingPayload(
+                $meeting,
+                'Décision de réunion à suivre',
+                sprintf('Vous êtes responsable de la décision suivante : %s', (string) $decision->description),
+                'list-checks',
+                'info',
+                $decision->priority === 'critical' ? 'urgent' : 'normal'
+            ),
+            $this->meetingReplacements($meeting, $actor),
             $actor?->id
         );
     }
@@ -1649,10 +1814,7 @@ class WorkspaceNotificationService
     {
         $directionId = (int) ($pta->direction_id ?? 0);
 
-        return $this->mergeRecipients(
-            $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
-            $this->delegationService->delegatedDirectionReviewers($directionId)
-        );
+        return $this->directionUsers($directionId, [User::ROLE_DIRECTION]);
     }
 
     private function ptaServiceRecipients(Pta $pta): Collection
@@ -1664,6 +1826,105 @@ class WorkspaceNotificationService
             $this->serviceUsers($directionId, $serviceId, $this->serviceManagerRoles()),
             $this->delegationService->delegatedServiceReviewers($directionId, $serviceId)
         );
+    }
+
+    /** @return Collection<int, User> */
+    private function meetingParticipantRecipients(InstitutionalReport $meeting): Collection
+    {
+        $participantIds = collect($meeting->participant_ids ?? [])
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->when($meeting->responsible_id !== null, fn (Collection $ids): Collection => $ids->push((int) $meeting->responsible_id))
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($participantIds !== []) {
+            return User::query()->whereIn('id', $participantIds)->get();
+        }
+
+        return $this->meetingDistributionRecipients($meeting);
+    }
+
+    /** @return Collection<int, User> */
+    private function meetingDistributionRecipients(InstitutionalReport $meeting): Collection
+    {
+        if ($meeting->service_id !== null) {
+            return User::query()
+                ->where('direction_id', $meeting->direction_id)
+                ->where('service_id', $meeting->service_id)
+                ->get();
+        }
+
+        return User::query()
+            ->where('direction_id', $meeting->direction_id)
+            ->get();
+    }
+
+    /** @return Collection<int, User> */
+    private function meetingRecipientsWithControls(InstitutionalReport $meeting): Collection
+    {
+        $controlRecipients = User::query()
+            ->whereIn('role', [
+                User::ROLE_SCIQ,
+                User::ROLE_SCIQ_SUIVI_GLOBAL,
+                User::ROLE_CHEF_UNITE_SCIQ,
+                User::ROLE_PLANIFICATION,
+                User::ROLE_CHEF_PLANIFICATION,
+            ])
+            ->get();
+
+        return $this->mergeRecipients($this->meetingDistributionRecipients($meeting), $controlRecipients);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function meetingPayload(
+        InstitutionalReport $meeting,
+        string $title,
+        string $message,
+        string $icon,
+        string $status,
+        string $priority
+    ): array {
+        return [
+            'title' => $title,
+            'message' => $message,
+            'module' => 'institutional_reports',
+            'entity_type' => 'institutional_report',
+            'entity_id' => $meeting->id,
+            'url' => route('workspace.reports.show', $meeting),
+            'icon' => $icon,
+            'status' => $status,
+            'priority' => $priority,
+            'notification_type' => 'evenement',
+            'categorie' => 'reunion',
+            'niveau' => $status,
+            'direction_id' => $meeting->direction_id,
+            'service_id' => $meeting->service_id,
+            'meta' => [
+                'event' => 'meeting',
+                'meeting_id' => (int) $meeting->id,
+                'meeting_title' => (string) $meeting->title,
+                'scheduled_at' => $meeting->scheduled_at?->toIso8601String(),
+                'held_at' => $meeting->held_at?->toIso8601String(),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, scalar|null>
+     */
+    private function meetingReplacements(InstitutionalReport $meeting, ?User $actor): array
+    {
+        return [
+            'meeting_title' => (string) $meeting->title,
+            'meeting_date' => $meeting->scheduled_at?->format('d/m/Y H:i'),
+            'actor_name' => $actor?->name,
+            'postponement_reason' => $meeting->postponement_reason,
+            'cancellation_reason' => $meeting->cancellation_reason,
+        ];
     }
 
     private function controlRecipients(): EloquentCollection
@@ -1794,6 +2055,17 @@ class WorkspaceNotificationService
         );
 
         return $this->mergeRecipients($targets, $this->unitChiefRecipientsForAction($action));
+    }
+
+    private function actionDirectionRecipients(Action $action): Collection
+    {
+        $action->loadMissing('pta:id,direction_id');
+        $directionId = (int) ($action->pta?->direction_id ?? 0);
+
+        return $this->mergeRecipients(
+            $this->directionUsers($directionId, [User::ROLE_DIRECTION]),
+            $this->delegationService->delegatedDirectionReviewers($directionId)
+        );
     }
 
     /**

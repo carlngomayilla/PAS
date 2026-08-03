@@ -8,11 +8,11 @@ use App\Models\User;
 use App\Services\Security\AntivirusScanner;
 use App\Services\Security\MalwareScanException;
 use App\Services\Security\PasswordPolicyService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -24,8 +24,7 @@ class ProfileWebController extends Controller
     public function __construct(
         private readonly PasswordPolicyService $passwordPolicy,
         private readonly AntivirusScanner $scanner
-    ) {
-    }
+    ) {}
 
     public function edit(Request $request): View
     {

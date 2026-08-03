@@ -8,7 +8,7 @@ use Illuminate\Support\Collection;
 class KpiAggregatorService
 {
     /**
-     * @param Collection<int, Action> $actions
+     * @param  Collection<int, Action>  $actions
      * @return array<string, float>
      */
     public function summarizeActions(Collection $actions): array

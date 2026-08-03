@@ -17,8 +17,11 @@ namespace App\Support;
 final class KpiLevel
 {
     public const CODE_FAIBLE = 'faible';
+
     public const CODE_MOYEN = 'moyen';
+
     public const CODE_ELEVE = 'eleve';
+
     public const CODE_NON_EVALUE = 'non_evalue';
 
     /**

@@ -197,6 +197,13 @@ class ActionWorkflowService
                 throw new \InvalidArgumentException('Cette action n est pas en attente de controle.');
             }
 
+            if ($lockedAction->isResponsible($actor)
+                || (int) ($lockedAction->soumise_par ?? 0) === (int) $actor->id
+                || (int) ($lockedAction->evalue_par ?? 0) === (int) $actor->id
+            ) {
+                throw new \InvalidArgumentException('Le controle final doit etre realise par un autre intervenant.');
+            }
+
             if ($approve) {
                 $official = (float) ($lockedAction->chef_progress_percent
                     ?? $this->calculator->provisionalPerformance($lockedAction));

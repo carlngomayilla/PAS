@@ -2,12 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
+use App\Jobs\GenerateReportJob;
 use App\Services\Analytics\ReportingAnalyticsService;
 use App\Services\NotificationPolicySettings;
-use App\Services\Security\PasswordPolicyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
@@ -44,7 +42,7 @@ class Phase2DCoverageTest extends TestCase
 
     public function test_a16_generate_report_job_has_authorization_recheck(): void
     {
-        $reflection = new \ReflectionClass(\App\Jobs\GenerateReportJob::class);
+        $reflection = new \ReflectionClass(GenerateReportJob::class);
         $this->assertTrue(
             $reflection->hasMethod('stillAuthorizedToExport'),
             'A16 — GenerateReportJob doit re-verifier l autorisation au runtime via stillAuthorizedToExport().'

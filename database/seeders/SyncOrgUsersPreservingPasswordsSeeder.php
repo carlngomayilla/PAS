@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use App\Services\Security\PasswordPolicyService;
-use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -269,7 +268,7 @@ class SyncOrgUsersPreservingPasswordsSeeder extends AnbgOrganizationSeeder
 
         $replacementId = $query
             ->orderByRaw(
-                "CASE WHEN role = ? THEN 0 WHEN role = ? THEN 1 ELSE 2 END",
+                'CASE WHEN role = ? THEN 0 WHEN role = ? THEN 1 ELSE 2 END',
                 [User::ROLE_AGENT, User::ROLE_SERVICE]
             )
             ->orderBy('id')

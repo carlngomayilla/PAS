@@ -32,6 +32,7 @@ class DeadlineExtensionWorkflowTest extends TestCase
 
         $this->actingAs($fixture['agent'])
             ->post(route('workspace.actions.deadline-extension.store', $action), [
+                'change_fields' => ['deadline'],
                 'requested_deadline' => now()->addMonths(2)->toDateString(),
                 'motif' => 'Contraintes operationnelles',
                 'justification' => 'Les ressources critiques sont indisponibles sur la periode initiale.',
@@ -41,521 +42,273 @@ class DeadlineExtensionWorkflowTest extends TestCase
         $this->assertDatabaseCount('deadline_extension_requests', 0);
     }
 
-    public function test_deadline_extension_follows_the_full_governed_circuit_before_controller_applies_date(): void
-    {
-        Notification::fake();
-        Storage::fake('local');
-
-        $fixture = $this->createPlanningFixture();
-        $action = $this->createAction($fixture, now()->addMonth()->toDateString());
-        $requestedDeadline = now()->addMonths(2)->toDateString();
-        $approvedDeadline = now()->addMonths(3)->toDateString();
-
-        $this->actingAs($fixture['agent'])
-            ->post(route('workspace.actions.deadline-extension.store', $action), [
-                'requested_deadline' => $requestedDeadline,
-                'motif' => 'Contraintes operationnelles',
-                'justification' => 'Les ressources critiques sont indisponibles sur la periode initiale.',
-                'piece_justificative' => UploadedFile::fake()->create('report.pdf', 12, 'application/pdf'),
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $deadlineRequest = DeadlineExtensionRequest::query()->firstOrFail();
-
-        $this->assertSame(DeadlineExtensionRequest::STATUS_SOUMISE, $deadlineRequest->status);
-        $this->assertSame($requestedDeadline, $deadlineRequest->requested_deadline->toDateString());
-        $this->assertNotNull($deadlineRequest->attachment_path);
-        $this->assertSame(now()->addMonth()->toDateString(), $action->fresh()->date_fin->toDateString());
-
-        $this->actingAs($fixture['chef'])
-            ->get(route('workspace.deadline-extension.attachment', $deadlineRequest))
-            ->assertOk();
-
-        $this->actingAs($fixture['planification'])
-            ->post(route('workspace.deadline-extension.controller', $deadlineRequest), [
-                'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-                'comment' => 'Tentative de saut du chef.',
-            ])
-            ->assertSessionHasErrors('decision');
-        $this->assertSame(DeadlineExtensionRequest::STATUS_SOUMISE, $deadlineRequest->fresh()->status);
-
-        $this->actingAs($fixture['chef'])
-            ->post(route('workspace.deadline-extension.chef', $deadlineRequest), [
-                'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-                'comment' => 'Avis favorable du chef de service.',
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $deadlineRequest->refresh();
-        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE, $deadlineRequest->status);
-        $this->assertSame(DeadlineExtensionRequest::AVIS_FAVORABLE, $deadlineRequest->chef_avis);
-        $this->assertSame(now()->addMonth()->toDateString(), $action->fresh()->date_fin->toDateString());
-
-        $this->actingAs($fixture['planification'])
-            ->post(route('workspace.deadline-extension.controller', $deadlineRequest), [
-                'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-                'comment' => 'Dossier conforme pour validation finale.',
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $deadlineRequest->refresh();
-        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE, $deadlineRequest->status);
-        $this->assertSame(DeadlineExtensionRequest::AVIS_FAVORABLE, $deadlineRequest->sciq_avis);
-        $this->assertSame(now()->addMonth()->toDateString(), $action->fresh()->date_fin->toDateString());
-
-        $this->actingAs($fixture['dg'])
-            ->post(route('workspace.deadline-extension.final', $deadlineRequest), [
-                'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
-                'approved_deadline' => $approvedDeadline,
-                'comment' => 'Report approuve.',
-            ])
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $deadlineRequest->refresh();
-        $action->refresh();
-
-        $this->assertSame(DeadlineExtensionRequest::STATUS_APPROUVEE, $deadlineRequest->status);
-        $this->assertSame(DeadlineExtensionRequest::DECISION_APPROUVER, $deadlineRequest->final_decision);
-        $this->assertSame($approvedDeadline, $deadlineRequest->approved_deadline->toDateString());
-        $this->assertSame(now()->addMonth()->toDateString(), $action->date_fin->toDateString());
-
-        $this->actingAs($fixture['dg'])
-            ->post(route('workspace.deadline-extension.apply', $deadlineRequest))
-            ->assertForbidden();
-        $this->actingAs($fixture['chef_planification'])
-            ->post(route('workspace.deadline-extension.apply', $deadlineRequest))
-            ->assertForbidden();
-        $this->assertSame(now()->addMonth()->toDateString(), $action->fresh()->date_fin->toDateString());
-
-        $this->actingAs($fixture['planification'])
-            ->post(route('workspace.deadline-extension.apply', $deadlineRequest))
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $deadlineRequest->refresh();
-        $action->refresh();
-
-        $this->assertSame(DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE, $deadlineRequest->status);
-        $this->assertSame($fixture['planification']->id, $deadlineRequest->applied_by);
-        $this->assertSame($approvedDeadline, $action->date_fin->toDateString());
-        $this->assertSame($approvedDeadline, $action->date_echeance->toDateString());
-        $this->assertSame($approvedDeadline, $action->echeance_cible->toDateString());
-        $this->assertDatabaseHas('action_logs', [
-            'action_id' => $action->id,
-            'type_evenement' => 'deadline_extension_applied_by_controller',
-        ]);
-        $this->assertDatabaseHas('journal_audit', [
-            'module' => 'reports_echeance',
-            'action' => 'deadline_applied',
-        ]);
-    }
-
-    public function test_chef_planification_can_give_final_approval_without_applying_date(): void
+    public function test_deadline_extension_follows_rmo_chef_director_dg_and_applies_exact_changes(): void
     {
         Notification::fake();
         Storage::fake('local');
 
         $fixture = $this->createPlanningFixture();
         $originalDeadline = now()->addMonth()->toDateString();
+        $requestedDeadline = now()->addMonths(3)->toDateString();
         $action = $this->createAction($fixture, $originalDeadline);
+        $secondRmo = User::factory()->create([
+            'role' => User::ROLE_AGENT,
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
+            'password_changed_at' => now(),
+        ]);
 
         $this->actingAs($fixture['agent'])
-            ->post(route('workspace.actions.deadline-extension.store', $action), [
-                'requested_deadline' => now()->addMonths(2)->toDateString(),
-                'motif' => 'Charge additionnelle',
-                'justification' => 'Une charge additionnelle documentee impose un report de l echeance.',
-                'piece_justificative' => UploadedFile::fake()->create('charge.pdf', 12, 'application/pdf'),
-            ]);
+            ->post(route('workspace.actions.deadline-extension.store', $action), $this->changePayload($requestedDeadline, [
+                'change_fields' => ['deadline', 'libelle', 'responsables', 'priorite'],
+                'requested_libelle' => 'Action replanifiee',
+                'requested_responsable_ids' => [$fixture['agent']->id, $secondRmo->id],
+                'requested_priorite' => 'haute',
+            ]))
+            ->assertRedirect(route('workspace.actions.suivi', $action));
 
         $deadlineRequest = DeadlineExtensionRequest::query()->firstOrFail();
+        $this->assertSame(DeadlineExtensionRequest::STATUS_SOUMISE, $deadlineRequest->status);
+        $this->assertSame(['deadline', 'libelle', 'responsables', 'priorite'], array_keys($deadlineRequest->requested_changes));
+        $this->assertSame('Action report', $action->fresh()->libelle);
+        $this->assertSame($originalDeadline, $action->fresh()->date_fin->toDateString());
+
+        $this->actingAs($fixture['director'])
+            ->post(route('workspace.deadline-extension.direction', $deadlineRequest), [
+                'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+                'comment' => 'Tentative de saut du chef.',
+            ])
+            ->assertSessionHasErrors('decision');
+
         $this->actingAs($fixture['chef'])
             ->post(route('workspace.deadline-extension.chef', $deadlineRequest), [
                 'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-                'comment' => 'Avis chef favorable.',
-            ]);
-        $this->actingAs($fixture['planification'])
-            ->post(route('workspace.deadline-extension.controller', $deadlineRequest), [
+                'comment' => 'Validation du chef de service.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION, $deadlineRequest->fresh()->status);
+
+        $outsideDirector = User::factory()->create([
+            'role' => User::ROLE_DIRECTION,
+            'password_changed_at' => now(),
+        ]);
+        $this->actingAs($outsideDirector)
+            ->post(route('workspace.deadline-extension.direction', $deadlineRequest), [
                 'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-                'comment' => 'Avis controle favorable.',
-            ]);
+                'comment' => 'Hors périmètre.',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($fixture['director'])
+            ->post(route('workspace.deadline-extension.direction', $deadlineRequest), [
+                'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+                'comment' => 'Accord du directeur.',
+            ])
+            ->assertRedirect(route('workspace.actions.suivi', $action));
+
+        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_DG, $deadlineRequest->fresh()->status);
+
         $this->actingAs($fixture['chef_planification'])
             ->post(route('workspace.deadline-extension.final', $deadlineRequest), [
                 'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
-                'approved_deadline' => now()->addMonths(3)->toDateString(),
-                'comment' => 'Validation finale Chef Planification.',
+                'comment' => 'Tentative non autorisée.',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($fixture['dg'])
+            ->post(route('workspace.deadline-extension.final', $deadlineRequest), [
+                'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
+                'comment' => 'Accord final DG.',
             ])
             ->assertRedirect(route('workspace.actions.suivi', $action));
 
         $deadlineRequest->refresh();
-        $this->assertSame(DeadlineExtensionRequest::STATUS_APPROUVEE, $deadlineRequest->status);
-        $this->assertSame(User::ROLE_CHEF_PLANIFICATION, $deadlineRequest->final_approver_role);
-        $this->assertSame($originalDeadline, $action->fresh()->date_fin->toDateString());
-        $this->assertNull($deadlineRequest->applied_at);
+        $action->refresh()->load('responsables');
+
+        $this->assertSame(DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE, $deadlineRequest->status);
+        $this->assertSame($fixture['dg']->id, $deadlineRequest->applied_by);
+        $this->assertSame('Action replanifiee', $action->libelle);
+        $this->assertSame('haute', $action->priorite);
+        $this->assertSame($requestedDeadline, $action->date_fin->toDateString());
+        $this->assertSame($requestedDeadline, $action->date_echeance->toDateString());
+        $this->assertEqualsCanonicalizing(
+            [$fixture['agent']->id, $secondRmo->id],
+            $action->responsables->pluck('id')->all()
+        );
+        $this->assertDatabaseHas('action_logs', [
+            'action_id' => $action->id,
+            'type_evenement' => 'deadline_extension_dg_approved_and_applied',
+        ]);
+        $this->assertDatabaseHas('journal_audit', [
+            'module' => 'reports_echeance',
+            'action' => 'final_decision',
+        ]);
+
+        $this->actingAs($fixture['dg'])
+            ->post(route('workspace.deadline-extension.final', $deadlineRequest), [
+                'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
+            ])
+            ->assertSessionHasErrors('decision');
     }
 
-    public function test_sub_action_deadline_is_only_changed_after_the_same_full_circuit(): void
+    public function test_chef_planification_cannot_replace_the_dg_for_final_approval(): void
     {
-        Notification::fake();
         Storage::fake('local');
+        $fixture = $this->createPlanningFixture();
+        $action = $this->createAction($fixture, now()->addMonth()->toDateString());
+        $request = $this->submitAndReachDg($fixture, $action, now()->addMonths(2)->toDateString());
 
+        $this->actingAs($fixture['chef_planification'])
+            ->post(route('workspace.deadline-extension.final', $request), [
+                'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
+                'comment' => 'Le chef planification ne remplace pas la DG.',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_DG, $request->fresh()->status);
+        $this->assertNull($request->fresh()->applied_at);
+    }
+
+    public function test_sub_action_changes_are_applied_only_to_the_selected_sub_action(): void
+    {
+        Storage::fake('local');
         $fixture = $this->createPlanningFixture();
         $actionDeadline = now()->addMonths(4)->toDateString();
         $subActionDeadline = now()->addMonth()->toDateString();
-        $approvedDeadline = now()->addMonths(3)->toDateString();
+        $requestedDeadline = now()->addMonths(3)->toDateString();
         $action = $this->createAction($fixture, $actionDeadline);
         $subAction = $action->sousActions()->create([
             'agent_id' => $fixture['agent']->id,
-            'libelle' => 'Sous-action report',
+            'libelle' => 'Sous-action initiale',
             'date_debut' => now()->toDateString(),
             'date_fin' => $subActionDeadline,
             'statut' => 'non_demarre',
         ]);
 
-        $this->actingAs($fixture['agent'])
-            ->post(route('workspace.actions.deadline-extension.store', $action), [
+        $this->actingAs($fixture['agent'])->post(
+            route('workspace.actions.deadline-extension.store', $action),
+            $this->changePayload($requestedDeadline, [
                 'sous_action_id' => $subAction->id,
-                'requested_deadline' => now()->addMonths(2)->toDateString(),
-                'motif' => 'Dependance externe',
-                'justification' => 'Une dependance externe documentee retarde uniquement cette sous-action.',
-                'piece_justificative' => UploadedFile::fake()->create('dependance.pdf', 12, 'application/pdf'),
-            ]);
+                'change_fields' => ['deadline', 'libelle'],
+                'requested_libelle' => 'Sous-action ajustée',
+            ])
+        );
 
         $deadlineRequest = DeadlineExtensionRequest::query()->firstOrFail();
-        $this->assertSame('sous_action', $deadlineRequest->target_type);
+        $this->reviewChefDirectorDg($fixture, $deadlineRequest);
 
-        $this->actingAs($fixture['chef'])->post(route('workspace.deadline-extension.chef', $deadlineRequest), [
-            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-            'comment' => 'Avis chef favorable.',
-        ]);
-        $this->assertSame($subActionDeadline, $subAction->fresh()->date_fin->toDateString());
-
-        $this->actingAs($fixture['planification'])->post(route('workspace.deadline-extension.controller', $deadlineRequest), [
-            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-            'comment' => 'Avis controle favorable.',
-        ]);
-        $this->actingAs($fixture['dg'])->post(route('workspace.deadline-extension.final', $deadlineRequest), [
-            'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
-            'approved_deadline' => $approvedDeadline,
-            'comment' => 'Report de la sous-action approuve.',
-        ]);
-
-        $this->assertSame($subActionDeadline, $subAction->fresh()->date_fin->toDateString());
-
-        $this->actingAs($fixture['planification'])
-            ->post(route('workspace.deadline-extension.apply', $deadlineRequest))
-            ->assertRedirect(route('workspace.actions.suivi', $action));
-
-        $this->assertSame($approvedDeadline, $subAction->fresh()->date_fin->toDateString());
+        $this->assertSame('Sous-action ajustée', $subAction->fresh()->libelle);
+        $this->assertSame($requestedDeadline, $subAction->fresh()->date_fin->toDateString());
+        $this->assertSame('Action report', $action->fresh()->libelle);
         $this->assertSame($actionDeadline, $action->fresh()->date_fin->toDateString());
-        $this->assertSame(DeadlineExtensionRequest::STATUS_MISE_A_JOUR_APPLIQUEE, $deadlineRequest->fresh()->status);
     }
 
-    public function test_requester_can_complete_the_same_request_at_each_review_stage(): void
+    public function test_requester_can_complete_and_content_changes_restart_the_circuit(): void
     {
-        Notification::fake();
         Storage::fake('local');
-
         $fixture = $this->createPlanningFixture();
-        $originalDeadline = now()->addMonth()->toDateString();
-        $action = $this->createAction($fixture, $originalDeadline);
+        $action = $this->createAction($fixture, now()->addMonth()->toDateString());
+        $initialDeadline = now()->addMonths(2)->toDateString();
 
-        $this->actingAs($fixture['agent'])->post(route('workspace.actions.deadline-extension.store', $action), [
-            'requested_deadline' => now()->addMonths(2)->toDateString(),
-            'motif' => 'Dependance initiale',
-            'justification' => 'Une premiere dependance documentee impose le report de cette action.',
-            'piece_justificative' => UploadedFile::fake()->create('initial.pdf', 12, 'application/pdf'),
-        ]);
+        $this->actingAs($fixture['agent'])->post(
+            route('workspace.actions.deadline-extension.store', $action),
+            $this->changePayload($initialDeadline)
+        );
         $deadlineRequest = DeadlineExtensionRequest::query()->firstOrFail();
-        $queueService = app(DeadlineExtensionQueueService::class);
-
-        $this->assertSame(1, $queueService->actionableCount($fixture['chef']));
-        $this->assertSame(0, $queueService->actionableCount($fixture['planification']));
-        $this->assertSame(0, $queueService->actionableCount($fixture['dg']));
 
         $this->actingAs($fixture['chef'])->post(route('workspace.deadline-extension.chef', $deadlineRequest), [
-            'decision' => DeadlineExtensionRequest::AVIS_COMPLEMENT,
-            'comment' => 'Ajouter le calendrier du prestataire.',
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+            'comment' => 'Accord chef.',
         ]);
-        $this->assertSame(DeadlineExtensionRequest::STATUS_COMPLEMENT_DEMANDE, $deadlineRequest->fresh()->status);
+        $this->actingAs($fixture['director'])->post(route('workspace.deadline-extension.direction', $deadlineRequest), [
+            'decision' => DeadlineExtensionRequest::AVIS_COMPLEMENT,
+            'comment' => 'Ajouter un calendrier détaillé.',
+        ]);
 
-        $this->actingAs($fixture['agent'])
-            ->get(route('workspace.actions.suivi', $action))
-            ->assertOk()
-            ->assertSee('Complément demandé')
-            ->assertSee(route('workspace.deadline-extension.resubmit', $deadlineRequest));
-        $this->actingAs($fixture['planification'])
-            ->get(route('workspace.actions.suivi', $action))
-            ->assertOk()
-            ->assertDontSee(route('workspace.deadline-extension.resubmit', $deadlineRequest));
-
-        $this->actingAs($fixture['planification'])
-            ->post(route('workspace.deadline-extension.resubmit', $deadlineRequest), [
-                'requested_deadline' => now()->addMonths(3)->toDateString(),
-                'motif' => 'Tentative non autorisee',
-                'justification' => 'Un autre utilisateur ne doit pas completer la demande.',
-                'piece_justificative' => UploadedFile::fake()->create('interdit.pdf', 12, 'application/pdf'),
-            ])
+        $this->actingAs($fixture['director'])
+            ->post(route('workspace.deadline-extension.resubmit', $deadlineRequest), $this->changePayload($initialDeadline))
             ->assertForbidden();
 
         $this->actingAs($fixture['agent'])
-            ->post(route('workspace.deadline-extension.resubmit', $deadlineRequest), [
-                'requested_deadline' => now()->addMonths(3)->toDateString(),
-                'motif' => 'Calendrier prestataire',
-                'justification' => 'Le calendrier detaille du prestataire est maintenant disponible.',
-            ])
-            ->assertSessionHasErrors('piece_justificative');
+            ->post(route('workspace.deadline-extension.resubmit', $deadlineRequest), $this->changePayload($initialDeadline, [
+                'justification' => 'Le calendrier détaillé demandé est désormais joint au dossier.',
+            ]));
 
-        $this->actingAs($fixture['agent'])->post(route('workspace.deadline-extension.resubmit', $deadlineRequest), [
-            'requested_deadline' => now()->addMonths(3)->toDateString(),
-            'motif' => 'Calendrier prestataire',
-            'justification' => 'Le calendrier detaille du prestataire est maintenant disponible.',
-            'piece_justificative' => UploadedFile::fake()->create('calendrier.pdf', 12, 'application/pdf'),
+        $deadlineRequest->refresh();
+        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_DIRECTION, $deadlineRequest->status);
+        $this->assertSame(DeadlineExtensionRequest::AVIS_FAVORABLE, $deadlineRequest->chef_avis);
+        $this->assertNull($deadlineRequest->director_decision);
+
+        $this->actingAs($fixture['director'])->post(route('workspace.deadline-extension.direction', $deadlineRequest), [
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+            'comment' => 'Accord direction.',
         ]);
+        $this->actingAs($fixture['dg'])->post(route('workspace.deadline-extension.final', $deadlineRequest), [
+            'decision' => DeadlineExtensionRequest::DECISION_COMPLEMENT,
+            'comment' => 'Réviser la date demandée.',
+        ]);
+
+        $changedDeadline = now()->addMonths(4)->toDateString();
+        $this->actingAs($fixture['agent'])
+            ->post(route('workspace.deadline-extension.resubmit', $deadlineRequest), $this->changePayload($changedDeadline));
 
         $deadlineRequest->refresh();
         $this->assertSame(DeadlineExtensionRequest::STATUS_SOUMISE, $deadlineRequest->status);
         $this->assertNull($deadlineRequest->chef_avis);
-        $this->assertSame(1, $deadlineRequest->metadata['revision_count']);
-        $this->assertSame('initial.pdf', $deadlineRequest->metadata['revision_history'][0]['previous_attachment_name']);
-
-        $revisionUrl = route('workspace.deadline-extension.attachment.revision', [$deadlineRequest, 0]);
-        $this->actingAs($fixture['agent'])
-            ->get($revisionUrl)
-            ->assertOk();
-        $this->actingAs($fixture['agent'])
-            ->get(route('workspace.actions.suivi', $action))
-            ->assertOk()
-            ->assertSee($revisionUrl)
-            ->assertSee('initial.pdf');
-        $this->actingAs($fixture['agent'])
-            ->get(route('workspace.deadline-extension.attachment.revision', [$deadlineRequest, 99]))
-            ->assertNotFound();
-
-        $outsideAgent = User::factory()->create([
-            'role' => User::ROLE_AGENT,
-            'password_changed_at' => now(),
-        ]);
-        $this->actingAs($outsideAgent)
-            ->get($revisionUrl)
-            ->assertForbidden();
-        $this->actingAs($outsideAgent)
-            ->get(route('workspace.deadline-extension.show', $deadlineRequest))
-            ->assertForbidden();
-
-        $this->actingAs($fixture['chef'])->post(route('workspace.deadline-extension.chef', $deadlineRequest), [
-            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-            'comment' => 'Dossier complete par le demandeur.',
-        ]);
-        $this->actingAs($fixture['planification'])->post(route('workspace.deadline-extension.controller', $deadlineRequest), [
-            'decision' => DeadlineExtensionRequest::AVIS_COMPLEMENT,
-            'comment' => 'Ajouter le detail de la marge planning.',
-        ]);
-
-        $this->actingAs($fixture['agent'])->post(route('workspace.deadline-extension.resubmit', $deadlineRequest), [
-            'requested_deadline' => now()->addMonths(4)->toDateString(),
-            'motif' => 'Marge planning documentee',
-            'justification' => 'La marge planning demandee par le controleur est jointe au dossier.',
-            'piece_justificative' => UploadedFile::fake()->create('marge-planning.pdf', 12, 'application/pdf'),
-        ]);
-
-        $deadlineRequest->refresh();
-        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_CONTROLE, $deadlineRequest->status);
-        $this->assertSame(DeadlineExtensionRequest::AVIS_FAVORABLE, $deadlineRequest->chef_avis);
-        $this->assertNull($deadlineRequest->sciq_avis);
-        $this->assertSame(2, $deadlineRequest->metadata['revision_count']);
-
-        $this->actingAs($fixture['planification'])->post(route('workspace.deadline-extension.controller', $deadlineRequest), [
-            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-            'comment' => 'Dossier conforme apres complement.',
-        ]);
-        $this->actingAs($fixture['dg'])->post(route('workspace.deadline-extension.final', $deadlineRequest), [
-            'decision' => DeadlineExtensionRequest::DECISION_COMPLEMENT,
-            'comment' => 'Ajouter une note de synthese finale.',
-        ]);
-
-        $this->actingAs($fixture['agent'])->post(route('workspace.deadline-extension.resubmit', $deadlineRequest), [
-            'requested_deadline' => now()->addMonths(5)->toDateString(),
-            'motif' => 'Note de synthese finale',
-            'justification' => 'La note de synthese demandee pour la validation finale est jointe.',
-            'piece_justificative' => UploadedFile::fake()->create('note-synthese.pdf', 12, 'application/pdf'),
-        ]);
-
-        $deadlineRequest->refresh();
-        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_VALIDATION_FINALE, $deadlineRequest->status);
-        $this->assertSame(DeadlineExtensionRequest::AVIS_FAVORABLE, $deadlineRequest->chef_avis);
-        $this->assertSame(DeadlineExtensionRequest::AVIS_FAVORABLE, $deadlineRequest->sciq_avis);
+        $this->assertNull($deadlineRequest->director_decision);
         $this->assertNull($deadlineRequest->final_decision);
-        $this->assertSame(3, $deadlineRequest->metadata['revision_count']);
-        $this->assertSame($originalDeadline, $action->fresh()->date_fin->toDateString());
-        $this->assertDatabaseHas('action_logs', [
-            'action_id' => $action->id,
-            'type_evenement' => 'deadline_extension_resubmitted',
-        ]);
-        $this->assertDatabaseHas('journal_audit', [
-            'module' => 'reports_echeance',
-            'action' => 'resubmit',
-        ]);
+        $this->assertSame(2, $deadlineRequest->metadata['revision_count']);
     }
 
-    public function test_report_queue_routes_the_request_to_the_current_actor(): void
+    public function test_report_queue_routes_the_request_to_chef_director_then_dg(): void
     {
-        Notification::fake();
         Storage::fake('local');
-
         $fixture = $this->createPlanningFixture();
         $action = $this->createAction($fixture, now()->addMonth()->toDateString());
+        $queue = app(DeadlineExtensionQueueService::class);
 
-        $initialChefDashboard = $this->actingAs($fixture['chef'])
-            ->get(route('dashboard'))
-            ->assertOk();
-        $this->assertStringContainsString(
-            'data-dashboard-flow="deadline-extensions" data-flow-count="0"',
-            $initialChefDashboard->getContent()
+        $this->actingAs($fixture['agent'])->post(
+            route('workspace.actions.deadline-extension.store', $action),
+            $this->changePayload(now()->addMonths(2)->toDateString())
         );
+        $request = DeadlineExtensionRequest::query()->firstOrFail();
 
-        $this->actingAs($fixture['agent'])->post(route('workspace.actions.deadline-extension.store', $action), [
-            'requested_deadline' => now()->addMonths(2)->toDateString(),
-            'motif' => 'Report a router',
-            'justification' => 'Cette demande permet de verifier la file de traitement par profil.',
-            'piece_justificative' => UploadedFile::fake()->create('routage.pdf', 12, 'application/pdf'),
+        $this->assertSame(1, $queue->actionableCount($fixture['chef']));
+        $this->assertSame(0, $queue->actionableCount($fixture['director']));
+        $this->assertSame(0, $queue->actionableCount($fixture['dg']));
+
+        $this->actingAs($fixture['chef'])->post(route('workspace.deadline-extension.chef', $request), [
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+            'comment' => 'Accord chef.',
         ]);
-        $deadlineRequest = DeadlineExtensionRequest::query()->firstOrFail();
-        $queueService = app(DeadlineExtensionQueueService::class);
+        $this->assertSame(0, $queue->actionableCount($fixture['chef']));
+        $this->assertSame(1, $queue->actionableCount($fixture['director']));
 
-        $this->assertSame(1, $queueService->actionableCount($fixture['chef']));
-        $this->assertSame(0, $queueService->actionableCount($fixture['planification']));
-        $this->assertSame(0, $queueService->actionableCount($fixture['dg']));
+        $directorPage = $this->actingAs($fixture['director'])
+            ->get(route('workspace.deadline-extension.show', $request))
+            ->assertOk()
+            ->assertSee(route('workspace.deadline-extension.direction', $request))
+            ->assertDontSee(route('workspace.deadline-extension.final', $request));
+        $this->assertStringContainsString('data-sidebar-badge-for="reports_echeance"', $directorPage->getContent());
 
-        $chefDashboard = $this->actingAs($fixture['chef'])
-            ->get(route('dashboard'))
-            ->assertOk()
-            ->assertSee("Reports d'échéance");
-        $this->assertStringContainsString(
-            'data-dashboard-flow="deadline-extensions" data-flow-count="1"',
-            $chefDashboard->getContent()
-        );
-
-        $this->actingAs($fixture['agent'])
-            ->get(route('workspace.deadline-extension.index', ['vue' => 'mes_demandes']))
-            ->assertOk()
-            ->assertSee('Action report')
-            ->assertSee('Avis chef attendu');
-        $chefQueueResponse = $this->actingAs($fixture['chef'])
-            ->get(route('workspace.deadline-extension.index'))
-            ->assertOk()
-            ->assertSee('Action report')
-            ->assertSee('Traiter')
-            ->assertSee(route('workspace.deadline-extension.show', $deadlineRequest));
-        $this->assertStringContainsString('data-sidebar-badge-for="reports_echeance"', $chefQueueResponse->getContent());
-        $this->actingAs($fixture['chef'])
-            ->get(route('workspace.deadline-extension.show', $deadlineRequest))
-            ->assertOk()
-            ->assertSee(route('workspace.deadline-extension.chef', $deadlineRequest))
-            ->assertDontSee(route('workspace.deadline-extension.controller', $deadlineRequest));
-        $this->actingAs($fixture['planification'])
-            ->get(route('workspace.deadline-extension.index'))
-            ->assertOk()
-            ->assertDontSee('Action report');
-
-        $this->actingAs($fixture['chef'])
-            ->post(route('workspace.deadline-extension.chef', $deadlineRequest), [
-                'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-                'comment' => 'Transmettre au controle.',
-                'return_to' => 'report_detail',
-            ])
-            ->assertRedirect(route('workspace.deadline-extension.show', $deadlineRequest));
-
-        $this->assertSame(0, $queueService->actionableCount($fixture['chef']));
-        $this->assertSame(1, $queueService->actionableCount($fixture['planification']));
-
-        $this->actingAs($fixture['chef'])
-            ->get(route('workspace.deadline-extension.index'))
-            ->assertOk()
-            ->assertDontSee('Action report');
-        $this->actingAs($fixture['planification'])
-            ->get(route('workspace.deadline-extension.index'))
-            ->assertOk()
-            ->assertSee('Action report')
-            ->assertSee('Controle attendu');
-        $this->actingAs($fixture['planification'])
-            ->get(route('workspace.deadline-extension.show', $deadlineRequest))
-            ->assertOk()
-            ->assertSee(route('workspace.deadline-extension.controller', $deadlineRequest))
-            ->assertDontSee(route('workspace.deadline-extension.final', $deadlineRequest));
-        $this->actingAs($fixture['dg'])
-            ->get(route('workspace.deadline-extension.index'))
-            ->assertOk()
-            ->assertDontSee('Action report');
-
-        $this->actingAs($fixture['planification'])
-            ->post(route('workspace.deadline-extension.controller', $deadlineRequest), [
-                'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
-                'comment' => 'Transmettre en validation finale.',
-                'return_to' => 'report_detail',
-            ])
-            ->assertRedirect(route('workspace.deadline-extension.show', $deadlineRequest));
-
-        $this->assertSame(0, $queueService->actionableCount($fixture['planification']));
-        $this->assertSame(1, $queueService->actionableCount($fixture['dg']));
-
-        $this->actingAs($fixture['planification'])
-            ->get(route('workspace.deadline-extension.index'))
-            ->assertOk()
-            ->assertDontSee('Action report');
-        $this->actingAs($fixture['dg'])
-            ->get(route('workspace.deadline-extension.index'))
-            ->assertOk()
-            ->assertSee('Action report')
-            ->assertSee('Validation finale attendue');
-        $this->actingAs($fixture['dg'])
-            ->get(route('workspace.deadline-extension.show', $deadlineRequest))
-            ->assertOk()
-            ->assertSee(route('workspace.deadline-extension.final', $deadlineRequest))
-            ->assertDontSee(route('workspace.deadline-extension.apply', $deadlineRequest));
+        $this->actingAs($fixture['director'])->post(route('workspace.deadline-extension.direction', $request), [
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+            'comment' => 'Accord direction.',
+        ]);
+        $this->assertSame(0, $queue->actionableCount($fixture['director']));
+        $this->assertSame(1, $queue->actionableCount($fixture['dg']));
 
         $this->actingAs($fixture['dg'])
-            ->post(route('workspace.deadline-extension.final', $deadlineRequest), [
-                'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
-                'approved_deadline' => now()->addMonths(3)->toDateString(),
-                'comment' => 'Report approuve.',
-                'return_to' => 'report_detail',
-            ])
-            ->assertRedirect(route('workspace.deadline-extension.show', $deadlineRequest));
-
-        $this->assertSame(0, $queueService->actionableCount($fixture['dg']));
-        $this->assertSame(1, $queueService->actionableCount($fixture['planification']));
-
-        $this->actingAs($fixture['dg'])
-            ->get(route('workspace.deadline-extension.index'))
+            ->get(route('workspace.deadline-extension.show', $request))
             ->assertOk()
-            ->assertDontSee('Action report');
-        $this->actingAs($fixture['planification'])
-            ->get(route('workspace.deadline-extension.index'))
-            ->assertOk()
-            ->assertSee('Action report')
-            ->assertSee('Application controleur attendue');
-        $this->actingAs($fixture['planification'])
-            ->get(route('workspace.deadline-extension.show', $deadlineRequest))
-            ->assertOk()
-            ->assertSee(route('workspace.deadline-extension.apply', $deadlineRequest))
-            ->assertDontSee(route('workspace.deadline-extension.final', $deadlineRequest));
+            ->assertSee(route('workspace.deadline-extension.final', $request));
 
-        $this->actingAs($fixture['planification'])
-            ->post(route('workspace.deadline-extension.apply', $deadlineRequest), [
-                'return_to' => 'report_detail',
-            ])
-            ->assertRedirect(route('workspace.deadline-extension.show', $deadlineRequest));
-
-        $this->assertSame(0, $queueService->actionableCount($fixture['planification']));
-
-        $this->actingAs($fixture['planification'])
-            ->get(route('workspace.deadline-extension.index'))
-            ->assertOk()
-            ->assertDontSee('Action report');
-        $this->actingAs($fixture['agent'])
-            ->get(route('workspace.deadline-extension.index', ['vue' => 'mes_demandes']))
-            ->assertOk()
-            ->assertSee('Action report')
-            ->assertSee('Date appliquee');
+        $this->actingAs($fixture['dg'])->post(route('workspace.deadline-extension.final', $request), [
+            'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
+            'comment' => 'Accord final.',
+        ]);
+        $this->assertSame(0, $queue->actionableCount($fixture['dg']));
     }
 
     public function test_report_queue_searches_and_paginates_a_large_task_list(): void
@@ -569,6 +322,8 @@ class DeadlineExtensionWorkflowTest extends TestCase
                 'target_type' => 'action',
                 'old_deadline' => now()->addMonth()->toDateString(),
                 'requested_deadline' => now()->addMonths(2)->addDays($index)->toDateString(),
+                'requested_changes' => ['deadline' => now()->addMonths(2)->addDays($index)->toDateString()],
+                'original_values' => ['deadline' => now()->addMonth()->toDateString()],
                 'requested_by' => $fixture['agent']->id,
                 'motif' => sprintf('Dossier volume %02d', $index),
                 'justification' => 'Dossier genere pour tester la recherche et la pagination de la file.',
@@ -588,11 +343,6 @@ class DeadlineExtensionWorkflowTest extends TestCase
             ->assertDontSee('Dossier volume 01');
 
         $this->actingAs($fixture['chef'])
-            ->get(route('workspace.deadline-extension.index', ['page' => 2]))
-            ->assertOk()
-            ->assertSee('Dossier volume 01');
-
-        $this->actingAs($fixture['chef'])
             ->get(route('workspace.deadline-extension.index', ['recherche' => 'volume 03']))
             ->assertOk()
             ->assertSee('1 dossier(s)')
@@ -600,67 +350,151 @@ class DeadlineExtensionWorkflowTest extends TestCase
             ->assertDontSee('Dossier volume 04');
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function createPlanningFixture(): array
+    public function test_non_rmo_and_forbidden_fields_are_rejected(): void
     {
-        $direction = Direction::query()->create([
-            'code' => 'DIR-REP',
-            'libelle' => 'Direction report',
-            'actif' => true,
-        ]);
-        $service = Service::query()->create([
-            'direction_id' => $direction->id,
-            'code' => 'SER-REP',
-            'libelle' => 'Service report',
-            'actif' => true,
-        ]);
-        $agent = User::factory()->create([
+        Storage::fake('local');
+        $fixture = $this->createPlanningFixture();
+        $action = $this->createAction($fixture, now()->addMonth()->toDateString());
+        $nonRmo = User::factory()->create([
             'role' => User::ROLE_AGENT,
-            'direction_id' => $direction->id,
-            'service_id' => $service->id,
-            'password_changed_at' => now(),
-        ]);
-        $planification = User::factory()->create([
-            'role' => User::ROLE_PLANIFICATION,
-            'direction_id' => $direction->id,
-            'password_changed_at' => now(),
-        ]);
-        $chef = User::factory()->create([
-            'role' => User::ROLE_SERVICE,
-            'direction_id' => $direction->id,
-            'service_id' => $service->id,
-            'password_changed_at' => now(),
-        ]);
-        $chefPlanification = User::factory()->create([
-            'role' => User::ROLE_CHEF_PLANIFICATION,
-            'password_changed_at' => now(),
-        ]);
-        $dg = User::factory()->create([
-            'role' => User::ROLE_DG,
+            'direction_id' => $fixture['direction']->id,
+            'service_id' => $fixture['service']->id,
             'password_changed_at' => now(),
         ]);
 
-        $pas = Pas::query()->create([
-            'titre' => 'PAS report',
-            'periode_debut' => now()->year,
-            'periode_fin' => now()->year + 2,
-            'statut' => 'actif',
+        $this->actingAs($nonRmo)
+            ->post(route('workspace.actions.deadline-extension.store', $action), $this->changePayload(now()->addMonths(2)->toDateString()))
+            ->assertForbidden();
+
+        $this->actingAs($fixture['agent'])
+            ->post(route('workspace.actions.deadline-extension.store', $action), $this->changePayload(now()->addMonths(2)->toDateString(), [
+                'change_fields' => ['statut'],
+                'statut' => 'cloturee',
+            ]))
+            ->assertSessionHasErrors('change_fields.0');
+
+        $this->assertDatabaseCount('deadline_extension_requests', 0);
+    }
+
+    public function test_dg_approval_rolls_back_when_a_requested_value_has_drifted(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->createPlanningFixture();
+        $action = $this->createAction($fixture, now()->addMonth()->toDateString());
+        $request = $this->submitAndReachDg($fixture, $action, now()->addMonths(2)->toDateString());
+
+        $action->forceFill(['date_fin' => now()->addWeeks(6)->toDateString()])->save();
+
+        $this->actingAs($fixture['dg'])
+            ->post(route('workspace.deadline-extension.final', $request), [
+                'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
+                'comment' => 'Accord final.',
+            ])
+            ->assertSessionHasErrors('decision');
+
+        $request->refresh();
+        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_DG, $request->status);
+        $this->assertNull($request->final_decision);
+        $this->assertNull($request->applied_at);
+    }
+
+    public function test_deleted_sub_action_never_falls_back_to_the_parent_action(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->createPlanningFixture();
+        $actionDeadline = now()->addMonths(4)->toDateString();
+        $action = $this->createAction($fixture, $actionDeadline);
+        $subAction = $action->sousActions()->create([
+            'agent_id' => $fixture['agent']->id,
+            'libelle' => 'Sous-action temporaire',
+            'date_debut' => now()->toDateString(),
+            'date_fin' => now()->addMonth()->toDateString(),
+            'statut' => 'non_demarre',
         ]);
-        $axe = PasAxe::query()->create([
-            'pas_id' => $pas->id,
-            'code' => 'AXE-REP',
-            'libelle' => 'Axe report',
-            'ordre' => 1,
+
+        $this->actingAs($fixture['agent'])->post(
+            route('workspace.actions.deadline-extension.store', $action),
+            $this->changePayload(now()->addMonths(2)->toDateString(), ['sous_action_id' => $subAction->id])
+        );
+        $request = DeadlineExtensionRequest::query()->firstOrFail();
+        $this->actingAs($fixture['chef'])->post(route('workspace.deadline-extension.chef', $request), [
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
         ]);
-        $objectif = PasObjectif::query()->create([
-            'pas_axe_id' => $axe->id,
-            'code' => 'OS-REP',
-            'libelle' => 'Objectif report',
-            'date_echeance' => now()->addYears(2)->toDateString(),
-            'ordre' => 1,
+        $this->actingAs($fixture['director'])->post(route('workspace.deadline-extension.direction', $request), [
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
         ]);
+        $subAction->delete();
+
+        $this->actingAs($fixture['dg'])
+            ->post(route('workspace.deadline-extension.final', $request), [
+                'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
+            ])
+            ->assertSessionHasErrors('decision');
+
+        $this->assertSame($actionDeadline, $action->fresh()->date_fin->toDateString());
+        $this->assertSame(DeadlineExtensionRequest::STATUS_TRANSMISE_DG, $request->fresh()->status);
+    }
+
+    /** @param array<string, mixed> $overrides */
+    private function changePayload(string $deadline, array $overrides = []): array
+    {
+        return array_replace([
+            'change_fields' => ['deadline'],
+            'requested_deadline' => $deadline,
+            'motif' => 'Contraintes operationnelles',
+            'justification' => 'Les contraintes documentees imposent cette modification du planning.',
+            'piece_justificative' => UploadedFile::fake()->create('justificatif.pdf', 12, 'application/pdf'),
+        ], $overrides);
+    }
+
+    /** @param array<string, mixed> $fixture */
+    private function submitAndReachDg(array $fixture, Action $action, string $deadline): DeadlineExtensionRequest
+    {
+        $this->actingAs($fixture['agent'])->post(
+            route('workspace.actions.deadline-extension.store', $action),
+            $this->changePayload($deadline)
+        );
+        $request = DeadlineExtensionRequest::query()->latest('id')->firstOrFail();
+        $this->actingAs($fixture['chef'])->post(route('workspace.deadline-extension.chef', $request), [
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+            'comment' => 'Accord chef.',
+        ]);
+        $this->actingAs($fixture['director'])->post(route('workspace.deadline-extension.direction', $request), [
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+            'comment' => 'Accord direction.',
+        ]);
+
+        return $request->fresh();
+    }
+
+    /** @param array<string, mixed> $fixture */
+    private function reviewChefDirectorDg(array $fixture, DeadlineExtensionRequest $request): void
+    {
+        $this->actingAs($fixture['chef'])->post(route('workspace.deadline-extension.chef', $request), [
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+        ]);
+        $this->actingAs($fixture['director'])->post(route('workspace.deadline-extension.direction', $request), [
+            'decision' => DeadlineExtensionRequest::AVIS_FAVORABLE,
+        ]);
+        $this->actingAs($fixture['dg'])->post(route('workspace.deadline-extension.final', $request), [
+            'decision' => DeadlineExtensionRequest::DECISION_APPROUVER,
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function createPlanningFixture(): array
+    {
+        $direction = Direction::query()->create(['code' => 'DIR-REP', 'libelle' => 'Direction report', 'actif' => true]);
+        $service = Service::query()->create(['direction_id' => $direction->id, 'code' => 'SER-REP', 'libelle' => 'Service report', 'actif' => true]);
+        $agent = User::factory()->create(['role' => User::ROLE_AGENT, 'direction_id' => $direction->id, 'service_id' => $service->id, 'password_changed_at' => now()]);
+        $chef = User::factory()->create(['role' => User::ROLE_SERVICE, 'direction_id' => $direction->id, 'service_id' => $service->id, 'password_changed_at' => now()]);
+        $director = User::factory()->create(['role' => User::ROLE_DIRECTION, 'direction_id' => $direction->id, 'password_changed_at' => now()]);
+        $planification = User::factory()->create(['role' => User::ROLE_PLANIFICATION, 'direction_id' => $direction->id, 'password_changed_at' => now()]);
+        $chefPlanification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION, 'password_changed_at' => now()]);
+        $dg = User::factory()->create(['role' => User::ROLE_DG, 'password_changed_at' => now()]);
+        $pas = Pas::query()->create(['titre' => 'PAS report', 'periode_debut' => now()->year, 'periode_fin' => now()->year + 2, 'statut' => 'actif']);
+        $axe = PasAxe::query()->create(['pas_id' => $pas->id, 'code' => 'AXE-REP', 'libelle' => 'Axe report', 'ordre' => 1]);
+        $objectif = PasObjectif::query()->create(['pas_axe_id' => $axe->id, 'code' => 'OS-REP', 'libelle' => 'Objectif report', 'date_echeance' => now()->addYears(2)->toDateString(), 'ordre' => 1]);
         $pao = Pao::query()->create([
             'pas_id' => $pas->id,
             'pas_objectif_id' => $objectif->id,
@@ -691,26 +525,16 @@ class DeadlineExtensionWorkflowTest extends TestCase
             'statut' => Pta::STATUS_EN_COURS,
         ]);
 
-        return [
-            'direction' => $direction,
-            'service' => $service,
-            'agent' => $agent,
-            'planification' => $planification,
-            'chef' => $chef,
+        return compact('direction', 'service', 'agent', 'chef', 'director', 'planification', 'chefPlanification', 'dg', 'pao', 'pta', 'objectifOperationnel') + [
             'chef_planification' => $chefPlanification,
-            'dg' => $dg,
-            'pao' => $pao,
-            'pta' => $pta,
             'objectif_operationnel' => $objectifOperationnel,
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $fixture
-     */
+    /** @param array<string, mixed> $fixture */
     private function createAction(array $fixture, string $deadline): Action
     {
-        return Action::query()->create([
+        $action = Action::query()->create([
             'pta_id' => $fixture['pta']->id,
             'pao_id' => $fixture['pao']->id,
             'objectif_operationnel_id' => $fixture['objectif_operationnel']->id,
@@ -734,5 +558,8 @@ class DeadlineExtensionWorkflowTest extends TestCase
             'seuil_alerte_progression' => 10,
             'financement_requis' => false,
         ]);
+        $action->responsables()->sync([$fixture['agent']->id => ['is_primary' => true]]);
+
+        return $action;
     }
 }
