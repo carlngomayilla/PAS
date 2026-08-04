@@ -272,9 +272,9 @@
     };
 
     $fmtCount = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ');
-    {{-- Meme arrondi partout : sinon la carte « Avancement global » affiche 2,8 %
-         et la ligne d'axe 3 % pour la meme valeur. Les decimales n'apparaissent
-         qu'a partir de 0,01 %. --}}
+    // Meme arrondi partout : sinon la carte « Avancement global » affiche 2,8 %
+    // et la ligne d'axe 3 % pour la meme valeur. Les decimales n'apparaissent
+    // qu'a partir de 0,01 %.
     $fmtPct = static fn ($value): string => \App\Support\UiLabel::percent($value === null ? null : (float) $value);
     $shortText = static fn ($value, int $limit = 42): string => \Illuminate\Support\Str::limit((string) ($value ?: '-'), $limit);
     $chartFallbackPoints = static function (array $rows, string $key = 'global'): string {
