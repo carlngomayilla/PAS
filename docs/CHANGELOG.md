@@ -7,6 +7,601 @@ Format : entrées datées (les plus récentes en haut), avec description, fichie
 
 ---
 
+## 2026-08-04 - Clôture planification non reconnue, progression de la vue synthétique, en-têtes de tableaux
+
+### Changement
+
+- **Une action clôturée par la planification n'était comptée nulle part** : `ActionTrackingService::hasFinalValidation()` ne connaissait que `validee_controle` et `validee_direction`. Le nouveau statut `validee_planification` (3e visa) n'était donc **pas** reconnu comme visa final : à chaque recalcul, `determineDynamicStatus()` écrasait la clôture posée par `reviewActionByPlanification()` et remettait l'action en `en_cours` / `en_retard`. Conséquence visible : « 0/36 action(s) terminée(s) » alors qu'une action était clôturée. Deux constantes centralisent désormais ces listes — `FINAL_VALIDATION_STATUSES` et `CORRECTION_VALIDATION_STATUSES` — et les 21 listes de statuts « validé » / « en correction » de l'application (dashboard, policy, KPI, reporting, performance, tâches personnelles, calcul officiel) intègrent les statuts planification.
+- **Migration de réparation** `2026_08_04_114242_repair_actions_closed_by_planification` : remet en `cloturee` les actions déjà validées par la planification que le recalcul avait rouvertes, et renseigne `date_fin_reelle` / `cloture_le` si absents.
+- **Écart 2,8 % / 3 %** : la carte « Avancement global » formatait avec une décimale et la ligne d'axe arrondissait à l'entier — même valeur, deux arrondis. `$fmtPct` utilise maintenant `UiLabel::percent()`, comme le reste de l'application : décimales affichées seulement à partir de 0,01 %.
+
+- **Vue synthétique des axes (onglet Synthèse) figée à 0 %** : la progression était lue via `$action->avancement_operationnel ?? $action->progression_reelle`. Or `avancement_operationnel` vaut `0` (et non `null`) dès qu'une action n'a pas de sous-action : l'opérateur `??` ne basculait donc **jamais** sur `progression_reelle`, et tous les axes/objectifs/PAO/actions affichaient 0 %. Les 4 emplacements concernés utilisent désormais `dashboardPtaProgressRate()`, la règle déjà appliquée partout ailleurs dans le tableau de bord (`progression_reelle` → `taux_global` → `taux_realisation_global` → `avancement_operationnel` → `taux_atteinte_cible`, puis 100 % si l'action est clôturée).
+- **Évolution rendue visible** : la ligne de synthèse d'un axe affiche maintenant `Évolution` (En retard / Exécuté / En exécution / En déclinaison / Non décliné) et le compteur `terminées / total`, calculés depuis `groupEvolutionLabel()` mais qui n'étaient jusqu'ici jamais rendus.
+- **Bande vide dans les en-têtes de tableaux** : le bouton de tri injecté par `data-table-enhancements.js` est ajouté *après* le libellé de colonne et ne contient que la flèche `↕` ; avec `width: 100%` il passait à la ligne et créait une bande vide sous chaque intitulé. Il redevient une petite icône en ligne (`width: auto`, fond transparent, sans bordure).
+- **Bandeau blanc des en-têtes** : `<thead class="sticky top-0 z-10 bg-white">` posait un fond blanc sous les cellules d'en-tête (déjà `sticky` et bleu institutionnel via le thème). Le `bg-white` est retiré des 7 tableaux concernés.
+- **Mots coupés** : dans les tableaux `.app-table` / `.data-table` / `.dashboard-table` (`table-layout: auto`), les cellules passent en `overflow-wrap: normal` + `word-break: keep-all` : les colonnes s'élargissent et le conteneur défile horizontalement plutôt que de couper un mot. Le tableau Suivi PTA (`table-layout: fixed`) conserve `break-word` pour ne pas déborder sur la colonne voisine.
+- **Accents** : correction des libellés affichés sans accents (`Non assigné`, `Non renseigné`, `Axe non renseigné`, `Hors délai`, `Clôturée`, `Clôture`, `Échéance dépassée`, `Action à paramétrer`, `Objectif stratégique non renseigné`, `Plan d'Accélération Stratégique`, `Exécuté`, `En exécution`, `En déclinaison`, `Non décliné`…) dans les enums, services de reporting/export et vues de synthèse.
+
+### Fichiers modifiés
+
+- `app/Http/Controllers/DashboardController.php` : `buildSynthesisActionNode()`, `synthesisActionsProgress()`, `buildPtaServiceActionRows()`, `buildAgentActionRows()` → `dashboardPtaProgressRate()` ; `groupEvolutionLabel()` et libellés accentués.
+- `resources/views/partials/dashboard-analytics/_panel-synthesis-hierarchy.blade.php` : ligne d'évolution de l'axe, compteur `terminées/total`, accents.
+- `resources/views/partials/dashboard-analytics/_panel-tables.blade.php`, `_panel-overview.blade.php`, `_panel-synthesis-tables.blade.php` : retrait de `bg-white` sur les `<thead>` collants.
+- `resources/css/ui-system.css` : bouton de tri en ligne, `keep-all` sur les tableaux à largeur automatique, `break-word` conservé pour `.pta-suivi-table`.
+- `app/Enums/*`, `app/Services/Ai/*`, `app/Services/Analytics/ReportingAnalyticsService.php`, `app/Services/Exports/ReportingWorkbookExporter.php`, `app/Services/PaoHierarchyService.php`, `app/Services/PtaSuiviService.php`, contrôleurs PAS/PAO/PTA : libellés accentués.
+
+### Validation
+
+- Vérification des styles calculés sur les bundles compilés : en-tête sur une seule ligne (43 px), bouton de tri `inline-flex` de 6 px sur la même ligne que le libellé, fond transparent ; cellules en `overflow-wrap: normal` / `word-break: keep-all`.
+- `npm run build` et `vendor/bin/pint --dirty` sans erreur.
+
+---
+
+## 2026-08-03 - Lisibilité des tableaux Suivi PTA / Reporting et retrait des poignées de redimensionnement
+
+### Changement
+
+- **Tableau Suivi PTA / Reporting officiel (19 colonnes)** : correction de l'écrasement des cellules qui cassait le texte lettre par lettre. Largeurs de colonnes explicites définies sur les classes `pta-col-*` (indispensables avec `table-layout: fixed`), `min-width` du tableau porté à `2200px` et coupure des mots ramenée à `overflow-wrap: break-word` (au lieu de `anywhere`). Le tableau défile désormais horizontalement et reste lisible.
+- **Tableaux enrichis (`data-table-enhanced`)** : retrait des poignées de redimensionnement de colonnes (les « pastilles blanches » `⋮` sur les en-têtes), jugées gênantes. Le redimensionnement passe en opt-in (`data-table-column-resize="true"`) et reste désactivé par défaut ; le tri, la recherche, la pagination et le menu « Colonnes » sont inchangés.
+
+### Fichiers modifiés
+
+- `resources/css/app.css` et `resources/css/anbg-glass.css` : bloc `.pta-suivi-table` (largeurs `pta-col-*`, `min-width`, `overflow-wrap`).
+- `resources/views/workspace/pta-suivi/index.blade.php` et `resources/views/workspace/monitoring/reporting.blade.php` : `<style>` inline aligné (`min-width:2200px`, `overflow-wrap:break-word`).
+- `resources/js/data-table-enhancements.js` : `resizeEnabled` en opt-in (`=== 'true'`).
+
+### Validation
+
+- Build Vite (`npm run build`) sans erreur.
+- Contrôle visuel des pages Suivi PTA officiel et Reporting après reconstruction des assets.
+
+---
+
+## 2026-08-04 - Notifications planification, menus contextuels et audit des livrables
+
+### Changement
+
+- **Notifications de l'étape planification branchées** : les méthodes existaient mais n'étaient jamais appelées.
+  - après le visa du contrôle : `notifyActionSubmittedToPlanification()` prévient les profils planification qu'une action attend leur validation finale, et informe le RMO de la transmission ;
+  - après la décision finale : `notifyActionReviewedByPlanification()` informe le RMO de la clôture ou du renvoi en correction.
+- **Menus contextuels des tableaux rognés** : les panneaux ouverts depuis une cellule (« Réinit. MDP », « Supprimer », « Demander suppression ») étaient coupés par le conteneur à défilement horizontal et sortaient de l'écran. Le conteneur laisse désormais déborder son contenu lorsqu'un menu est ouvert, et le panneau est borné à la largeur de la fenêtre.
+- **Correctif de calcul** : `actionDeliverableCompleted()` ne reconnaissait pas `validee_planification` — une action clôturée par le nouveau 3e visa ne voyait donc pas son livrable comptabilisé comme réalisé. Statut ajouté.
+
+### Audit des livrables qualitatifs — constat, sans modification
+
+La règle actuelle considère un livrable comme réalisé (**100 %**) dès qu'**un justificatif existe** :
+
+```php
+return $action->exists && $action->justificatifs()->exists();
+```
+
+**Aucune vérification de validation** n'est faite : un document simplement téléversé — incomplet, incorrect ou même rejeté — produit 100 %. La performance peut donc être surévaluée.
+
+Cette règle **n'a volontairement pas été modifiée** : elle change les taux de toutes les actions non quantitatives et relève d'une décision métier. Piste recommandée :
+
+| État du justificatif | Taux proposé |
+| --- | --- |
+| Non déposé | 0 % |
+| Déposé, non validé | suivi soumis, pas 100 % officiel |
+| Validé | 100 % |
+| Rejeté | 0 % ou maintien de la valeur précédente |
+
+### Fichiers modifiés
+
+- `app/Http/Controllers/Web/ActionTrackingWebController.php`, `app/Services/PtaOfficialCalculationService.php`, `resources/css/ui-system.css`.
+
+---
+
+## 2026-08-04 - Circuit à 3 visas rendu opérationnel de bout en bout
+
+### Problème constaté
+
+Le moteur transmettait bien l'action à la planification après le visa du contrôle, mais **aucune couche de lecture ne connaissait le statut `soumise_planification`**. Conséquences observées :
+
+- la **planification ne voyait jamais** les actions en attente de sa validation finale (aucune tâche générée) ;
+- le **statut de suivi n'était pas à jour** : l'action restait affichée « En validation contrôleur » ou basculait à tort vers « Clôturé ».
+
+Le circuit était donc interrompu entre le 2e et le 3e visa.
+
+### Correction
+
+- **`PtaSuiviService`** : nouvelle étape `validation_planification` dans le calcul du statut de suivi (`soumise_planification`, `correction_planification`) et dans les options de filtre ; `validee_planification` reconnu comme clôture.
+- **`DashboardController`** : même étape ajoutée au statut de synthèse et à la liste des filtres `statut_suivi`.
+- **`PersonalTaskService`** : nouvelle file de tâches `planificationValidationTasks()` — les actions visées par le contrôle apparaissent désormais dans « Mes tâches » des profils planification, chef planification, admin fonctionnel et super admin, avec échéance de traitement à 48 h. Le type est rattaché à la famille « validations » et compté dans les tâches de contrôle.
+
+### Défauts visuels corrigés en parallèle
+
+- **Pastilles blanches dans les en-têtes de tableau** : les boutons de tri injectés par le JS héritaient du style « bouton plein » du thème (`button[type="button"]`), ce qui les affichait comme des pastilles. Ils en sont désormais exclus (18 exclusions) et neutralisés dans `ui-system.css`.
+- **Accents rétablis** dans les indicateurs du rapport PTA : « Actions réalisées / actions prévues × 100 », « Niveau global d'exécution du PTA », « Réalisation des actions échues », « Respect des échéances arrivées à terme ».
+
+### Validation
+
+- 50 tests passés (521 assertions) : `PersonalTaskWorkflowTest`, `PtaSuiviWebTest`, `DashboardSynthesisDropdownTest`.
+- Build Vite ; Pint OK.
+
+---
+
+## 2026-08-04 - Correctif métier : statut délai fondé sur une date, plus sur le seul seuil
+
+### Problème constaté
+
+Le calcul du statut délai contenait cette règle :
+
+```
+si taux >= seuil de complétude  ->  « dans les délais »
+```
+
+Elle s'appliquait **sans comparer aucune date**. Conséquence : une action ayant atteint son seuil **après** son échéance, mais pas encore clôturée, était affichée « dans les délais ».
+
+*Exemple réel* : échéance au 30/04, seuil atteint le 15/05, action non clôturée → l'application indiquait « dans les délais » alors que l'objectif avait été atteint avec quinze jours de retard. C'est une **décision métier trompeuse**, qui remontait ensuite dans les tableaux de bord et les rapports.
+
+### Correction
+
+- **Nouvelle colonne `actions.seuil_atteint_le`** (migration additive, nullable) : horodatage du **premier** franchissement du seuil de complétude, enregistré une seule fois et jamais réécrit (`ActionWorkflowService::recordActionProgress`).
+- **Règle de délai revue** : le statut compare désormais toujours **une date** à l'échéance, selon cet ordre de priorité :
+  1. date de fin réelle / clôture ;
+  2. date d'atteinte du seuil (`seuil_atteint_le`) ;
+  3. à défaut, la date du jour.
+- **Repli prudent** : pour les actions antérieures à cette colonne (valeur `null`), le calcul compare la date du jour à l'échéance au lieu de supposer le respect du délai. Une action au seuil dont l'échéance est dépassée est donc signalée **hors délai** — comportement honnête plutôt qu'optimiste.
+
+### Ce qui n'a pas changé
+
+Aucune formule de taux, de performance ou d'écart n'est modifiée. Le correctif porte uniquement sur la **date de référence** du statut délai.
+
+### Fichiers modifiés
+
+- `database/migrations/2026_08_04_083003_add_seuil_atteint_le_to_actions_table.php` (nouveau).
+- `app/Services/PtaSuiviService.php` : `delayStatusForDates()` + `thresholdReachedAt()`.
+- `app/Services/Workflow/ActionWorkflowService.php` : enregistrement de la date au franchissement du seuil.
+- `app/Models/Action.php` : cast `datetime`.
+
+### Validation
+
+- Migration appliquée en local (`127.0.0.1:5433`) ; Pint OK ; tests de statut délai et du suivi PTA.
+
+---
+
+## 2026-08-04 - Suivi PTA : libellés de colonnes clarifiés (aucune formule modifiée)
+
+### Changement
+
+Application de la priorité « corriger les ambiguïtés de libellés » **sans toucher au moteur de calcul**, afin de ne pas altérer rapports, validations, consolidations ni exports.
+
+| Libellé avant | Libellé après | Motif |
+| --- | --- | --- |
+| Ratio | **Réalisé / cible** | le mot « ratio » n'indiquait pas ce qui était rapporté à quoi |
+| Seuil | **Seuil de complétude** | il s'agit du seuil à partir duquel l'action est considérée réalisée, pas d'un seuil générique |
+| Ecart | **Reste à réaliser** | la formule est `max(0, 100 − taux)` : c'est le reste jusqu'à 100 %, **pas** un écart au seuil ni au niveau attendu. Le mot « écart » était trompeur |
+| Realise | **Réalisé** | accentuation |
+| Echeance | **Échéance** | accentuation |
+| Statut action | **État d'avancement** | distingue l'avancement métier des deux autres statuts |
+| Statut de suivi | **Étape du suivi** | il s'agit de l'étape du circuit de validation |
+| Statut delai | **État du délai** | accentuation + cohérence |
+| Preuve : « Aucune » | **À déposer** | état actionnable plutôt qu'un simple constat |
+
+- Les **exports Excel/PDF conservent leurs intitulés institutionnels** : ils servent de pièce officielle et leur nomenclature ne doit pas varier.
+- La colonne **Performance** est conservée pour l'instant (identique au taux par construction) : sa suppression relève de la future vue synthétique, et sa redéfinition éventuelle (`taux / seuil × 100`) exige une validation métier.
+
+### Fichiers modifiés
+
+- `resources/views/components/tables/pta-suivi-table.blade.php`, `resources/views/components/pta/proof-button.blade.php`, `resources/views/workspace/pta-suivi/index.blade.php`, `tests/Feature/PtaSuiviWebTest.php`.
+
+---
+
+## 2026-08-04 - Sections de formulaire à nouveau identifiables (style léger)
+
+### Changement
+
+- Le passage à « 2 cartes maximum » avait **effacé la distinction visuelle des sections** de formulaire (« 1. Identification de l'action », « 2. Responsable / affectation »…), qui apparaissaient à plat.
+- **Style léger rétabli** au-delà du 2e niveau pour `.form-section`, `.form-step-accordion` et `.pta-action-block` : filet coloré de 3 px à gauche, fond très clair, coins arrondis et marge intérieure — **sans cadre complet ni ombre**. Les titres de section et résumés d'accordéon reprennent la couleur institutionnelle en gras.
+- Les niveaux 1 et 2 restent des cartes pleines ; l'empilement de cartes lourdes ne revient pas.
+
+### Validation — mesuré dans le navigateur
+
+| Niveau | Cadre complet | Ombre | Fond | Bordure gauche |
+| --- | --- | --- | --- | --- |
+| 1 panneau | oui | oui | blanc | 4 px |
+| 2 coquille | oui | oui | blanc | 4 px |
+| 3 à 5 sections | **non** | **non** | gris très clair | filet 2,7 px |
+
+### Fichiers modifiés
+
+- `resources/css/ui-system.css`.
+
+---
+
+## 2026-08-04 - Correctif : « Undefined variable $request » à l'enregistrement d'une action
+
+### Changement
+
+- **Bug bloquant corrigé** (préexistant, présent dans `HEAD`) : `WorkspaceNotificationService::notifyActionAssigned()` construisait son URL avec `route('workspace.deadline-extension.show', $request)` alors que cette méthode reçoit `(Action $action, ?User $actor)` — **`$request` n'y existe pas**. Erreur de copier-coller depuis les méthodes de demande de report, qui reçoivent bien un `$request`.
+- **Symptôme** : « Erreur serveur : Undefined variable $request » au clic sur « Enregistrer » d'une action du formulaire PTA (la notification d'assignation au RMO est déclenchée à la sauvegarde). L'audit d'interface ne l'avait pas détecté car il ne couvre que les pages en lecture (GET), pas les soumissions.
+- **Correction** : `route('workspace.actions.suivi', $action)` — la notification pointe désormais vers la fiche de l'action concernée, ce qui est aussi le lien attendu fonctionnellement.
+- Contrôle : les 4 autres usages de cette route (`notifyDeadlineExtensionResubmitted`, `ChefReviewed`, `DirectorReviewed`, `FinalDecided`) sont légitimes — leurs méthodes reçoivent bien un `DeadlineExtensionRequest $request`. Vérification automatisée : **0 méthode du service n'utilise plus une variable `$request` non déclarée**.
+
+### Fichiers modifiés
+
+- `app/Services/Notifications/WorkspaceNotificationService.php`.
+
+### Validation
+
+- `BusinessWorkflowNotificationTest` : 2 tests passés (19 assertions) ; Pint OK.
+
+---
+
+## 2026-08-03 - Profondeur des cartes limitée à 2 niveaux (toutes les pages)
+
+### Changement
+
+- **Empilement de cartes réduit** : l'application imbriquait jusqu'à **5 conteneurs** décorés (panneau → coquille → section → bloc action → accordéon), chacun avec bordure, fond, ombre et marge intérieure. Résultat : beaucoup d'espace perdu, largeur utile réduite à chaque niveau, lecture confuse.
+- **Règle appliquée globalement** : à partir du **3e niveau**, le « chrome » de carte est retiré (bordure, fond, ombre, arrondi, marges latérales) — seul le contenu subsiste. Les deux premiers niveaux restent des cartes. La marge intérieure du 2e niveau est allégée et les blocs de formulaire occupent toute la largeur disponible.
+- S'applique à tous les conteneurs de l'application : `showcase-panel`, `app-card`, `ui-card`, `glass-card`, `form-shell`, `form-section`, `form-step-accordion`, `pta-action-block`, `workspace-card`, `eas-section-card`, `dashboard-card`, `action-detail-card`, `data-table-shell`.
+
+### Points techniques
+
+Deux pièges du cascade CSS ont dû être levés pour que la règle s'applique :
+1. `:where()` **annule la spécificité** — la première version (0,0,0) perdait face au thème (0,3,2). Remplacé par `:is()`.
+2. Pour les déclarations `!important`, **une couche l'emporte sur le hors-couche**. La règle a donc été placée dans `@layer components`, comme le thème historique.
+
+### Validation — mesuré dans le navigateur (1440 px)
+
+| Niveau | Largeur | Bordure | Ombre | Carte |
+| --- | --- | --- | --- | --- |
+| 1 panneau | 1440 px | 4 px | oui | oui |
+| 2 coquille | 1398 px | 4 px | oui | oui |
+| 3 à 5 | **1368 px** | 0 | non | non |
+
+Avant correctif, les niveaux 3 à 5 se réduisaient en cascade (1368 → 1326 → 1298 px).
+
+### Fichiers modifiés
+
+- `resources/css/ui-system.css`.
+
+---
+
+## 2026-08-03 - Suppression du mode plein écran des tableaux
+
+### Changement
+
+- **Mode « Ouvrir en plein écran » des tableaux retiré** (`analytics-explorer.js`) : il s'agissait d'un **second** mécanisme d'agrandissement, distinct de l'aperçu supprimé juste avant. Il rendait **chaque tableau de l'application cliquable** (`role="button"`, `tabindex`, badge de zoom), interceptait les clics destinés aux boutons d'action des lignes, et ouvrait un panneau qui s'affichait mal positionné (contenu tronqué hors écran).
+- La décoration des tableaux et la fonction `isWorkspaceTable` sont supprimées ; seuls les **graphiques** (`.dashboard-canvas`, `.dashboard-gauge-card`) restent agrandissables.
+- Vérifié : plus aucune décoration de tableau dans le bundle JS compilé.
+
+### Fichiers modifiés
+
+- `resources/js/analytics-explorer.js`.
+
+### Validation
+
+- `node --check` OK ; build Vite ; contrôle automatisé du bundle (0 occurrence).
+
+---
+
+## 2026-08-03 - Suppression de l'aperçu de tableau + statuts planification dans l'UI
+
+### Changement
+
+- **Aperçu de tableau supprimé** : le bouton « Aperçu » injecté au-dessus de chaque tableau et l'ouverture d'un aperçu au clic **interceptaient les clics des boutons d'action** (supprimer, modifier…), qui agrandissaient le tableau au lieu d'exécuter leur action. Le code correspondant est **entièrement retiré** (`collectTableRows`, `downloadTableAsExcel`, `openTablePreview`, `findTableByPreviewId`, `tableSupportsPreview`, `injectTablePreviewButtons`, déclencheur de clic et entrées d'API publique). Vérifié : plus aucune trace dans le JS compilé.
+- **Conservé volontairement** : la consultation des **pièces justificatives** (`data-preview-file`, boutons « Preuve » et justificatifs Word/PDF/image/Excel) et l'aperçu des graphiques — ce sont des fonctionnalités demandées, sans rapport avec l'aperçu de tableau.
+- **Statuts planification pris en compte dans l'interface** (complément WS3) : `validee_planification` ajouté aux listes qui déterminent la publication des métriques et l'état du workflow (`actions/index`, `actions/suivi`, stepper), et les trois statuts planification déclarés dans `ActionStatusService`. Sans cela, une action clôturée par la planification n'aurait affiché ni ses métriques ni son état validé.
+
+### Fichiers modifiés
+
+- `resources/js/preview-modal.js` : retrait complet de l'aperçu de tableau.
+- `resources/views/workspace/actions/{index,suivi}.blade.php`, `app/Services/Actions/ActionStatusService.php` : statuts planification.
+
+### Validation
+
+- Build Vite ; syntaxe JS vérifiée (`node --check`) ; 0 occurrence résiduelle dans les bundles.
+
+---
+
+## 2026-08-03 - Circuit de validation à 3 visas opérationnel (WS3)
+
+### Changement
+
+Le circuit de validation des actions passe de **2 visas** à **3 visas** :
+`RMO → chef de service → contrôle SCIQ → planification (clôture)`.
+
+- **Le contrôle (SCIQ) ne clôture plus** : à l'approbation, l'action passe en `soumise_planification`, reste `en_cours`, et un événement `action_transmise_planification` est journalisé à destination de la planification. Le bouton devient « **Viser et transmettre à la planification** ».
+- **Nouvelle validation finale par la planification** (`ActionWorkflowService::reviewActionByPlanification`) : à l'approbation → `validee_planification` + `cloturee`, performance officielle figée, `cloture_le`/`cloture_par` renseignés ; au refus → `correction_planification` + `a_corriger` (et sous-actions validées repassées en correction pour les actions composées).
+- **Séparation des intervenants renforcée** : la validation finale est refusée si l'acteur est le responsable, le soumettant, l'évaluateur chef **ou le contrôleur** qui a visé.
+- **Endpoint + route** : `POST workspace/actions/{action}/validation-planification` (`workspace.actions.planification.review`), réservé aux profils `planification`, `chef_planification`, `admin_fonctionnel`, `super_admin`, avec journal d'audit (`review_planification_validate` / `review_planification_reject`).
+- **Interface** : bloc « Validation finale — Planification » dans la fiche action (valider/clôturer ou renvoyer en correction) ; message d'attente affiché aux autres profils lorsque l'action est en attente de ce visa.
+
+### Fichiers modifiés
+
+- `app/Services/Workflow/ActionWorkflowService.php` : transmission au lieu de clôture + `reviewActionByPlanification`.
+- `app/Http/Controllers/Web/ActionTrackingWebController.php` : `reviewByPlanification`, `canReviewByPlanification`.
+- `routes/web.php` : route de validation planification.
+- `resources/views/workspace/actions/suivi.blade.php` : libellé du visa contrôle + bloc de validation finale.
+
+### Validation
+
+- Statuts et contrainte de base déjà déployés (migration `2026_08_03_181223`, appliquée en local).
+- Tests : `ApiActionValidationWorkflowTest` (4 passés), `KpiExcludeRejectedActionsTest` + `Phase2CKpiCoherenceTest` + `PtaCalculationFormulaTest` (14 passés) — aucun impact sur les calculs de KPI.
+- Pint OK ; route vérifiée via `route:list`.
+
+---
+
+## 2026-08-03 - Bouton mot de passe, rôles lisibles et audit d'interface automatisé
+
+### Changement
+
+- **Bouton « afficher le mot de passe » enfin positionné dans son champ** : le thème forçait `position: relative !important` sur **tous** les boutons (`anbg-glass.css`, sélecteurs incluant `button[type="button"]` et `button[type="submit"]`), ce qui sortait le bouton de son champ et le faisait tomber en dessous. Le sélecteur exclut désormais `.auth-password-toggle` (18 exclusions), et `ui-system.css` réaffirme `position: absolute` avec une spécificité suffisante. **Vérifié dans le navigateur** : le bouton est mesuré à l'intérieur des limites du champ.
+- **Rôles techniques remplacés par des libellés lisibles** (`UiLabel::roleAudience`) dans les demandes de report, les déverrouillages de planification, les unités DG et le formulaire de délégation (`chef_unite_sciq` → « Chef d'unité SCIQ », etc.).
+- **Dates techniques** restantes converties en `jj/mm/aaaa` (vue d'ensemble par rôle, aperçu PTA trimestriel).
+- **Nouvel audit d'interface automatisé** (`tests/Feature/UiPageAuditTest.php`) : rend **toutes les pages principales pour les 10 profils** (agent, chef de service, direction, SCIQ, chef d'unité SCIQ, planification, chef planification, DG, admin, super admin) et signale les anomalies — clés techniques exposées, dates au format technique, erreurs de rendu. Échoue si une page renvoie une erreur serveur.
+
+### Vérification en conditions réelles
+
+Les correctifs CSS ont été mesurés dans un navigateur sur les bundles réellement servis :
+- boutons de tableau : `white-space: nowrap`, hauteur 36 px, libellés d'une seule ligne (« Envoyer au controle » = 149 px) ;
+- barre de filtres : formulaire à 1063 px sur 1100 px, grille répartie sur **4 colonnes** ;
+- bouton mot de passe : `position: absolute`, entièrement contenu dans son champ.
+
+### Fichiers modifiés
+
+- `resources/css/anbg-glass.css`, `resources/css/ui-system.css`.
+- `resources/views/workspace/{deadline-extensions,planning-unlocks,super_admin,governance}/…`, `resources/views/partials/dashboard-role-overview.blade.php`, `resources/views/workspace/ai-reports/partials/pta-quarterly-preview.blade.php`.
+- `tests/Feature/UiPageAuditTest.php` (nouveau).
+
+---
+
+## 2026-08-03 - CAUSE RACINE : suppression de `overflow-wrap: anywhere` dans tout le CSS
+
+### Changement
+
+- **Origine réelle des mots et boutons coupés lettre par lettre** (« Ex/pl/or/er », « Dét/ails », « Mod/ifi/er ») : le thème `anbg-glass.css` appliquait `overflow-wrap: anywhere !important` **directement sur les boutons** (`.btn`, `.btn-sm`, `.app-btn`, `button[type=submit]`, onglets…), et `app.css` faisait de même sur **toutes les cellules de tableau** ainsi que sur plusieurs titres et libellés de KPI. `anywhere` autorise la coupure **à n'importe quel caractère**, y compris au milieu d'un mot. Ces déclarations étant en `!important` et très spécifiques, tous les correctifs ajoutés ailleurs restaient sans effet.
+- **Correctif définitif** : les **11 déclarations** `overflow-wrap: anywhere` de l'application sont supprimées et remplacées :
+  - **boutons, onglets et commandes** → `overflow-wrap: normal` + `word-break: keep-all` + `white-space: nowrap` (un libellé de bouton ne se coupe jamais) ;
+  - **cellules de tableau, titres et libellés** → `overflow-wrap: break-word` + `word-break: normal` (coupure aux limites de mots uniquement, avec repli si un mot dépasse la colonne).
+- Vérification : `overflow-wrap: anywhere` n'apparaît plus **nulle part** dans les sources ni dans les bundles compilés.
+
+### Fichiers modifiés
+
+- `resources/css/anbg-glass.css` : 4 déclarations (boutons, onglets, titres d'action).
+- `resources/css/app.css` : 7 déclarations (cellules de tableau, KPI, fiches action).
+
+### Validation
+
+- Build Vite ; contrôle automatisé : 0 occurrence de `anywhere` dans `app-*.css` et `anbg-glass-*.css` servis.
+
+---
+
+## 2026-08-03 - Correctifs de lisibilité déplacés hors @layer (priorité CSS)
+
+### Changement
+
+- **Cause racine identifiée** : les correctifs de lisibilité ajoutés dans `resources/css/app.css` se trouvaient dans `@layer components`. Or `ui-system.css` et `anbg-glass.css` sont chargés ensuite avec des règles **hors couche**, qui l'emportent sur toute règle *layered* quelle que soit sa spécificité. Plusieurs correctifs (boutons coupés, barre de filtres, bouton mot de passe) restaient donc sans effet à l'écran.
+- **Correctif** : les règles critiques sont désormais définies dans `resources/css/ui-system.css` (chargé en dernier, hors `@layer`) :
+  - boutons et liens d'un tableau : `white-space: nowrap` (fin des « Ex/pl/or/er », « Dét/ails », « Mod/ifi/er ») ;
+  - cellules : coupure aux mots uniquement ;
+  - barre de filtres : titre et formulaire sur toute la largeur, grille de champs multi-colonnes restaurée ;
+  - bouton « afficher le mot de passe » : ancré à l'intérieur de son champ (il s'affichait sous les champs sur la page Profil).
+- **Dates techniques** `2026-04-30` → `30/04/2026` dans le tableau « Actions non démarrées » du tableau de bord.
+
+### Fichiers modifiés
+
+- `resources/css/ui-system.css` : bloc « Correctifs de lisibilité prioritaires ».
+- `resources/views/partials/dashboard-analytics/_panel-tables.blade.php` : format de date.
+
+### Validation
+
+- Build Vite + `view:clear`. À confirmer visuellement après **Ctrl+Shift+R**.
+
+---
+
+## 2026-08-03 - Correctif : barre de filtres effondrée en une colonne
+
+### Changement
+
+- **Barre « Filtres » illisible** (constaté sur la liste PTA : champs empilés dans une colonne étroite, titre « Filtres » rejeté en bas, large zone vide à droite) : `.showcase-toolbar` est un conteneur `display:flex; align-items:end`, or elle contient un titre **et** un formulaire complet. Le formulaire n'occupait donc pas la largeur et sa grille `.showcase-filter-grid` s'effondrait en une seule colonne.
+- **Correctif** : dans une barre de filtres, le bloc de titre et le formulaire prennent désormais toute la largeur (`flex: 1 1 100%`) et la barre passe en `align-items: stretch` lorsqu'elle contient un formulaire. Les champs se répartissent à nouveau sur plusieurs colonnes.
+
+### Fichiers modifiés
+
+- `resources/css/app.css` : règles de mise en page des barres de filtres.
+
+### Validation
+
+- Build Vite. À confirmer visuellement (Ctrl+Shift+R) sur les listes PTA/PAO/PAS et les autres écrans à filtres.
+
+---
+
+## 2026-08-03 - Correctif : boutons d'action verticaux et dates techniques dans les listes
+
+### Changement
+
+- **Boutons d'action cassés lettre par lettre** (constaté sur la liste PTA : « Ex/pl/or/er », « Mod/ifi/er », « En/vo/yer au co/ntr/ole ») : les boutons et liens situés dans une cellule de tableau reçoivent désormais `white-space: nowrap` + `word-break: keep-all`, et la dernière colonne (Actions) ne se comprime plus. Les boutons restent sur une seule ligne quelle que soit la largeur.
+- **Boutons trop volumineux** dans la liste PTA : passage en `btn-sm` (Explorer, Modifier, Envoyer au contrôle, Archiver, Supprimer) pour des lignes de tableau compactes.
+- **Dates techniques** `2026-12-31 00:00:00` remplacées par `31/12/2026` dans les listes **PAO** et **PTA** (colonne Échéance).
+
+### Fichiers modifiés
+
+- `resources/css/app.css` : `nowrap` sur les boutons de cellule + colonne d'actions.
+- `resources/views/workspace/pao/index.blade.php`, `resources/views/workspace/pta/index.blade.php` : format de date + boutons compacts.
+
+### Validation
+
+- Build Vite ; Pint. À confirmer visuellement (Ctrl+Shift+R) sur les listes PTA et PAO.
+
+---
+
+## 2026-08-03 - Libellés lisibles, indicateurs clarifiés, barre d'enregistrement (roadmap RM2-RM4)
+
+### Changement
+
+- **Clés techniques masquées (RM3)** : nouvelles méthodes `UiLabel::eventType()`, `UiLabel::roleAudience()` et `UiLabel::alertLevel()` traduisant les clés brutes en libellés métier (`progression_sous_seuil` → « Progression inférieure au seuil attendu », `alerte_combinee_critique` → « Retard critique », `chef_unite_sciq` → « Chef d’unité SCIQ »…). Appliquées au **journal d'alertes de la fiche action** (`suivi.blade.php`), qui affichait jusqu'ici les clés brutes.
+- **Dates au format français (RM3)** : journal d'alertes et e-mail de digest passent de `Y-m-d H:i` à `d/m/Y`. Les `Y-m-d` des `<input type="date">` et des payloads JS sont conservés (format requis).
+- **Indicateurs « Mes tâches » clarifiés (RM2)** : le chip « Score » devient **« Traitements terminés X % »** avec infobulle précisant qu'il porte sur les traitements déjà terminés et **non** sur la charge restante ; ajout d'une ligne « Charge en attente » au-dessus des compteurs et d'une infobulle de définition sur chaque compteur (À traiter, En retard, Sous 24 h, Critiques, Sans échéance). Lève la contradiction apparente « 13 en retard / score 100 % ».
+- **Barre d'enregistrement collante du formulaire PTA (RM4)** : `.form-actions-sticky` reste visible en bas pendant le défilement, affiche « Modifications non enregistrées » dès la première saisie et **avertit avant de quitter la page** si des modifications sont en cours. (L'accordéon « une seule action ouverte » existait déjà.)
+
+### Fichiers modifiés
+
+- `app/Support/UiLabel.php` : `eventType`, `roleAudience`, `alertLevel`.
+- `resources/views/workspace/actions/suivi.blade.php` : libellés + dates FR du journal.
+- `resources/views/emails/alert-digest.blade.php` : dates FR + statut lisible.
+- `resources/views/workspace/tasks/index.blade.php` : intitulés et infobulles des indicateurs.
+- `resources/views/workspace/pta/form.blade.php` + `resources/css/ui-system.css` : barre collante et détection de modifications.
+
+### Validation
+
+- Build Vite ; Pint ; tests des modules touchés (digest d'alertes, suivi d'action, tâches).
+
+---
+
+## 2026-08-03 - Tableaux de liste : anti-coupure, scroll horizontal, helpers (roadmap RM1)
+
+### Changement
+
+- **Cellules `.app-table`/`.data-table`** : coupure ramenée à `overflow-wrap: break-word` + `word-break: normal` + `hyphens: none` (fin des mots/codes cassés lettre par lettre dans toutes les listes) ; alignement en haut de cellule.
+- **Helpers de colonnes** : `.nowrap` (pas de retour à la ligne), `.col-title` (largeur mini 220px), `.col-code` (nowrap + chiffres tabulaires), et en-tête figé au défilement (`thead.sticky-head`).
+- **Scroll horizontal** sur les listes tassées : `min-width` ajouté aux tables **PTA (1100px)**, **PAO (1200px)**, **PAS (1000px)** — elles défilent désormais au lieu de comprimer les colonnes (Actions l'avait déjà). Fondation du composant tableau commun.
+
+### Fichiers modifiés
+
+- `resources/css/app.css` : règles `.app-table` cellules + helpers + sticky header.
+- `resources/views/workspace/{pta,pao,pas}/index.blade.php` : `min-w-[…]` sur la table.
+
+### Validation
+
+- Build Vite. À confirmer visuellement (Ctrl+Shift+R) : listes PAS/PAO/PTA lisibles avec défilement horizontal.
+
+---
+
+## 2026-08-03 - Boutons du tableau de suivi stylés + reset MDP admin + export Word
+
+### Changement
+
+- **Boutons de la colonne « Commandes » (tableau Suivi PTA/Reporting)** : les liens `pta-inline-open`/`pta-inline-report` (Modifier / Valider / Report d'échéance) n'avaient **aucun style** et s'affichaient en texte brut cliquable. Ajout d'un vrai style bouton (Modifier/Valider en bleu clair, Report en ambre).
+- **Réinitialisation de mot de passe par les admins** : nouveau — les gestionnaires d'utilisateurs (admins, pas seulement super-admin) peuvent réinitialiser le mot de passe **individuellement** (bouton par ligne) **et en masse** (« Réinitialiser tous les MDP », périmètre de l'acteur). Mot de passe temporaire généré par l'application, changement forcé à la première connexion, sessions révoquées, audit tracé. Endpoints `reset-password` / `bulk-reset-password` dans le module Référentiel.
+- **Export Word (.doc) des utilisateurs** : nouveau bouton « Exporter Word » — document HTML mis en forme (palette ANBG, tableau paysage A4) ouvrable par Microsoft Word, mêmes périmètre/filtres que l'export CSV. Aucune dépendance ajoutée.
+- **Reconstruction & caches** : `npm run build` + `php artisan optimize:clear` (route/vue/config) pour que les changements CSS/JS et les nouvelles routes soient effectifs.
+
+### Fichiers modifiés
+
+- `resources/css/app.css` : style boutons `pta-inline-open`/`pta-inline-report`.
+- `app/Http/Controllers/Web/ReferentielWebController.php` : `utilisateurResetPassword`, `utilisateursBulkResetPassword`, `utilisateursExportWord`.
+- `app/Services/Organization/OrganizationDirectoryService.php` : `usersForWordExport`.
+- `resources/views/workspace/referentiel/utilisateurs/index.blade.php` : boutons reset (ligne + masse) et export Word.
+- `resources/views/workspace/referentiel/utilisateurs/export-word.blade.php` : vue Word.
+- `routes/web.php` : routes reset + export Word.
+
+### Validation
+
+- Build Vite OK ; Pint OK ; routes enregistrées (vérifiées via `route:list`).
+
+---
+
+## 2026-08-03 - Hotfix : route du filtre RMO (dashboard 500)
+
+### Changement
+
+- **Correction d'une régression** introduite par le filtre RMO : `dashboard-analytics.blade.php` appelait `route('ajax.users')` alors que la route réelle est `workspace.ajax.users` (groupe préfixé `workspace.`). Provoquait une erreur 500 (`RouteNotFoundException`) au chargement du tableau de bord. Nom de route corrigé.
+
+### Fichiers modifiés
+
+- `resources/views/partials/dashboard-analytics.blade.php`.
+
+### Validation
+
+- Route `workspace.ajax.users` résout correctement ; `php artisan view:clear` ; dashboard rechargé sans erreur.
+
+---
+
+## 2026-08-03 - Matricule obligatoire pour tous les profils
+
+### Changement
+
+- **Matricule universel** : le matricule (`agent_matricule`) devient obligatoire pour **tous les profils, sans exception** (auparavant réservé au rôle agent, forcé à `null` pour les autres).
+  - Modèle `User` : filet de sécurité — tout utilisateur enregistré sans matricule en reçoit un automatiquement (`MAT-…`), aucun compte ne peut exister sans matricule.
+  - Contrôleurs de création/édition (`ReferentielWebController`, `SuperAdminWebController`) : matricule requis pour tous les rôles ; la fonction/téléphone restent spécifiques au rôle agent.
+  - Formulaires (`referentiel/utilisateurs`, `super_admin/organization`) : champ matricule sorti du bloc « agent », toujours visible et requis.
+  - Factory : matricule attribué à tout utilisateur de test.
+  - **Backfill** : migration attribuant `MAT-{id}` aux utilisateurs existants sans matricule (agents déjà couverts précédemment).
+
+### Fichiers modifiés
+
+- `app/Models/User.php` (hook `saving`), `database/factories/UserFactory.php`.
+- `app/Http/Controllers/Web/ReferentielWebController.php`, `app/Http/Controllers/Web/SuperAdminWebController.php`.
+- `resources/views/workspace/referentiel/utilisateurs/form.blade.php`, `resources/views/workspace/super_admin/organization.blade.php`.
+- `database/migrations/2026_08_03_182848_backfill_matricule_for_all_users.php`.
+
+### Validation
+
+- Migration backfill OK en local ; **0 utilisateur sans matricule** après exécution.
+- Pint OK.
+
+---
+
+## 2026-08-03 - Circuit de validation à 3 étapes (fondation)
+
+### Changement
+
+- **Workflow de validation — préparation de l'étape planification** : ajout des statuts `soumise_planification`, `correction_planification`, `validee_planification` (`ActionTrackingService`) et migration **non destructive** étendant la contrainte `actions_statut_validation_check`. Objectif du circuit cible : `chef de service → contrôleur SCIQ (transmet) → planification (clôture)`.
+- ⚠️ **En cours** : le câblage du moteur (`reviewActionByController` ne clôture plus / nouvelle `reviewActionByPlanification`), l'endpoint/route/policy, les notifications, l'UI du stepper et les compteurs reporting restent à faire, avec reprise de la suite de tests du workflow.
+
+### Fichiers modifiés
+
+- `app/Services/Actions/ActionTrackingService.php` : constantes planification.
+- `database/migrations/2026_08_03_181223_expand_action_validation_status_constraint_for_planification.php` : extension de contrainte (appliquée en local).
+
+### Validation
+
+- `php artisan migrate` OK en local (127.0.0.1:5433). Contrainte étendue.
+
+---
+
+## 2026-08-03 - Ergonomie & sécurité : loader, bouton mot de passe, politique de mot de passe
+
+### Changement
+
+- **Loader de page** : réduction du flou du voile de chargement (`blur(6px)` → `blur(2px)`) et allègement du fond (78 % → 58 % ; dark 82 % → 62 %) pour un rendu plus net et professionnel.
+- **Bouton « voir le mot de passe »** : correction du placement — les pages utilisant le wrapper `.password-field` (réinitialisation de mot de passe, etc.) n'avaient pas de contexte de positionnement, le bouton flottait hors du champ. Ajout de `.password-field { position: relative }` + padding droit sur l'input, pour ancrer chaque bouton à l'intérieur de son propre champ.
+- **Politique de mot de passe** : niveau « moyen » confirmé — minimum 8 caractères, lettres + chiffres requis, sans symboles ni casse mixte obligatoires ; désactivation par défaut du blocage « mot de passe compromis » (réactivable via `SECURITY_PASSWORD_CHECK_PWNED=true`).
+- **Tailles de formulaires harmonisées** : les champs `.app-form-control` alignés exactement sur la taille des champs bruts et `.app-input`/`.app-select` (min-height 2.85rem, rayon 0.85rem, padding 0.72×0.9rem) — les trois systèmes de champs partagent désormais une taille unique.
+
+### Fichiers modifiés
+
+- `resources/css/ui-system.css` : voile du loader (clair + sombre).
+- `resources/css/guest.css` : `.password-field` (positionnement + padding).
+- `config/security.php` : `check_pwned` par défaut à `false`.
+- `resources/css/app.css` : `.app-form-control` aligné sur la taille canonique des champs.
+
+### Validation
+
+- Build Vite OK.
+
+---
+
+## 2026-08-03 - Filtre RMO de la synthèse, tableau de suivi en lecture seule, graphiques regroupés
+
+### Changement
+
+- **Synthèse (filtres)** : ajout d'un filtre **RMO** (responsable) en cascade dynamique — le choix d'une direction restreint les services, puis les RMO du périmètre ; validation via « Appliquer ». S'appuie sur l'endpoint existant `ajax.users` et la cascade `dashboard-render.js`.
+- **Tableau de suivi PTA (lecture seule)** : retrait de l'édition inline directement dans le tableau. Les cellules deviennent en lecture seule ; la colonne « Commandes » ne propose plus que trois actions gardées par rôle : **Modifier le paramétrage** (planification), **Valider** (validation contrôleur/SCIQ) et **Report d'échéance** (`can_request_report`). L'endpoint d'édition (`pta.suivi.actions.update`) est conservé côté serveur (masquage UI uniquement).
+- **Graphiques** : les 4 graphiques du PTA trimestriel présents en double dans l'onglet « Vue détaillée » sont retirés ; ils restent uniquement dans l'onglet « Graphiques » (suppression du doublon).
+- **Justificatifs** : confirmation que les types acceptés sont bien Word, PDF, image et Excel (`pdf, doc, docx, xls, xlsx, png, jpg, jpeg`) — déjà en place via `DocumentPolicySettings`. Aucun changement de code nécessaire.
+
+### Fichiers modifiés
+
+- `app/Http/Controllers/DashboardController.php` : lecture + application du filtre `responsable_id` dans les filtres de synthèse.
+- `resources/views/partials/dashboard-analytics.blade.php` : sélecteur RMO en cascade, propagation `responsable_id`.
+- `resources/views/partials/dashboard-analytics/_panel-overview.blade.php` : `responsable_id` dans `baseSynthesisQuery`.
+- `resources/js/dashboard-render.js` : cascade RMO (peuplement dynamique depuis `ajax.users`).
+- `resources/views/components/tables/pta-suivi-table.blade.php` : tableau lecture seule + 3 boutons gardés par rôle.
+- `resources/views/partials/dashboard-analytics/_panel-tables.blade.php` : retrait des graphiques dupliqués.
+- `tests/Feature/PtaSuiviWebTest.php` : assertions alignées sur le tableau en lecture seule (et sur l'état courant du working tree PTA).
+
+### Validation
+
+- `DashboardSynthesisDropdownTest` : 3 tests passés (70 assertions).
+- `PtaSuiviWebTest` : **32 tests passés** (338 assertions).
+- Build Vite OK ; Pint OK.
+
+---
+
 ## 2026-07-22 - Navigation compacte et suivi PTA lisible
 
 ### Changement

@@ -74,7 +74,7 @@
                                 @foreach ($delegantOptions as $option)
                                     <option
                                         value="{{ $option->id }}"
-                                        data-role="{{ $option->role }}"
+                                        data-role="{{ \App\Support\UiLabel::roleAudience($option->role) }}"
                                         data-direction-id="{{ $option->direction_id }}"
                                         data-service-id="{{ $option->service_id }}"
                                         @selected(old('delegant_id') == $option->id)

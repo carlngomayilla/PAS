@@ -384,6 +384,33 @@ class OrganizationDirectoryService
     }
 
     /**
+     * Lignes structurees pour l'export Word (memes perimetre et filtres que le CSV).
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<array<string, string>>
+     */
+    public function usersForWordExport(User $viewer, array $filters): array
+    {
+        $rows = [];
+
+        foreach ($this->userQuery($viewer, $filters)->reorder()->lazyById(500) as $user) {
+            $rows[] = [
+                'nom' => (string) $user->name,
+                'email' => (string) $user->email,
+                'role' => (string) $user->roleLabel(),
+                'direction' => (string) ($user->direction?->code ?? '-'),
+                'service' => (string) ($user->service?->code ?? $user->uniteDg?->code ?? '-'),
+                'matricule' => (string) ($user->agent_matricule ?? '-'),
+                'fonction' => (string) ($user->agent_fonction ?? '-'),
+                'telephone' => (string) ($user->agent_telephone ?? '-'),
+                'sante' => (string) $this->userHealth($user)['label'],
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
      * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, Direction>
      */

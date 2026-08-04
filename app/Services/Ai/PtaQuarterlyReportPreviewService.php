@@ -83,7 +83,7 @@ class PtaQuarterlyReportPreviewService
             ->values()
             ->map(fn (array $axis, int $index): array => [
                 (string) ($index + 1),
-                (string) ($axis['libelle'] ?? 'Non renseigne'),
+                (string) ($axis['libelle'] ?? 'Non renseigné'),
                 $this->asNumber($axis['actions_prevues'] ?? 0),
                 $this->asNumber($axis['actions_realisees'] ?? 0),
                 $this->asNumber($axis['actions_en_retard_non_realisees'] ?? 0),
@@ -143,7 +143,7 @@ class PtaQuarterlyReportPreviewService
 
         $rows = collect($matrix)
             ->map(function (array $line) use ($axisLabels): array {
-                $cells = [(string) ($line['service'] ?? 'Non renseigne')];
+                $cells = [(string) ($line['service'] ?? 'Non renseigné')];
                 $axisCells = is_array($line['axes'] ?? null) ? $line['axes'] : [];
 
                 foreach ($axisLabels as $axisLabel) {
@@ -170,7 +170,7 @@ class PtaQuarterlyReportPreviewService
             ['Axe strategique', 'Actions prevues', 'Actions echues', 'Taux de realisation', 'Statut'],
             collect($axes)
                 ->map(fn (array $axis): array => [
-                    (string) ($axis['libelle'] ?? 'Non renseigne'),
+                    (string) ($axis['libelle'] ?? 'Non renseigné'),
                     $this->asNumber($axis['actions_prevues'] ?? 0),
                     $this->asNumber($axis['actions_echues'] ?? 0),
                     $this->asPercent($axis['taux_realisation'] ?? 0),
@@ -192,7 +192,7 @@ class PtaQuarterlyReportPreviewService
             ['PTA', 'Taux de realisation', 'Nombre d actions echues', 'Statut'],
             collect($services)
                 ->map(fn (array $service): array => [
-                    (string) ($service['libelle'] ?? 'Non renseigne'),
+                    (string) ($service['libelle'] ?? 'Non renseigné'),
                     $this->asPercent($service['taux_realisation'] ?? 0),
                     $this->asNumber($service['actions_echues'] ?? 0),
                     $this->statusFromRate($service['taux_realisation'] ?? 0),
@@ -213,7 +213,7 @@ class PtaQuarterlyReportPreviewService
             ['Mois', 'Actions echues', 'Actions realisees', 'Taux de realisation', 'Variation', 'Tendance'],
             collect($monthly)
                 ->map(fn (array $row): array => [
-                    (string) ($row['mois'] ?? 'Non renseigne'),
+                    (string) ($row['mois'] ?? 'Non renseigné'),
                     $this->asNumber($row['actions_echues'] ?? 0),
                     $this->asNumber($row['actions_realisees'] ?? 0),
                     $this->asPercent($row['taux_realisation'] ?? 0),
@@ -235,7 +235,7 @@ class PtaQuarterlyReportPreviewService
             array_merge(['Axe'], collect($months)->pluck('mois')->map(fn ($month): string => (string) $month)->all(), ['Evolution']),
             collect($rows)->map(function (array $row): array {
                 return array_merge(
-                    [(string) ($row['axe'] ?? 'Non renseigne')],
+                    [(string) ($row['axe'] ?? 'Non renseigné')],
                     collect($row['mois'] ?? [])->map(fn (array $month): string => $this->asPercent($month['taux'] ?? 0))->all(),
                     [(string) ($row['evolution'] ?? 0).' point(s)']
                 );
@@ -324,7 +324,7 @@ class PtaQuarterlyReportPreviewService
     private function seriesFromRows(array $rows, string $labelKey, string $valueKey): array
     {
         return [
-            'labels' => collect($rows)->map(fn (array $row): string => (string) ($row[$labelKey] ?? 'Non renseigne'))->values()->all(),
+            'labels' => collect($rows)->map(fn (array $row): string => (string) ($row[$labelKey] ?? 'Non renseigné'))->values()->all(),
             'values' => collect($rows)->map(fn (array $row): float => (float) ($row[$valueKey] ?? 0))->values()->all(),
         ];
     }
@@ -365,8 +365,8 @@ class PtaQuarterlyReportPreviewService
             'title' => $title,
             'rows' => collect($rows)
                 ->map(fn (array $row): array => [
-                    'libelle' => (string) ($row['libelle'] ?? 'Non renseigne'),
-                    'responsable' => (string) ($row['responsable'] ?? 'Non renseigne'),
+                    'libelle' => (string) ($row['libelle'] ?? 'Non renseigné'),
+                    'responsable' => (string) ($row['responsable'] ?? 'Non renseigné'),
                     'date_fin' => (string) ($row['date_fin'] ?? '-'),
                     'statut' => (string) ($row['statut'] ?? '-'),
                 ])

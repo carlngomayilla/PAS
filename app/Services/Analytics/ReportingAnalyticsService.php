@@ -1028,6 +1028,7 @@ class ReportingAnalyticsService
             'anomalies' => $this->reportActionAnomalies($action),
             'kpi_rows' => $this->reportActionKpiRows($action),
             'est_validee' => in_array($validationStatus, [
+                ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                 ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true),
@@ -1382,7 +1383,7 @@ class ReportingAnalyticsService
     private function reportKpiStatus(?float $value, ?float $threshold): string
     {
         if ($value === null || $threshold === null) {
-            return 'Non renseigne';
+            return 'Non renseigné';
         }
 
         return $value < $threshold ? 'Alerte' : 'OK';
@@ -2318,7 +2319,7 @@ class ReportingAnalyticsService
                 }
 
                 $groupKey = 'direction:'.$groupId;
-                $label = (string) ($action->pta?->direction?->code ?? $action->pta?->direction?->libelle ?? 'Non renseigne');
+                $label = (string) ($action->pta?->direction?->code ?? $action->pta?->direction?->libelle ?? 'Non renseigné');
                 $url = $this->officialActionIndexRoute(['direction_id' => $groupId]);
             } elseif ($mode === 'service') {
                 $groupId = (int) ($action->pta?->service?->id ?? 0);
@@ -2327,7 +2328,7 @@ class ReportingAnalyticsService
                 }
 
                 $groupKey = 'service:'.$groupId;
-                $label = (string) ($action->pta?->service?->code ?? $action->pta?->service?->libelle ?? 'Non renseigne');
+                $label = (string) ($action->pta?->service?->code ?? $action->pta?->service?->libelle ?? 'Non renseigné');
                 $url = $this->officialActionIndexRoute(['service_id' => $groupId]);
             } else {
                 $groupKey = 'action:'.(int) $action->id;
@@ -2346,7 +2347,7 @@ class ReportingAnalyticsService
                 $items = collect($group['items'] ?? []);
 
                 return [
-                    'label' => (string) ($group['label'] ?? 'Non renseigne'),
+                    'label' => (string) ($group['label'] ?? 'Non renseigné'),
                     'url' => (string) ($group['url'] ?? $this->officialActionIndexRoute()),
                     'actions_total' => $items->count(),
                     'kpi_global' => round((float) $items->avg(

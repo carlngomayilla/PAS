@@ -172,7 +172,7 @@
                             '<input type="text" name="axes[' + axeIndex + '][objectifs][' + objectifIndex + '][libelle]" value="' + escapeHtml(objectif.libelle || '') + '" required>' +
                         '</div>' +
                         '<div class="mt-3">' +
-                            '<label>Date d echeance</label>' +
+                            '<label>Date d échéance</label>' +
                             '<input type="date" name="axes[' + axeIndex + '][objectifs][' + objectifIndex + '][date_echeance]" value="' + escapeHtml(objectif.date_echeance || '') + '" required>' +
                         '</div>' +
                     '</div>';

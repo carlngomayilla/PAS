@@ -126,7 +126,7 @@
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <h2 class="form-section-title">Matrice de permissions</h2>
-                        <p class="mt-2 text-xs font-medium text-slate-500">Les cases grisees sont imposees ou bloquees par le perimetre du role.</p>
+                        <p class="mt-2 text-xs font-medium text-slate-500">Les cases grisees sont imposees ou bloquees par le périmètre du role.</p>
                         <p class="form-section-subtitle">Un rôle sans permission ne voit plus le module correspondant et perd l'accès direct à ses routes principales.</p>
                     </div>
                     <div class="flex flex-wrap gap-2">

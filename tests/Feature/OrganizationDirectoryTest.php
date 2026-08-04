@@ -235,8 +235,10 @@ class OrganizationDirectoryTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'agent.trace@anbg.test']);
     }
 
-    public function test_user_model_refuses_to_persist_an_agent_without_matricule(): void
+    public function test_user_model_auto_generates_a_matricule_when_missing(): void
     {
+        // Matricule obligatoire pour TOUS les profils : si aucun n'est fourni,
+        // le modele en genere un automatiquement (aucun compte sans matricule).
         [$direction, $service] = $this->operationalScope();
         $agent = User::factory()->make([
             'role' => User::ROLE_AGENT,
@@ -244,9 +246,10 @@ class OrganizationDirectoryTest extends TestCase
             'service_id' => $service->id,
         ])->forceFill(['agent_matricule' => null]);
 
-        $this->expectException(\InvalidArgumentException::class);
-
         $agent->save();
+
+        $this->assertNotNull($agent->fresh()->agent_matricule);
+        $this->assertNotSame('', trim((string) $agent->fresh()->agent_matricule));
     }
 
     public function test_bulk_password_reset_generates_a_distinct_password_for_each_user(): void

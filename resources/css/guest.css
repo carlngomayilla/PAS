@@ -306,6 +306,18 @@
     padding-right: 3.15rem;
 }
 
+/* Contexte de positionnement pour que le bouton "voir le mot de passe" soit
+   ancre A L'INTERIEUR de son propre champ (pages reset/mot de passe oublie). */
+.password-field {
+    position: relative;
+    display: block;
+}
+
+.password-field > input {
+    width: 100%;
+    padding-right: 3.15rem;
+}
+
 .auth-password-toggle,
 .login-pwd-show {
     position: absolute;

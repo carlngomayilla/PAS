@@ -84,7 +84,10 @@ class ActionTrackingService
     public const RISK_ALERT_THRESHOLD_DAYS = 3;
 
     // ── CONSTANTES DE VALIDATION ──────────────────────────────────────────────
-    // Circuit de validation : agent → chef de service → controleur SCIQ/Planification.
+    // Circuit de validation cible (3 visas) :
+    //   agent/RMO → chef de service → controleur SCIQ → planification (cloture).
+    // Le controleur (SCIQ) ne cloture plus : il transmet a la planification, qui
+    // realise la validation finale (cloture officielle) de l'action.
     public const VALIDATION_NON_SOUMISE = 'non_soumise';
 
     public const VALIDATION_SOUMISE_CHEF = 'soumise_chef';
@@ -100,6 +103,40 @@ class ActionTrackingService
     public const VALIDATION_CORRECTION_CONTROLE = 'correction_controle';
 
     public const VALIDATION_VALIDEE_CONTROLE = 'validee_controle';
+
+    // Etape finale : validation planification (= cloture officielle de l'action).
+    public const VALIDATION_SOUMISE_PLANIFICATION = 'soumise_planification';
+
+    public const VALIDATION_CORRECTION_PLANIFICATION = 'correction_planification';
+
+    public const VALIDATION_VALIDEE_PLANIFICATION = 'validee_planification';
+
+    /**
+     * Statuts qui valent cloture officielle de l'action.
+     *
+     * Depuis le circuit a trois visas, c'est la planification qui cloture :
+     * `validee_controle` ne vaut plus cloture que pour les enregistrements
+     * historiques anterieurs a la bascule.
+     *
+     * @var list<string>
+     */
+    public const FINAL_VALIDATION_STATUSES = [
+        self::VALIDATION_VALIDEE_PLANIFICATION,
+        self::VALIDATION_VALIDEE_CONTROLE,
+        self::VALIDATION_VALIDEE_DIRECTION,
+    ];
+
+    /**
+     * Statuts qui renvoient l'action a son responsable pour correction.
+     *
+     * @var list<string>
+     */
+    public const CORRECTION_VALIDATION_STATUSES = [
+        self::VALIDATION_REJETEE_CHEF,
+        self::VALIDATION_CORRECTION_DEMANDEE,
+        self::VALIDATION_CORRECTION_CONTROLE,
+        self::VALIDATION_CORRECTION_PLANIFICATION,
+    ];
 
     /**
      * @deprecated L'etape de validation direction a ete supprimee du circuit.
@@ -228,6 +265,9 @@ class ActionTrackingService
             self::VALIDATION_SOUMISE_CONTROLE,
             self::VALIDATION_CORRECTION_CONTROLE,
             self::VALIDATION_VALIDEE_CONTROLE,
+            self::VALIDATION_SOUMISE_PLANIFICATION,
+            self::VALIDATION_CORRECTION_PLANIFICATION,
+            self::VALIDATION_VALIDEE_PLANIFICATION,
         ];
     }
 
@@ -951,11 +991,7 @@ class ActionTrackingService
             return self::STATUS_CLOTUREE;
         }
 
-        if (in_array((string) ($action->statut_validation ?? ''), [
-            self::VALIDATION_REJETEE_CHEF,
-            self::VALIDATION_CORRECTION_DEMANDEE,
-            self::VALIDATION_CORRECTION_CONTROLE,
-        ], true)) {
+        if (in_array((string) ($action->statut_validation ?? ''), self::CORRECTION_VALIDATION_STATUSES, true)) {
             return self::STATUS_A_CORRIGER;
         }
 
@@ -1394,9 +1430,6 @@ class ActionTrackingService
 
     private function hasFinalValidation(Action $action): bool
     {
-        return in_array((string) ($action->statut_validation ?? ''), [
-            self::VALIDATION_VALIDEE_CONTROLE,
-            self::VALIDATION_VALIDEE_DIRECTION,
-        ], true);
+        return in_array((string) ($action->statut_validation ?? ''), self::FINAL_VALIDATION_STATUSES, true);
     }
 }

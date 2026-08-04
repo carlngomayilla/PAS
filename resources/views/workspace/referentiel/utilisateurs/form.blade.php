@@ -235,12 +235,15 @@
                     })();
                 </script>
 
+                {{-- Matricule obligatoire pour TOUS les profils, sans exception. --}}
+                <div class="mt-4">
+                    <label for="agent_matricule">Matricule <span aria-hidden="true">*</span></label>
+                    <input id="agent_matricule" name="agent_matricule" type="text" maxlength="80" value="{{ old('agent_matricule', $row->agent_matricule) }}" required>
+                    <p class="field-hint">Identifiant matricule requis pour tout utilisateur.</p>
+                </div>
+
                 <div id="agent-fields" class="conditional-block mt-4">
                     <div class="form-grid-compact mt-2">
-                        <div>
-                            <label for="agent_matricule">Matricule agent <span aria-hidden="true">*</span></label>
-                            <input id="agent_matricule" name="agent_matricule" type="text" maxlength="80" value="{{ old('agent_matricule', $row->agent_matricule) }}" required>
-                        </div>
                         <div>
                             <label for="agent_fonction">Fonction</label>
                             <input id="agent_fonction" name="agent_fonction" type="text" value="{{ old('agent_fonction', $row->agent_fonction) }}" placeholder="Ex : Chargé du suivi des actions">

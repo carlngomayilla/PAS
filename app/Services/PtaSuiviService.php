@@ -1209,14 +1209,14 @@ class PtaSuiviService
                 ['label' => 'En cours', 'color' => '#3996d3'],
                 ['label' => 'En validation chef', 'color' => '#9333ea'],
                 ['label' => 'En validation controleur', 'color' => '#4f46e5'],
-                ['label' => 'Cloture', 'color' => '#00b050'],
+                ['label' => 'Clôture', 'color' => '#00b050'],
             ],
             'Alerte echeance' => [
                 ['label' => 'Aucune alerte', 'color' => '#d9ead3', 'text' => '#14532d'],
                 ['label' => 'Echeance proche', 'color' => '#fff200', 'text' => '#111827'],
                 ['label' => 'Critique', 'color' => '#f9b13c', 'text' => '#111827'],
                 ['label' => 'En retard', 'color' => '#ff0000'],
-                ['label' => 'Cloturee', 'color' => '#00b050'],
+                ['label' => 'Clôturée', 'color' => '#00b050'],
             ],
         ];
     }
@@ -1245,7 +1245,13 @@ class PtaSuiviService
             return 'validation_controleur';
         }
 
-        if (in_array($validation, ['validee_controle', 'validee_direction'], true)) {
+        // 3e visa : l'action a ete visee par le controle et attend la
+        // validation finale de la planification.
+        if (in_array($validation, ['soumise_planification', 'correction_planification'], true)) {
+            return 'validation_planification';
+        }
+
+        if (in_array($validation, ['validee_planification', 'validee_controle', 'validee_direction'], true)) {
             return 'cloture';
         }
 
@@ -1262,24 +1268,55 @@ class PtaSuiviService
 
     private function delayStatus(Action $action, ?float $rate = null, float $completionThreshold = 100.0): string
     {
-        return $this->delayStatusForDates($this->deadline($action), $this->completedAt($action), $rate, $completionThreshold);
+        return $this->delayStatusForDates(
+            $this->deadline($action),
+            $this->completedAt($action),
+            $rate,
+            $completionThreshold,
+            $this->thresholdReachedAt($action)
+        );
     }
 
-    private function delayStatusForDates(?Carbon $deadline, ?Carbon $completedAt = null, ?float $rate = null, float $completionThreshold = 100.0): string
-    {
+    /**
+     * Statut delai d'une action.
+     *
+     * Regle : on compare toujours une DATE a l'echeance, jamais le seul fait
+     * d'avoir atteint le seuil. Auparavant, une action ayant atteint son seuil
+     * sans etre cloturee etait declaree « dans les delais » meme si l'echeance
+     * etait depassee depuis des mois — une decision metier trompeuse.
+     *
+     * Date de reference retenue, par ordre de priorite :
+     *   1. date de fin reelle / cloture (`$completedAt`) ;
+     *   2. date d'atteinte du seuil (`seuil_atteint_le`) ;
+     *   3. a defaut, la date du jour.
+     */
+    private function delayStatusForDates(
+        ?Carbon $deadline,
+        ?Carbon $completedAt = null,
+        ?float $rate = null,
+        float $completionThreshold = 100.0,
+        ?Carbon $thresholdReachedAt = null
+    ): string {
         if ($deadline === null) {
             return 'dans_les_delais';
         }
 
+        $limit = $deadline->copy()->endOfDay();
+
         if ($completedAt !== null) {
-            return $completedAt->gt($deadline->copy()->endOfDay()) ? 'hors_delai' : 'dans_les_delais';
+            return $completedAt->gt($limit) ? 'hors_delai' : 'dans_les_delais';
         }
 
         if ($rate !== null && $rate >= $completionThreshold) {
-            return 'dans_les_delais';
+            // Seuil atteint : c'est la date d'atteinte qui fait foi. Si elle n'a
+            // pas ete enregistree (donnees anterieures a son introduction), on
+            // compare la date du jour plutot que de supposer le respect du delai.
+            $reference = $thresholdReachedAt ?? now();
+
+            return $reference->copy()->startOfDay()->gt($limit) ? 'hors_delai' : 'dans_les_delais';
         }
 
-        return now()->startOfDay()->gt($deadline->copy()->endOfDay()) ? 'hors_delai' : 'dans_les_delais';
+        return now()->startOfDay()->gt($limit) ? 'hors_delai' : 'dans_les_delais';
     }
 
     private function alertStatus(
@@ -1440,7 +1477,8 @@ class PtaSuiviService
             'en_cours' => 'En cours',
             'validation_chef' => 'En validation chef',
             'validation_controleur' => 'En validation controleur',
-            'cloture' => 'Cloture',
+            'validation_planification' => 'En validation planification',
+            'cloture' => 'Clôture',
         ];
     }
 
@@ -1467,7 +1505,7 @@ class PtaSuiviService
             'echeance_proche' => 'Echeance proche',
             'critique' => 'Critique',
             'en_retard' => 'En retard',
-            'cloturee' => 'Cloturee',
+            'cloturee' => 'Clôturée',
             'a_parametrer' => 'A parametrer',
         ];
     }
@@ -1487,6 +1525,20 @@ class PtaSuiviService
         $value = $action->date_echeance ?? $action->echeance_cible ?? $action->date_fin ?? null;
 
         return $value instanceof Carbon ? $value->copy() : ($value !== null ? Carbon::parse($value) : null);
+    }
+
+    /**
+     * Date d'atteinte du seuil de completude, si elle a ete enregistree.
+     */
+    private function thresholdReachedAt(Action $action): ?Carbon
+    {
+        $value = $action->seuil_atteint_le ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        return $value instanceof Carbon ? $value->copy() : Carbon::parse($value);
     }
 
     private function completedAt(Action $action): ?Carbon
@@ -1792,7 +1844,7 @@ class PtaSuiviService
             ],
             [
                 'niveau' => 'Controleur',
-                'statut' => $this->workflowStatus($action) === 'cloture' ? 'Cloture' : ($this->workflowStatus($action) === 'validation_controleur' ? 'En attente controle' : 'Non transmis'),
+                'statut' => $this->workflowStatus($action) === 'cloture' ? 'Clôture' : ($this->workflowStatus($action) === 'validation_controleur' ? 'En attente controle' : 'Non transmis'),
                 'validateur' => (string) ($action->controleReviewedBy?->name ?? $action->clotureePar?->name ?? '-'),
                 'date' => $action->controle_reviewed_at?->format('Y-m-d H:i') ?? $action->cloture_le?->format('Y-m-d H:i') ?? '-',
                 'commentaire' => $this->dash($action->controle_comment ?? $action->justification_cloture ?? $action->rapport_final ?? null),
@@ -2067,7 +2119,25 @@ class PtaSuiviService
             return 'A parametrer';
         }
 
-        return number_format($value, 2, '.', ' ').'%';
+        return $this->formatPercent($value);
+    }
+
+    /**
+     * Formatte un pourcentage sans decimales inutiles.
+     *
+     * Les decimales n'apparaissent que si elles portent une information :
+     * `0` s'affiche « 0% » et non « 0.00% », `100` s'affiche « 100% »,
+     * tandis que `12.5` reste « 12.5% » et `0.01` reste « 0.01% ».
+     */
+    private function formatPercent(float $value): string
+    {
+        $rounded = round($value, 2);
+
+        if (abs($rounded - round($rounded)) < 0.005) {
+            return number_format($rounded, 0, '.', ' ').'%';
+        }
+
+        return rtrim(rtrim(number_format($rounded, 2, '.', ' '), '0'), '.').'%';
     }
 
     private function integerFilter(mixed $value): ?int

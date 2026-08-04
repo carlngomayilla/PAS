@@ -23,7 +23,7 @@
             <p class="mt-1 text-sm text-slate-600">{{ $activeExercise?->libelle ?? 'Aucun exercice actif defini' }}</p>
         </article>
         <article class="ui-card !mb-0">
-            <p class="text-sm text-slate-500">Periode active</p>
+            <p class="text-sm text-slate-500">Période active</p>
             <p class="mt-2 text-xl font-bold text-slate-900">
                 {{ $activeExercise?->date_debut?->format('d/m/Y') ?? '-' }} - {{ $activeExercise?->date_fin?->format('d/m/Y') ?? '-' }}
             </p>
@@ -60,11 +60,11 @@
                 </span>
             </label>
             <div>
-                <label for="planning_pao_archive_after_days">Delai PAO cloture vers archive</label>
+                <label for="planning_pao_archive_after_days">Délai PAO clôture vers archive</label>
                 <input id="planning_pao_archive_after_days" name="planning_pao_archive_after_days" type="number" min="1" max="3650" value="{{ old('planning_pao_archive_after_days', $archiveSettings['planning_pao_archive_after_days'] ?? 30) }}" required>
             </div>
             <div>
-                <label for="planning_pta_archive_after_days">Delai PTA cloture vers archive</label>
+                <label for="planning_pta_archive_after_days">Délai PTA clôture vers archive</label>
                 <input id="planning_pta_archive_after_days" name="planning_pta_archive_after_days" type="number" min="1" max="3650" value="{{ old('planning_pta_archive_after_days', $archiveSettings['planning_pta_archive_after_days'] ?? 30) }}" required>
             </div>
             <div class="flex items-end">

@@ -491,8 +491,8 @@ class DashboardController extends Controller
         $services = $actions
             ->groupBy(fn (Action $action): string => $this->dashboardPtaServiceKey($action))
             ->map(fn (Collection $rows): array => $this->dashboardPtaAnalysisRow($rows, $periodEnd) + [
-                'direction' => (string) ($rows->first()?->pta?->direction?->libelle ?? 'Non renseignee'),
-                'libelle' => (string) ($rows->first()?->pta?->service?->libelle ?? 'Non renseigne'),
+                'direction' => (string) ($rows->first()?->pta?->direction?->libelle ?? 'Non renseignée'),
+                'libelle' => (string) ($rows->first()?->pta?->service?->libelle ?? 'Non renseigné'),
                 'url' => $rows->first()?->pta?->service_id !== null
                     ? $this->actionIndexRoute(['service_id' => (int) $rows->first()->pta->service_id])
                     : $this->actionIndexRoute(),
@@ -771,17 +771,17 @@ class DashboardController extends Controller
                 $action->objectifOperationnel?->pasObjectif?->libelle
                 ?? $action->pta?->objectifOperationnel?->pasObjectif?->libelle
                 ?? $action->pta?->pao?->pasObjectif?->libelle
-                ?? 'Non renseigne'
+                ?? 'Non renseigné'
             ),
             'objectif_operationnel' => (string) (
                 $action->objectifOperationnel?->libelle
                 ?? $action->pta?->objectifOperationnel?->libelle
                 ?? $action->pta?->pao?->objectif_operationnel
-                ?? 'Non renseigne'
+                ?? 'Non renseigné'
             ),
-            'direction' => (string) ($action->pta?->direction?->libelle ?? 'Non renseignee'),
-            'service' => (string) ($action->pta?->service?->libelle ?? 'Non renseigne'),
-            'responsable' => (string) ($action->responsable?->name ?? 'Non renseigne'),
+            'direction' => (string) ($action->pta?->direction?->libelle ?? 'Non renseignée'),
+            'service' => (string) ($action->pta?->service?->libelle ?? 'Non renseigné'),
+            'responsable' => (string) ($action->responsable?->name ?? 'Non renseigné'),
             'date_fin' => $this->actionReferenceDate($action)?->format('d/m/Y'),
             'progression' => $this->dashboardPtaProgressRate($action),
             'url' => route('workspace.actions.suivi', $action),
@@ -1471,7 +1471,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @return array{periode: string, periode_label: string, statut_suivi: string|null, statut_delai: string|null, alerte_echeance: string|null}
+     * @return array{periode: string, periode_label: string, statut_suivi: string|null, statut_delai: string|null, alerte_echeance: string|null, responsable_id: int|null}
      */
     private function selectedDashboardSynthesisFilters(): array
     {
@@ -1485,15 +1485,22 @@ class DashboardController extends Controller
 
         $period = $this->selectedDashboardSynthesisPeriod();
 
+        $responsableRaw = trim((string) request()->query('responsable_id', ''));
+        $responsableId = ($responsableRaw !== '' && $responsableRaw !== 'all' && ctype_digit($responsableRaw) && (int) $responsableRaw > 0)
+            ? (int) $responsableRaw
+            : null;
+
         return [
             'periode' => $period,
             'periode_label' => $this->ptaSuiviService->periodLabel($period),
+            'responsable_id' => $responsableId,
             'statut_suivi' => $pick('statut_suivi', [
                 'a_parametrer',
                 'non_demarre',
                 'en_cours',
                 'validation_chef',
                 'validation_controleur',
+                'validation_planification',
                 'cloture',
             ]),
             'statut_delai' => $pick('statut_delai', [
@@ -1530,7 +1537,7 @@ class DashboardController extends Controller
             (string) ($filters['periode'] ?? 'all')
         );
 
-        if ($periodRange === null && ! $filters['statut_suivi'] && ! $filters['statut_delai'] && ! $filters['alerte_echeance']) {
+        if ($periodRange === null && ! $filters['statut_suivi'] && ! $filters['statut_delai'] && ! $filters['alerte_echeance'] && ! $filters['responsable_id']) {
             return $actions->values();
         }
 
@@ -1539,6 +1546,16 @@ class DashboardController extends Controller
                 if ($periodRange !== null) {
                     $date = $this->actionReferenceDate($action);
                     if (! $date instanceof Carbon || ! $date->betweenIncluded($periodRange[0], $periodRange[1])) {
+                        return false;
+                    }
+                }
+
+                if ($filters['responsable_id'] !== null) {
+                    $responsableId = (int) $filters['responsable_id'];
+                    $matchesResponsable = (int) ($action->responsable_id ?? 0) === $responsableId
+                        || ($action->relationLoaded('responsables')
+                            && $action->responsables->contains(fn ($responsable): bool => (int) $responsable->getKey() === $responsableId));
+                    if (! $matchesResponsable) {
                         return false;
                     }
                 }
@@ -1639,7 +1656,17 @@ class DashboardController extends Controller
             return 'validation_controleur';
         }
 
+        // 3e visa : en attente de la validation finale de la planification.
         if (in_array($validation, [
+            ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
+            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
+        ], true)) {
+            return 'validation_planification';
+        }
+
+        if (in_array($validation, [
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
             ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
@@ -2463,6 +2490,7 @@ class DashboardController extends Controller
                 ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
                     ActionTrackingService::VALIDATION_VALIDEE_CHEF,
                     ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                    ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                     ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                     ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
                 ], true))
@@ -2768,7 +2796,7 @@ class DashboardController extends Controller
                 $axisId = (int) ($axis?->id ?? 0);
 
                 return [
-                    'axe' => trim(((string) ($axis?->code ?? '')).' - '.((string) ($axis?->libelle ?? 'Axe non renseigne')), ' -'),
+                    'axe' => trim(((string) ($axis?->code ?? '')).' - '.((string) ($axis?->libelle ?? 'Axe non renseigné')), ' -'),
                     'progression' => $progress,
                     'meta' => $rows->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count().' objectif(s) | '.$rows->count().' actions | '.$late.' retard(s)',
                     'status' => $this->decisionProgressStatus($progress, $late, $qualityThreshold),
@@ -2874,14 +2902,14 @@ class DashboardController extends Controller
                 $score = round((float) $rows->avg(fn (Action $action): float => (float) ($action->actionKpi?->kpi_global ?? 0)), 2);
                 $directionId = (int) ($first?->pta?->direction?->id ?? 0);
                 $criticalService = $rows
-                    ->groupBy(fn (Action $action): string => (string) ($action->pta?->service?->libelle ?? 'Non renseigne'))
+                    ->groupBy(fn (Action $action): string => (string) ($action->pta?->service?->libelle ?? 'Non renseigné'))
                     ->map(fn (Collection $serviceRows): int => $serviceRows->filter(fn (Action $action): bool => $this->isAlertAction($action))->count())
                     ->sortDesc()
                     ->keys()
                     ->first();
 
                 return [
-                    'direction' => (string) ($first?->pta?->direction?->libelle ?? 'Non renseignee'),
+                    'direction' => (string) ($first?->pta?->direction?->libelle ?? 'Non renseignée'),
                     'actions_total' => $total,
                     'achevees' => $completed,
                     'retards' => $late,
@@ -2915,14 +2943,14 @@ class DashboardController extends Controller
                 $snapshot = $this->buildDashboardSnapshot($rows);
                 $officialSnapshot = $this->buildDashboardSnapshot($officialRows);
                 $criticalService = $rows
-                    ->groupBy(fn (Action $action): string => (string) ($action->pta?->service?->libelle ?? 'Non renseigne'))
+                    ->groupBy(fn (Action $action): string => (string) ($action->pta?->service?->libelle ?? 'Non renseigné'))
                     ->map(fn (Collection $serviceRows): int => $serviceRows->filter(fn (Action $action): bool => $this->isAlertAction($action))->count())
                     ->sortDesc()
                     ->keys()
                     ->first();
 
                 return [
-                    'direction' => (string) ($first?->pta?->direction?->libelle ?? 'Non renseignee'),
+                    'direction' => (string) ($first?->pta?->direction?->libelle ?? 'Non renseignée'),
                     'actions_total' => (int) $snapshot['actions_total'],
                     'actions_officielles' => (int) $officialSnapshot['actions_total'],
                     'achevees' => (int) $snapshot['achevees'],
@@ -3276,6 +3304,7 @@ class DashboardController extends Controller
             ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
                 ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                 ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true))
@@ -3332,6 +3361,7 @@ class DashboardController extends Controller
             ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
                 ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                 ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true))
@@ -3484,7 +3514,7 @@ class DashboardController extends Controller
                 $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
 
                 return [
-                    'agent' => (string) ($first?->responsable?->name ?? 'Non assigne'),
+                    'agent' => (string) ($first?->responsable?->name ?? 'Non assigné'),
                     'actions_total' => $total,
                     'achevees' => $completed,
                     'retards' => $late,
@@ -3521,7 +3551,7 @@ class DashboardController extends Controller
                     $serviceId = (int) ($first?->pta?->service?->id ?? 0);
 
                     return [
-                        'service' => (string) ($first?->pta?->service?->code ?? $first?->pta?->service?->libelle ?? 'Non renseigne'),
+                        'service' => (string) ($first?->pta?->service?->code ?? $first?->pta?->service?->libelle ?? 'Non renseigné'),
                         'actions_total' => $total,
                         'achevees' => $completed,
                         'retards' => $late,
@@ -3656,26 +3686,26 @@ class DashboardController extends Controller
 
         foreach ($actions as $action) {
             $groupKey = 'none';
-            $label = 'Non renseigne';
+            $label = 'Non renseigné';
 
             if ($mode === 'objectif_strategique') {
                 $groupKey = (string) ($action->pta?->pao?->pasObjectif?->id ?? 0);
                 $axeCode = (string) ($action->pta?->pao?->pasObjectif?->pasAxe?->code ?? '');
                 $objectifCode = (string) ($action->pta?->pao?->pasObjectif?->code ?? '');
-                $objectifLibelle = (string) ($action->pta?->pao?->pasObjectif?->libelle ?? 'Non renseigne');
+                $objectifLibelle = (string) ($action->pta?->pao?->pasObjectif?->libelle ?? 'Non renseigné');
                 $label = trim($axeCode.' / '.$objectifCode.' - '.$objectifLibelle, ' /-') ?: $objectifLibelle;
                 $url = $this->officialActionIndexRoute([
                     'pas_objectif_id' => (int) ($action->pta?->pao?->pasObjectif?->id ?? 0),
                 ]);
             } elseif ($mode === 'direction') {
                 $groupKey = (string) ($action->pta?->direction?->id ?? 0);
-                $label = (string) ($action->pta?->direction?->code ?? $action->pta?->direction?->libelle ?? 'Non renseigne');
+                $label = (string) ($action->pta?->direction?->code ?? $action->pta?->direction?->libelle ?? 'Non renseigné');
                 $url = $this->officialActionIndexRoute([
                     'direction_id' => (int) ($action->pta?->direction?->id ?? 0),
                 ]);
             } elseif ($mode === 'service') {
                 $groupKey = (string) ($action->pta?->service?->id ?? 0);
-                $label = (string) ($action->pta?->service?->code ?? $action->pta?->service?->libelle ?? 'Non renseigne');
+                $label = (string) ($action->pta?->service?->code ?? $action->pta?->service?->libelle ?? 'Non renseigné');
                 $url = $this->officialActionIndexRoute([
                     'service_id' => (int) ($action->pta?->service?->id ?? 0),
                 ]);
@@ -3699,7 +3729,7 @@ class DashboardController extends Controller
                 $alerts = $items->filter(fn (Action $action): bool => $this->isAlertAction($action))->count();
 
                 return [
-                    'label' => (string) ($group['label'] ?? 'Non renseigne'),
+                    'label' => (string) ($group['label'] ?? 'Non renseigné'),
                     'url' => (string) ($group['url'] ?? $this->officialActionIndexRoute()),
                     'actions_total' => $items->count(),
                     'progression_moyenne' => round((float) $items->avg(fn (Action $action): float => (float) ($action->progression_reelle ?? 0)), 2),
@@ -3817,7 +3847,7 @@ class DashboardController extends Controller
                     'pas' => (string) ($pas?->titre ?: 'PAS'),
                     'objectif_strategique' => $this->strategicObjectiveLabel($objective),
                     'pao' => (string) ($pao?->titre ?: ('PAO '.($pao?->annee ?? ''))),
-                    'objectif_operationnel' => (string) ($operationalObjective?->libelle ?: 'Non renseigne'),
+                    'objectif_operationnel' => (string) ($operationalObjective?->libelle ?: 'Non renseigné'),
                     'pta' => (string) ($pta?->titre ?: 'PTA'),
                     'actions' => $total,
                     'etat' => $state,
@@ -3844,7 +3874,7 @@ class DashboardController extends Controller
                 $inProgress = $rows->filter(fn (Action $action): bool => in_array($this->normalizeStatus((string) ($action->statut_dynamique ?? '')), ['en_cours', 'a_risque', 'en_avance'], true))->count();
 
                 return [
-                    'service' => (string) ($first?->pta?->service?->libelle ?? $first?->pta?->service?->code ?? 'Non renseigne'),
+                    'service' => (string) ($first?->pta?->service?->libelle ?? $first?->pta?->service?->code ?? 'Non renseigné'),
                     'pta' => $rows->pluck('pta.id')->filter()->unique()->count(),
                     'actions' => $total,
                     'terminees' => $completed,
@@ -3880,7 +3910,7 @@ class DashboardController extends Controller
             }
 
             if ($agents->isEmpty()) {
-                $agents = collect([(object) ['id' => 0, 'name' => 'Non assigne']]);
+                $agents = collect([(object) ['id' => 0, 'name' => 'Non assigné']]);
             }
 
             foreach ($agents->unique('id') as $agent) {
@@ -3892,9 +3922,9 @@ class DashboardController extends Controller
                         ->count()
                     : 0;
 
-                $groups[$key]['agent'] = (string) ($agent->name ?? 'Non assigne');
+                $groups[$key]['agent'] = (string) ($agent->name ?? 'Non assigné');
                 $groups[$key]['agent_id'] = $agentId;
-                $groups[$key]['service'] = (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? 'Non renseigne');
+                $groups[$key]['service'] = (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? 'Non renseigné');
                 $groups[$key]['actions'][(int) $action->id] = $action;
                 $groups[$key]['sous_actions'] = (int) ($groups[$key]['sous_actions'] ?? 0) + $subActionCount;
             }
@@ -3909,8 +3939,8 @@ class DashboardController extends Controller
                 $late = $rows->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
 
                 return [
-                    'agent' => (string) ($group['agent'] ?? 'Non assigne'),
-                    'service' => (string) ($group['service'] ?? 'Non renseigne'),
+                    'agent' => (string) ($group['agent'] ?? 'Non assigné'),
+                    'service' => (string) ($group['service'] ?? 'Non renseigné'),
                     'actions_affectees' => $total,
                     'terminees' => $completed,
                     'en_retard' => $late,
@@ -3985,7 +4015,7 @@ class DashboardController extends Controller
                     'delay_status' => $this->delayStatusKey($action),
                     'statut_delai' => $this->delayStatusLabel($action),
                     'progression' => round((float) ($action->progression_reelle ?? 0), 2),
-                    'motif' => trim((string) ($action->difficultes_rencontrees ?: $action->mesures_correctives ?: 'Non renseigne')),
+                    'motif' => trim((string) ($action->difficultes_rencontrees ?: $action->mesures_correctives ?: 'Non renseigné')),
                 ];
             })
             ->values()
@@ -4078,7 +4108,7 @@ class DashboardController extends Controller
                 ];
             }
 
-            if ($this->actionResponsibleLabel($action) === 'Non assigne') {
+            if ($this->actionResponsibleLabel($action) === 'Non assigné') {
                 $rows[] = [
                     'type' => 'Responsable',
                     'element' => $label,
@@ -4179,7 +4209,7 @@ class DashboardController extends Controller
                 $directionId = (int) ($first?->pta?->direction?->id ?? 0);
 
                 return [
-                    'direction' => (string) ($first?->pta?->direction?->code ?? $first?->pta?->direction?->libelle ?? 'Non renseignee'),
+                    'direction' => (string) ($first?->pta?->direction?->code ?? $first?->pta?->direction?->libelle ?? 'Non renseignée'),
                     'pao_cree' => $rows->pluck('pta.pao.id')->filter()->unique()->isNotEmpty() ? 'Oui' : 'Non',
                     'objectifs_operationnels' => $rows->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)->filter()->unique()->count(),
                     'services' => $services,
@@ -4228,7 +4258,7 @@ class DashboardController extends Controller
                 $paoCount = $rows->pluck('pta.pao.id')->filter()->unique()->count();
 
                 return [
-                    'direction' => (string) ($first?->pta?->direction?->code ?? $first?->pta?->direction?->libelle ?? 'Non renseignee'),
+                    'direction' => (string) ($first?->pta?->direction?->code ?? $first?->pta?->direction?->libelle ?? 'Non renseignée'),
                     'axes' => $rows->pluck('pta.pao.pasObjectif.pasAxe.id')->filter()->unique()->count(),
                     'objectifs_strategiques' => $strategicObjectives->count(),
                     'pao_cree' => $paoCount > 0 ? 'Oui' : 'Non',
@@ -4269,12 +4299,12 @@ class DashboardController extends Controller
                 return [
                     'direction' => (string) ($first?->pta?->direction?->code ?? $first?->pta?->direction?->libelle ?? '-'),
                     'objectif_strategique' => $this->strategicObjectiveLabel($first?->pta?->pao?->pasObjectif),
-                    'objectif_operationnel' => (string) ($operationalObjective?->libelle ?: 'Non renseigne'),
+                    'objectif_operationnel' => (string) ($operationalObjective?->libelle ?: 'Non renseigné'),
                     'service' => (string) ($first?->pta?->service?->libelle ?? $first?->pta?->service?->code ?? '-'),
                     'echeance' => $operationalObjective?->echeance instanceof Carbon ? $operationalObjective->echeance->format('d/m/Y') : '-',
                     'pta_cree' => $first?->pta !== null ? 'Oui' : 'Non',
                     'actions_creees' => $total,
-                    'actions_affectees' => $rows->filter(fn (Action $action): bool => $this->actionResponsibleLabel($action) !== 'Non assigne')->count(),
+                    'actions_affectees' => $rows->filter(fn (Action $action): bool => $this->actionResponsibleLabel($action) !== 'Non assigné')->count(),
                     'en_cours' => $inProgress,
                     'realisees' => $completed,
                     'retards' => $late,
@@ -4300,7 +4330,7 @@ class DashboardController extends Controller
 
                 return [
                     'service' => (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? '-'),
-                    'objectif_operationnel' => (string) (($action->objectifOperationnel ?? $action->pta?->objectifOperationnel)?->libelle ?: 'Non renseigne'),
+                    'objectif_operationnel' => (string) (($action->objectifOperationnel ?? $action->pta?->objectifOperationnel)?->libelle ?: 'Non renseigné'),
                     'action' => (string) $action->libelle,
                     'responsable' => $this->actionResponsibleLabel($action),
                     'debut' => $action->date_debut instanceof Carbon ? $action->date_debut->format('d/m/Y') : '-',
@@ -4309,7 +4339,7 @@ class DashboardController extends Controller
                     'realise' => $this->actionRealizedLabel($action),
                     'reste' => $this->actionRemainingLabel($action),
                     'taux_realisation' => $this->actionQuantitativeRate($action),
-                    'progression' => round((float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0), 2),
+                    'progression' => $this->dashboardPtaProgressRate($action),
                     'statut' => $this->statusLabel($this->normalizeStatus((string) ($action->statut_dynamique ?? ''))),
                     'statut_delai' => $this->delayStatusLabel($action),
                     'justificatifs' => $this->actionProofs($action)->count(),
@@ -4341,9 +4371,9 @@ class DashboardController extends Controller
                 $subDone = $agentSubActions->filter(fn ($subAction): bool => (bool) ($subAction->est_effectuee ?? false))->count();
 
                 $rows[] = [
-                    'agent' => (string) ($agent->name ?? 'Non assigne'),
+                    'agent' => (string) ($agent->name ?? 'Non assigné'),
                     'action' => (string) $action->libelle,
-                    'objectif_operationnel' => (string) (($action->objectifOperationnel ?? $action->pta?->objectifOperationnel)?->libelle ?: 'Non renseigne'),
+                    'objectif_operationnel' => (string) (($action->objectifOperationnel ?? $action->pta?->objectifOperationnel)?->libelle ?: 'Non renseigné'),
                     'pta' => (string) ($action->pta?->titre ?: 'PTA'),
                     'direction' => (string) ($action->pta?->direction?->code ?? $action->pta?->direction?->libelle ?? '-'),
                     'service' => (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? '-'),
@@ -4352,7 +4382,7 @@ class DashboardController extends Controller
                     'realise' => $this->actionRealizedLabel($action),
                     'reste' => $this->actionRemainingLabel($action),
                     'sous_actions' => $subDone.'/'.$subTotal,
-                    'progression' => round((float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0), 2),
+                    'progression' => $this->dashboardPtaProgressRate($action),
                     'taux_realisation' => $this->actionQuantitativeRate($action),
                     'statut' => $this->statusLabel($this->normalizeStatus((string) ($action->statut_dynamique ?? ''))),
                     'statut_delai' => $this->delayStatusLabel($action),
@@ -4382,7 +4412,7 @@ class DashboardController extends Controller
 
         foreach ($actions as $action) {
             $agents = $this->actionAgents($action);
-            $serviceLabel = (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? 'Non renseigne');
+            $serviceLabel = (string) ($action->pta?->service?->libelle ?? $action->pta?->service?->code ?? 'Non renseigné');
             $actionScore = $this->agentPerformanceReferenceScore($action);
             $isClosed = $this->isAgentPerformanceClosedAction($action);
             $isClosedInTime = $isClosed && $this->delayStatusKey($action) === 'dans_delais';
@@ -4391,7 +4421,7 @@ class DashboardController extends Controller
 
             foreach ($agents as $agent) {
                 $agentId = (int) ($agent->id ?? 0);
-                $agentName = trim((string) ($agent->name ?? '')) ?: 'Non assigne';
+                $agentName = trim((string) ($agent->name ?? '')) ?: 'Non assigné';
                 $bucketKey = $agentId > 0 ? (string) $agentId : 'unassigned:'.$agentName;
 
                 if (! isset($buckets[$bucketKey])) {
@@ -4526,6 +4556,7 @@ class DashboardController extends Controller
     {
         $validationStatus = (string) ($action->statut_validation ?? '');
         if (in_array($validationStatus, [
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
             ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
@@ -4547,7 +4578,7 @@ class DashboardController extends Controller
         $alerts = [];
 
         foreach ($rows as $row) {
-            $agent = (string) ($row['agent'] ?? 'Non assigne');
+            $agent = (string) ($row['agent'] ?? 'Non assigné');
             $score = (float) ($row['score_global'] ?? 0);
             $assigned = (int) ($row['actions_assigned'] ?? 0);
             $closed = (int) ($row['actions_closed'] ?? 0);
@@ -4731,18 +4762,18 @@ class DashboardController extends Controller
                 ->implode(', ');
         }
 
-        return (string) ($action->responsable?->name ?? 'Non assigne');
+        return (string) ($action->responsable?->name ?? 'Non assigné');
     }
 
     private function strategicObjectiveLabel($objective): string
     {
         if ($objective === null) {
-            return 'Non renseigne';
+            return 'Non renseigné';
         }
 
         $axisCode = (string) ($objective->pasAxe?->code ?? '');
         $objectiveCode = (string) ($objective->code ?? '');
-        $objectiveLabel = (string) ($objective->libelle ?? 'Non renseigne');
+        $objectiveLabel = (string) ($objective->libelle ?? 'Non renseigné');
 
         return trim($axisCode.' / '.$objectiveCode.' - '.$objectiveLabel, ' /-') ?: $objectiveLabel;
     }
@@ -4843,7 +4874,7 @@ class DashboardController extends Controller
     {
         $total = $actions->count();
         if ($total <= 0) {
-            return 'Non decline';
+            return 'Non décliné';
         }
 
         $late = $actions->filter(fn (Action $action): bool => $this->isLateAction($action))->count();
@@ -4853,15 +4884,15 @@ class DashboardController extends Controller
 
         $completed = $actions->filter(fn (Action $action): bool => $this->isCompletedAction($action))->count();
         if ($completed === $total) {
-            return 'Execute';
+            return 'Exécuté';
         }
 
         $inProgress = $actions->filter(fn (Action $action): bool => $this->isInProgressAction($action))->count();
         if ($inProgress > 0) {
-            return 'En execution';
+            return 'En exécution';
         }
 
-        return 'En declinaison';
+        return 'En déclinaison';
     }
 
     /**
@@ -4973,6 +5004,7 @@ class DashboardController extends Controller
             ActionTrackingService::STATUS_CLOTUREE,
         ], true)
             || in_array($validationStatus, [
+                ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                 ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true)
@@ -5093,7 +5125,7 @@ class DashboardController extends Controller
         }
 
         if ($agents->isEmpty()) {
-            return collect([(object) ['id' => 0, 'name' => 'Non assigne']]);
+            return collect([(object) ['id' => 0, 'name' => 'Non assigné']]);
         }
 
         return $agents
@@ -5300,7 +5332,7 @@ class DashboardController extends Controller
         return array_merge($this->synthesisGroupMetrics(collect()), [
             'key' => (string) $axis->id,
             'code' => (string) ($axis->code ?: 'AXE'),
-            'label' => (string) ($axis->libelle ?: 'Axe non renseigne'),
+            'label' => (string) ($axis->libelle ?: 'Axe non renseigné'),
             'objectives_total' => $axis->objectifs->count(),
             'operational_objectives_total' => $axis->objectifs->flatMap(fn (PasObjectif $objective): Collection => $objective->objectifsOperationnels)->count(),
             'ptas_total' => 0,
@@ -5319,7 +5351,7 @@ class DashboardController extends Controller
         return array_merge($this->synthesisGroupMetrics(collect()), [
             'key' => (string) $objective->id,
             'code' => (string) ($objective->code ?: 'OS'),
-            'label' => (string) ($objective->libelle ?: 'Objectif strategique non renseigne'),
+            'label' => (string) ($objective->libelle ?: 'Objectif stratégique non renseigné'),
             'operational_objectives_total' => $objective->objectifsOperationnels->count(),
             'operational_objectives' => $objective->objectifsOperationnels
                 ->map(fn ($operationalObjective): array => $this->emptySynthesisOperationalObjectiveNode($operationalObjective))
@@ -5355,7 +5387,7 @@ class DashboardController extends Controller
         return array_merge($this->synthesisGroupMetrics($actions), [
             'key' => (string) ($axis?->id ?? 0),
             'code' => (string) ($axis?->code ?: 'AXE'),
-            'label' => (string) ($axis?->libelle ?: 'Axe non renseigne'),
+            'label' => (string) ($axis?->libelle ?: 'Axe non renseigné'),
             'objectives_total' => $actions->pluck('pta.pao.pasObjectif.id')->filter()->unique()->count(),
             'operational_objectives_total' => $actions
                 ->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)
@@ -5383,7 +5415,7 @@ class DashboardController extends Controller
         return array_merge($this->synthesisGroupMetrics($actions), [
             'key' => (string) ($objective?->id ?? 0),
             'code' => (string) ($objective?->code ?: 'OS'),
-            'label' => (string) ($objective?->libelle ?: 'Objectif strategique non renseigne'),
+            'label' => (string) ($objective?->libelle ?: 'Objectif stratégique non renseigné'),
             'operational_objectives_total' => $actions
                 ->map(fn (Action $action): ?int => $action->objectifOperationnel?->id ?? $action->pta?->objectifOperationnel?->id)
                 ->filter()
@@ -5449,7 +5481,7 @@ class DashboardController extends Controller
      */
     private function buildSynthesisActionNode(Action $action): array
     {
-        $progress = round((float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0), 2);
+        $progress = $this->dashboardPtaProgressRate($action);
         $subActions = $this->actionSubActions($action);
 
         return [
@@ -5517,7 +5549,7 @@ class DashboardController extends Controller
             'realized' => $this->formatPercent($progress),
             'progress' => $progress,
             'status' => $this->groupEvolutionLabel($actions),
-            'alert' => $late > 0 ? $late.' action(s) hors delai' : 'Pas d\'alerte bloquante',
+            'alert' => $late > 0 ? $late.' action(s) hors délai' : 'Pas d\'alerte bloquante',
             'actions_total' => $total,
             'completed_actions_total' => $completed,
             'late_actions_total' => $late,
@@ -5536,17 +5568,17 @@ class DashboardController extends Controller
             return 0.0;
         }
 
-        return round((float) $actions->avg(fn (Action $action): float => (float) ($action->avancement_operationnel ?? $action->progression_reelle ?? 0)), 2);
+        return round((float) $actions->avg(fn (Action $action): float => $this->dashboardPtaProgressRate($action)), 2);
     }
 
     private function synthesisAlertLabel(string $status): string
     {
         return match ($status) {
-            'cloturee' => 'Cloturee',
-            'en_retard' => 'Hors delai',
-            'critique' => 'Echeance critique',
-            'echeance_proche' => 'Echeance proche',
-            'a_parametrer' => 'A parametrer',
+            'cloturee' => 'Clôturée',
+            'en_retard' => 'Hors délai',
+            'critique' => 'Échéance critique',
+            'echeance_proche' => 'Échéance proche',
+            'a_parametrer' => 'À paramétrer',
             default => 'Pas d\'alerte',
         };
     }
@@ -5554,27 +5586,27 @@ class DashboardController extends Controller
     private function synthesisBlockageReason(Action $action): string
     {
         if ($this->actionStatusService->isPendingSetup($action)) {
-            return 'Action a parametrer';
+            return 'Action à paramétrer';
         }
 
-        if ($this->actionResponsibleLabel($action) === 'Non assigne') {
-            return 'Responsable non assigne';
+        if ($this->actionResponsibleLabel($action) === 'Non assigné') {
+            return 'Responsable non assigné';
         }
 
         if ($this->isLateAction($action)) {
-            return 'Echeance depassee';
+            return 'Échéance dépassée';
         }
 
         if ($this->actionSubActions($action)->isEmpty()) {
-            return 'Sous-actions non renseignees';
+            return 'Sous-actions non renseignées';
         }
 
         if ((float) ($action->progression_reelle ?? 0) <= 0 && ! $this->isCompletedAction($action)) {
-            return 'Action non demarree';
+            return 'Action non démarrée';
         }
 
         if ($this->isCompletedAction($action) && $this->actionProofs($action)->isEmpty()) {
-            return 'Action cloturee sans preuve';
+            return 'Action clôturée sans preuve';
         }
 
         if ((string) ($action->statut_validation ?? '') === ActionTrackingService::VALIDATION_SOUMISE_CHEF) {
@@ -5583,7 +5615,7 @@ class DashboardController extends Controller
 
         $latest = $this->actionLatestActivityDate($action);
         if ($latest instanceof Carbon && $latest->diffInDays(Carbon::today()) >= 30 && ! $this->isCompletedAction($action)) {
-            return 'Action non mise a jour recemment';
+            return 'Action non mise à jour récemment';
         }
 
         return 'Aucun blocage critique';
@@ -5609,7 +5641,7 @@ class DashboardController extends Controller
                 $objective = $first?->pta?->pao?->pasObjectif;
                 $axisCode = (string) ($objective?->pasAxe?->code ?? '');
                 $objectiveCode = (string) ($objective?->code ?? '');
-                $objectiveLabel = (string) ($objective?->libelle ?? 'Non renseigne');
+                $objectiveLabel = (string) ($objective?->libelle ?? 'Non renseigné');
 
                 return [
                     'objectif' => trim($axisCode.' '.$objectiveCode) !== ''
@@ -5715,7 +5747,7 @@ class DashboardController extends Controller
             if ($delayStatus === 'en_retard' && $deadline instanceof Carbon) {
                 $daysLate = $deadline->diffInDays($today);
                 $rows[] = [
-                    'titre' => (float) ($action->progression_reelle ?? 0) <= 0 ? 'Action non demarree' : 'Action en retard',
+                    'titre' => (float) ($action->progression_reelle ?? 0) <= 0 ? 'Action non démarrée' : 'Action en retard',
                     'niveau' => $daysLate >= 7 || (float) ($action->progression_reelle ?? 0) <= 0 ? 'Critique' : 'Attention',
                     'direction' => (string) ($action->pta?->direction?->code ?? '-'),
                     'action' => (string) $action->libelle,

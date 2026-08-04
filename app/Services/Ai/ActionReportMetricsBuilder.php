@@ -58,7 +58,7 @@ class ActionReportMetricsBuilder
                 ->sortKeys()
                 ->all(),
             'par_direction' => $this->countBy($actions, fn (Action $action): string => (string) ($action->pta?->direction?->libelle ?? $action->pao?->direction?->libelle ?? 'Non renseignee')),
-            'par_service' => $this->countBy($actions, fn (Action $action): string => (string) ($action->pta?->service?->libelle ?? 'Non renseigne')),
+            'par_service' => $this->countBy($actions, fn (Action $action): string => (string) ($action->pta?->service?->libelle ?? 'Non renseigné')),
             'actions_hors_delai' => $late->take(20)->map(fn (Action $action): array => $this->actionLine($action))->values()->all(),
             'actions_critiques' => $late->sortBy('date_fin')->take(10)->map(fn (Action $action): array => $this->actionLine($action))->values()->all(),
             'alertes' => $late->take(10)->map(fn (Action $action): string => 'Action hors delai : '.(string) $action->libelle)->values()->all(),
@@ -220,7 +220,7 @@ class ActionReportMetricsBuilder
             ->groupBy(fn (Action $action): string => $this->serviceKey($action))
             ->map(fn (Collection $rows): array => $this->analysisRow($rows, $periodEnd) + [
                 'direction' => (string) ($rows->first()?->pta?->direction?->libelle ?? $rows->first()?->pao?->direction?->libelle ?? 'Non renseignee'),
-                'libelle' => (string) ($rows->first()?->pta?->service?->libelle ?? 'Non renseigne'),
+                'libelle' => (string) ($rows->first()?->pta?->service?->libelle ?? 'Non renseigné'),
             ])
             ->sortBy('libelle')
             ->values()
@@ -319,7 +319,7 @@ class ActionReportMetricsBuilder
 
                 return [
                     'direction' => (string) ($rows->first()?->pta?->direction?->libelle ?? $rows->first()?->pao?->direction?->libelle ?? 'Non renseignee'),
-                    'service' => (string) ($rows->first()?->pta?->service?->libelle ?? 'Non renseigne'),
+                    'service' => (string) ($rows->first()?->pta?->service?->libelle ?? 'Non renseigné'),
                     'taux_realisation' => $serviceAnalysis['taux_realisation'],
                     'actions_echues' => $serviceAnalysis['actions_echues'],
                     'axes' => $axisCells,
@@ -462,16 +462,16 @@ class ActionReportMetricsBuilder
                 'realisees' => $row['actions_realisees'],
                 'base' => $row['actions_prevues'],
                 'taux' => $row['taux_global_avancement'],
-                'formule' => 'Actions realisees / actions prevues x 100',
-                'interpretation' => 'Niveau global d execution du PTA',
+                'formule' => 'Actions réalisées / actions prévues × 100',
+                'interpretation' => "Niveau global d'exécution du PTA",
             ],
             [
-                'indicateur' => 'Realisation des actions echues',
+                'indicateur' => 'Réalisation des actions échues',
                 'realisees' => $row['actions_echues_realisees'],
                 'base' => $row['actions_echues'],
                 'taux' => $row['taux_realisation'],
-                'formule' => 'Actions echues realisees / actions echues x 100',
-                'interpretation' => 'Respect des echeances arrivees a terme',
+                'formule' => 'Actions échues réalisées / actions échues × 100',
+                'interpretation' => 'Respect des échéances arrivées à terme',
             ],
         ];
     }
@@ -505,12 +505,12 @@ class ActionReportMetricsBuilder
 
         return [
             'points_forts' => array_values(array_filter([
-                $strongestAxis ? 'Axe le plus avance : '.($strongestAxis['libelle'] ?? 'Non renseigne').' ('.$strongestAxis['taux_realisation'].' %).' : null,
-                $strongestService ? 'Service le plus avance : '.($strongestService['libelle'] ?? 'Non renseigne').' ('.$strongestService['taux_realisation'].' %).' : null,
+                $strongestAxis ? 'Axe le plus avance : '.($strongestAxis['libelle'] ?? 'Non renseigné').' ('.$strongestAxis['taux_realisation'].' %).' : null,
+                $strongestService ? 'Service le plus avance : '.($strongestService['libelle'] ?? 'Non renseigné').' ('.$strongestService['taux_realisation'].' %).' : null,
             ])),
             'points_faibles' => array_values(array_filter([
-                $weakestAxis ? 'Axe necessitant le plus d attention : '.($weakestAxis['libelle'] ?? 'Non renseigne').' ('.$weakestAxis['taux_realisation'].' %).' : null,
-                $weakestService ? 'Service necessitant un accompagnement : '.($weakestService['libelle'] ?? 'Non renseigne').' ('.$weakestService['taux_realisation'].' %).' : null,
+                $weakestAxis ? 'Axe necessitant le plus d attention : '.($weakestAxis['libelle'] ?? 'Non renseigné').' ('.$weakestAxis['taux_realisation'].' %).' : null,
+                $weakestService ? 'Service necessitant un accompagnement : '.($weakestService['libelle'] ?? 'Non renseigné').' ('.$weakestService['taux_realisation'].' %).' : null,
                 $unrealized->isNotEmpty() ? $unrealized->count().' action(s) echue(s) restent non realisee(s).' : null,
             ])),
             'priorites' => array_values(array_filter([
@@ -646,7 +646,7 @@ class ActionReportMetricsBuilder
 
     private function strategicObjectiveLabel(Action $action): string
     {
-        return (string) ($action->pta?->pao?->pasObjectif?->libelle ?? 'Non renseigne');
+        return (string) ($action->pta?->pao?->pasObjectif?->libelle ?? 'Non renseigné');
     }
 
     private function operationalObjectiveLabel(Action $action): string
@@ -655,7 +655,7 @@ class ActionReportMetricsBuilder
             $action->objectifOperationnel?->libelle
             ?? $action->pta?->objectifOperationnel?->libelle
             ?? $action->pta?->pao?->objectif_operationnel
-            ?? 'Non renseigne'
+            ?? 'Non renseigné'
         );
     }
 }

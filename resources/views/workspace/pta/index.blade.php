@@ -22,7 +22,7 @@
         $workflowSteps = [
             ['status' => 'en_cours', 'label' => 'En cours', 'count' => $ps['en_cours'] ?? 0],
             ['status' => 'controle_sciq', 'label' => 'Controle SCIQ', 'count' => $ps['controle_sciq'] ?? 0],
-            ['status' => 'cloture', 'label' => 'Cloture', 'count' => $ps['clotures'] ?? 0],
+            ['status' => 'cloture', 'label' => 'Clôture', 'count' => $ps['clotures'] ?? 0],
             ['status' => 'archive', 'label' => 'Archive', 'count' => $ps['archives'] ?? 0],
         ];
     @endphp
@@ -52,7 +52,7 @@
                         <p class="mt-1 text-2xl font-black text-slate-900">{{ $ps['actions_total'] ?? 0 }}</p>
                     </div>
                     <div class="rounded-xl border border-slate-200/80 bg-white/80 p-3">
-                        <p class="text-xs font-bold uppercase text-slate-500">A parametrer</p>
+                        <p class="text-xs font-bold uppercase text-slate-500">A paramétrer</p>
                         <p class="mt-1 text-2xl font-black text-slate-900">{{ $ps['sans_action'] ?? 0 }}</p>
                     </div>
                 </div>
@@ -158,7 +158,7 @@
             <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
         <div class="app-table-wrapper overflow-x-auto">
-            <table class="app-table data-table">
+            <table class="app-table data-table min-w-[1100px]">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -216,7 +216,7 @@
                             </td>
                             <td>{{ $row->direction?->code }} {{ $row->direction?->libelle ? '- '.$row->direction->libelle : '' }}</td>
                             <td>{{ $row->service?->code }} {{ $row->service?->libelle ? '- '.$row->service->libelle : '' }}</td>
-                            <td class="whitespace-nowrap text-xs text-slate-700">{{ $row->objectifOperationnel?->echeance ?? '-' }}</td>
+                            <td class="whitespace-nowrap text-xs text-slate-700">{{ optional($row->objectifOperationnel?->echeance)->format('d/m/Y') ?? '-' }}</td>
                             <td>
                                 <span class="{{ $statusClasses }}">
                                     {{ $workflowStatusLabel($row->statut) }}
@@ -228,38 +228,45 @@
                             <td class="text-center"><span class="anbg-badge anbg-badge-info px-3">{{ $row->actions_count }}</span></td>
                             <td>{{ $row->validateur?->name ?? '-' }}</td>
                             <td>
+                                {{-- Action principale + menu secondaire « ⋮ » : evite d'empiler
+                                     5 boutons par ligne (roadmap : tableaux lisibles). --}}
                                 <div class="row-actions">
-                                    <a class="btn btn-secondary" href="{{ route('workspace.pta.show', $row) }}">Explorer</a>
+                                    <a class="btn btn-secondary btn-sm" href="{{ route('workspace.pta.show', $row) }}">Explorer</a>
                                     @if ($canWrite)
-                                        @if (! $isModificationLocked)
-                                            <a class="btn btn-warning" href="{{ route('workspace.pta.edit', $row) }}">Modifier</a>
-                                        @elseif ($canRequestUnlock)
-                                            @include('workspace.planning-unlocks._request-inline', [
-                                                'target' => $row,
-                                                'route' => route('workspace.pta.unlock-requests.store', $row),
-                                                'context' => 'Modification PTA demandee par '.$currentUser->name,
-                                            ])
-                                        @endif
-                                        @if ($canClose)
-                                            <form method="POST" action="{{ route('workspace.pta.close', $row) }}" data-confirm-message="{{ $closeConfirmMessage }}" data-confirm-tone="warning" data-confirm-label="{{ $closeButtonLabel }}">
-                                                @csrf
-                                                <input type="hidden" name="motif" value="{{ $closeMotif }}">
-                                                <button class="btn btn-primary" type="submit">{{ $closeButtonLabel }}</button>
-                                            </form>
-                                        @endif
-                                        @if ($canArchive)
-                                            <form method="POST" action="{{ route('workspace.pta.archive', $row) }}" data-confirm-message="Archiver ce PTA cloture ?" data-confirm-tone="warning" data-confirm-label="Archiver">
-                                                @csrf
-                                                <input type="hidden" name="motif" value="Archivage PTA cloture depuis la liste">
-                                                <button class="btn btn-secondary" type="submit">Archiver</button>
-                                            </form>
-                                        @endif
-                                            <form method="POST" action="{{ route('workspace.pta.destroy', $row) }}" data-confirm-message="Supprimer ce PTA ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
-                                                @csrf
-                                                @method('DELETE')
-                                                <input type="hidden" name="motif" value="Demande de suppression PTA depuis le module PTA">
-                                                <button class="btn btn-danger" type="submit">Supprimer</button>
-                                            </form>
+                                        <details class="row-actions-menu" data-preview-ignore="1">
+                                            <summary class="btn btn-secondary btn-sm row-actions-trigger" title="Autres actions" aria-label="Autres actions" data-preview-ignore="1">⋮</summary>
+                                            <div class="row-actions-panel" data-preview-ignore="1">
+                                                @if (! $isModificationLocked)
+                                                    <a class="btn btn-warning btn-sm" href="{{ route('workspace.pta.edit', $row) }}">Modifier</a>
+                                                @elseif ($canRequestUnlock)
+                                                    @include('workspace.planning-unlocks._request-inline', [
+                                                        'target' => $row,
+                                                        'route' => route('workspace.pta.unlock-requests.store', $row),
+                                                        'context' => 'Modification PTA demandee par '.$currentUser->name,
+                                                    ])
+                                                @endif
+                                                @if ($canClose)
+                                                    <form method="POST" action="{{ route('workspace.pta.close', $row) }}" data-confirm-message="{{ $closeConfirmMessage }}" data-confirm-tone="warning" data-confirm-label="{{ $closeButtonLabel }}">
+                                                        @csrf
+                                                        <input type="hidden" name="motif" value="{{ $closeMotif }}">
+                                                        <button class="btn btn-primary btn-sm" type="submit">{{ $closeButtonLabel }}</button>
+                                                    </form>
+                                                @endif
+                                                @if ($canArchive)
+                                                    <form method="POST" action="{{ route('workspace.pta.archive', $row) }}" data-confirm-message="Archiver ce PTA cloture ?" data-confirm-tone="warning" data-confirm-label="Archiver">
+                                                        @csrf
+                                                        <input type="hidden" name="motif" value="Archivage PTA cloture depuis la liste">
+                                                        <button class="btn btn-secondary btn-sm" type="submit">Archiver</button>
+                                                    </form>
+                                                @endif
+                                                <form method="POST" action="{{ route('workspace.pta.destroy', $row) }}" data-confirm-message="Supprimer ce PTA ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <input type="hidden" name="motif" value="Demande de suppression PTA depuis le module PTA">
+                                                    <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
+                                                </form>
+                                            </div>
+                                        </details>
                                     @endif
                                 </div>
                             </td>

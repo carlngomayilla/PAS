@@ -264,7 +264,7 @@ class ReportExportService
         foreach ($axes as $index => $axis) {
             $this->addPtaTableRow($table, [
                 (string) ($index + 1),
-                (string) ($axis['libelle'] ?? 'Non renseigne'),
+                (string) ($axis['libelle'] ?? 'Non renseigné'),
                 (string) ($axis['actions_prevues'] ?? 0),
                 (string) ($axis['actions_realisees'] ?? 0),
                 (string) ($axis['actions_en_retard_non_realisees'] ?? 0),
@@ -321,7 +321,7 @@ class ReportExportService
 
             foreach ($matrix as $line) {
                 $axisCells = is_array($line['axes'] ?? null) ? $line['axes'] : [];
-                $values = [(string) ($line['service'] ?? 'Non renseigne')];
+                $values = [(string) ($line['service'] ?? 'Non renseigné')];
 
                 foreach ($axisLabels as $axisLabel) {
                     $cell = is_array($axisCells[$axisLabel] ?? null) ? $axisCells[$axisLabel] : [];
@@ -341,7 +341,7 @@ class ReportExportService
         foreach ($axes as $axis) {
             $rate = $axis['taux_realisation'] ?? 0;
             $this->addPtaTableRow($table, [
-                (string) ($axis['libelle'] ?? 'Non renseigne'),
+                (string) ($axis['libelle'] ?? 'Non renseigné'),
                 (string) ($axis['actions_prevues'] ?? 0),
                 (string) ($axis['actions_echues'] ?? 0),
                 $this->asPercent($rate),
@@ -368,7 +368,7 @@ class ReportExportService
         foreach ($services as $service) {
             $rate = $service['taux_realisation'] ?? 0;
             $this->addPtaTableRow($table, [
-                (string) ($service['libelle'] ?? 'Non renseigne'),
+                (string) ($service['libelle'] ?? 'Non renseigné'),
                 $this->asPercent($rate),
                 (string) ($service['actions_echues'] ?? 0),
                 $this->statusFromRate($rate),
@@ -388,7 +388,7 @@ class ReportExportService
 
         foreach ($monthly as $row) {
             $this->addPtaTableRow($table, [
-                (string) ($row['mois'] ?? 'Non renseigne'),
+                (string) ($row['mois'] ?? 'Non renseigné'),
                 (string) ($row['actions_echues'] ?? 0),
                 (string) ($row['actions_realisees'] ?? 0),
                 $this->asPercent($row['taux_realisation'] ?? 0),
@@ -461,7 +461,7 @@ class ReportExportService
                 continue;
             }
             foreach ($rows as $row) {
-                $section->addListItem(trim((string) (($row['libelle'] ?? '-').' - RMO : '.($row['responsable'] ?? 'Non renseigne'))), 0, ['size' => 10]);
+                $section->addListItem(trim((string) (($row['libelle'] ?? '-').' - RMO : '.($row['responsable'] ?? 'Non renseigné'))), 0, ['size' => 10]);
             }
         }
 
@@ -473,7 +473,7 @@ class ReportExportService
             $section->addText('Aucun taux inferieur au seuil n est signale dans le snapshot.', ['size' => 10]);
         } else {
             $lowRates->each(function (array $row) use ($section): void {
-                $section->addListItem((string) (($row['libelle'] ?? 'Non renseigne').' : '.$this->asPercent($row['taux_realisation'] ?? 0)), 0, ['size' => 10]);
+                $section->addListItem((string) (($row['libelle'] ?? 'Non renseigné').' : '.$this->asPercent($row['taux_realisation'] ?? 0)), 0, ['size' => 10]);
             });
         }
 

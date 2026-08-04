@@ -81,6 +81,7 @@
             'dashboardTab' => 'overview',
             'direction_id' => $selectedSynthesisDirection ?: 'all',
             'service_id' => $selectedSynthesisService ?: 'all',
+            'responsable_id' => ($selectedSynthesisRmo ?? request('responsable_id')) ?: 'all',
             'exercice' => $selectedSynthesisYear ?: 'all',
             'periode' => $selectedSynthesisPeriod ?: 'all',
             'statut_suivi' => $synthesisFilters['statut_suivi'] ?? 'all',
@@ -144,7 +145,7 @@
                 'used' => $decisionActionTotal > 0,
             ],
             [
-                'label' => 'A parametrer',
+                'label' => 'À paramétrer',
                 'value' => $fmtCount($summaryCount($workflowCounts, 'a_parametrer')),
                 'accent' => '#6b7280',
                 'icon' => '<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/>',
@@ -186,7 +187,7 @@
                 'href' => $synthesisCardUrl(['statut_suivi' => 'validation_controleur']),
             ],
             [
-                'label' => 'Cloturees',
+                'label' => 'Clôturées',
                 'value' => $fmtCount($summaryCount($workflowCounts, 'cloture')),
                 'accent' => '#00a65a',
                 'icon' => '<path d="M20 6L9 17l-5-5"/>',
@@ -204,7 +205,7 @@
                 'href' => $synthesisCardUrl(['statut_delai' => 'dans_les_delais']),
             ],
             [
-                'label' => 'Hors delai',
+                'label' => 'Hors délai',
                 'value' => $fmtCount($summaryCount($delayCounts, 'hors_delai')),
                 'accent' => '#f97316',
                 'icon' => '<circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 17h.01"/>',
@@ -493,7 +494,7 @@
                         </summary>
                         <div class="app-table-wrapper overflow-x-auto">
                             <table id="{{ $synthesisTableId }}" class="app-table data-table dashboard-synthesis-table">
-                                <thead class="sticky top-0 z-10 bg-white">
+                                <thead>
                                     <tr>
                                         @foreach ($synthesisTable['headers'] as $header)
                                             <th>{{ $header }}</th>

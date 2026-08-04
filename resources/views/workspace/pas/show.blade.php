@@ -33,7 +33,7 @@
             <div class="border-l-4 border-[#17324a] bg-white px-5 py-4 shadow-sm dark:bg-slate-900">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <p class="text-xs font-bold uppercase text-slate-500">Plan d'actions strategique</p>
+                        <p class="text-xs font-bold uppercase text-slate-500">Plan d'actions stratégique</p>
                         <p class="mt-1 font-mono text-sm font-bold text-[#3996d3]">PAS-{{ $row->periode_debut }}-{{ $row->periode_fin }}</p>
                         <p class="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
                             Periode {{ $row->periode_debut }} - {{ $row->periode_fin }}
@@ -46,7 +46,7 @@
             </div>
 
             <div class="bg-[#17324a] px-5 py-4 text-white shadow-sm">
-                <p class="text-xs font-bold uppercase text-sky-200">Couverture strategique</p>
+                <p class="text-xs font-bold uppercase text-sky-200">Couverture stratégique</p>
                 <div class="mt-2 flex items-end justify-between gap-3">
                     <strong class="text-3xl font-black">{{ $coverage }}%</strong>
                     <span class="text-xs font-semibold text-slate-200">
@@ -86,7 +86,7 @@
             </section>
         @else
             <section class="border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
-                La chaine de declinaison est complete pour le perimetre consulte.
+                La chaine de declinaison est complete pour le périmètre consulte.
             </section>
         @endif
 
@@ -167,16 +167,16 @@
 
                                                     @if (empty($pao['operational_objectives']))
                                                         <div class="bg-amber-50 px-4 py-4 text-sm font-bold text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                                                            Ce PAO ne contient encore aucun objectif operationnel visible dans votre perimetre.
+                                                            Ce PAO ne contient encore aucun objectif opérationnel visible dans votre périmètre.
                                                         </div>
                                                     @else
                                                         <div class="overflow-x-auto">
                                                             <table class="app-table data-table min-w-[900px]">
                                                                 <thead>
                                                                     <tr>
-                                                                        <th>Objectif operationnel</th>
+                                                                        <th>Objectif opérationnel</th>
                                                                         <th>Service</th>
-                                                                        <th>Echeance</th>
+                                                                        <th>Échéance</th>
                                                                         <th>PTA</th>
                                                                         <th>Actions</th>
                                                                         <th>Acces</th>
@@ -237,7 +237,7 @@
                                                 </div>
                                             @empty
                                                 <div class="bg-amber-50 px-4 py-5 text-sm font-bold text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                                                    Cet objectif strategique n'est encore rattache a aucun objectif operationnel dans votre perimetre.
+                                                    Cet objectif stratégique n'est encore rattache a aucun objectif opérationnel dans votre périmètre.
                                                 </div>
                                             @endforelse
                                         </div>

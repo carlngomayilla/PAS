@@ -181,7 +181,7 @@
                             <tr class="dashboard-row-link" data-row-link="{{ $row['url'] }}">
                                 <td class="font-semibold text-[#17324a]">{{ $row['libelle'] }}</td>
                                 <td>{{ $row['pta'] }}</td>
-                                <td>{{ $row['echeance'] }}</td>
+                                <td>{{ $row['echeance'] ? \Illuminate\Support\Carbon::parse($row['echeance'])->format('d/m/Y') : '-' }}</td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($delayStatusTone((string) ($row['delay_status'] ?? ''))) }}">{{ $row['statut_delai'] ?? '-' }}</span></td>
                                 <td><span class="dashboard-pill" style="{{ $dashboardPillVars($dashboardStatusTone($row['statut'])) }}">{{ $actionStatusLabel($row['statut']) }}</span></td>
                                 <td>{{ number_format((float) ($row['progression'] ?? 0), 0) }}%</td>
@@ -370,7 +370,7 @@
                     @forelse ($secondaryRows as $row)
                         <tr>
                             <td class="font-semibold text-[#17324a]">{{ $row['libelle'] }}</td>
-                            <td>{{ $row['echeance'] }}</td>
+                            <td>{{ $row['echeance'] ? \Illuminate\Support\Carbon::parse($row['echeance'])->format('d/m/Y') : '-' }}</td>
                             <td><span class="dashboard-pill" style="{{ $dashboardPillVars($delayStatusTone((string) ($row['delay_status'] ?? ''))) }}">{{ $row['statut_delai'] ?? '-' }}</span></td>
                             <td>{{ $row['retard_jours'] }}j</td>
                             <td>{{ number_format((float) ($row['progression'] ?? 0), 0) }}%</td>

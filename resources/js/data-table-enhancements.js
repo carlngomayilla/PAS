@@ -446,7 +446,10 @@
         configureColumnFeatures() {
             const structure = this.getSimpleColumnStructure();
             const visibilityEnabled = this.table.dataset.tableColumnVisibility !== 'false';
-            const resizeEnabled = this.table.dataset.tableColumnResize !== 'false';
+            // Redimensionnement de colonnes desactive par defaut : les poignees "⋮"
+            // (pastilles blanches sur les en-tetes) etaient jugees genantes. Opt-in
+            // uniquement via data-table-column-resize="true".
+            const resizeEnabled = this.table.dataset.tableColumnResize === 'true';
 
             if (!structure || (!visibilityEnabled && !resizeEnabled)) {
                 this.clearColumnFeatures();

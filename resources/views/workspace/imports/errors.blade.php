@@ -7,7 +7,7 @@
             <h1 class="showcase-panel-title">Historique des erreurs</h1>
             <div class="flex flex-wrap gap-2">
                 <a class="btn btn-outline" href="{{ route('workspace.imports.show', $import) }}">Retour a l'import</a>
-                <a class="btn btn-secondary" href="{{ route('workspace.imports.error-report', $import) }}">Telecharger le rapport</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.imports.error-report', $import) }}">Télécharger le rapport</a>
             </div>
         </div>
         <div class="space-y-2">

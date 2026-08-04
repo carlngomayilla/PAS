@@ -57,7 +57,7 @@
                         <th class="px-3 py-2">Statut</th>
                         <th class="px-3 py-2">Action</th>
                         <th class="px-3 py-2">Rattachement</th>
-                        <th class="px-3 py-2">Parametrage</th>
+                        <th class="px-3 py-2">Paramétrage</th>
                         <th class="px-3 py-2">Dates</th>
                         <th class="px-3 py-2">Correction</th>
                     </tr>

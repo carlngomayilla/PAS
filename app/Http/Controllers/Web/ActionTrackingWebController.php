@@ -593,11 +593,82 @@ class ActionTrackingWebController extends Controller
             $user
         );
 
+        if ($approve) {
+            // 3e visa : la planification doit savoir qu'une action l'attend.
+            $notificationService->notifyActionSubmittedToPlanification(
+                $reviewed->loadMissing('pta:id,direction_id,service_id'),
+                $user
+            );
+        }
+
         return redirect()
             ->route('workspace.actions.suivi', $action)
             ->with('success', $approve
-                ? 'Controle final valide. L action est cloturee.'
+                ? 'Visa de controle enregistre. L action est transmise a la planification pour validation finale.'
                 : 'Correction demandee par le controleur.');
+    }
+
+    /**
+     * Validation finale (cloture) par la planification — 3e visa du circuit.
+     */
+    public function reviewByPlanification(
+        Request $request,
+        Action $action,
+        ActionWorkflowService $workflow,
+        WorkspaceNotificationService $notificationService
+    ): RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id,statut,responsable_id');
+        if (! $this->canReviewByPlanification($user)) {
+            abort(403, 'Acces reserve aux profils de planification.');
+        }
+
+        $validated = $request->validate([
+            'decision' => ['required', Rule::in(['valider', 'rejeter'])],
+            'motif' => ['nullable', 'string', 'max:5000'],
+        ]);
+        $approve = $validated['decision'] === 'valider';
+        $before = $action->toArray();
+
+        try {
+            $workflow->reviewActionByPlanification($action, $approve, $validated['motif'] ?? null, $user);
+        } catch (InvalidArgumentException $exception) {
+            return back()->withInput()->withErrors(['general' => $exception->getMessage()]);
+        }
+
+        $reviewed = $action->fresh();
+        $this->recordAudit(
+            $request,
+            'action',
+            $approve ? 'review_planification_validate' : 'review_planification_reject',
+            $reviewed,
+            $before,
+            [
+                ...$reviewed->toArray(),
+                'audit_context' => [
+                    'intervention_processed' => true,
+                    'task_type' => 'validation_planification',
+                    'decision' => $approve ? 'valider' : 'rejeter',
+                    'motif' => $validated['motif'] ?? null,
+                ],
+            ]
+        );
+
+        $notificationService->notifyActionReviewedByPlanification(
+            $reviewed->loadMissing('pta:id,direction_id,service_id'),
+            $approve,
+            $user
+        );
+
+        return redirect()
+            ->route('workspace.actions.suivi', $action)
+            ->with('success', $approve
+                ? 'Validation finale enregistree. L action est cloturee.'
+                : 'Action renvoyee en correction par la planification.');
     }
 
     public function submitFinancing(
@@ -918,6 +989,7 @@ class ActionTrackingWebController extends Controller
             ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
             ActionTrackingService::VALIDATION_REJETEE_CHEF,
             ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
         ], true);
         $lifecycleStatus = (string) ($action->statut_dynamique ?: $action->statut ?: '');
 
@@ -981,6 +1053,18 @@ class ActionTrackingWebController extends Controller
     {
         return app(PlanningModificationLockService::class)->canGivePlanifAvis($user)
             || $user->isSuperAdmin()
+            || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
+    }
+
+    /**
+     * Troisieme visa du circuit : validation finale (cloture) par la planification.
+     */
+    private function canReviewByPlanification(User $user): bool
+    {
+        return $user->hasRole(
+            User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_PLANIFICATION
+        ) || $user->isSuperAdmin()
             || $user->hasRole(User::ROLE_ADMIN_FONCTIONNEL);
     }
 

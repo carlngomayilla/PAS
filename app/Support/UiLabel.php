@@ -125,4 +125,117 @@ final class UiLabel
             default => ucfirst(str_replace('_', ' ', (string) $status)),
         };
     }
+
+    /**
+     * Pourcentage sans decimales inutiles : « 0% » et non « 0,00% ».
+     * Les decimales n'apparaissent qu'a partir de 0,01.
+     */
+    public static function percent(?float $value, string $decimalSeparator = ','): string
+    {
+        if ($value === null) {
+            return '-';
+        }
+
+        $rounded = round($value, 2);
+
+        if (abs($rounded - round($rounded)) < 0.005) {
+            return number_format($rounded, 0, $decimalSeparator, ' ').'%';
+        }
+
+        $formatted = number_format($rounded, 2, $decimalSeparator, ' ');
+
+        return rtrim(rtrim($formatted, '0'), $decimalSeparator).'%';
+    }
+
+    /**
+     * Libelle lisible d'un type d'evenement / d'alerte.
+     *
+     * Evite d'exposer les cles techniques (`progression_sous_seuil`,
+     * `alerte_combinee_critique`, `action_validee_controle`...) dans le journal
+     * d'alertes, les notifications et les exports.
+     */
+    public static function eventType(?string $type): string
+    {
+        return match ((string) $type) {
+            // Alertes de suivi
+            'progression_sous_seuil' => 'Progression inférieure au seuil attendu',
+            'alerte_combinee_critique' => 'Retard critique',
+            'action_overdue', 'retard_constate' => 'Action en retard',
+            'action_a_surveiller' => 'Action à surveiller',
+            'action_a_parametrer', 'action_pending_setup' => 'Action à paramétrer',
+            'echeance_proche' => 'Échéance proche',
+            'action_alert', 'action_alert_escalation' => 'Alerte sur l’action',
+
+            // Cycle de vie de l'action
+            'action_initialisee' => 'Action initialisée',
+            'action_assigned' => 'Action assignée',
+            'action_non_demarre' => 'Action non démarrée',
+            'action_suspendue' => 'Action suspendue',
+            'action_annulee' => 'Action annulée',
+            'semaine_renseignee' => 'Suivi hebdomadaire renseigné',
+            'sous_action_mise_a_jour' => 'Sous-action mise à jour',
+            'sous_action_effectuee' => 'Sous-action réalisée',
+            'execution_quantitative' => 'Exécution quantitative enregistrée',
+
+            // Circuit de validation
+            'action_soumise_validation', 'action_submitted_to_chef' => 'Action soumise au chef de service',
+            'action_validee_chef', 'action_reviewed_by_chef' => 'Action visée par le chef de service',
+            'action_rejetee_chef' => 'Action rejetée par le chef de service',
+            'action_correction_demandee' => 'Correction demandée',
+            'action_transmise_controle' => 'Action transmise au contrôle',
+            'action_validee_controle' => 'Action validée par le contrôle',
+            'action_rejetee_controle' => 'Action rejetée par le contrôle',
+            'action_transmise_planification' => 'Action transmise à la planification',
+            'action_validee_planification' => 'Action validée par la planification (clôture)',
+            'action_rejetee_planification' => 'Action renvoyée par la planification',
+            'action_finalized_by_chef' => 'Action finalisée par le chef de service',
+
+            // Financement
+            'action_financing_requested' => 'Financement demandé',
+            'action_financing_reviewed_by_daf' => 'Financement examiné par la DAF',
+            'action_financing_reviewed_by_dg' => 'Financement décidé par la Direction générale',
+
+            'action_comment_added' => 'Commentaire ajouté',
+
+            default => ucfirst(str_replace('_', ' ', (string) $type)),
+        };
+    }
+
+    /**
+     * Libelle lisible d'un role destinataire (evite d'exposer `chef_unite_sciq`,
+     * `dg`, `direction`... tels quels dans l'interface).
+     */
+    public static function roleAudience(?string $role): string
+    {
+        return match ((string) $role) {
+            'dg' => 'Direction générale',
+            'direction' => 'Direction concernée',
+            'service' => 'Chef de service',
+            'agent' => 'Agent / RMO',
+            'planification' => 'Planification',
+            'chef_planification' => 'Chef de la planification',
+            'sciq' => 'SCIQ',
+            'chef_unite_sciq' => 'Chef d’unité SCIQ',
+            'sciq_suivi_global' => 'SCIQ — suivi global',
+            'cabinet' => 'Cabinet',
+            'admin' => 'Administrateur',
+            'super_admin' => 'Super administrateur',
+            'auditeur' => 'Auditeur',
+            default => ucfirst(str_replace('_', ' ', (string) $role)),
+        };
+    }
+
+    /**
+     * Libelle lisible d'un niveau d'alerte.
+     */
+    public static function alertLevel(?string $level): string
+    {
+        return match ((string) $level) {
+            'info' => 'Information',
+            'warning' => 'Vigilance',
+            'critical', 'critique' => 'Critique',
+            'urgence' => 'Urgence',
+            default => ucfirst(str_replace('_', ' ', (string) $level)),
+        };
+    }
 }

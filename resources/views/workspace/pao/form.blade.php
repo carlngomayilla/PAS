@@ -73,10 +73,10 @@
                 @endif
 
                 <div class="form-section">
-                    <h2 class="form-section-title">Perimetre PAO</h2>
+                    <h2 class="form-section-title">Périmètre PAO</h2>
                     <div class="form-grid">
                         <div class="md:col-span-2">
-                            <label for="pas_axe_id">Axe strategique</label>
+                            <label for="pas_axe_id">Axe stratégique</label>
                             <select id="pas_axe_id" name="pas_axe_id" required>
                                 <option value="">Sélectionner d'abord'un axe</option>
                                 @foreach ($axeOptions as $axe)

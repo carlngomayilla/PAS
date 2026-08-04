@@ -35,11 +35,11 @@
                     <input id="title" name="title" value="{{ old('title') }}" class="w-full rounded-lg border border-[#d8ecf8] bg-white p-3 text-sm">
                 </div>
                 <div>
-                    <label class="form-label" for="period_start">Periode debut</label>
+                    <label class="form-label" for="period_start">Période debut</label>
                     <input id="period_start" name="period_start" type="date" value="{{ old('period_start') }}" class="w-full rounded-lg border border-[#d8ecf8] bg-white p-3 text-sm">
                 </div>
                 <div>
-                    <label class="form-label" for="period_end">Periode fin</label>
+                    <label class="form-label" for="period_end">Période fin</label>
                     <input id="period_end" name="period_end" type="date" value="{{ old('period_end') }}" class="w-full rounded-lg border border-[#d8ecf8] bg-white p-3 text-sm">
                 </div>
                 <div>

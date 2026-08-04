@@ -1720,6 +1720,7 @@ class ActionWebController extends Controller
         }
 
         $validatedStatuses = [
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
             ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ];
@@ -1771,6 +1772,8 @@ class ActionWebController extends Controller
             ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
             ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
+            ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
+            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
         ];
     }
 

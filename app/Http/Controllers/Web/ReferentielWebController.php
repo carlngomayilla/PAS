@@ -18,12 +18,15 @@ use App\Services\Security\MalwareScanException;
 use App\Services\Security\PasswordPolicyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class ReferentielWebController extends Controller
 {
@@ -321,6 +324,30 @@ class ReferentielWebController extends Controller
         });
     }
 
+    /**
+     * Export Word (.doc) de la liste des utilisateurs — document HTML mis en forme
+     * ouvrable par Microsoft Word (aucune dependance externe requise).
+     */
+    public function utilisateursExportWord(Request $request): Response
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessReferentielReader($user);
+        $filters = $this->organizationDirectoryService->normalizeUserFilters($request->query());
+        $rows = $this->organizationDirectoryService->usersForWordExport($user, $filters);
+
+        $html = view('workspace.referentiel.utilisateurs.export-word', [
+            'rows' => $rows,
+            'generatedAt' => now()->format('d/m/Y à H:i'),
+        ])->render();
+
+        $filename = 'referentiel-utilisateurs-'.now()->format('Ymd-His').'.doc';
+
+        return response($html, 200, [
+            'Content-Type' => 'application/msword; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
     public function utilisateursCreate(Request $request): View
     {
         $user = $this->authUser($request);
@@ -467,6 +494,93 @@ class ReferentielWebController extends Controller
         return redirect()
             ->route('workspace.referentiel.utilisateurs.index')
             ->with('success', 'Utilisateur mis a jour avec succès.');
+    }
+
+    /**
+     * Reinitialise le mot de passe d'un utilisateur (mot de passe temporaire
+     * genere par l'application, changement force a la prochaine connexion).
+     */
+    public function utilisateurResetPassword(Request $request, User $utilisateur): RedirectResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessUserManager($user);
+        $this->denyUnlessManagedUserAccessible($user, $utilisateur);
+
+        $temporaryPassword = $this->passwordPolicy->generateInitialPassword();
+        $before = Arr::except($utilisateur->toArray(), ['password']);
+
+        DB::transaction(function () use ($utilisateur, $temporaryPassword): void {
+            $this->passwordPolicy->persistPassword($utilisateur, $temporaryPassword, forceRenewal: true);
+            $utilisateur->tokens()->delete();
+        });
+
+        $this->recordAudit($request, 'referentiel_utilisateur', 'password_reset', $utilisateur, $before, [
+            'user_id' => $utilisateur->id,
+            'generated_password_reset' => true,
+            'force_renewal' => true,
+        ]);
+
+        return redirect()
+            ->route('workspace.referentiel.utilisateurs.index')
+            ->with('success', 'Mot de passe temporaire genere pour '.$utilisateur->email.'. Changement requis a la prochaine connexion.')
+            ->with('temporary_password_value', $temporaryPassword)
+            ->with('temporary_password_user', $utilisateur->email);
+    }
+
+    /**
+     * Reinitialise en masse les mots de passe (chaque utilisateur du perimetre
+     * recoit un mot de passe temporaire genere par l'application). Les comptes
+     * hors perimetre de l'acteur sont ignores.
+     */
+    public function utilisateursBulkResetPassword(Request $request): RedirectResponse
+    {
+        $user = $this->authUser($request);
+        $this->denyUnlessUserManager($user);
+
+        $resetAll = $request->boolean('reset_all');
+
+        $validated = $request->validate([
+            'reset_all' => ['nullable', 'boolean'],
+            'user_ids' => [$resetAll ? 'nullable' : 'required', 'array'],
+            'user_ids.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        $generated = [];
+
+        DB::transaction(function () use ($validated, $resetAll, $user, &$generated): void {
+            $targets = $resetAll
+                ? User::query()->where('id', '!=', $user->id)->orderBy('id')->get()
+                : User::query()->whereIn('id', $validated['user_ids'] ?? [])->get();
+
+            foreach ($targets as $target) {
+                try {
+                    $this->denyUnlessManagedUserAccessible($user, $target);
+                } catch (HttpException) {
+                    continue; // Hors perimetre : ignore.
+                }
+
+                $password = $this->passwordPolicy->generateInitialPassword();
+                $this->passwordPolicy->persistPassword($target, $password, forceRenewal: true);
+                $target->tokens()->delete();
+
+                $generated[] = [
+                    'name' => (string) $target->name,
+                    'email' => (string) $target->email,
+                    'matricule' => (string) $target->agent_matricule,
+                    'password' => $password,
+                ];
+            }
+        });
+
+        $this->recordAudit($request, 'referentiel_utilisateur', 'bulk_password_reset', $user, null, [
+            'count' => count($generated),
+            'user_ids' => $validated['user_ids'],
+        ]);
+
+        return redirect()
+            ->route('workspace.referentiel.utilisateurs.index')
+            ->with('success', count($generated).' mot(s) de passe temporaire(s) genere(s). Changement requis a la premiere connexion.')
+            ->with('bulk_reset_credentials', $generated);
     }
 
     public function utilisateursDeletionRequestStore(Request $request, User $utilisateur): RedirectResponse
@@ -677,6 +791,14 @@ class ReferentielWebController extends Controller
         $directionId = isset($validated['direction_id']) ? (int) $validated['direction_id'] : null;
         $serviceId = isset($validated['service_id']) ? (int) $validated['service_id'] : null;
 
+        // Matricule obligatoire pour TOUS les profils, sans exception.
+        if (trim((string) ($validated['agent_matricule'] ?? '')) === '') {
+            throw ValidationException::withMessages([
+                'agent_matricule' => 'Le matricule est obligatoire pour tout utilisateur.',
+            ]);
+        }
+        $validated['agent_matricule'] = User::normalizeAgentMatricule($validated['agent_matricule']);
+
         if ($role === User::ROLE_SERVICE || $role === User::ROLE_AGENT) {
             if ($directionId === null || $serviceId === null) {
                 throw ValidationException::withMessages([
@@ -694,19 +816,12 @@ class ReferentielWebController extends Controller
             }
 
             if ($role === User::ROLE_AGENT) {
-                if (trim((string) ($validated['agent_matricule'] ?? '')) === '') {
-                    throw ValidationException::withMessages([
-                        'agent_matricule' => 'Le matricule est obligatoire pour le role agent.',
-                    ]);
-                }
-
                 if (trim((string) ($validated['agent_fonction'] ?? '')) === '') {
                     throw ValidationException::withMessages([
                         'agent_fonction' => 'La fonction est obligatoire pour le role agent.',
                     ]);
                 }
             } else {
-                $validated['agent_matricule'] = null;
                 $validated['agent_fonction'] = null;
                 $validated['agent_telephone'] = null;
             }
@@ -714,7 +829,8 @@ class ReferentielWebController extends Controller
             return;
         }
 
-        $validated['agent_matricule'] = null;
+        // Autres profils : le matricule reste requis (deja verifie ci-dessus),
+        // seuls fonction/telephone (specifiques agent) sont neutralises.
         $validated['agent_fonction'] = null;
         $validated['agent_telephone'] = null;
 

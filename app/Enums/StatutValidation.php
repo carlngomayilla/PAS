@@ -40,7 +40,7 @@ enum StatutValidation: string
             self::EnAttenteValidationControleur => 'En attente validation controleur',
             self::RejeteParControleur => 'Rejete par controleur',
             self::ValideParControleur => 'Valide par controleur',
-            self::Cloture => 'Cloture',
+            self::Cloture => 'Clôture',
         };
     }
 

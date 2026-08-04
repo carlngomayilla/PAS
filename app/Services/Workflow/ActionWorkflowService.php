@@ -45,9 +45,20 @@ class ActionWorkflowService
 
         $provisional = $this->calculator->provisionalPerformance($action);
 
+        // Date d'atteinte du seuil de completude : enregistree UNE SEULE FOIS,
+        // au premier franchissement. Elle sert au calcul du statut delai : sans
+        // elle, une action atteignant son seuil apres l'echeance apparaissait
+        // « dans les delais ».
+        $completionThreshold = max(0.0, min(100.0, (float) ($action->seuil_minimum ?? 100.0)));
+        $thresholdReachedAt = $action->seuil_atteint_le;
+        if ($thresholdReachedAt === null && $provisional >= $completionThreshold) {
+            $thresholdReachedAt = now();
+        }
+
         $action->forceFill([
             'progression_reelle' => $provisional,
             'statut_performance' => $this->calculator->performanceStatus($provisional),
+            'seuil_atteint_le' => $thresholdReachedAt,
             'statut' => ActionTrackingService::STATUS_EN_COURS,
             'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
             // Tant que non soumise, on reste en non_soumise / correction.
@@ -205,28 +216,29 @@ class ActionWorkflowService
             }
 
             if ($approve) {
-                $official = (float) ($lockedAction->chef_progress_percent
+                // Circuit a 3 visas : le controleur (SCIQ) ne cloture plus l'action,
+                // il la transmet a la planification qui realise la validation finale.
+                $provisional = (float) ($lockedAction->chef_progress_percent
                     ?? $this->calculator->provisionalPerformance($lockedAction));
 
                 $lockedAction->forceFill([
-                    'official_progress_percent' => $official,
-                    'progression_reelle' => $official,
-                    'statut_performance' => $this->calculator->performanceStatus($official),
-                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
-                    'statut' => ActionTrackingService::STATUS_CLOTUREE,
-                    'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
-                    'date_fin_reelle' => $lockedAction->date_fin_reelle ?: now()->toDateString(),
-                    'cloture_le' => now(),
-                    'cloture_par' => $actor->id,
+                    'statut_validation' => ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
+                    'statut' => ActionTrackingService::STATUS_EN_COURS,
+                    'statut_dynamique' => ActionTrackingService::STATUS_EN_COURS,
                     'controle_decision' => 'valider',
                     'controle_comment' => $comment,
                     'controle_reviewed_by' => $actor->id,
                     'controle_reviewed_at' => now(),
                 ])->save();
 
-                $this->log($lockedAction, 'action_validee_controle', 'Action validee par le controleur.', $actor, [
-                    'performance_officielle' => $official,
-                ], 'responsable');
+                $this->log(
+                    $lockedAction,
+                    'action_transmise_planification',
+                    'Action visee par le controle et transmise a la planification.',
+                    $actor,
+                    ['performance_provisoire' => $provisional],
+                    'planification'
+                );
 
                 return $lockedAction->refresh();
             }
@@ -255,6 +267,97 @@ class ActionWorkflowService
             $this->log($lockedAction, 'action_rejetee_controle', 'Action renvoyee par le controleur pour correction.', $actor, [
                 'motif' => $comment,
             ], 'responsable');
+
+            return $lockedAction->refresh();
+        });
+    }
+
+    /**
+     * Validation finale par la planification : troisieme et dernier visa du
+     * circuit (chef de service -> controle SCIQ -> planification). C'est ce visa
+     * qui cloture officiellement l'action et fige sa performance officielle.
+     */
+    public function reviewActionByPlanification(
+        Action $action,
+        bool $approve,
+        ?string $comment,
+        User $actor
+    ): Action {
+        if (! $approve && trim((string) $comment) === '') {
+            throw new \InvalidArgumentException('Le motif est obligatoire pour renvoyer une action en correction.');
+        }
+
+        return DB::transaction(function () use ($approve, $action, $comment, $actor): Action {
+            $lockedAction = Action::query()
+                ->whereKey($action->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ((string) $lockedAction->statut_validation !== ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION) {
+                throw new \InvalidArgumentException('Cette action n est pas en attente de validation planification.');
+            }
+
+            if ($lockedAction->isResponsible($actor)
+                || (int) ($lockedAction->soumise_par ?? 0) === (int) $actor->id
+                || (int) ($lockedAction->evalue_par ?? 0) === (int) $actor->id
+                || (int) ($lockedAction->controle_reviewed_by ?? 0) === (int) $actor->id
+            ) {
+                throw new \InvalidArgumentException('La validation finale doit etre realisee par un autre intervenant.');
+            }
+
+            if ($approve) {
+                $official = (float) ($lockedAction->chef_progress_percent
+                    ?? $this->calculator->provisionalPerformance($lockedAction));
+
+                $lockedAction->forceFill([
+                    'official_progress_percent' => $official,
+                    'progression_reelle' => $official,
+                    'statut_performance' => $this->calculator->performanceStatus($official),
+                    'statut_validation' => ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
+                    'statut' => ActionTrackingService::STATUS_CLOTUREE,
+                    'statut_dynamique' => ActionTrackingService::STATUS_CLOTUREE,
+                    'date_fin_reelle' => $lockedAction->date_fin_reelle ?: now()->toDateString(),
+                    'cloture_le' => now(),
+                    'cloture_par' => $actor->id,
+                ])->save();
+
+                $this->log(
+                    $lockedAction,
+                    'action_validee_planification',
+                    'Action validee par la planification : cloture officielle.',
+                    $actor,
+                    ['performance_officielle' => $official],
+                    'responsable'
+                );
+
+                return $lockedAction->refresh();
+            }
+
+            $lockedAction->forceFill([
+                'statut_validation' => ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
+                'statut' => ActionTrackingService::STATUS_A_CORRIGER,
+                'statut_dynamique' => ActionTrackingService::STATUS_A_CORRIGER,
+            ])->save();
+
+            if ($lockedAction->isComposee()) {
+                $lockedAction->sousActions()
+                    ->where('validation_status', SousAction::VALIDATION_VALIDEE)
+                    ->update([
+                        'validation_status' => SousAction::VALIDATION_REJETEE,
+                        'statut' => 'rejetee_a_corriger',
+                        'est_effectuee' => false,
+                        'completed_at' => null,
+                    ]);
+            }
+
+            $this->log(
+                $lockedAction,
+                'action_rejetee_planification',
+                'Action renvoyee par la planification pour correction.',
+                $actor,
+                ['motif' => $comment],
+                'responsable'
+            );
 
             return $lockedAction->refresh();
         });

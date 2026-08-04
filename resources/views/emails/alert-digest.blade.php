@@ -8,7 +8,7 @@
     <h2 style="margin-bottom: 8px;">Alerte automatique ANBG</h2>
     <p style="margin-top: 0;">
         Bonjour {{ $user->name }},<br>
-        voici le point des alertes de votre périmètre au {{ $digest['generated_at']->format('Y-m-d H:i') }}.
+        voici le point des alertes de votre périmètre au {{ $digest['generated_at']->format('d/m/Y à H:i') }}.
     </p>
 
     <table cellpadding="6" cellspacing="0" border="1" style="border-collapse: collapse; margin: 12px 0;">
@@ -44,9 +44,9 @@
             @foreach ($digest['actions_retard'] as $action)
                 <li>
                     {{ $action->libelle }} |
-                    echeance: {{ optional($action->date_echeance)->format('Y-m-d') ?? '-' }} |
-                    statut: {{ $action->statut_dynamique }} |
-                    responsable: {{ $action->responsable?->name ?? '-' }}
+                    échéance : {{ optional($action->date_echeance)->format('d/m/Y') ?? '-' }} |
+                    statut : {{ \App\Support\UiLabel::actionStatus((string) $action->statut_dynamique) }} |
+                    responsable : {{ $action->responsable?->name ?? '-' }}
                 </li>
             @endforeach
         </ul>

@@ -31,6 +31,7 @@ class ActionSummaryService
             'actions_total' => $total,
             'actions_validees' => $actions
                 ->filter(fn (Action $action): bool => in_array((string) $action->statut_validation, [
+                    ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                     ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                     ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
                 ], true))

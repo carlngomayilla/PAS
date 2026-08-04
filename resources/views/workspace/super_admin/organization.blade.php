@@ -255,8 +255,8 @@
                     </select>
                 </div>
                 <div>
-                    <label for="managed_matricule">Matricule</label>
-                    <input id="managed_matricule" name="agent_matricule" type="text" value="{{ old('agent_matricule', $editingUser?->agent_matricule) }}">
+                    <label for="managed_matricule">Matricule <span aria-hidden="true">*</span></label>
+                    <input id="managed_matricule" name="agent_matricule" type="text" value="{{ old('agent_matricule', $editingUser?->agent_matricule) }}" required>
                 </div>
                 <div>
                     <label for="managed_fonction">Fonction</label>
@@ -295,7 +295,7 @@
                     <div>
                         <label for="managed_transfer_to_user_id">Repreneur taches ouvertes</label>
                         <select id="managed_transfer_to_user_id" name="transfer_to_user_id">
-                            <option value="">Auto si meme perimetre</option>
+                            <option value="">Auto si meme périmètre</option>
                             @foreach ($transferUserOptions as $candidate)
                                 @continue((int) $candidate->id === (int) $editingUser->id)
                                 <option value="{{ $candidate->id }}" @selected((int) old('transfer_to_user_id') === (int) $candidate->id)>

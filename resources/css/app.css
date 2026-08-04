@@ -122,13 +122,13 @@
 
     body.admin-theme-scope .app-form-control:not([type="checkbox"]):not([type="radio"]):not([type="color"]) {
         width: 100%;
-        min-height: 2.9rem;
+        min-height: 2.85rem;
         max-width: none;
         border: 1px solid color-mix(in srgb, var(--app-border) 88%, #7faecb 12%) !important;
-        border-radius: 0.82rem !important;
+        border-radius: 0.85rem !important;
         background: var(--app-surface) !important;
         color: var(--app-text) !important;
-        padding: 0.72rem 0.88rem !important;
+        padding: 0.72rem 0.9rem !important;
         font-size: 0.9rem;
         line-height: 1.35;
         box-shadow: 0 1px 2px rgba(23, 50, 74, 0.035) !important;
@@ -3795,7 +3795,65 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
         background: var(--app-surface) !important;
         color: var(--app-text) !important;
         font-size: 0.88rem;
-        vertical-align: middle;
+        vertical-align: top;
+        /* Jamais de coupure lettre par lettre : on casse uniquement aux limites
+           de mots, avec repli sur break-word si un mot depasse la colonne. */
+        overflow-wrap: break-word;
+        word-break: normal;
+        hyphens: none;
+    }
+
+    /* Les boutons/liens d'action dans un tableau ne doivent JAMAIS se casser
+       lettre par lettre : ils restent sur une ligne et la colonne s'adapte. */
+    .app-table td .btn,
+    .data-table td .btn,
+    .app-table td .btn-sm,
+    .data-table td .btn-sm,
+    .app-table td summary,
+    .data-table td summary,
+    .app-table td a.btn,
+    .data-table td a.btn {
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+        overflow-wrap: normal !important;
+        hyphens: none !important;
+    }
+
+    /* Colonne d'actions : largeur suffisante pour ses boutons. */
+    .app-table td:last-child,
+    .data-table td:last-child,
+    .app-table th:last-child,
+    .data-table th:last-child {
+        white-space: nowrap;
+    }
+
+    /* Helpers de colonnes pour le tableau commun. */
+    .app-table .nowrap,
+    .data-table .nowrap {
+        white-space: nowrap;
+    }
+
+    .app-table .col-title,
+    .data-table .col-title {
+        min-width: 220px;
+        overflow-wrap: break-word;
+        word-break: normal;
+    }
+
+    .app-table .col-code,
+    .data-table .col-code {
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* En-tete de tableau fige pendant le defilement vertical. */
+    .app-table thead.sticky-head th,
+    .data-table thead.sticky-head th,
+    .app-table thead.sticky.top-0 th,
+    .data-table thead.sticky.top-0 th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
     }
 
     .app-table tbody tr:hover td,
@@ -5730,7 +5788,8 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
     .dashboard-summary-number {
         color: #3996d3 !important;
         max-width: 100%;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
+        word-break: normal;
         font-size: 1.65rem !important;
         font-weight: 850 !important;
         line-height: 1.05;
@@ -6294,7 +6353,8 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
         white-space: normal !important;
         overflow: visible !important;
         text-overflow: unset !important;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
+        word-break: normal;
         font-size: 0.72rem !important;
         font-weight: 850 !important;
         letter-spacing: 0 !important;
@@ -6310,7 +6370,8 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
         font-size: 1.72rem !important;
         font-weight: 850 !important;
         line-height: 1.05 !important;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
+        word-break: normal;
     }
 
     .app-table-wrapper,
@@ -7161,7 +7222,8 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
         min-width: 0;
         padding: 1.15rem 1.2rem !important;
         text-align: center;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
+        word-break: normal;
     }
 
     body.admin-theme-scope :is(#action-validation, #action-fiche, #action-financement, #action-status) :is(.showcase-inline-stat, .action-detail-card) > :is(strong, h3) {
@@ -7185,7 +7247,8 @@ html.dark body.admin-theme-scope .dashboard-synthesis-hierarchy-card .dashboard-
 
     body.admin-theme-scope #action-fiche .action-fiche-dl :is(dt, dd) {
         min-width: 0;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
+        word-break: normal;
         line-height: 1.45;
     }
 
@@ -10088,7 +10151,8 @@ body.admin-theme-scope .dealdeck-dashboard :is(
     .dashboard-agent-alert-body strong,
     .dashboard-agent-alert-body span {
         min-width: 0;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
+        word-break: normal;
     }
 
     .dashboard-agent-alert-body strong {
@@ -10350,13 +10414,39 @@ body.admin-theme-scope .dealdeck-dashboard :is(
         color: #111827 !important;
     }
 
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table-wrap {
+        width: 100% !important;
+        overflow-x: auto !important;
+    }
+
     body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table {
         width: 100% !important;
+        min-width: 2200px !important;
         border-collapse: collapse !important;
         border-spacing: 0 !important;
         table-layout: fixed !important;
         font-size: 12px !important;
     }
+
+    /* Largeurs de colonnes explicites : sans elles, table-layout:fixed repartit
+       les 19 colonnes a egalite (~52px) et le texte se casse lettre par lettre. */
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-number { width: 44px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-action { width: 200px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-sub-action { width: 180px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-indicator { width: 240px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-responsable { width: 140px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-ratio { width: 68px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-threshold { width: 92px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-realized { width: 74px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-rate { width: 78px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-performance { width: 92px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-gap { width: 74px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-deadline { width: 100px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-delay { width: 70px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-status { width: 112px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-proof { width: 100px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-observation { width: 160px !important; }
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-col-row-actions { width: 150px !important; }
 
     body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table th,
     body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table td {
@@ -10364,7 +10454,9 @@ body.admin-theme-scope .dealdeck-dashboard :is(
         padding: 6px !important;
         vertical-align: middle !important;
         box-shadow: none !important;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word !important;
+        word-break: normal !important;
+        hyphens: none !important;
     }
 
     body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table th {
@@ -10453,6 +10545,47 @@ body.admin-theme-scope .dealdeck-dashboard :is(
 
     body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-save:hover {
         background: #17324a;
+    }
+
+    /* Boutons d'action de la colonne « Commandes » (Modifier / Valider / Report).
+       Rendus comme de vrais boutons (et non du texte cliquable brut). */
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-open,
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-report {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        border-radius: 6px;
+        padding: 5px 8px;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1.1;
+        white-space: nowrap;
+        text-decoration: none !important;
+        cursor: pointer;
+        transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-open {
+        border: 1px solid #1e5fa8;
+        background: #eef6fc;
+        color: #0f2f57 !important;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-open:hover {
+        background: #1e5fa8;
+        color: #ffffff !important;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-report {
+        border: 1px solid #b45309;
+        background: #fef3c7;
+        color: #92400e !important;
+    }
+
+    body.admin-theme-scope :where(.pta-suivi-page, .reporting-pta-official) .pta-inline-report:hover {
+        background: #f59e0b;
+        color: #ffffff !important;
     }
 
     .auth-password-toggle {
@@ -10545,7 +10678,8 @@ body.admin-theme-scope .dealdeck-dashboard :is(
 
     body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table, .glass-table) td,
     body.admin-theme-scope :where(.app-table, .data-table, .dashboard-table, .glass-table) th {
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
+        word-break: normal;
     }
 
     body.admin-theme-scope :where(.admin-navbar-icon-button, .app-sidebar-collapse-toggle, .anbg-dialog-close) {
@@ -10637,6 +10771,21 @@ body.admin-theme-scope .dealdeck-dashboard :is(
         border-radius: 1.1rem;
         background: color-mix(in srgb, var(--app-surface) 94%, transparent);
         box-shadow: 0 12px 30px -28px rgba(15, 76, 129, 0.5);
+    }
+
+    /* Une barre de filtres qui contient un titre + un formulaire complet doit
+       empiler ces blocs sur toute la largeur : sinon le formulaire est comprime
+       et sa grille de champs s'effondre en une seule colonne etroite. */
+    body.admin-theme-scope :where(.filter-bar, .filters-bar, .showcase-toolbar) > form,
+    body.admin-theme-scope :where(.filter-bar, .filters-bar, .showcase-toolbar) > div:has(.showcase-panel-title),
+    body.admin-theme-scope :where(.filter-bar, .filters-bar, .showcase-toolbar) > div:has(> h1, > h2, > h3) {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+    }
+
+    body.admin-theme-scope :where(.filter-bar, .filters-bar, .showcase-toolbar):has(> form) {
+        align-items: stretch;
     }
 
     body.admin-theme-scope :where(.app-table-wrapper, .data-table-shell, .table-wrap) {

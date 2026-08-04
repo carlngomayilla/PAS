@@ -25,7 +25,17 @@
         <x-ui.page-title class="mb-4 app-screen-block" eyebrow="Administration organisationnelle" title="Référentiel - Utilisateurs" subtitle="Annuaire, rattachements métier et santé des comptes.">
             <x-slot:actions>
                 <a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.referentiel.utilisateurs.export.csv', $exportFilters) }}">Exporter CSV</a>
+                <a class="btn btn-secondary min-h-10 px-4" href="{{ route('workspace.referentiel.utilisateurs.export.word', $exportFilters) }}">Exporter Word</a>
                 @if ($canWrite)
+                    <details class="relative" data-preview-ignore="1">
+                        <summary class="btn btn-secondary min-h-10 px-4 cursor-pointer list-none" data-preview-ignore="1">Réinitialiser tous les MDP</summary>
+                        <form method="POST" action="{{ route('workspace.referentiel.utilisateurs.bulk-reset-password') }}" class="absolute right-0 z-20 mt-2 grid w-80 gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900" data-preview-ignore="1">
+                            @csrf
+                            <input type="hidden" name="reset_all" value="1">
+                            <p class="text-xs text-slate-600 dark:text-slate-300">Génère un mot de passe temporaire pour tous les utilisateurs de votre périmètre (changement requis à la première connexion). Les identifiants générés sont affichés une seule fois.</p>
+                            <button class="btn btn-danger btn-sm" type="submit">Confirmer la réinitialisation générale</button>
+                        </form>
+                    </details>
                     <a class="btn btn-primary min-h-10 px-4" href="{{ route('workspace.referentiel.utilisateurs.create') }}">Nouvel utilisateur</a>
                 @endif
             </x-slot:actions>
@@ -138,7 +148,7 @@
                                         <div class="min-w-0"><strong class="block truncate text-slate-900 dark:text-slate-100">{{ $row->name }}</strong><span class="block truncate text-xs text-slate-500 dark:text-slate-400">{{ $row->email }}</span></div>
                                     </div>
                                 </td>
-                                <td><div class="min-w-[180px]"><span class="anbg-badge anbg-badge-neutral">{{ $row->roleLabel() }}</span><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">{{ $row->effectiveRoleCode() }}</span></div></td>
+                                <td><div class="min-w-[180px]"><span class="anbg-badge anbg-badge-neutral">{{ $row->roleLabel() }}</span></div></td>
                                 <td><div class="min-w-[230px]"><strong class="text-slate-800 dark:text-slate-200">{{ $row->direction?->code ?? 'Périmètre global' }}</strong><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">{{ $row->service?->code ? $row->service->code.' - '.$row->service->libelle : ($row->uniteDg?->code ? $row->uniteDg->code.' - '.$row->uniteDg->libelle : $row->profileScopeLabel()) }}</span></div></td>
                                 <td><div class="min-w-[180px]"><span>{{ $row->agent_fonction ?: '-' }}</span>@if ($row->agent_matricule)<span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">Matricule {{ $row->agent_matricule }}</span>@endif</div></td>
                                 <td><div class="min-w-[180px]"><span>{{ $row->agent_telephone ?: '-' }}</span><span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">#{{ $row->id }}</span></div></td>
@@ -147,6 +157,9 @@
                                     <td>
                                         <div class="flex min-w-[190px] flex-wrap items-start gap-2">
                                             @if ($canWrite)<a class="btn btn-secondary btn-sm" href="{{ route('workspace.referentiel.utilisateurs.edit', $row) }}">Modifier</a>@endif
+                                            @if ($canWrite && (int) auth()->id() !== (int) $row->id)
+                                                <details class="relative" data-preview-ignore="1"><summary class="btn btn-secondary btn-sm cursor-pointer list-none" data-preview-ignore="1">Réinit. MDP</summary><form method="POST" action="{{ route('workspace.referentiel.utilisateurs.reset-password', $row) }}" class="absolute right-0 z-20 mt-2 grid w-72 gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900" data-preview-ignore="1">@csrf<p class="text-xs text-slate-600 dark:text-slate-300" data-preview-ignore="1">Génère un mot de passe temporaire pour {{ $row->email }} (changement requis à la prochaine connexion).</p><button class="btn btn-danger btn-sm" type="submit" data-preview-ignore="1">Confirmer</button></form></details>
+                                            @endif
                                             @if (($canDeleteUsers ?? false) && (int) auth()->id() !== (int) $row->id)
                                                 <details class="relative" data-preview-ignore="1"><summary class="btn btn-danger btn-sm cursor-pointer list-none" data-preview-ignore="1">Supprimer</summary><form method="POST" action="{{ route('workspace.referentiel.utilisateurs.destroy', $row) }}" class="absolute right-0 z-20 mt-2 grid w-72 gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900" data-preview-ignore="1">@csrf @method('DELETE')<label class="grid gap-1 text-xs font-bold uppercase text-slate-500" data-preview-ignore="1">Motif<input name="motif" type="text" minlength="5" maxlength="1000" required class="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal normal-case dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100" data-preview-ignore="1"></label><button class="btn btn-danger btn-sm" type="submit" data-preview-ignore="1">Confirmer</button></form></details>
                                             @elseif (($canRequestUserDeletion ?? false) && (int) auth()->id() !== (int) $row->id)

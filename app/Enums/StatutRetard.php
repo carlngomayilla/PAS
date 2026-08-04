@@ -11,7 +11,7 @@ enum StatutRetard: string
     {
         return match ($this) {
             self::DansLesDelais => 'Dans les delais',
-            self::EnRetard => 'Hors delai / En retard',
+            self::EnRetard => 'Hors délai / En retard',
         };
     }
 }

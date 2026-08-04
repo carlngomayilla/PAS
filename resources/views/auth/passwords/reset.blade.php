@@ -103,7 +103,7 @@
                 <strong>Politique de securite :</strong> minimum 8 caracteres, lettres et chiffres requis. Majuscules et symboles sont acceptes mais non obligatoires. Les 5 derniers mots de passe ne peuvent pas etre reutilises.
             </div>
 
-            <button class="btn" type="submit">Reinitialiser le mot de passe</button>
+            <button class="btn" type="submit">Réinitialiser le mot de passe</button>
         </form>
 
         <div class="links">

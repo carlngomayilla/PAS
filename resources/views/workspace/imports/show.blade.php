@@ -18,7 +18,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 @if ($import->error_rows > 0)
-                    <a class="btn btn-secondary" href="{{ route('workspace.imports.error-report', $import) }}">Telecharger le rapport d'erreurs</a>
+                    <a class="btn btn-secondary" href="{{ route('workspace.imports.error-report', $import) }}">Télécharger le rapport d'erreurs</a>
                 @endif
                 <a class="btn btn-outline" href="{{ route('workspace.imports.index') }}">Historique</a>
                 <form method="POST" action="{{ route('workspace.imports.destroy', $import) }}" data-confirm-message="Supprimer cet import et tout son historique ?" data-confirm-tone="danger" data-confirm-label="Supprimer">
@@ -134,7 +134,7 @@
                         <th>Statut</th>
                         <th>Direction</th>
                         <th>Service</th>
-                        <th>Objectif operationnel</th>
+                        <th>Objectif opérationnel</th>
                         <th>Action</th>
                         <th>Message</th>
                     </tr>

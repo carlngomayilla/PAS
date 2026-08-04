@@ -47,7 +47,7 @@
             <div class="border-l-4 border-[#7656a8] bg-white px-5 py-4 shadow-sm dark:bg-slate-900">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <p class="text-xs font-bold uppercase text-slate-500">Plan d'actions operationnel annuel</p>
+                        <p class="text-xs font-bold uppercase text-slate-500">Plan d'actions opérationnel annuel</p>
                         <p class="mt-1 font-mono text-sm font-bold text-[#7656a8]">{{ $row->code ?: 'PAO-'.$row->id }}</p>
                         <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
                             <span>{{ $row->direction?->code }} - {{ $row->direction?->libelle ?? 'Direction non renseignee' }}</span>
@@ -105,7 +105,7 @@
         <section class="app-screen-block" aria-labelledby="pao-hierarchy-title">
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
                 <div>
-                    <p class="text-xs font-bold uppercase text-[#7656a8]">Portefeuille operationnel</p>
+                    <p class="text-xs font-bold uppercase text-[#7656a8]">Portefeuille opérationnel</p>
                     <h2 id="pao-hierarchy-title" class="mt-1 text-xl font-black text-[#17324a] dark:text-white">Objectifs, PTA et actions</h2>
                 </div>
                 <p class="text-sm font-semibold text-slate-500">Les actions conservent uniquement les acces Suivi et Report.</p>
@@ -175,7 +175,7 @@
                                                                     <tr>
                                                                         <th>Action</th>
                                                                         <th>Responsable</th>
-                                                                        <th>Echeance</th>
+                                                                        <th>Échéance</th>
                                                                         <th>Avancement</th>
                                                                         <th>Statut</th>
                                                                         <th>Report</th>
@@ -220,7 +220,7 @@
                                                                             <td>
                                                                                 <div class="flex flex-wrap gap-2">
                                                                                     <a class="btn btn-primary btn-sm" href="{{ route('workspace.actions.suivi', $action['id']) }}">Faire le suivi</a>
-                                                                                    <a class="btn btn-secondary btn-sm" href="{{ route('workspace.actions.suivi', $action['id']) }}#action-echeances">Report d'echeance</a>
+                                                                                    <a class="btn btn-secondary btn-sm" href="{{ route('workspace.actions.suivi', $action['id']) }}#action-echeances">Report d'échéance</a>
                                                                                 </div>
                                                                             </td>
                                                                         </tr>
@@ -231,13 +231,13 @@
                                                     @endif
                                                 </div>
                                             @empty
-                                                <div class="bg-amber-50 px-4 py-4 text-sm font-bold text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">PTA manquant pour cet objectif operationnel.</div>
+                                                <div class="bg-amber-50 px-4 py-4 text-sm font-bold text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">PTA manquant pour cet objectif opérationnel.</div>
                                             @endforelse
                                         </div>
                                     </article>
                                 @empty
                                     <div class="border border-amber-200 bg-amber-50 px-4 py-5 text-sm font-bold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                                        Aucun objectif operationnel visible dans votre perimetre pour ce PAO.
+                                        Aucun objectif opérationnel visible dans votre périmètre pour ce PAO.
                                     </div>
                                 @endforelse
                             </div>

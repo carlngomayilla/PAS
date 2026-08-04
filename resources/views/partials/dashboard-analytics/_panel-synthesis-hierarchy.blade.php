@@ -31,14 +31,13 @@
 <section class="dashboard-synthesis-hierarchy-card mb-4 space-y-3" data-dashboard-synthesis-hierarchy>
     <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
-            <p class="text-[11px] font-black uppercase tracking-wide text-[#3996d3]">Vue synthetique des axes</p>
-            <h2 class="showcase-panel-title mt-1">Axes -> Objectifs -> PAO/PTA -> Actions</h2>
-            <p class="mt-1 text-sm font-semibold text-[#667085]">Ouvrez un axe pour comprendre rapidement son avancement, ses retards et les elements qui le composent.</p>
+            <p class="text-[11px] font-black uppercase tracking-wide text-[#3996d3]">Vue synthétique des axes</p>
+            <h2 class="showcase-panel-title mt-1">Axes → Objectifs → PAO/PTA → Actions</h2>
         </div>
         <div class="flex items-center gap-2">
             <span class="showcase-chip">{{ $axisNodes->count() }} axe(s)</span>
             <a href="{{ $synthesisDetailUrl }}" class="btn btn-secondary btn-sm rounded-lg px-3 py-1.5 text-xs">
-                Vue detaillee
+                Vue détaillée
             </a>
         </div>
     </div>
@@ -55,12 +54,13 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="dashboard-pill dashboard-synthesis-level-pill">{{ $axis['code'] ?? 'AXE' }}</span>
-                            <strong class="text-[#17324a]">{{ $axis['label'] ?? 'Axe non renseigne' }}</strong>
+                            <strong class="text-[#17324a]">{{ $axis['label'] ?? 'Axe non renseigné' }}</strong>
                         </div>
-                        <div class="mt-2 grid gap-2 text-xs font-semibold text-[#667085] md:grid-cols-4">
+                        <div class="mt-2 grid gap-2 text-xs font-semibold text-[#667085] md:grid-cols-5">
                             <span>Niveau attendu {{ $axis['target'] ?? '100%' }}</span>
-                            <span>Realise {{ $axis['realized'] ?? $fmtPct($axisProgress) }}</span>
-                            <span>{{ $fmtCount($axis['actions_total'] ?? 0) }} action(s)</span>
+                            <span>Réalisé {{ $axis['realized'] ?? $fmtPct($axisProgress) }}</span>
+                            <span>Évolution : {{ $axis['status'] ?? '-' }}</span>
+                            <span>{{ $fmtCount($axis['completed_actions_total'] ?? 0) }}/{{ $fmtCount($axis['actions_total'] ?? 0) }} action(s) terminée(s)</span>
                             <span>{{ $fmtCount($axis['late_actions_total'] ?? 0) }} retard(s)</span>
                         </div>
                         <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
@@ -85,7 +85,7 @@
                             <summary class="dashboard-synthesis-node-summary cursor-pointer list-none py-2">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                     <div class="min-w-0">
-                                        <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#3996d3]">Objectif strategique {{ $objective['code'] ?? 'OS' }}</p>
+                                        <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#3996d3]">Objectif stratégique {{ $objective['code'] ?? 'OS' }}</p>
                                         <h3 class="text-sm font-black text-[#17324a]">{{ $objective['label'] ?? '-' }}</h3>
                                     </div>
                                     <span class="dashboard-pill dashboard-synthesis-progress-pill" style="--pill-fg:{{ $synthesisTone($objectiveProgress) }};">{{ $fmtPct($objectiveProgress) }}</span>
@@ -102,7 +102,7 @@
                                         <summary class="dashboard-synthesis-node-summary cursor-pointer list-none px-3 py-2">
                                             <div class="flex flex-wrap items-center justify-between gap-2">
                                                 <div class="min-w-0">
-                                                    <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#667085]">Objectif operationnel / PAO</p>
+                                                    <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#667085]">Objectif opérationnel / PAO</p>
                                                     <h4 class="text-sm font-black text-[#17324a]">{{ $operational['label'] ?? '-' }}</h4>
                                                     <p class="mt-1 text-xs font-semibold text-[#667085]">{{ $operational['direction'] ?? '-' }} | {{ $operational['service'] ?? '-' }}</p>
                                                 </div>
@@ -139,7 +139,7 @@
                                                                         <div class="min-w-0 flex-1">
                                                                             <p class="dashboard-synthesis-level-label text-[11px] font-black uppercase text-[#667085]">{{ $action['code'] ?? 'ACT' }} | {{ $action['responsible'] ?? '-' }}</p>
                                                                             <h5 class="text-sm font-black text-[#17324a]">{{ $action['label'] ?? '-' }}</h5>
-                                                                            <p class="mt-1 text-xs font-semibold text-[#667085]">Niveau attendu {{ $action['target'] ?? '-' }} | Realise {{ $action['realized'] ?? '-' }} | {{ $action['alert'] ?? '-' }}</p>
+                                                                            <p class="mt-1 text-xs font-semibold text-[#667085]">Niveau attendu {{ $action['target'] ?? '-' }} | Réalisé {{ $action['realized'] ?? '-' }} | {{ $action['alert'] ?? '-' }}</p>
                                                                         </div>
                                                                         <div class="flex min-w-[170px] items-center gap-2">
                                                                             <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
@@ -152,12 +152,12 @@
                                                                 <div class="border-t border-slate-200 px-3 py-2">
                                                                     <div class="grid gap-2 text-xs font-semibold text-[#667085] md:grid-cols-4">
                                                                         <span>Statut : {{ $action['status'] ?? '-' }}</span>
-                                                                        <span>Delai : {{ $action['delay_status'] ?? '-' }}</span>
+                                                                        <span>Délai : {{ $action['delay_status'] ?? '-' }}</span>
                                                                         <span>Cause : {{ $action['blockage_reason'] ?? '-' }}</span>
                                                                         <span>Preuves : {{ $fmtCount($action['proofs_total'] ?? 0) }}</span>
                                                                     </div>
                                                                     <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
-                                                                        <span class="text-xs font-semibold text-[#667085]">{{ $fmtCount($action['sub_actions_done'] ?? 0) }}/{{ $fmtCount($action['sub_actions_total'] ?? 0) }} sous-action(s) effectuee(s)</span>
+                                                                        <span class="text-xs font-semibold text-[#667085]">{{ $fmtCount($action['sub_actions_done'] ?? 0) }}/{{ $fmtCount($action['sub_actions_total'] ?? 0) }} sous-action(s) effectuée(s)</span>
                                                                         <a href="{{ $action['detail_url'] ?? '#' }}" class="btn btn-primary btn-sm rounded-lg px-3 py-1.5 text-xs">Voir action</a>
                                                                     </div>
 
@@ -184,7 +184,7 @@
                                                                 </div>
                                                             </details>
                                                         @empty
-                                                            <p class="text-sm font-semibold text-[#667085]">Aucune action PTA rattachee.</p>
+                                                            <p class="text-sm font-semibold text-[#667085]">Aucune action PTA rattachée.</p>
                                                         @endforelse
                                                     </div>
                                                 </div>
@@ -192,17 +192,17 @@
                                         </div>
                                     </details>
                                 @empty
-                                    <p class="text-sm font-semibold text-[#667085]">Aucun objectif operationnel rattache.</p>
+                                    <p class="text-sm font-semibold text-[#667085]">Aucun objectif opérationnel rattaché.</p>
                                 @endforelse
                             </div>
                         </details>
                     @empty
-                        <x-ui.empty-state title="Aucun objectif" message="Aucun objectif strategique rattache a cet axe." icon="file" />
+                        <x-ui.empty-state title="Aucun objectif" message="Aucun objectif stratégique rattaché à cet axe." icon="file" />
                     @endforelse
                 </div>
             </details>
         @empty
-            <x-ui.empty-state title="Aucune synthese PAS" message="Aucune action ne permet encore de construire l'arborescence PAS." icon="chart" tone="info" />
+            <x-ui.empty-state title="Aucune synthèse PAS" message="Aucune action ne permet encore de construire l'arborescence PAS." icon="chart" tone="info" />
         @endforelse
     </div>
 </section>

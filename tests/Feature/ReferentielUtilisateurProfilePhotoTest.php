@@ -47,6 +47,7 @@ class ReferentielUtilisateurProfilePhotoTest extends TestCase
                 'email' => 'controleur.reporting@anbg.test',
                 'role' => 'controleur_reporting',
                 'is_active' => '1',
+                'agent_matricule' => 'CTR-100',
                 'password' => 'Password-Test@123',
                 'password_confirmation' => 'Password-Test@123',
             ])
@@ -75,6 +76,7 @@ class ReferentielUtilisateurProfilePhotoTest extends TestCase
             'name' => 'Profil Test',
             'email' => 'profil.test@anbg.test',
             'role' => User::ROLE_CABINET,
+            'agent_matricule' => 'CAB-100',
             'password' => 'Password-Test@123',
             'password_confirmation' => 'Password-Test@123',
             'profile_photo' => UploadedFile::fake()->createWithContent(

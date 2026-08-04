@@ -25,7 +25,7 @@
                         <th class="px-3 py-2">Score</th>
                         <th class="px-3 py-2">Lignes</th>
                         <th class="px-3 py-2">Erreurs</th>
-                        <th class="px-3 py-2">Details</th>
+                        <th class="px-3 py-2">Détails</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">

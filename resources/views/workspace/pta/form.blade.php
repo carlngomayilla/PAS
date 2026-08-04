@@ -276,7 +276,10 @@
                     @endif
                 </div>
 
-                <div class="form-actions">
+                {{-- Barre d'enregistrement collante : reste visible pendant le
+                     defilement d'un formulaire long (roadmap RM4). --}}
+                <div class="form-actions form-actions-sticky" data-pta-sticky-actions>
+                    <span class="form-actions-state" data-pta-dirty-state hidden>Modifications non enregistrées</span>
                     <button class="btn btn-primary" type="submit">{{ $isEdit ? 'Mettre à jour le PTA' : 'Enregistrer le PTA' }}</button>
                     <a class="btn btn-secondary" href="{{ route('workspace.pta.index') }}">Retour</a>
                 </div>
@@ -1485,6 +1488,47 @@
             syncScope();
             refreshActionIndexes();
             focusFieldInActionContext();
+        })();
+
+        // Barre d'enregistrement collante : signale les modifications non
+        // enregistrees et previent l'utilisateur avant qu'il quitte la page.
+        (function () {
+            var form = document.querySelector('form[data-pta-form], form');
+            var state = document.querySelector('[data-pta-dirty-state]');
+            if (!form) {
+                return;
+            }
+
+            var isDirty = false;
+            var isSubmitting = false;
+
+            function markDirty() {
+                if (isDirty) {
+                    return;
+                }
+                isDirty = true;
+                if (state) {
+                    state.hidden = false;
+                }
+            }
+
+            form.addEventListener('input', markDirty);
+            form.addEventListener('change', markDirty);
+            form.addEventListener('submit', function () {
+                isSubmitting = true;
+                isDirty = false;
+                if (state) {
+                    state.hidden = true;
+                }
+            });
+
+            window.addEventListener('beforeunload', function (event) {
+                if (!isDirty || isSubmitting) {
+                    return;
+                }
+                event.preventDefault();
+                event.returnValue = '';
+            });
         })();
     </script>
 @endpush

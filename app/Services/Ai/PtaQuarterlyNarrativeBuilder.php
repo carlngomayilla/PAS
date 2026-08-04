@@ -79,7 +79,7 @@ class PtaQuarterlyNarrativeBuilder
             ->values()
             ->map(function (array $axis, int $index): string {
                 $rate = (float) ($axis['taux_realisation'] ?? 0);
-                $label = (string) ($axis['libelle'] ?? 'Non renseigne');
+                $label = (string) ($axis['libelle'] ?? 'Non renseigné');
                 $due = (int) ($axis['actions_echues'] ?? 0);
                 $completed = (int) ($axis['actions_realisees'] ?? 0);
                 $late = (int) ($axis['actions_en_retard_non_realisees'] ?? 0);
@@ -105,8 +105,8 @@ class PtaQuarterlyNarrativeBuilder
         $weak = $this->weakestRow($axes);
 
         return 'Au regard des donnees consolidees, l analyse par axe permet de distinguer les domaines les plus avances de ceux qui necessitent un appui de suivi. '
-            .'L axe le plus avance est "'.($best['libelle'] ?? 'Non renseigne').'" avec '.$this->asPercent($best['taux_realisation'] ?? 0)
-            .', tandis que l axe le moins avance est "'.($weak['libelle'] ?? 'Non renseigne').'" avec '.$this->asPercent($weak['taux_realisation'] ?? 0)
+            .'L axe le plus avance est "'.($best['libelle'] ?? 'Non renseigné').'" avec '.$this->asPercent($best['taux_realisation'] ?? 0)
+            .', tandis que l axe le moins avance est "'.($weak['libelle'] ?? 'Non renseigné').'" avec '.$this->asPercent($weak['taux_realisation'] ?? 0)
             .'. Cette lecture doit guider la priorisation des relances et des arbitrages.';
     }
 
@@ -117,7 +117,7 @@ class PtaQuarterlyNarrativeBuilder
     private function axisEvolutionParagraph(array $axes, array $monthly): string
     {
         $axisText = collect($axes)
-            ->map(fn (array $axis): string => ($axis['libelle'] ?? 'Non renseigne').' ('.$this->asPercent($axis['taux_realisation'] ?? 0).')')
+            ->map(fn (array $axis): string => ($axis['libelle'] ?? 'Non renseigné').' ('.$this->asPercent($axis['taux_realisation'] ?? 0).')')
             ->implode(', ');
 
         $trend = $this->monthlyTrendSentence($monthly);
@@ -141,8 +141,8 @@ class PtaQuarterlyNarrativeBuilder
         $weak = $this->weakestRow($services);
 
         return 'La lecture par PTA/service montre que le niveau de realisation global est de '.$this->asPercent($summary['taux_realisation'] ?? 0)
-            .'. Le PTA/service le plus avance est "'.($best['libelle'] ?? 'Non renseigne').'" avec '.$this->asPercent($best['taux_realisation'] ?? 0)
-            .', alors que "'.($weak['libelle'] ?? 'Non renseigne').'" constitue le point de vigilance principal avec '.$this->asPercent($weak['taux_realisation'] ?? 0)
+            .'. Le PTA/service le plus avance est "'.($best['libelle'] ?? 'Non renseigné').'" avec '.$this->asPercent($best['taux_realisation'] ?? 0)
+            .', alors que "'.($weak['libelle'] ?? 'Non renseigné').'" constitue le point de vigilance principal avec '.$this->asPercent($weak['taux_realisation'] ?? 0)
             .'. Ces ecarts doivent etre analyses avec les responsables de mise en oeuvre afin de distinguer les retards administratifs, les difficultes de moyens et les actions simplement non mises a jour.';
     }
 
@@ -290,15 +290,15 @@ class PtaQuarterlyNarrativeBuilder
     private function gapFocusSentence(array $late, array $partial, array $postponed): string
     {
         if ($late !== []) {
-            return 'Le premier point d attention porte sur les actions echues non realisees, notamment "'.($late[0]['libelle'] ?? 'Non renseigne').'", qui doit faire l objet d une decision de regularisation, de reprogrammation ou de justification.';
+            return 'Le premier point d attention porte sur les actions echues non realisees, notamment "'.($late[0]['libelle'] ?? 'Non renseigné').'", qui doit faire l objet d une decision de regularisation, de reprogrammation ou de justification.';
         }
 
         if ($partial !== []) {
-            return 'Le premier point d attention porte sur les actions partiellement realisees, notamment "'.($partial[0]['libelle'] ?? 'Non renseigne').'", pour lesquelles le reste a faire doit etre precise.';
+            return 'Le premier point d attention porte sur les actions partiellement realisees, notamment "'.($partial[0]['libelle'] ?? 'Non renseigné').'", pour lesquelles le reste a faire doit etre precise.';
         }
 
         if ($postponed !== []) {
-            return 'Le premier point d attention porte sur les activites reportees, notamment "'.($postponed[0]['libelle'] ?? 'Non renseigne').'", dont la nouvelle periode d execution doit etre confirmee.';
+            return 'Le premier point d attention porte sur les activites reportees, notamment "'.($postponed[0]['libelle'] ?? 'Non renseigné').'", dont la nouvelle periode d execution doit etre confirmee.';
         }
 
         return 'Aucun ecart majeur n est remonte dans le snapshot ; la priorite est donc de maintenir la qualite du suivi et la mise a jour des preuves.';

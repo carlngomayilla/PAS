@@ -256,6 +256,7 @@ class ActionPerformanceService
             ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
             ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
             ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
         ], true)) {
             return 'rejetee';
         }
@@ -269,6 +270,7 @@ class ActionPerformanceService
         }
 
         if (in_array($validationStatus, [
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
             ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
@@ -343,6 +345,7 @@ class ActionPerformanceService
 
         $parent = $subAction->action ?? null;
         if ($parent !== null && in_array((string) $parent->statut_validation, [
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
             ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {
@@ -369,6 +372,7 @@ class ActionPerformanceService
             ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
             ActionTrackingService::VALIDATION_CORRECTION_DEMANDEE,
             ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+            ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
         ], true)) {
             return false;
         }
@@ -380,6 +384,7 @@ class ActionPerformanceService
                 ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                 ActionTrackingService::VALIDATION_VALIDEE_CHEF,
                 ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+                ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                 ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true)

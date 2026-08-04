@@ -3112,21 +3112,8 @@ class SuperAdminWebController extends Controller
 
         $creating = ! ($managedUser instanceof User);
 
-        $selectedRole = (string) ($request->input('role') ?? '');
-        $baseRole = $this->roleRegistry->baseRole($selectedRole);
-        $requiresUserMatricule = in_array($baseRole, [
-            User::ROLE_AGENT,
-            User::ROLE_DIRECTION,
-            User::ROLE_SERVICE,
-            User::ROLE_DG,
-            User::ROLE_SUPER_ADMIN,
-            User::ROLE_ADMIN_FONCTIONNEL,
-            User::ROLE_PLANIFICATION,
-            User::ROLE_AUDITEUR,
-        ], true);
-        $agentMatriculeRules = $requiresUserMatricule
-            ? ['required', 'string', 'max:80', 'filled', $matriculeRule]
-            : ['nullable', 'string', 'max:80', $matriculeRule];
+        // Matricule obligatoire pour TOUS les profils, sans exception.
+        $agentMatriculeRules = ['required', 'string', 'max:80', 'filled', $matriculeRule];
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],

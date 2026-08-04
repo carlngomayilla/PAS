@@ -241,7 +241,7 @@ class AiReportWritingService
 
         return collect($axes)
             ->map(function (array $axis, int $index): string {
-                return 'L axe strategique N '.($index + 1).' : "'.($axis['libelle'] ?? 'Non renseigne').'" compte '.($axis['actions_prevues'] ?? 0).' action(s) prevue(s), '.($axis['actions_realisees'] ?? 0).' action(s) realisee(s), '.($axis['actions_en_retard_non_realisees'] ?? 0).' action(s) en retard ou non realisee(s), et affiche un taux de realisation de '.($axis['taux_realisation'] ?? 0).' %.';
+                return 'L axe strategique N '.($index + 1).' : "'.($axis['libelle'] ?? 'Non renseigné').'" compte '.($axis['actions_prevues'] ?? 0).' action(s) prevue(s), '.($axis['actions_realisees'] ?? 0).' action(s) realisee(s), '.($axis['actions_en_retard_non_realisees'] ?? 0).' action(s) en retard ou non realisee(s), et affiche un taux de realisation de '.($axis['taux_realisation'] ?? 0).' %.';
             })
             ->implode("\n");
     }
@@ -254,7 +254,7 @@ class AiReportWritingService
     {
         $monthText = $this->formatQuarterRows($monthly, 'mois', 'taux_realisation');
         $axisText = collect($axes)
-            ->map(fn (array $axis): string => ($axis['libelle'] ?? 'Non renseigne').' : '.($axis['taux_realisation'] ?? 0).' %')
+            ->map(fn (array $axis): string => ($axis['libelle'] ?? 'Non renseigné').' : '.($axis['taux_realisation'] ?? 0).' %')
             ->implode(' ; ');
 
         return 'Sur la periode analysee, les taux disponibles par axe sont les suivants : '.($axisText !== '' ? $axisText : 'donnee non disponible').'. Evolution mensuelle consolidee : '.$monthText;
@@ -334,7 +334,7 @@ class AiReportWritingService
         }
 
         return collect($rows)
-            ->map(fn (array $row): string => ($row[$labelKey] ?? 'Non renseigne').' : '.($row[$rateKey] ?? 0).' %')
+            ->map(fn (array $row): string => ($row[$labelKey] ?? 'Non renseigné').' : '.($row[$rateKey] ?? 0).' %')
             ->implode(' ; ');
     }
 

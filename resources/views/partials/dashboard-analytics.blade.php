@@ -87,31 +87,35 @@
     $synthesisPeriodOptions = $ptaSuiviService->periodOptions();
     $synthesisWorkflowOptions = [
         'all' => 'Tous suivis',
-        'a_parametrer' => 'A parametrer',
+        'a_parametrer' => 'À paramétrer',
         'non_demarre' => 'Non demarre',
         'en_cours' => 'En cours',
         'validation_chef' => 'Validation chef',
         'validation_controleur' => 'Validation controleur',
-        'cloture' => 'Cloture',
+        'cloture' => 'Clôture',
     ];
     $synthesisDelayOptions = [
         'all' => 'Tous delais',
         'dans_les_delais' => 'Dans les delais',
-        'hors_delai' => 'Hors delai',
+        'hors_delai' => 'Hors délai',
     ];
     $synthesisAlertOptions = [
         'all' => 'Toutes alertes',
         'aucune_alerte' => 'Aucune alerte',
-        'echeance_proche' => 'Echeance proche',
+        'echeance_proche' => 'Échéance proche',
         'critique' => 'Critique',
         'en_retard' => 'En retard',
-        'cloturee' => 'Cloturee',
-        'a_parametrer' => 'A parametrer',
+        'cloturee' => 'Clôturée',
+        'a_parametrer' => 'À paramétrer',
     ];
     $selectedSynthesisYear = request()->query('exercice', $exerciseFilter['year'] ?? 'all');
     $selectedSynthesisPeriod = $ptaSuiviService->normalizePeriod(request()->query('periode', request()->query('trimestre', $exerciseFilter['period'] ?? 'all')));
     $selectedSynthesisDirection = (string) ($directionSelector['selected_id'] ?? request('direction_id', 'all'));
     $selectedSynthesisService = (string) ($directionSelector['service_selected_id'] ?? request('service_id', 'all'));
+    $selectedSynthesisRmo = (string) request('responsable_id', 'all');
+    $selectedSynthesisRmoLabel = ($selectedSynthesisRmo !== '' && $selectedSynthesisRmo !== 'all' && ctype_digit($selectedSynthesisRmo))
+        ? \App\Models\User::query()->whereKey((int) $selectedSynthesisRmo)->value('name')
+        : null;
     $pilotDashboardRoles = ['global', 'admin', 'super_admin', 'dg', 'cabinet', 'planification'];
     $showDirectionSynthesisSelector = ($directionSelector['enabled'] ?? false)
         && in_array($dashboardRole, $pilotDashboardRoles, true);
@@ -268,7 +272,10 @@
     };
 
     $fmtCount = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ');
-    $fmtPct = static fn ($value): string => number_format((float) ($value ?? 0), 0, ',', ' ').'%';
+    {{-- Meme arrondi partout : sinon la carte « Avancement global » affiche 2,8 %
+         et la ligne d'axe 3 % pour la meme valeur. Les decimales n'apparaissent
+         qu'a partir de 0,01 %. --}}
+    $fmtPct = static fn ($value): string => \App\Support\UiLabel::percent($value === null ? null : (float) $value);
     $shortText = static fn ($value, int $limit = 42): string => \Illuminate\Support\Str::limit((string) ($value ?: '-'), $limit);
     $chartFallbackPoints = static function (array $rows, string $key = 'global'): string {
         $items = collect($rows)->values();
@@ -729,9 +736,10 @@
         data-form-layout="wide"
         data-dashboard-synthesis-filter-form
         data-services-url-template="{{ route('synthese.services-by-direction', ['direction' => '__DIRECTION__']) }}"
+        data-users-url="{{ route('workspace.ajax.users') }}"
     >
         <input type="hidden" name="dashboardTab" value="{{ $currentDashboardTab }}">
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
             <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
                 Annee
                 <select name="exercice" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
@@ -741,7 +749,7 @@
                 </select>
             </label>
             <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
-                Periode
+                Période
                 <select name="periode" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
                     @foreach ($synthesisPeriodOptions as $option)
                         <option value="{{ $option['value'] }}" @selected((string) $selectedSynthesisPeriod === (string) $option['value'])>{{ $option['label'] }}</option>
@@ -767,6 +775,15 @@
                         @endforeach
                     </select>
                 </label>
+                <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
+                    RMO
+                    <select name="responsable_id" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]" data-synthesis-rmo-select @disabled($selectedSynthesisDirection === '' || $selectedSynthesisDirection === 'all')>
+                        <option value="all" @selected($selectedSynthesisRmo === '' || $selectedSynthesisRmo === 'all')>Tous les RMO</option>
+                        @if ($selectedSynthesisRmo !== '' && $selectedSynthesisRmo !== 'all')
+                            <option value="{{ $selectedSynthesisRmo }}" selected>{{ $selectedSynthesisRmoLabel ?: 'RMO #'.$selectedSynthesisRmo }}</option>
+                        @endif
+                    </select>
+                </label>
             @endif
             <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
                 Statut suivi
@@ -777,7 +794,7 @@
                 </select>
             </label>
             <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
-                Statut delai
+                Statut délai
                 <select name="statut_delai" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
                     @foreach ($synthesisDelayOptions as $value => $label)
                         <option value="{{ $value }}" @selected((string) ($synthesisFilters['statut_delai'] ?? 'all') === (string) $value || (($synthesisFilters['statut_delai'] ?? null) === null && $value === 'all'))>{{ $label }}</option>
@@ -785,7 +802,7 @@
                 </select>
             </label>
             <label class="grid gap-1 text-[11px] font-black uppercase tracking-wide text-[#667085]">
-                Alerte echeance
+                Alerte échéance
                 <select name="alerte_echeance" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-[#17324a]">
                     @foreach ($synthesisAlertOptions as $value => $label)
                         <option value="{{ $value }}" @selected((string) ($synthesisFilters['alerte_echeance'] ?? 'all') === (string) $value || (($synthesisFilters['alerte_echeance'] ?? null) === null && $value === 'all'))>{{ $label }}</option>
@@ -798,7 +815,7 @@
                 {{ $directionSelector['selected_label'] ?? 'Synthese globale' }} | {{ $directionSelector['service_selected_label'] ?? 'Tous les services' }} | {{ $exerciseFilter['label'] ?? 'Exercice courant' }}
             </div>
             <div class="flex flex-wrap gap-2">
-                <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('synthese.index', ['dashboardTab' => $currentDashboardTab, 'direction_id' => 'all', 'service_id' => 'all', 'exercice' => 'all', 'periode' => 'all', 'trimestre' => 'all', 'statut_suivi' => 'all', 'statut_delai' => 'all', 'alerte_echeance' => 'all']) }}">Reinitialiser</a>
+                <a class="btn btn-secondary btn-sm rounded-xl px-3 py-1.5 text-xs" href="{{ route('synthese.index', ['dashboardTab' => $currentDashboardTab, 'direction_id' => 'all', 'service_id' => 'all', 'responsable_id' => 'all', 'exercice' => 'all', 'periode' => 'all', 'trimestre' => 'all', 'statut_suivi' => 'all', 'statut_delai' => 'all', 'alerte_echeance' => 'all']) }}">Réinitialiser</a>
                 <button type="submit" class="btn btn-primary btn-sm rounded-xl px-3 py-1.5 text-xs">Appliquer</button>
             </div>
         </div>

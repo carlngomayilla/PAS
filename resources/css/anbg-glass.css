@@ -1978,7 +1978,8 @@ body.admin-theme-scope.anbg-glass-theme .action-detail-title {
     font-weight: 800;
     line-height: 1.12;
     letter-spacing: 0;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 body.admin-theme-scope.anbg-glass-theme .action-detail-meta-grid {
@@ -2211,7 +2212,8 @@ body.admin-theme-scope.anbg-glass-theme .action-stepper-copy small {
     font-size: 0.74rem;
     font-weight: 800;
     line-height: 1.25;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 body.admin-theme-scope.anbg-glass-theme .action-stepper-item.is-done .action-stepper-marker,
@@ -2356,7 +2358,8 @@ body.admin-theme-scope.anbg-glass-theme .action-tracking-type {
     font-weight: 800;
     line-height: 1.25;
     padding: 0.5rem 0.75rem;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 html.dark body.admin-theme-scope.anbg-glass-theme .action-detail-hero,
@@ -2767,13 +2770,38 @@ body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-o
     color: #111827 !important;
 }
 
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table-wrap {
+    width: 100% !important;
+    overflow-x: auto !important;
+}
+
 body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table {
     width: 100% !important;
+    min-width: 2200px !important;
     border-collapse: collapse !important;
     border-spacing: 0 !important;
     table-layout: fixed !important;
     font-size: 12px !important;
 }
+
+/* Largeurs de colonnes explicites (cf. app.css) : evitent l'ecrasement des 19 colonnes. */
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-number { width: 44px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-action { width: 200px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-sub-action { width: 180px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-indicator { width: 240px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-responsable { width: 140px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-ratio { width: 68px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-threshold { width: 92px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-realized { width: 74px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-rate { width: 78px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-performance { width: 92px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-gap { width: 74px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-deadline { width: 100px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-delay { width: 70px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-status { width: 112px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-proof { width: 100px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-observation { width: 160px !important; }
+body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-col-row-actions { width: 150px !important; }
 
 body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table th,
 body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table td {
@@ -2781,7 +2809,9 @@ body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-o
     padding: 6px !important;
     vertical-align: middle !important;
     box-shadow: none !important;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+    hyphens: none !important;
 }
 
 body.admin-theme-scope.anbg-glass-theme :where(.pta-suivi-page, .reporting-pta-official) .pta-suivi-table th {
@@ -3428,7 +3458,7 @@ body.admin-theme-scope.anbg-glass-theme {
     --anbg-button-soft-corner: 0.7rem;
 }
 
-body.admin-theme-scope.anbg-glass-theme :where(.btn, .btn-sm, .app-btn, button[type="submit"], .admin-dropdown-link) {
+body.admin-theme-scope.anbg-glass-theme :where(.btn, .btn-sm, .app-btn, button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button), .admin-dropdown-link) {
     position: relative !important;
     isolation: isolate !important;
     display: inline-flex !important;
@@ -3448,7 +3478,11 @@ body.admin-theme-scope.anbg-glass-theme :where(.btn, .btn-sm, .app-btn, button[t
     text-transform: uppercase !important;
     text-decoration: none !important;
     overflow: hidden !important;
-    overflow-wrap: anywhere !important;
+    /* Les libelles de boutons ne doivent jamais se casser lettre par lettre. */
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+    white-space: nowrap !important;
+    hyphens: none !important;
     transition:
         transform 160ms ease,
         border-color 160ms ease,
@@ -3588,7 +3622,9 @@ body.admin-theme-scope.anbg-glass-theme :where(
     text-decoration: none !important;
     box-shadow: none !important;
     overflow: hidden !important;
-    overflow-wrap: anywhere !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+    white-space: nowrap !important;
     transition:
         transform 160ms ease,
         border-color 160ms ease,
@@ -3763,7 +3799,7 @@ body.admin-theme-scope.anbg-glass-theme :where(
     .btn,
     .btn-sm,
     .app-btn,
-    button[type="submit"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .admin-dropdown-link,
     .pta-inline-save,
     .pta-param-change,
@@ -3794,7 +3830,11 @@ body.admin-theme-scope.anbg-glass-theme :where(
     text-decoration: none !important;
     text-transform: none !important;
     overflow: hidden !important;
-    overflow-wrap: anywhere !important;
+    /* Les libelles de boutons ne doivent jamais se casser lettre par lettre. */
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+    white-space: nowrap !important;
+    hyphens: none !important;
     transition:
         transform 160ms ease,
         border-color 160ms ease,
@@ -3804,7 +3844,7 @@ body.admin-theme-scope.anbg-glass-theme :where(
         opacity 160ms ease !important;
 }
 
-body.admin-theme-scope.anbg-glass-theme :where(.btn, .btn-sm, .app-btn, button[type="submit"], .pta-inline-save)::before {
+body.admin-theme-scope.anbg-glass-theme :where(.btn, .btn-sm, .app-btn, button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button), .pta-inline-save)::before {
     display: none !important;
 }
 
@@ -3848,7 +3888,7 @@ body.admin-theme-scope.anbg-glass-theme :where(
     .btn-follow,
     .app-btn-primary,
     .page-header-button-primary,
-    button[type="submit"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .pta-inline-save
 ) {
     border-color: rgba(18, 102, 181, 0.78) !important;
@@ -4243,8 +4283,8 @@ body.admin-theme-scope.anbg-glass-theme :where(
     .btn,
     .btn-sm,
     .app-btn,
-    button[type="submit"],
-    button[type="button"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
+    button[type="button"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .admin-dropdown-link,
     .admin-navbar-icon-button,
     .admin-local-clock,
@@ -4281,8 +4321,8 @@ body.admin-theme-scope.anbg-glass-theme :where(
     .btn,
     .btn-sm,
     .app-btn,
-    button[type="submit"],
-    button[type="button"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
+    button[type="button"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .admin-dropdown-link,
     .admin-navbar-icon-button,
     .admin-local-clock,
@@ -4315,8 +4355,8 @@ body.admin-theme-scope.anbg-glass-theme :where(
     .btn,
     .btn-sm,
     .app-btn,
-    button[type="submit"],
-    button[type="button"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
+    button[type="button"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .admin-dropdown-link,
     .pta-inline-save,
     .pta-param-change,
@@ -4332,7 +4372,7 @@ body.admin-theme-scope.anbg-glass-theme :where(
     .btn-follow,
     .app-btn-primary,
     .page-header-button-primary,
-    button[type="submit"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .pta-inline-save
 ) {
     background:
@@ -4510,8 +4550,8 @@ body.admin-theme-scope.anbg-glass-theme :where(
     .btn,
     .btn-sm,
     .app-btn,
-    button[type="submit"],
-    button[type="button"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
+    button[type="button"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .admin-dropdown-link,
     .admin-navbar-icon-button,
     #admin-back-button,
@@ -4559,7 +4599,7 @@ body.admin-theme-scope.anbg-glass-theme :where(
     .btn-follow,
     .app-btn-primary,
     .page-header-button-primary,
-    button[type="submit"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .pta-inline-save
 ) {
     border: 1.5px solid transparent !important;
@@ -4648,8 +4688,8 @@ html.dark body.admin-theme-scope.anbg-glass-theme :where(
     .btn,
     .btn-sm,
     .app-btn,
-    button[type="submit"],
-    button[type="button"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
+    button[type="button"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .admin-dropdown-link,
     .pta-param-change,
     .pta-proof-button
@@ -4665,8 +4705,8 @@ body.admin-theme-scope.anbg-glass-theme :where(
     .btn,
     .btn-sm,
     .app-btn,
-    button[type="submit"],
-    button[type="button"],
+    button[type="submit"]:not(.auth-password-toggle):not(.data-table-sort-button),
+    button[type="button"]:not(.auth-password-toggle):not(.data-table-sort-button),
     .admin-dropdown-link,
     .admin-navbar-icon-button,
     .admin-local-clock,

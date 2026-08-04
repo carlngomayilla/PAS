@@ -101,6 +101,7 @@ class ActionPolicy
         if (in_array((string) $action->statut_validation, [
             ActionTrackingService::VALIDATION_VALIDEE_CHEF,
             ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
             ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {

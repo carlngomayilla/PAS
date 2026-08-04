@@ -108,11 +108,11 @@
                         </select>
                     </div>
                     <div>
-                        <label for="date_debut">Periode debut</label>
+                        <label for="date_debut">Période debut</label>
                         <input id="date_debut" name="date_debut" type="date" value="{{ $filters['date_debut'] ?? '' }}">
                     </div>
                     <div>
-                        <label for="date_fin">Periode fin</label>
+                        <label for="date_fin">Période fin</label>
                         <input id="date_fin" name="date_fin" type="date" value="{{ $filters['date_fin'] ?? '' }}">
                     </div>
                 </div>

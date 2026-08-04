@@ -1037,15 +1037,15 @@ class ReportingWorkbookExporter
             ->groupBy(fn (array $row): string => implode('|', [
                 (string) ($row['direction_label'] ?? '-'),
                 (string) ($row['service_label'] ?? '-'),
-                (string) ($row['rmo'] ?? $row['responsable'] ?? 'Non renseigne'),
+                (string) ($row['rmo'] ?? $row['responsable'] ?? 'Non renseigné'),
             ]))
             ->map(function (Collection $rows, string $key): array {
-                [$directionLabel, $serviceLabel, $rmo] = array_pad(explode('|', $key, 3), 3, 'Non renseigne');
+                [$directionLabel, $serviceLabel, $rmo] = array_pad(explode('|', $key, 3), 3, 'Non renseigné');
 
                 return [
                     $directionLabel !== '' ? $directionLabel : '-',
                     $serviceLabel !== '' ? $serviceLabel : '-',
-                    $rmo !== '' ? $rmo : 'Non renseigne',
+                    $rmo !== '' ? $rmo : 'Non renseigné',
                     $rows->count(),
                     round((float) $rows->avg(fn (array $row): float => (float) ($row['kpi_performance_value'] ?? 0)), 2),
                 ];
@@ -1185,7 +1185,7 @@ class ReportingWorkbookExporter
                         (string) ($kpiRow['type'] ?? '-'),
                         ($kpiRow['valeur'] ?? null) !== null ? (float) $kpiRow['valeur'] : 0.0,
                         ($kpiRow['seuil'] ?? null) !== null ? (float) $kpiRow['seuil'] : 0.0,
-                        (string) ($kpiRow['statut'] ?? 'Non renseigne'),
+                        (string) ($kpiRow['statut'] ?? 'Non renseigné'),
                     ])
                     ->all();
             })

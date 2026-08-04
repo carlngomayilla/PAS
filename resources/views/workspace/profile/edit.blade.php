@@ -78,7 +78,7 @@
             <div class="showcase-data-list">
                 <div class="showcase-data-point">
                     <p class="showcase-data-key">Rôle</p>
-                    <p class="showcase-data-value">{{ $profil['role_label'] }} ({{ $profil['role'] }})</p>
+                    <p class="showcase-data-value">{{ $profil['role_label'] }}</p>
                 </div>
                 <div class="showcase-data-point">
                     <p class="showcase-data-key">Portée</p>

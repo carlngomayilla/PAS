@@ -47,7 +47,7 @@
                                 </td>
                                 <td>
                                     {{ $row->requester?->name ?? '-' }}
-                                    <p class="mt-1 text-xs text-slate-500">{{ $row->requester?->role ?? '-' }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $row->requester?->role ? \App\Support\UiLabel::roleAudience($row->requester->role) : '-' }}</p>
                                 </td>
                                 <td class="max-w-md">
                                     {{ $row->reason }}
@@ -63,7 +63,7 @@
                                         <p>Transmise par <strong>{{ $row->transferredBy?->name ?? 'controleur' }}</strong></p>
                                     @endif
                                     @if ($row->planif_avis)
-                                        <p>Avis controleur : <strong>{{ $row->planif_avis }}</strong>{{ $row->planif_comment ? ' - '.$row->planif_comment : '' }}</p>
+                                        <p>Avis contrôleur : <strong>{{ $row->planif_avis }}</strong>{{ $row->planif_comment ? ' - '.$row->planif_comment : '' }}</p>
                                     @endif
                                     @if ($row->reviewer)
                                         <p>Decision : <strong>{{ $row->reviewer?->name }}</strong>{{ $row->review_comment ? ' - '.$row->review_comment : '' }}</p>

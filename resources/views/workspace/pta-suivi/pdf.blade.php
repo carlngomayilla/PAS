@@ -78,7 +78,7 @@
             </div>
         </div>
         <div class="pta-suivi-meta">
-            {{ $scopeLabel }} | Total actions : {{ $summary['actions'] ?? 0 }} | Performance consolidee : {{ number_format((float) ($summary['performance'] ?? 0), 2) }}% | A parametrer : {{ $summary['a_parametrer'] ?? 0 }}
+            {{ $scopeLabel }} | Total actions : {{ $summary['actions'] ?? 0 }} | Performance consolidee : {{ number_format((float) ($summary['performance'] ?? 0), 2) }}% | À paramétrer : {{ $summary['a_parametrer'] ?? 0 }}
         </div>
         @include('workspace.pta-suivi.partials.table', ['groups' => $groups, 'exportMode' => 'pdf'])
     </section>

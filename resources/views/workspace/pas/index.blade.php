@@ -80,7 +80,7 @@
             <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
         <div class="app-table-wrapper overflow-x-auto">
-            <table class="app-table data-table">
+            <table class="app-table data-table min-w-[1000px]">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -145,7 +145,7 @@
                                                 <button class="btn btn-primary" type="submit">Cloturer</button>
                                             </form>
                                         @endif
-                                        @if ($row->statut === 'cloture')
+                                        @if ($row->statut === 'clôture')
                                             <form method="POST" action="{{ route('workspace.pas.archive', $row) }}" data-confirm-message="Archiver ce PAS cloture ?" data-confirm-tone="warning" data-confirm-label="Archiver">
                                                 @csrf
                                                 <input type="hidden" name="motif" value="Archivage PAS cloture depuis la liste">

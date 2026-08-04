@@ -100,6 +100,7 @@ class PersonalTaskService
         return $this->collectCached($user)
             ->whereIn('type', [
                 'validation_controleur',
+                'validation_planification',
                 'controle_pta',
                 'controle_modification',
             ])
@@ -142,6 +143,7 @@ class PersonalTaskService
             ->merge($this->chefValidationTasks($user, $role))
             ->merge($this->chefSubActionValidationTasks($user, $role))
             ->merge($this->controllerValidationTasks($user, $role))
+            ->merge($this->planificationValidationTasks($user, $role))
             ->merge($this->ptaControlTasks($user, $role))
             ->merge($this->deadlineExtensionControlTasks($user))
             ->merge($this->dafFinancingTasks($user, $role))
@@ -181,6 +183,7 @@ class PersonalTaskService
                         ActionTrackingService::VALIDATION_SOUMISE_CHEF,
                         ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
                         ActionTrackingService::VALIDATION_VALIDEE_CHEF,
+                        ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                         ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                         ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
                     ])
@@ -203,6 +206,7 @@ class PersonalTaskService
                     ActionTrackingService::VALIDATION_REJETEE_CHEF,
                     ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
                     ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+                    ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
                 ], true);
 
                 $financingStatus = $action->financementStatus();
@@ -384,6 +388,50 @@ class PersonalTaskService
                     'action_id' => (int) ($subAction->action?->id ?? 0),
                     'sous_action_id' => (int) $subAction->id,
                 ];
+            });
+    }
+
+    /**
+     * 3e visa : actions visees par le controle et en attente de la validation
+     * finale (cloture) par la planification.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function planificationValidationTasks(User $user, string $role): Collection
+    {
+        $allowed = $user->hasRole(
+            User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_PLANIFICATION,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_SUPER_ADMIN
+        );
+
+        if (! $allowed) {
+            return collect();
+        }
+
+        return Action::query()
+            ->with(['pta:id,direction_id,service_id,titre', 'pta.service:id,libelle', 'responsable:id,name'])
+            ->where('statut_validation', ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION)
+            ->latest('controle_reviewed_at')
+            ->get()
+            ->map(function (Action $action): array {
+                $received = $this->carbon($action->controle_reviewed_at) ?? $this->carbon($action->updated_at);
+                $deadline = $received?->copy()->addHours(48);
+
+                return $this->task(
+                    key: 'planification-validation:'.$action->id,
+                    type: 'validation_planification',
+                    title: 'Validation finale (cloture)',
+                    subject: (string) $action->libelle,
+                    context: $this->actionContext($action),
+                    responsible: $action->responsable?->name,
+                    receivedAt: $received,
+                    deadlineAt: $deadline,
+                    url: route('workspace.actions.suivi', $action).'#action-controle',
+                    criticality: $this->criticalityFromDeadline($deadline, 'importante'),
+                    scoreImpact: 'Retard impute a la planification, pas au RMO.'
+                );
             });
     }
 
@@ -903,7 +951,7 @@ class PersonalTaskService
         return match ($type) {
             'execution_action', 'execution_sous_action' => 'execution',
             'correction_action', 'correction_financement', 'complement_suppression' => 'corrections',
-            'validation_chef', 'validation_sous_action_chef', 'validation_controleur' => 'validations',
+            'validation_chef', 'validation_sous_action_chef', 'validation_controleur', 'validation_planification' => 'validations',
             'financement_rmo', 'financement_daf', 'financement_dg' => 'financements',
             'alerte_action' => 'alertes',
             'decision_suppression', 'decision_modification_dg', 'controle_modification' => 'decisions',

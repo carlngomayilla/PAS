@@ -8,7 +8,7 @@
                 <h1 class="showcase-panel-title">Nouvel import</h1>
                 <p class="text-sm text-slate-500">Une feuille, un tableau, une ligne par action planifiee.</p>
             </div>
-            <a class="btn btn-secondary" href="{{ route('workspace.imports.template') }}">Telecharger le modele Excel</a>
+            <a class="btn btn-secondary" href="{{ route('workspace.imports.template') }}">Télécharger le modele Excel</a>
         </div>
 
         @if ($errors->any())

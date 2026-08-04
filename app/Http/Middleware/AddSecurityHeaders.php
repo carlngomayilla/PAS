@@ -19,7 +19,10 @@ class AddSecurityHeaders
         $contentSecurityPolicy = implode('; ', [
             "default-src 'self'",
             "base-uri 'self'",
-            "frame-ancestors 'none'",
+            // 'self' (et non 'none') : l'application encadre ses propres documents
+            // dans l'apercu des justificatifs. Le cadrage par un site tiers reste bloque.
+            "frame-ancestors 'self'",
+            "frame-src 'self' blob:",
             "form-action 'self'",
             "object-src 'none'",
             "img-src 'self' data: blob:",
@@ -31,7 +34,7 @@ class AddSecurityHeaders
         ]);
 
         $response->headers->set('Content-Security-Policy', $contentSecurityPolicy);
-        $response->headers->set('X-Frame-Options', 'DENY');
+        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');

@@ -5,9 +5,9 @@
 @push('head')
     <style>
         .reporting-pta-official .pta-suivi-table-wrap { width:100%; overflow-x:auto; }
-        .reporting-pta-official .pta-suivi-table { width:100%; min-width:1880px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+        .reporting-pta-official .pta-suivi-table { width:100%; min-width:2200px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
         .reporting-pta-official .pta-suivi-table th,
-        .reporting-pta-official .pta-suivi-table td { border:1px solid #111; padding:6px; vertical-align:middle; overflow-wrap:anywhere; }
+        .reporting-pta-official .pta-suivi-table td { border:1px solid #111; padding:6px; vertical-align:middle; overflow-wrap:break-word; word-break:normal; hyphens:none; }
         .reporting-pta-official .pta-suivi-table th { background:#d9d9d9; color:#000; text-align:center; font-weight:900; }
         .reporting-pta-official .pta-pas-row td { background:#2f75b5; color:#fff; font-weight:900; text-align:center; }
         .reporting-pta-official .pta-level-axis td { background:#0f2f57; color:#fff; font-weight:900; text-align:center; }
@@ -149,7 +149,7 @@
                 </select>
             </div>
             <div>
-                <label for="periode">Periode</label>
+                <label for="periode">Période</label>
                 <select id="periode" name="periode">
                     @foreach (($reportFilterOptions['periodes'] ?? $reportFilterOptions['trimestres'] ?? []) as $option)
                         <option value="{{ $option['value'] }}" @selected((string) $selectedReportPeriod === (string) $option['value'])>{{ $option['label'] }}</option>
@@ -235,7 +235,7 @@
             <article class="showcase-panel">
                 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h2 class="showcase-panel-title">Controle de conformite</h2>
+                        <h2 class="showcase-panel-title">Contrôle de conformite</h2>
                     </div>
                     <div class="flex flex-wrap gap-2 text-xs">
                         <span class="anbg-badge anbg-badge-neutral px-3">{{ $conformityRows->count() }} controles</span>
@@ -251,7 +251,7 @@
                                 <th class="px-3 py-2">Service</th>
                                 <th class="px-3 py-2">Action</th>
                                 <th class="px-3 py-2">RMO</th>
-                                <th class="px-3 py-2">Controle</th>
+                                <th class="px-3 py-2">Contrôle</th>
                                 <th class="px-3 py-2">Statut</th>
                                 <th class="px-3 py-2">Correction attendue</th>
                                 <th class="px-3 py-2 text-right">Avancement</th>
@@ -276,7 +276,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="px-3 py-8 text-center text-sm font-semibold text-slate-500">Aucun controle de conformite disponible.</td>
+                                    <td colspan="8" class="px-3 py-8 text-center text-sm font-semibold text-slate-500">Aucun contrôle de conformite disponible.</td>
                                 </tr>
                             @endforelse
                         </tbody>

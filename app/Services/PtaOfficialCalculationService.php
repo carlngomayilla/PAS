@@ -434,6 +434,8 @@ class PtaOfficialCalculationService
     private function actionDeliverableCompleted(Action $action): bool
     {
         if (in_array((string) ($action->statut_validation ?? ''), [
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
+            ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
             ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
             ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
         ], true)) {

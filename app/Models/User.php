@@ -28,15 +28,12 @@ class User extends Authenticatable
     protected static function booted(): void
     {
         static::saving(function (User $user): void {
-            if ($user->role !== self::ROLE_AGENT) {
-                return;
-            }
-
-            $user->agent_matricule = self::normalizeAgentMatricule($user->agent_matricule);
-
-            if ($user->agent_matricule === null) {
-                throw new \InvalidArgumentException('Le matricule est obligatoire pour tout agent.');
-            }
+            // Matricule obligatoire pour TOUS les profils, sans exception.
+            // Filet de securite : si aucun matricule n'est fourni (creation
+            // programmatique, seeders...), on en genere un unique automatiquement
+            // pour qu'aucun utilisateur ne puisse exister sans matricule.
+            $user->agent_matricule = self::normalizeAgentMatricule($user->agent_matricule)
+                ?? 'MAT-'.Str::upper(Str::random(12));
         });
     }
 

@@ -27,6 +27,9 @@ class ActionStatusService
         'soumise_controle',
         'correction_controle',
         'validee_controle',
+        'soumise_planification',
+        'correction_planification',
+        'validee_planification',
         'rejetee_direction',
         'validee_direction',
         'en_validation_chef',
@@ -93,6 +96,8 @@ class ActionStatusService
         ActionTrackingService::VALIDATION_VALIDEE_CHEF,
         ActionTrackingService::VALIDATION_SOUMISE_CONTROLE,
         ActionTrackingService::VALIDATION_CORRECTION_CONTROLE,
+        ActionTrackingService::VALIDATION_SOUMISE_PLANIFICATION,
+        ActionTrackingService::VALIDATION_CORRECTION_PLANIFICATION,
         ActionTrackingService::VALIDATION_REJETEE_DIRECTION,
         'en_validation_chef',
         'soumise_direction',
@@ -103,6 +108,7 @@ class ActionStatusService
      * @var list<string>
      */
     private const FINAL_VALIDATION_STATUSES = [
+        ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
         ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
         ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
     ];

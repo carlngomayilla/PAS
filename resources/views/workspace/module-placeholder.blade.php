@@ -22,7 +22,7 @@
             />
 
             <div class="mt-4 rounded-2xl border border-slate-200/85 bg-white/95 p-4 text-sm text-[#667085]">
-                <p><strong class="text-[#17324a]">Perimetre :</strong> {{ $user->direction?->libelle ?? 'Global' }} / {{ $user->service?->libelle ?? 'Tous services' }}</p>
+                <p><strong class="text-[#17324a]">Périmètre :</strong> {{ $user->direction?->libelle ?? 'Global' }} / {{ $user->service?->libelle ?? 'Tous services' }}</p>
                 <p class="mt-1"><strong class="text-[#17324a]">Endpoint attendu :</strong> <code>{{ $module['endpoint'] ?? '' }}</code></p>
             </div>
         </section>

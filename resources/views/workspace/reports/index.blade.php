@@ -54,7 +54,7 @@
                 </div>
                 <div class="app-table-wrapper overflow-x-auto">
                     <table class="app-table data-table min-w-[880px]">
-                        <thead><tr><th>Decision</th><th>Reunion</th><th>Responsable</th><th>Echeance</th><th>Etat</th></tr></thead>
+                        <thead><tr><th>Decision</th><th>Reunion</th><th>Responsable</th><th>Échéance</th><th>Etat</th></tr></thead>
                         <tbody>
                             @foreach ($followUpDecisions as $decision)
                                 <tr>

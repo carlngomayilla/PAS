@@ -207,6 +207,7 @@ class Action extends Model
             'nombre_sous_actions_prevu' => 'integer',
             'date_fin' => 'date',
             'date_fin_reelle' => 'date',
+            'seuil_atteint_le' => 'datetime',
             'date_echeance' => 'date',
             'echeance_cible' => 'date',
             'statut_echeance' => 'string',

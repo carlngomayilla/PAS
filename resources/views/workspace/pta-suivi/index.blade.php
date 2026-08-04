@@ -31,8 +31,8 @@
         .pta-suivi-toolbar select { min-width:126px; border:1px solid #b7c7d6; border-radius:6px; padding:6px 8px; font-size:12px; background:#fff; }
         .pta-suivi-actionbar { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; padding:10px 12px; border-bottom:1px solid #d7d7d7; background:#f8fbff; }
         .pta-suivi-table-wrap { width:100%; overflow-x:auto; }
-        .pta-suivi-table { width:100%; min-width:1880px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
-        .pta-suivi-table th, .pta-suivi-table td { border:1px solid #111; padding:6px 6px; vertical-align:middle; overflow-wrap:anywhere; }
+        .pta-suivi-table { width:100%; min-width:2200px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+        .pta-suivi-table th, .pta-suivi-table td { border:1px solid #111; padding:6px 6px; vertical-align:middle; overflow-wrap:break-word; word-break:normal; hyphens:none; }
         .pta-suivi-table th { background:#d9d9d9; color:#000; text-align:center; font-weight:900; }
         .pta-pas-row td { background:#2f75b5; color:#fff; font-weight:900; text-align:center; }
         .pta-pas-code { width:42px; }
@@ -124,11 +124,11 @@
 @section('content')
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3 no-print">
         <div>
-            <p class="text-xs font-black uppercase tracking-wide text-[#3996d3]">Controle PTA</p>
+            <p class="text-xs font-black uppercase tracking-wide text-[#3996d3]">Contrôle PTA</p>
             <h1 class="text-2xl font-black text-[#17324a]">Suivi PTA officiel</h1>
         </div>
         <div class="flex flex-wrap gap-2">
-            <a class="btn btn-secondary rounded-xl px-4 py-2 text-sm" href="{{ route('dashboard', $syntheseQuery) }}">Synthese</a>
+            <a class="btn btn-secondary rounded-xl px-4 py-2 text-sm" href="{{ route('dashboard', $syntheseQuery) }}">Synthèse</a>
             <button class="btn btn-secondary rounded-xl px-4 py-2 text-sm" type="button" onclick="window.print()">Imprimer</button>
             <a class="btn btn-primary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.excel', $query) }}">Export Excel</a>
             <a class="btn btn-primary rounded-xl px-4 py-2 text-sm" href="{{ route('pta.suivi.export.pdf', $query) }}">Export PDF</a>
@@ -148,7 +148,7 @@
                 @foreach (explode(' | ', $scopeLabel) as $scopeLine)
                     <p>{{ $scopeLine }}</p>
                 @endforeach
-                <p>Total actions : {{ $summary['actions'] ?? 0 }} | Performance consolidee : {{ number_format((float) ($summary['performance'] ?? 0), 2) }}% | A parametrer : {{ $summary['a_parametrer'] ?? 0 }}</p>
+                <p>Total actions : {{ $summary['actions'] ?? 0 }} | Performance consolidee : {{ number_format((float) ($summary['performance'] ?? 0), 2) }}% | À paramétrer : {{ $summary['a_parametrer'] ?? 0 }}</p>
             </div>
             <form method="GET" action="{{ route('pta.suivi.index') }}" class="pta-suivi-toolbar no-print">
                 <div>
@@ -178,7 +178,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="periode">Periode</label>
+                    <label for="periode">Période</label>
                     <select id="periode" name="periode">
                         @foreach (($filterOptions['periodes'] ?? $filterOptions['trimestres'] ?? []) as $option)
                             <option value="{{ $option['value'] }}" @selected((string) ($filters['periode'] ?? 'all') === (string) $option['value'])>{{ $option['label'] }}</option>
@@ -186,7 +186,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="statut_suivi">Statut suivi</label>
+                    <label for="statut_suivi">Étape du suivi</label>
                     <select id="statut_suivi" name="statut_suivi">
                         <option value="all">Tous</option>
                         @foreach (($filterOptions['statut_suivi'] ?? []) as $value => $label)
@@ -195,7 +195,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="statut_delai">Statut delai</label>
+                    <label for="statut_delai">État du délai</label>
                     <select id="statut_delai" name="statut_delai">
                         <option value="all">Tous</option>
                         @foreach (($filterOptions['statut_delai'] ?? []) as $value => $label)

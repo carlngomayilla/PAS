@@ -23,7 +23,7 @@
             </summary>
             <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
-                    <thead class="sticky top-0 z-10 bg-white"><tr><th>{{ $unitModeLabel }}</th><th>Actions</th><th>Progression</th><th>Indicateur moyen</th><th>Alertes</th><th>Validation</th></tr></thead>
+                    <thead><tr><th>{{ $unitModeLabel }}</th><th>Actions</th><th>Progression</th><th>Indicateur moyen</th><th>Alertes</th><th>Validation</th></tr></thead>
                     <tbody>
                         @forelse ($unitRows as $row)
                             @php
@@ -128,19 +128,9 @@
                     </table>
                 </div>
 
-                <div class="grid gap-3 border-t border-slate-200/80 p-3 xl:grid-cols-2">
-                    @foreach ([
-                        ['dashboard-pta-axis-progression-chart-details', 'Progression des axes sur les trois mois'],
-                        ['dashboard-pta-monthly-rate-chart-details', 'Évolution du taux des actions échues'],
-                        ['dashboard-pta-axis-rate-chart-details', 'Taux des axes stratégiques'],
-                        ['dashboard-pta-service-rate-chart-details', 'Taux par direction ou service'],
-                    ] as [$chartId, $chartTitle])
-                        <article class="rounded-lg border border-[#d8ecf8] bg-white p-3">
-                            <h3 class="mb-2 text-sm font-black text-[#17324a]">{{ $chartTitle }}</h3>
-                            <div id="{{ $chartId }}" class="dashboard-chart-host min-h-[320px]"></div>
-                        </article>
-                    @endforeach
-                </div>
+                {{-- Graphiques du PTA trimestriel deplaces vers l'onglet « Graphiques »
+                     (partials/dashboard-analytics/_panel-charts.blade.php) : la Vue detaillee
+                     ne conserve que les tableaux. --}}
 
                 <div class="app-table-wrapper overflow-x-auto">
                     <table
@@ -153,7 +143,7 @@
                         data-table-label-plural="axes"
                         data-mobile-cards
                     >
-                        <thead class="sticky top-0 z-10 bg-white">
+                        <thead>
                             <tr><th>Axe</th><th data-sort-type="number" data-num data-mobile-hidden>Prévues</th><th data-sort-type="number" data-num data-mobile-hidden>Réalisées</th><th data-sort-type="number" data-num data-mobile-hidden>En cours</th><th data-sort-type="number" data-num>En retard/non réalisées</th><th data-sort-type="number" data-num data-mobile-hidden>Non démarrées</th><th data-sort-type="number" data-num data-mobile-hidden>Échues</th><th data-sort-type="number" data-num>Avancement</th><th data-sort-type="number" data-num>Réalisation échues</th></tr>
                         </thead>
                         <tbody>
@@ -188,7 +178,7 @@
                             data-table-label-plural="services"
                             data-mobile-cards
                         >
-                            <thead class="sticky top-0 z-10 bg-white">
+                            <thead>
                                 <tr><th>Service</th><th data-mobile-hidden>Direction</th><th data-mobile-hidden>Prévues</th><th data-mobile-hidden>Réalisées</th><th data-mobile-hidden>Échues</th><th>Taux PTA</th><th>Niveau</th></tr>
                             </thead>
                             <tbody>
@@ -279,7 +269,17 @@
                                                     <td><span class="table-text-truncate font-semibold text-[#17324a]" title="{{ $row['libelle'] ?? '-' }}">{{ $row['libelle'] ?? '-' }}</span></td>
                                                     <td data-mobile-hidden>{{ $row['axe'] ?? '-' }}</td>
                                                     <td data-mobile-hidden>{{ $row['responsable'] ?? '-' }}</td>
-                                                    <td data-sort-value="{{ $row['date_fin'] ?? '' }}">{{ $row['date_fin'] ?? '-' }}</td>
+                                                    @php
+                                                        $rawDeadline = trim((string) ($row['date_fin'] ?? ''));
+                                                        try {
+                                                            $deadlineLabel = $rawDeadline !== ''
+                                                                ? \Illuminate\Support\Carbon::parse($rawDeadline)->format('d/m/Y')
+                                                                : '-';
+                                                        } catch (\Throwable) {
+                                                            $deadlineLabel = $rawDeadline !== '' ? $rawDeadline : '-';
+                                                        }
+                                                    @endphp
+                                                    <td data-sort-value="{{ $rawDeadline }}">{{ $deadlineLabel }}</td>
                                                     <td data-num data-sort-value="{{ (float) ($row['progression'] ?? 0) }}"><x-pta.progress-bar :value="(float) ($row['progression'] ?? 0)" :label="number_format((float) ($row['progression'] ?? 0), 1, ',', ' ').'%'" /></td>
                                                     <td><span class="dashboard-pill" style="{{ $dashboardPillVars($gapSection['tone']) }}">{{ $gapSection['label'] }}</span></td>
                                                     <td class="dashboard-no-export"><button type="button" class="btn btn-secondary btn-sm" data-dashboard-row-detail="{{ $detailPayload }}">Détails</button></td>
@@ -348,7 +348,7 @@
             <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     {{-- Colonne "Conformité" retiree (2026-05-28) : KPI conformite supprime de l'app. --}}
-                    <thead class="sticky top-0 z-10 bg-white"><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Statut délai</th></tr></thead>
+                    <thead><tr><th>Action</th><th>Direction</th><th>Statut</th><th>Avancement réel</th><th>Performance d'exécution</th><th>Statut délai</th></tr></thead>
                     <tbody>
                         @forelse ($priorityActionRows as $row)
                             @php
@@ -388,7 +388,7 @@
             <div class="app-table-wrapper overflow-x-auto">
                 <table class="app-table data-table">
                     {{-- Colonne "Conformité" retiree (2026-05-28) du tableau des alertes. --}}
-                    <thead class="sticky top-0 z-10 bg-white">
+                    <thead>
                         <tr><th>Alerte</th><th>Direction</th><th>Action</th><th>Niveau</th><th>Détail</th><th>{{ $metricLabel('global') }}</th><th>Accès</th></tr>
                     </thead>
                     <tbody>

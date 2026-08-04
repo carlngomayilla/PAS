@@ -56,8 +56,8 @@ class PtaCalculationFormulaTest extends TestCase
         $this->assertSame(66.67, $summary['taux_global_avancement']);
 
         $comparison = $metrics['pta_analyse']['comparaison_indicateurs'];
-        $this->assertSame('Actions realisees / actions prevues x 100', $comparison[0]['formule']);
-        $this->assertSame('Actions echues realisees / actions echues x 100', $comparison[1]['formule']);
+        $this->assertSame('Actions réalisées / actions prévues × 100', $comparison[0]['formule']);
+        $this->assertSame('Actions échues réalisées / actions échues × 100', $comparison[1]['formule']);
     }
 
     public function test_pta_rates_are_zero_when_no_action_is_due(): void

@@ -39,7 +39,7 @@
                     <a class="btn btn-secondary" href="{{ route('workspace.pao.show', $path['pao']['id']) }}">Explorer le PAO</a>
                 @endif
                 @if ($canWrite)
-                    <a class="btn btn-primary" href="{{ route('workspace.pta.edit', $row) }}">Parametrer le PTA</a>
+                    <a class="btn btn-primary" href="{{ route('workspace.pta.edit', $row) }}">Paramétrer le PTA</a>
                 @endif
             </x-slot:actions>
         </x-ui.page-title>
@@ -84,7 +84,7 @@
             @foreach ([
                 ['label' => 'Actions', 'value' => $summary['actions'] ?? 0, 'tone' => 'border-[#3996d3]'],
                 ['label' => 'Sous-actions', 'value' => $summary['sub_actions'] ?? 0, 'tone' => 'border-[#7656a8]'],
-                ['label' => 'A parametrer', 'value' => $summary['unconfigured_actions'] ?? 0, 'tone' => 'border-[#f9b13c]'],
+                ['label' => 'À paramétrer', 'value' => $summary['unconfigured_actions'] ?? 0, 'tone' => 'border-[#f9b13c]'],
                 ['label' => 'En retard', 'value' => $summary['late_actions'] ?? 0, 'tone' => 'border-[#b42318]'],
                 ['label' => 'Reports actifs', 'value' => $summary['active_reports'] ?? 0, 'tone' => 'border-[#17324a]'],
                 ['label' => 'Validations en attente', 'value' => $summary['pending_validations'] ?? 0, 'tone' => 'border-[#20c76b]'],
@@ -143,7 +143,7 @@
         <section class="app-screen-block" aria-labelledby="pta-actions-title">
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
                 <div>
-                    <p class="text-xs font-bold uppercase text-[#168c4c]">Execution et controle</p>
+                    <p class="text-xs font-bold uppercase text-[#168c4c]">Execution et contrôle</p>
                     <h2 id="pta-actions-title" class="mt-1 text-xl font-black text-[#17324a] dark:text-white">Tableau des actions et sous-actions</h2>
                 </div>
                 <span class="text-sm font-semibold text-slate-500">{{ $actions->count() }} ligne(s)</span>
@@ -162,10 +162,10 @@
                         <thead>
                             <tr>
                                 <th>Action</th>
-                                <th>Parametrage</th>
+                                <th>Paramétrage</th>
                                 <th>Indicateur et cible</th>
                                 <th>RMO</th>
-                                <th>Periode</th>
+                                <th>Période</th>
                                 <th>Avancement</th>
                                 <th>Sous-actions / preuves</th>
                                 <th>Validation</th>
@@ -188,7 +188,7 @@
                                     </td>
                                     <td class="min-w-[210px] align-top">
                                         <span class="{{ $statusClasses($action['configuration_status']) }}">
-                                            {{ $action['configuration_status'] === 'parametre' ? 'Parametree' : 'A parametrer' }}
+                                            {{ $action['configuration_status'] === 'parametre' ? 'Parametree' : 'À paramétrer' }}
                                         </span>
                                         <p class="mt-2 text-xs font-bold text-slate-700 dark:text-slate-200">{{ $action['type'] }}</p>
                                         <p class="mt-1 text-xs text-slate-500">{{ $action['indicator_type'] }}</p>
@@ -244,7 +244,7 @@
                                     <td class="min-w-[225px] align-top">
                                         <div class="flex flex-wrap gap-2">
                                             <a class="btn btn-primary btn-sm" href="{{ route('workspace.actions.suivi', $action['id']) }}">Faire le suivi</a>
-                                            <a class="btn btn-secondary btn-sm" href="{{ route('workspace.actions.suivi', $action['id']) }}#action-echeances">Report d'echeance</a>
+                                            <a class="btn btn-secondary btn-sm" href="{{ route('workspace.actions.suivi', $action['id']) }}#action-echeances">Report d'échéance</a>
                                         </div>
                                     </td>
                                 </tr>

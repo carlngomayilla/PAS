@@ -66,7 +66,7 @@ class WorkspaceNotificationService
                 'module' => 'actions',
                 'entity_type' => 'action',
                 'entity_id' => $action->id,
-                'url' => route('workspace.deadline-extension.show', $request),
+                'url' => route('workspace.actions.suivi', $action),
                 'icon' => 'bolt',
                 'status' => 'info',
                 'priority' => 'normal',
@@ -110,6 +110,103 @@ class WorkspaceNotificationService
                 'icon' => 'check-circle',
                 'status' => 'info',
                 'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    /**
+     * 3e visa du circuit : l'action a ete visee par le controle et attend la
+     * validation finale (cloture) de la planification.
+     */
+    public function notifyActionSubmittedToPlanification(Action $action, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_submitted_to_direction')) {
+            return;
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id');
+
+        $planificationRecipients = $this->globalUsers([
+            User::ROLE_PLANIFICATION,
+            User::ROLE_CHEF_PLANIFICATION,
+            User::ROLE_ADMIN_FONCTIONNEL,
+            User::ROLE_SUPER_ADMIN,
+        ]);
+
+        $this->dispatchEvent(
+            'action_submitted_to_direction',
+            $planificationRecipients,
+            [
+                'title' => 'Action à valider (validation finale)',
+                'message' => sprintf('L\'action « %s » a été visée par le contrôle et attend votre validation finale.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'arrow-up-right',
+                'status' => 'info',
+                'priority' => 'high',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
+            $actor?->id
+        );
+
+        $this->dispatchEvent(
+            'action_submitted_to_direction',
+            $this->agentRecipient($action),
+            [
+                'title' => 'Action transmise à la planification',
+                'message' => sprintf('Votre action « %s » a été visée par le contrôle et attend la validation finale de la planification.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => 'check-circle',
+                'status' => 'info',
+                'priority' => 'normal',
+            ],
+            [
+                'action_label' => (string) $action->libelle,
+                'actor_name' => (string) ($actor?->name ?? ''),
+            ],
+            $actor?->id
+        );
+    }
+
+    /**
+     * Decision finale de la planification : cloture ou renvoi en correction.
+     */
+    public function notifyActionReviewedByPlanification(Action $action, bool $approved, ?User $actor = null): void
+    {
+        if (! $this->notificationPolicySettings->eventEnabled('action_reviewed_by_direction')) {
+            return;
+        }
+
+        $action->loadMissing('pta:id,direction_id,service_id');
+
+        $this->dispatchEvent(
+            'action_reviewed_by_direction',
+            $this->agentRecipient($action),
+            [
+                'title' => $approved ? 'Action clôturée' : 'Action à corriger',
+                'message' => $approved
+                    ? sprintf('Votre action « %s » a été validée par la planification : elle est officiellement clôturée.', (string) $action->libelle)
+                    : sprintf('Votre action « %s » a été renvoyée en correction par la planification.', (string) $action->libelle),
+                'module' => 'actions',
+                'entity_type' => 'action',
+                'entity_id' => $action->id,
+                'url' => route('workspace.actions.suivi', $action),
+                'icon' => $approved ? 'check-circle' : 'alert-triangle',
+                'status' => $approved ? 'success' : 'warning',
+                'priority' => $approved ? 'normal' : 'high',
             ],
             [
                 'action_label' => (string) $action->libelle,

@@ -24,7 +24,7 @@
                 $action->isResponsible($currentUser)
                 || ($action->relationLoaded('sousActions') && $action->sousActions->contains(fn ($subAction): bool => (int) $subAction->agent_id === (int) $currentUser->id))
             );
-        $executorMetricsReleased = in_array($validationStatus, ['validee_controle', 'validee_direction'], true);
+        $executorMetricsReleased = in_array($validationStatus, ['validee_controle', 'validee_planification', 'validee_direction'], true);
         $hideExecutorMetrics = $isExecutorAgent && ! $executorMetricsReleased;
         $financingStatusOptions = \App\Models\Action::financingStatusOptions();
         $financingStatus = $action->financementStatus();
@@ -256,8 +256,8 @@
         $stepperStoppedStatuses = ['suspendu', 'annule'];
         $stepperFinishedStatuses = ['acheve_dans_delai', 'acheve_hors_delai', 'cloturee'];
         $stepperSubmittedStatuses = ['soumise_chef', 'validee_chef', 'soumise_controle', 'correction_demandee', 'correction_controle', 'rejetee_chef', 'validee_controle', 'validee_direction', 'rejetee_direction'];
-        $stepperChefApprovedStatuses = ['validee_chef', 'soumise_controle', 'validee_controle', 'validee_direction'];
-        $stepperValidatedStatuses = ['validee_controle', 'validee_direction'];
+        $stepperChefApprovedStatuses = ['validee_chef', 'soumise_controle', 'soumise_planification', 'validee_controle', 'validee_planification', 'validee_direction'];
+        $stepperValidatedStatuses = ['validee_controle', 'validee_planification', 'validee_direction'];
         $stepperCorrectionStatuses = ['correction_demandee', 'correction_controle', 'rejetee_chef', 'rejetee_direction'];
         $stepperIsStopped = in_array($status, $stepperStoppedStatuses, true);
         $stepperHasStarted = $progressionReelle > 0
@@ -323,7 +323,7 @@
                 <h1 class="action-detail-title">{{ $action->libelle }}</h1>
                 <div class="action-detail-meta-grid">
                     <span class="action-detail-meta">
-                        <span class="action-detail-meta-label">Periode</span>
+                        <span class="action-detail-meta-label">Période</span>
                         <strong>{{ $periodDisplay }}</strong>
                     </span>
                     <span class="action-detail-meta">
@@ -410,7 +410,7 @@
                     <strong class="mt-1 block text-sm text-slate-900 dark:text-slate-100">{{ $actionWorkspace['role_label'] ?? '-' }}</strong>
                 </div>
                 <div class="p-4">
-                    <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Echeance</span>
+                    <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Échéance</span>
                     <strong class="mt-1 block text-sm {{ $workspaceDeadlineClasses[$workspaceDeadline['state'] ?? 'missing'] ?? $workspaceDeadlineClasses['missing'] }}">
                         {{ isset($workspaceDeadline['date']) ? optional($workspaceDeadline['date'])->format('d/m/Y') : '-' }}
                     </strong>
@@ -459,7 +459,7 @@
         <section class="showcase-summary-grid mb-4">
             <article class="showcase-kpi-card">
                 <p class="showcase-kpi-label">Execution</p>
-                <p class="showcase-kpi-number">Realise</p>
+                <p class="showcase-kpi-number">Réalisé</p>
             </article>
             <article class="showcase-kpi-card">
                 <p class="showcase-kpi-label">Validation</p>
@@ -531,7 +531,7 @@
         $v2ValidationStatus = (string) ($action->statut_validation ?? 'non_soumise');
         $v2IsSubmitted = $v2ValidationStatus === 'soumise_chef';
         $v2IsAwaitingControl = in_array($v2ValidationStatus, ['validee_chef', 'soumise_controle'], true);
-        $v2IsValidated = in_array($v2ValidationStatus, ['validee_controle', 'validee_direction'], true);
+        $v2IsValidated = in_array($v2ValidationStatus, ['validee_controle', 'validee_planification', 'validee_direction'], true);
     @endphp
 
     <span id="action-suivi" class="block scroll-mt-24" aria-hidden="true"></span>
@@ -554,7 +554,7 @@
             </div>
             <div class="action-tracking-badges">
                 @if ($hideExecutorMetrics)
-                    <span class="anbg-badge anbg-badge-success px-3 py-1">Realise</span>
+                    <span class="anbg-badge anbg-badge-success px-3 py-1">Réalisé</span>
                     <span class="anbg-badge anbg-badge-warning px-3 py-1">{{ $validationLabel }}</span>
                 @else
                     <span class="anbg-badge {{ $perfClass }} px-3 py-1">{{ $perfLabel }}</span>
@@ -568,7 +568,7 @@
             @if ($hideExecutorMetrics)
                 <article class="action-tracking-stat action-tracking-stat-main">
                     <span class="action-tracking-stat-label">Execution</span>
-                    <strong class="action-tracking-stat-value">Realise</strong>
+                    <strong class="action-tracking-stat-value">Réalisé</strong>
                 </article>
                 <article class="action-tracking-stat">
                     <span class="action-tracking-stat-label">Validation</span>
@@ -678,7 +678,7 @@
                                     @if ($sa->weight !== null)<span class="ml-1 text-xs text-slate-500">poids {{ number_format((float) $sa->weight, 0, ',', ' ') }}%</span>@endif
                                 @endunless
                                 @if ($hideExecutorMetrics)
-                                    <p class="text-sm text-slate-600">Realise · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
+                                    <p class="text-sm text-slate-600">Réalisé · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
                                 @else
                                     <p class="text-sm text-slate-600">Perf : <strong>{{ number_format($saPerf, 0, ',', ' ') }}%</strong> · Statut : <strong>{{ str_replace('_', ' ', $saValStatus) }}</strong></p>
                                 @endif
@@ -798,7 +798,7 @@
                         <input type="hidden" name="decision" value="valider">
                         <label for="control-comment">Observation finale <span class="text-xs text-slate-400">(optionnel)</span></label>
                         <textarea id="control-comment" name="motif" rows="2">{{ old('motif') }}</textarea>
-                        <button class="btn btn-primary mt-2" type="submit">Valider et clôturer</button>
+                        <button class="btn btn-primary mt-2" type="submit">Viser et transmettre à la planification</button>
                     </form>
                     <form method="POST" action="{{ route('workspace.actions.control.review', $action) }}" class="rounded-md border border-amber-200 bg-amber-50/50 p-3">
                         @csrf
@@ -809,6 +809,45 @@
                     </form>
                 </div>
             </div>
+        @endif
+
+        {{-- 3e visa du circuit : validation finale (cloture) par la planification. --}}
+        @php
+            $isAwaitingPlanification = $validationStatus === 'soumise_planification';
+            $canValidatePlanification = auth()->user()?->hasRole(
+                \App\Models\User::ROLE_PLANIFICATION,
+                \App\Models\User::ROLE_CHEF_PLANIFICATION,
+                \App\Models\User::ROLE_ADMIN_FONCTIONNEL,
+                \App\Models\User::ROLE_SUPER_ADMIN
+            );
+        @endphp
+        @if ($isAwaitingPlanification && $canValidatePlanification)
+            <div class="mt-4 rounded-lg border border-[#3996d3]/30 bg-[#eef6fc]/60 p-4">
+                <h3 class="text-base font-black text-[#17324a]">Validation finale — Planification</h3>
+                <p class="mt-1 text-sm text-[#667085]">
+                    L'action a été visée par le chef de service puis par le contrôle. Votre validation clôture officiellement l'action.
+                </p>
+                <div class="mt-3 grid gap-3 lg:grid-cols-2">
+                    <form method="POST" action="{{ route('workspace.actions.planification.review', $action) }}" class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
+                        @csrf
+                        <input type="hidden" name="decision" value="valider">
+                        <label for="planif-comment">Observation finale <span class="text-xs text-slate-400">(optionnel)</span></label>
+                        <textarea id="planif-comment" name="motif" rows="2">{{ old('motif') }}</textarea>
+                        <button class="btn btn-primary mt-2" type="submit">Valider et clôturer</button>
+                    </form>
+                    <form method="POST" action="{{ route('workspace.actions.planification.review', $action) }}" class="rounded-md border border-amber-200 bg-amber-50/50 p-3">
+                        @csrf
+                        <input type="hidden" name="decision" value="rejeter">
+                        <label for="planif-reason">Motif de correction</label>
+                        <textarea id="planif-reason" name="motif" rows="2" required>{{ old('motif') }}</textarea>
+                        <button class="btn btn-secondary mt-2" type="submit">Renvoyer en correction</button>
+                    </form>
+                </div>
+            </div>
+        @elseif ($isAwaitingPlanification)
+            <p class="mt-4 rounded-lg border border-[#3996d3]/30 bg-[#eef6fc]/60 p-3 text-sm font-semibold text-[#17324a]">
+                Action visée par le contrôle — en attente de la validation finale de la planification.
+            </p>
         @endif
     </section>
 
@@ -879,7 +918,7 @@
             <article class="showcase-inline-stat action-detail-card">
                 <h3 class="form-section-title">Execution</h3>
                 <dl class="action-fiche-dl mt-2">
-                    <dt>Etat</dt><dd>Realise</dd>
+                    <dt>Etat</dt><dd>Réalisé</dd>
                     <dt>Validation</dt><dd>{{ $validationLabel }}</dd>
                 </dl>
             </article>
@@ -893,7 +932,7 @@
                         <dt>Unité</dt><dd>{{ $action->unite_cible ?: '-' }}</dd>
                         <dt>Réalisé</dt><dd>{{ $action->quantite_realisee !== null ? number_format((float) $action->quantite_realisee, 0, ',', ' ') : '0' }} {{ $action->unite_cible ?: '' }}</dd>
                         <dt>Reste</dt><dd>{{ number_format((float) ($action->reste_a_realiser ?? $remainingValue), 0, ',', ' ') }} {{ $action->unite_cible ?: '' }}</dd>
-                        <dt>Taux de realisation</dt><dd>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 0, ',', ' ') }}%</dd>
+                        <dt>Taux de réalisation</dt><dd>{{ number_format((float) ($action->taux_atteinte_cible ?? 0), 0, ',', ' ') }}%</dd>
                         <dt>Dépassement</dt><dd>{{ $overachievementRate > 0 ? '+'.number_format($overachievementRate, 0, ',', ' ').'%' : '-' }}</dd>
                         <dt>Seuil minimum</dt><dd>{{ number_format((float) ($action->seuil_minimum ?? 80), 0, ',', ' ') }}%</dd>
                         <dt>Statut perf.</dt><dd>{{ $performanceLabels[$action->statut_performance ?? 'non_evaluee'] ?? ($action->statut_performance ?: '-') }}</dd>
@@ -1077,7 +1116,7 @@
                                 <dt>Avis chef</dt><dd>{{ $deadlineRequest->chef_avis ?: '-' }}{{ $deadlineRequest->chefReviewedBy ? ' · '.$deadlineRequest->chefReviewedBy->name : '' }}</dd>
                                 <dt>Accord directeur</dt><dd>{{ $deadlineRequest->director_decision ?: '-' }}{{ $deadlineRequest->directorReviewedBy ? ' · '.$deadlineRequest->directorReviewedBy->name : '' }}</dd>
                                 <dt>Accord final DG</dt><dd>{{ $deadlineRequest->final_decision ?: $deadlineRequest->dg_decision ?: '-' }}{{ $deadlineRequest->finalDecidedBy ? ' · '.$deadlineRequest->finalDecidedBy->name : '' }}</dd>
-                                <dt>Echeance approuvee</dt><dd>{{ optional($deadlineRequest->approved_deadline)->format('d/m/Y') ?: '-' }}</dd>
+                                <dt>Échéance approuvee</dt><dd>{{ optional($deadlineRequest->approved_deadline)->format('d/m/Y') ?: '-' }}</dd>
                                 <dt>Application</dt><dd>{{ $deadlineRequest->appliedBy?->name ?? '-' }}{{ $deadlineRequest->applied_at ? ' · '.$deadlineRequest->applied_at->format('d/m/Y H:i') : '' }}</dd>
                             </dl>
 
@@ -1411,7 +1450,7 @@
                             <p class="font-semibold">{{ $entry->utilisateur?->name ?? 'Système' }}</p>
                             <p class="text-xs text-slate-500">{{ optional($entry->created_at)->format('d/m/Y H:i') ?: '-' }}</p>
                         </div>
-                        <span class="anbg-badge anbg-badge-neutral px-3">{{ str_replace('_', ' ', $entry->type_evenement) }}</span>
+                        <span class="anbg-badge anbg-badge-neutral px-3">{{ \App\Support\UiLabel::eventType($entry->type_evenement) }}</span>
                     </div>
                     <p class="mt-3 whitespace-pre-line text-slate-700">{{ $entry->message }}</p>
                 </article>
@@ -1603,11 +1642,11 @@
                 <tbody>
                     @forelse ($action->actionLogs as $log)
                         <tr>
-                            <td>{{ optional($log->created_at)->format('Y-m-d H:i') }}</td>
-                            <td>{{ $alertLevelLabels[$log->niveau] ?? $log->niveau }}</td>
-                            <td>{{ $log->type_evenement }}</td>
+                            <td>{{ optional($log->created_at)->format('d/m/Y H:i') }}</td>
+                            <td>{{ $alertLevelLabels[$log->niveau] ?? \App\Support\UiLabel::alertLevel($log->niveau) }}</td>
+                            <td>{{ \App\Support\UiLabel::eventType($log->type_evenement) }}</td>
                             <td>{{ $log->message }}</td>
-                            <td>{{ $log->cible_role ?: '-' }}</td>
+                            <td>{{ $log->cible_role ? \App\Support\UiLabel::roleAudience($log->cible_role) : '-' }}</td>
                         </tr>
                     @empty
                         <tr>

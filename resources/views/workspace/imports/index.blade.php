@@ -15,7 +15,7 @@
                 <p class="text-sm text-slate-500">Chargez en une operation le PAS, les axes, objectifs, PAO, PTA et actions planifiees.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                <a class="btn btn-secondary" href="{{ route('workspace.imports.template') }}">Telecharger le modele Excel</a>
+                <a class="btn btn-secondary" href="{{ route('workspace.imports.template') }}">Télécharger le modele Excel</a>
                 <a class="btn btn-primary" href="{{ route('workspace.imports.create') }}">Nouvel import</a>
             </div>
         </div>
@@ -63,7 +63,7 @@
                 <div class="grid gap-3 sm:grid-cols-3">
                     <a href="{{ route('workspace.imports.template') }}" class="rounded-lg border border-[#d8ecf8] p-3 transition hover:border-[#3996d3] hover:bg-[#f8fbfe]">
                         <span class="block text-sm font-extrabold text-[#3996d3]">1. Modele</span>
-                        <span class="mt-1 block text-xs text-slate-500">Telecharger le fichier avec les 27 colonnes attendues.</span>
+                        <span class="mt-1 block text-xs text-slate-500">Télécharger le fichier avec les 27 colonnes attendues.</span>
                     </a>
                     <label for="file" class="cursor-pointer rounded-lg border border-[#d8ecf8] p-3 transition hover:border-[#3996d3] hover:bg-[#f8fbfe]">
                         <span class="block text-sm font-extrabold text-[#3996d3]">2. Verification</span>
@@ -143,9 +143,9 @@
                             <td colspan="7">
                                 <div class="py-6 text-center">
                                     <p class="font-semibold text-[#1c203d]">Aucun import enregistre.</p>
-                                    <p class="mt-1 text-sm text-slate-500">Commencez par telecharger le modele, puis lancez un nouvel import.</p>
+                                    <p class="mt-1 text-sm text-slate-500">Commencez par télécharger le modele, puis lancez un nouvel import.</p>
                                     <div class="mt-3 flex justify-center gap-2">
-                                        <a class="btn btn-secondary" href="{{ route('workspace.imports.template') }}">Telecharger le modele</a>
+                                        <a class="btn btn-secondary" href="{{ route('workspace.imports.template') }}">Télécharger le modele</a>
                                         <a class="btn btn-primary" href="{{ route('workspace.imports.create') }}">Nouvel import</a>
                                     </div>
                                 </div>

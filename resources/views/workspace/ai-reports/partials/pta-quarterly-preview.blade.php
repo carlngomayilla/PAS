@@ -114,7 +114,7 @@
                         @forelse ($section['rows'] as $row)
                             <div class="{{ $pdfMode ? 'preview-gap-item' : 'rounded-lg bg-slate-50 p-3 text-sm text-slate-700' }}">
                                 <p class="{{ $pdfMode ? '' : 'font-bold text-[#1c203d]' }}">{{ $row['libelle'] }}</p>
-                                <p class="{{ $pdfMode ? '' : 'mt-1 text-xs text-slate-500' }}">RMO : {{ $row['responsable'] }} - Fin : {{ $row['date_fin'] }} - Statut : {{ $row['statut'] }}</p>
+                                <p class="{{ $pdfMode ? '' : 'mt-1 text-xs text-slate-500' }}">RMO : {{ $row['responsable'] }} - Fin : {{ $row['date_fin'] ? \Illuminate\Support\Carbon::parse($row['date_fin'])->format('d/m/Y') : '-' }} - Statut : {{ $row['statut'] }}</p>
                             </div>
                         @empty
                             <p class="{{ $pdfMode ? '' : 'text-sm text-slate-500' }}">Aucun ecart dans cette categorie.</p>

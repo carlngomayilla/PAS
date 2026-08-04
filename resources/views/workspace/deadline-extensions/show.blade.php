@@ -125,7 +125,7 @@
                                 <p class="font-semibold text-slate-900">Version actuelle</p>
                                 <p class="text-sm text-slate-500">{{ $deadlineRequest->attachment_name ?: 'Piece justificative' }}</p>
                             </div>
-                            <a class="btn btn-secondary btn-sm" href="{{ route('workspace.deadline-extension.attachment', $deadlineRequest) }}">Telecharger</a>
+                            <a class="btn btn-secondary btn-sm" href="{{ route('workspace.deadline-extension.attachment', $deadlineRequest) }}">Télécharger</a>
                         </div>
                         @foreach ($revisionHistory as $revisionIndex => $revision)
                             <div class="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -133,7 +133,7 @@
                                     <p class="font-semibold text-slate-900">Version {{ $revisionIndex + 1 }}</p>
                                     <p class="text-sm text-slate-500">{{ $revision['previous_attachment_name'] ?? 'Piece justificative' }}</p>
                                 </div>
-                                <a class="btn btn-secondary btn-sm" href="{{ route('workspace.deadline-extension.attachment.revision', [$deadlineRequest, $revisionIndex]) }}">Telecharger</a>
+                                <a class="btn btn-secondary btn-sm" href="{{ route('workspace.deadline-extension.attachment.revision', [$deadlineRequest, $revisionIndex]) }}">Télécharger</a>
                             </div>
                         @endforeach
                     </div>

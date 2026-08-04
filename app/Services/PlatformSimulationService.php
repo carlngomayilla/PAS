@@ -338,6 +338,7 @@ class PlatformSimulationService
         return $action->date_fin_reelle !== null
             || $action->cloture_le !== null
             || in_array((string) ($action->statut_validation ?? ''), [
+                ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION,
                 ActionTrackingService::VALIDATION_VALIDEE_CONTROLE,
                 ActionTrackingService::VALIDATION_VALIDEE_DIRECTION,
             ], true)

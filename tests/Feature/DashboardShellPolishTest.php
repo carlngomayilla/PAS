@@ -78,7 +78,11 @@ class DashboardShellPolishTest extends TestCase
         $this->assertStringContainsString('role="tablist"', $tabs);
         $this->assertStringContainsString('aria-selected=', $tabs);
 
-        $this->assertStringContainsString("url('/images/logo-anbg-flamme.png')", $styles);
+        // Le logo de la barre laterale repliee est rendu par une balise <img>
+        // (`.app-sidebar-logo-flame`) et non plus par un `background-image` CSS,
+        // pour eviter le logo affiche en double.
+        $this->assertStringContainsString('app-sidebar-logo-image app-sidebar-logo-flame', $sidebar);
+        $this->assertStringNotContainsString("url('/images/logo-anbg-flamme.png')", $styles);
         $this->assertStringContainsString('.module-family-tab.is-active::after', $styles);
         $this->assertStringContainsString('All application tabs inherit the Import module navigation treatment.', $styles);
         $this->assertStringContainsString('Unified statistical cards: same visual language as the control dashboard.', $styles);

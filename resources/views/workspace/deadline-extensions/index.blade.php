@@ -111,7 +111,7 @@
                                 </td>
                                 <td>
                                     <p class="font-medium text-slate-800">{{ $deadlineRequest->requestedBy?->name ?? '-' }}</p>
-                                    <p class="mt-1 text-xs text-slate-500">{{ $deadlineRequest->requestedBy?->role ?? '-' }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $deadlineRequest->requestedBy?->role ? \App\Support\UiLabel::roleAudience($deadlineRequest->requestedBy->role) : '-' }}</p>
                                 </td>
                                 <td class="whitespace-nowrap">
                                     <p>{{ optional($deadlineRequest->old_deadline)->format('d/m/Y') ?: '-' }}</p>

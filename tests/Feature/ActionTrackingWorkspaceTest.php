@@ -150,14 +150,56 @@ class ActionTrackingWorkspaceTest extends TestCase
             ->assertDontSee('85%', false);
 
         $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        // Circuit a 3 visas : le controle transmet, la planification cloture.
         $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+
+        $planification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]);
+        $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
 
         $this->actingAs($fixture['agent'])
             ->get(route('workspace.actions.index', ['vue' => 'mes_actions']))
             ->assertOk()
             ->assertSee('85%', false)
-            ->assertSeeText('Validée par le contrôle')
             ->assertDontSee('En attente de validation.', false);
+    }
+
+    /**
+     * Regression : `hasFinalValidation()` ignorait `validee_planification`, donc
+     * le recalcul du statut dynamique ecrasait la cloture posee par la
+     * planification et remettait l'action en `en_retard`. L'action n'etait alors
+     * comptee nulle part comme terminee.
+     */
+    public function test_planification_closure_survives_the_dynamic_status_recalculation(): void
+    {
+        $fixture = $this->createFixture();
+        $workflow = app(ActionWorkflowService::class);
+        $tracking = app(ActionTrackingService::class);
+
+        $action = $workflow->recordActionProgress(
+            $fixture['action'],
+            ['quantite_realisee' => 100],
+            $fixture['agent']
+        );
+        $action = $workflow->submitAction($action, ['has_new_proof' => true], $fixture['agent']);
+        $action = $workflow->reviewAction($action, true, null, $fixture['chef']);
+        $action = $workflow->reviewActionByController($action, true, null, $fixture['controller']);
+
+        $planification = User::factory()->create(['role' => User::ROLE_CHEF_PLANIFICATION]);
+        $action = $workflow->reviewActionByPlanification($action, true, null, $planification);
+
+        $this->assertSame(ActionTrackingService::VALIDATION_VALIDEE_PLANIFICATION, $action->statut_validation);
+        $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $action->statut_dynamique);
+
+        // Le recalcul des metriques ne doit pas rouvrir l'action.
+        $tracking->refreshActionMetrics($action->fresh());
+
+        $refreshed = $action->fresh();
+        $this->assertSame(ActionTrackingService::STATUS_CLOTUREE, $refreshed->statut_dynamique);
+        $this->assertContains($refreshed->statut, [
+            ActionTrackingService::STATUS_CLOTUREE,
+            ActionTrackingService::STATUS_ACHEVE_DANS_DELAI,
+            ActionTrackingService::STATUS_ACHEVE_HORS_DELAI,
+        ]);
     }
 
     public function test_correction_workspace_tells_the_responsible_what_to_do_next(): void

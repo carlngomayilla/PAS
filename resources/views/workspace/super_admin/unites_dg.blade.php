@@ -67,7 +67,7 @@
                                     <option value="">— Aucun chef désigné —</option>
                                     @foreach ($candidates as $candidate)
                                         <option value="{{ $candidate->id }}" @selected((int) $unite->chef_user_id === (int) $candidate->id)>
-                                            {{ $candidate->name }} ({{ $candidate->role }})
+                                            {{ $candidate->name }} ({{ \App\Support\UiLabel::roleAudience($candidate->role) }})
                                         </option>
                                     @endforeach
                                 </select>
@@ -97,7 +97,7 @@
                                             <p class="truncate font-semibold text-slate-700">{{ $member->name }}</p>
                                             <p class="truncate text-xs text-slate-500">{{ $member->email }}</p>
                                         </div>
-                                        <span class="anbg-badge anbg-badge-neutral shrink-0">{{ $member->role }}</span>
+                                        <span class="anbg-badge anbg-badge-neutral shrink-0">{{ \App\Support\UiLabel::roleAudience($member->role) }}</span>
                                     </li>
                                 @endforeach
                             </ul>

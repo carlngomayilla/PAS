@@ -42,7 +42,7 @@
             }
 
             $validationStatus = (string) ($row->statut_validation ?? '');
-            $isReleased = in_array($validationStatus, ['validee_controle', 'validee_direction'], true);
+            $isReleased = in_array($validationStatus, ['validee_controle', 'validee_planification', 'validee_direction'], true);
 
             return ! $isReleased;
         };
@@ -435,7 +435,7 @@
                                 @php $kEcheance = $echeanceOf($row); @endphp
                                 <div class="kanban-card-footer">
                                     @if ($hideRowMetrics)
-                                        <span class="kanban-card-pct" style="color:#178f5f;">Realise</span>
+                                        <span class="kanban-card-pct" style="color:#178f5f;">Réalisé</span>
                                     @else
                                         <span class="kanban-card-pct" style="color: {{ $pctColor }};">{{ number_format($pct, 0, ',', ' ') }}%</span>
                                     @endif
@@ -666,7 +666,7 @@
                                 {{-- Progress fill --}}
                                 @if ($hideGanttMetrics)
                                 <div style="position:absolute; left:{{ $gLeft }}%; width:{{ $gWidth }}%; top:50%; transform:translateY(-50%); height:1.25rem; border-radius:5px; color:#0f5132; font-size:0.62rem; font-weight:800; display:flex; align-items:center; padding-left:5px; pointer-events:none;"
-                                     title="{{ $ganttRow->libelle }} - Realise">Realise</div>
+                                     title="{{ $ganttRow->libelle }} - Realise">Réalisé</div>
                                 @else
                                 <div style="position:absolute; left:{{ $gLeft }}%; width:{{ max(0.3, $gFillW) }}%; top:50%; transform:translateY(-50%); height:1.25rem; border-radius:5px; background:{{ $gColor }};"
                                      title="{{ $ganttRow->libelle }} — {{ number_format($gPct, 0) }}%">
@@ -775,7 +775,7 @@
                             </td>
                             <td class="min-w-[180px]">
                                 @if ($hideRowMetrics)
-                                    <span class="anbg-badge anbg-badge-success px-3">Realise</span>
+                                    <span class="anbg-badge anbg-badge-success px-3">Réalisé</span>
                                     <p class="mt-1 text-xs text-slate-500">En attente de validation.</p>
                                 @else
                                 <div class="mb-2 flex items-center justify-between gap-2 text-xs">

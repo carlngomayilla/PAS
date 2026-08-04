@@ -15,6 +15,14 @@
         \App\Models\User::ROLE_PLANIFICATION,
         \App\Models\User::ROLE_CHEF_PLANIFICATION
     );
+    // Bouton « Valider » (validation contrôleur / SCIQ) reserve aux profils de controle.
+    $canValidateControl = $isInteractive && auth()->user()?->hasRole(
+        \App\Models\User::ROLE_SCIQ,
+        \App\Models\User::ROLE_SCIQ_SUIVI_GLOBAL,
+        \App\Models\User::ROLE_CHEF_UNITE_SCIQ,
+        \App\Models\User::ROLE_PLANIFICATION,
+        \App\Models\User::ROLE_CHEF_PLANIFICATION
+    );
     $actionCellStyle = 'background:#f8fafc;color:#111827;';
     $subActionCellStyle = 'background:#f1f5f9;color:#334155;';
     $previewUrl = static function (array $metricRow, array $row): string {
@@ -64,7 +72,7 @@
                 <tr class="pta-pas-row">
                     <td class="pta-pas-code">{{ $pasGroup['code'] ?? 'PAS' }}</td>
                     <td colspan="{{ $pasLabelColspan }}" class="pta-pas-label">{{ $pasGroup['label'] ?? 'PAS' }}</td>
-                    <td colspan="3" class="pta-pas-rate">{{ $pasGroup['performance_label'] ?? number_format((float) ($pasGroup['performance'] ?? 0), 2).'%' }}</td>
+                    <td colspan="3" class="pta-pas-rate">{{ $pasGroup['performance_label'] ?? \App\Support\UiLabel::percent((float) ($pasGroup['performance'] ?? 0), '.') }}</td>
                 </tr>
 
                 @foreach (($pasGroup['axes'] ?? []) as $axisGroup)
@@ -97,17 +105,17 @@
                                 <th>Sous-actions</th>
                                 <th>Indicateurs de mesure</th>
                                 <th>RMO</th>
-                                <th>Ratio</th>
-                                <th>Seuil</th>
-                                <th>Realise</th>
+                                <th>Réalisé / cible</th>
+                                <th>Seuil de complétude</th>
+                                <th>Réalisé</th>
                                 <th>Taux (%)</th>
                                 <th>Performance</th>
-                                <th>Ecart</th>
-                                <th>Echeance</th>
+                                <th>Reste à réaliser</th>
+                                <th>Échéance</th>
                                 <th>Retard</th>
-                                <th>Statut action</th>
-                                <th>Statut de suivi</th>
-                                <th>Statut delai</th>
+                                <th>État d'avancement</th>
+                                <th>Étape du suivi</th>
+                                <th>État du délai</th>
                                 <th>Preuve</th>
                                 <th>Observations</th>
                                 @if ($isInteractive)
@@ -126,9 +134,12 @@
                                         $hasSubAction = is_array($detailRow);
                                         $metricRow = $hasSubAction ? $detailRow : $row;
                                         $actionPreviewUrl = (string) ($row['preview_url'] ?? $row['details_url'] ?? '#');
-                                        $canEditMetric = $isInteractive && (bool) (($metricRow['inline_editable'] ?? $row['inline_editable'] ?? false) === true);
-                                        $canEditAction = $canEditMetric && ! $hasSubAction;
-                                        $canEditActionHeader = $isInteractive && $hasSubAction && $loop->first && (bool) (($row['inline_editable'] ?? false) === true);
+                                        // Edition inline retiree (WS2) : le tableau de suivi PTA est en lecture
+                                        // seule. Le parametrage se fait via « Modifier », la validation via
+                                        // « Valider », le report via « Report d'échéance » (colonne Commandes).
+                                        $canEditMetric = false;
+                                        $canEditAction = false;
+                                        $canEditActionHeader = false;
                                         $formId = 'pta-inline-'.$row['id'].'-'.($hasSubAction ? 'sa-'.$metricRow['id'] : 'action');
                                         $indicatorPanelId = 'pta-indicator-panel-'.$row['id'].'-'.($hasSubAction ? 'sa-'.$metricRow['id'] : 'action');
                                         $actionFormId = 'pta-inline-'.$row['id'].'-action-header';
@@ -374,7 +385,7 @@
                                         <td class="pta-responsable">
                                             @if ($canEditMetric)
                                                 <select form="{{ $formId }}" name="rmo_id" class="pta-inline-field" aria-label="RMO" data-pta-cell-input>
-                                                    <option value="">Non assigne</option>
+                                                    <option value="">Non assigné</option>
                                                     @foreach ($rmoOptions as $rmo)
                                                         <option value="{{ $rmo['id'] }}" @selected($selectedRmoId === (int) $rmo['id'])>{{ $rmo['label'] }}</option>
                                                     @endforeach
@@ -449,18 +460,14 @@
                                         @if ($isInteractive)
                                             <td class="pta-row-actions">
                                                 <div class="pta-row-actions-stack">
-                                                    @if ($canEditMetric && $inlineUpdateUrl !== '')
-                                                        <button form="{{ $formId }}" class="pta-inline-save" type="submit" data-pta-save>Enregistrer</button>
-                                                        <span class="pta-inline-save-state" data-pta-save-state aria-live="polite">Aucune modification</span>
-                                                    @endif
                                                     @if ($canOpenActionParameters && (! $hasSubAction || $loop->first) && $parameterUrl !== '')
                                                         <a class="pta-inline-open" href="{{ $parameterUrl }}">Modifier le paramétrage</a>
                                                     @endif
-                                                    <a class="pta-inline-open" href="{{ $trackingUrl }}">Faire le suivi</a>
+                                                    @if ($canValidateControl)
+                                                        <a class="pta-inline-open" href="{{ $trackingUrl }}#action-controle">Valider</a>
+                                                    @endif
                                                     @if ($canRequestReport)
-                                                        <a class="pta-inline-report" href="{{ $reportUrl }}">Demander un report</a>
-                                                    @else
-                                                        <span class="pta-inline-report is-disabled" aria-disabled="true">Report indisponible</span>
+                                                        <a class="pta-inline-report" href="{{ $reportUrl }}">Report d'échéance</a>
                                                     @endif
                                                 </div>
                                             </td>
@@ -469,7 +476,7 @@
                                 @endforeach
                             @empty
                                 <tr>
-                                    <td colspan="{{ $tableColumnCount }}" class="pta-empty">Aucune action rattachee a cet objectif operationnel.</td>
+                                    <td colspan="{{ $tableColumnCount }}" class="pta-empty">Aucune action rattachee a cet objectif opérationnel.</td>
                                 </tr>
                             @endforelse
                         @endforeach

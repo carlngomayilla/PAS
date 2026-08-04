@@ -37,7 +37,7 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringContainsString('name="alerte_echeance"', $view);
         $this->assertStringContainsString('data-synthesis-direction-select', $view);
         $this->assertStringContainsString('data-synthesis-service-select', $view);
-        $this->assertStringContainsString('Vue detaillee', $view);
+        $this->assertStringContainsString('Vue détaillée', $view);
         $this->assertStringContainsString('data-dashboard-panel="advanced"', $tables);
         $this->assertStringContainsString("const panelKeys = ['overview', 'charts', 'advanced'];", $script);
         $this->assertStringContainsString('$baseSynthesisQuery', $overview);
@@ -45,8 +45,8 @@ class DashboardSynthesisDropdownTest extends TestCase
         $this->assertStringNotContainsString('$personalTaskItems', $overview);
         $this->assertStringContainsString('Alertes critiques', $overview);
         $this->assertStringContainsString('_panel-synthesis-hierarchy', $overview);
-        $this->assertStringContainsString('Vue synthetique des axes', $hierarchy);
-        $this->assertStringNotContainsString("Vue synthetique d'avancement PAS", $hierarchy);
+        $this->assertStringContainsString('Vue synthétique des axes', $hierarchy);
+        $this->assertStringNotContainsString("Vue synthétique d'avancement PAS", $hierarchy);
         $this->assertStringContainsString('$showSynthesisTablesInOverview ?? false', $overview);
         $this->assertStringContainsString('_panel-synthesis-tables', $tables);
         $this->assertStringContainsString('Tableaux de synthese', $detailTables);

@@ -67,15 +67,31 @@
                     <span class="showcase-chip-dot {{ (int) ($summary['overdue'] ?? 0) > 0 ? 'bg-red-600' : 'bg-green-600' }}"></span>
                     {{ (int) ($summary['total'] ?? 0) }} ouverte(s)
                 </span>
-                <span class="showcase-chip">Score {{ number_format((float) ($summary['score'] ?? 100), 0, ',', ' ') }} %</span>
-                <span class="showcase-chip">Qualité {{ $summary['quality_label'] ?? 'Excellent' }}</span>
+                <span class="showcase-chip" title="Score personnel calculé sur vos traitements déjà terminés (performance et respect des délais). Il ne mesure pas la charge restante ci-dessous.">
+                    Traitements terminés {{ number_format((float) ($summary['score'] ?? 100), 0, ',', ' ') }} %
+                </span>
+                <span class="showcase-chip" title="Appréciation qualitative de vos traitements terminés, dérivée du score ci-contre.">
+                    Qualité {{ $summary['quality_label'] ?? 'Excellent' }}
+                </span>
             </x-slot:actions>
         </x-ui.page-title>
 
         <section class="app-screen-block border-y border-slate-200 bg-white/70 py-4 dark:border-slate-700 dark:bg-slate-900/55" aria-label="Synthèse personnelle">
+            <p class="mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Charge en attente — ces compteurs mesurent ce qu’il vous reste à traiter, indépendamment du score de vos traitements déjà terminés.
+            </p>
             <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(135px,1fr))]">
+                @php
+                    $metricHints = [
+                        'À traiter' => 'Nombre de tâches ouvertes qui vous sont assignées.',
+                        'En retard' => 'Tâches ouvertes dont l’échéance est dépassée.',
+                        'Sous 24 h' => 'Tâches ouvertes dont l’échéance arrive dans moins de 24 heures.',
+                        'Critiques' => 'Tâches ouvertes de criticité « critique ».',
+                        'Sans échéance' => 'Tâches ouvertes sans date d’échéance renseignée.',
+                    ];
+                @endphp
                 @foreach ($summaryMetrics as $metric)
-                    <div class="border-l-4 pl-3 {{ $metric['tone'] }}">
+                    <div class="border-l-4 pl-3 {{ $metric['tone'] }}" title="{{ $metricHints[$metric['label']] ?? '' }}">
                         <span class="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">{{ $metric['label'] }}</span>
                         <strong class="mt-1 block text-2xl">{{ number_format((int) $metric['value'], 0, ',', ' ') }}</strong>
                     </div>

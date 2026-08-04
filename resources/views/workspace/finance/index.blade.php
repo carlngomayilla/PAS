@@ -95,7 +95,7 @@
                     </select>
                 </label>
                 <button class="btn btn-primary self-end" type="submit">Appliquer</button>
-                <a class="btn btn-secondary self-end" href="{{ route('workspace.daf.financements.index') }}">Reinitialiser</a>
+                <a class="btn btn-secondary self-end" href="{{ route('workspace.daf.financements.index') }}">Réinitialiser</a>
             </form>
         </section>
 
@@ -140,7 +140,7 @@
         @if ($selectedAction)
             <section class="showcase-panel app-screen-block" aria-labelledby="finance-detail-title">
                 <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
-                    <div><span class="showcase-eyebrow">Detail de l'action</span><h2 id="finance-detail-title" class="showcase-panel-title mb-0">{{ $selectedAction->libelle }}</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $selectedAction->pta?->direction?->libelle }} · {{ $selectedAction->pta?->service?->libelle }}</p></div>
+                    <div><span class="showcase-eyebrow">Détail de l'action</span><h2 id="finance-detail-title" class="showcase-panel-title mb-0">{{ $selectedAction->libelle }}</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $selectedAction->pta?->direction?->libelle }} · {{ $selectedAction->pta?->service?->libelle }}</p></div>
                     <a class="btn btn-secondary" href="{{ route('workspace.actions.suivi', $selectedAction) }}#action-discussion">Donner un avis</a>
                 </div>
                 <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -153,7 +153,7 @@
                         <h3 class="text-base font-bold text-[#17324a] dark:text-white">Operations enregistrees</h3>
                         <div class="mt-3 overflow-x-auto border border-slate-200 dark:border-slate-700"><table class="app-table data-table"><thead><tr><th>Date</th><th>Nature</th><th>Montant</th><th>Reference</th><th>Justificatif</th></tr></thead><tbody>
                             @forelse ($transactions as $transaction)
-                                <tr><td>{{ $transaction->operated_on?->format('d/m/Y') }}</td><td>{{ $transaction->operation_type === \App\Models\FinancialTransaction::TYPE_COMMITMENT ? 'Engagement' : 'Decaissement' }}</td><td class="whitespace-nowrap font-semibold">{{ $money($transaction->amount) }}</td><td>{{ $transaction->reference ?: '-' }}<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $transaction->beneficiary ?: '' }}</p></td><td>@if ($transaction->justificatifs->isNotEmpty())<a class="font-semibold text-[#176A9D] hover:underline dark:text-sky-300" href="{{ route('workspace.finances.transactions.proof.download', [$transaction, $transaction->justificatifs->first()]) }}">Telecharger</a>@else - @endif</td></tr>
+                                <tr><td>{{ $transaction->operated_on?->format('d/m/Y') }}</td><td>{{ $transaction->operation_type === \App\Models\FinancialTransaction::TYPE_COMMITMENT ? 'Engagement' : 'Decaissement' }}</td><td class="whitespace-nowrap font-semibold">{{ $money($transaction->amount) }}</td><td>{{ $transaction->reference ?: '-' }}<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $transaction->beneficiary ?: '' }}</p></td><td>@if ($transaction->justificatifs->isNotEmpty())<a class="font-semibold text-[#176A9D] hover:underline dark:text-sky-300" href="{{ route('workspace.finances.transactions.proof.download', [$transaction, $transaction->justificatifs->first()]) }}">Télécharger</a>@else - @endif</td></tr>
                             @empty
                                 <tr><td colspan="5" class="text-slate-500 dark:text-slate-400">Aucune operation enregistree.</td></tr>
                             @endforelse
@@ -184,7 +184,7 @@
             <section class="showcase-panel app-screen-block" aria-labelledby="overrun-title">
                 <div class="flex flex-wrap items-center justify-between gap-3"><div><h2 id="overrun-title" class="showcase-panel-title mb-0">Depassements budgetaires</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Circuit : Chef de service DAF → Directrice DAF → DG.</p></div></div>
                 <div class="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.8fr)]">
-                    <div class="overflow-x-auto border border-slate-200 dark:border-slate-700"><table class="app-table data-table"><thead><tr><th>Perimetre</th><th>Montant supplementaire</th><th>Demandeur</th><th>Statut</th><th>Decision</th></tr></thead><tbody>
+                    <div class="overflow-x-auto border border-slate-200 dark:border-slate-700"><table class="app-table data-table"><thead><tr><th>Périmètre</th><th>Montant supplementaire</th><th>Demandeur</th><th>Statut</th><th>Decision</th></tr></thead><tbody>
                         @forelse ($overruns as $overrun)
                             <tr><td>{{ ucfirst($overrun->scope_type) }} #{{ $overrun->scope_id }}<p class="mt-1 max-w-xs text-xs text-slate-500 dark:text-slate-400">{{ $overrun->reason }}</p>@if ($overrun->justificatifs->isNotEmpty())<a class="mt-1 inline-block text-xs font-semibold text-[#176A9D] hover:underline dark:text-sky-300" href="{{ route('workspace.finances.overruns.proof.download', [$overrun, $overrun->justificatifs->first()]) }}">Voir la piece</a>@endif</td><td class="whitespace-nowrap">{{ $money($overrun->requested_extra) }}</td><td>{{ $overrun->requestedBy?->name ?? '-' }}</td><td><span class="anbg-badge {{ $overrunTones[$overrun->status] ?? 'anbg-badge-neutral' }} px-2 py-1 text-xs">{{ $overrunLabels[$overrun->status] ?? $overrun->status }}</span></td><td class="min-w-[185px]">
                                 @if (($isDafDirector && $overrun->status === \App\Models\BudgetOverrunRequest::STATUS_PENDING_DIRECTOR) || ($isDg && $overrun->status === \App\Models\BudgetOverrunRequest::STATUS_PENDING_DG))
@@ -201,7 +201,7 @@
                         <form method="POST" action="{{ route('workspace.finances.overruns.store') }}" enctype="multipart/form-data" class="rounded-lg border border-slate-200 bg-slate-50/85 p-4 dark:border-slate-700 dark:bg-slate-900/70">
                             @csrf
                             <h3 class="text-base font-bold text-[#17324a] dark:text-white">Nouvelle demande</h3>
-                            <div class="mt-3 grid gap-3"><label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Perimetre<select id="overrun-scope-type" name="scope_type" class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"><option value="action">Action</option><option value="service">Service</option><option value="direction">Direction</option></select></label>
+                            <div class="mt-3 grid gap-3"><label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Périmètre<select id="overrun-scope-type" name="scope_type" class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"><option value="action">Action</option><option value="service">Service</option><option value="direction">Direction</option></select></label>
                                 <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Element concerne<select id="overrun-scope-id" name="scope_id" class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"></select></label>
                                 <template id="overrun-options-action">@foreach ($actionOptions as $action)<option value="{{ $action->id }}">{{ \Illuminate\Support\Str::limit($action->libelle, 68) }}</option>@endforeach</template><template id="overrun-options-service">@foreach ($serviceOptions as $service)<option value="{{ $service->id }}">{{ $service->code }} - {{ $service->libelle }}</option>@endforeach</template><template id="overrun-options-direction">@foreach ($directionOptions as $direction)<option value="{{ $direction->id }}">{{ $direction->code }} - {{ $direction->libelle }}</option>@endforeach</template>
                                 <label class="grid gap-1 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Montant supplementaire FCFA<input name="requested_extra" type="number" min="0.01" step="0.01" required class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"></label>

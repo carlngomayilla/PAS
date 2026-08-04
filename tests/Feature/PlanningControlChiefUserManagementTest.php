@@ -86,6 +86,7 @@ class PlanningControlChiefUserManagementTest extends TestCase
                 'is_active' => '1',
                 'direction_id' => $direction->id,
                 'service_id' => $service->id,
+                'agent_matricule' => 'SVC-100',
                 'password' => 'ValidPass123!',
                 'password_confirmation' => 'ValidPass123!',
             ])

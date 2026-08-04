@@ -175,7 +175,9 @@ function bindDashboardSynthesisFilters() {
 
   const directionSelect = form.querySelector('[data-synthesis-direction-select]');
   const serviceSelect = form.querySelector('[data-synthesis-service-select]');
+  const rmoSelect = form.querySelector('[data-synthesis-rmo-select]');
   const servicesUrlTemplate = form.dataset.servicesUrlTemplate || '';
+  const usersUrl = form.dataset.usersUrl || '';
 
   if (!(directionSelect instanceof HTMLSelectElement) || !(serviceSelect instanceof HTMLSelectElement) || !servicesUrlTemplate) {
     return;
@@ -192,11 +194,70 @@ function bindDashboardSynthesisFilters() {
     serviceSelect.value = 'all';
   };
 
+  const resetRmoSelect = () => {
+    if (!(rmoSelect instanceof HTMLSelectElement)) {
+      return;
+    }
+    rmoSelect.innerHTML = '';
+    const option = document.createElement('option');
+    option.value = 'all';
+    option.textContent = 'Tous les RMO';
+    rmoSelect.appendChild(option);
+    rmoSelect.value = 'all';
+  };
+
+  // Cascade RMO : la liste des responsables depend de la direction (et du service
+  // si precise). Rechargee a chaque changement de direction/service.
+  const populateRmo = async (preselectId = 'all') => {
+    if (!(rmoSelect instanceof HTMLSelectElement) || !usersUrl) {
+      return;
+    }
+
+    resetRmoSelect();
+
+    if (!directionSelect.value || directionSelect.value === 'all') {
+      rmoSelect.disabled = true;
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('direction_id', directionSelect.value);
+    if (serviceSelect.value && serviceSelect.value !== 'all') {
+      params.set('service_id', serviceSelect.value);
+    }
+
+    rmoSelect.disabled = true;
+    try {
+      const response = await fetch(`${usersUrl}?${params.toString()}`, {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (!response.ok) {
+        return;
+      }
+      const users = await response.json();
+      users.forEach((entry) => {
+        const option = document.createElement('option');
+        option.value = String(entry.id || '');
+        option.textContent = entry.name || `RMO #${entry.id}`;
+        rmoSelect.appendChild(option);
+      });
+      if (preselectId && preselectId !== 'all') {
+        rmoSelect.value = String(preselectId);
+      }
+    } finally {
+      rmoSelect.disabled = false;
+    }
+  };
+
   directionSelect.addEventListener('change', async () => {
     resetServiceSelect();
+    resetRmoSelect();
 
     if (!directionSelect.value || directionSelect.value === 'all') {
       serviceSelect.disabled = true;
+      if (rmoSelect instanceof HTMLSelectElement) {
+        rmoSelect.disabled = true;
+      }
       return;
     }
 
@@ -209,23 +270,34 @@ function bindDashboardSynthesisFilters() {
         },
       });
 
-      if (!response.ok) {
-        return;
+      if (response.ok) {
+        const services = await response.json();
+        services.forEach((service) => {
+          const option = document.createElement('option');
+          option.value = String(service.id || '');
+          const code = service.code ? `${service.code} - ` : '';
+          option.textContent = `${code}${service.libelle || 'Service'}`;
+          serviceSelect.appendChild(option);
+        });
       }
-
-      const services = await response.json();
-      services.forEach((service) => {
-        const option = document.createElement('option');
-        option.value = String(service.id || '');
-        const code = service.code ? `${service.code} - ` : '';
-        option.textContent = `${code}${service.libelle || 'Service'}`;
-        serviceSelect.appendChild(option);
-      });
-      serviceSelect.disabled = false;
     } catch (error) {
+      // Ignore : le service reste sur "Tous services".
+    } finally {
       serviceSelect.disabled = false;
     }
+
+    populateRmo('all');
   });
+
+  serviceSelect.addEventListener('change', () => {
+    populateRmo('all');
+  });
+
+  // Pre-population initiale : si une direction est deja choisie au chargement,
+  // on recharge la liste des RMO et on restaure la valeur selectionnee.
+  if (rmoSelect instanceof HTMLSelectElement && directionSelect.value && directionSelect.value !== 'all') {
+    populateRmo(rmoSelect.value);
+  }
 }
 
 function bindDashboardPageInteractions() {
@@ -2722,7 +2794,7 @@ function bootDashboardRender(force = false) {
     const urls = Array.isArray(chart?.urls) ? chart.urls : [];
 
     return labels.slice(0, limit).map((label, index) => ({
-      label: String(label || 'Non renseigne'),
+      label: String(label || 'Non renseigné'),
       value: boundedPercent(values[index] ?? 0),
       meta: meta[index] || '',
       url: urls[index] || '',

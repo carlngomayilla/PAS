@@ -142,7 +142,7 @@ class PaoHierarchyService
                     'target' => $strategicObjective?->valeur_cible,
                     'axis' => [
                         'code' => (string) ($strategicObjective?->pasAxe?->code ?: '-'),
-                        'label' => (string) ($strategicObjective?->pasAxe?->libelle ?: 'Axe non renseigne'),
+                        'label' => (string) ($strategicObjective?->pasAxe?->libelle ?: 'Axe non renseigné'),
                     ],
                     'operational_objectives' => $objectives
                         ->map(fn (ObjectifOperationnel $objective): array => $this->operationalObjectiveNode($objective))
@@ -166,7 +166,7 @@ class PaoHierarchyService
                 'target' => $pao->pasObjectif->valeur_cible,
                 'axis' => [
                     'code' => (string) ($pao->pasObjectif->pasAxe?->code ?: '-'),
-                    'label' => (string) ($pao->pasObjectif->pasAxe?->libelle ?: 'Axe non renseigne'),
+                    'label' => (string) ($pao->pasObjectif->pasAxe?->libelle ?: 'Axe non renseigné'),
                 ],
                 'operational_objectives' => [],
                 'operational_objectives_count' => 0,

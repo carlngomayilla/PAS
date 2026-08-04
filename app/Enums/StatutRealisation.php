@@ -42,7 +42,7 @@ enum StatutRealisation: string
             self::EnCours => 'En cours',
             self::PartiellementRealisee => 'Partiellement realisee',
             self::Realisee => 'Realisee',
-            self::Cloturee => 'Cloturee',
+            self::Cloturee => 'Clôturée',
         };
     }
 

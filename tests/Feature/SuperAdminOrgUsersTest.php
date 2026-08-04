@@ -171,6 +171,7 @@ class SuperAdminOrgUsersTest extends TestCase
                 'direction_id' => $direction->id,
                 'service_id' => $service->id,
                 'is_active' => '1',
+                'agent_matricule' => 'CPL-100',
                 'password' => 'Password-Test@123',
                 'password_confirmation' => 'Password-Test@123',
             ])

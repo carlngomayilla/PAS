@@ -10,6 +10,231 @@
     --ui-focus: rgb(57 150 211 / 18%);
 }
 
+/* ==========================================================================
+   Correctifs de lisibilité prioritaires
+   Ce fichier est charge APRES app.css/anbg-glass.css et n'est pas dans une
+   @layer : ses regles l'emportent donc sur les couches du theme historique.
+   ========================================================================== */
+
+/* 1. Aucun bouton/lien d'un tableau ne doit se casser lettre par lettre
+      (« Ex/pl/or/er », « Dét/ails », « Mod/ifi/er »). */
+:where(.app-table, .data-table, .dashboard-table) td :where(.btn, .btn-sm, a, button, summary),
+:where(.app-table, .data-table, .dashboard-table) th :where(.btn, .btn-sm, button) {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+}
+
+/* La colonne d'actions garde ses boutons sur une ligne. */
+:where(.app-table, .data-table) td:last-child,
+:where(.app-table, .data-table) th:last-child {
+    white-space: nowrap;
+}
+
+/* 2. Le texte des cellules se coupe aux mots, jamais au milieu d'un mot. */
+:where(.app-table, .data-table, .dashboard-table) :where(td, th) {
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: none;
+}
+
+/* 3. Barre de filtres : le titre et le formulaire occupent toute la largeur,
+      sinon la grille de champs s'effondre en une seule colonne etroite. */
+:where(.filter-bar, .filters-bar, .showcase-toolbar) > form,
+:where(.filter-bar, .filters-bar, .showcase-toolbar) > div:has(.showcase-panel-title),
+:where(.filter-bar, .filters-bar, .showcase-toolbar) > div:has(> h1, > h2, > h3) {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+:where(.filter-bar, .filters-bar, .showcase-toolbar):has(> form) {
+    align-items: stretch !important;
+}
+
+/* 4. Bouton « afficher le mot de passe » ancre A L'INTERIEUR de son champ. */
+:has(> .auth-password-toggle) {
+    position: relative;
+}
+
+/* Selecteur volontairement tres specifique : le theme force
+   `position: relative !important` sur tous les boutons, ce qui sortait ce
+   bouton de son champ. */
+body .auth-password-toggle,
+body.admin-theme-scope .auth-password-toggle,
+body.admin-theme-scope.anbg-glass-theme .auth-password-toggle,
+button.auth-password-toggle {
+    position: absolute !important;
+    right: 0.6rem !important;
+    top: 50% !important;
+    bottom: auto !important;
+    left: auto !important;
+    transform: translateY(-50%) !important;
+    margin: 0 !important;
+}
+
+/* Regles placees dans @layer components : pour les declarations !important,
+   une couche l'emporte sur les styles hors couche. Sans cela, les regles
+   ci-dessous seraient ignorees face au theme historique. */
+@layer components {
+    /* ==========================================================================
+       Profondeur de cartes limitee a 2 niveaux
+       L'application empilait jusqu'a 5 conteneurs (panneau > coquille > section >
+       bloc > accordeon), chacun avec bordure, fond, ombre et marge interieure :
+       beaucoup d'espace perdu et une lecture confuse. A partir du 3e niveau, on
+       retire le "chrome" de carte et on ne garde que le contenu.
+       NB : on utilise :is() (et non :where()) pour conserver une specificite
+       superieure a celle du theme historique, sinon la regle est ignoree.
+       ========================================================================== */
+    body.admin-theme-scope :is(.showcase-panel, .app-card, .ui-card, .glass-card, .form-shell, .form-section, .form-step-accordion, .pta-action-block, .workspace-card, .eas-section-card, .dashboard-card, .action-detail-card, .data-table-shell)
+      :is(.showcase-panel, .app-card, .ui-card, .glass-card, .form-shell, .form-section, .form-step-accordion, .pta-action-block, .workspace-card, .eas-section-card, .dashboard-card, .action-detail-card, .data-table-shell)
+      :is(.showcase-panel, .app-card, .ui-card, .glass-card, .form-shell, .form-section, .form-step-accordion, .pta-action-block, .workspace-card, .eas-section-card, .dashboard-card, .action-detail-card, .data-table-shell) {
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    /* Niveau 2 : marge interieure allegee pour elargir la zone utile. */
+    body.admin-theme-scope :is(.showcase-panel, .app-card, .ui-card, .glass-card, .form-shell, .form-section, .form-step-accordion, .pta-action-block, .workspace-card, .eas-section-card, .dashboard-card, .action-detail-card, .data-table-shell)
+      :is(.showcase-panel, .app-card, .ui-card, .glass-card, .form-shell, .form-section, .form-step-accordion, .pta-action-block, .workspace-card, .eas-section-card, .dashboard-card, .action-detail-card, .data-table-shell) {
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+    }
+
+    /* Les blocs de formulaire occupent toute la largeur disponible. */
+    body.admin-theme-scope :is(.form-shell, .form-section, .form-step-accordion, .pta-action-block) {
+        width: 100%;
+        max-width: none !important;
+    }
+}
+
+@layer components {
+    /* Les SECTIONS restent identifiables meme au-dela du 2e niveau : filet
+       colore a gauche et fond tres clair, sans cadre complet ni ombre. On
+       retrouve la lecture par section sans reempiler des cartes. */
+    body.admin-theme-scope :is(.showcase-panel, .app-card, .ui-card, .glass-card, .form-shell, .form-section, .form-step-accordion, .pta-action-block, .workspace-card, .eas-section-card, .dashboard-card, .action-detail-card, .data-table-shell)
+      :is(.showcase-panel, .app-card, .ui-card, .glass-card, .form-shell, .form-section, .form-step-accordion, .pta-action-block, .workspace-card, .eas-section-card, .dashboard-card, .action-detail-card, .data-table-shell)
+      :is(.form-section, .form-step-accordion, .pta-action-block) {
+        padding: 0.85rem 0.95rem !important;
+        border-left: 3px solid color-mix(in srgb, var(--ui-institutional) 55%, transparent) !important;
+        border-radius: 0.5rem !important;
+        background: var(--ui-surface-subtle) !important;
+    }
+
+    /* Titre de section et resume d'accordeon : hierarchie visible. */
+    body.admin-theme-scope :is(.form-section, .form-step-accordion) > :is(summary, .form-section-title, h3, h4) {
+        margin-bottom: 0.5rem;
+        color: var(--ui-institutional);
+        font-weight: 800;
+    }
+}
+
+@layer components {
+    /* Boutons de tri injectes dans les en-tetes de tableau : ce sont des
+       libelles cliquables, pas des boutons. Le theme les stylisait comme des
+       boutons pleins, ce qui produisait des pastilles blanches dans l'entete. */
+    body.admin-theme-scope :is(.app-table, .data-table, .dashboard-table) th .data-table-sort-button {
+        display: inline-flex !important;
+        width: auto !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        margin: 0 0 0 0.25rem !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        color: inherit !important;
+        font: inherit !important;
+        text-transform: inherit !important;
+        letter-spacing: inherit !important;
+        vertical-align: baseline !important;
+    }
+}
+
+@layer components {
+    /* Aucun mot ne doit etre coupe au milieu dans un tableau : les colonnes
+       s'elargissent et le conteneur defile horizontalement si necessaire. */
+    body.admin-theme-scope :is(.app-table, .data-table, .dashboard-table) :is(td, th) {
+        overflow-wrap: normal !important;
+        word-break: keep-all !important;
+        hyphens: none !important;
+    }
+
+    /* Le tableau de suivi PTA est en table-layout:fixed : on garde
+       `break-word` (coupure seulement si un mot ne tient pas du tout) pour
+       eviter qu'un libelle deborde sur la colonne voisine. */
+    body.admin-theme-scope .pta-suivi-table :is(td, th) {
+        overflow-wrap: break-word !important;
+        word-break: normal !important;
+        hyphens: none !important;
+    }
+
+    /* Les en-tetes restent sur une seule ligne, sans bande vide sous le
+       libelle. */
+    body.admin-theme-scope :is(.app-table, .data-table, .dashboard-table) thead th {
+        white-space: nowrap !important;
+    }
+}
+
+@layer components {
+    /* Menus contextuels (« Réinit. MDP », « Supprimer »…) ouverts depuis une
+       cellule de tableau : le conteneur a defilement horizontal les rognait,
+       le panneau apparaissait coupe hors de l'ecran. Quand un menu est ouvert,
+       le conteneur laisse deborder son contenu. */
+    :is(.app-table-wrapper, .data-table-shell, .table-wrap):has(details[open]) {
+        overflow: visible !important;
+    }
+
+    /* Le panneau ne depasse jamais la largeur de l'ecran. */
+    :is(.app-table, .data-table) td details[open] > :is(form, div) {
+        max-width: min(22rem, calc(100vw - 2rem));
+        white-space: normal;
+    }
+}
+
+/* Barre d'enregistrement collante des formulaires longs (PTA) -------------- */
+.form-actions-sticky {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--ui-border);
+    border-radius: 0 0 0.75rem 0.75rem;
+    background: rgb(255 255 255 / 96%);
+    box-shadow: 0 -6px 18px rgb(15 23 42 / 8%);
+    backdrop-filter: blur(4px);
+}
+
+.form-actions-sticky .form-actions-state {
+    margin-right: auto;
+    color: #92400e;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+html.dark .form-actions-sticky {
+    border-top-color: rgb(148 163 184 / 30%);
+    background: rgb(15 23 42 / 94%);
+}
+
+html.dark .form-actions-sticky .form-actions-state {
+    color: #fbbf24;
+}
+
 /* Global blocking loader -------------------------------------------------- */
 .global-loader-overlay {
     position: fixed;
@@ -18,11 +243,11 @@
     display: grid;
     place-items: center;
     padding: 1.5rem;
-    background: rgb(248 250 252 / 78%);
+    background: rgb(248 250 252 / 58%);
     opacity: 0;
     visibility: hidden;
     pointer-events: auto;
-    backdrop-filter: blur(6px);
+    backdrop-filter: blur(2px);
     transition: opacity 160ms ease, visibility 160ms ease;
 }
 
@@ -78,7 +303,7 @@ a[aria-busy="true"] {
 }
 
 html.dark .global-loader-overlay {
-    background: rgb(8 19 31 / 82%);
+    background: rgb(8 19 31 / 62%);
 }
 
 html.dark .global-loader-status {
@@ -532,28 +757,23 @@ table.is-resizing-columns * {
     opacity: 0.45;
 }
 
-th[data-enhanced-sort] button,
+/* Le bouton de tri est ajoute APRES le libelle de la colonne et ne contient
+   que la fleche : il doit rester une petite icone en ligne. Avec une largeur
+   de 100 % il passait a la ligne et laissait une bande vide dans l'en-tete. */
 th.data-table-sortable .data-table-sort-button {
     display: inline-flex;
-    width: 100%;
+    width: auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    justify-content: center;
+    gap: 0.25rem;
+    vertical-align: baseline;
     color: inherit;
     font: inherit;
     text-align: inherit;
 }
 
-th[data-enhanced-sort] button::after {
-    content: '↕';
-    opacity: 0.7;
-}
-
-th[data-enhanced-sort][aria-sort="ascending"] button::after { content: '↑'; }
-th[data-enhanced-sort][aria-sort="descending"] button::after { content: '↓'; }
-
 .data-table-sort-indicator {
-    margin-left: auto;
+    margin-left: 0;
     opacity: 0.72;
 }
 

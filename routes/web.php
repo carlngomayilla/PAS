@@ -199,6 +199,8 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.referentiel.utilisateurs.index');
         Route::get('/workspace/referentiel/utilisateurs/export.csv', [ReferentielWebController::class, 'utilisateursExport'])
             ->name('workspace.referentiel.utilisateurs.export.csv');
+        Route::get('/workspace/referentiel/utilisateurs/export.word', [ReferentielWebController::class, 'utilisateursExportWord'])
+            ->name('workspace.referentiel.utilisateurs.export.word');
         Route::get('/workspace/referentiel/utilisateurs/create', [ReferentielWebController::class, 'utilisateursCreate'])
             ->name('workspace.referentiel.utilisateurs.create');
         Route::post('/workspace/referentiel/utilisateurs', [ReferentielWebController::class, 'utilisateursStore'])
@@ -211,6 +213,10 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
             ->name('workspace.referentiel.utilisateurs.deletion-requests.store');
         Route::delete('/workspace/referentiel/utilisateurs/{utilisateur}', [ReferentielWebController::class, 'utilisateursDestroy'])
             ->name('workspace.referentiel.utilisateurs.destroy');
+        Route::post('/workspace/referentiel/utilisateurs/reinitialiser-mots-de-passe', [ReferentielWebController::class, 'utilisateursBulkResetPassword'])
+            ->name('workspace.referentiel.utilisateurs.bulk-reset-password');
+        Route::post('/workspace/referentiel/utilisateurs/{utilisateur}/reinitialiser-mot-de-passe', [ReferentielWebController::class, 'utilisateurResetPassword'])
+            ->name('workspace.referentiel.utilisateurs.reset-password');
 
         // ── GOUVERNANCE (Documentation API, Rétention, Délégations) ──────────────
         // Analyse canonique du modele PAS (kit IDE/dark, vue statique).
@@ -438,6 +444,9 @@ Route::middleware(['auth', EnsureActiveAccount::class])->group(function (): void
                 ->name('actions.review');
             Route::post('actions/{action}/controle', [ActionTrackingWebController::class, 'reviewControl'])
                 ->name('actions.control.review');
+            // 3e visa : validation finale (cloture) par la planification.
+            Route::post('actions/{action}/validation-planification', [ActionTrackingWebController::class, 'reviewByPlanification'])
+                ->name('actions.planification.review');
             Route::post('actions/{action}/financement/soumettre', [ActionTrackingWebController::class, 'submitFinancing'])
                 ->name('actions.financement.submit');
             Route::post('actions/{action}/financement/daf', [ActionTrackingWebController::class, 'reviewFinancingByDaf'])

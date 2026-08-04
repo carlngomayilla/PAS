@@ -67,7 +67,7 @@
                     </dl>
                 </div>
                 <label class="charts-requested-select-wrap">
-                    <span class="sr-only">Periode du graphique</span>
+                    <span class="sr-only">Période du graphique</span>
                     <select class="charts-requested-select" data-requested-area-range>
                         <option value="3">3 derniers mois</option>
                         <option value="6">6 derniers mois</option>

@@ -9,7 +9,10 @@ return [
         'require_mixed_case' => (bool) env('SECURITY_PASSWORD_REQUIRE_MIXED_CASE', false),
         'require_numbers' => (bool) env('SECURITY_PASSWORD_REQUIRE_NUMBERS', true),
         'require_symbols' => (bool) env('SECURITY_PASSWORD_REQUIRE_SYMBOLS', false),
-        'check_pwned' => (bool) env('SECURITY_PASSWORD_CHECK_PWNED', true),
+        // Niveau « moyen » demande : 8 caracteres, lettres + chiffres, sans symboles
+        // ni casse mixte, et sans blocage « mot de passe compromis » par defaut
+        // (reactivable via SECURITY_PASSWORD_CHECK_PWNED=true).
+        'check_pwned' => (bool) env('SECURITY_PASSWORD_CHECK_PWNED', false),
     ],
 
     'uploads' => [

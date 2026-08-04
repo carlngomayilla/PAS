@@ -116,7 +116,7 @@
             <span class="text-sm font-medium text-slate-500">{{ $rows->count() }} ligne(s)</span>
         </div>
         <div class="app-table-wrapper overflow-x-auto">
-            <table class="app-table data-table">
+            <table class="app-table data-table min-w-[1200px]">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -190,7 +190,7 @@
                                 </div>
                             </td>
                             <td class="text-center">{{ $row->annee }}</td>
-                            <td class="whitespace-nowrap text-xs text-slate-700">{{ $row->echeance ?? '-' }}</td>
+                            <td class="whitespace-nowrap text-xs text-slate-700">{{ optional($row->echeance)->format('d/m/Y') ?? '-' }}</td>
                             <td>
                                 <span class="{{ $statusClasses }}">
                                     {{ $workflowStatusLabel($row->statut) }}

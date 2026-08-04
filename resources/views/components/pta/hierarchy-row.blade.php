@@ -10,7 +10,7 @@
 
 @php
     $level = (string) $level;
-    $rateLabel = $rate === null ? 'A parametrer' : number_format((float) $rate, 2, '.', ' ').'%';
+    $rateLabel = $rate === null ? 'À paramétrer' : \App\Support\UiLabel::percent((float) $rate, '.');
     $classes = [
         'axis' => 'pta-level-axis',
         'strategic-objective' => 'pta-level-strategic-objective',

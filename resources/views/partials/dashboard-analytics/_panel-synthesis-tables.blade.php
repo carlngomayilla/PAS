@@ -1,7 +1,7 @@
 @if (($directionSynthesisTables ?? []) !== [])
     <section class="mb-3">
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 class="showcase-panel-title">Tableaux de synthese</h2>
+            <h2 class="showcase-panel-title">Tableaux de synthèse</h2>
             <span class="showcase-chip">Vue detaillee</span>
         </div>
         <div class="space-y-2">
@@ -30,12 +30,12 @@
                     </summary>
                     <div class="app-table-wrapper overflow-x-auto">
                         <table id="{{ $synthesisTableId }}" class="app-table data-table dashboard-synthesis-table">
-                            <thead class="sticky top-0 z-10 bg-white">
+                            <thead>
                                 <tr>
                                     @foreach ($synthesisTable['headers'] as $header)
                                         <th>{{ $header }}</th>
                                     @endforeach
-                                    <th class="dashboard-no-export">Detail</th>
+                                    <th class="dashboard-no-export">Détail</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -91,8 +91,8 @@
         <aside class="h-full w-full max-w-[42rem] overflow-hidden bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="dashboard-row-detail-title">
             <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3996d3]">Detail de ligne</p>
-                    <h3 id="dashboard-row-detail-title" class="mt-1 text-lg font-black text-[#17324a]">Detail</h3>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3996d3]">Détail de ligne</p>
+                    <h3 id="dashboard-row-detail-title" class="mt-1 text-lg font-black text-[#17324a]">Détail</h3>
                 </div>
                 <button type="button" class="btn btn-primary btn-sm rounded-xl" data-dashboard-row-detail-close>Fermer</button>
             </div>

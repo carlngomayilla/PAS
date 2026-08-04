@@ -25,7 +25,7 @@
                 <p class="font-semibold text-[#17324a]">{{ $user->name }}</p>
                 <p class="text-sm text-[#667085]">{{ $user->email }}</p>
                 <p class="text-sm text-[#667085]">
-                    Profil : <strong>{{ $profil['role_label'] }}</strong> ({{ $profil['role'] }})
+                    Profil : <strong>{{ $profil['role_label'] }}</strong>
                 </p>
                 <p class="text-sm text-[#667085]">
                     Portée : <strong>{{ $profil['scope'] }}</strong>

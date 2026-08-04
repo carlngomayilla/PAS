@@ -118,7 +118,7 @@
                                     @if ($attachment['is_previewable'])
                                         <a class="btn btn-secondary btn-sm rounded-lg px-3 py-1 text-xs" href="{{ $attachment['preview_url'] }}" target="_blank" rel="noopener">Voir</a>
                                     @endif
-                                    <a class="btn btn-primary btn-sm rounded-lg px-3 py-1 text-xs" href="{{ $attachment['download_url'] }}">Telecharger</a>
+                                    <a class="btn btn-primary btn-sm rounded-lg px-3 py-1 text-xs" href="{{ $attachment['download_url'] }}">Télécharger</a>
                                 </div>
                             </td>
                         </tr>

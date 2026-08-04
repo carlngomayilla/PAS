@@ -22,13 +22,6 @@ function fileKind(mime, title) {
     return 'unknown';
 }
 
-function collectTableRows(table) {
-    return Array.from(table.querySelectorAll('tr')).map(function (row) {
-        return Array.from(row.children).map(function (cell) {
-            return String(cell.textContent || '').replace(/\s+/g, ' ').trim();
-        });
-    });
-}
 
 function rowsToHtmlTable(rows) {
     return [
@@ -52,19 +45,6 @@ function safeFilename(title, fallback) {
         .toLowerCase() || fallback || 'export';
 }
 
-function downloadTableAsExcel(title, rows) {
-    var safeTitle = safeFilename(title, 'tableau');
-    var html = '<!doctype html><html><head><meta charset="utf-8"></head><body>' + rowsToHtmlTable(rows) + '</body></html>';
-    var blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = safeTitle + '.xls';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-}
 
 function canvasToPngDataUrl(canvas) {
     var output = document.createElement('canvas');
@@ -160,8 +140,6 @@ function svgToPngDataUrl(svgElement) {
     var pdfBtn = null;
     var printBtn = null;
     var lastFocus = null;
-    var activeTableRows = [];
-    var activeTableTitle = 'Apercu tableau';
     var activeChartUrl = '';
     var activeChartTitle = 'Graphique';
     var activePreviewCleanup = null;
@@ -245,7 +223,6 @@ function svgToPngDataUrl(svgElement) {
         document.body.classList.remove('preview-modal-open');
         cleanupActivePreview();
         bodyEl.innerHTML = '';
-        activeTableRows = [];
         activeChartUrl = '';
 
         if (lastFocus && typeof lastFocus.focus === 'function') {
@@ -326,19 +303,6 @@ function svgToPngDataUrl(svgElement) {
         return '';
     }
 
-    function openTablePreview(table) {
-        activeTableRows = collectTableRows(table);
-        activeTableTitle = table.dataset.previewTitle || nearestTitle(table);
-
-        openBase({
-            eyebrow: 'Tableau',
-            title: activeTableTitle,
-            subtitle: nearestSubtitle(table) || 'Apercu grand format du tableau affiche',
-            body: rowsToHtmlTable(activeTableRows),
-        });
-
-        excelBtn.classList.remove('hidden');
-    }
 
     function resolveChartNode(source) {
         if (!source) return null;
@@ -628,11 +592,6 @@ function svgToPngDataUrl(svgElement) {
         return prefix + '-' + previewId;
     }
 
-    function findTableByPreviewId(id) {
-        return Array.from(document.querySelectorAll('table.app-table')).find(function (table) {
-            return table.dataset.previewTableId === id;
-        });
-    }
 
     function findChartByPreviewId(id) {
         return Array.from(document.querySelectorAll('.dashboard-chart-host, .dashboard-canvas, .dashboard-gauge-card')).find(function (node) {
@@ -640,44 +599,7 @@ function svgToPngDataUrl(svgElement) {
         });
     }
 
-    function tableSupportsPreview(table) {
-        if (!table) return false;
-        if (table.closest('#preview-modal')) return false;
-        if (table.closest('[data-preview-disabled="1"]')) return false;
-        if (table.querySelector('button, a, input, select, textarea, summary, details, form, [role="button"], [data-action], [data-preview-ignore="1"]')) {
-            return false;
-        }
 
-        return true;
-    }
-
-    function injectTablePreviewButtons() {
-        document.querySelectorAll('table.app-table').forEach(function (table) {
-            table.classList.remove('preview-table-clickable');
-            if (table.getAttribute('title') === 'Agrandir le tableau') {
-                table.removeAttribute('title');
-            }
-
-            if (!tableSupportsPreview(table)) return;
-            if (table.dataset.previewReady === '1') return;
-            table.dataset.previewReady = '1';
-            table.dataset.previewTableId = table.dataset.previewTableId || nextPreviewId('preview-table');
-
-            var wrapper = table.closest('.app-table-wrapper') || table.parentElement;
-            if (!wrapper || wrapper.querySelector('[data-preview-table-trigger]')) return;
-
-            var toolbar = document.createElement('div');
-            toolbar.className = 'preview-table-toolbar';
-            var button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'btn btn-secondary btn-sm';
-            button.dataset.previewTableTrigger = '1';
-            button.dataset.previewTableId = table.dataset.previewTableId;
-            button.textContent = 'Apercu';
-            toolbar.appendChild(button);
-            wrapper.parentNode.insertBefore(toolbar, wrapper);
-        });
-    }
 
     function injectChartPreviewButtons() {
         document.querySelectorAll('.dashboard-chart-host, .dashboard-canvas, .dashboard-gauge-card').forEach(function (node) {
@@ -705,7 +627,8 @@ function svgToPngDataUrl(svgElement) {
     }
 
     function refreshPreviewTargets() {
-        injectTablePreviewButtons();
+        // Apercu de tableau retire : il interceptait les clics des boutons
+        // d'action (supprimer, modifier...) et n'apportait pas de valeur.
         injectChartPreviewButtons();
     }
 
@@ -778,15 +701,7 @@ function svgToPngDataUrl(svgElement) {
             return;
         }
 
-        var tableTrigger = event.target.closest('[data-preview-table-trigger]');
-        if (tableTrigger) {
-            event.preventDefault();
-            var table = tableTrigger.dataset.previewTableId
-                ? findTableByPreviewId(tableTrigger.dataset.previewTableId)
-                : null;
-            if (table) openTablePreview(table);
-            return;
-        }
+        // Apercu de tableau desactive (voir refreshPreviewTargets).
 
         var chartTrigger = event.target.closest('[data-preview-chart-trigger]');
         if (chartTrigger) {
@@ -821,9 +736,7 @@ function svgToPngDataUrl(svgElement) {
         if (!ensureElements()) return;
 
         excelBtn.addEventListener('click', function () {
-            if (activeTableRows.length > 0) {
-                downloadTableAsExcel(activeTableTitle, activeTableRows);
-            }
+            // Export tableau retire avec l'apercu de tableau.
         });
         pdfBtn.addEventListener('click', printPreview);
         printBtn.addEventListener('click', printPreview);
@@ -849,10 +762,8 @@ function svgToPngDataUrl(svgElement) {
 
     window.PasPreviewModal = {
         close: closeModal,
-        openTable: openTablePreview,
         openChart: openChartPreview,
         refresh: refreshPreviewTargets,
-        refreshTables: injectTablePreviewButtons,
         refreshCharts: injectChartPreviewButtons,
     };
 })();

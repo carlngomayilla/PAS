@@ -20,8 +20,11 @@ class UserFactory extends Factory
     public function configure(): static
     {
         return $this->afterMaking(function (User $user): void {
-            if ($user->role === User::ROLE_AGENT && $user->agent_matricule === null) {
-                $user->agent_matricule = 'AGT-'.Str::upper(Str::random(12));
+            // Matricule obligatoire pour tous les profils : on en attribue un a
+            // chaque utilisateur cree via factory qui n'en a pas.
+            if ($user->agent_matricule === null) {
+                $prefix = $user->role === User::ROLE_AGENT ? 'AGT-' : 'MAT-';
+                $user->agent_matricule = $prefix.Str::upper(Str::random(12));
             }
         });
     }

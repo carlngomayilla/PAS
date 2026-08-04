@@ -18,7 +18,7 @@
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="showcase-panel-title">IA & Imports PTA</h1>
-                <p class="text-sm text-slate-500">Extraction, controle humain et import final des fichiers PTA.</p>
+                <p class="text-sm text-slate-500">Extraction, contrôle humain et import final des fichiers PTA.</p>
             </div>
             <a class="btn btn-outline" href="{{ route('workspace.ai-imports.history') }}">Historique</a>
         </div>

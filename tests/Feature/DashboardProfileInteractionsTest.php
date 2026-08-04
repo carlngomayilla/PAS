@@ -24,7 +24,7 @@ class DashboardProfileInteractionsTest extends TestCase
         $response->assertDontSee('Interactions disponibles pour ce profil');
         $response->assertSee('Synth');
         $response->assertSee('Graphiques');
-        $response->assertSee('Vue detaillee');
+        $response->assertSee('Vue détaillée');
         $response->assertSee('Pilotage du service');
         $response->assertSee('Flux à traiter');
         $response->assertSee("Reports d'échéance");

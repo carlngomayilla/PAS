@@ -146,25 +146,6 @@ function createZoomableBadge(target) {
   target.appendChild(badge);
 }
 
-function isWorkspaceTable(table) {
-  if (!table || table.closest('#analytics-explorer')) {
-    return false;
-  }
-
-  if (table.matches('.dashboard-table')) {
-    return true;
-  }
-
-  if (!table.closest('main')) {
-    return false;
-  }
-
-  if (table.closest('form') && !table.closest('.table-wrap, .overflow-auto, .overflow-x-auto, .overflow-y-auto, .showcase-panel')) {
-    return false;
-  }
-
-  return true;
-}
 
 function decorateTarget(target) {
   if (!target || target.dataset.analyticsZoomBound === '1') {
@@ -201,13 +182,9 @@ function initAnalyticsExplorer() {
       decorateTarget(node);
     });
 
-    document.querySelectorAll('table').forEach((node) => {
-      if (!isWorkspaceTable(node)) {
-        return;
-      }
-
-      decorateTarget(node);
-    });
+    // Agrandissement des TABLEAUX retire : il rendait chaque tableau cliquable,
+    // interceptait les clics des boutons d'action et ouvrait un panneau
+    // superflu. Seuls les graphiques restent agrandissables.
   };
 
   const close = () => {

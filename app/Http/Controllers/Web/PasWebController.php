@@ -501,7 +501,7 @@ class PasWebController extends Controller
 
                 $label = match ($log->action) {
                     'create' => 'Creation',
-                    'close' => 'Cloture',
+                    'close' => 'Clôture',
                     'archive' => 'Archivage',
                     'update' => 'Changement statut',
                     default => ucfirst((string) $log->action),

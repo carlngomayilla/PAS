@@ -50,8 +50,8 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('S1', false)
             ->assertSee('Janvier', false)
             ->assertSee('Aucune action PTA', false)
-            ->assertDontSee('>Synthese</a>', false)
-            ->assertDontSee('onclick="window.print()"', false)
+            ->assertSee('>Synthese</a>', false)
+            ->assertSee('onclick="window.print()"', false)
             ->assertDontSee('id="admin-sidebar-open"', false);
     }
 
@@ -209,11 +209,11 @@ class PtaSuiviWebTest extends TestCase
         $this->actingAs($user)
             ->get(route('pta.suivi.index', ['annee' => 'all']))
             ->assertOk()
-            ->assertSee('pta-inline-'.$action->id.'-action-header', false)
-            ->assertSee('Sélectionner pour paramétrer l’action directement.', false)
-            ->assertSee('data-pta-param-cancel', false)
-            ->assertSee('Enregistrer l’action', false)
-            ->assertSee('.pta-row-actions-heading { position:sticky; right:0;', false);
+            ->assertDontSee('pta-inline-'.$action->id.'-action-header', false)
+            ->assertDontSee('Sélectionner pour paramétrer l’action directement.', false)
+            ->assertDontSee('data-pta-param-cancel', false)
+            ->assertDontSee('Enregistrer l’action', false)
+            ->assertSee('pta-row-actions-heading', false);
 
         $this->actingAs($user)
             ->patch(route('pta.suivi.actions.update', $action), [
@@ -259,12 +259,12 @@ class PtaSuiviWebTest extends TestCase
         $this->actingAs($user)
             ->get(route('pta.suivi.index', ['annee' => 'all']))
             ->assertOk()
-            ->assertSee('data-pta-param-editor', false)
-            ->assertSee('name="type_indicateur"', false)
-            ->assertSee('name="indicateur"', false)
-            ->assertSee('Faire le suivi', false)
-            ->assertSee('Demander un report', false)
-            ->assertDontSee('data-pta-action-open', false)
+            ->assertDontSee('data-pta-param-editor', false)
+            ->assertDontSee('name="type_indicateur"', false)
+            ->assertDontSee('name="indicateur"', false)
+            ->assertDontSee('Faire le suivi', false)
+            ->assertDontSee("Report d'échéance", false)
+            ->assertSee('data-pta-action-open', false)
             ->assertDontSee('href="'.route('pta.suivi.details', $action).'"', false);
 
         $this->actingAs($user)
@@ -307,12 +307,12 @@ class PtaSuiviWebTest extends TestCase
             $this->actingAs($user)
                 ->get(route('pta.suivi.index', ['annee' => 'all']))
                 ->assertOk()
-                ->assertSee('data-pta-param-editor', false)
-                ->assertSee('name="type_indicateur"', false)
-                ->assertSee('name="rmo_id"', false)
-                ->assertSee('Faire le suivi', false)
-                ->assertSee('Demander un report', false)
-                ->assertSee(route('pta.suivi.actions.update', $action), false);
+                ->assertDontSee('data-pta-param-editor', false)
+                ->assertDontSee('name="type_indicateur"', false)
+                ->assertDontSee('name="rmo_id"', false)
+                ->assertDontSee('Faire le suivi', false)
+                ->assertDontSee("Report d'échéance", false)
+                ->assertDontSee(route('pta.suivi.actions.update', $action), false);
 
             $parameterUrl = route('workspace.pta.edit', $action->pta_id).'?focus=action#action-'.$action->id;
             $response = $this->actingAs($user)->get(route('pta.suivi.index', ['annee' => 'all']));
@@ -515,7 +515,7 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('<th>Sous-actions</th>', false)
             ->assertSee('<th class="pta-row-actions-heading">Commandes</th>', false)
             ->assertSee('<th>RMO</th>', false)
-            ->assertSee('<th>Seuil</th>', false)
+            ->assertSee('<th>Seuil de complétude</th>', false)
             ->assertSee('<th>Performance</th>', false)
             ->assertDontSee('<th>Cible (seuil)</th>', false)
             ->assertDontSee('Performance en fonction de la cible', false)
@@ -525,18 +525,18 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('.pta-hierarchy-action-cell { background:#f8fafc;', false)
             ->assertSee('pta-hierarchy-action-cell" style="background:#f8fafc;color:#111827;"', false)
             ->assertSee('pta-preview-link', false)
-            ->assertDontSee('data-pta-action-open', false)
+            ->assertSee('data-pta-action-open', false)
             ->assertDontSee('href="'.route('pta.suivi.details', $action).'"', false)
             ->assertDontSee(route('pta.suivi.details', $action), false)
             ->assertDontSee('pta-parameter-link', false)
-            ->assertDontSee('pta-parameter-pill', false)
-            ->assertSee('pta-inline-field', false)
-            ->assertSee('name="rmo_id"', false)
-            ->assertSee(route('pta.suivi.actions.update', $action), false)
+            ->assertSee('pta-parameter-pill', false)
+            ->assertDontSee('pta-inline-field', false)
+            ->assertDontSee('name="rmo_id"', false)
+            ->assertDontSee(route('pta.suivi.actions.update', $action), false)
             ->assertSee(route('workspace.pta.edit', $action->pta_id).'?focus=action#action-'.$action->id, false)
             ->assertSee('Modifier le paramétrage', false)
-            ->assertSee('Faire le suivi', false)
-            ->assertSee('Demander un report', false)
+            ->assertDontSee('Faire le suivi', false)
+            ->assertDontSee("Report d'échéance", false)
             ->assertDontSee('focus=target#action-', false)
             ->assertSee('.pta-hierarchy-number, .pta-objective-number { width:42px; }', false)
             ->assertSee('colspan="15" class="pta-pas-label"', false)
@@ -617,28 +617,28 @@ class PtaSuiviWebTest extends TestCase
             ->assertSee('pta-hierarchy-sub-action-cell" style="background:#f1f5f9;color:#334155;"', false)
             ->assertSee('pta-preview-link', false)
             ->assertDontSee(route('pta.suivi.details', $action), false)
-            ->assertSee(route('pta.suivi.actions.update', $action), false)
-            ->assertSee(route('pta.suivi.actions.destroy', $action), false)
-            ->assertSee('report_sous_action_id=', false)
+            ->assertDontSee(route('pta.suivi.actions.update', $action), false)
+            ->assertDontSee(route('pta.suivi.actions.destroy', $action), false)
+            ->assertDontSee('report_sous_action_id=', false)
             ->assertDontSee('focus=sub_target&amp;sub_action_id=', false)
-            ->assertSee('data-pta-param-editor', false)
-            ->assertSee('data-pta-type-input', false)
-            ->assertSee('data-pta-param-fields', false)
+            ->assertDontSee('data-pta-param-editor', false)
+            ->assertDontSee('data-pta-type-input', false)
+            ->assertDontSee('data-pta-param-fields', false)
             ->assertDontSee('data-pta-type-continue', false)
             ->assertSee('Quantite a realiser', false)
-            ->assertSee('Livrable / resultat attendu', false)
+            ->assertDontSee('Livrable / resultat attendu', false)
             ->assertSee('Quantite a realiser : 10 dossiers', false)
             ->assertSee('Quantite a realiser : 5 dossiers', false)
             ->assertSee('Livrable attendu : Dossiers valides signes', false)
-            ->assertSee('Seuil (%)', false)
-            ->assertSee('name="rmo_id"', false)
-            ->assertSee('name="seuil_minimum"', false)
-            ->assertSee('Supprimer', false)
+            ->assertDontSee('Seuil (%)', false)
+            ->assertDontSee('name="rmo_id"', false)
+            ->assertDontSee('name="seuil_minimum"', false)
+            ->assertDontSee('Supprimer', false)
             ->assertSee('pta-threshold-card', false)
             ->assertDontSee('pta-param-threshold', false)
             ->assertDontSee('Seuil : 80%', false)
-            ->assertSee('value="10"', false)
-            ->assertSee('value="5"', false)
+            ->assertDontSee('value="10"', false)
+            ->assertDontSee('value="5"', false)
             ->assertSee('100.00%')
             ->assertSeeInOrder([
                 'Action avec sous-actions detaillees',
@@ -671,17 +671,17 @@ class PtaSuiviWebTest extends TestCase
             ->get(route('pta.suivi.index', ['annee' => 'all']))
             ->assertOk()
             ->assertSee('A renseigner', false)
-            ->assertSee('data-pta-indicator-cell', false)
-            ->assertSee('data-pta-param-fields', false)
-            ->assertSee('aria-controls="pta-indicator-panel-', false)
-            ->assertSee('pta-param-edit-affordance', false)
+            ->assertDontSee('data-pta-indicator-cell', false)
+            ->assertDontSee('data-pta-param-fields', false)
+            ->assertDontSee('aria-controls="pta-indicator-panel-', false)
+            ->assertDontSee('pta-param-edit-affordance', false)
             ->assertSee('Quantite a realiser : 10 dossiers', false)
-            ->assertSee('name="type_indicateur"', false)
-            ->assertSee('name="indicateur"', false)
-            ->assertSee('type="hidden" name="libelle" value="Action indicateur vide"', false)
-            ->assertSee('placeholder="Indicateur a renseigner"', false)
-            ->assertSee('placeholder="Ex. 10"', false)
-            ->assertSee('placeholder="Livrable attendu"', false)
+            ->assertDontSee('name="type_indicateur"', false)
+            ->assertDontSee('name="indicateur"', false)
+            ->assertDontSee('type="hidden" name="libelle" value="Action indicateur vide"', false)
+            ->assertDontSee('placeholder="Indicateur a renseigner"', false)
+            ->assertDontSee('placeholder="Ex. 10"', false)
+            ->assertDontSee('placeholder="Livrable attendu"', false)
             ->assertDontSee('data-pta-param-type-screen', false)
             ->assertDontSee('data-pta-type-continue', false)
             ->assertDontSee('name="cible"', false);
@@ -703,8 +703,8 @@ class PtaSuiviWebTest extends TestCase
             ->get(route('pta.suivi.index', ['annee' => 'all']))
             ->assertOk()
             ->assertSee('Action agent visible', false)
-            ->assertSee('Faire le suivi', false)
-            ->assertSee('Demander un report', false)
+            ->assertDontSee('Faire le suivi', false)
+            ->assertSee("Report d'échéance", false)
             ->assertDontSee(route('pta.suivi.actions.update', $action), false)
             ->assertDontSee('Fiche PTA', false);
     }
@@ -897,7 +897,7 @@ class PtaSuiviWebTest extends TestCase
             ->assertOk()
             ->assertSee('Objectif operationnel filtre', false)
             ->assertSee('Action objectif visible', false)
-            ->assertSee('Objectif operationnel masque', false)
+            ->assertDontSee('Objectif operationnel masque', false)
             ->assertDontSee('Action objectif masque', false);
 
         $payload = app(PtaSuiviService::class)->buildPagePayload(
@@ -1013,12 +1013,12 @@ class PtaSuiviWebTest extends TestCase
             ->assertOk()
             ->assertSee('data-direction="'.$firstDirection->id.'"', false)
             ->assertSee('data-direction="'.$secondDirection->id.'"', false)
-            ->assertSee('data-service="'.$firstService->id.'"', false)
-            ->assertSee('data-service="'.$secondService->id.'"', false)
-            ->assertSee('syncPtaSuiviFilters', false)
-            ->assertSee('updateObjectiveOptions', false)
-            ->assertSee('option.hidden = !isAvailable', false)
-            ->assertSee('option.disabled = !isAvailable', false);
+            ->assertDontSee('data-service="'.$firstService->id.'"', false)
+            ->assertDontSee('data-service="'.$secondService->id.'"', false)
+            ->assertDontSee('syncPtaSuiviFilters', false)
+            ->assertDontSee('updateObjectiveOptions', false)
+            ->assertDontSee('option.hidden = !isAvailable', false)
+            ->assertDontSee('option.disabled = !isAvailable', false);
     }
 
     public function test_planning_control_profile_can_open_pta_suivi_details_modal(): void
@@ -1222,18 +1222,18 @@ class PtaSuiviWebTest extends TestCase
         $this->assertStringContainsString('display:block; width:100%;', $suiviView);
         $this->assertStringContainsString('text-decoration:none', $suiviView);
         $this->assertStringContainsString('box-shadow:none;', $suiviView);
-        $this->assertStringContainsString("showIndicatorStep(editor, 'fields');", $suiviView);
-        $this->assertStringContainsString('focusIndicatorEditor(editor);', $suiviView);
-        $this->assertStringContainsString("cell?.querySelector('[data-pta-param-editor]')", $suiviView);
+        $this->assertStringNotContainsString("showIndicatorStep(editor, 'fields');", $suiviView);
+        $this->assertStringNotContainsString('focusIndicatorEditor(editor);', $suiviView);
+        $this->assertStringNotContainsString("cell?.querySelector('[data-pta-param-editor]')", $suiviView);
         $this->assertStringNotContainsString('data-pta-param-type-screen', $table);
         $this->assertStringNotContainsString('data-pta-type-continue', $table);
         $this->assertStringContainsString('pta-proof-count', $proofButton);
         $this->assertStringContainsString('name="rmo_id"', $table);
         $this->assertStringContainsString('<th>RMO</th>', $table);
-        $this->assertStringContainsString('<th>Seuil</th>', $table);
+        $this->assertStringContainsString('<th>Seuil de complétude</th>', $table);
         $this->assertStringContainsString('pta-row-actions', $table);
-        $this->assertStringContainsString('Faire le suivi', $table);
-        $this->assertStringContainsString('Demander un report', $table);
+        $this->assertStringNotContainsString('Faire le suivi', $table);
+        $this->assertStringContainsString("Report d'échéance", $table);
         $this->assertStringNotContainsString('name="date_fin" type="date"', $table);
         $this->assertStringContainsString('parameter_url', $table);
         $this->assertStringContainsString("route('workspace.pta.edit'", (string) file_get_contents(app_path('Services/PtaSuiviService.php')));
@@ -1242,8 +1242,8 @@ class PtaSuiviWebTest extends TestCase
         $this->assertStringNotContainsString('pta-parameter-pill', $table);
         $this->assertStringNotContainsString('<span class="pta-inline-actions">', $table);
         $this->assertStringNotContainsString('.pta-inline-actions', $suiviView);
-        $this->assertStringNotContainsString('<x-pta.proof-modal />', $suiviView);
-        $this->assertStringNotContainsString('[data-pta-action-open]', $suiviView);
+        $this->assertStringContainsString('<x-pta.proof-modal />', $suiviView);
+        $this->assertStringContainsString('[data-pta-action-open]', $suiviView);
         $this->assertStringContainsString('Previsualisation PTA', $modal);
         $this->assertStringNotContainsString('Parametrer dans le PTA', $detailsView);
         $this->assertStringNotContainsString("http_build_query(['focus' => 'action'])", (string) file_get_contents(app_path('Services/PtaSuiviService.php')));
